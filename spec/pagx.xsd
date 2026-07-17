@@ -371,6 +371,96 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <!-- Animation loop behavior -->
+  <xs:simpleType name="LoopModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="once"/>
+      <xs:enumeration value="loop"/>
+      <xs:enumeration value="pingPong"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Keyframe interpolation between a key and the next -->
+  <xs:simpleType name="InterpolationType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="linear"/>
+      <xs:enumeration value="bezier"/>
+      <xs:enumeration value="hold"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Value type carried by an animation Channel -->
+  <xs:simpleType name="ChannelValueType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="float"/>
+      <xs:enumeration value="number"/>
+      <xs:enumeration value="bool"/>
+      <xs:enumeration value="int"/>
+      <xs:enumeration value="enum"/>
+      <xs:enumeration value="string"/>
+      <xs:enumeration value="text"/>
+      <xs:enumeration value="image"/>
+      <xs:enumeration value="imageRef"/>
+      <xs:enumeration value="color"/>
+      <xs:enumeration value="matrix"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- StateMachine input kind -->
+  <xs:simpleType name="StateMachineInputType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="bool"/>
+      <xs:enumeration value="number"/>
+      <xs:enumeration value="trigger"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Transition condition comparison operator -->
+  <xs:simpleType name="TransitionConditionOpType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="equal"/>
+      <xs:enumeration value="notEqual"/>
+      <xs:enumeration value="lessThan"/>
+      <xs:enumeration value="lessThanOrEqual"/>
+      <xs:enumeration value="greaterThan"/>
+      <xs:enumeration value="greaterThanOrEqual"/>
+      <xs:enumeration value="trigger"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ViewModel property type (case-insensitive; both forms accepted by importer) -->
+  <xs:simpleType name="ViewModelPropertyType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="number"/>
+      <xs:enumeration value="Number"/>
+      <xs:enumeration value="string"/>
+      <xs:enumeration value="String"/>
+      <xs:enumeration value="boolean"/>
+      <xs:enumeration value="Boolean"/>
+      <xs:enumeration value="color"/>
+      <xs:enumeration value="Color"/>
+      <xs:enumeration value="image"/>
+      <xs:enumeration value="Image"/>
+      <xs:enumeration value="viewModel"/>
+      <xs:enumeration value="ViewModel"/>
+      <xs:enumeration value="enum"/>
+      <xs:enumeration value="Enum"/>
+      <xs:enumeration value="trigger"/>
+      <xs:enumeration value="Trigger"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- DataBind flow direction -->
+  <xs:simpleType name="DataBindDirectionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ToTarget"/>
+      <xs:enumeration value="ToSource"/>
+      <xs:enumeration value="TwoWay"/>
+      <xs:enumeration value="Once"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <!-- ========================= Attribute Groups ========================= -->
 
   <!-- Common attributes available on any element: id and data-* -->
@@ -897,6 +987,8 @@
       <xs:element name="Timelines" type="TimelinesType"/>
       <!-- Child Layers -->
       <xs:element name="Layer" type="LayerType"/>
+      <!-- Timeline references (when this Layer imports a Composition) -->
+      <xs:element name="Timelines" type="TimelinesType"/>
     </xs:choice>
   </xs:group>
 
@@ -932,6 +1024,207 @@
     <xs:attribute name="passThroughBackground" type="BoolType" default="true"/>
     <xs:attribute name="import" type="xs:string"/>
     <xs:attribute name="importFormat" type="xs:string"/>
+    <xs:attribute name="vmContext" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- ========================= Animation System ========================= -->
+
+  <!-- Keyframe: a value at a specific frame with transition to the next key -->
+  <xs:complexType name="KeyType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="time" type="xs:integer" default="0"/>
+    <xs:attribute name="value" type="xs:string"/>
+    <xs:attribute name="interpolation" type="InterpolationType" default="linear"/>
+    <xs:attribute name="bezier-in" type="PointType"/>
+    <xs:attribute name="bezier-out" type="PointType"/>
+  </xs:complexType>
+
+  <!-- Channel: a typed property driven by keyframes on a target node -->
+  <xs:complexType name="ChannelType">
+    <xs:sequence>
+      <xs:element name="Key" type="KeyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="type" type="ChannelValueType"/>
+  </xs:complexType>
+
+  <!-- Object: groups channels targeting a single node -->
+  <xs:complexType name="AnimationObjectType">
+    <xs:sequence>
+      <xs:element name="Channel" type="ChannelType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="target" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- Animation: a named keyframe timeline -->
+  <xs:complexType name="AnimationType">
+    <xs:sequence>
+      <xs:element name="Object" type="AnimationObjectType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="duration" type="xs:integer" default="0"/>
+    <xs:attribute name="frameRate" type="xs:decimal" default="60"/>
+    <xs:attribute name="loop" type="LoopModeType" default="once"/>
+  </xs:complexType>
+
+  <!-- Input: a named port on a StateMachine -->
+  <xs:complexType name="InputType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="type" type="StateMachineInputType" default="bool"/>
+    <xs:attribute name="default" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="InputsType">
+    <xs:sequence>
+      <xs:element name="Input" type="InputType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+  </xs:complexType>
+
+  <!-- State: a state within a StateRegion, optionally bound to an Animation -->
+  <xs:complexType name="StateType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="animation" type="IdRefType"/>
+  </xs:complexType>
+
+  <xs:complexType name="StatesType">
+    <xs:sequence>
+      <xs:element name="State" type="StateType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+  </xs:complexType>
+
+  <!-- Condition: gates a Transition by comparing an input against a value -->
+  <xs:complexType name="ConditionType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="input" type="xs:string" use="required"/>
+    <xs:attribute name="op" type="TransitionConditionOpType" default="equal"/>
+    <xs:attribute name="value" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- Transition: a directed edge between two states -->
+  <xs:complexType name="TransitionType">
+    <xs:sequence>
+      <xs:element name="Condition" type="ConditionType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="from" type="xs:string" use="required"/>
+    <xs:attribute name="to" type="xs:string" use="required"/>
+    <xs:attribute name="duration" type="xs:integer" default="0"/>
+    <xs:attribute name="frameRate" type="xs:decimal" default="60"/>
+    <xs:attribute name="interpolation" type="InterpolationType" default="linear"/>
+    <xs:attribute name="bezier-in" type="PointType"/>
+    <xs:attribute name="bezier-out" type="PointType"/>
+    <xs:attribute name="earlyExit" type="BoolType" default="false"/>
+    <xs:attribute name="pauseOnExit" type="BoolType" default="false"/>
+  </xs:complexType>
+
+  <xs:complexType name="TransitionsType">
+    <xs:sequence>
+      <xs:element name="Transition" type="TransitionType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+  </xs:complexType>
+
+  <!-- StateRegion: one orthogonal region of a StateMachine -->
+  <xs:complexType name="StateRegionType">
+    <xs:sequence>
+      <xs:element name="States" type="StatesType" minOccurs="0"/>
+      <xs:element name="Transitions" type="TransitionsType" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="name" type="xs:string"/>
+    <xs:attribute name="initialState" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- StateMachine: input-driven state graph -->
+  <xs:complexType name="StateMachineType">
+    <xs:sequence>
+      <xs:element name="Inputs" type="InputsType" minOccurs="0"/>
+      <xs:element name="StateRegion" type="StateRegionType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+  </xs:complexType>
+
+  <!-- Animations: container of Animation and StateMachine definitions -->
+  <xs:complexType name="AnimationsType">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Animation" type="AnimationType"/>
+      <xs:element name="StateMachine" type="StateMachineType"/>
+    </xs:choice>
+    <xs:attributeGroup ref="CommonAttributes"/>
+  </xs:complexType>
+
+  <!-- Timelines: Layer-level drivers referencing Animation / StateMachine by id -->
+  <xs:complexType name="AnimationDriverType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="ref" type="IdRefType" use="required"/>
+    <xs:attribute name="playing" type="BoolType" default="true"/>
+  </xs:complexType>
+
+  <xs:complexType name="StateMachineDriverType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="ref" type="IdRefType" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="TimelinesType">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Animation" type="AnimationDriverType"/>
+      <xs:element name="StateMachine" type="StateMachineDriverType"/>
+    </xs:choice>
+    <xs:attributeGroup ref="CommonAttributes"/>
+  </xs:complexType>
+
+  <!-- ========================= ViewModel & Data Binding ========================= -->
+
+  <!-- Property: a single ViewModel property declaration -->
+  <xs:complexType name="PropertyType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="type" type="ViewModelPropertyType" default="number"/>
+    <xs:attribute name="default" type="xs:string"/>
+    <xs:attribute name="min" type="xs:decimal"/>
+    <xs:attribute name="max" type="xs:decimal"/>
+    <xs:attribute name="options" type="xs:string"/>
+    <xs:attribute name="viewModelRef" type="IdRefType"/>
+    <xs:attribute name="dataConverter" type="IdRefType"/>
+  </xs:complexType>
+
+  <!-- ViewModel: a schema of typed properties -->
+  <xs:complexType name="ViewModelType">
+    <xs:sequence>
+      <xs:element name="Property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+  </xs:complexType>
+
+  <!-- DataBind: connects a ViewModel property to a node channel -->
+  <xs:complexType name="DataBindType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="source" type="xs:string" use="required"/>
+    <xs:attribute name="target" type="xs:string" use="required"/>
+    <xs:attribute name="channel" type="xs:string" use="required"/>
+    <xs:attribute name="direction" type="DataBindDirectionType" default="ToTarget"/>
+  </xs:complexType>
+
+  <!-- Param: a key-value parameter for a DataConverter -->
+  <xs:complexType name="ParamType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="value" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- DataConverter: transforms ViewModel values before applying to targets -->
+  <xs:complexType name="DataConverterType">
+    <xs:sequence>
+      <xs:element name="Param" type="ParamType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="type" type="xs:string" use="required"/>
   </xs:complexType>
 
   <xs:complexType name="CompositionType">
