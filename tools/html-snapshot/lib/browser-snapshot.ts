@@ -119,7 +119,17 @@ function normalizeBackgroundImage(value) {
         return '';
       }
     }
-    return `url("${url.replace(/"/g, "'")}")`;
+    // Emit a SINGLE-quoted url() so the value embeds safely inside the
+    // double-quoted `style="…"` attribute the snapshot writes. The <body>
+    // background path pushes this value verbatim (it does not route through
+    // `appendStyleProp`, which is the only place that rewrites embedded double
+    // quotes), so a double-quoted url() here would prematurely close the style
+    // attribute and break the importer's XML parse. CSS treats url("…") and
+    // url('…') as equivalent, and the importer's ExtractCssUrl strips either
+    // quote style, so single quotes round-trip cleanly. Any embedded double
+    // quote in the path is still rewritten to a single quote so it can never
+    // close the surrounding attribute.
+    return `url('${url.replace(/"/g, "'")}')`;
   }
   if (/url\(/i.test(value)) return '';
   return '';
@@ -4362,6 +4372,7 @@ export {
   emitInlineBoxFragments,
   dashedBorderSideSvg,
   forwardDataAttrs,
+  normalizeBackgroundImage,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
