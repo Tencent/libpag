@@ -18,10 +18,13 @@
 
 #include "ProgressModel.h"
 #include <QApplication>
+#include <QThread>
 
 namespace exporter {
 
 ProgressModel::ProgressModel(QObject* parent) : QObject(parent) {
+  connect(this, &ProgressModel::requestAddFinishedSteps, this,
+          &ProgressModel::addFinishedStepsInternal, Qt::QueuedConnection);
 }
 
 int ProgressModel::getExportStatus() const {
@@ -67,11 +70,18 @@ void ProgressModel::setTotalSteps(uint64_t value) {
 }
 
 void ProgressModel::addFinishedSteps(uint64_t value) {
+  if (QThread::currentThread() != thread()) {
+    Q_EMIT requestAddFinishedSteps(value);
+    return;
+  }
+  addFinishedStepsInternal(value);
+}
+
+void ProgressModel::addFinishedStepsInternal(uint64_t value) {
   finishedSteps += value;
   if (finishedSteps >= totalSteps) {
     finishedSteps = totalSteps;
   }
-  QApplication::processEvents();
   Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
 }
 
