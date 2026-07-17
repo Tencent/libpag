@@ -5601,6 +5601,63 @@ PAGX_TEST(PAGXTest, LayerTimelinesRoundTrip) {
 }
 
 /**
+ * Test case: Animation's startOffset and AnimationTimeline's compositionStartOffset survive an
+ * export/import round-trip when non-default, and default (zero) values are omitted from the XML.
+ */
+PAGX_TEST(PAGXTest, AnimationTimelineOffsetsRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto card = doc->makeNode<pagx::Composition>("card");
+  card->width = 80;
+  card->height = 40;
+
+  auto anim = doc->makeNode<pagx::Animation>("enter");
+  anim->duration = 30;
+  anim->startOffset = 12;
+  card->animations.push_back(anim);
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = card;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "enter";
+  driver->compositionStartOffset = 5;
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("start-offset=\"12\""), std::string::npos);
+  EXPECT_NE(xml.find("composition-start-offset=\"5\""), std::string::npos);
+
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(loaded != nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  ASSERT_GE(loaded->layers.size(), 1u);
+  auto* slot2 = loaded->layers[0];
+  ASSERT_EQ(slot2->timelines.size(), 1u);
+  auto* loadedDriver = static_cast<pagx::AnimationTimeline*>(slot2->timelines[0].get());
+  EXPECT_EQ(loadedDriver->compositionStartOffset, 5);
+  auto* loadedAnim = loaded->findNode<pagx::Animation>("enter");
+  ASSERT_TRUE(loadedAnim != nullptr);
+  EXPECT_EQ(loadedAnim->startOffset, 12);
+
+  auto doc2 = pagx::PAGXDocument::Make(100, 100);
+  auto card2 = doc2->makeNode<pagx::Composition>("card");
+  auto anim2 = doc2->makeNode<pagx::Animation>("enter");
+  anim2->duration = 30;
+  card2->animations.push_back(anim2);
+  auto slotDefault = doc2->makeNode<pagx::Layer>("slot");
+  slotDefault->composition = card2;
+  auto driverDefault = std::make_unique<pagx::AnimationTimeline>();
+  driverDefault->animationId = "enter";
+  slotDefault->timelines.push_back(std::move(driverDefault));
+  doc2->layers.push_back(slotDefault);
+
+  auto xmlDefault = pagx::PAGXExporter::ToXML(*doc2);
+  EXPECT_EQ(xmlDefault.find("start-offset"), std::string::npos);
+  EXPECT_EQ(xmlDefault.find("composition-start-offset"), std::string::npos);
+}
+
+/**
  * Test case: TypedChannel<T>::evaluateAt returns the keyframe value at or before the requested
  * frame (Hold-style staircase), validating the binary search baseline behavior.
  */
@@ -6485,10 +6542,15 @@ PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
   // Advance by 30 frames @ 60fps = 500_000 us. Linear keyframe should write alpha = 0.5.
   file->advanceAndApply(500'000);
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
+  EXPECT_TRUE(tgfxChild->visible());
 
-  // Advance to the end of the segment (another 500_000 us).
+  // Advance to and past the window end: 60 frames reaches the end of the [0, 60) visibility
+  // window. The target is hidden and the alpha stays at the last evaluation (0.5) because the
+  // channel is no longer applied. This matches PAG's "contentVisible: contentFrame >= duration
+  // hides the layer" semantics.
   file->advanceAndApply(500'000);
-  EXPECT_NEAR(tgfxChild->alpha(), 1.0f, 1.0e-3f);
+  EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
+  EXPECT_FALSE(tgfxChild->visible());
 }
 
 /**
@@ -6593,10 +6655,13 @@ PAGX_TEST(PAGXTest, CompositionNestedDriver) {
   // Advance 30 frames @ 60fps = 500_000 us. The nested timeline must be driven to alpha = 0.5.
   file->advanceAndApply(500'000);
   EXPECT_NEAR(tgfxInnerChild->alpha(), 0.5f, 1.0e-3f);
+  EXPECT_TRUE(tgfxInnerChild->visible());
 
-  // Advance to the end of the segment.
+  // Advance past the window end. The nested layer is hidden, alpha holds the last in-window
+  // value, matching PAG's "contentFrame >= duration hides the layer" semantics.
   file->advanceAndApply(500'000);
-  EXPECT_NEAR(tgfxInnerChild->alpha(), 1.0f, 1.0e-3f);
+  EXPECT_NEAR(tgfxInnerChild->alpha(), 0.5f, 1.0e-3f);
+  EXPECT_FALSE(tgfxInnerChild->visible());
 }
 
 /**

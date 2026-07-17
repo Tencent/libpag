@@ -112,7 +112,16 @@ class PAGAnimation : public PAGTimeline {
 
  private:
   PAGAnimation(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
-               std::weak_ptr<PAGScene> owner);
+               std::weak_ptr<PAGScene> owner, int64_t compositionStartOffsetMicros = 0);
+
+  // Applies the animation gated by its visibility window, using the owning composition's monotonic
+  // elapsed clock (compositionElapsedUs) as the window reference. Outside [startOffset, startOffset
+  // + duration) (in the animation's own frameRate) the driven targets are hidden and evaluation is
+  // skipped; inside the window the targets are shown and evaluated normally. Called by
+  // PAGComposition, which owns the composition-level clock (a single PAGAnimation only knows its own
+  // content position, not where the parent composition's timeline is). A zero duration means "no
+  // window" and applies unconditionally.
+  void applyWithVisibilityWindow(int64_t compositionElapsedUs, float mix);
 
   // Resolves each animation object's target node against contextDoc into the (node, channels)
   // pairs consumed by apply(). Targets that resolve outside binding's scope (e.g. a document-level
@@ -143,6 +152,16 @@ class PAGAnimation : public PAGTimeline {
   // its binding pointer so no other signal would trigger a re-resolve.
   bool targetsDirty = true;
   int64_t currentTimeUs = 0;
+  // Evaluation-time content offset in microseconds. Shift the point at which the animation's
+  // content is evaluated, relative to the timeline's own clock. Channel evaluation uses max(0,
+  // currentTimeUs - compositionStartOffsetMicros): a positive offset delays content (holds the
+  // first frame until the offset elapses); a negative offset skips ahead (content starts from
+  // that point, since subtracting a negative adds time). Only correct under LoopMode::Once,
+  // where currentTimeUs increases monotonically before being clamped. Under Loop/PingPong the
+  // offset is applied after advance()'s WrapTime, which clamps each cycle's leading [0, offset)
+  // window to the first frame and drops the trailing [duration-offset, duration] window; a
+  // correct fix must fold the offset into the pre-wrap time base in advance() (deferred).
+  int64_t compositionStartOffsetMicros = 0;
 
   friend class PAGScene;
   friend class PAGComposition;

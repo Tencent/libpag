@@ -489,6 +489,7 @@ static void WriteAnimation(XMLBuilder& xml, const Animation* animation) {
   xml.openElement("Animation");
   xml.addAttribute("id", animation->id);
   xml.addRequiredAttribute("duration", animation->duration);
+  xml.addAttribute("start-offset", animation->startOffset, static_cast<Frame>(0));
   xml.addAttribute("frameRate", animation->frameRate, 60.0f);
   xml.addAttribute("loop", LoopModeToString(animation->loop));
   xml.closeElementStart();
@@ -1736,6 +1737,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
           xml.openElement("Animation");
           xml.addRequiredAttribute("ref", "@" + anim->animationId);
           xml.addAttribute("playing", anim->playing, true);
+          xml.addAttribute("composition-start-offset", anim->compositionStartOffset,
+                           static_cast<int64_t>(0));
           xml.closeElementSelfClosing();
           break;
         }

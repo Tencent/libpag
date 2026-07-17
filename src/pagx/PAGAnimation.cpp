@@ -56,9 +56,24 @@ static void ApplyResolved(
   }
 }
 
+// Forces the "visible" property of every resolved target node, used to gate rendering by the
+// animation's visibility window. mix is ignored: visible is a discrete bool property whose writer
+// overwrites the current value.
+static void ApplyVisibility(
+    const std::vector<std::pair<Node*, std::vector<Channel*>>>& resolvedTargets,
+    RuntimeBinding* binding, bool visible) {
+  if (binding == nullptr) {
+    return;
+  }
+  for (const auto& entry : resolvedTargets) {
+    binding->apply(entry.first, "visible", KeyValue{visible}, 1.0f);
+  }
+}
+
 PAGAnimation::PAGAnimation(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc,
-                           std::weak_ptr<PAGScene> owner)
-    : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc) {
+                           std::weak_ptr<PAGScene> owner, int64_t compositionStartOffsetMicros)
+    : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc),
+      compositionStartOffsetMicros(compositionStartOffsetMicros) {
 }
 
 void PAGAnimation::resolveTargets(const RuntimeBinding* effectiveBinding) {
@@ -190,7 +205,39 @@ void PAGAnimation::apply(float mix) {
     resolveTargets(effectiveBinding);
     targetsDirty = false;
   }
-  ApplyResolved(resolvedTargets, animation, effectiveBinding, currentTimeUs, clamped);
+  auto evaluationTimeUs = std::max<int64_t>(0, currentTimeUs - compositionStartOffsetMicros);
+  ApplyResolved(resolvedTargets, animation, effectiveBinding, evaluationTimeUs, clamped);
+}
+
+void PAGAnimation::applyWithVisibilityWindow(int64_t compositionElapsedUs, float mix) {
+  // Visibility window gate (PAG Layer.startTime + duration semantics): outside [startOffset,
+  // startOffset + duration) the driven targets are hidden. The window is measured on the owning
+  // composition's monotonic elapsed clock, so it still closes after the animation has played its
+  // full duration (unlike currentTimeUs, which loop mode wraps). A zero duration means "no window"
+  // and applies unconditionally, so ordinary animations keep their default visibility.
+  if (animation == nullptr || animation->duration <= 0) {
+    apply(mix);
+    return;
+  }
+  RuntimeBinding* effectiveBinding = binding;
+  if (effectiveBinding == nullptr) {
+    auto scene = owner.lock();
+    effectiveBinding = scene != nullptr ? scene->mutableBinding() : nullptr;
+  }
+  if (effectiveBinding == nullptr) {
+    return;
+  }
+  if (!resolved) {
+    resolveTargets();
+  }
+  auto startUs = FramesToUs(animation->startOffset, animation->frameRate);
+  auto endUs = FramesToUs(animation->startOffset + animation->duration, animation->frameRate);
+  if (compositionElapsedUs < startUs || compositionElapsedUs >= endUs) {
+    ApplyVisibility(resolvedTargets, effectiveBinding, false);
+    return;
+  }
+  ApplyVisibility(resolvedTargets, effectiveBinding, true);
+  apply(mix);
 }
 
 }  // namespace pagx

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include "pagx/nodes/Timeline.h"
 
@@ -43,6 +44,15 @@ class AnimationTimeline : public Timeline {
    * is true.
    */
   bool playing = true;
+
+  /**
+   * Shifts the evaluation point of the referenced Animation, measured in frames of the
+   * Animation's own frameRate. At runtime the content is evaluated at (currentFrame -
+   * compositionStartOffset): a positive offset delays content playback (freezes at the first
+   * frame until the offset elapses), a negative offset skips ahead (content starts from that
+   * frame). Carries the semantics of PAG's compositionStartTime. Default is 0.
+   */
+  int64_t compositionStartOffset = 0;
 
   TimelineType timelineType() const override {
     return TimelineType::Animation;

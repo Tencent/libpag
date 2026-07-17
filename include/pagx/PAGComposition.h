@@ -189,6 +189,12 @@ class PAGComposition : public PAGLayer {
   // frame keeps contributing to the output. Mirrors Rive's NestedSimpleAnimation.isPlaying, which
   // gates time advancement but not application.
   std::set<std::string> pausedTimelineIds = {};
+  // Monotonic elapsed time in microseconds on this composition's own timeline, accumulated in
+  // advance() regardless of per-timeline pause state. Used as the reference clock for each
+  // animation's visibility window: "is the composition's timeline within [startOffset, startOffset +
+  // duration) of this animation?" A single PAGAnimation only tracks its own content position, so the
+  // window decision must come from this composition-level clock. Clamped to >= 0 on rewind.
+  int64_t elapsedUs = 0;
   std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
   std::unique_ptr<DataBindRuntime> dataBindRuntime;
   std::shared_ptr<DataContext> dataContext = nullptr;
