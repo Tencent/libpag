@@ -1220,6 +1220,13 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
         auto size = image->data->size();
         xml.addAttribute("source", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
                                        ";base64," + Base64Encode(bytes, size));
+      } else {
+        // `source` is a required attribute (see pagx.xsd). An unresolved image — e.g. an `<img>`
+        // whose `src` was missing/invalid at HTML import time, preserved so the element is not
+        // dropped — carries neither a file path nor inline data. `addAttribute` skips empty
+        // values, so emit the empty source explicitly to keep the document schema-valid (and to
+        // round-trip back to the same unresolved Image).
+        xml.addRequiredAttribute("source", "");
       }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();

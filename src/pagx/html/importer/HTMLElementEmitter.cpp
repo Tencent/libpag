@@ -299,11 +299,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
 Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
                                        const HTMLBoxAttributes& box) {
   auto* srcAttr = element->findAttribute("src");
-  if (!srcAttr || srcAttr->empty()) {
-    warn("html: <img> missing src; skipped");
-    return nullptr;
-  }
-  const std::string& src = *srcAttr;
+  const std::string src = (srcAttr != nullptr) ? *srcAttr : std::string();
   if (IsExternalSvgSrc(src)) {
     auto layer = _document->makeNode<Layer>();
     _layerBuilder->applySizeAndPosition(layer, box);
@@ -314,8 +310,16 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     return layer;
   }
 
-  auto* imageNode = registerImageResource(resolveImageSource(src));
-  if (!imageNode) return nullptr;
+  // A missing / empty `src` is not a reason to drop the element: the `<img>` still occupies a
+  // box in the layout and carries its own visuals (size, border-radius, data-*). Preserve the
+  // layer and back its fill with a placeholder `Image` whose source is left unresolved, so the
+  // image slot survives the import instead of vanishing from the PAGX. A non-empty `src` always
+  // registers an `Image` (even a broken path decodes to an unloadable-but-present resource).
+  Image* imageNode = src.empty() ? nullptr : registerImageResource(resolveImageSource(src));
+  if (imageNode == nullptr) {
+    warn("html: <img> missing src; image preserved with unresolved source");
+    imageNode = _imageResources->createPlaceholder();
+  }
 
   auto layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);

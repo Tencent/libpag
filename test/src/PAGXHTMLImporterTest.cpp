@@ -4404,7 +4404,11 @@ PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesFauxItalic) {
   EXPECT_TRUE(text->fauxItalic);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, ImageMissingSrcWarnsAndIsSkipped) {
+// A missing / empty `src` warns but no longer drops the `<img>`: the element still occupies a
+// box, so the importer preserves the layer and backs it with an ImagePattern fill whose Image
+// resource is left unresolved (empty filePath). This keeps the image slot in the PAGX instead of
+// vanishing.
+PAG_TEST(PAGXHTMLImporterTest, ImageMissingSrcWarnsButIsPreserved) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
       <img style="width:80px;height:80px"/>
@@ -4416,6 +4420,38 @@ PAG_TEST(PAGXHTMLImporterTest, ImageMissingSrcWarnsAndIsSkipped) {
     if (msg.find("missing src") != std::string::npos) warned = true;
   }
   EXPECT_TRUE(warned);
+
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* leaf = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(leaf);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_TRUE(pattern->image->filePath.empty());
+}
+
+// The preserved placeholder Image (empty filePath, no data) must still serialise a `source`
+// attribute — it is `use="required"` in pagx.xsd — so the exported document stays schema-valid
+// and round-trips back to the same unresolved Image instead of tripping validation.
+PAG_TEST(PAGXHTMLImporterTest, ImageMissingSrcExportsEmptySourceAttribute) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img style="width:80px;height:80px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("source=\"\""), std::string::npos);
+
+  auto reimported = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(reimported, nullptr);
+  ASSERT_FALSE(reimported->layers.front()->children.empty());
+  auto* leaf = reimported->layers.front()->children.front();
+  auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(leaf)->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_TRUE(pattern->image->filePath.empty());
 }
 
 PAG_TEST(PAGXHTMLImporterTest, TransparentColorIsTreatedAsNoFill) {
@@ -5283,7 +5319,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawExcessivelyNestedTreeTripsRecursionLimit) {
 // HTMLElementEmitter — `<img>` / inline `<svg>` rejection branches
 //==================================================================================================
 
-PAG_TEST(PAGXHTMLImporterTest, ImgWithoutSrcSkippedWithDiagnostic) {
+PAG_TEST(PAGXHTMLImporterTest, ImgWithoutSrcPreservedWithDiagnostic) {
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:50px;height:50px">
       <img style="width:50px;height:50px"/>
@@ -5291,6 +5327,11 @@ PAG_TEST(PAGXHTMLImporterTest, ImgWithoutSrcSkippedWithDiagnostic) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   EXPECT_TRUE(HasDiagnosticContaining(doc, "<img> missing src"));
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* leaf = doc->layers.front()->children.front();
+  auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(leaf)->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, ImgExternalSvgRoutesAsImportDirective) {
