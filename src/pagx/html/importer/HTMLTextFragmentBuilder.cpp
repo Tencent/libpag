@@ -309,9 +309,27 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   // host them, but the unified Layer.matrix path makes the wrapping Layer transform every
   // descendant uniformly — including the bare `<Text>+<Fill>` pair the no-TextBox branch
   // emits — so the extra TextBox is no longer needed.
+  //
+  // `hasNoWrap` (CSS `white-space: nowrap` / `pre`) is deliberately NOT a trigger: a bare
+  // `<Text>` is inherently single-line and never soft-wraps, so it already reproduces the
+  // no-wrap behaviour without a `TextBox wordWrap="false"` wrapper. The html-snapshot pipeline
+  // stamps `white-space: nowrap` onto every flattened text span, so keying off it here forced a
+  // TextBox around essentially every label. Hard line breaks (`pre` / `<br>` `\n`) are also fine
+  // on a bare Text — per the spec a source newline triggers a line break with the font-metric
+  // default line height, which is exactly what a `TextBox` with `lineHeight="0"` (auto) does.
+  //
+  // Only a *real* (pixel-resolved) line height forces a TextBox so it can carry `lineHeight`.
+  // A `normal` / unset line height resolves to NaN and must NOT force one — the html-snapshot
+  // pipeline stamps `line-height: normal` onto every flattened span, so keying off the raw
+  // (non-empty) string would wrap every label in a TextBox. Check both the leaf's own resolved
+  // value and every fragment's (`fragmentHasExplicitLineHeight`), so a real value inherited by
+  // the leaf is not lost when the only run overrides its own line height back to `normal`.
+  float leafLineHeightPx =
+      _valueParser.resolveLineHeightPx(inherited.lineHeight, inherited.fontSizePx);
+  bool hasRealLineHeight =
+      (!std::isnan(leafLineHeightPx) && leafLineHeightPx > 0) || fragmentHasExplicitLineHeight;
   bool needsTextBox = hasMultipleFragments || !inherited.textAlign.empty() ||
-                      !inherited.lineHeight.empty() || box.clipOverflow || hasNoWrap ||
-                      isVertical || fragmentHasExplicitLineHeight;
+                      box.clipOverflow || isVertical || hasRealLineHeight;
 
   // CSS shrink-to-fit for inline text. The html-snapshot pipeline bakes the *browser's*
   // measured px width/height onto every text `<span>` (it flattens each run into an

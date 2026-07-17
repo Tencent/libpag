@@ -1218,6 +1218,9 @@ PAG_TEST(PAGXHTMLImporterTest, WhiteSpacePreLineKeepsNewlineCollapsesSpaces) {
 }
 
 // `white-space: pre` keeps source spaces and newlines verbatim (no folding, no per-fragment trim).
+// A single-fragment `pre` run needs no TextBox — a bare <Text> reproduces both the verbatim spaces
+// and the hard line break — so the importer emits bare Text; only when another paragraph feature is
+// present is a TextBox synthesised, and then its wrapping is disabled.
 PAG_TEST(PAGXHTMLImporterTest, WhiteSpacePreKeepsSpacesVerbatim) {
   auto doc = ParseFromString(
       "<html><body style=\"width:200px;height:80px\">"
@@ -1225,12 +1228,14 @@ PAG_TEST(PAGXHTMLImporterTest, WhiteSpacePreKeepsSpacesVerbatim) {
       "</body></html>");
   ASSERT_NE(doc, nullptr);
   auto* leaf = doc->layers.front()->children.front();
-  auto* tb = FindElementOfType<pagx::TextBox>(leaf);
-  ASSERT_NE(tb, nullptr);
-  EXPECT_FALSE(tb->wordWrap);
   std::vector<pagx::Text*> texts;
   std::vector<pagx::Fill*> fills;
-  GatherTextRuns(tb->elements, &texts, &fills);
+  if (auto* tb = FindElementOfType<pagx::TextBox>(leaf)) {
+    EXPECT_FALSE(tb->wordWrap);
+    GatherTextRuns(tb->elements, &texts, &fills);
+  } else {
+    GatherTextRuns(leaf->contents, &texts, &fills);
+  }
   ASSERT_FALSE(texts.empty());
   const std::string& t = texts.front()->text;
   EXPECT_NE(t.find("A   B"), std::string::npos);
@@ -2858,6 +2863,9 @@ PAG_TEST(PAGXHTMLImporterTest, TextAlignJustifyMapped) {
   EXPECT_EQ(tb->textAlign, pagx::TextAlign::Justify);
 }
 
+// `white-space: nowrap` disables soft wrapping. A bare <Text> never soft-wraps, so a run that has
+// no other paragraph feature is emitted as bare Text (no TextBox needed); when a TextBox is present
+// for another reason its wordWrap must be false. Either shape reproduces the no-wrap behaviour.
 PAG_TEST(PAGXHTMLImporterTest, WhiteSpaceNowrapDisablesWrap) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -2865,9 +2873,15 @@ PAG_TEST(PAGXHTMLImporterTest, WhiteSpaceNowrapDisablesWrap) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
-  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
-  ASSERT_NE(tb, nullptr);
-  EXPECT_FALSE(tb->wordWrap);
+  auto* leaf = doc->layers.front()->children.front();
+  if (auto* tb = FindElementOfType<pagx::TextBox>(leaf)) {
+    EXPECT_FALSE(tb->wordWrap);
+  } else {
+    std::vector<pagx::Text*> texts;
+    std::vector<pagx::Fill*> fills;
+    GatherTextRuns(leaf->contents, &texts, &fills);
+    EXPECT_FALSE(texts.empty());
+  }
 }
 
 PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenOnTextContainerHidesText) {

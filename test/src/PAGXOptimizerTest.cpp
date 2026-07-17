@@ -1244,4 +1244,166 @@ CLI_TEST(VerifyUtilsTest, HasPainterPainterAsFirstElement) {
   EXPECT_TRUE(HasPainter(elements));
 }
 
+// ---------------------------------------------------------------------------
+// CollapseSingleChildLayers
+// ---------------------------------------------------------------------------
+
+// Only the collapse rule enabled, so a test observes it in isolation from the other structural
+// passes (which could otherwise downgrade/merge the same layers).
+static PAGXOptimizerOptions CollapseOnly() {
+  PAGXOptimizerOptions options;
+  options.pruneEmpty = false;
+  options.downgradeShellChildren = false;
+  options.mergeAdjacentShellLayers = false;
+  options.unwrapRedundantFirstGroup = false;
+  options.mergeAdjacentGroups = false;
+  options.canonicalizePaths = false;
+  options.rectMaskToScrollRect = false;
+  options.dedupPathData = false;
+  options.pruneUnreferencedResources = false;
+  options.collapseSingleChildLayers = true;
+  return options;
+}
+
+static void AddRectFill(PAGXDocument* doc, Layer* layer, float w, float h) {
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->position = {w / 2.0f, h / 2.0f};
+  rect->size = {w, h};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(MakeSolidFill(doc, 1, 0, 0));
+}
+
+// A clipping/sizing parent whose single child exactly fills it and only carries paint content:
+// the child's content is absorbed and the parent keeps its frame + clip.
+CLI_TEST(PAGXOptimizerTest, CollapseAbsorbsFillingChild) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_EQ(doc->layers[0], parent);
+  EXPECT_TRUE(parent->children.empty());
+  EXPECT_TRUE(parent->clipToBounds);
+  EXPECT_FLOAT_EQ(parent->width, 16.0f);
+  ASSERT_EQ(parent->contents.size(), 2u);
+  EXPECT_EQ(parent->contents[0]->nodeType(), NodeType::Rectangle);
+  EXPECT_EQ(parent->contents[1]->nodeType(), NodeType::Fill);
+}
+
+// A shell parent (all attributes default, no contents) is dropped in favour of its only child,
+// which carries the real frame.
+CLI_TEST(PAGXOptimizerTest, CollapseDropsShellParent) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  auto* child = doc->makeNode<Layer>();
+  child->width = 40;
+  child->height = 20;
+  child->left = 5;
+  child->top = 5;
+  AddRectFill(doc.get(), child, 40, 20);
+  parent->children.push_back(child);
+  ASSERT_TRUE(IsLayerShell(parent));
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_EQ(doc->layers[0], child);
+  EXPECT_FLOAT_EQ(child->width, 40.0f);
+  EXPECT_FLOAT_EQ(child->left, 5.0f);
+}
+
+// A child that applies its own opacity must NOT be absorbed — the alpha would be lost.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithAlpha) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  child->alpha = 0.5f;
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_TRUE(parent->contents.empty());
+}
+
+// A filling child that carries non-geometric semantics (an external composition, a databind
+// context, ...) must NOT be absorbed — dropping the child layer would discard that content/binding.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithComposition) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  child->compositionFilePath = "icon.pagx";
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_EQ(child->compositionFilePath, "icon.pagx");
+}
+
+// A shell parent that carries a databind context is not a pure structural wrapper: dropping it
+// would discard the vmContext, so it must be kept even though its geometry looks like a shell.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsShellParentWithVmContext) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->vmContext = "$vm.item";
+  auto* child = doc->makeNode<Layer>();
+  child->width = 40;
+  child->height = 20;
+  AddRectFill(doc.get(), child, 40, 20);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_EQ(doc->layers[0], parent);
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_EQ(parent->vmContext, "$vm.item");
+}
+
+// A child that does not fill its parent (smaller + offset) is left alone: the parent's frame/clip
+// is doing real work positioning it.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsNonFillingChild) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 20;
+  parent->height = 20;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 10;
+  child->height = 10;
+  child->left = 5;
+  child->top = 5;
+  AddRectFill(doc.get(), child, 10, 10);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+}
+
 }  // namespace pag
