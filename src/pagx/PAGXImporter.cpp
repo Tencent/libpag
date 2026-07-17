@@ -1708,6 +1708,9 @@ static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
         key.interpolation = ParseKeyframeInterpolation(GetAttribute(child.get(), "interpolation"),
                                                        doc, child.get());
         auto bezierOut = GetAttribute(child.get(), "bezierOut");
+        if (bezierOut.empty()) {
+          bezierOut = GetAttribute(child.get(), "bezier-out");
+        }
         if (!bezierOut.empty()) {
           bool valid = false;
           key.bezierOut = ParsePoint(bezierOut, &valid);
@@ -1716,6 +1719,9 @@ static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
           }
         }
         auto bezierIn = GetAttribute(child.get(), "bezierIn");
+        if (bezierIn.empty()) {
+          bezierIn = GetAttribute(child.get(), "bezier-in");
+        }
         if (!bezierIn.empty()) {
           bool valid = false;
           key.bezierIn = ParsePoint(bezierIn, &valid);
@@ -1948,8 +1954,10 @@ static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) 
   auto interp = GetAttribute(node, "interpolation", "linear");
   transition->interpolation = ParseKeyframeInterpolation(interp, doc, node);
   if (transition->interpolation == KeyframeInterpolationType::Bezier) {
-    transition->bezierOut = GetPointAttribute(node, "bezierOut", {0.0f, 0.0f}, doc);
-    transition->bezierIn = GetPointAttribute(node, "bezierIn", {0.0f, 0.0f}, doc);
+    const char* bezierOutName = node->findAttribute("bezierOut") ? "bezierOut" : "bezier-out";
+    const char* bezierInName = node->findAttribute("bezierIn") ? "bezierIn" : "bezier-in";
+    transition->bezierOut = GetPointAttribute(node, bezierOutName, {0.0f, 0.0f}, doc);
+    transition->bezierIn = GetPointAttribute(node, bezierInName, {0.0f, 0.0f}, doc);
   }
   transition->enableEarlyExit = GetBoolAttribute(node, "earlyExit", false, doc);
   transition->pauseOnExit = GetBoolAttribute(node, "pauseOnExit", false, doc);

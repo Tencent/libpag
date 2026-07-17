@@ -1071,6 +1071,9 @@
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
     <xs:attribute name="bezierOut" type="PointType"/>
     <xs:attribute name="bezierIn" type="PointType"/>
+    <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
+    <xs:attribute name="bezier-out" type="PointType"/>
+    <xs:attribute name="bezier-in" type="PointType"/>
   </xs:complexType>
 
   <xs:complexType name="ChannelType">
@@ -1095,7 +1098,7 @@
       <xs:element name="Object" type="AnimationObjectType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="duration" type="xs:integer" use="required"/>
+    <xs:attribute name="duration" type="xs:integer" default="0"/>
     <xs:attribute name="frameRate" type="xs:decimal" default="60"/>
     <xs:attribute name="loop" type="LoopModeType" default="once"/>
   </xs:complexType>
@@ -1145,11 +1148,14 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="from" type="xs:string" use="required"/>
     <xs:attribute name="to" type="xs:string" use="required"/>
-    <xs:attribute name="duration" type="xs:integer" use="required"/>
+    <xs:attribute name="duration" type="xs:integer" default="0"/>
     <xs:attribute name="frameRate" type="xs:decimal" default="60"/>
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
     <xs:attribute name="bezierOut" type="PointType"/>
     <xs:attribute name="bezierIn" type="PointType"/>
+    <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
+    <xs:attribute name="bezier-out" type="PointType"/>
+    <xs:attribute name="bezier-in" type="PointType"/>
     <xs:attribute name="earlyExit" type="BoolType" default="false"/>
     <xs:attribute name="pauseOnExit" type="BoolType" default="false"/>
   </xs:complexType>
