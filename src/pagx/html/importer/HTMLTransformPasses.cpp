@@ -326,6 +326,151 @@ void CoalesceWebkitAlias(PropertyMap& resolved, const std::string& vendorName,
   resolved.erase(vendorIt);
 }
 
+// ----- `background` shorthand decomposition -------------------------------------------------
+
+// A token that names a `background-image` source: `url(...)` or any `*-gradient(...)`.
+bool IsBackgroundImageToken(const std::string& lower) {
+  return lower.rfind("url(", 0) == 0 || lower.find("gradient(") != std::string::npos;
+}
+
+// A `background-repeat` keyword.
+bool IsBackgroundRepeatToken(const std::string& lower) {
+  return lower == "repeat" || lower == "no-repeat" || lower == "repeat-x" ||
+         lower == "repeat-y" || lower == "space" || lower == "round";
+}
+
+// `background-attachment` / `background-origin` / `background-clip` box keywords. PAGX has no
+// analogue for these, so they are recognised only to skip them during decomposition. (The
+// `background-clip: text` gradient-text technique is written as a separate longhand, never inside
+// the `background` shorthand, so it is handled elsewhere and not listed here.)
+bool IsBackgroundBoxOrAttachmentToken(const std::string& lower) {
+  return lower == "scroll" || lower == "fixed" || lower == "local" || lower == "border-box" ||
+         lower == "padding-box" || lower == "content-box";
+}
+
+// Heuristically recognises a CSS <color> token: hex, a functional colour notation, the CSS-wide
+// `currentcolor`, or a named colour from the CSS table (which also covers `transparent`).
+bool IsColorToken(const std::string& token) {
+  std::string lower = ToLower(Trim(token));
+  if (lower.empty()) return false;
+  if (lower[0] == '#') return true;
+  static const char* kColorFns[] = {"rgb(",  "rgba(", "hsl(",   "hsla(",  "hwb(",
+                                    "lab(",  "lch(",  "oklab(", "oklch(", "color("};
+  for (const char* fn : kColorFns) {
+    if (lower.rfind(fn, 0) == 0) return true;
+  }
+  if (lower == "currentcolor") return true;
+  const auto& named = NamedColors();
+  return named.find(lower) != named.end();
+}
+
+// Splits one `background` layer into whitespace tokens while promoting a top-level `/` (which
+// separates `<position> / <size>`) to its own token even when written without surrounding
+// spaces (`center/cover`). Slashes inside `url(...)` / `gradient(...)` are left untouched.
+std::vector<std::string> SplitBackgroundLayerTokens(const std::string& layer) {
+  std::string spaced;
+  spaced.reserve(layer.size() + 8);
+  int depth = 0;
+  for (char c : layer) {
+    if (c == '(') {
+      depth++;
+    } else if (c == ')' && depth > 0) {
+      depth--;
+    }
+    if (c == '/' && depth == 0) {
+      spaced += " / ";
+    } else {
+      spaced += c;
+    }
+  }
+  return SplitTopLevelWhitespace(spaced);
+}
+
+std::string JoinTokens(const std::vector<std::string>& tokens) {
+  std::string out;
+  for (const auto& t : tokens) {
+    if (!out.empty()) out += ' ';
+    out += t;
+  }
+  return out;
+}
+
+// Expands the `background` shorthand into the longhand properties the subset property table
+// understands (`background-color`, `background-image`, `background-position`, `background-size`,
+// `background-repeat`). Without this the shorthand is not in the table and `PropertyFilterPass`
+// drops it, silently losing the box's fill. This mirrors the computed-style expansion the
+// html-snapshot browser pass performs, so raw HTML fed straight through the importer paints
+// identically — including combined forms such as `background:#fff url(x) center/cover no-repeat`
+// and stacked gradients. Only the final comma-separated layer may carry the colour. An explicit
+// longhand already present wins (`emplace` never overwrites), so a separate `background-color`
+// declaration is preserved.
+void ExpandBackgroundShorthand(PropertyMap& resolved) {
+  auto it = resolved.find("background");
+  if (it == resolved.end()) return;
+  std::string value = Trim(it->second);
+  resolved.erase(it);
+  if (value.empty()) return;
+
+  auto layers = SplitTopLevelCommas(value);
+  std::vector<std::string> imageLayers;
+  std::string colorToken;
+  std::string positionStr;
+  std::string sizeStr;
+  std::string repeatStr;
+
+  for (size_t li = 0; li < layers.size(); ++li) {
+    const bool isLast = (li + 1 == layers.size());
+    std::string imageToken;
+    std::vector<std::string> posTokens;
+    std::vector<std::string> sizeTokens;
+    bool afterSlash = false;
+    for (const auto& tok : SplitBackgroundLayerTokens(layers[li])) {
+      if (tok == "/") {
+        afterSlash = true;
+        continue;
+      }
+      std::string lower = ToLower(tok);
+      if (IsBackgroundImageToken(lower)) {
+        imageToken = tok;
+      } else if (lower == "none") {
+        // `background-image: none`; nothing to paint from this layer's image slot.
+      } else if (isLast && colorToken.empty() && IsColorToken(tok)) {
+        colorToken = tok;
+      } else if (IsBackgroundRepeatToken(lower)) {
+        repeatStr = lower;
+      } else if (IsBackgroundBoxOrAttachmentToken(lower)) {
+        // No PAGX analogue — skip.
+      } else if (afterSlash) {
+        sizeTokens.push_back(tok);
+      } else {
+        posTokens.push_back(tok);
+      }
+    }
+    if (!imageToken.empty()) {
+      imageLayers.push_back(std::move(imageToken));
+      // Position / size apply to this layer's image; keep the last image layer's values (the
+      // importer only consumes them for single `url(...)` backgrounds).
+      if (!posTokens.empty()) positionStr = JoinTokens(posTokens);
+      if (!sizeTokens.empty()) sizeStr = JoinTokens(sizeTokens);
+    }
+  }
+
+  if (!imageLayers.empty()) {
+    std::string joined;
+    for (const auto& layer : imageLayers) {
+      if (!joined.empty()) joined += ", ";
+      joined += layer;
+    }
+    resolved.emplace("background-image", std::move(joined));
+    if (!positionStr.empty()) resolved.emplace("background-position", positionStr);
+    if (!sizeStr.empty()) resolved.emplace("background-size", sizeStr);
+    if (!repeatStr.empty()) resolved.emplace("background-repeat", repeatStr);
+  }
+  if (!colorToken.empty()) {
+    resolved.emplace("background-color", colorToken);
+  }
+}
+
 void ResolveTree(const std::shared_ptr<DOMNode>& element, const PropertyMap& inheritedIn,
                  HTMLTransformContext& ctx, int depth) {
   if (ShouldSkipWalkerNode(element, depth, ctx, "style resolution")) return;
@@ -401,6 +546,9 @@ void ResolveElement(const std::shared_ptr<DOMNode>& element, const PropertyMap& 
   // Coalesce vendor aliases onto their standard names so the subset property table only
   // needs to register the canonical form. The standard name wins when both are present.
   CoalesceWebkitAlias(resolved, "-webkit-background-clip", "background-clip");
+  // Expand the `background` shorthand so `PropertyFilterPass` keeps the paint instead of
+  // dropping the (unlisted) shorthand and losing the box's fill.
+  ExpandBackgroundShorthand(resolved);
   ctx.setResolved(element.get(), std::move(resolved));
 }
 

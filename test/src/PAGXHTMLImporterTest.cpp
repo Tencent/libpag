@@ -285,6 +285,82 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundColorBecomesRectangleAndFill) {
   EXPECT_FLOAT_EQ(div->height, 40.0f);
 }
 
+// Regression: a colour-only `background` shorthand (e.g. `background:#FF0000`) must paint the
+// same fill as the `background-color` longhand. The subset property table only lists the longhand,
+// so ComputedStylePass expands the shorthand before PropertyFilterPass would otherwise drop it.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandColorBecomesFill) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <div style="width:80px;height:40px;background:#FF0000;border-radius:8px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* rect = FindElementOfType<pagx::Rectangle>(div);
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(rect, nullptr);
+  ASSERT_NE(fill, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 8.0f);
+  auto* solid = As<pagx::SolidColor>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFF0000)));
+}
+
+// A gradient carried by the `background` shorthand routes to `background-image` during expansion
+// and paints a gradient fill, matching the `background-image` longhand.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandGradientBecomesGradientFill) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background:linear-gradient(90deg, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 2u);
+  EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
+  EXPECT_TRUE(ColorNear(lg->colorStops.back()->color, HexColor(0x0000FF)));
+}
+
+// A functional-notation colour (`rgba(...)`) carried by the `background` shorthand must be
+// recognised as a colour — not mistaken for an image — and paint a solid fill.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandFunctionalColorBecomesFill) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background:rgba(255,0,0,0.5)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = As<pagx::SolidColor>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_NEAR(solid->color.alpha, 0.5f, 0.02f);
+}
+
+// A combined `background` shorthand (colour + gradient overlay) decomposes into both a
+// `background-color` and a `background-image`; the gradient paints over the colour, so the fill
+// is the gradient.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandColorPlusGradient) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background:#00FF00 linear-gradient(90deg, #FF0000 0%, #0000FF 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 2u);
+  EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, BorderRadiusMapsToRoundness) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
