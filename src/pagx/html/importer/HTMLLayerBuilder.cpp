@@ -536,21 +536,26 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
   }
 
   // data-* attributes -> customData
-  for (const auto& attr : element->attributes) {
-    if (attr.name.compare(0, 5, "data-") == 0) {
-      std::string key = attr.name.substr(5);
-      if (IsValidCustomDataKey(key)) {
-        layer->customData[key] = attr.value;
-      } else {
-        _diagnostics.warn("html: invalid data-* attribute name '" + attr.name + "'");
-      }
-    }
-  }
+  forwardDataAttributes(layer, element);
   // href on <a>
   if (element->name == "a") {
     auto* href = element->findAttribute("href");
     if (href && !href->empty() && IsValidCustomDataKey("href")) {
       layer->customData["href"] = *href;
+    }
+  }
+}
+
+void HTMLLayerBuilder::forwardDataAttributes(Layer* layer,
+                                             const std::shared_ptr<DOMNode>& element) {
+  if (layer == nullptr || element == nullptr) return;
+  for (const auto& attr : element->attributes) {
+    if (attr.name.compare(0, 5, "data-") != 0) continue;
+    std::string key = attr.name.substr(5);
+    if (IsValidCustomDataKey(key)) {
+      layer->customData[key] = attr.value;
+    } else {
+      _diagnostics.warn("html: invalid data-* attribute name '" + attr.name + "'");
     }
   }
 }

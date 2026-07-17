@@ -2971,6 +2971,40 @@ PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagate) {
   EXPECT_EQ(div->customData["label"], "hi");
 }
 
+// `data-*` attributes on an `<img>` forward onto the image layer's customData, matching the
+// behaviour on plain containers. html-snapshot preserves these on the emitted `<img>`.
+PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagateOnImage) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <img src="logo.png" data-id="hero" data-role="cover" style="width:80px;height:80px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* img = doc->layers.front()->children.front();
+  auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(img)->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(img->customData["id"], "hero");
+  EXPECT_EQ(img->customData["role"], "cover");
+}
+
+// The rounded-image fold collapses the wrapper + inner `<img>` into one layer; the inner
+// `<img>`'s `data-*` must still reach the folded layer's customData.
+PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagateOnFoldedRoundedImage) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <img src="avatar.png" data-id="avatar" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->children.empty());
+  auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(wrapper)->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(wrapper->customData["id"], "avatar");
+}
+
 PAG_TEST(PAGXHTMLImporterTest, IdAttributePropagatesToLayer) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">

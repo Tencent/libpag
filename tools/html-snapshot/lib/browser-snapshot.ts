@@ -2252,6 +2252,25 @@ function renderBoxedReplaced(rect, left, top, computed, opts, inner, extraBoxSty
   return `<div style="${composed}">${inner}${overlays}</div>`;
 }
 
+// Forward an element's author `data-*` attributes onto the emitted markup so the
+// PAGX importer can surface them as layer customData (its `applyLayerAttributes`
+// copies every `data-*` attribute into the layer's `customData`). Returns a string
+// like ` data-id="hero" data-role="cover"` (leading space, ready to splice into a
+// tag) or an empty string. The snapshot pipeline's own bookkeeping attributes
+// (`data-snapshot-*` for inlined image sources / icon-svg ids / materialised-pseudo
+// markers, `data-pagx-*` for importer diagnostics) are internal plumbing and must
+// not leak into the output as user data.
+function forwardDataAttrs(el) {
+  if (!el || typeof el.getAttributeNames !== 'function') return '';
+  let out = '';
+  for (const name of el.getAttributeNames()) {
+    if (name.indexOf('data-') !== 0) continue;
+    if (name.indexOf('data-snapshot-') === 0 || name.indexOf('data-pagx-') === 0) continue;
+    out += ` ${name}="${escapeHtml(el.getAttribute(name) || '')}"`;
+  }
+  return out;
+}
+
 // <img>: wrapper + nested <img> sized to fill it. Asymmetric borders are
 // baked into overlay rectangles painted on top.
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
@@ -2259,7 +2278,8 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const alt = escapeHtml(el.getAttribute('alt') || '');
   const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
   const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
-  const inner = `<img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>`;
+  const dataAttrs = forwardDataAttrs(el);
+  const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs} style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
@@ -3805,6 +3825,7 @@ const HELPER_FNS = [
   renderSvg,
   renderInlineIconSvg,
   renderBoxedReplaced,
+  forwardDataAttrs,
   renderImg,
   renderCanvas,
   renderTextInput,
@@ -4340,6 +4361,7 @@ export {
   inlineBoxLineRects,
   emitInlineBoxFragments,
   dashedBorderSideSvg,
+  forwardDataAttrs,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };

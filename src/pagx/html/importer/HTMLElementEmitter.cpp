@@ -286,6 +286,12 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   pattern->scaleMode = ResolveImageScaleMode(imgBox.objectFit);
   fill->color = pattern;
   layer->contents.push_back(fill);
+
+  // The fold collapses the wrapper + inner `<img>` into a single layer. The wrapper's own
+  // `data-*` were already forwarded when its layer attributes were applied; forward the inner
+  // `<img>`'s too so image-carried custom data (e.g. `data-id`) is not lost to the fold.
+  _layerBuilder->forwardDataAttributes(layer, img);
+
   _idAllocator->assign(layer, element);
   return true;
 }
