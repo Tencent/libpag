@@ -75,6 +75,12 @@ void ProgressModel::addFinishedSteps(uint64_t value) {
     return;
   }
   addFinishedStepsInternal(value);
+  // Pump the event loop only from the main-thread path. The export loop blocks the main
+  // thread in exportFile(), so this keeps progress updates flowing and drains queued
+  // cross-thread requestAddFinishedSteps events. It must NOT live inside
+  // addFinishedStepsInternal: the queued-slot invocations would then re-enter
+  // processEvents() recursively, one level per pending event.
+  QApplication::processEvents();
 }
 
 void ProgressModel::addFinishedStepsInternal(uint64_t value) {
@@ -82,7 +88,6 @@ void ProgressModel::addFinishedStepsInternal(uint64_t value) {
   if (finishedSteps >= totalSteps) {
     finishedSteps = totalSteps;
   }
-  QApplication::processEvents();
   Q_EMIT currentProgressChanged(static_cast<double>(finishedSteps));
 }
 
