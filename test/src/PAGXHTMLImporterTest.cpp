@@ -3061,9 +3061,8 @@ PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagate) {
   EXPECT_EQ(div->customData["label"], "hi");
 }
 
-// `data-*` attributes on an `<img>` forward onto the backing `Image` resource's customData rather
-// than the layer, so the custom data travels with the image itself. html-snapshot preserves these
-// on the emitted `<img>`.
+// `data-*` attributes on an `<img>` forward onto the image layer's customData, matching the
+// behaviour on plain containers. html-snapshot preserves these on the emitted `<img>`.
 PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagateOnImage) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
@@ -3074,15 +3073,12 @@ PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagateOnImage) {
   auto* img = doc->layers.front()->children.front();
   auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(img)->color);
   ASSERT_NE(pattern, nullptr);
-  ASSERT_NE(pattern->image, nullptr);
-  // Custom data lands on the Image resource, not the layer.
-  EXPECT_EQ(pattern->image->customData["id"], "hero");
-  EXPECT_EQ(pattern->image->customData["role"], "cover");
-  EXPECT_TRUE(img->customData.empty());
+  EXPECT_EQ(img->customData["id"], "hero");
+  EXPECT_EQ(img->customData["role"], "cover");
 }
 
 // The rounded-image fold collapses the wrapper + inner `<img>` into one layer; the inner
-// `<img>`'s `data-*` must still reach its backing `Image` resource's customData.
+// `<img>`'s `data-*` must still reach the folded layer's customData.
 PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagateOnFoldedRoundedImage) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:64px;height:64px">
@@ -3096,8 +3092,7 @@ PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagateOnFoldedRoundedImage) 
   EXPECT_TRUE(wrapper->children.empty());
   auto* pattern = As<pagx::ImagePattern>(FindElementOfType<pagx::Fill>(wrapper)->color);
   ASSERT_NE(pattern, nullptr);
-  ASSERT_NE(pattern->image, nullptr);
-  EXPECT_EQ(pattern->image->customData["id"], "avatar");
+  EXPECT_EQ(wrapper->customData["id"], "avatar");
 }
 
 PAG_TEST(PAGXHTMLImporterTest, IdAttributePropagatesToLayer) {
