@@ -1273,9 +1273,7 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
   if (!parent->padding.isZero()) {
     return false;
   }
-  auto sameDim = [](float a, float b) {
-    return (std::isnan(a) && std::isnan(b)) || a == b;
-  };
+  auto sameDim = [](float a, float b) { return (std::isnan(a) && std::isnan(b)) || a == b; };
   bool explicitMatch =
       sameDim(child->width, parent->width) && sameDim(child->height, parent->height);
   bool percentFill = child->percentWidth == 100.0f && child->percentHeight == 100.0f;

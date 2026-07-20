@@ -335,8 +335,8 @@ bool IsBackgroundImageToken(const std::string& lower) {
 
 // A `background-repeat` keyword.
 bool IsBackgroundRepeatToken(const std::string& lower) {
-  return lower == "repeat" || lower == "no-repeat" || lower == "repeat-x" ||
-         lower == "repeat-y" || lower == "space" || lower == "round";
+  return lower == "repeat" || lower == "no-repeat" || lower == "repeat-x" || lower == "repeat-y" ||
+         lower == "space" || lower == "round";
 }
 
 // `background-attachment` / `background-origin` / `background-clip` box keywords. PAGX has no
@@ -354,8 +354,8 @@ bool IsColorToken(const std::string& token) {
   std::string lower = ToLower(Trim(token));
   if (lower.empty()) return false;
   if (lower[0] == '#') return true;
-  static const char* kColorFns[] = {"rgb(",  "rgba(", "hsl(",   "hsla(",  "hwb(",
-                                    "lab(",  "lch(",  "oklab(", "oklch(", "color("};
+  static const char* kColorFns[] = {"rgb(", "rgba(", "hsl(",   "hsla(",  "hwb(",
+                                    "lab(", "lch(",  "oklab(", "oklch(", "color("};
   for (const char* fn : kColorFns) {
     if (lower.rfind(fn, 0) == 0) return true;
   }
