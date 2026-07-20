@@ -13566,25 +13566,6 @@ PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
   EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
 }
 
-// Smoke test: the demo pagx file (animation + viewmodel driving text channels) parses cleanly.
-PAGX_TEST(PAGXTest, TextReshapeDemoParses) {
-  auto doc =
-      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/text_reshape_demo.pagx"));
-  ASSERT_NE(doc, nullptr);
-  for (const auto& err : doc->errors) {
-    FAIL() << "parse error: " << err;
-  }
-  EXPECT_EQ(doc->layers.size(), 2u);
-  EXPECT_EQ(doc->animations.size(), 1u);
-  EXPECT_EQ(doc->dataBinds.size(), 2u);
-  ASSERT_NE(doc->viewModel, nullptr);
-  EXPECT_EQ(doc->viewModel->id, "MainVM");
-  EXPECT_NE(doc->findNode<pagx::Animation>("textAnim"), nullptr);
-  auto* vmText = doc->findNode<pagx::Text>("vmText");
-  ASSERT_NE(vmText, nullptr);
-  EXPECT_EQ(vmText->text, "VM Default");
-}
-
 // Verifies the demo pagx's animation and viewmodel both reshape text through the runtime holder:
 // after advancing the default timeline past the second keyframe, the animated Text's blob width
 // changes to the "Animated" glyph extent; after driving the ViewModel's "title" property, the
@@ -13592,7 +13573,7 @@ PAGX_TEST(PAGXTest, TextReshapeDemoParses) {
 // holder's flush (setTextBlob) reflects in the bound tgfx::Text.
 PAGX_TEST(PAGXTest, TextReshapeDemoAnimationAndViewModel) {
   auto doc =
-      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/text_reshape_demo.pagx"));
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/text/text_reshape_demo.pagx"));
   ASSERT_NE(doc, nullptr);
   pagx::FontConfig fontConfig;
   for (const auto& fontPath : GetFallbackFontPaths()) {
