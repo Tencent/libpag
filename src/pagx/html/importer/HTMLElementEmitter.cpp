@@ -165,7 +165,17 @@ std::string ExtractCssUrl(const std::string& value) {
       inner.back() == inner.front()) {
     inner = inner.substr(1, inner.size() - 2);
   }
-  return Trim(inner);
+  std::string unescaped;
+  unescaped.reserve(inner.size());
+  for (size_t i = 0; i < inner.size(); ++i) {
+    if (inner[i] == '\\' && i + 1 < inner.size() &&
+        (inner[i + 1] == '\\' || inner[i + 1] == '\'' || inner[i + 1] == '"')) {
+      unescaped.push_back(inner[++i]);
+    } else {
+      unescaped.push_back(inner[i]);
+    }
+  }
+  return Trim(unescaped);
 }
 
 // Decodes a single hex digit to its 0-15 value, or -1 when not a hex digit.

@@ -42,6 +42,12 @@ describe('normalizeBackgroundImage', () => {
     expect(out).not.toContain('"');
   });
 
+  test('escapes an apostrophe inside a single-quoted CSS url', () => {
+    const out = normalizeBackgroundImage(`url("/tmp/b's.png")`);
+    expect(out).toBe("url('/tmp/b\\'s.png')");
+    expect(out).not.toContain('"');
+  });
+
   test('passes gradients through unchanged', () => {
     const grad = 'linear-gradient(90deg, rgb(0, 0, 0) 0%, rgb(255, 255, 255) 100%)';
     expect(normalizeBackgroundImage(grad)).toBe(grad);

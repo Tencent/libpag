@@ -106,9 +106,15 @@ function normalizeBackgroundImage(value) {
   }
   const trimmed = value.trim();
   if (/^url\(/i.test(trimmed)) {
-    const m = /^url\(\s*(['"]?)([^'")]+)\1\s*\)$/i.exec(trimmed);
+    const m = /^url\(\s*([\s\S]*?)\s*\)$/i.exec(trimmed);
     if (!m) return '';
-    let url = m[2];
+    let url = m[1].trim();
+    if (url[0] === '"' || url[0] === "'") {
+      if (url.length < 2 || url[url.length - 1] !== url[0]) return '';
+      url = url.slice(1, -1);
+    } else if (/[\s'"]/.test(url)) {
+      return '';
+    }
     if (/^file:/i.test(url)) {
       try {
         const u = new URL(url);
@@ -126,10 +132,12 @@ function normalizeBackgroundImage(value) {
     // quotes), so a double-quoted url() here would prematurely close the style
     // attribute and break the importer's XML parse. CSS treats url("…") and
     // url('…') as equivalent, and the importer's ExtractCssUrl strips either
-    // quote style, so single quotes round-trip cleanly. Any embedded double
-    // quote in the path is still rewritten to a single quote so it can never
-    // close the surrounding attribute.
-    return `url('${url.replace(/"/g, "'")}')`;
+    // quote style, so single quotes round-trip cleanly. Escape backslashes and
+    // embedded single quotes for the CSS string; rewrite double quotes so none
+    // can close the surrounding HTML attribute. ExtractCssUrl reverses these
+    // simple CSS escapes when the snapshot is imported.
+    const escaped = url.replace(/\\/g, '\\\\').replace(/"/g, "'").replace(/'/g, "\\'");
+    return `url('${escaped}')`;
   }
   if (/url\(/i.test(value)) return '';
   return '';

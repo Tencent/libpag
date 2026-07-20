@@ -553,6 +553,11 @@ void HTMLLayerBuilder::forwardDataAttributes(Layer* layer,
     if (attr.name.compare(0, 5, "data-") != 0) continue;
     std::string key = attr.name.substr(5);
     if (IsValidCustomDataKey(key)) {
+      auto existing = layer->customData.find(key);
+      if (existing != layer->customData.end() && existing->second != attr.value) {
+        _diagnostics.warn("html: data-* attribute '" + attr.name +
+                          "' overrides an existing custom data value");
+      }
       layer->customData[key] = attr.value;
     } else {
       _diagnostics.warn("html: invalid data-* attribute name '" + attr.name + "'");

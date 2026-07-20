@@ -46,6 +46,11 @@ static constexpr const char* HTML_DEFAULT_FONT_FAMILY = "Arial";
  */
 static constexpr const char* HTML_DEFAULT_FONT_STYLE = "Regular";
 
+/** Returns a concrete PAGX font style name for a resolved HTML face. */
+inline std::string ResolveHTMLFontStyleName(const std::string& fontStyleName) {
+  return fontStyleName.empty() ? HTML_DEFAULT_FONT_STYLE : fontStyleName;
+}
+
 /**
  * Default text colour used when no `color` is inherited; matches the CSS default for
  * <body> in `ElementDefaults()`.

@@ -1255,6 +1255,19 @@ bool MergeAdjacentGroupsInLayer(Layer* layer) {
 // proof of equality: parent and child may measure from different contents, and percentage-sized
 // descendants would then resolve against a different box after reparenting. Require each axis to
 // be either an exact concrete match or an explicit 100% fill.
+bool IsZeroOrUnset(float value) {
+  return std::isnan(value) || value == 0.0f;
+}
+
+bool AxisFills(float childSize, float parentSize, float childPercent) {
+  // Percentage sizing takes precedence over the absolute field in constraint layout, so a
+  // programmatically-built node carrying both must be judged by its percentage.
+  if (!std::isnan(childPercent)) {
+    return childPercent == 100.0f;
+  }
+  return !std::isnan(childSize) && !std::isnan(parentSize) && childSize == parentSize;
+}
+
 bool ChildFillsParent(const Layer* parent, const Layer* child) {
   if (child->x != 0.0f || child->y != 0.0f) {
     return false;
@@ -1262,8 +1275,7 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
   if (!child->matrix.isIdentity() || !child->matrix3D.isIdentity()) {
     return false;
   }
-  auto zeroOrUnset = [](float v) { return std::isnan(v) || v == 0.0f; };
-  if (!zeroOrUnset(child->left) || !zeroOrUnset(child->top)) {
+  if (!IsZeroOrUnset(child->left) || !IsZeroOrUnset(child->top)) {
     return false;
   }
   if (!std::isnan(child->right) || !std::isnan(child->bottom) || !std::isnan(child->centerX) ||
@@ -1274,18 +1286,8 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
   if (!parent->padding.isZero()) {
     return false;
   }
-  auto axisFills = [](float childSize, float parentSize, float childPercent) {
-    // Percentage sizing takes precedence over the absolute field in constraint layout, so a
-    // programmatically-built node carrying both must be judged by its percentage.
-    if (!std::isnan(childPercent)) {
-      return childPercent == 100.0f;
-    }
-    bool concreteMatch =
-        !std::isnan(childSize) && !std::isnan(parentSize) && childSize == parentSize;
-    return concreteMatch;
-  };
-  return axisFills(child->width, parent->width, child->percentWidth) &&
-         axisFills(child->height, parent->height, child->percentHeight);
+  return AxisFills(child->width, parent->width, child->percentWidth) &&
+         AxisFills(child->height, parent->height, child->percentHeight);
 }
 
 // The child applies nothing that would change how its payload is painted once it is reparented into

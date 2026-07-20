@@ -1608,6 +1608,29 @@ CLI_TEST(PAGXOptimizerTest, CollapseDropsShellParent) {
   EXPECT_FLOAT_EQ(child->left, 5.0f);
 }
 
+// Bottom-up recursion plus the local fixed-point loop collapses an arbitrarily nested shell chain
+// in one optimizer pass, leaving the painted leaf as the sole top-level layer.
+CLI_TEST(PAGXOptimizerTest, CollapseDropsNestedShellChainInOnePass) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* outer = AddTopLayer(doc.get());
+  auto* middle = doc->makeNode<Layer>();
+  auto* inner = doc->makeNode<Layer>();
+  auto* leaf = doc->makeNode<Layer>();
+  leaf->width = 40;
+  leaf->height = 20;
+  AddRectFill(doc.get(), leaf, 40, 20);
+  inner->children.push_back(leaf);
+  middle->children.push_back(inner);
+  outer->children.push_back(middle);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_EQ(doc->layers.front(), leaf);
+  EXPECT_TRUE(leaf->children.empty());
+  ASSERT_EQ(leaf->contents.size(), 2u);
+}
+
 // A child that applies its own opacity must NOT be absorbed — the alpha would be lost.
 CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithAlpha) {
   auto doc = PAGXDocument::Make(100, 100);

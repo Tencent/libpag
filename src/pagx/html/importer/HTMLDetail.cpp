@@ -205,6 +205,7 @@ void ApplyBackgroundShorthand(const std::string& value,
 
   auto layers = SplitTopLevelCommas(Trim(value));
   std::vector<std::string> imageLayers;
+  bool hasURLImage = false;
   std::string colorToken;
   std::string positionValue;
   std::string sizeValue;
@@ -240,21 +241,32 @@ void ApplyBackgroundShorthand(const std::string& value,
       }
     }
     if (!imageToken.empty()) {
+      bool isURLImage = ToLower(imageToken).rfind("url(", 0) == 0;
       imageLayers.push_back(std::move(imageToken));
-      // PAGX currently consumes fitting properties only for a single url() background. Retaining
-      // the last painted image layer matches the previous supported subset while preserving both
-      // repeat axes when the CSS uses the two-keyword form.
-      if (!positionTokens.empty()) positionValue = JoinStyleTokens(positionTokens);
-      if (!sizeTokens.empty()) sizeValue = JoinStyleTokens(sizeTokens);
-      if (!repeatTokens.empty()) repeatValue = JoinStyleTokens(repeatTokens);
+      hasURLImage |= isURLImage;
+      // PAGX can stack gradients, but its ImagePattern path consumes only one image layer. Keep
+      // the fitting values from the CSS-topmost image so they stay paired with the same layer if
+      // the shorthand has to be reduced to one image below.
+      if (imageLayers.size() == 1) {
+        positionValue = JoinStyleTokens(positionTokens);
+        sizeValue = JoinStyleTokens(sizeTokens);
+        repeatValue = JoinStyleTokens(repeatTokens);
+      }
     }
   }
 
   if (!imageLayers.empty()) {
     std::string joinedImages;
-    for (const auto& image : imageLayers) {
-      if (!joinedImages.empty()) joinedImages += ", ";
-      joinedImages += image;
+    if (hasURLImage) {
+      // Mixed/url stacks cannot be represented by one PAGX ImagePattern. CSS paints the first
+      // listed image on top, so retain that layer and its position/size/repeat values rather than
+      // pairing a multi-layer image list with unrelated fitting data.
+      joinedImages = imageLayers.front();
+    } else {
+      for (const auto& image : imageLayers) {
+        if (!joinedImages.empty()) joinedImages += ", ";
+        joinedImages += image;
+      }
     }
     out["background-image"] = std::move(joinedImages);
     out["background-position"] = std::move(positionValue);

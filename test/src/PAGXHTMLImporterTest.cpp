@@ -362,6 +362,28 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandColorPlusGradient) {
   EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
 }
 
+// PAGX represents a URL background with one ImagePattern. When a shorthand contains multiple
+// image layers, retain the CSS-topmost layer and the fitting properties declared on that same
+// layer instead of pairing the image with a lower layer's size/repeat/position.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandKeepsTopImageFittingTogether) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;
+                  background:url(top.png) center / contain no-repeat,
+                             url(bottom.png) left top / cover repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_EQ(pattern->image->filePath, "top.png");
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
+}
+
 // A higher-priority shorthand resets every background longhand supplied by a lower-priority rule.
 // In particular, an inline colour-only background must clear a class-provided image.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandResetsLowerPriorityLonghands) {
@@ -1277,14 +1299,10 @@ PAG_TEST(PAGXHTMLImporterTest, WhiteSpacePreKeepsSpacesVerbatim) {
       "</body></html>");
   ASSERT_NE(doc, nullptr);
   auto* leaf = doc->layers.front()->children.front();
+  EXPECT_EQ(FindElementOfType<pagx::TextBox>(leaf), nullptr);
   std::vector<pagx::Text*> texts;
   std::vector<pagx::Fill*> fills;
-  if (auto* tb = FindElementOfType<pagx::TextBox>(leaf)) {
-    EXPECT_FALSE(tb->wordWrap);
-    GatherTextRuns(tb->elements, &texts, &fills);
-  } else {
-    GatherTextRuns(leaf->contents, &texts, &fills);
-  }
+  GatherTextRuns(leaf->contents, &texts, &fills);
   ASSERT_FALSE(texts.empty());
   const std::string& t = texts.front()->text;
   EXPECT_NE(t.find("A   B"), std::string::npos);
@@ -3146,6 +3164,30 @@ PAG_TEST(PAGXHTMLImporterTest, DataStarAttributesPropagateOnFoldedRoundedImage) 
   EXPECT_EQ(wrapper->customData["id"], "avatar");
 }
 
+// The folded <img> is the more specific payload node, so its data value wins over the structural
+// wrapper's value. The lossy collision is surfaced as a diagnostic rather than silently ignored.
+PAG_TEST(PAGXHTMLImporterTest, FoldedImageDataConflictWarnsAndImageWins) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:64px;height:64px">
+      <div data-id="wrapper" style="width:64px;height:64px;border-radius:9999px;overflow:hidden">
+        <img src="avatar.png" data-id="image" style="position:absolute;left:0;top:0;width:64px;height:64px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_EQ(wrapper->customData["id"], "image");
+  bool foundConflict = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("data-id") != std::string::npos &&
+        error.find("overrides") != std::string::npos) {
+      foundConflict = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundConflict);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, IdAttributePropagatesToLayer) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -3322,6 +3364,23 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeContainMapsToLetterBox) {
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
+}
+
+// html-snapshot escapes apostrophes inside its single-quoted CSS url(). The importer removes that
+// simple CSS escape so local paths keep their actual filename.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageUnescapesQuotedURL) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:120px">
+      <div style="width:160px;height:120px;background-image:url('/tmp/b\'s.png')"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_EQ(pattern->image->filePath, "/tmp/b's.png");
 }
 
 // `background-size: cover` → Zoom.
