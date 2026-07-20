@@ -38,9 +38,14 @@
 #include "cli/FormatUtils.h"
 #include "cli/LayoutUtils.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/DataBind.h"
+#include "pagx/nodes/DataConverter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -60,11 +65,17 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineTimeline.h"
+#include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/nodes/ViewModel.h"
+#include "pagx/nodes/ViewModelProperty.h"
 #include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -302,6 +313,88 @@ static void CollectRefsFromLayer(const Layer* layer, std::unordered_set<std::str
   for (auto* child : layer->children) {
     CollectRefsFromLayer(child, refs);
   }
+  // Timelines reference document-level Animation / StateMachine definitions by id.
+  for (const auto& timeline : layer->timelines) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    if (timeline->timelineType() == TimelineType::Animation) {
+      const auto& id = static_cast<const AnimationTimeline*>(timeline.get())->animationId;
+      if (!id.empty()) refs.insert(id);
+    } else if (timeline->timelineType() == TimelineType::StateMachine) {
+      const auto& id = static_cast<const StateMachineTimeline*>(timeline.get())->stateMachineId;
+      if (!id.empty()) refs.insert(id);
+    }
+  }
+}
+
+// Records ids referenced by a ViewModel's property declarations. A property may reference a
+// DataConverter (via dataConverter) and a nested ViewModel (via viewModelRef), both by id.
+static void CollectRefsFromViewModel(const ViewModel* vm, std::unordered_set<std::string>& refs) {
+  if (vm == nullptr) {
+    return;
+  }
+  for (auto* prop : vm->properties) {
+    if (prop == nullptr) {
+      continue;
+    }
+    if (prop->dataConverter != nullptr && !prop->dataConverter->id.empty()) {
+      refs.insert(prop->dataConverter->id);
+    }
+    if (prop->viewModelRef != nullptr && !prop->viewModelRef->id.empty()) {
+      refs.insert(prop->viewModelRef->id);
+    }
+    if (prop->defaultImage != nullptr && !prop->defaultImage->id.empty()) {
+      refs.insert(prop->defaultImage->id);
+    }
+  }
+}
+
+// Records ids referenced by a DataBind. `target` is an "@id" reference to a render node; `source`
+// is a "$vm.name" path that names the owning ViewModel via its doc-level `viewModel` binding, so
+// only the target id is resolvable here. The source ViewModel is covered by doc->viewModel.
+static void CollectRefsFromDataBind(const DataBind* bind, std::unordered_set<std::string>& refs) {
+  if (bind == nullptr) {
+    return;
+  }
+  if (!bind->target.empty() && bind->target[0] == '@') {
+    refs.insert(bind->target.substr(1));
+  }
+}
+
+// Records ids referenced by an Animation's objects (each object targets a render node by id).
+static void CollectRefsFromAnimation(const Animation* animation,
+                                     std::unordered_set<std::string>& refs) {
+  if (animation == nullptr) {
+    return;
+  }
+  for (auto* object : animation->objects) {
+    if (object == nullptr || object->target.empty()) {
+      continue;
+    }
+    refs.insert(object->target);
+  }
+}
+
+// Records ids referenced by a StateMachine: each AnimationState.animation points at an Animation,
+// and each StateMachineInput.defaultImage (if any) points at an Image resource.
+static void CollectRefsFromStateMachine(const StateMachine* sm,
+                                        std::unordered_set<std::string>& refs) {
+  if (sm == nullptr) {
+    return;
+  }
+  for (auto* region : sm->regions) {
+    if (region == nullptr) {
+      continue;
+    }
+    for (auto* state : region->states) {
+      if (state == nullptr || state->stateType() != StateType::Animation) {
+        continue;
+      }
+      const auto& id = static_cast<const AnimationState*>(state)->animationId;
+      if (!id.empty()) refs.insert(id);
+    }
+  }
 }
 
 static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std::string>& refs) {
@@ -314,6 +407,39 @@ static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std
       for (auto* layer : comp->layers) {
         CollectRefsFromLayer(layer, refs);
       }
+      if (comp->viewModel != nullptr && !comp->viewModel->id.empty()) {
+        refs.insert(comp->viewModel->id);
+      }
+    }
+  }
+  // Document-level ViewModel binding (pagx viewModel="@id") makes the referenced ViewModel — and
+  // every property on it — "used" even when no DataBind names it explicitly.
+  if (doc->viewModel != nullptr) {
+    refs.insert(doc->viewModel->id);
+    for (auto* prop : doc->viewModel->properties) {
+      if (prop != nullptr && !prop->id.empty()) {
+        refs.insert(prop->id);
+      }
+    }
+  }
+  // DataBind targets and Animation object targets reference render nodes by id.
+  for (auto* node : doc->dataBinds) {
+    CollectRefsFromDataBind(static_cast<const DataBind*>(node), refs);
+  }
+  for (auto* node : doc->animations) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() == NodeType::Animation) {
+      CollectRefsFromAnimation(static_cast<const Animation*>(node), refs);
+    } else if (node->nodeType() == NodeType::StateMachine) {
+      CollectRefsFromStateMachine(static_cast<const StateMachine*>(node), refs);
+    }
+  }
+  // ViewModel property declarations may reference DataConverter / nested ViewModel resources.
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::ViewModel) {
+      CollectRefsFromViewModel(static_cast<const ViewModel*>(node.get()), refs);
     }
   }
 }

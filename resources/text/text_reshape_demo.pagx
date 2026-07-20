@@ -8,20 +8,16 @@
   </Resources>
 
   <Layer id="animLayer" name="AnimText" width="400" height="100">
-    <Group>
-      <Text id="animText" text="Hello" fontFamily="NotoSansSC" fontSize="40" position="20,70"/>
-      <Fill color="#000000"/>
-    </Group>
+    <Text id="animText" text="Hello" fontFamily="NotoSansSC" fontSize="40" position="20,70"/>
+    <Fill color="#000000"/>
     <Timelines>
       <Animation ref="@textAnim"/>
     </Timelines>
   </Layer>
 
   <Layer id="vmLayer" name="VMText" width="400" height="100" y="100">
-    <Group>
-      <Text id="vmText" text="VM Default" fontFamily="NotoSansSC" fontSize="40" position="20,170"/>
-      <Fill color="#0000FF"/>
-    </Group>
+    <Text id="vmText" text="VM Default" fontFamily="NotoSansSC" fontSize="40" position="20,170"/>
+    <Fill color="#0000FF"/>
   </Layer>
 
   <DataBind source="$vm.title" target="@vmText" channel="text"/>
