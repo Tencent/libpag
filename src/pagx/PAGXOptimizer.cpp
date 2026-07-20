@@ -1251,9 +1251,10 @@ bool MergeAdjacentGroupsInLayer(Layer* layer) {
 // ----------------------------------------------------------------------------
 
 // The child occupies the parent's whole content box with no offset / transform of its own, so
-// flattening it leaves its payload in exactly the same place. Sizes are concrete post-resolve, so
-// exact equality is the right comparison (auto==auto also fills, since the parent then sizes to the
-// child regardless).
+// flattening it leaves its payload in exactly the same place. A content-sized (NaN) axis is not
+// proof of equality: parent and child may measure from different contents, and percentage-sized
+// descendants would then resolve against a different box after reparenting. Require each axis to
+// be either an exact concrete match or an explicit 100% fill.
 bool ChildFillsParent(const Layer* parent, const Layer* child) {
   if (child->x != 0.0f || child->y != 0.0f) {
     return false;
@@ -1273,11 +1274,18 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
   if (!parent->padding.isZero()) {
     return false;
   }
-  auto sameDim = [](float a, float b) { return (std::isnan(a) && std::isnan(b)) || a == b; };
-  bool explicitMatch =
-      sameDim(child->width, parent->width) && sameDim(child->height, parent->height);
-  bool percentFill = child->percentWidth == 100.0f && child->percentHeight == 100.0f;
-  return explicitMatch || percentFill;
+  auto axisFills = [](float childSize, float parentSize, float childPercent) {
+    // Percentage sizing takes precedence over the absolute field in constraint layout, so a
+    // programmatically-built node carrying both must be judged by its percentage.
+    if (!std::isnan(childPercent)) {
+      return childPercent == 100.0f;
+    }
+    bool concreteMatch =
+        !std::isnan(childSize) && !std::isnan(parentSize) && childSize == parentSize;
+    return concreteMatch;
+  };
+  return axisFills(child->width, parent->width, child->percentWidth) &&
+         axisFills(child->height, parent->height, child->percentHeight);
 }
 
 // The child applies nothing that would change how its payload is painted once it is reparented into
@@ -1292,7 +1300,8 @@ bool ChildHasNoPaintAffectingEffect(const Layer* child) {
          !child->clipToBounds && child->mask == nullptr && child->composition == nullptr &&
          child->compositionFilePath.empty() && child->externalDoc == nullptr &&
          child->timelines.empty() && child->styles.empty() && child->filters.empty() &&
-         child->customData.empty() && child->vmContext.empty() && child->layout == LayoutMode::None;
+         child->customData.empty() && child->vmContext.empty() && child->padding.isZero() &&
+         child->layout == LayoutMode::None;
 }
 
 bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
@@ -1307,8 +1316,13 @@ bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
   if (LayerNeedsKeeping(child, maskRefs)) {
     return false;  // child is referenced as a mask elsewhere
   }
-  if (!child->id.empty() && !parent->id.empty()) {
-    return false;  // cannot preserve two ids on one surviving layer
+  // An identified/named layer is externally observable even when no current document node points
+  // at it: animations, data binds, host lookups, and later edits may target it. Moving its identity
+  // onto the parent changes the scope of those operations (and assigning an id directly would also
+  // leave PAGXDocument's id index pointing at the detached child), so only anonymous wrappers may
+  // be dissolved.
+  if (!child->id.empty() || !child->name.empty()) {
+    return false;
   }
   if (!ChildHasNoPaintAffectingEffect(child)) {
     return false;
@@ -1348,12 +1362,6 @@ void AbsorbFillingChild(Layer* parent, Layer* child) {
   parent->gap = 0.0f;
   parent->alignment = Alignment::Stretch;
   parent->arrangement = Arrangement::Start;
-  if (parent->id.empty()) {
-    parent->id = child->id;
-  }
-  if (parent->name.empty()) {
-    parent->name = child->name;
-  }
 }
 
 // The parent is a pure shell (all attributes default, no contents), so it contributes nothing and

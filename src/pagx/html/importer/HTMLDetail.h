@@ -85,6 +85,8 @@ std::vector<std::pair<std::string, std::string>> ParseStyleDeclarations(const st
 
 // Parse a CSS style string into a property map. Later properties override earlier ones.
 // Property names are lower-cased before insertion so callers can use canonical CSS names.
+// `background` is expanded in source order into the supported longhands; empty internal values
+// act as cascade resets and are omitted when the final inline style is emitted.
 // Thin wrapper over `ParseStyleDeclarations` — see it for syntactic guarantees.
 void ParseStyleString(const std::string& styleStr,
                       std::unordered_map<std::string, std::string>& out);

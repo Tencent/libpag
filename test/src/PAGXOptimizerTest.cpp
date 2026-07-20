@@ -1342,6 +1342,112 @@ CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithAlpha) {
   EXPECT_TRUE(parent->contents.empty());
 }
 
+// Padding changes the constraint frame used to lay out the child's contents. Dissolving this layer
+// would make percentage/constrained elements resolve against the parent's unpadded frame.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithPadding) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 100;
+  parent->height = 100;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 100;
+  child->height = 100;
+  child->padding = {10, 10, 10, 10};
+  auto* rect = doc->makeNode<Rectangle>();
+  rect->percentWidth = 100;
+  rect->percentHeight = 100;
+  child->contents.push_back(rect);
+  child->contents.push_back(MakeSolidFill(doc.get(), 1, 0, 0));
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_TRUE(parent->contents.empty());
+}
+
+// An id makes the child externally observable through animations, data binds, host lookups, and
+// future edits. Moving that id to a parent that may have its own contents changes the target scope.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsIdentifiedChild) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 100;
+  parent->height = 100;
+  AddRectFill(doc.get(), parent, 100, 100);
+  auto* child = doc->makeNode<Layer>("animated");
+  child->width = 100;
+  child->height = 100;
+  AddRectFill(doc.get(), child, 50, 50);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_EQ(doc->findNode("animated"), child);
+  EXPECT_EQ(parent->contents.size(), 2u);
+}
+
+// Two auto/content-sized axes are not evidence that the resolved boxes match: parent and child can
+// measure from different payloads, and reparenting percentage descendants would change their frame.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsUnprovenAutoSizedChild) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+}
+
+// Fill proof is per-axis: an exact concrete width plus a 100%-height constraint is as safe as two
+// concrete matches and should retain the useful optimisation.
+CLI_TEST(PAGXOptimizerTest, CollapseAbsorbsMixedConcreteAndPercentFill) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->percentHeight = 100;
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  EXPECT_TRUE(parent->children.empty());
+  ASSERT_EQ(parent->contents.size(), 2u);
+}
+
+// Percentage constraints take precedence over absolute dimensions. A malformed/programmatically
+// built node can carry both, so matching absolute dimensions must not hide a non-filling percent.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsNonFillingPercentDespiteMatchingAbsoluteSize) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  child->percentWidth = 50;
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_TRUE(parent->contents.empty());
+}
+
 // A filling child that carries non-geometric semantics (an external composition, a databind
 // context, ...) must NOT be absorbed — dropping the child layer would discard that content/binding.
 CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithComposition) {

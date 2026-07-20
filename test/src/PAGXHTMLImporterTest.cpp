@@ -287,7 +287,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundColorBecomesRectangleAndFill) {
 
 // Regression: a colour-only `background` shorthand (e.g. `background:#FF0000`) must paint the
 // same fill as the `background-color` longhand. The subset property table only lists the longhand,
-// so ComputedStylePass expands the shorthand before PropertyFilterPass would otherwise drop it.
+// so declaration parsing expands the shorthand before PropertyFilterPass would otherwise drop it.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandColorBecomesFill) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:100px;height:50px">
@@ -359,6 +359,54 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandColorPlusGradient) {
   ASSERT_NE(lg, nullptr);
   ASSERT_EQ(lg->colorStops.size(), 2u);
   EXPECT_TRUE(ColorNear(lg->colorStops.front()->color, HexColor(0xFF0000)));
+}
+
+// A higher-priority shorthand resets every background longhand supplied by a lower-priority rule.
+// In particular, an inline colour-only background must clear a class-provided image.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandResetsLowerPriorityLonghands) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>
+      .card { background-image:linear-gradient(90deg,#FF0000,#0000FF); }
+    </style></head><body style="width:50px;height:50px">
+      <div class="card" style="width:50px;height:50px;background:#00FF00"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* solid = As<pagx::SolidColor>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x00FF00)));
+}
+
+// Shorthand/longhand precedence within one declaration block follows source order in both
+// directions: a later shorthand resets an earlier image, while a later longhand overrides the
+// corresponding component produced by an earlier shorthand.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandAndLonghandHonorSourceOrder) {
+  auto earlierImage = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:linear-gradient(90deg,#FF0000,#0000FF);
+                  background:#00FF00"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(earlierImage, nullptr);
+  auto* firstFill = FindElementOfType<pagx::Fill>(earlierImage->layers.front()->children.front());
+  ASSERT_NE(firstFill, nullptr);
+  auto* solid = As<pagx::SolidColor>(firstFill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x00FF00)));
+
+  auto laterImage = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background:#00FF00;
+                  background-image:linear-gradient(90deg,#FF0000,#0000FF)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(laterImage, nullptr);
+  auto* secondFill = FindElementOfType<pagx::Fill>(laterImage->layers.front()->children.front());
+  ASSERT_NE(secondFill, nullptr);
+  EXPECT_NE(As<pagx::LinearGradient>(secondFill->color), nullptr);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BorderRadiusMapsToRoundness) {
