@@ -9,6 +9,7 @@ process.argv.push("../src");
 process.argv.push("-p");
 process.argv.push("web");
 process.argv.push("pag");
+require("./setup.emsdk");
 require("../../build_pag");
 
 const getArgValue = (argName, defaultValue = "wasm") => process.argv.includes(argName) ? process.argv[process.argv.indexOf(argName) + 1] : defaultValue;
