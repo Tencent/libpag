@@ -158,7 +158,7 @@ export interface _PAGXView {
   /**
    * Returns the frame rate of the animation.
    */
-  _currentFrameRate(): number;
+  _frameRate(): number;
 
   /**
    * Sets the current playback time in microseconds.

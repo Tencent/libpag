@@ -57,7 +57,7 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("_durationMicros", optional_override([](pagx::PAGXView& self) -> double {
                   return static_cast<double>(self.durationMicros());
                 }))
-      .function("_currentFrameRate", &pagx::PAGXView::currentFrameRate)
+      .function("_frameRate", &pagx::PAGXView::frameRate)
       .function("_setCurrentTimeMicros", optional_override([](pagx::PAGXView& self, double micros) {
                   self.setCurrentTimeMicros(static_cast<int64_t>(micros));
                 }))

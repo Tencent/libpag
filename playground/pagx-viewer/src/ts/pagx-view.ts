@@ -333,8 +333,8 @@ export class PAGXView {
   /**
    * Returns the frame rate of the animation. Returns 0 if no content is loaded.
    */
-  public currentFrameRate(): number {
-    return this.nativeView._currentFrameRate();
+  public frameRate(): number {
+    return this.nativeView._frameRate();
   }
 
   /**

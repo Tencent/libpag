@@ -849,7 +849,7 @@ function formatTime(microseconds: number): string {
 function getCurrentFrame(): number {
     const view = playgroundState.pagxView;
     if (!view) return 0;
-    const rate = view.currentFrameRate();
+    const rate = view.frameRate();
     if (rate <= 0) return 0;
     return Math.round(Math.max(0, view.currentTimeMicros()) * rate / 1_000_000);
 }
@@ -857,7 +857,7 @@ function getCurrentFrame(): number {
 function getTotalFrames(): number {
     const view = playgroundState.pagxView;
     if (!view) return 0;
-    const rate = view.currentFrameRate();
+    const rate = view.frameRate();
     if (rate <= 0) return 0;
     return Math.ceil(view.durationMicros() * rate / 1_000_000);
 }
@@ -951,7 +951,7 @@ function stepFrame(direction: number): void {
     if (!view) {
         return;
     }
-    const rate = view.currentFrameRate();
+    const rate = view.frameRate();
     const duration = view.durationMicros();
     if (rate <= 0 || duration <= 0) {
         return;
@@ -964,12 +964,9 @@ function stepFrame(direction: number): void {
 }
 
 function hidePlaybackUI(): void {
-    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-    const playbackBar = document.getElementById('playback-bar') as HTMLDivElement;
-    canvas.classList.add('hidden');
-    toolbar.classList.add('hidden');
-    playbackBar.classList.add('hidden');
+    document.getElementById('pagx-canvas')?.classList.add('hidden');
+    document.getElementById('toolbar')?.classList.add('hidden');
+    document.getElementById('playback-bar')?.classList.add('hidden');
 }
 
 const DEFAULT_TITLE = 'PAGX Playground';
@@ -979,14 +976,10 @@ function goHome(pushHistory: boolean = true): void {
         playgroundState.pagxView.clear();
         gestureManager.resetTransform(playgroundState);
     }
-    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-    const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
-    const playbackBar = document.getElementById('playback-bar') as HTMLDivElement;
-    canvas.classList.add('hidden');
-    toolbar.classList.add('hidden');
-    playbackBar.classList.add('hidden');
-    navBtns.classList.remove('hidden');
+    document.getElementById('pagx-canvas')?.classList.add('hidden');
+    document.getElementById('toolbar')?.classList.add('hidden');
+    document.getElementById('playback-bar')?.classList.add('hidden');
+    document.getElementById('nav-btns')?.classList.remove('hidden');
     document.title = DEFAULT_TITLE;
     showDropZoneUI();
     currentPlayingFile = null;
@@ -1039,6 +1032,17 @@ async function loadExternalFiles(baseURL: string): Promise<void> {
     await Promise.all(fetches);
 }
 
+// Shared post-reparse UI refresh. Any call site that runs parsePAGX + buildLayers must invoke
+// this so the canvas backing store, playback bar visibility and playback UI values stay in sync
+// with the newly parsed document; forgetting it leaves the UI stuck on the previous file's
+// duration/dimensions.
+function refreshUIAfterReparse(): void {
+    updateSize();
+    // showPlaybackBar handles the static-image case (duration === 0 → hide) and refreshes the
+    // slider / time / loop icon internally when the bar becomes visible.
+    showPlaybackBar();
+}
+
 async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
     const toolbar = document.getElementById('toolbar') as HTMLDivElement;
@@ -1056,14 +1060,13 @@ async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
     // opened file starts fresh instead of inheriting the previous file's loop toggle.
     playgroundState.pagxView.setLoop(true);
     gestureManager.resetTransform(playgroundState);
-    updateSize();
+    refreshUIAfterReparse();
     // Draw the first frame before showing canvas to avoid flashing old content
     playgroundState.pagxView.draw();
     hideDropZone();
     canvas.classList.remove('hidden');
     toolbar.classList.remove('hidden');
     navBtns.classList.add('hidden');
-    showPlaybackBar();
     document.title = 'PAGX Playground - ' + name;
     currentFileName = name;
 
@@ -1342,19 +1345,35 @@ function setupPlaybackControls(): void {
         });
     }
 
-    // Keyboard shortcut: Space for play/pause
+    // Keyboard shortcuts: Space toggles play/pause, ArrowLeft/ArrowRight step one frame.
+    // Guards are shared across shortcuts:
+    //   - text-entry targets (input/textarea/contentEditable) never trigger playback shortcuts;
+    //   - when the progress slider itself holds focus, ArrowLeft/Right must fall through to the
+    //     native range control (fine-grained scrub) rather than jumping a whole frame; Space
+    //     however still toggles playback so the user can pause without leaving the slider;
+    //   - no file loaded (canvas hidden) → do nothing so the shortcut can't be misused before
+    //     the drop-zone is dismissed.
     document.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.code !== 'Space') return;
-        // Ignore only text entry fields; the range slider must still respond to Space.
+        const isPlayPause = e.code === 'Space';
+        const stepDirection = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
+        if (!isPlayPause && stepDirection === 0) return;
         const target = e.target;
         const isTextInput =
             (target instanceof HTMLInputElement && target.type !== 'range') ||
-            target instanceof HTMLTextAreaElement;
+            target instanceof HTMLTextAreaElement ||
+            (target instanceof HTMLElement && target.isContentEditable);
         if (isTextInput) return;
+        // Range slider owns Arrow keys for scrub; only Space passes through to play/pause.
+        const isRangeSlider = target instanceof HTMLInputElement && target.type === 'range';
+        if (isRangeSlider && !isPlayPause) return;
         const canvas = document.getElementById('pagx-canvas');
         if (!canvas || canvas.classList.contains('hidden')) return;
         e.preventDefault();
-        togglePlayback();
+        if (isPlayPause) {
+            togglePlayback();
+        } else {
+            stepFrame(stepDirection);
+        }
     });
 
     // Update playback UI periodically. Also fire once on the play -> stop transition so the slider,
@@ -1585,6 +1604,12 @@ if (typeof window !== 'undefined') {
 
         // Encodes XML, reparses and redraws the view. Shared by the editor's Apply
         // and Save actions. Returns '' on success, otherwise an error message.
+        //
+        // Runs the same UI refresh as loadPAGXData's post-parse step so that an edit which
+        // changes the canvas dimensions (width/height attrs) or the animation duration (static
+        // ↔ animated) is fully reflected: canvas backing store is resized, the playback bar
+        // shows/hides, and the time/frame display picks up the new duration instead of showing
+        // the previous file's values.
         const applyXmlToView = (xmlText: string): string => {
             if (playgroundState.pagxView === null) {
                 return 'PAGXView not initialized';
@@ -1593,6 +1618,7 @@ if (typeof window !== 'undefined') {
                 const data = new TextEncoder().encode(xmlText);
                 playgroundState.pagxView.parsePAGX(data);
                 playgroundState.pagxView.buildLayers();
+                refreshUIAfterReparse();
                 playgroundState.pagxView.draw();
                 return '';
             } catch (e) {

@@ -11,8 +11,8 @@
     "build": "npm run prebuild && rollup -c ./scripts/rollup.js",
     "build:release": "node scripts/prebuild.js --release && BUILD_MODE=release rollup -c ./scripts/rollup.js",
     "prebuild:st": "node scripts/prebuild.js --arch st",
-    "build:st": "npm run prebuild:st && ARCH=wasm rollup -c ./scripts/rollup.js",
-    "build:release:st": "node scripts/prebuild.js --arch st --release && ARCH=wasm BUILD_MODE=release rollup -c ./scripts/rollup.js",
+    "build:st": "npm run prebuild:st && ARCH=st rollup -c ./scripts/rollup.js",
+    "build:release:st": "node scripts/prebuild.js --arch st --release && ARCH=st BUILD_MODE=release rollup -c ./scripts/rollup.js",
     "publish": "node scripts/publish.js",
     "server": "node static/server.js"
   },
@@ -38,7 +38,6 @@
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
     "@lezer/highlight": "^1.2.3",
-    "codemirror": "^6.0.2",
     "express": "^4.21.1",
     "highlight.js": "^11.9.0",
     "marked": "^15.0.0",

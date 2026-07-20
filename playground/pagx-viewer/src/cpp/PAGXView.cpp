@@ -511,13 +511,19 @@ int64_t PAGXView::durationMicros() const {
   return 0;
 }
 
-float PAGXView::currentFrameRate() const {
+float PAGXView::frameRate() const {
   if (defaultAnimation != nullptr) {
     return defaultAnimation->frameRate();
   }
   return 0.0f;
 }
 
+// Known limitation: seek only repositions the default (top-level) animation. Nested
+// auto-playing compositions rendered by `scene` are delta-driven via advanceAndApply() and have
+// no absolute-time entry point, so their frame lags behind the main timeline after a scrub:
+// the main animation jumps to `micros` while the nested compositions stay wherever their
+// accumulated delta left them. Acceptable for the MVP viewer; a future fix would need per-scene
+// seek support (or a full scene rebuild) rather than a workaround here.
 void PAGXView::setCurrentTimeMicros(int64_t micros) {
   if (defaultAnimation != nullptr) {
     defaultAnimation->setCurrentTime(micros);

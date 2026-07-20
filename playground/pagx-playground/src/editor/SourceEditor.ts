@@ -16,14 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { EditorView, keymap, lineNumbers, highlightSpecialChars, drawSelection } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { minimalSetup } from 'codemirror';
-import { defaultKeymap, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, historyKeymap, history } from '@codemirror/commands';
 import { xml } from '@codemirror/lang-xml';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { syntaxHighlighting, HighlightStyle, defaultHighlightStyle } from '@codemirror/language';
 import { highlightSelectionMatches } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
+
+// Inline replacement for the `codemirror` meta-package's `minimalSetup`. We depend directly on
+// the @codemirror/* sub-packages so npm never has to reconcile the meta-package's own version
+// pins against ours (mismatched pins spawn duplicate EditorState instances, which then trip
+// instanceof checks inside CodeMirror at runtime). Sourced from codemirror v6's minimalSetup.
+const minimalSetup = [
+    highlightSpecialChars(),
+    history(),
+    drawSelection(),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    keymap.of([...defaultKeymap, ...historyKeymap]),
+];
 
 /** Syntax highlight colors matching the desktop client (VS Code Dark+ palette). */
 const pagxHighlightStyle = HighlightStyle.define([

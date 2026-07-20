@@ -85,7 +85,7 @@ class PAGXView {
   bool isPlaying() const;
   int64_t currentTimeMicros() const;
   int64_t durationMicros() const;
-  float currentFrameRate() const;
+  float frameRate() const;
   void setCurrentTimeMicros(int64_t micros);
   void setLoop(bool loop);
   bool isLoop() const;

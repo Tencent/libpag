@@ -38,9 +38,9 @@ const banner = existsSync(fileHeaderPath) ? readFileSync(fileHeaderPath, 'utf-8'
 const isRelease = process.env.BUILD_MODE === 'release';
 
 // Detect the pagx-viewer arch by checking which glue file was copied into wasm-mt/.
-// This must stay in sync with prebuild.js's auto-detection logic.
+// This must stay in sync with prebuild.js's auto-detection logic (both accept ARCH=st|mt).
 function detectGlueInfix() {
-  if (process.env.ARCH === 'wasm') return '.st';
+  if (process.env.ARCH === 'st') return '.st';
   if (process.env.ARCH === 'mt') return '';
   // No explicit ARCH env: check which .esm.js actually exists.
   if (!existsSync(path.join(playgroundRoot, 'wasm-mt/pagx-viewer.esm.js'))
