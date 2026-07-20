@@ -2815,7 +2815,7 @@ PAGX_TEST(PAGXViewModelTest, TextReshapeByViewModelBaseline) {
   auto* text = doc->makeNode<pagx::Text>("titleText");
   text->text = "Hello";
   text->fontSize = 48;
-  text->position = {20, 80};
+  text->position = {10, 20};
   auto* fill = doc->makeNode<pagx::Fill>();
   auto* color = doc->makeNode<pagx::SolidColor>();
   color->color = {0.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
@@ -2857,7 +2857,7 @@ PAGX_TEST(PAGXViewModelTest, TextReshapeByAnimationBaseline) {
   auto* text = doc->makeNode<pagx::Text>("titleText");
   text->text = "Hello";
   text->fontSize = 48;
-  text->position = {20, 80};
+  text->position = {10, 20};
   auto* fill = doc->makeNode<pagx::Fill>();
   auto* color = doc->makeNode<pagx::SolidColor>();
   color->color = {0.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
@@ -2896,7 +2896,7 @@ PAGX_TEST(PAGXViewModelTest, TextReshapeByAnimationBaseline) {
   // Advance past the second keyframe (frame 60 at 60fps = 1s) so the Hold value is "Animated".
   auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_NE(timeline, nullptr);
-  timeline->setCurrentTime(1'000'000);
+  timeline->advanceAndApply(1'000'000);
   timeline->apply();
   EXPECT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXViewModelTest/TextReshapeByAnimation"));
