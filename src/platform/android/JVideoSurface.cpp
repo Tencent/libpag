@@ -76,7 +76,7 @@ PAG_API jobject Java_org_libpag_VideoSurface_getInputSurface(JNIEnv* env, jobjec
   if (reader == nullptr) {
     return nullptr;
   }
-  return reader->getInputSurface();
+  return reader->createInputSurface();
 }
 
 PAG_API void Java_org_libpag_VideoSurface_notifyFrameAvailable(JNIEnv* env, jobject thiz) {
