@@ -109,14 +109,6 @@ PAG_API void Java_org_libpag_VideoSurface_nativeSetup(JNIEnv* env, jobject thiz,
   setImageStream(env, thiz, new JVideoSurface(imageStream));
 }
 
-PAG_API jobject Java_org_libpag_VideoSurface_getInputSurface(JNIEnv* env, jobject thiz) {
-  auto reader = JVideoSurface::GetImageReader(env, thiz);
-  if (reader == nullptr) {
-    return nullptr;
-  }
-  return reader->getInputSurface();
-}
-
 PAG_API void Java_org_libpag_VideoSurface_notifyFrameAvailable(JNIEnv* env, jobject thiz) {
   auto reader = JVideoSurface::GetImageReader(env, thiz);
   if (reader == nullptr) {
