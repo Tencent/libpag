@@ -322,17 +322,22 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
 void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box,
                                            Element* geometry, bool& emitted) {
   if (!geometry) return;
-  if (box.backgroundColorSet && box.backgroundImage.empty()) {
-    layer->contents.push_back(buildSolidFill(box.backgroundColor));
-    emitted = true;
-    return;
-  }
-  if (box.backgroundImage.empty()) return;
 
   // A `url(...)` background is recovered as an `ImagePattern` fill by `HTMLParserContext`
-  // (it owns the image-resource registry and native-size decoding). The geometry is already
-  // on the layer; leave the fill to the caller and emit nothing here.
-  if (ToLower(box.backgroundImage).find("url(") != std::string::npos) return;
+  // (it owns the image-resource registry and native-size decoding) and pushed onto the layer
+  // right after this call, so it paints on top. CSS layers the image over the
+  // background-color, and decorative url() backgrounds are frequently partly transparent
+  // (e.g. a low-opacity noise overlay), so the colour must still be emitted underneath here
+  // rather than dropped.
+  bool urlImage = !box.backgroundImage.empty() &&
+                  ToLower(box.backgroundImage).find("url(") != std::string::npos;
+  if (box.backgroundImage.empty() || urlImage) {
+    if (box.backgroundColorSet) {
+      layer->contents.push_back(buildSolidFill(box.backgroundColor));
+      emitted = true;
+    }
+    return;
+  }
 
   // CSS allows stacking multiple gradients in `background-image` separated by top-level
   // commas, with the first listed gradient painted on top. PAGX paints Fills in the order

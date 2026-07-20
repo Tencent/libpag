@@ -384,6 +384,34 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandKeepsTopImageFittingTogether) 
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::LetterBox);
 }
 
+// CSS paints a `url(...)` background image on top of the `background-color`, and such images are
+// frequently partly transparent (e.g. a low-opacity noise overlay), so the colour must show
+// through. Emit the solid colour fill underneath the ImagePattern rather than dropping it.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundColorPlusUrlImageKeepsColorUnderneath) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-color:#DFDDDA;
+                  background-image:url(noise.png);background-repeat:repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+
+  // Two fills: the solid colour first (painted underneath) then the image pattern on top.
+  std::vector<pagx::Fill*> fills;
+  for (auto* e : div->contents) {
+    if (auto* f = As<pagx::Fill>(e)) fills.push_back(f);
+  }
+  ASSERT_EQ(fills.size(), 2u);
+  auto* solid = As<pagx::SolidColor>(fills[0]->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0xDFDDDA)));
+  auto* pattern = As<pagx::ImagePattern>(fills[1]->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_EQ(pattern->image->filePath, "noise.png");
+}
+
 // A higher-priority shorthand resets every background longhand supplied by a lower-priority rule.
 // In particular, an inline colour-only background must clear a class-provided image.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandResetsLowerPriorityLonghands) {
