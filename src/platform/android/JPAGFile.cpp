@@ -182,7 +182,8 @@ PAG_API void Java_org_libpag_PAGFile_nativeReplaceImage(JNIEnv* env, jobject thi
 }
 
 PAG_API void Java_org_libpag_PAGFile_nativeReplaceImageByName(JNIEnv* env, jobject thiz,
-                                                              jstring layerName, long imageObject) {
+                                                              jstring layerName,
+                                                              jlong imageObject) {
   auto pagFile = getPAGFile(env, thiz);
   if (pagFile == nullptr) {
     return;
