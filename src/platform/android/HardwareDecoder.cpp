@@ -130,7 +130,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
     return false;
   }
 
-  auto surface = imageReader->getInputSurface();
+  auto surface = imageReader->createInputSurface();
   if (surface == nullptr) {
     AMediaFormat_delete(mediaFormat);
     AMediaCodec_delete(videoDecoder);
@@ -139,6 +139,14 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   }
 
   nativeWindow = ANativeWindow_fromSurface(env, surface);
+
+  // createInputSurface() returns a caller-owned Surface. Release it after
+  // ANativeWindow_fromSurface() holds its own reference to the underlying buffer.
+  auto surfaceClass = env->FindClass("android/view/Surface");
+  auto releaseMethod = env->GetMethodID(surfaceClass, "release", "()V");
+  env->CallVoidMethod(surface, releaseMethod);
+  env->DeleteLocalRef(surfaceClass);
+  env->DeleteLocalRef(surface);
 
   media_status_t status;
   status = AMediaCodec_configure(videoDecoder, mediaFormat, nativeWindow, nullptr, 0);
