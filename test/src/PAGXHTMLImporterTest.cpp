@@ -35,8 +35,8 @@
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLTransformContext.h"
-#include "pagx/html/importer/HTMLTransformPasses.h"
 #include "pagx/html/importer/HTMLTransformPassUtils.h"
+#include "pagx/html/importer/HTMLTransformPasses.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -8796,8 +8796,7 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, StrayTextAfterElementIsWrappedAndBlankTe
 }
 
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FilterKeepsDataPropertyAndEmitterRemovesEmptyStyle) {
-  auto root = ParseHtml(
-      "<html><body><div style=\"old\"></div><div></div></body></html>");
+  auto root = ParseHtml("<html><body><div style=\"old\"></div><div></div></body></html>");
   ASSERT_NE(root, nullptr);
   auto body = root->getFirstChild("body");
   auto empty = body->getFirstChild("div");
