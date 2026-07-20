@@ -355,6 +355,10 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     text->text = "\n";
     text->fontFamily = inherited.primaryFontFamily.empty() ? HTML_DEFAULT_FONT_FAMILY
                                                            : inherited.primaryFontFamily;
+    text->fontStyle =
+        inherited.fontStyleName.empty() ? HTML_DEFAULT_FONT_STYLE : inherited.fontStyleName;
+    text->fauxBold = inherited.fauxBold;
+    text->fauxItalic = inherited.fauxItalic;
     text->fontSize = HTML_DEFAULT_FONT_SIZE;
     layer->contents.push_back(text);
     return layer;

@@ -72,7 +72,10 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   auto t = _document->makeNode<Text>();
   t->text = fragment.text;
   t->fontFamily = fragment.fontFamily;
-  t->fontStyle = fragment.fontStyleName;
+  // Every imported Text node must carry a concrete fontStyle. The synthesis leaves the label empty
+  // for the plain base face (bold / italic ride on the faux flags), so substitute the canonical
+  // "Regular" name here.
+  t->fontStyle = fragment.fontStyleName.empty() ? HTML_DEFAULT_FONT_STYLE : fragment.fontStyleName;
   t->fauxBold = fragment.fauxBold;
   t->fauxItalic = fragment.fauxItalic;
   t->fontSize = fragment.fontSize;

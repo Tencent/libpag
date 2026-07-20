@@ -39,6 +39,14 @@ static constexpr float HTML_DEFAULT_FONT_SIZE = 14.0f;
 static constexpr const char* HTML_DEFAULT_FONT_FAMILY = "Arial";
 
 /**
+ * Default font style/variant name written to every imported `Text` node. The synthesis in
+ * `ResolveFontStyleSynthesis` leaves the style label empty for the plain base face (bold / italic
+ * are carried by `fauxBold` / `fauxItalic`); this constant substitutes the canonical "Regular"
+ * name so every HTML-imported `Text` node always carries a concrete `fontStyle`.
+ */
+static constexpr const char* HTML_DEFAULT_FONT_STYLE = "Regular";
+
+/**
  * Default text colour used when no `color` is inherited; matches the CSS default for
  * <body> in `ElementDefaults()`.
  */
