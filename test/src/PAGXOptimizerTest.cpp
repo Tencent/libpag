@@ -29,13 +29,18 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/utils/VerifyUtils.h"
 #include "utils/ProjectPath.h"
 
@@ -51,7 +56,12 @@ using pagx::DropShadowStyle;
 using pagx::Element;
 using pagx::Ellipse;
 using pagx::Fill;
+using pagx::Font;
+using pagx::Glyph;
+using pagx::GlyphRun;
 using pagx::Group;
+using pagx::Image;
+using pagx::ImagePattern;
 using pagx::HasLayerOnlyFeatures;
 using pagx::HasPainter;
 using pagx::IsLayerShell;
@@ -74,6 +84,7 @@ using pagx::PathData;
 using pagx::Rectangle;
 using pagx::SolidColor;
 using pagx::Stroke;
+using pagx::Text;
 
 // ---------------------------------------------------------------------------
 // Builders kept tiny so each test stays focused on the rule under inspection.
@@ -101,6 +112,21 @@ static Layer* AddTopLayer(PAGXDocument* doc) {
   auto* layer = doc->makeNode<Layer>();
   doc->layers.push_back(layer);
   return layer;
+}
+
+static PAGXOptimizerOptions OnlyRuleOptions() {
+  PAGXOptimizerOptions options;
+  options.pruneEmpty = false;
+  options.downgradeShellChildren = false;
+  options.mergeAdjacentShellLayers = false;
+  options.collapseSingleChildLayers = false;
+  options.unwrapRedundantFirstGroup = false;
+  options.mergeAdjacentGroups = false;
+  options.canonicalizePaths = false;
+  options.rectMaskToScrollRect = false;
+  options.dedupPathData = false;
+  options.pruneUnreferencedResources = false;
+  return options;
 }
 
 // ---------------------------------------------------------------------------
@@ -889,6 +915,267 @@ CLI_TEST(PAGXOptimizerTest, OptimizeResultSignalsNonConvergenceAtIterationCap) {
     }
   }
   EXPECT_TRUE(warnedAboutOptimizer);
+}
+
+// ---------------------------------------------------------------------------
+// Coverage-focused guards for canonicalization, mask conversion, and resources.
+// ---------------------------------------------------------------------------
+
+CLI_TEST(PAGXOptimizerTest, OptimizeNullDocumentIsANoOp) {
+  auto result = OptimizeWithOptions(nullptr, OnlyRuleOptions());
+  EXPECT_TRUE(result.converged);
+  EXPECT_EQ(result.iterationsUsed, 0);
+}
+
+CLI_TEST(PAGXOptimizerTest, CanonicalizesEllipseAndPreservesIneligiblePaths) {
+  auto doc = PAGXDocument::Make(120, 120);
+  auto* layer = AddTopLayer(doc.get());
+
+  auto* ellipseData = doc->makeNode<PathData>();
+  ellipseData->moveTo(50, 0);
+  ellipseData->cubicTo(77.614235f, 0, 100, 22.385765f, 100, 50);
+  ellipseData->cubicTo(100, 77.614235f, 77.614235f, 100, 50, 100);
+  ellipseData->cubicTo(22.385765f, 100, 0, 77.614235f, 0, 50);
+  ellipseData->cubicTo(0, 22.385765f, 22.385765f, 0, 50, 0);
+  ellipseData->close();
+  auto* ellipsePath = doc->makeNode<Path>();
+  ellipsePath->data = ellipseData;
+  ellipsePath->position = {3, 4};
+  layer->contents.push_back(ellipsePath);
+
+  auto* emptyPath = doc->makeNode<Path>();
+  emptyPath->data = doc->makeNode<PathData>();
+  layer->contents.push_back(emptyPath);
+
+  auto* rectData = doc->makeNode<PathData>();
+  rectData->moveTo(0, 0);
+  rectData->lineTo(10, 0);
+  rectData->lineTo(10, 10);
+  rectData->lineTo(0, 10);
+  rectData->close();
+  auto* reversedPath = doc->makeNode<Path>();
+  reversedPath->data = rectData;
+  reversedPath->reversed = true;
+  layer->contents.push_back(reversedPath);
+  auto* constrainedPath = doc->makeNode<Path>();
+  constrainedPath->data = rectData;
+  constrainedPath->right = 0;
+  layer->contents.push_back(constrainedPath);
+  auto* annotatedPath = doc->makeNode<Path>();
+  annotatedPath->data = rectData;
+  annotatedPath->customData["data-role"] = "shape";
+  layer->contents.push_back(annotatedPath);
+
+  auto options = OnlyRuleOptions();
+  options.canonicalizePaths = true;
+  OptimizeWithOptions(doc.get(), options);
+
+  ASSERT_EQ(layer->contents.size(), 5u);
+  ASSERT_EQ(layer->contents[0]->nodeType(), NodeType::Ellipse);
+  auto* ellipse = static_cast<Ellipse*>(layer->contents[0]);
+  EXPECT_FLOAT_EQ(ellipse->position.x, 53.0f);
+  EXPECT_FLOAT_EQ(ellipse->position.y, 54.0f);
+  EXPECT_FLOAT_EQ(ellipse->size.width, 100.0f);
+  EXPECT_FLOAT_EQ(ellipse->size.height, 100.0f);
+  for (size_t i = 1; i < layer->contents.size(); i++) {
+    EXPECT_EQ(layer->contents[i]->nodeType(), NodeType::Path);
+  }
+}
+
+CLI_TEST(PAGXOptimizerTest, NonDefaultGroupsKeepTheirTransformAndConstraintFrame) {
+  auto options = OnlyRuleOptions();
+  options.unwrapRedundantFirstGroup = true;
+  for (int guard = 0; guard < 11; guard++) {
+    auto doc = PAGXDocument::Make(100, 100);
+    auto* layer = AddTopLayer(doc.get());
+    auto* group = doc->makeNode<Group>();
+    group->elements.push_back(doc->makeNode<Rectangle>());
+    switch (guard) {
+      case 0:
+        group->alpha = 0.5f;
+        break;
+      case 1:
+        group->position.x = 1;
+        break;
+      case 2:
+        group->anchor.y = 1;
+        break;
+      case 3:
+        group->rotation = 5;
+        break;
+      case 4:
+        group->scale.x = 2;
+        break;
+      case 5:
+        group->skew = 3;
+        break;
+      case 6:
+        group->skewAxis = 15;
+        break;
+      case 7:
+        group->width = 20;
+        break;
+      case 8:
+        group->percentHeight = 100;
+        break;
+      case 9:
+        group->padding.left = 2;
+        break;
+      case 10:
+        group->right = 0;
+        break;
+    }
+    layer->contents.push_back(group);
+    OptimizeWithOptions(doc.get(), options);
+    ASSERT_EQ(layer->contents.size(), 1u) << "guard=" << guard;
+    EXPECT_EQ(layer->contents[0], group) << "guard=" << guard;
+  }
+}
+
+CLI_TEST(PAGXOptimizerTest, RectMaskConversionRejectsSemanticAndGeometryChanges) {
+  struct Fixture {
+    std::shared_ptr<PAGXDocument> doc;
+    Layer* mask = nullptr;
+    Layer* user = nullptr;
+    Rectangle* rect = nullptr;
+    Fill* fill = nullptr;
+  };
+  auto makeFixture = []() {
+    Fixture f;
+    f.doc = PAGXDocument::Make(100, 100);
+    f.mask = AddTopLayer(f.doc.get());
+    f.rect = f.doc->makeNode<Rectangle>();
+    f.rect->position = {25, 25};
+    f.rect->size = {50, 50};
+    f.fill = MakeSolidFill(f.doc.get(), 1, 1, 1);
+    f.mask->contents = {f.rect, f.fill};
+    f.user = AddTopLayer(f.doc.get());
+    f.user->mask = f.mask;
+    f.user->maskType = MaskType::Alpha;
+    f.user->contents.push_back(MakeFilledRectGroup(f.doc.get(), 100, 100, 1, 0, 0));
+    return f;
+  };
+
+  auto options = OnlyRuleOptions();
+  options.rectMaskToScrollRect = true;
+  for (int guard = 0; guard < 22; guard++) {
+    auto f = makeFixture();
+    switch (guard) {
+      case 0:
+        f.user->hasScrollRect = true;
+        break;
+      case 1:
+        f.mask->x = 1;
+        break;
+      case 2:
+        f.mask->matrix = Matrix::Scale(2, 2);
+        break;
+      case 3:
+        f.mask->matrix3D.setRowColumn(0, 3, 1);
+        break;
+      case 4:
+        f.mask->alpha = 0.5f;
+        break;
+      case 5:
+        f.mask->blendMode = BlendMode::Multiply;
+        break;
+      case 6:
+        f.mask->styles.push_back(f.doc->makeNode<DropShadowStyle>());
+        break;
+      case 7:
+        f.mask->customData["data-mask"] = "kept";
+        break;
+      case 8:
+        f.mask->contents.pop_back();
+        break;
+      case 9:
+        f.mask->contents[0] = f.doc->makeNode<Ellipse>();
+        break;
+      case 10:
+        f.mask->contents[1] = f.doc->makeNode<Stroke>();
+        break;
+      case 11:
+        f.rect->reversed = true;
+        break;
+      case 12:
+        f.rect->right = 0;
+        break;
+      case 13:
+        f.rect->customData["data-rect"] = "kept";
+        break;
+      case 14:
+        f.fill->alpha = 0.5f;
+        break;
+      case 15:
+        f.fill->blendMode = BlendMode::Multiply;
+        break;
+      case 16:
+        f.fill->color = f.doc->makeNode<ImagePattern>();
+        break;
+      case 17:
+        static_cast<SolidColor*>(f.fill->color)->color.alpha = 0.5f;
+        break;
+      case 18:
+        f.user->matrix = Matrix::Scale(2, 1);
+        break;
+      case 19:
+        f.user->matrix3D.setRowColumn(1, 3, 2);
+        break;
+      case 20:
+        f.user->right = 0;
+        break;
+      case 21:
+        f.user->width = 100;
+        break;
+    }
+    OptimizeWithOptions(f.doc.get(), options);
+    EXPECT_EQ(f.user->mask, f.mask) << "guard=" << guard;
+  }
+}
+
+CLI_TEST(PAGXOptimizerTest, PruneResourcesFollowsPatternsTextAndFontGlyphs) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = AddTopLayer(doc.get());
+
+  auto* fillImage = doc->makeNode<Image>("fill-image");
+  auto* fillPattern = doc->makeNode<ImagePattern>("fill-pattern");
+  fillPattern->image = fillImage;
+  auto* fill = doc->makeNode<Fill>();
+  fill->color = fillPattern;
+  layer->contents.push_back(fill);
+
+  auto* strokeImage = doc->makeNode<Image>("stroke-image");
+  auto* strokePattern = doc->makeNode<ImagePattern>("stroke-pattern");
+  strokePattern->image = strokeImage;
+  auto* stroke = doc->makeNode<Stroke>();
+  stroke->color = strokePattern;
+  layer->contents.push_back(stroke);
+
+  auto* glyphPath = doc->makeNode<PathData>("glyph-path");
+  auto* glyphImage = doc->makeNode<Image>("glyph-image");
+  auto* pathGlyph = doc->makeNode<Glyph>();
+  pathGlyph->path = glyphPath;
+  auto* imageGlyph = doc->makeNode<Glyph>();
+  imageGlyph->image = glyphImage;
+  auto* font = doc->makeNode<Font>("embedded-font");
+  font->glyphs = {nullptr, pathGlyph, imageGlyph};
+  auto* run = doc->makeNode<GlyphRun>();
+  run->font = font;
+  auto* text = doc->makeNode<Text>();
+  text->glyphRuns = {nullptr, run};
+  layer->contents.push_back(text);
+
+  auto options = OnlyRuleOptions();
+  options.pruneUnreferencedResources = true;
+  OptimizeWithOptions(doc.get(), options);
+
+  EXPECT_EQ(fillPattern->id, "fill-pattern");
+  EXPECT_EQ(fillImage->id, "fill-image");
+  EXPECT_EQ(strokePattern->id, "stroke-pattern");
+  EXPECT_EQ(strokeImage->id, "stroke-image");
+  EXPECT_EQ(font->id, "embedded-font");
+  EXPECT_EQ(glyphPath->id, "glyph-path");
+  EXPECT_EQ(glyphImage->id, "glyph-image");
 }
 
 // ---------------------------------------------------------------------------

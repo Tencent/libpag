@@ -35,6 +35,7 @@
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLTransformContext.h"
+#include "pagx/html/importer/HTMLTransformPasses.h"
 #include "pagx/html/importer/HTMLTransformPassUtils.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
@@ -8730,6 +8731,128 @@ PAG_TEST(PAGXHTMLPassUtilsTest, ClearChildMainMarginColumnPreservesCrossAxis) {
   EXPECT_EQ(props.count("margin-bottom"), 0u);
   EXPECT_EQ(pagx::html::LookupProperty(props, "margin-left"), "16px");
   EXPECT_EQ(pagx::html::LookupProperty(props, "margin-right"), "8px");
+}
+
+//==================================================================================================
+// HTMLTransformPasses — uncovered document and normalization edge cases
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, NullRootAndMissingBodyAreRejected) {
+  pagx::HTMLSubsetTransformer::Options options;
+  pagx::HTMLTransformContext context(options);
+  pagx::html::DocumentSkeletonPass pass;
+  pass.apply(nullptr, context);
+  ASSERT_TRUE(context.hasFatal());
+  ASSERT_FALSE(context.diagnostics().empty());
+  EXPECT_EQ(context.diagnostics().back().code, "subset:no-root");
+
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform("<html><head><title>x</title></head></html>", &root);
+  EXPECT_FALSE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:no-body"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SkeletonMergesDuplicatesAndSanitizesRootAndHead) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><head><title>a</title></head>"
+      "<aside></aside>"
+      "<head><meta name=\"x\"/><link rel=\"stylesheet\" href=\"x.css\"/></head>"
+      "<body style=\"width:10px;height:10px\"><div></div></body>"
+      "<body><span>x</span></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto head = root->getFirstChild("head");
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(head, nullptr);
+  ASSERT_NE(body, nullptr);
+  EXPECT_NE(head->getFirstChild("title"), nullptr);
+  EXPECT_NE(head->getFirstChild("meta"), nullptr);
+  EXPECT_EQ(head->getFirstChild("link"), nullptr);
+  EXPECT_EQ(CountElementChildren(body), 2u);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:external-stylesheet"));
+  EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-tag"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, StrayTextAfterElementIsWrappedAndBlankTextDropped) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:10px;height:10px\">"
+      "<div><span>a</span>tail<span>b</span>   </div>"
+      "</body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  auto div = FirstBodyChild(root, "div");
+  ASSERT_NE(div, nullptr);
+  auto first = div->getFirstChild("span");
+  ASSERT_NE(first, nullptr);
+  auto wrapped = first->nextSibling;
+  ASSERT_NE(wrapped, nullptr);
+  EXPECT_EQ(wrapped->name, "p");
+  EXPECT_TRUE(HasDiagnostic(result, "subset:text-wrapped"));
+  for (auto child = div->firstChild; child; child = child->nextSibling) {
+    EXPECT_EQ(child->type, pagx::DOMNodeType::Element);
+  }
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FilterKeepsDataPropertyAndEmitterRemovesEmptyStyle) {
+  auto root = ParseHtml(
+      "<html><body><div style=\"old\"></div><div></div></body></html>");
+  ASSERT_NE(root, nullptr);
+  auto body = root->getFirstChild("body");
+  auto empty = body->getFirstChild("div");
+  auto data = empty->nextSibling;
+  ASSERT_NE(data, nullptr);
+
+  pagx::HTMLSubsetTransformer::Options options;
+  pagx::HTMLTransformContext context(options);
+  context.setResolved(empty.get(), {});
+  context.setResolved(data.get(), {{"data-test", "kept"}});
+  pagx::html::PropertyFilterPass filter;
+  filter.apply(root, context);
+  pagx::html::InlineStyleEmitterPass emitter;
+  emitter.apply(root, context);
+
+  EXPECT_EQ(empty->findAttribute("style"), nullptr);
+  EXPECT_TRUE(StyleContains(data, "data-test: kept"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, MarginToGapRejectsMismatchedOuterMargins) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto trailing = RunTransform(
+      "<html><body style=\"width:100px;height:20px\">"
+      "<div style=\"display:flex;width:100px;height:20px\">"
+      "<div style=\"width:10px;margin-right:8px\"></div>"
+      "<div style=\"width:10px;margin-right:8px\"></div>"
+      "<div style=\"width:10px;margin-right:4px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(trailing.ok);
+  EXPECT_FALSE(HasDiagnostic(trailing, "subset:margin-promoted-to-gap"));
+
+  auto leading = RunTransform(
+      "<html><body style=\"width:100px;height:20px\">"
+      "<div style=\"display:flex;width:100px;height:20px\">"
+      "<div style=\"width:10px;margin-left:4px\"></div>"
+      "<div style=\"width:10px;margin-left:8px\"></div>"
+      "<div style=\"width:10px;margin-left:8px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(leading.ok);
+  EXPECT_FALSE(HasDiagnostic(leading, "subset:margin-promoted-to-gap"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceJustifyUsesPercentageChildrenAndGap) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:100px;height:20px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;gap:10px;width:100px;height:20px\">"
+      "<div style=\"width:60%\"></div><div style=\"width:60%\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-justify-collapsed-on-overflow"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: flex-start"));
 }
 
 }  // namespace pag
