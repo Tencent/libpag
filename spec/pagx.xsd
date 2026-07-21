@@ -936,11 +936,16 @@
 
   <xs:complexType name="CompositionType">
     <xs:sequence>
-      <xs:element name="Layer" type="LayerType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="Layer" type="LayerType"/>
+        <xs:element name="Animations" type="AnimationsType"/>
+        <xs:element name="DataBind" type="DataBindType"/>
+      </xs:choice>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="width" type="xs:decimal" use="required"/>
     <xs:attribute name="height" type="xs:decimal" use="required"/>
+    <xs:attribute name="viewModel" type="IdRefType"/>
   </xs:complexType>
 
   <!-- ========================= ViewModel & DataBind ========================= -->
