@@ -350,9 +350,10 @@ struct RuntimeBinding {
   // references in O(1).
   std::unordered_map<const Node*, std::vector<const Node*>> imageUsers = {};
 
-  // TextHolders owning runtime text objects for this layer tree. shared_ptr so the channel writer
-  // closures can co-own their holder. TextHolder entries are cleaned up when their RuntimeTargets
-  // are removed via remove(node) to prevent use-after-free on subsequent flush.
+  // TextHolders owning runtime text objects for this layer tree. shared_ptr so the
+  // TextRuntimeTarget can co-own its holder via its holder member. TextHolder entries are cleaned
+  // up when their RuntimeTargets are removed via remove(node) to prevent use-after-free on
+  // subsequent flush.
   std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 };
 
