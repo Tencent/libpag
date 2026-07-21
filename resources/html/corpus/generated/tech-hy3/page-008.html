@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>平台支持与定价策略</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid -->
+    <div class="absolute left-[50%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-devices text-[20px]"></i>
+      <span class="text-[14px]/[20px]">平台支持 · 定价</span>
+    </div>
+
+    <!-- Page Title -->
+    <div class="absolute top-[60px] left-[80px] z-[10]">
+      <h1 class="text-[56px] font-[600] leading-[1.2] tracking-[-0.01em]">平台支持与定价策略</h1>
+      <div class="w-[80px] h-[2px] bg-[#111111] mt-[12px]"></div>
+    </div>
+
+    <!-- Left: 支持平台 -->
+    <div class="absolute top-[200px] left-[80px] w-[520px] z-[10]">
+      <h3 class="text-[18px] font-[600] mb-[20px] flex items-center gap-[10px]"><i class="ph ph-devices text-[18px]"></i>支持平台</h3>
+      <div class="space-y-[16px]">
+        <div class="flex items-center gap-[12px]">
+          <i class="ph ph-globe text-[18px]"></i>
+          <div>
+            <p class="text-[15px]/[24px] font-[600]">Web端</p>
+            <p class="text-[13px]/[20px] text-[#111111]/60">浏览器直接使用，无需安装</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-[12px]">
+          <i class="ph ph-apple-logo text-[18px]"></i>
+          <div>
+            <p class="text-[15px]/[24px] font-[600]">macOS</p>
+            <p class="text-[13px]/[20px] text-[#111111]/60">Apple Silicon（M1/M2/M3/M4）& Intel芯片</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-[12px]">
+          <i class="ph ph-desktop text-[18px]"></i>
+          <div>
+            <p class="text-[15px]/[24px] font-[600]">Windows桌面版</p>
+            <p class="text-[13px]/[20px] text-[#111111]/60">即将推出</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-[12px]">
+          <i class="ph ph-device-mobile text-[18px]"></i>
+          <div>
+            <p class="text-[15px]/[24px] font-[600]">微信小程序</p>
+            <p class="text-[13px]/[20px] text-[#111111]/60">手机端评审，即将上线</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: 定价策略 -->
+    <div class="absolute top-[200px] left-[680px] w-[520px] z-[10]">
+      <h3 class="text-[18px] font-[600] mb-[20px] flex items-center gap-[10px]"><i class="ph ph-currency-circle text-[18px]"></i>定价策略</h3>
+      <div class="space-y-[20px]">
+        <div class="border-[1px] border-[#111111]/30 rounded-[10px] p-[20px]">
+          <div class="flex items-center gap-[10px] mb-[8px]">
+            <i class="ph ph-tag text-[18px]"></i>
+            <p class="text-[15px]/[24px] font-[600]">公测期间免费使用</p>
+          </div>
+          <p class="text-[13px]/[20px] leading-[1.6] text-[#111111]/60">注册即享1000 Credits免费额度，适合团队零成本试用测试</p>
+        </div>
+        <div class="border-[1px] border-[#111111]/30 rounded-[10px] p-[20px]">
+          <div class="flex items-center gap-[10px] mb-[8px]">
+            <i class="ph ph-arrow-down-circle text-[18px]"></i>
+            <p class="text-[15px]/[24px] font-[600]">零成本试用建议</p>
+          </div>
+          <p class="text-[13px]/[20px] leading-[1.6] text-[#111111]/60">新项目试用Ardot，存量项目逐步迁移，Figma文件可无缝导入</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom border -->
+    <div class="absolute bottom-[40px] left-[80px] right-[80px] h-[1px] bg-[#111111]/20 z-[10]"></div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竞品综合对比矩阵</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .card-border {
+      border: 1px solid rgba(17,17,17,0.2);
+    }
+    .score-cell {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 22px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .score-5 { background: #111111; color: #FFFFFF; }
+    .score-4 { background: #A3A3A3; color: #FFFFFF; }
+    .score-3 { background: #E5E5E5; color: #111111; }
+    .score-2 { background: #F5F5F5; color: #A3A3A3; }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- 极细网格线装饰 -->
+    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(rgba(17,17,17,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,0.06) 1px, transparent 1px); background-size: 80px 80px;"></div>
+
+    <!-- 页眉线 -->
+    <div class="absolute top-0 left-0 w-full h-[2px]" style="background: rgba(17,17,17,0.2);"></div>
+
+    <!-- zone-1: 标题区 -->
+    <div class="absolute" style="top:30px; left:60px; width:1160px; height:60px;">
+      <h1 class="text-[56px] font-semibold" style="letter-spacing: -0.025em; line-height: 1.1;">竞品综合对比矩阵</h1>
+      <p class="text-[20px] font-medium mt-1" style="color: rgba(17,17,17,0.6);">九维度横向评分对比</p>
+    </div>
+
+    <!-- zone-2: 左侧-雷达图 -->
+    <div class="absolute" style="top:110px; left:60px; width:520px; height:530px;">
+      <div id="radarChart" style="width:520px; height:530px;"></div>
+    </div>
+
+    <!-- zone-3: 右侧-评分表格 -->
+    <div class="absolute" style="top:110px; left:620px; width:600px; height:530px;">
+      <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:20px; height:100%;">
+        <h3 class="text-[20px] font-medium mb-4 flex items-center gap-2">
+          <i class="ph ph-table text-[20px]"></i>
+          九维度评分表
+        </h3>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.2);">
+              <th style="text-align:left; padding:8px 6px; font-weight:500; color:rgba(17,17,17,0.6); width:100px;">维度</th>
+              <th style="text-align:center; padding:8px 4px; font-weight:600;">Ardot</th>
+              <th style="text-align:center; padding:8px 4px; font-weight:500; color:rgba(17,17,17,0.7);">Figma</th>
+              <th style="text-align:center; padding:8px 4px; font-weight:500; color:rgba(17,17,17,0.7);">MasterGo</th>
+              <th style="text-align:center; padding:8px 4px; font-weight:500; color:rgba(17,17,17,0.7);">即时设计</th>
+              <th style="text-align:center; padding:8px 4px; font-weight:500; color:rgba(17,17,17,0.7);">Pixso</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">AI生成设计稿</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">可编辑输出</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">实时协作</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">代码交付</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">设计系统</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">插件生态</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-2">2</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">跨平台</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(17,17,17,0.08);">
+              <td style="padding:8px 6px; font-weight:500;">数据安全/合规</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+            </tr>
+            <tr>
+              <td style="padding:8px 6px; font-weight:500;">价格优势</td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-3">3</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-5">5</span></td>
+              <td style="text-align:center; padding:8px 4px;"><span class="score-cell score-4">4</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- zone-4: 亮点条 -->
+    <div class="absolute" style="top:660px; left:60px; width:1160px; height:30px;">
+      <div class="flex items-center gap-3 px-5 py-2 card-border" style="border-radius:6px; background: rgba(17,17,17,0.04);">
+        <i class="ph ph-star text-[16px]"></i>
+        <span class="text-[14px] font-medium">Ardot在AI生成、代码交付、数据安全、价格四项维度均获满分</span>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-0 left-0 w-full flex justify-between items-center px-[60px]" style="height:30px;">
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">腾讯Ardot设计平台 - 分析与竞品分析报告</span>
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">12</span>
+    </div>
+
+    <!-- 几何圆环装饰 -->
+    <div class="absolute" style="top:20px; right:60px; width:40px; height:40px; border:1px solid #111111; border-radius:50%; opacity:0.15;"></div>
+    <div class="absolute" style="top:32px; right:72px; width:16px; height:16px; border:1px solid #111111; border-radius:50%; opacity:0.1;"></div>
+  </div>
+
+  <script>
+    var chart = echarts.init(document.getElementById('radarChart'));
+    var option = {
+      backgroundColor: 'transparent',
+      font: 'Plus Jakarta Sans',
+      legend: {
+        data: ['Ardot', 'Figma', 'MasterGo'],
+        bottom: 10,
+        textStyle: {
+          fontFamily: 'Plus Jakarta Sans',
+          color: '#111111',
+          fontSize: 13
+        },
+        itemWidth: 16,
+        itemHeight: 8,
+        itemGap: 20
+      },
+      radar: {
+        indicator: [
+          { name: 'AI生成设计稿', max: 5 },
+          { name: '可编辑输出', max: 5 },
+          { name: '实时协作', max: 5 },
+          { name: '代码交付', max: 5 },
+          { name: '设计系统', max: 5 },
+          { name: '插件生态', max: 5 },
+          { name: '跨平台', max: 5 },
+          { name: '数据安全/合规', max: 5 },
+          { name: '价格优势', max: 5 }
+        ],
+        shape: 'polygon',
+        splitNumber: 5,
+        axisName: {
+          fontFamily: 'Plus Jakarta Sans',
+          color: '#111111',
+          fontSize: 11,
+          fontWeight: 500
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(17,17,17,0.1)'
+          }
+        },
+        splitArea: {
+          show: false
+        },
+        axisLine: {
+          lineStyle: {
+            color: 'rgba(17,17,17,0.1)'
+          }
+        }
+      },
+      series: [{
+        type: 'radar',
+        data: [
+          {
+            value: [5, 5, 5, 5, 4, 2, 4, 5, 5],
+            name: 'Ardot',
+            lineStyle: { color: '#111111', width: 2 },
+            areaStyle: { color: 'rgba(17,17,17,0.12)' },
+            itemStyle: { color: '#111111' },
+            symbol: 'circle',
+            symbolSize: 5
+          },
+          {
+            value: [5, 5, 5, 4, 5, 5, 5, 3, 3],
+            name: 'Figma',
+            lineStyle: { color: '#A3A3A3', width: 2 },
+            areaStyle: { color: 'rgba(163,163,163,0.08)' },
+            itemStyle: { color: '#A3A3A3' },
+            symbol: 'circle',
+            symbolSize: 5
+          },
+          {
+            value: [3, 4, 5, 5, 4, 3, 4, 5, 4],
+            name: 'MasterGo',
+            lineStyle: { color: '#E5E5E5', width: 2 },
+            areaStyle: { color: 'rgba(229,229,229,0.08)' },
+            itemStyle: { color: '#E5E5E5' },
+            symbol: 'circle',
+            symbolSize: 5
+          }
+        ]
+      }]
+    };
+    chart.setOption(option);
+  </script>
+</body>
+</html>

@@ -1,0 +1,2132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPT Presentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/1.4.1/layer.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/phosphor/2.0.10/webfont/webfont.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.1.1/src/css/play.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.1.1/src/style.css">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f5f5f5; padding: 40px 20px; min-height: 100vh; overflow-x: auto; }
+    .slide-wrapper {
+      --available-width: min(1280px, calc(100vw - 40px));
+      --slide-scale: calc(var(--available-width) / 1280);
+      position: relative; width: var(--available-width); height: calc(720px * var(--slide-scale));
+      margin: 0 auto 40px auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden;
+    }
+    .slide-wrapper:last-child { margin-bottom: 0; }
+    .slide-number { position: absolute; top: -30px; left: 0; background: #7C3AED; color: white; padding: 4px 12px; border-radius: 4px 4px 0 0; font-size: 12px; font-weight: 600; z-index: 10; }
+    .slide { width: 1280px; height: 720px; background: white; position: relative; overflow: hidden; transform-origin: top left; transform: scale(var(--slide-scale)); }
+    @media print { body { background: white; padding: 0; margin: 0; } .slide-wrapper { page-break-after: always; page-break-inside: avoid; box-shadow: none; margin: 0; border-radius: 0; width: 100%; height: 100vh; overflow: hidden; } .slide-wrapper:last-child { page-break-after: auto; } .slide-number { display: none; } .slide { width: 100%; height: 100%; transform: none; } }
+    .slide-page-1 .slide {
+background: #EFEEEC;
+}
+
+.slide-page-1 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-1 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-1 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-1 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-2 .slide {
+background: #EFEEEC;
+}
+
+.slide-page-2 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-2 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-2 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-2 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-3 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-3 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-3 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-3 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-3 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-4 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-4 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-4 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-4 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-4 .slide .vtext {
+writing-mode: vertical-rl;
+}
+
+.slide-page-4 .slide .dotted-line {
+background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);
+}
+.slide-page-5 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-5 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-5 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-5 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-5 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-6 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-6 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-6 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-6 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-6 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-7 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-7 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-7 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-7 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-7 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-8 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-8 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-8 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-8 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-8 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-9 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-9 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-9 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-9 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-9 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-10 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-10 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-10 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-10 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-10 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-11 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-11 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-11 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-11 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-11 .slide .vtext {
+writing-mode: vertical-rl;
+}
+
+.slide-page-11 .slide .dotted-line {
+background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);
+}
+.slide-page-12 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-12 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-12 .slide {
+margin: 0; padding: 0; background-color: #F6F5F3;
+}
+
+.slide-page-12 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #F6F5F3;
+      color: #403E3E;
+}
+
+.slide-page-12 .slide .vtext {
+writing-mode: vertical-rl;
+}
+
+.slide-page-12 .slide /* Layout Overflow Guard: Ensure no content below 660px */ .content-safe-area {
+max-height: 660px;
+}
+.slide-page-13 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-13 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-13 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-13 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-13 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-14 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-14 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-14 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-14 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-14 .slide .vtext {
+writing-mode: vertical-rl;
+}
+
+.slide-page-14 .slide .dotted-line {
+background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);
+}
+.slide-page-15 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-15 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-15 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-15 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-15 .slide .vtext {
+writing-mode: vertical-rl;
+}
+
+.slide-page-15 .slide .dotted-line {
+background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);
+}
+.slide-page-16 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-16 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-16 .slide {
+margin: 0; padding: 0; background-color: #EFEEEC;
+}
+
+.slide-page-16 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #F6F5F3; /* 使用交替背景色 */
+}
+
+.slide-page-16 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-17 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-17 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-17 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-17 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-17 .slide .vtext {
+writing-mode: vertical-rl;
+}
+.slide-page-18 .slide {
+background: #F6F5F3;
+}
+
+.slide-page-18 .slide {
+font-family: 'Noto Sans SC', sans-serif;
+}
+
+.slide-page-18 .slide {
+margin: 0; padding: 0; background-color: #EFEEEC;
+}
+
+.slide-page-18 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: 'Noto Sans SC', sans-serif;
+      background-color: #F6F5F3; /* 使用交替背景色 */
+}
+
+.slide-page-18 .slide .vtext {
+writing-mode: vertical-rl;
+}
+  </style>
+</head>
+<body>
+
+    <div class="slide-wrapper slide-page-1">
+      <div class="slide-number">1</div>
+      <div class="slide bg-[#EFEEEC] text-[#403E3E]" style="background:#EFEEEC;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E]"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E]"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar (Core Signature) -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14">
+        <div class="vtext text-[14px] tracking-[0.22em] font-normal">GLOBAL COMPETITIVE ANALYSIS</div>
+        <div class="vtext text-[14px] tracking-[0.22em] font-normal uppercase">TENCENT IMA</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative flex flex-col justify-center px-20">
+        <!-- Four Corners Labels (Core Signature) -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-80">Strategic Intelligence</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-80">2026 · 04</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-80">Competitive Landscape</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-80">CONFIDENTIAL</div>
+
+        <!-- Title Section -->
+        <div class="max-w-[900px]">
+          <h1 class="text-[89px] font-medium tracking-[-0.03em] leading-[1.05] text-[#403E3E]">
+            腾讯 ima 知识库产品<br/>全球竞品分析报告
+          </h1>
+          
+          <!-- Subtitle/Points Section -->
+          <div class="mt-12 flex flex-col gap-4">
+            <div class="flex items-center gap-4">
+              <div class="w-8 h-px bg-[#403E3E]/55"></div>
+              <div class="text-[24px] font-medium tracking-[-0.02em] text-[#403E3E]/80">
+                用户视角：从"我整理知识"到"知识主动编译"
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="w-8 h-px bg-[#403E3E]/55"></div>
+              <div class="text-[24px] font-medium tracking-[-0.02em] text-[#403E3E]/80">
+                AI 主动编译——重塑知识管理范式
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Meta Information Strip -->
+        <div class="absolute bottom-24 left-20 right-20 flex items-end justify-between">
+          <div class="flex flex-col gap-2">
+            <div class="text-[13px] tracking-[0.22em] uppercase text-[#403E3E]/55">Report Scope</div>
+            <div class="text-[14px] font-medium text-[#403E3E]">全球 AI 知识库 / 智能知识管理系统</div>
+          </div>
+          
+          <!-- Meta Tags -->
+          <div class="flex gap-6">
+            <div class="flex items-center gap-2 text-[13px] tracking-[0.1em] text-[#403E3E]/80 border-b border-[#403E3E]/20 pb-1">
+              <i class="ph ph-chart-bar text-[16px]"></i> 市场全景与竞品矩阵
+            </div>
+            <div class="flex items-center gap-2 text-[13px] tracking-[0.1em] text-[#403E3E]/80 border-b border-[#403E3E]/20 pb-1">
+              <i class="ph ph-magnifying-glass text-[16px]"></i> 核心竞品深度分析
+            </div>
+            <div class="flex items-center gap-2 text-[13px] tracking-[0.1em] text-[#403E3E]/80 border-b border-[#403E3E]/20 pb-1">
+              <i class="ph ph-user-focus text-[16px]"></i> 用户体验分析
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-2">
+      <div class="slide-number">2</div>
+      <div class="slide bg-[#EFEEEC] text-[#403E3E]" style="background:#EFEEEC;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E]"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E]"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar (Core Signature) -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14">
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase">Knowledge Management</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase">Agenda</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels (Core Signature) -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase">AI Intelligence</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase">2025 · Strategy</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase">AI 主动编译机制</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase">PAGE 02</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[96px] px-16">
+          <!-- Page Title -->
+          <h1 class="text-[64px] font-medium tracking-[-0.03em] leading-none mb-12">目录</h1>
+          
+          <!-- Catalog List -->
+          <div class="max-w-[900px]">
+            <!-- Item 01 -->
+            <div class="flex flex-col py-6 border-b border-[#403E3E]/20 group">
+              <div class="flex items-baseline gap-6 mb-3">
+                <div class="text-[24px] font-black w-[40px]">01</div>
+                <div class="text-[24px] font-medium tracking-[-0.02em]">AI 主动编译机制</div>
+              </div>
+              <div class="pl-[56px] text-[14px] leading-[1.75] text-[#403E3E]/80 max-w-[700px]">
+                基于AI技术实现知识的自动化整理与维护，让用户从繁琐的手动整理中解放出来，实现'AI帮你整理一切'的智能体验，代表产品如Karpathy LLM Wiki。
+              </div>
+            </div>
+
+            <!-- Item 02 -->
+            <div class="flex flex-col py-6 border-b border-[#403E3E]/20 group">
+              <div class="flex items-baseline gap-6 mb-3">
+                <div class="text-[24px] font-black w-[40px]">02</div>
+                <div class="text-[24px] font-medium tracking-[-0.02em]">用户视角转变</div>
+              </div>
+              <div class="pl-[56px] text-[14px] leading-[1.75] text-[#403E3E]/80 max-w-[700px]">
+                知识管理从传统的人工'我整理知识'模式，演进为AI驱动下的'知识自己长出来'的自动化形态，实现知识库的自我维护与智能生长，彻底重构用户与知识库的互动关系。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-3">
+      <div class="slide-number">3</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-80">Knowledge Management</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase font-medium">AI Active Compilation</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Methodology 01</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 1 · 2026</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">AI 知识管理研究</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 3</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-16">
+          <!-- Title Section -->
+          <div class="mb-16">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">
+              1.2 方法一：AI 主动编译<br/>
+              <span class="text-[#403E3E]/60">"你的知识在自动生长"</span>
+            </h1>
+          </div>
+
+          <!-- Asymmetric Split Body -->
+          <div class="grid grid-cols-[320px_1fr] gap-12 items-start">
+            
+            <!-- Left Column: Authority & Influence -->
+            <div class="flex flex-col gap-8">
+              <div class="text-[14px] tracking-[0.22em] uppercase opacity-55 flex items-center gap-2">
+                <i class="ph ph-user-focus text-[18px]"></i> 提出者与影响力
+              </div>
+              
+              <div class="border-t-2 border-[#403E3E] pt-6">
+                <div class="text-[24px] font-bold tracking-[-0.02em] mb-4">Andrej Karpathy</div>
+                <div class="text-[14px] leading-[1.75] text-[#403E3E]/80 mb-6">
+                  前特斯拉 AI 总监，于 2026 年 4 月提出该方法，重新定义了知识的存储与检索逻辑。
+                </div>
+                
+                <!-- Data Points -->
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-[#FDFDFA] border border-[#403E3E]/20 p-4">
+                    <div class="text-[32px] font-black tracking-[-0.03em]">252K</div>
+                    <div class="text-[12px] tracking-wider opacity-60 uppercase">Views</div>
+                  </div>
+                  <div class="bg-[#FDFDFA] border border-[#403E3E]/20 p-4">
+                    <div class="text-[32px] font-black tracking-[-0.03em]">4.1W</div>
+                    <div class="text-[12px] tracking-wider opacity-60 uppercase">Saves</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Core Experience Transformation -->
+            <div class="relative">
+              <div class="text-[14px] tracking-[0.22em] uppercase opacity-55 flex items-center gap-2 mb-6">
+                <i class="ph ph-arrows-clockwise text-[18px]"></i> 核心体验变革
+              </div>
+
+              <div class="grid grid-cols-1 gap-6">
+                <!-- Comparison Card -->
+                <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] relative overflow-hidden">
+                  <!-- Background Decoration Number -->
+                  <div class="absolute -right-4 -bottom-4 text-[120px] font-black text-[#403E3E]/5 leading-none select-none">
+                    EVOLVE
+                  </div>
+
+                  <div class="flex flex-col gap-6 relative z-10">
+                    <div class="flex items-start gap-4">
+                      <div class="w-12 h-12 flex-shrink-0 flex items-center justify-center border border-[#403E3E]/30 text-[#403E3E]/40">
+                        <i class="ph ph-archive text-[24px]"></i>
+                      </div>
+                      <div>
+                        <div class="text-[16px] font-medium mb-1">传统知识库</div>
+                        <div class="text-[14px] leading-[1.7] text-[#403E3E]/60">如同"死的档案柜"，依赖人工手动分类与维护，随时间推移逐渐失效。</div>
+                      </div>
+                    </div>
+
+                    <!-- Dotted Separator -->
+                    <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+
+                    <div class="flex items-start gap-4">
+                      <div class="w-12 h-12 flex-shrink-0 flex items-center justify-center bg-[#403E3E] text-[#FDFDFA]">
+                        <i class="ph ph-plant text-[24px]"></i>
+                      </div>
+                      <div>
+                        <div class="text-[16px] font-medium mb-1">AI 主动编译</div>
+                        <div class="text-[14px] leading-[1.7] text-[#403E3E]/80 font-medium">
+                          彻底转变为能够自动生长、自动整理的活体系统，实现知识的动态更新与持续演化，无需人工干预即可保持时效性与完整性。
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-4">
+      <div class="slide-number">4</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">KNOWLEDGE MANAGEMENT</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-80">USER EXPERIENCE</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative px-12">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">User Perspective</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 2 · 2026</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Paradigm Shift</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 4</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[96px]">
+          <!-- Title Section -->
+          <div class="mb-12">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">
+              用户视角：从"我整理知识"到"知识自己长出来"
+            </h1>
+            <div class="mt-4 flex items-center gap-4">
+              <div class="h-px w-12 bg-[#403E3E]"></div>
+              <div class="text-[20px] tracking-[-0.02em] text-[#403E3E]/80 font-medium">
+                核心痛点：整理累而非记录难
+              </div>
+            </div>
+            <p class="mt-4 text-[16px] leading-[1.7] text-[#403E3E]/70 max-w-[900px]">
+              传统知识管理最大的痛点并非"记录难"，而是"整理累"——用户往往能够轻松收集信息，却需要耗费大量认知资源在后续的分类、打标签、建立链接和定期回顾等繁琐整理工作上。
+            </p>
+          </div>
+
+          <!-- Comparison Duel Section -->
+          <div class="grid grid-cols-2 gap-12 items-stretch relative">
+            <!-- Left: Traditional Process -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] relative">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-warning-circle text-[24px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">传统流程：7步人工重担</div>
+              </div>
+              <div class="h-px w-full dotted-line mb-8"></div>
+              
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center gap-4 p-3 border border-[#403E3E]/15 bg-[#EFEEEC]/50">
+                  <span class="text-[24px] font-black text-[#403E3E]/20 w-6">01</span>
+                  <span class="text-[15px]">收集信息</span>
+                </div>
+                <div class="flex items-center gap-4 p-3 border border-[#403E3E]/15 bg-[#EFEEEC]/50">
+                  <span class="text-[24px] font-black text-[#403E3E]/20 w-6">02</span>
+                  <span class="text-[15px]">阅读筛选</span>
+                </div>
+                <div class="flex items-center gap-4 p-3 border border-[#403E3E]/15 bg-[#EFEEEC]/50">
+                  <span class="text-[24px] font-black text-[#403E3E]/20 w-6">03</span>
+                  <span class="text-[15px]">深度理解</span>
+                </div>
+                <div class="flex items-center gap-4 p-3 border border-[#403E3E]/15 bg-[#EFEEEC]/50">
+                  <span class="text-[24px] font-black text-[#403E3E]/20 w-6">04</span>
+                  <span class="text-[15px]">手动分类</span>
+                </div>
+                <div class="flex items-center gap-4 p-3 border border-[#403E3E]/15 bg-[#EFEEEC]/50">
+                  <span class="text-[24px] font-black text-[#403E3E]/20 w-6">05</span>
+                  <span class="text-[15px]">打标签/索引</span>
+                </div>
+                <div class="flex items-center gap-4 p-3 border border-[#403E3E]/15 bg-[#EFEEEC]/50">
+                  <span class="text-[24px] font-black text-[#403E3E]/20 w-6">06</span>
+                  <span class="text-[15px]">建立双向链接</span>
+                </div>
+                <div class="flex items-center gap-4 p-3 border border-[#403E3E]/15 bg-[#EFEEEC]/50">
+                  <span class="text-[24px] font-black text-[#403E3E]/20 w-6">07</span>
+                  <span class="text-[15px]">定期回顾维护</span>
+                </div>
+              </div>
+              <div class="mt-6 text-[13px] text-[#403E3E]/60 italic">
+                * 每一个步骤都需要人类投入宝贵的时间和认知精力
+              </div>
+            </div>
+
+            <!-- Right: LLM Wiki Process -->
+            <div class="border-2 border-[#403E3E] p-8 bg-[#FDFDFA] relative flex flex-col justify-center">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-magic-wand text-[24px] text-[#403E3E]"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">LLM Wiki：1步极简操作</div>
+              </div>
+              <div class="h-px w-full dotted-line mb-12"></div>
+              
+              <div class="flex flex-col items-center text-center">
+                <div class="w-24 h-24 rounded-full border-2 border-[#403E3E] flex items-center justify-center mb-6 bg-white shadow-sm">
+                  <span class="text-[42px] font-black">1</span>
+                </div>
+                <div class="text-[28px] font-bold tracking-tight mb-4">直接输入 / 丢入素材</div>
+                <div class="text-[16px] leading-[1.7] text-[#403E3E]/80 max-w-[300px]">
+                  AI 自动完成：<br>
+                  <span class="font-medium">理解 → 分类 → 链接 → 结构化</span>
+                </div>
+              </div>
+
+              <!-- Visual Badge -->
+              <div class="absolute -top-4 -right-4 bg-[#403E3E] text-white px-4 py-2 text-[14px] tracking-widest uppercase font-bold">
+                Paradigm Shift
+              </div>
+            </div>
+
+            <!-- Center Arrow/Flip Indicator -->
+            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+              <div class="w-16 h-16 bg-[#F6F5F3] border-2 border-[#403E3E] rounded-full flex items-center justify-center">
+                <i class="ph ph-arrow-right text-[32px] font-bold"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-5">
+      <div class="slide-number">5</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">AI 知识库升级报告</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">EXPERIENCE UPGRADE</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">User Value Perception</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 3 · 2025</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">体验升级矩阵</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 5</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[96px] px-12">
+          <!-- Title Section: Limited to 48px per Continuity Anchor -->
+          <div class="mb-12">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">
+              用户能感受到的三大体验升级
+            </h1>
+            <div class="mt-4 w-24 h-1 bg-[#403E3E]"></div>
+          </div>
+
+          <!-- 3-Column Matrix -->
+          <div class="grid grid-cols-3 gap-8 mt-16">
+            <!-- Card 1 -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[380px]">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-stack text-[24px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">知识自动组织</div>
+              </div>
+              
+              <!-- Dotted Separator -->
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              
+              <div class="flex-1">
+                <div class="text-[15px] leading-[1.75] text-[#403E3E]/80 mb-8">
+                  AI将碎片素材编译为结构化维基，按主题归类、建立交叉引用。
+                </div>
+                
+                <!-- User Quote Section -->
+                <div class="relative p-4 bg-[#EFEEEC] border-l-2 border-[#403E3E]">
+                  <i class="ph ph-quotes absolute -top-3 -left-2 text-[20px] text-[#403E3E]/20"></i>
+                  <div class="text-[14px] italic leading-relaxed text-[#403E3E]">
+                    "我只是随手存了些东西，打开一看居然被整理得井井有条"
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[380px]">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-intersect text-[24px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">关联自动发现</div>
+              </div>
+              
+              <!-- Dotted Separator -->
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              
+              <div class="flex-1">
+                <div class="text-[15px] leading-[1.75] text-[#403E3E]/80 mb-8">
+                  AI主动发现你没注意到的跨文档关联——两年前的一篇文章和今天的会议记录有关。
+                </div>
+                
+                <!-- User Quote Section -->
+                <div class="relative p-4 bg-[#EFEEEC] border-l-2 border-[#403E3E]">
+                  <i class="ph ph-quotes absolute -top-3 -left-2 text-[20px] text-[#403E3E]/20"></i>
+                  <div class="text-[14px] italic leading-relaxed text-[#403E3E]">
+                    "哇，原来这两个东西是有联系的"
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[380px]">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-plant text-[24px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">知识库会"生长"</div>
+              </div>
+              
+              <!-- Dotted Separator -->
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              
+              <div class="flex-1">
+                <div class="text-[15px] leading-[1.75] text-[#403E3E]/80 mb-8">
+                  每次向AI提问并获得回答后，答案会被整合回知识库，知识越用越丰富。
+                </div>
+                
+                <!-- User Quote Section -->
+                <div class="relative p-4 bg-[#EFEEEC] border-l-2 border-[#403E3E]">
+                  <i class="ph ph-quotes absolute -top-3 -left-2 text-[20px] text-[#403E3E]/20"></i>
+                  <div class="text-[14px] italic leading-relaxed text-[#403E3E]">
+                    "每次用完感觉知识库更聪明了"
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-6">
+      <div class="slide-number">6</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">知识库维护体系</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">HEALTH CHECK</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">AI Maintenance</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 4 · 2025</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Knowledge Health Report</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 6</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-16">
+          <!-- Title Section: Max 48px as per Content Page Continuity -->
+          <div class="flex items-baseline gap-4 mb-12">
+            <span class="text-[24px] font-black">04</span>
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-none">知识库健康度——给知识做体检</h1>
+          </div>
+
+          <!-- Body: 2x2 Grid for Health Indicators -->
+          <div class="grid grid-cols-2 gap-8 max-w-[1000px]">
+            
+            <!-- Card 1: Coverage (KPI Style) -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col justify-between">
+              <div>
+                <div class="flex items-center gap-3 mb-6">
+                  <i class="ph ph-chart-pie-slice text-[22px] text-[#403E3E]/55"></i>
+                  <div class="text-[18px] font-medium tracking-[-0.02em]">知识覆盖度</div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-[52px] font-black tracking-[-0.03em] leading-none">87%</span>
+                  <span class="text-[16px] font-medium text-[#403E3E]/60">较上月 +5%</span>
+                </div>
+              </div>
+              <div class="mt-6 h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-6 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                当前知识库整体覆盖度达到87%，较上月实现5个百分点的增长，显示知识体系正在稳步扩展。
+              </div>
+            </div>
+
+            <!-- Card 2: Discovery & Warning -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-magnifying-glass-plus text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">新关联挖掘与盲区预警</div>
+              </div>
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[14px] leading-[1.7] text-[#403E3E]/80 space-y-4">
+                <p>AI自动发现 <span class="font-bold text-[#403E3E]">8个</span> 跨文档的新知识关联，促进隐性知识连接。</p>
+                <p>检测到 <span class="font-bold text-[#403E3E]">2个</span> 知识盲区并建议补充，确保知识体系无遗漏。</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Footer Interaction Hint -->
+          <div class="mt-12 flex items-center justify-center gap-4">
+            <div class="h-px w-12 bg-[#403E3E]/30"></div>
+            <div class="flex items-center gap-2 px-4 py-2 border border-[#403E3E] bg-white text-[13px] tracking-[0.1em] uppercase font-medium">
+              <i class="ph ph-magic-wand text-[16px]"></i>
+              <span>One-Click Auto Repair</span>
+            </div>
+            <div class="h-px w-12 bg-[#403E3E]/30"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-7">
+      <div class="slide-number">7</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">PRODUCT STRATEGY</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-80">INSIGHTS 2025</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 05</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Strategic Framework</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">ima Product Evolution</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 07</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-16">
+          <!-- Title Section: Max 48px as per Content Page Continuity -->
+          <div class="mb-12">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">对 ima 的启示</h1>
+            <div class="mt-4 w-20 h-1 bg-[#403E3E]"></div>
+          </div>
+
+          <!-- 2x2 Matrix Grid -->
+          <div class="grid grid-cols-2 gap-8 max-w-[1000px]">
+            <!-- Card 1 -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[240px]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-magic-wand text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">"AI 帮你整理"模式</div>
+              </div>
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[15px] leading-[1.75] text-[#403E3E]/80">
+                ima 的核心体验应从"你来整理知识"变为"AI 帮你整理知识"——用户只管塞，AI 自动组织成知识图谱，彻底降低知识管理门槛。
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[240px]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-intersect text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">跨文档关联推荐</div>
+              </div>
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[15px] leading-[1.75] text-[#403E3E]/80">
+                在知识库内实现"你可能没注意到，这两篇内容有关联"的主动发现与智能推荐，帮助用户挖掘隐性知识关联，构建完整知识网络。
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[240px]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-heartbeat text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">知识库健康度</div>
+              </div>
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[15px] leading-[1.75] text-[#403E3E]/80">
+                推出月度"知识体检"功能，让用户直观看到知识库的成长轨迹、内在矛盾与认知盲区，实现知识库的持续健康管理与优化。
+              </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[240px]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-chart-line-up text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">知识生长可视化</div>
+              </div>
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[15px] leading-[1.75] text-[#403E3E]/80">
+                用动画生动展示知识库的增长过程，包括新增知识内容与发现的知识关联，以此显著增强用户的成就感与持续使用动力。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-8">
+      <div class="slide-number">8</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-0">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">多模态知识融合</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">Multimodal Fusion</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Methodology 01</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 6 · 2026</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Knowledge Fusion</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 8</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[96px] px-16">
+          <!-- Title Section: Max 48px as per Content Page Continuity -->
+          <div class="flex items-baseline gap-4 mb-12">
+            <span class="text-[24px] font-black">1.3</span>
+            <h1 class="text-[42px] font-medium tracking-[-0.03em] leading-tight">
+              方法二：多模态知识融合——<span class="text-[#403E3E]/60">"知识不只是文字"</span>
+            </h1>
+          </div>
+
+          <!-- Body Content: Asymmetric Split / Structured List -->
+          <div class="grid grid-cols-1 gap-8 max-w-[900px]">
+            
+            <!-- Card 1: Representative Products -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] relative">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-cube text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">代表产品：三大多模态知识平台</div>
+              </div>
+              <!-- Dotted Separator -->
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[16px] leading-[1.75] text-[#403E3E]/80">
+                当前市场代表产品包括：<span class="font-medium text-[#403E3E]">NotebookLM（Google）</span>作为AI研究工具，可生成讨论式播客、幻灯片、短视频及互动测验；通过将静态文档转化为动态多模态内容，重塑知识内化路径。
+              </div>
+            </div>
+
+            <!-- Card 2: Capability Matrix -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] relative">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-grid-four text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[20px] font-medium tracking-[-0.02em]">多模态输入输出能力矩阵</div>
+              </div>
+              <!-- Dotted Separator -->
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[16px] leading-[1.75] text-[#403E3E]/80">
+                用户指令与AI生成内容的对应关系呈现多模态突破：基础需求包括<span class="font-medium text-[#403E3E]">"总结研究"</span>生成结构化报告（ima、NotebookLM已支持）、<span class="font-medium text-[#403E3E]">"制作播客"</span>生成AI双主持人讨论（NotebookLM核心能力）。
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-9">
+      <div class="slide-number">9</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">竞品分析报告</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">Competitive Analysis</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Market Intelligence</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 7 · 2025</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">深度分析模块</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 9</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-12">
+          <!-- Title Section: Max 48px as per Content Page Continuity -->
+          <div class="flex items-baseline gap-4 mb-12">
+            <span class="text-[24px] font-black">03</span>
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-none">三、核心竞品深度分析</h1>
+          </div>
+
+          <!-- Body Grid: 3-column clean variant as per semantic intent -->
+          <div class="grid grid-cols-[1fr_1fr_0.6fr] gap-8 items-start">
+            
+            <!-- Left Column: Cards -->
+            <div class="flex flex-col gap-6">
+              <!-- Card 1: 核心竞品矩阵 -->
+              <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+                <div class="flex items-center gap-3 mb-4">
+                  <i class="ph ph-grid-four text-[20px] text-[#403E3E]/55"></i>
+                  <div class="text-[18px] font-medium tracking-[-0.02em]">核心竞品矩阵</div>
+                </div>
+                <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+                <div class="mt-4 text-[14px] leading-[1.75] text-[#403E3E]/80">
+                  基于综合维度加权计算结果从高到低排列，重点剖析Notion、钉钉/悟空、飞书/Aily及Evernote…
+                </div>
+              </div>
+
+              <!-- Card 2: 排序逻辑说明 -->
+              <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+                <div class="flex items-center gap-3 mb-4">
+                  <i class="ph ph-list-numbers text-[20px] text-[#403E3E]/55"></i>
+                  <div class="text-[18px] font-medium tracking-[-0.02em]">排序逻辑说明</div>
+                </div>
+                <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+                <div class="mt-4 text-[14px] leading-[1.75] text-[#403E3E]/80">
+                  严格遵循用户规模 × 市场份额 × 行业影响力的综合得分排序原则，优先分析头部竞品的成功要素与短板。
+                </div>
+              </div>
+            </div>
+
+            <!-- Middle Column: Visual Anchor / Detail -->
+            <div class="flex flex-col gap-6">
+              <div class="border-t-2 border-[#403E3E] pt-6">
+                <div class="text-[52px] font-black tracking-[-0.03em] leading-none">TOP 4</div>
+                <div class="mt-3 text-[18px] font-medium tracking-[-0.02em]">重点分析对象</div>
+                <div class="mt-4 space-y-3">
+                  <div class="flex items-center gap-3 text-[14px] py-1 border-b border-[#403E3E]/10">
+                    <span class="w-2 h-2 bg-[#403E3E] rounded-full"></span> Notion (知识库标杆)
+                  </div>
+                  <div class="flex items-center gap-3 text-[14px] py-1 border-b border-[#403E3E]/10">
+                    <span class="w-2 h-2 bg-[#403E3E] rounded-full"></span> 钉钉/悟空 (生态集成)
+                  </div>
+                  <div class="flex items-center gap-3 text-[14px] py-1 border-b border-[#403E3E]/10">
+                    <span class="w-2 h-2 bg-[#403E3E] rounded-full"></span> 飞书/Aily (协作先锋)
+                  </div>
+                  <div class="flex items-center gap-3 text-[14px] py-1 border-b border-[#403E3E]/10">
+                    <span class="w-2 h-2 bg-[#403E3E] rounded-full"></span> Evernote (传统强项)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Media Binding -->
+            <div class="flex flex-col items-center">
+              <div class="relative group">
+                <!-- Image Placeholder -->
+                <div class="w-[280px] h-[360px] border border-[#403E3E] flex items-center justify-center bg-[#EFEEEC] relative overflow-hidden">
+                  <div class="text-center text-[#403E3E]/30">
+                    
+                    <div class="mt-2 text-[12px] tracking-[0.22em] uppercase">Evernote AI</div>
+                  </div>
+                  <!-- Image Index Marker -->
+                  <div class="absolute top-2 right-2 text-[10px] font-mono text-[#403E3E]/20">IMG_17</div>
+                </div>
+                <!-- Caption -->
+                <div class="mt-4 text-center">
+                  <div class="text-[13px] tracking-[0.1em] text-[#403E3E]/60 font-medium">Evernote AI 功能</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-10">
+      <div class="slide-number">10</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">AI PRODUCT ANALYSIS</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-80">NOTION 2026</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Product Profile</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 8 · 2026</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Global Workspace Insight</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 10</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-16">
+          <!-- Title Section -->
+          <div class="flex items-end gap-6 mb-12">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-none">3.1 Notion —— 全能型工作空间</h1>
+            <div class="mb-2 image-placeholder" data-image-index="0" style="overflow:hidden;"><img src="data:image/png;base64,AAABAAQAEBAAAAEAIABoBAAARgAAACAgAAABACAAqBAAAK4EAAAwMAAAAQAgAKglAABWFQAAQEAAAAEAIAAoQgAA/joAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABMLAAATCwAAAAAAAAAAAAAAAAAAAAAAAP///yX////O39/f/+np6fTo6Ojp////2f///9T////J////tP///6////+q////j////3T///8VAAAAAP///wv////USkpK/wsLC/8LCwv/CwsL/wsLC/8RERH/Kysr/zY2Nv9LS0v/UVFR/2tra/+lpaX/////swAAAAD///+LhYWF/wAAAP/09PT/9PT0//T09P/k5OT/1NTU/8/Pz/+0tLT/paWl/5WVlf9/f3//FhYW/////+n///9AysrK/wUFBf8AAAD//////4uLi/9mZmb/ampq////////////pKSk/4qKiv//////9PT0/xYWFv/////p////v0ZGRv8AAAD/AAAA////////////FhYW/8TExP//////ubm5/wAAAP8WFhb///////T09P8WFhb/////6f///+kWFhb/AAAA/wAAAP///////////xYWFv/U1NT/7+/v/yUlJf8AAAD/FhYW///////09PT/FhYW/////+n////pFhYW/wAAAP8AAAD///////////8WFhb/1NTU/2VlZf8AAAD/W1tb/xYWFv//////9PT0/xYWFv/////p////6RYWFv8AAAD/AAAA////////////FhYW/5SUlP8AAAD/NjY2/9XV1f8WFhb///////T09P8WFhb/////6f///+kWFhb/AAAA/wAAAP///////////xYWFv8QEBD/EBAQ/9TU1P/f39//FhYW///////09PT/FhYW/////+n////pFhYW/wAAAP8AAAD//////4CAgP8FBQX/AAAA/5CQkP//////ycnJ/xEREf/6+vr/9PT0/xYWFv/////p////6RYWFv8AAAD/AAAA/////////////////+Xl5f///////////6Wlpf98fHz/kJCQ//T09P8WFhb/////6f///+kWFhb/AAAA/wAAAP9QUFD/dXV1/3t7e/+UlJT/mZmZ/7S0tP/ExMT/1NTU/+Tk5P/Z2dn/FhYW/////+n////pFhYW/wAAAP9gYGD/paWl/5WVlf+Kior/dXV1/2tra/9gYGD/S0tL/0VFRf8mJib/AAAA/0FBQf/////U////6RYWFv9KSkr/ycnJ/9/f3//6+vr////////////////////////////f39//UFBQ/4CAgP/19fX0////Sv///6mvr6//gICA/2ZmZv9VVVX/Ozs7/zAwMP8wMDD/Ozs7/0VFRf9VVVX/Ozs7/7W1tf////++////FQAAAAD///8L////Sv///3D///+K////mf///6r////E////2fT09Onq6ur62tra//Pz8+T///9fAAAAAAAAAAAAAAAAwAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAcAACgAAAAgAAAAQAAAAAEAIAAAAAAAABAAABMLAAATCwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///yD///+g////7//////////v////3////9////+/////v////5////+f////gP///4D///9g////YP///1D///9A////IP///yD///8QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8Q////3///////////////////////////////////////////////////////////////////////////////////////////////////////////////7////9////+f////MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///6D/////39/f/yAgIP8AAAD/AAAA/yAgIP8gICD/QEBA/0BAQP9gYGD/YGBg/4CAgP+AgID/n5+f/5+fn/+vr6//v7+//9/f3//f39//7+/v////////////////////////////////QAAAAAAAAAAAAAAAAAAAAAD///9w/////+/v7/8gICD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/xAQEP8gICD/j4+P//////////+/AAAAAAAAAAAAAAAA////MP//////////X19f/wAAAP8AAAD/kJCQ/9/f3/+/v7//v7+//5+fn/+fn5//kJCQ/4CAgP9wcHD/YGBg/1BQUP9AQED/MDAw/yAgIP8gICD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD///////////8AAAAAAAAAAP///yD////f/////4+Pj/8AAAD/AAAA/wAAAP///////////////////////////////////////////////////////////////////////////////////////////9/f3/+vr6//AAAA/wAAAP///////////wAAAAAAAAAA////v//////Pz8//AAAA/wAAAP8AAAD/AAAA//////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA////////////AAAAAP///2D/////7+/v/yAgIP8AAAD/AAAA/wAAAP8AAAD///////////+fn5//AAAA/yAgIP8gICD/MDAw/6+vr//////////////////f39//QEBA/1BQUP9/f3///////////////////////wAAAP8AAAD///////////8AAAAA////v/////9gYGD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////+vr6//AAAA/wAAAP9wcHD/r6+v/////////////////0BAQP8AAAD/AAAA/wAAAP//////////////////////AAAA/wAAAP///////////wAAAAD//////////xAQEP8AAAD/AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAD/AAAA//////////////////////+Pj4//AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAD/AAAA////////////AAAAAP//////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAP8AAAD/////////////////39/f/xAQEP8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAP8AAAD///////////8AAAAA//////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAA/wAAAP////////////////9AQED/AAAA/wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAA/wAAAP///////////wAAAAD//////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAD/AAAA////////////r6+v/wAAAP8AAAD/AAAA/0BAQP8AAAD/AAAA//////////////////////8AAAD/AAAA////////////AAAAAP//////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAP8AAAD//////+/v7/8QEBD/AAAA/wAAAP8QEBD/39/f/wAAAP8AAAD//////////////////////wAAAP8AAAD///////////8AAAAA//////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAA/wAAAP//////cHBw/wAAAP8AAAD/AAAA/5CQkP//////AAAA/wAAAP//////////////////////AAAA/wAAAP///////////wAAAAD//////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAD/AAAA/7+/v/8AAAD/AAAA/wAAAP9AQED///////////8AAAD/AAAA//////////////////////8AAAD/AAAA////////////AAAAAP//////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAP8AAAD/ICAg/wAAAP8AAAD/EBAQ/9/f3////////////wAAAP8AAAD//////////////////////wAAAP8AAAD///////////8AAAAA//////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP+QkJD/////////////////AAAA/wAAAP//////////////////////AAAA/wAAAP///////////wAAAAD//////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA////////////39/f/6+vr/8AAAD/AAAA/wAAAP8AAAD/QEBA//////////////////////8AAAD/AAAA//////////////////////8AAAD/AAAA////////////AAAAAP//////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD///////////+wsLD/AAAA/wAAAP8AAAD/AAAA/wAAAP/f39/////////////f39//gICA/wAAAP8AAAD/39/f/////////////////wAAAP8AAAD///////////8AAAAA//////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP//////////////////////39/f/8/Pz/+vr6//v7+//////////////////9/f3/9QUFD/QEBA/zAwMP8gICD/v7+/////////////AAAA/wAAAP///////////wAAAAD//////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA//////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA////////////AAAAAP//////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/b29v/7+/v//Pz8//39/f/9/f3////////////////////////////////////////////////////////////////////////////wAAAP8AAAD///////////8AAAAA//////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/ICAg/yAgIP9AQED/QEBA/2BgYP9gYGD/cHBw/4CAgP+Pj4//n5+f/5+fn/+Pj4//AAAA/wAAAP///////////wAAAAD//////////wAAAP8AAAD/AAAA/wAAAP8AAAD/UFBQ/2BgYP9gYGD/QEBA/0BAQP8gICD/ICAg/xAQEP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/EBAQ////////////AAAAAP//////////AAAA/wAAAP8AAAD/EBAQ/6CgoP/////////////////////////////////////////////////f39//39/f/8/Pz/+/v7//r6+v/5+fn/+QkJD/gICA/3BwcP8QEBD/AAAA/yAgIP+vr6///////////78AAAAA//////////8AAAD/AAAA/yAgIP/f39/////////////////////////////////////////////////////////////////////////////////////////////f39//YGBg/wAAAP9AQED/39/f///////////f////IAAAAAD//////////xAQEP8AAAD/MDAw/4CAgP+Pj4//n5+f/6+vr/+/v7//39/f/+/v7///////////////////////////////////////////////////////v7+//yAgIP8AAAD/gICA////////////////n////yAAAAAAAAAAAP///7//////kJCQ/yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/ICAg/zAwMP9QUFD/YGBg/3BwcP+AgID/gICA/2BgYP8AAAD/ICAg/9/f3///////////7////2AAAAAAAAAAAAAAAAAAAAAA////IP///+/////////////////v7+//39/f/8/Pz/+/v7//n5+f/5CQkP+AgID/cHBw/2BgYP9AQED/MDAw/yAgIP8QEBD/AAAA/wAAAP8AAAD/AAAA/4CAgP///////////////8////8gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////IP///4////+/////3////+//////////////////////////////////////////////////////////////////////39/f/9/f3//v7+////////////////9/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8Q////IP///0D///9Q////YP///3D///+A////n////5////+/////z////9/////v/////////+////+f////IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+AAAf/AAAAPwAAAB4AAAAcAAAAGAAAABgAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAwAAAA8AAAAfgAAAf/4AAP8oAAAAMAAAAGAAAAABACAAAAAAAAAkAAATCwAAEwsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///yD///+g////v////9/////f////v////6////+f////n////4D///+A////YP///2D///9A////QP///yD///8gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////gP/////////////////////////////////////////////////////////////////////////////////////////////////////////f////3////8////+/////n////5////+Q////gP///3D///9g////UP///0D///8w////EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///+A/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////7////9QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///0D///////////////+/v7//QEBA/yAgIP8gICD/QEBA/1BQUP9gYGD/YGBg/4CAgP+Pj4//n5+f/5+fn/+/v7//z8/P/9/f3//f39//////////////////////////////////////////////////////////////////////////////////////////////////////gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////IP///+///////////8/Pz/8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8gICD/ICAg/zAwMP9AQED/YGBg/2BgYP9wcHD/gICA/4+Pj/+fn5//r6+v/7+/v//f39///////////////////////////2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////z///////////39/f/yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/EBAQ/8/Pz////////////////78AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///+Q////////////////QEBA/wAAAP8AAAD/UFBQ/5+fn/+fn5//n5+f/4CAgP+AgID/YGBg/2BgYP9QUFD/QEBA/zAwMP8gICD/EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/zAwMP///////////////+8AAAAAAAAAAAAAAAAAAAAAAAAAAP///2D///////////////9wcHD/AAAA/wAAAP8AAAD/7+/v///////////////////////////////////////////////////////////////////////v7+//39/f/9/f3/+/v7//v7+//5+fn/+fn5//kJCQ/4CAgP9wcHD/YGBg/2BgYP9AQED/MDAw/wAAAP8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAAAAAAAAAAAA////IP///+///////////6+vr/8AAAD/AAAA/wAAAP8AAAD//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////6+vr/8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAAAAAAD///8Q////3///////////39/f/xAQEP8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAAAAAAD///+Q///////////v7+//MDAw/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////39/f/yAgIP8wMDD/QEBA/1BQUP9gYGD/cHBw/4+Pj//v7+//////////////////////////////////39/f/4CAgP+AgID/v7+///////////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///0D///////////////9wcHD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////5+fn/9AQED/AAAA/wAAAP8AAAD/AAAA/wAAAP9gYGD////////////////////////////f39//EBAQ/wAAAP8AAAD/AAAA/yAgIP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///5D//////////7+/v/8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/kJCQ/7+/v////////////////////////////+/v7/8gICD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///9///////////0BAQP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD//////////////////////////////////////4CAgP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/////////////////////////////////z8/P/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/////////////////////////////////QEBA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD///////////////////////////+Pj4//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD//////////////////////9/f3/8QEBD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD//////////////////////0BAQP8AAAD/AAAA/wAAAP8AAAD/AAAA/3BwcP8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/////////////////r6+v/wAAAP8AAAD/AAAA/wAAAP8AAAD/ICAg/+/v7/8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD////////////v7+//EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/v7+///////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD///////////9wcHD/AAAA/wAAAP8AAAD/AAAA/wAAAP9wcHD///////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD//////7+/v/8AAAD/AAAA/wAAAP8AAAD/AAAA/yAgIP/v7+////////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/7+/v/yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/6+vr/////////////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/gICA/wAAAP8AAAD/AAAA/wAAAP8AAAD/UFBQ//////////////////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/7+/v//////////////////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP+goKD///////////////////////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/0BAQP////////////////////////////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////7+/v/5+fn/+Pj4//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/EBAQ/9/f3/////////////////////////////////8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/kJCQ////////////////////////////z8/P/7+/v/8AAAD/AAAA/wAAAP////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////+/v7/+QkJD/gICA/3BwcP9gYGD/UFBQ/0BAQP9QUFD////////////////////////////v7+//AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/j4+P//////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////////////////////////////////////////////////////v7+//3BwcP9gYGD/QEBA/yAgIP8gICD/EBAQ//////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/b29v/9/f3//f39//7+/v//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/ICAg/yAgIP9AQED/UFBQ/2BgYP9gYGD/gICA/4CAgP+fn5//n5+f/6+vr/+/v7//z8/P/9/f3//v7+///////////////////////////////////////9/f3/8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/xAQEP8gICD/ICAg/0BAQP9AQED/YGBg/yAgIP8AAAD/AAAA/wAAAP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8gICD/UFBQ/2BgYP9QUFD/QEBA/yAgIP8gICD/EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/xAQEP////////////////8AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/1BQUP/f39/////////////////////////////////////////////v7+//39/f/8/Pz/+/v7//r6+v/5+fn/+fn5//gICA/3BwcP9gYGD/YGBg/0BAQP9AQED/ICAg/yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/4CAgP///////////////98AAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/gICA/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8DAwP8QEBD/AAAA/wAAAP8gICD/v7+//////////////////////4AAAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/yAgIP+vr6//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////j4+P/xAQEP8AAAD/AAAA/2BgYP/f39//////////////////////zwAAAAAAAAAAAAAAAP///////////////wAAAP8AAAD/AAAA/3BwcP/f39//7+/v/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/f3/9gYGD/AAAA/wAAAP8QEBD/oKCg//////////////////////////9/AAAAAAAAAAAAAAAAAAAAAP///+///////////0BAQP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8gICD/ICAg/0BAQP9gYGD/YGBg/4CAgP+Pj4//n5+f/6+vr/+/v7//39/f/9/f3///////////////////////////////////////////////////////z8/P/yAgIP8AAAD/AAAA/zAwMP/f39//////////////////////3////0AAAAAAAAAAAAAAAAAAAAAAAAAAAP///5///////////9/f3/9AQED/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/EBAQ/yAgIP8wMDD/QEBA/2BgYP9gYGD/gICA/4CAgP9AQED/AAAA/wAAAP8AAAD/gICA//////////////////////////+f////IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///yD/////////////////////7+/v/9/f3//Pz8//v7+//5+fn/+fn5//gICA/3BwcP9gYGD/UFBQ/zAwMP8gICD/EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/yAgIP/f39//////////////////////7////2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///9////////////////////////////////////////////////////////////////////////////////////////////f39//39/f/7+/v/+vr6//n5+f/5CQkP+AgID/YGBg/2BgYP9AQED/ICAg/yAgIP9AQED/oKCg///////////////////////////P////IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////QP///7/////v/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////38AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////EP///yD///8w////UP///2D///9w////gP///5////+f////v////8/////f////7//////////////////////////////////////////////////////////////////////////////////////////f////IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8g////IP///0D///9Q////YP///4D///+A////n////6////+/////3////9/////P////r////2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/8AAH///AAD/gAAAAB8AAP8AAAAABwAA/gAAAAADAAD8AAAAAAEAAPwAAAAAAQAA+AAAAAABAADwAAAAAAEAAOAAAAAAAQAAwAAAAAABAADAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAABAACAAAAAAAEAAIAAAAAAAQAAgAAAAAADAACAAAAAAAcAAIAAAAAADwAAgAAAAAAfAACAAAAAAH8AAMAAAAAA/wAA4AAAAAP/AAD8AAAAB/8AAP//8AAf/wAAKAAAAEAAAACAAAAAAQAgAAAAAAAAQAAAEwsAABMLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8g////cP///7/////P////7//////////////////////////f////3////8////+/////n////5////+Q////gP///3D///9g////UP///0D///8w////IP///yAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///+A/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+/////f////3////7////+v////n////5////+A////gP///2D///9g////UP///0D///8g////IP///xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///+A/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+/////P////n////0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///9A////////////////////////////////39/f/9/f3//v7+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////z////zAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8g////7/////////////////////9wcHD/EBAQ/wAAAP8AAAD/AAAA/wAAAP8QEBD/ICAg/yAgIP9AQED/UFBQ/2BgYP9gYGD/gICA/4CAgP+fn5//n5+f/6+vr/+/v7//39/f/9/f3//v7+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////v////MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////z/////////////////////9fX1//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8gICD/ICAg/zAwMP9AQED/UFBQ/2BgYP9wcHD/gICA/4+Pj/+fn5//n5+f/7+/v//Pz8//39/f/9/f3////////////////////////////////////////////////98AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////kP////////////////////+Pj4//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8gICD/UFBQ/7+/v///////////////////////////YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////YP////////////////////+/v7//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/n5+f/////////////////////78AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////IP///+/////////////////f39//ICAg/wAAAP8AAAD/AAAA/yAgIP+QkJD/n5+f/5+fn/+QkJD/gICA/3BwcP9gYGD/YGBg/0BAQP8wMDD/ICAg/yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/zAwMP/////////////////////vAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////EP///9//////////////////////QEBA/wAAAP8AAAD/AAAA/wAAAP+/v7/////////////////////////////////////////////////////////////////////////////f39//39/f/8/Pz/+/v7//n5+f/5+fn/+QkJD/gICA/3BwcP9gYGD/YGBg/0BAQP9AQED/ICAg/yAgIP8QEBD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///6D/////////////////////cHBw/wAAAP8AAAD/AAAA/wAAAP8AAAD////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////v7+//39/f/8/Pz/+/v7//r6+v/5CQkP8gICD/AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAP///3D/////////////////////r6+v/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////z8/P/wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAAAAAAAAAAAAP///zD/////////////////////39/f/xAQEP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAAAAAAAP///xD////f////////////////7+/v/zAwMP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAAAAAAD///+A/////////////////////3BwcP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////2BgYP8gICD/QEBA/0BAQP9gYGD/YGBg/3BwcP+Pj4//v7+////////////////////////////////////////////////////////f39//j4+P/4+Pj/+/v7//7+/v/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD///8Q////7////////////////4+Pj/8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////+QkJD/EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP9AQED////////////////////////////////////////////Pz8//EBAQ/wAAAP8AAAD/AAAA/xAQEP9/f3////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA////gP///////////////+/v7/8QEBD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////+/v7//AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/UFBQ/9/f3//////////////////////////////////f39//EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP///7////////////////+AgID/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP/Pz8//////////////////////////////////////////////////QEBA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD////v////////////////ICAg/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////j4+P/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////39/f/xAQEP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////1BQUP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////////////////////7+/v/8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA/////////////////////////////////+/v7/8gICD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP////////////////////////////////9wcHD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD///////////////////////////+/v7//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/yAgIP8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA////////////////////////////ICAg/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP+/v7//AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////gICA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP9wcHD//////wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD/////////////////39/f/xAQEP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/7+/v//////8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA/////////////////0BAQP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/r6+v////////////AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP///////////4+Pj/8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/UFBQ/////////////////wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////+/v7/8QEBD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/EBAQ/+/v7/////////////////8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////9QUFD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/5CQkP//////////////////////AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP+/v7//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/0BAQP///////////////////////////wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD/ICAg/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/xAQEP/f39////////////////////////////8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP+QkJD/////////////////////////////////AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP9AQED//////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/39/f//////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD///////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////7+/v/9/f3/+/v7//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/kJCQ////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/////////////////////////////////0BAQP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/QEBA/////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP///////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////+fn5//AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/EBAQ/9/f3/////////////////////////////////+Pj4//QEBA/yAgIP8AAAD/AAAA/wAAAP8AAAD/n5+f/9/f3/////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////////////////////7+/v/+AgID/gICA/2BgYP9gYGD/QEBA/zAwMP8gICD/EBAQ/5CQkP//////////////////////////////////////n5+f/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/j4+P////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+vr6//cHBw/2BgYP9gYGD/QEBA/0BAQP8gICD/ICAg/2BgYP///////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/7+/v////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/YGBg/2BgYP+AgID/gICA/5+fn/+fn5//r6+v/7+/v//Pz8//39/f/+/v7/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/xAQEP8gICD/ICAg/0BAQP9AQED/YGBg/2BgYP9wcHD/gICA/4+Pj/+fn5//r6+v/7+/v//Pz8//39/f/9/f3/////////////////////////////////////////////////+/v7//AAAA/wAAAP8AAAD/AAAA//////////////////////8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8gICD/ICAg/0BAQP9AQED/YGBg/2BgYP9gYGD/ICAg/wAAAP8AAAD/AAAA/wAAAP//////////////////////AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD//////////////////////wAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/yAgIP+goKD/7+/v///////v7+//39/f/9/f3/+/v7//r6+v/5+fn/+fn5//gICA/4CAgP9gYGD/YGBg/0BAQP9AQED/ICAg/yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/QEBA/////////////////////+8AAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/1BQUP/f39/////////////////////////////////////////////////////////////////////////////////////////////////////////////f39//39/f/8/Pz/+/v7//n5+f/5+fn/+QkJD/gICA/3BwcP9gYGD/YGBg/0BAQP8wMDD/ICAg/yAgIP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/ICAg/9/f3/////////////////////+/AAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/4CAgP//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////39/f/xAQEP8AAAD/AAAA/wAAAP8AAAD/cHBw/+/v7///////////////////////////YAAAAAAAAAAA/////////////////////wAAAP8AAAD/AAAA/wAAAP8AAAD/EBAQ/6+vr///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////j4+P/xAQEP8AAAD/AAAA/wAAAP8gICD/oKCg////////////////////////////////nwAAAAAAAAAAAAAAAP////////////////////8AAAD/AAAA/wAAAP8AAAD/ICAg/9/f3//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////f39//YGBg/wAAAP8AAAD/AAAA/wAAAP9gYGD/39/f////////////////////////////////jwAAAAAAAAAAAAAAAAAAAAD/////////////////////AAAA/wAAAP8AAAD/AAAA/yAgIP+vr6//v7+//9/f3//f39/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////f39//ICAg/wAAAP8AAAD/AAAA/xAQEP+QkJD////////////////////////////////v////cAAAAAAAAAAAAAAAAAAAAAAAAAAA////7////////////////0BAQP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8QEBD/ICAg/zAwMP9QUFD/YGBg/3BwcP+AgID/n5+f/5+fn/+/v7//z8/P/9/f3//v7+////////////////////////////////////////////////////////////////////////////////////////////9/f3//AAAA/wAAAP8AAAD/AAAA/yAgIP/f39/////////////////////////////////f////IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///6/////////////////Pz8//EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8gICD/ICAg/0BAQP9QUFD/YGBg/3BwcP+AgID/n5+f/5+fn/+/v7//z8/P/9/f3//v7+//z8/P/5+fn/8gICD/AAAA/wAAAP8AAAD/AAAA/4CAgP////////////////////////////////////9/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///9g/////////////////////9/f3/9wcHD/QEBA/zAwMP8gICD/EBAQ/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/ICAg/8/Pz////////////////////////////////9////8gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///9//////////////////////////////////////////////////////39/f/9/f3/+/v7//n5+f/5+fn/+AgID/cHBw/2BgYP9QUFD/QEBA/yAgIP8gICD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/AAAA/wAAAP8AAAD/YGBg/+/v7////////////////////////////////4////8QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///8g////3//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////v7+//39/f/8/Pz/+vr6//n5+f/5CQkP+AgID/YGBg/2BgYP9AQED/MDAw/yAgIP8QEBD/AAAA/wAAAP8AAAD/AAAA/wAAAP9AQED/oKCg////////////////////////////////3////2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///yD///+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////f39//39/f/9/f3//v7+//////////////////////////////////////r////yAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///yD///9w////n////7/////P////3////+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///yD///8g////QP///2D///9g////gP///4////+f////r////7/////f////3/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////+/////IAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////EP///yD///8w////QP///2D///9w////gP///4////+f////v////8/////f////7////////////////////+/////P////r////3D///8gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+AAAB//////wAAAAAAP//+AAAAAAAB//wAAAAAAAB/+AAAAAAAAD/4AAAAAAAAP/AAAAAAAAAf4AAAAAAAAB/AAAAAAAAAH4AAAAAAAAAfgAAAAAAAAB8AAAAAAAAAHgAAAAAAAAAcAAAAAAAAABwAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAABgAAAAAAAAAGAAAAAAAAAAYAAAAAAAAADgAAAAAAAAAeAAAAAAAAAD4AAAAAAAAAfgAAAAAAAAH+AAAAAAAAA/8AAAAAAAAH/wAAAAAAAB//gAAAAAAAP//gAAAAAAD////gAAAAAf//////AAAH//w==" alt="Icon 0" style="width:64px;height:64px;object-fit:contain;display:inline-block;vertical-align:middle;" data-icon="true" /></div>
+          </div>
+
+          <!-- 2x2 Matrix Grid -->
+          <div class="grid grid-cols-2 gap-8 max-w-[1000px]">
+            <!-- Card 1: Background -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-users-three text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">公司背景与用户规模</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                Notion Labs旗下旗舰产品，截至2025年全球用户规模突破1亿，作为海外协作增强型知识管理工具的标杆，服务于个人及企业级用户的全场景工作需求。
+              </div>
+            </div>
+
+            <!-- Card 2: Positioning -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-target text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">核心产品定位</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                All-in-one工作空间，深度整合笔记、数据库、项目管理、Wiki与AI能力于一体，打破传统工具边界，实现知识创作、管理与协作的无缝融合。
+              </div>
+            </div>
+
+            <!-- Card 3: Architecture -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-cpu text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">AI底层架构</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                采用多模型架构设计，底层灵活接入GPT-4o、Claude等主流大模型，通过模型能力互补确保AI功能的先进性、稳定性与场景适应性。
+              </div>
+            </div>
+
+            <!-- Card 4: Updates -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-sparkle text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">2026关键更新</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[13px] leading-[1.6] text-[#403E3E]/80 space-y-2">
+                <p><strong>Custom Agents:</strong> 支持自定义AI Agent自主执行多步骤任务</p>
+                <p><strong>Notion 3.2/3.4:</strong> 强化移动端AI、接入新模型、升级表格计算</p>
+                <p><strong>AI Q&A:</strong> 实现全量知识库智能问答</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-11">
+      <div class="slide-number">11</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">AI AGENT WORKBENCH</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-80">KNOWLEDGE SYSTEM</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 09</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">2026 · UPDATE</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">AI Agent 知识工作台</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 11</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-12">
+          <!-- Title Section (Capped at 48px per Continuity Anchor) -->
+          <div class="mb-12">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">关键更新界面截图</h1>
+            <div class="mt-4 w-24 h-1 bg-[#403E3E]"></div>
+          </div>
+
+          <!-- Comparison Grid -->
+          <div class="grid grid-cols-2 gap-12 items-start">
+            
+            <!-- Left Column: Notion Custom Agents -->
+            <div class="flex flex-col gap-6">
+              <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] h-full">
+                <div class="flex items-center gap-3 mb-4">
+                  <i class="ph ph-cpu text-[24px] text-[#403E3E]/55"></i>
+                  <div class="text-[22px] font-medium tracking-[-0.02em]">Notion Custom Agents</div>
+                </div>
+                <div class="h-px w-full dotted-line mb-6"></div>
+                <div class="text-[16px] leading-[1.75] text-[#403E3E]/80">
+                  Notion于2026年2月推出的Custom Agents功能，支持用户自定义AI Agent，能够自主执行多步骤任务，标志着Notion从被动问答转向主动任务执行，进入AI Agent知识工作台阶段。
+                </div>
+                <!-- Decorative Element -->
+                <div class="mt-8 flex items-center gap-2 text-[13px] tracking-[0.1em] uppercase opacity-40">
+                  <span class="w-8 h-px bg-[#403E3E]"></span>
+                  <span>Autonomous Execution</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: NotebookLM Deep Research -->
+            <div class="flex flex-col gap-6">
+              <div class="border border-[#403E3E] p-8 bg-[#FDFDFA]">
+                <div class="flex items-center gap-3 mb-4">
+                  <i class="ph ph-magnifying-glass text-[24px] text-[#403E3E]/55"></i>
+                  <div class="text-[22px] font-medium tracking-[-0.02em]">NotebookLM Deep Research</div>
+                </div>
+                <div class="h-px w-full dotted-line mb-6"></div>
+                <div class="text-[16px] leading-[1.75] text-[#403E3E]/80 mb-8">
+                  提供深度研究能力，支持AI自主进行多步骤信息检索与分析，代表AI Agent在知识管理领域的深度应用，通过可视化界面展示自主研究的工作流程。
+                </div>
+                
+                <!-- Image Placeholder (Bound Media Index 9) -->
+                <div class="relative w-full h-[240px] border border-[#403E3E] bg-[#EFEEEC] flex items-center justify-center overflow-hidden group">
+                  <div class="text-center text-[#403E3E]/30">
+                    
+                    <div class="mt-2 text-[12px] tracking-[0.22em] uppercase">Screenshot 09</div>
+                  </div>
+                  <!-- Caption Overlay -->
+                  <div class="absolute bottom-0 left-0 right-0 bg-[#403E3E] text-white text-[12px] py-2 px-4 tracking-wider text-center">
+                    NotebookLM Deep Research
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-12">
+      <div class="slide-number">12</div>
+      <div class="slide" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-20"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-20"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-10">
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">Competitive Analysis</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">ima Strategy 2026</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative px-12">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Threat Matrix</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 10 · 2026</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Market Intelligence</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 12</div>
+
+        <!-- Page Header -->
+        <div class="pt-[96px] pb-12">
+          <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">对 ima 的威胁分析</h1>
+          <div class="mt-4 w-24 h-1 bg-[#403E3E]"></div>
+        </div>
+
+        <!-- Matrix Content -->
+        <div class="grid grid-cols-3 gap-8 content-safe-area">
+          
+          <!-- Column 1: Custom Agents Threat -->
+          <div class="flex flex-col">
+            <div class="border-t-2 border-[#403E3E] pt-6 pb-4">
+              <div class="flex items-center gap-2 text-[#403E3E]/55 mb-2">
+                <i class="ph ph-warning-circle text-[20px]"></i>
+                <span class="text-[14px] tracking-[0.1em] uppercase font-medium">Threat 01</span>
+              </div>
+              <div class="text-[22px] font-bold tracking-[-0.02em] leading-tight">Custom Agents：工作流自动化</div>
+            </div>
+            <div class="mt-4 p-6 bg-[#FDFDFA] border border-[#403E3E] flex-1">
+              <div class="h-px w-full mb-4" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <p class="text-[15px] leading-[1.7] text-[#403E3E]/80">
+                Notion 于 2026 年 2 月推出 Custom Agents 功能，支持用户自定义 AI Agent 以自主执行多步骤复杂工作流，具备极强的灵活性和任务自动化能力，标志着知识库产品从"被动检索"向"主动执行"进化。
+              </p>
+            </div>
+          </div>
+
+          <!-- Column 2: Global Ecosystem Threat -->
+          <div class="flex flex-col">
+            <div class="border-t-2 border-[#403E3E] pt-6 pb-4">
+              <div class="flex items-center gap-2 text-[#403E3E]/55 mb-2">
+                <i class="ph ph-globe text-[20px]"></i>
+                <span class="text-[14px] tracking-[0.1em] uppercase font-medium">Threat 02</span>
+              </div>
+              <div class="text-[22px] font-bold tracking-[-0.02em] leading-tight">全球化生态：规模与粘性壁垒</div>
+            </div>
+            <div class="mt-4 p-6 bg-[#FDFDFA] border border-[#403E3E] flex-1">
+              <div class="h-px w-full mb-4" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <p class="text-[15px] leading-[1.7] text-[#403E3E]/80">
+                Notion 拥有超 1 亿全球用户（2025 年数据），以 All-in-one 工作空间为定位，整合笔记、数据库、项目管理与 Wiki 功能，形成极高的用户粘性与生态壁垒，构成全球化竞争威胁。
+              </p>
+            </div>
+          </div>
+
+          <!-- Column 3: ima Defense Advantage -->
+          <div class="flex flex-col">
+            <div class="border-t-2 border-[#403E3E] pt-6 pb-4">
+              <div class="flex items-center gap-2 text-[#403E3E]/55 mb-2">
+                <i class="ph ph-shield-check text-[20px]"></i>
+                <span class="text-[14px] tracking-[0.1em] uppercase font-medium">Defense</span>
+              </div>
+              <div class="text-[22px] font-bold tracking-[-0.02em] leading-tight">ima 的本地化防御优势</div>
+            </div>
+            <div class="mt-4 p-6 bg-[#403E3E] text-[#FDFDFA] border border-[#403E3E] flex-1">
+              <div class="h-px w-full mb-4" style="background-image: repeating-linear-gradient(to right, rgba(253,253,250,0.55) 0 1px, transparent 1px 6px);"></div>
+              <p class="text-[15px] leading-[1.7] opacity-90">
+                ima 在中国大陆市场具有显著优势：Notion 存在访问速度慢、中文支持一般、无微信集成等短板，而 ima 在访问体验、中文语义理解及微信生态集成方面具备差异化竞争力。
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-13">
+      <div class="slide-number">13</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">AI 原生工作平台</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">DingTalk AI</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Enterprise AI</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 11 · 2025</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Strategic Analysis</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 13</div>
+
+        <!-- Content Container -->
+        <div class="pt-[80px] px-16">
+          <!-- Title Section: Max 48px as per Continuity Anchor -->
+          <div class="mb-12">
+            <div class="text-[24px] font-black mb-2">11.03</div>
+            <h1 class="text-[42px] font-medium tracking-[-0.03em] leading-tight">
+              钉钉知识库 / 悟空 <span class="text-[#403E3E]/50 mx-2">—</span> 企业级 AI 原生工作平台
+            </h1>
+            <div class="mt-4 w-24 h-1 bg-[#403E3E]"></div>
+          </div>
+
+          <!-- 2x2 Matrix Layout -->
+          <div class="grid grid-cols-2 gap-x-10 gap-y-8 max-w-[1000px]">
+            
+            <!-- Card 1: Background -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-buildings text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">企业背景与领导力</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                阿里巴巴集团旗下钉钉出品，由CEO陈航（花名"无招"）领衔打造，依托阿里生态资源与技术积累，专注企业级数字化办公与AI原生工作平台建设，具备深厚的企业服务基因与组织管理理解。
+              </div>
+            </div>
+
+            <!-- Card 2: Scale -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-users-three text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">市场渗透与用户规模</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                服务<span class="font-bold text-[#403E3E]">8亿用户</span>、覆盖<span class="font-bold text-[#403E3E]">2000万+企业组织</span>，其中30万家付费企业客户已深度使用AI功能，形成庞大的企业级AI应用生态与数据沉淀，在国内企业协作市场占据绝对领先地位。
+              </div>
+            </div>
+
+            <!-- Card 3: Tech -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-cpu text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">底层技术架构</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                采用AI-Fusion引擎融合50+全球主流大模型能力，悟空底层Agent Runtime实现<span class="font-bold text-[#403E3E]">LLM Independent</span>架构，支持灵活切换与独立运行，确保技术自主可控与模型中立性。
+              </div>
+            </div>
+
+            <!-- Card 4: Strategy -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-4">
+                <i class="ph ph-target text-[22px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">战略产品定位</div>
+              </div>
+              <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+                升级为全球首个企业级AI原生工作平台（<span class="font-bold text-[#403E3E]">Agent OS</span>），构建Agent嵌入组织结构与业务流程的操作系统级解决方案，实现OS Independent与LLM Independent双重独立架构。
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-14">
+      <div class="slide-number">14</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">竞争情报分析</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">Threat Analysis</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative px-12">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Strategic Intelligence</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 12 · 2025</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Competitive Landscape</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 14</div>
+
+        <!-- Header Section -->
+        <div class="pt-12 pb-8">
+          <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">对 ima 的威胁分析</h1>
+          <div class="mt-4 flex items-center gap-3">
+            <span class="px-3 py-1 bg-[#403E3E] text-[#FDFDFA] text-[14px] font-medium tracking-wider">威胁等级：极高</span>
+            <div class="h-px flex-1 dotted-line"></div>
+            <div class="text-[18px] text-[#403E3E]/80 font-medium tracking-[-0.02em]">钉钉/悟空通过Agent OS级竞争升维，形成全方位战略压制</div>
+          </div>
+        </div>
+
+        <!-- 2x2 Matrix Grid -->
+        <div class="grid grid-cols-2 gap-6 mt-8">
+          <!-- Threat 1 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-3">
+              <i class="ph ph-device-mobile text-[20px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">① 规模 + 硬件闭环</div>
+            </div>
+            <div class="h-px w-full dotted-line mb-4"></div>
+            <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+              依托8亿用户基础，推出DingTalk A1与DingTalk Real硬件，实现从数字世界到物理世界的完整Agent闭环，构建难以复制的硬件护城河。
+            </div>
+          </div>
+
+          <!-- Threat 2 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-3">
+              <i class="ph ph-cpu text-[20px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">② Agent OS级竞争升维</div>
+            </div>
+            <div class="h-px w-full dotted-line mb-4"></div>
+            <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+              从“知识库工具”升维为“AI工作操作系统”，通过DEAP系统原子化企业能力，OS Independent架构彻底改变了竞争维度。
+            </div>
+          </div>
+
+          <!-- Threat 3 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-3">
+              <i class="ph ph-squares-four text-[20px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">③ MCP生态先发优势</div>
+            </div>
+            <div class="h-px w-full dotted-line mb-4"></div>
+            <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+              构建全球最大企业级MCP广场，形成AI时代“App Store”，并建立Skill开发+算粒分成的商业模式，生态壁垒极高。
+            </div>
+          </div>
+
+          <!-- Threat 4 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-3">
+              <i class="ph ph-briefcase text-[20px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">④ 悟空实战交付能力</div>
+            </div>
+            <div class="h-px w-full dotted-line mb-4"></div>
+            <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+              具备Planning→Acting→Learning闭环，在20+行业场景实现商业交付，企业级实战经验正向个人知识管理渗透。
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Bar (ima Advantage) -->
+        <div class="mt-8 border-t-2 border-[#403E3E] pt-6 flex items-start gap-6">
+          <div class="flex-shrink-0 pt-1">
+            <i class="ph ph-shield-check text-[24px] text-[#403E3E]"></i>
+          </div>
+          <div>
+            <div class="text-[18px] font-bold tracking-[-0.02em] mb-2">ima 差异化优势</div>
+            <div class="text-[14px] leading-[1.7] text-[#403E3E]/80 max-w-[1000px]">
+              C端个人体验远优于钉钉，微信生态更贴近个人使用场景，知识广场与社交功能无直接竞品，产品形态轻量且完全免费，在个人知识管理领域仍具独特价值。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-15">
+      <div class="slide-number">15</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">AGENT NATIVE PLATFORM</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-80">AILY ECOSYSTEM</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative px-12">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 13 · Intelligence</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">2026 · STRATEGY</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">飞书知识库 / Aily</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 15</div>
+
+        <!-- Header Section -->
+        <div class="pt-12 pb-8">
+          <div class="text-[24px] font-black mb-2">3.3</div>
+          <h1 class="text-[42px] font-medium tracking-[-0.03em] leading-tight">飞书知识库 / Aily —— Agent 原生工作平台</h1>
+          <div class="mt-4 text-[18px] tracking-[-0.02em] text-[#403E3E]/80 max-w-3xl leading-relaxed">
+            字节跳动旗下企业级Agent原生平台，依托豆包大模型，实现从传统协作办公工具向具备长期记忆与主动执行能力的智能体系统转型。
+          </div>
+        </div>
+
+        <!-- Timeline Section (Version Evolution) -->
+        <div class="mt-8 mb-10 relative">
+          <div class="flex items-center justify-between relative z-10">
+            <div class="flex flex-col items-center w-1/4">
+              <div class="w-3 h-3 rounded-full bg-[#403E3E] mb-3"></div>
+              <div class="text-[14px] font-bold">2025.07</div>
+              <div class="text-[13px] text-[#403E3E]/60 text-center">发布Aily智能体平台</div>
+            </div>
+            <div class="flex flex-col items-center w-1/4">
+              <div class="w-3 h-3 rounded-full bg-[#403E3E] mb-3"></div>
+              <div class="text-[14px] font-bold">2026.02</div>
+              <div class="text-[13px] text-[#403E3E]/60 text-center">升级Aily知识空间</div>
+            </div>
+            <div class="flex flex-col items-center w-1/4">
+              <div class="w-3 h-3 rounded-full bg-[#403E3E] mb-3"></div>
+              <div class="text-[14px] font-bold">2026.03.19</div>
+              <div class="text-[13px] text-[#403E3E]/60 text-center">宣布全面升级为Agent原生平台</div>
+            </div>
+            <div class="flex flex-col items-center w-1/4">
+              <div class="w-3 h-3 rounded-full bg-[#403E3E] mb-3"></div>
+              <div class="text-[14px] font-bold">2026.03.30</div>
+              <div class="text-[13px] text-[#403E3E]/60 text-center">V7.65版本正式发布</div>
+            </div>
+          </div>
+          <!-- Timeline Rail -->
+          <div class="absolute top-1.5 left-0 w-full h-[2px] bg-[#403E3E]/15 -z-0"></div>
+        </div>
+
+        <!-- Comparison Matrix (Duel Compare) -->
+        <div class="grid grid-cols-2 gap-8 mb-10">
+          <!-- Aily Smart Companion -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-chat-centered-text text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[20px] font-medium tracking-[-0.02em]">Aily 智能伙伴：嵌入式协作形态</div>
+            </div>
+            <div class="h-px w-full dotted-line mb-4"></div>
+            <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+              以常驻联系人形态存在于飞书生态中，具备全量上下文感知能力，覆盖群聊、会议、文档、日程、任务等全场景工作流，实现无缝的嵌入式协作。
+            </div>
+          </div>
+
+          <!-- Aily Pro -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA]">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-desktop text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[20px] font-medium tracking-[-0.02em]">Aily 专业版：独立工作站形态</div>
+            </div>
+            <div class="h-px w-full dotted-line mb-4"></div>
+            <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+              提供独立Web/移动端入口与完整GUI界面。支持复杂任务拆解与并行处理，可产出文档、PPT、代码及数据分析等全类型成果，对标OpenClaw深度创作需求。
+            </div>
+          </div>
+        </div>
+
+        <!-- Ecosystem Footer -->
+        <div class="border-t-2 border-[#403E3E] pt-6 flex items-start gap-10">
+          <div class="flex-shrink-0">
+            <div class="text-[14px] font-black tracking-[0.1em] uppercase">2026.03 核心升级生态</div>
+          </div>
+          <div class="flex gap-8">
+            <div class="flex items-center gap-2">
+              <i class="ph ph-code text-[16px] text-[#403E3E]/55"></i>
+              <span class="text-[13px] leading-tight">妙搭Code Agent：自然语言开发业务系统</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i class="ph ph-chart-bar text-[16px] text-[#403E3E]/55"></i>
+              <span class="text-[13px] leading-tight">多维表格Agent：结构化数据智能可视化</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-16">
+      <div class="slide-number">16</div>
+      <div class="slide text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">飞书 Aily 平台能力</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">Capability Matrix</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative px-12">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Platform Architecture</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 14 · 2025</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">核心功能谱系</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 16</div>
+
+        <!-- Page Header -->
+        <div class="pt-[96px] pb-8">
+          <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-none">核心功能矩阵</h1>
+          <div class="mt-4 w-24 h-1 bg-[#403E3E]"></div>
+        </div>
+
+        <!-- Matrix Grid -->
+        <div class="grid grid-cols-3 gap-6 mt-10">
+          <!-- Card 1 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-chat-centered-text text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">AI 知识问答</div>
+            </div>
+            <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+            <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+              基于企业文档、消息、会议纪要的智能问答能力，支持对飞书生态内各类知识资产的深度理解与检索，实现精准问答与知识溯源。
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-database text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">全域知识整合</div>
+            </div>
+            <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+            <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+              打通文档、消息、会议、审批、日程、任务等全链路数据，实现企业知识资产的统一沉淀与关联，构建完整的组织记忆体系。
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-robot text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">Aily Agent 形态</div>
+            </div>
+            <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+            <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+              以常驻联系人形式嵌入工作流，具备全量上下文感知与记忆能力，支持主动工作模式及多Agent协作，重塑人机协作体验。
+            </div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-code text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">妙搭 Code Agent</div>
+            </div>
+            <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+            <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+              支持通过自然语言开发业务系统，深度集成飞书身份认证与权限体系，实现低代码/无代码的应用快速构建与部署。
+            </div>
+          </div>
+
+          <!-- Card 5 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-cube text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">SkillHub 生态</div>
+            </div>
+            <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+            <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+              提供官方Skills市场与自定义Skill开发能力，内置安全扫描机制与开源认证体系，构建开放的Agent能力扩展生态。
+            </div>
+          </div>
+
+          <!-- Card 6 -->
+          <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+            <div class="flex items-center gap-3 mb-4">
+              <i class="ph ph-plug text-[22px] text-[#403E3E]/55"></i>
+              <div class="text-[18px] font-medium tracking-[-0.02em]">OpenClaw 兼容</div>
+            </div>
+            <div class="h-px w-full" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+            <div class="mt-4 text-[14px] leading-[1.7] text-[#403E3E]/80">
+              作为飞书官方版'龙虾'实现一键激活，兼容OpenClaw标准，降低Agent开发门槛，实现与开源生态的无缝对接。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-17">
+      <div class="slide-number">17</div>
+      <div class="slide bg-[#F6F5F3] text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">THREAT ANALYSIS</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-80">COMPETITIVE LANDSCAPE</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Strategic Insight</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 15 · 2026</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Competitive Analysis</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 17</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-12">
+          <!-- Title Section: Max 48px as per Content Page Continuity -->
+          <div class="mb-10">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">对 ima 的威胁分析</h1>
+            <div class="mt-3 text-[20px] tracking-[-0.02em] text-[#403E3E]/60">Aily 企业级能力对 ima 个人知识库定位的维度压制</div>
+          </div>
+
+          <!-- 2x2 Matrix Grid -->
+          <div class="grid grid-cols-2 gap-6 mb-8">
+            <!-- Matrix Item 1 -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-3">
+                <i class="ph ph-cpu text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">Agent原生平台：维度全面升级</div>
+              </div>
+              <div class="h-px w-full mb-4" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+                Aily已跃迁为Agent原生工作平台(V7.65)，集成豆包大模型能力；而ima仍局限于文档层面的知识库定位，未实现向Agent原生架构的转型。
+              </div>
+            </div>
+
+            <!-- Matrix Item 2 -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-3">
+                <i class="ph ph-globe text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">全量上下文感知：全域数据整合</div>
+              </div>
+              <div class="h-px w-full mb-4" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+                具备自主读取群聊、会议、文档、日程的全域感知能力，实现全链路知识沉淀；ima仅限文档处理，无法感知企业协作中的实时上下文。
+              </div>
+            </div>
+
+            <!-- Matrix Item 3 -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-3">
+                <i class="ph ph-shield-check text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">企业级深度能力：安全与开发集成</div>
+              </div>
+              <div class="h-px w-full mb-4" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+                提供权限继承、身份感知等安全管控，并集成妙搭Code Agent支持自然语言开发，深度满足企业级合规与定制化开发需求。
+              </div>
+            </div>
+
+            <!-- Matrix Item 4 -->
+            <div class="border border-[#403E3E] p-6 bg-[#FDFDFA] flex flex-col">
+              <div class="flex items-center gap-3 mb-3">
+                <i class="ph ph-squares-four text-[20px] text-[#403E3E]/55"></i>
+                <div class="text-[18px] font-medium tracking-[-0.02em]">SkillHub生态与"小龙虾"形态</div>
+              </div>
+              <div class="h-px w-full mb-4" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              <div class="text-[14px] leading-[1.7] text-[#403E3E]/80">
+                构建SkillHub生态支持自定义开发；"小龙虾"Agent作为常驻联系人具备记忆与主动工作特性，形成高频使用场景的生态闭环。
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Defense Advantage Section -->
+          <div class="border-t-2 border-[#403E3E] pt-6 flex items-start gap-6">
+            <div class="flex-shrink-0 pt-1">
+              <div class="bg-[#403E3E] text-[#FDFDFA] px-3 py-1 text-[12px] tracking-[0.1em] uppercase font-medium">Defense</div>
+            </div>
+            <div class="flex-1">
+              <div class="text-[18px] font-medium tracking-[-0.02em] mb-2">ima 的差异化防御优势</div>
+              <div class="text-[14px] leading-[1.7] text-[#403E3E]/80 max-w-[1000px]">
+                尽管面临企业级威胁，ima 仍保持 C 端体验更轻量、微信生态更深、个人用户更友好、免费无门槛等差异化优势，在个人知识管理及轻量级应用场景中具备独特价值主张。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-18">
+      <div class="slide-number">18</div>
+      <div class="slide text-[#403E3E]" style="background:#F6F5F3;">
+    <!-- Hairline Rails (Core Signature) -->
+    <div class="absolute inset-y-0 left-0 w-[2px] bg-[#403E3E] z-10"></div>
+    <div class="absolute inset-y-0 left-[70px] w-[2px] bg-[#403E3E] z-10"></div>
+
+    <div class="grid grid-cols-[70px_1fr] h-full">
+      <!-- Left Vertical Bar -->
+      <div class="bg-[#FDFDFA] flex flex-col items-center justify-between py-14 z-20">
+        <div class="vtext text-[14px] tracking-[0.22em] opacity-80">STRATEGIC SUMMARY</div>
+        <div class="vtext text-[14px] tracking-[0.22em] uppercase opacity-60">ima Intelligence</div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="relative">
+        <!-- Four Corner Labels -->
+        <div class="absolute left-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Conclusion</div>
+        <div class="absolute right-12 top-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Chapter 16 · 2025</div>
+        <div class="absolute left-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">Strategic Outlook</div>
+        <div class="absolute right-12 bottom-12 text-[14px] tracking-[0.22em] uppercase opacity-60">PAGE 18</div>
+
+        <!-- Content Layout -->
+        <div class="pt-[80px] px-16">
+          <!-- Title Section: Constrained to 48px per Continuity Anchor -->
+          <div class="mb-12">
+            <h1 class="text-[48px] font-medium tracking-[-0.03em] leading-tight">总结与展望</h1>
+            <div class="mt-4 w-20 h-1 bg-[#403E3E]"></div>
+          </div>
+
+          <!-- Summary Grid: 2-Column Layout for the 2 body items -->
+          <div class="grid grid-cols-2 gap-8 max-w-[1000px]">
+            
+            <!-- Card 1: AI Active Compilation -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[360px]">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-brain text-[24px] text-[#403E3E]/55"></i>
+                <div class="text-[22px] font-medium tracking-[-0.02em]">AI主动编译：知识自生长范式</div>
+              </div>
+              
+              <!-- Dotted Separator -->
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              
+              <div class="text-[16px] leading-[1.75] text-[#403E3E]/80 flex-1">
+                AI知识管理正从被动工具演进为主动整理者，实现"你的知识在自动生长"的体验。
+              </div>
+              
+              <div class="mt-8 pt-4 text-[13px] tracking-[0.1em] uppercase text-[#403E3E]/40 font-medium">
+                Paradigm Shift
+              </div>
+            </div>
+
+            <!-- Card 2: Future Action -->
+            <div class="border border-[#403E3E] p-8 bg-[#FDFDFA] flex flex-col h-[360px]">
+              <div class="flex items-center gap-3 mb-6">
+                <i class="ph ph-rocket-launch text-[24px] text-[#403E3E]/55"></i>
+                <div class="text-[22px] font-medium tracking-[-0.02em]">后续行动：ima战略升级路径</div>
+              </div>
+              
+              <!-- Dotted Separator -->
+              <div class="h-px w-full mb-6" style="background-image: repeating-linear-gradient(to right, rgba(64,62,62,0.55) 0 1px, transparent 1px 6px);"></div>
+              
+              <div class="text-[16px] leading-[1.75] text-[#403E3E]/80 flex-1">
+                建议ima知识库优先强化AI主动编译能力，构建"越用越懂你"的智能知识生态；同步布局多模态融合与知识广场功能，形成差异化竞争壁垒。
+              </div>
+              
+              <div class="mt-8 pt-4 text-[13px] tracking-[0.1em] uppercase text-[#403E3E]/40 font-medium">
+                Strategic Roadmap
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+</body>
+</html>

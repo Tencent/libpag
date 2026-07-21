@@ -1,0 +1,188 @@
+id,category,feature,tier,expected_warnings,notes
+01-structure__semantic-containers,structure,"div/section/header/footer/main/aside/nav/article all map to container Layers",subset,,semantic-neutral containers
+01-structure__headings-h1-h6,structure,"h1..h6 default font sizes (32/24/20/18/16/14, bold)",subset,,element defaults from spec 3.2
+01-structure__title-metadata,structure,"<title> -> data-title, <meta> ignored",subset,,head handling
+01-structure__stray-text-wrapped,structure,"bare text inside a container is wrapped in <p>",subset,subset:text-wrapped,StructureNormalization
+01-structure__unknown-tag-dropped,structure,"unsupported tag (<table>) is dropped",snapshot,subset:unsupported-tag,needs browser to render original
+02-box-model__box-sizing-border-box,box-model,"box-sizing: border-box (default/only)",subset,,padding stays inside width
+02-box-model__padding-one-value,box-model,"padding: N (all sides)",subset,,shorthand 1 value
+02-box-model__padding-two-value,box-model,"padding: T R",subset,,shorthand 2 value
+02-box-model__padding-four-value,box-model,"padding: T R B L",subset,,shorthand 4 value
+02-box-model__padding-longhand-sides,box-model,"padding-top/right/bottom/left",subset,,longhand sides
+02-box-model__margin-uniform,box-model,"uniform margin folded into a padding wrapper",subset,,no per-child margin in PAGX
+02-box-model__margin-negative,box-model,"negative margin passed through",subset,,
+02-box-model__margin-auto-center,box-model,"margin: 0 auto horizontal centering",snapshot,,auto margins resolved by browser
+02-box-model__margin-promoted-to-gap,box-model,"uniform child main-axis margin promoted to container gap",subset,subset:margin-promoted-to-gap,MarginToGapPromotion
+03-sizing-units__length-px,sizing-units,"px lengths on width/height",subset,,
+03-sizing-units__size-percent,sizing-units,"width/height in %",subset,,resolved against parent content box
+03-sizing-units__unit-em-coerced,sizing-units,"em coerced to px",subset,subset:unit-coerced,against parent font-size
+03-sizing-units__unit-rem-coerced,sizing-units,"rem coerced to px (16px base)",subset,subset:unit-coerced,
+03-sizing-units__unit-pt-coerced,sizing-units,"pt coerced to px (pt*4/3)",subset,subset:unit-coerced,
+03-sizing-units__unit-vw-vh-coerced,sizing-units,"vw/vh dropped (not coerced at filter time)",subset,subset:unsupported-property,vw/vh only coerce when canvas known to the filter; dropped otherwise
+03-sizing-units__calc-rejected,sizing-units,"calc() rejected",subset,subset:unsupported-property,
+03-sizing-units__min-max-width-ignored,sizing-units,"min-width/max-width ignored",subset,subset:unsupported-property,
+03-sizing-units__aspect-ratio-ignored,sizing-units,"aspect-ratio ignored",subset,subset:unsupported-property,
+04-display__display-block,display,"display: block stacking",subset,,default
+04-display__display-flex,display,"display: flex enables layout",subset,,
+04-display__display-inline-downgraded,display,"display: inline downgraded to block",subset,subset:unsupported-property,no true inline box model
+04-display__display-inline-block-downgraded,display,"display: inline-block downgraded to block",subset,subset:unsupported-property,
+04-display__display-none-hidden,display,"display: none removes the element",snapshot,subset:unsupported-property,browser removes from render
+04-display__display-grid,display,"display: grid (unsupported, needs snapshot)",snapshot,subset:unsupported-property,grid-* dropped by importer
+04-display__display-table,display,"display: table (unsupported, needs snapshot)",snapshot,"subset:text-wrapped,subset:unsupported-property",
+04-display__float-left-right,display,"float left/right (unsupported, needs snapshot)",snapshot,subset:unsupported-property,
+05-flexbox__flex-direction-row,flexbox,"flex-direction: row",subset,,
+05-flexbox__flex-direction-column,flexbox,"flex-direction: column",subset,,
+05-flexbox__flex-direction-row-reverse,flexbox,"flex-direction: row-reverse downgraded to row",subset,subset:unsupported-property,reverse ordering not modelled
+05-flexbox__justify-content-flex-start,flexbox,"justify-content: flex-start",subset,,
+05-flexbox__justify-content-center,flexbox,"justify-content: center",subset,,
+05-flexbox__justify-content-flex-end,flexbox,"justify-content: flex-end",subset,,
+05-flexbox__justify-content-space-between,flexbox,"justify-content: space-between",subset,,
+05-flexbox__justify-content-space-around,flexbox,"justify-content: space-around",subset,,
+05-flexbox__justify-content-space-evenly,flexbox,"justify-content: space-evenly",subset,,
+05-flexbox__align-items-stretch,flexbox,"align-items: stretch",subset,,
+05-flexbox__align-items-center,flexbox,"align-items: center",subset,,
+05-flexbox__align-items-flex-start,flexbox,"align-items: flex-start",subset,,
+05-flexbox__align-items-flex-end,flexbox,"align-items: flex-end",subset,,
+05-flexbox__align-items-baseline,flexbox,"align-items: baseline",subset,,
+05-flexbox__gap-single,flexbox,"gap: N",subset,,single value
+05-flexbox__flex-grow,flexbox,"flex: 1 grow distributes free space",subset,,
+05-flexbox__flex-none,flexbox,"flex: none maps to flex 0",subset,,
+05-flexbox__flex-shrink-zero,flexbox,"flex-shrink: 0 dropped silently",subset,,PAGX never shrinks
+05-flexbox__nested-flex,flexbox,"row flex nested inside a column flex",subset,,
+05-flexbox__flex-wrap,flexbox,"flex-wrap: wrap (unsupported, needs snapshot)",snapshot,subset:unsupported-property,
+05-flexbox__flex-basis,flexbox,"flex-basis (unsupported, needs snapshot)",snapshot,subset:unsupported-property,use flex:N
+05-flexbox__align-self,flexbox,"align-self (unsupported, needs snapshot)",snapshot,subset:unsupported-property,
+05-flexbox__order,flexbox,"order (unsupported, needs snapshot)",snapshot,subset:unsupported-property,
+07-position__absolute-inset,position,"inset shorthand is NOT in the subset (dropped)",subset,subset:unsupported-property,use explicit left/top/right/bottom (see absolute-four-sides)
+07-position__absolute-four-sides,position,"position: absolute with left/top/right/bottom",subset,,
+07-position__absolute-negative,position,"position: absolute with negative offsets",subset,,
+07-position__relative-noop,position,"position: relative is a silent no-op",subset,,offsets ignored
+07-position__fixed-downgraded,position,"position: fixed downgraded to absolute",subset,subset:unsupported-property,
+07-position__sticky-downgraded,position,"position: sticky downgraded to absolute",subset,subset:unsupported-property,
+07-position__absolute-center-translate,position,"absolute centering via top/left 50% + translate(-50%,-50%)",subset,,single transform fn
+07-position__z-index,position,"z-index stacking (ignored, needs snapshot)",snapshot,"subset:flex-inference-skipped,subset:unsupported-property",
+15-typography__font-family-fallback,typography,"font-family primary + fallback chain",subset,,
+15-typography__font-size-px,typography,"font-size in px",subset,,
+15-typography__font-weight-bold,typography,"font-weight: bold",subset,,
+15-typography__font-weight-numeric,typography,"font-weight: 600 numeric bold",subset,,>=600 maps to bold
+15-typography__font-style-italic,typography,"font-style: italic",subset,,
+15-typography__line-height-unitless,typography,"line-height: unitless multiplier",subset,,resolved against font-size
+15-typography__line-height-px,typography,"line-height: N px",subset,,
+15-typography__line-height-percent,typography,"line-height: N%",subset,,
+15-typography__letter-spacing,typography,"letter-spacing: N px",subset,,
+15-typography__text-align-center,typography,"text-align: center",subset,,
+15-typography__text-align-right,typography,"text-align: right -> end",subset,,
+15-typography__text-align-justify,typography,"text-align: justify",subset,,
+15-typography__text-decoration-underline,typography,"text-decoration: underline",subset,,known-verify-diagnostic: painter-leaks-geometry (underline rect shares Group with text)
+15-typography__text-decoration-line-through,typography,"text-decoration: line-through",subset,,known-verify-diagnostic: painter-leaks-geometry (strike rect shares Group with text)
+15-typography__white-space-nowrap,typography,"white-space: nowrap disables wrap",subset,,
+15-typography__white-space-pre,typography,"white-space: pre preserves spaces/newlines",subset,,
+15-typography__writing-mode-vertical,typography,"writing-mode: vertical-rl",subset,,vertical text
+15-typography__webkit-text-stroke,typography,"-webkit-text-stroke adds glyph stroke",subset,,
+15-typography__text-overflow-ellipsis,typography,"text-overflow: ellipsis (warned, not implemented)",subset,,warns 'not implemented in PAGX' without a subset: code
+15-typography__br-line-break,typography,"<br/> hard line break in text",subset,,
+15-typography__text-transform-ignored,typography,"text-transform (ignored, needs snapshot)",snapshot,subset:unsupported-property,
+15-typography__text-decoration-overline,typography,"text-decoration: overline (unsupported, needs snapshot)",snapshot,,only underline/line-through supported
+06-grid__grid-template-columns-fr,grid,"grid-template-columns with fr units",snapshot,subset:unsupported-property,grid dropped by importer; needs browser
+06-grid__grid-template-columns-fixed,grid,"grid-template-columns fixed px tracks",snapshot,subset:unsupported-property,
+06-grid__grid-auto-fit-minmax,grid,"grid auto-fit + minmax responsive tracks",snapshot,subset:unsupported-property,
+06-grid__grid-template-areas,grid,"grid-template-areas named layout",snapshot,subset:unsupported-property,
+06-grid__grid-column-span,grid,"grid-column: span N",snapshot,subset:unsupported-property,
+08-color__hex-3,color,"#rgb 3-digit hex",subset,,
+08-color__hex-4-alpha,color,"#rgba 4-digit hex with alpha",subset,,
+08-color__hex-6,color,"#rrggbb 6-digit hex",subset,,
+08-color__hex-8-alpha,color,"#rrggbbaa 8-digit hex with alpha",subset,,
+08-color__rgb,color,"rgb() function",subset,,
+08-color__rgba,color,"rgba() function",subset,,
+08-color__hsl,color,"hsl() function",subset,,
+08-color__hsla,color,"hsla() function",subset,,
+08-color__named,color,"CSS named color (rebeccapurple)",subset,,
+08-color__currentcolor,color,"currentColor keyword",subset,,
+08-color__transparent,color,"transparent keyword",subset,,
+08-color__display-p3,color,"color(display-p3 ...) wide gamut",subset,,
+09-background__background-color-solid,background,"background-color solid fill",subset,,
+09-background__linear-gradient-to-right,background,"linear-gradient(to right, ...)",subset,,
+09-background__linear-gradient-angle,background,"linear-gradient(angle, ...)",subset,,
+09-background__linear-gradient-multistop,background,"linear-gradient multiple stops",subset,,
+09-background__radial-gradient-circle,background,"radial-gradient(circle, ...)",subset,,
+09-background__radial-gradient-ellipse,background,"radial-gradient(ellipse at center, ...)",subset,,
+09-background__conic-gradient,background,"conic-gradient(from angle, ...)",subset,,
+09-background__background-clip-text-gradient,background,"background-clip: text gradient routed to text",subset,,
+09-background__background-image-url,background,"background-image: url(data-uri) as ImagePattern",subset,,
+09-background__background-size-cover,background,"background-size cover + position + repeat",subset,,
+09-background__multiple-backgrounds,background,"multiple background layers",subset,,importer keeps first-resolvable layer
+10-border-radius__border-solid,border-radius,"border shorthand solid",subset,,
+10-border-radius__border-dashed,border-radius,"border shorthand dashed",subset,,
+10-border-radius__border-dotted,border-radius,"border shorthand dotted",subset,,
+10-border-radius__border-radius-uniform,border-radius,"border-radius single value",subset,,
+10-border-radius__border-radius-circle-50,border-radius,"border-radius: 50% on square -> ellipse",subset,,
+10-border-radius__border-radius-four-corners,border-radius,"border-radius 4-value shorthand",subset,,
+10-border-radius__border-radius-elliptical,border-radius,"border-radius W / H elliptical (ignored)",subset,subset:unsupported-property,
+10-border-radius__border-per-side,border-radius,"border-left/bottom longhand (unsupported)",subset,subset:unsupported-property,
+10-border-radius__border-radius-per-corner,border-radius,"per-corner radius longhand (unsupported)",subset,subset:unsupported-property,
+10-border-radius__outline,border-radius,"outline (unsupported)",subset,subset:unsupported-property,
+11-shadow-filter__box-shadow-single,shadow-filter,"box-shadow single",subset,,
+11-shadow-filter__box-shadow-multiple,shadow-filter,"box-shadow multiple layers",subset,,
+11-shadow-filter__box-shadow-inset,shadow-filter,"box-shadow inset -> InnerShadowStyle",subset,,
+11-shadow-filter__box-shadow-spread,shadow-filter,"box-shadow spread radius (ignored)",subset,,spread not modelled
+11-shadow-filter__filter-blur,shadow-filter,"filter: blur()",subset,,
+11-shadow-filter__filter-drop-shadow,shadow-filter,"filter: drop-shadow()",subset,,
+11-shadow-filter__backdrop-filter-blur,shadow-filter,"backdrop-filter: blur()",subset,,
+11-shadow-filter__filter-brightness,shadow-filter,"filter: brightness() (needs snapshot for fidelity)",snapshot,,
+12-opacity-blend__opacity,opacity-blend,"opacity -> Layer.alpha",subset,,
+12-opacity-blend__mix-blend-mode-multiply,opacity-blend,"mix-blend-mode: multiply",subset,,
+12-opacity-blend__mix-blend-mode-screen,opacity-blend,"mix-blend-mode: screen",subset,,
+12-opacity-blend__background-blend-mode,opacity-blend,"background-blend-mode (unsupported)",subset,subset:unsupported-property,
+13-transform__rotate,transform,"transform: rotate()",subset,,
+13-transform__scale,transform,"transform: scale()",subset,,
+13-transform__scale-xy,transform,"transform: scaleX()",subset,,
+13-transform__skew-x,transform,"transform: skewX()",subset,,
+13-transform__translate,transform,"transform: translate()",subset,,
+13-transform__matrix,transform,"transform: matrix()",subset,,
+13-transform__transform-origin-center,transform,"transform-origin: center honoured",subset,,
+13-transform__rotate-chained,transform,"compound transform chain (unsupported)",subset,subset:unsupported-property,
+13-transform__rotate3d,transform,"rotate3d (unsupported)",subset,subset:unsupported-property,
+13-transform__perspective,transform,"perspective (unsupported)",subset,subset:unsupported-property,
+14-overflow-clip__overflow-hidden,overflow-clip,"overflow: hidden -> clipToBounds",subset,,
+14-overflow-clip__clip-path-url,overflow-clip,"clip-path: url(#id) contour mask",subset,,known-verify-diagnostic: mask sublayer includeInLayout in non-layout parent
+14-overflow-clip__clip-path-polygon,overflow-clip,"clip-path: polygon() (unsupported)",subset,subset:unsupported-property,
+14-overflow-clip__mask-image-svg,overflow-clip,"mask-image svg data-uri",subset,subset:unsupported-property,known-verify-diagnostic: mask sublayer includeInLayout in non-layout parent
+16-text-tricks__gradient-text,text-tricks,"gradient text via background-clip:text",subset,,
+16-text-tricks__text-stroke-outline,text-tricks,"outlined text via -webkit-text-stroke",subset,,
+16-text-tricks__line-clamp,text-tricks,"-webkit-line-clamp multi-line (unsupported)",snapshot,subset:unsupported-property,
+16-text-tricks__ellipsis-single-line,text-tricks,"single-line ellipsis trick",subset,,text-overflow warns (non-subset code)
+17-image__img-basic,image,"<img> raster via data-uri",subset,,
+17-image__img-object-fit-cover,image,"object-fit: cover -> Zoom",subset,,
+17-image__img-object-fit-contain,image,"object-fit: contain -> LetterBox",subset,,
+17-image__img-object-fit-none,image,"object-fit: none downgraded to contain",subset,subset:unsupported-property,
+17-image__img-rounded-avatar,image,"rounded avatar fold (div overflow:hidden > img)",subset,,
+17-image__img-aspect-ratio,image,"aspect-ratio on img (ignored)",subset,subset:unsupported-property,
+17-image__img-srcset,image,"srcset attribute (ignored, uses src)",subset,,
+18-svg-inline__svg-rect,svg-inline,"inline svg rect",subset,,
+18-svg-inline__svg-circle,svg-inline,"inline svg circle",subset,,
+18-svg-inline__svg-path,svg-inline,"inline svg path",subset,,
+18-svg-inline__svg-linear-gradient,svg-inline,"inline svg linearGradient",subset,,
+18-svg-inline__svg-currentcolor,svg-inline,"inline svg currentColor inheritance",subset,,
+18-svg-inline__svg-stroke-dash,svg-inline,"inline svg stroke-dasharray",subset,,
+18-svg-inline__svg-clippath,svg-inline,"inline svg clipPath",subset,,
+18-svg-inline__svg-mask,svg-inline,"inline svg mask",subset,,known-verify-diagnostic: painter-leaks-geometry after mask resolve
+18-svg-inline__svg-filter,svg-inline,"inline svg feGaussianBlur filter",subset,,
+18-svg-inline__svg-use-symbol,svg-inline,"inline svg use + symbol",subset,,
+19-css-delivery__inline-style,css-delivery,"inline style attribute",subset,,
+19-css-delivery__style-block-class,css-delivery,"<style> block class selector",subset,,
+19-css-delivery__element-selector,css-delivery,"element/type selector",subset,,
+19-css-delivery__comma-selectors,css-delivery,"comma-separated selector list",subset,,
+19-css-delivery__multi-class,css-delivery,"multiple classes on one element",subset,,
+19-css-delivery__id-selector,css-delivery,"id selector #id (unsupported)",subset,subset:unsupported-selector,
+19-css-delivery__descendant-selector,css-delivery,"descendant selector (unsupported)",subset,subset:unsupported-selector,
+19-css-delivery__pseudo-before,css-delivery,"::before pseudo (unsupported)",subset,subset:unsupported-selector,
+19-css-delivery__media-query,css-delivery,"@media at-rule (unsupported)",subset,subset:unsupported-at-rule,
+19-css-delivery__css-variable,css-delivery,"CSS var()/custom property (unsupported)",subset,subset:unsupported-property,
+19-css-delivery__font-face,css-delivery,"@font-face at-rule (unsupported)",subset,subset:unsupported-at-rule,
+20-components__card,components,"profile card (flex + shadow + radius)",subset,,
+20-components__button,components,"gradient button with shadow",subset,,
+20-components__badge,components,"pill badge",subset,,
+20-components__navbar,components,"nav bar with space-between",subset,,
+20-components__list,components,"vertical list rows",subset,,
+20-components__stat-tile,components,"gradient stat tile",subset,,
+20-components__gallery-grid,components,"2x2 gallery via nested flex",subset,,

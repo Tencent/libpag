@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Momentz - Artboard Preview</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brand:#22A45D;
+    --brand-dark:#1B8A4C;
+    --bg:#F5F5F5;
+    --card:#FFFFFF;
+    --muted:#8A8A8E;
+    --text:#1C1C1E;
+    --line:#EDEDED;
+  }
+  html,body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);}
+  .scrollbar-thin::-webkit-scrollbar{height:8px;width:8px}
+  .scrollbar-thin::-webkit-scrollbar-thumb{background:#d4d4d4;border-radius:9999px}
+  .phone-shadow{box-shadow:0 6px 24px rgba(0,0,0,.06),0 2px 6px rgba(0,0,0,.04)}
+  .tab-active{background:var(--brand);color:#fff;border-radius:9999px}
+  .chip-active{background:var(--brand);color:#fff}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-dark)}
+  .divider{height:1px;background:var(--line)}
+  .truncate-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+/* ---------- Icons (inline SVG, lucide-style) ---------- */
+const Icon = ({ name, className = "w-5 h-5", stroke = "currentColor", fill = "none" }) => {
+  const paths = {
+    bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></>,
+    send: <><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></>,
+    search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>,
+    home: <><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-6h-2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></>,
+    compass: <><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></>,
+    plus: <><path d="M12 5v14"/><path d="M5 12h14"/></>,
+    user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+    heart: <><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/></>,
+    chat: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></>,
+    share: <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></>,
+    bookmark: <><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/></>,
+    grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></>,
+    location: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>,
+    tag: <><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5"/></>,
+    sticker: <><path d="M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5z"/><path d="M15 3v6h6"/></>,
+    chevronRight: <><polyline points="9 18 15 12 9 6"/></>,
+    eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>,
+  };
+  return (
+    <svg viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {paths[name]}
+    </svg>
+  );
+};
+
+/* ---------- Image helper (Unsplash) ---------- */
+const img = (q, w = 600, h = 600, sig = 1) =>
+  `https://images.unsplash.com/${q}?auto=format&fit=crop&w=${w}&h=${h}&q=80`;
+
+/* photo IDs so result is stable */
+const P = {
+  alex:   "photo-1535713875002-d1d0cf377fde",
+  mia:    "photo-1494790108377-be9c29b29330",
+  leo:    "photo-1531123897727-8f129e1688ce",
+  sara:   "photo-1544005313-94ddf0286df2",
+  ian:    "photo-1500648767791-00dcc994a43e",
+  field:  "photo-1505761671935-60b3a7427bad",
+  lake:   "photo-1500530855697-b586d89ba3ee",
+  bridge: "photo-1467269204594-9661b134dd2b",
+  arch:   "photo-1502602898657-3e91760cbb34",
+  cathedral:"photo-1543059080-f9b1272213d5",
+  forest: "photo-1441974231531-c6227db76b6e",
+  pier:   "photo-1465146344425-f00d5f5c8f07",
+  sea:    "photo-1507525428034-b723cf961d3e",
+  mtn:    "photo-1469474968028-56623f02e42e",
+  desert: "photo-1473580044384-7ba9967e16a0",
+  brick:  "photo-1486325212027-8081e485255e",
+  sunset: "photo-1493558103817-58b2924bce98",
+  woods:  "photo-1448375240586-882707db888b",
+  cliff:  "photo-1519681393784-d120267933ba",
+  station:"photo-1502602898657-3e91760cbb34",
+  grand:  "photo-1485081669829-bacb8c7bb1f3",
+  travel1:"photo-1469854523086-cc02fe5d8800",
+  travel2:"photo-1488646953014-85cb44e25828",
+  travel3:"photo-1530789253388-582c481c54b0",
+};
+
+/* ---------- Phone Frame ---------- */
+const Phone = ({ title, children }) => (
+  <div className="flex flex-col items-center">
+    <div className="text-[12px] text-gray-500 mb-2 self-start pl-1">{title}</div>
+    <div className="relative bg-white rounded-[28px] phone-shadow overflow-hidden" style={{ width: 320, height: 660 }}>
+      {/* status bar */}
+      <div className="h-9 px-5 flex items-center justify-between text-[13px] font-semibold">
+        <span>9:41</span>
+        <div className="flex items-center gap-1 text-[11px]">
+          <span>••••</span>
+          <span>100%</span>
+        </div>
+      </div>
+      <div className="h-[calc(100%-36px)] overflow-hidden">{children}</div>
+    </div>
+  </div>
+);
+
+/* ---------- Bottom Tab Bar ---------- */
+const TabBar = ({ active = "home" }) => {
+  const tabs = [
+    { key: "home", label: "HOME", icon: "home" },
+    { key: "explore", label: "EXPLORE", icon: "compass" },
+    { key: "create", label: "CREATE", icon: "plus" },
+    { key: "profile", label: "PROFILE", icon: "user" },
+  ];
+  return (
+    <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-[var(--line)] px-4 py-2">
+      <div className="flex items-center justify-between">
+        {tabs.map((t) => {
+          const isActive = t.key === active;
+          return (
+            <button
+              key={t.key}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 ${
+                isActive ? "tab-active" : "text-gray-500"
+              }`}
+              style={isActive ? { paddingLeft: 14, paddingRight: 14 } : {}}
+            >
+              <Icon name={t.icon} className="w-4 h-4" />
+              <span className="text-[9px] font-semibold tracking-wide">{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Page 1: Home Feed ---------- */
+const HomeFeed = () => {
+  const stories = [
+    { name: "Alex", photo: P.alex, ring: true },
+    { name: "Mia", photo: P.mia, ring: true },
+    { name: "Leo", photo: P.leo, ring: true },
+    { name: "Sara", photo: P.sara, ring: true },
+  ];
+  return (
+    <div className="h-full flex flex-col">
+      {/* header */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <h1 className="text-[22px] font-extrabold tracking-tight">Momentz</h1>
+        <div className="flex items-center gap-3 text-gray-700">
+          <Icon name="bell" className="w-5 h-5" />
+          <Icon name="send" className="w-5 h-5" />
+        </div>
+      </div>
+
+      {/* stories */}
+      <div className="px-4 pt-2 pb-3 flex gap-4 overflow-x-auto scrollbar-thin">
+        {stories.map((s) => (
+          <div key={s.name} className="flex flex-col items-center gap-1.5 shrink-0">
+            <div className="p-[2px] rounded-full bg-gradient-to-tr from-[var(--brand)] to-emerald-300">
+              <div className="p-[2px] bg-white rounded-full">
+                <img src={img(s.photo, 120, 120)} className="w-14 h-14 rounded-full object-cover" />
+              </div>
+            </div>
+            <span className="text-[11px] text-gray-700">{s.name}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* feed card */}
+      <div className="px-4 pb-24 overflow-y-auto">
+        <div className="bg-white rounded-2xl border border-[var(--line)] overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <img src={img(P.alex, 80, 80)} className="w-8 h-8 rounded-full object-cover" />
+            <div className="flex-1">
+              <div className="text-[13px] font-semibold leading-tight">Alex Chen</div>
+              <div className="text-[10px] text-gray-500">2 hours ago • Hangzhou</div>
+            </div>
+            <div className="text-gray-400 text-lg leading-none pb-1">···</div>
+          </div>
+
+          <img src={img(P.field, 800, 600)} className="w-full h-44 object-cover" />
+
+          <div className="flex items-center gap-4 px-3 py-2 text-gray-700">
+            <div className="flex items-center gap-1">
+              <Icon name="heart" className="w-5 h-5" />
+              <span className="text-[12px]">285</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Icon name="chat" className="w-5 h-5" />
+              <span className="text-[12px]">42</span>
+            </div>
+            <Icon name="share" className="w-5 h-5" />
+            <div className="ml-auto">
+              <Icon name="bookmark" className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="px-3 pb-3 text-[12px] leading-relaxed truncate-2">
+            Sunset over the West Lake 🌅 The beauty of this moment is simply breathtaking. #hangzhou #travel #sunset
+          </div>
+        </div>
+      </div>
+
+      <TabBar active="home" />
+    </div>
+  );
+};
+
+/* ---------- Page 2: Explore ---------- */
+const Explore = () => {
+  const tags = [
+    { label: "Trending", icon: "🔥", active: true },
+    { label: "Travel" },
+    { label: "Food" },
+    { label: "Art" },
+  ];
+  const grid = [
+    P.lake, P.bridge, P.arch,
+    P.cathedral, P.forest, P.sea,
+    P.pier, P.sunset, P.brick,
+  ];
+  return (
+    <div className="h-full flex flex-col">
+      <div className="px-4 pt-3 pb-2">
+        <h1 className="text-[22px] font-extrabold">Explore</h1>
+      </div>
+
+      {/* search */}
+      <div className="px-4 pb-3">
+        <div className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-2">
+          <Icon name="search" className="w-4 h-4 text-gray-500" />
+          <span className="text-[12px] text-gray-500">Search people, tags, places...</span>
+        </div>
+      </div>
+
+      {/* tags */}
+      <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-thin">
+        {tags.map((t) => (
+          <div
+            key={t.label}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap border ${
+              t.active
+                ? "chip-active border-transparent"
+                : "bg-white text-gray-700 border-[var(--line)]"
+            }`}
+          >
+            {t.icon ? `${t.icon} ` : ""}
+            {t.label}
+          </div>
+        ))}
+      </div>
+
+      {/* grid */}
+      <div className="px-4 pb-24 overflow-y-auto">
+        <div className="grid grid-cols-3 gap-1">
+          {grid.map((p, i) => (
+            <img
+              key={i}
+              src={img(p, 300, 300)}
+              className={`w-full ${i === 4 ? "h-32" : "h-24"} object-cover rounded-md`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <TabBar active="explore" />
+    </div>
+  );
+};
+
+/* ---------- Page 3: Profile ---------- */
+const Profile = () => {
+  const posts = [P.mtn, P.brick, P.cliff, P.sea, P.pier, P.travel1];
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <h1 className="text-[22px] font-extrabold">Profile</h1>
+        <Icon name="settings" className="w-5 h-5 text-gray-700" />
+      </div>
+
+      <div className="px-4 pb-24 overflow-y-auto">
+        {/* avatar */}
+        <div className="flex flex-col items-center pt-2">
+          <div className="p-[2px] rounded-full bg-gradient-to-tr from-[var(--brand)] to-emerald-300">
+            <img src={img(P.alex, 200, 200)} className="w-20 h-20 rounded-full object-cover border-2 border-white" />
+          </div>
+          <div className="mt-2 font-bold text-[15px]">Alex Chen</div>
+          <div className="text-[11px] text-gray-500 text-center mt-0.5 leading-snug">
+            Photographer & Traveler<br />Capturing life's beautiful moments
+          </div>
+        </div>
+
+        {/* stats */}
+        <div className="mt-4 bg-white rounded-2xl border border-[var(--line)] py-4 px-2 flex">
+          {[
+            { v: "284", l: "Posts" },
+            { v: "12.6K", l: "Followers" },
+            { v: "538", l: "Following" },
+          ].map((s) => (
+            <div key={s.l} className="flex-1 text-center">
+              <div className="text-[18px] font-extrabold leading-none">{s.v}</div>
+              <div className="text-[10px] text-gray-500 mt-1">{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* actions */}
+        <div className="mt-3 flex items-center gap-2">
+          <button className="btn-primary flex-1 rounded-full py-2.5 text-[13px] font-semibold">Edit Profile</button>
+          <button className="w-10 h-10 rounded-full bg-white border border-[var(--line)] flex items-center justify-center text-gray-600">
+            <Icon name="share" className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* grid */}
+        <div className="mt-4 grid grid-cols-3 gap-1">
+          {posts.map((p, i) => (
+            <img key={i} src={img(p, 300, 300)} className="w-full h-20 object-cover rounded-md" />
+          ))}
+        </div>
+      </div>
+
+      <TabBar active="profile" />
+    </div>
+  );
+};
+
+/* ---------- Page 4: Create Post ---------- */
+const CreatePost = () => {
+  const rows = [
+    { icon: "location", label: "Add Location" },
+    { icon: "tag", label: "Tag People" },
+    { icon: "sticker", label: "Add to Story" },
+  ];
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <span className="text-[13px] text-gray-500">Cancel</span>
+        <span className="text-[14px] font-bold">New Post</span>
+        <span className="text-[13px] font-semibold text-[var(--brand)]">Share</span>
+      </div>
+
+      <div className="px-4 overflow-y-auto pb-6">
+        <img src={img(P.grand, 800, 600)} className="w-full h-52 object-cover rounded-2xl" />
+
+        <div className="mt-3 text-[12px] text-gray-400">Write a caption...</div>
+
+        <div className="mt-3 bg-white rounded-2xl border border-[var(--line)] divide-y divide-[var(--line)]">
+          {rows.map((r) => (
+            <div key={r.label} className="flex items-center gap-3 px-3 py-3">
+              <Icon name={r.icon} className="w-4 h-4 text-gray-500" />
+              <span className="flex-1 text-[13px]">{r.label}</span>
+              <Icon name="chevronRight" className="w-4 h-4 text-gray-400" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-auto">
+        <TabBar active="create" />
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Right Side Panel (Design inspector) ---------- */
+const RightPanel = () => {
+  const items = [
+    { label: "变量表" },
+    { label: "本地样式" },
+    { label: "导出" },
+  ];
+  return (
+    <div className="w-64 bg-white border-l border-[var(--line)] hidden xl:flex flex-col">
+      <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--line)]">
+        <div className="flex items-center gap-1.5 text-gray-500">
+          <span className="w-7 h-7 rounded-md flex items-center justify-center bg-gray-100 text-[11px]">{"</>"}</span>
+          <span className="w-7 h-7 rounded-full bg-[var(--brand)] text-white flex items-center justify-center text-[11px]">●</span>
+        </div>
+        <button className="px-3 py-1.5 rounded-md bg-gray-900 text-white text-[12px]">分享</button>
+      </div>
+
+      <div className="px-3 pt-3">
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 text-[12px]">
+          <button className="flex-1 py-1.5 bg-white rounded-md font-semibold shadow-sm">设计</button>
+          <button className="flex-1 py-1.5 text-gray-500">AI</button>
+        </div>
+      </div>
+
+      <div className="px-3 mt-3">
+        <div className="text-[11px] text-gray-500 mb-1.5">页面</div>
+        <div className="flex items-center gap-2 bg-[var(--bg)] rounded-md px-2.5 py-2 text-[12px]">
+          <span className="w-3 h-3 rounded-sm bg-gray-200 border border-gray-300"></span>
+          <span className="flex-1">F5F5F5</span>
+          <span className="text-gray-500">100%</span>
+          <Icon name="eye" className="w-3.5 h-3.5 text-gray-500" />
+        </div>
+      </div>
+
+      <div className="px-3 mt-3 space-y-1">
+        {items.map((it) => (
+          <div key={it.label} className="flex items-center justify-between px-2 py-2 text-[12px] hover:bg-gray-50 rounded-md">
+            <span>{it.label}</span>
+            <Icon name="plus" className="w-3.5 h-3.5 text-gray-400" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Left Layers Panel ---------- */
+const LeftPanel = () => {
+  const groups = [
+    {
+      name: "Create Post", locked: true, children: [],
+    },
+    {
+      name: "Profile", children: ["Status Bar","Profile Header","Profile Content","Avatar Section","Stats Row","Action Buttons","My Posts Grid","Tab Bar Container"],
+    },
+    {
+      name: "Explore", children: ["Status Bar","Search Area","Explore Title","Search Bar","Tags Row","Grid Content","Tab Bar Container"],
+    },
+    {
+      name: "Home Feed", children: ["Status Bar"],
+    },
+  ];
+  return (
+    <div className="w-60 bg-white border-r border-[var(--line)] hidden lg:flex flex-col">
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold">G</div>
+          <div className="text-[13px] font-semibold">新文件 1</div>
+        </div>
+        <div className="flex items-center gap-1 bg-gray-100 rounded-md p-0.5 text-[12px]">
+          <button className="flex-1 py-1 bg-white rounded shadow-sm font-semibold">文件</button>
+          <button className="flex-1 py-1 text-gray-500">组件</button>
+          <span className="text-gray-400 px-1.5"><Icon name="search" className="w-3.5 h-3.5"/></span>
+        </div>
+      </div>
+
+      <div className="px-3 mt-1 text-[11px] text-gray-500 flex items-center justify-between">
+        <span>页面</span>
+        <Icon name="plus" className="w-3 h-3" />
+      </div>
+      <div className="px-3 py-1 mt-1">
+        <div className="px-2 py-1.5 bg-gray-100 rounded text-[12px]">Page 1</div>
+      </div>
+
+      <div className="px-3 mt-3 text-[11px] text-gray-500">图层</div>
+      <div className="px-2 mt-1 overflow-y-auto text-[12px] flex-1">
+        {groups.map((g) => (
+          <div key={g.name} className="mb-1">
+            <div className="flex items-center gap-1 px-1.5 py-1.5 hover:bg-gray-50 rounded">
+              <span className="text-gray-400">▾</span>
+              <span className="font-medium flex-1">{g.name}</span>
+              {g.locked && <span className="text-gray-400 text-[10px]">🔒</span>}
+            </div>
+            {g.children.map((c) => (
+              <div key={c} className="pl-7 py-1 text-gray-600 hover:bg-gray-50 rounded">{c}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Top Toolbar ---------- */
+const Toolbar = () => (
+  <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-md border border-[var(--line)] px-2 py-1.5 flex items-center gap-1 z-10">
+    <button className="w-8 h-8 rounded-md bg-[var(--brand)] text-white flex items-center justify-center">
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l7 17 2-7 7-2z"/></svg>
+    </button>
+    <button className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-600">
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16"/></svg>
+    </button>
+    <button className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-600">
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="6" width="16" height="12" rx="2"/></svg>
+    </button>
+    <button className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-600">
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 4h6v6"/><path d="M10 20H4v-6"/><path d="M20 4 14 10"/><path d="M4 20l6-6"/></svg>
+    </button>
+    <button className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-600">
+      <Icon name="chat" className="w-4 h-4"/>
+    </button>
+    <button className="w-8 h-8 rounded-md hover:bg-gray-100 flex items-center justify-center text-gray-600">
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6z"/></svg>
+    </button>
+  </div>
+);
+
+/* ---------- Floating Right Buttons ---------- */
+const FloatingButtons = () => (
+  <div className="absolute bottom-6 right-6 flex flex-col gap-3 z-10">
+    <button className="w-10 h-10 rounded-full bg-white shadow-md border border-[var(--line)] flex items-center justify-center text-gray-600">
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 21l-4.35-4.35"/><circle cx="11" cy="11" r="7"/><path d="M11 8v6M8 11h6"/></svg>
+    </button>
+    <button className="w-10 h-10 rounded-full bg-white shadow-md border border-[var(--line)] flex items-center justify-center text-gray-600">
+      <Icon name="grid" className="w-4 h-4"/>
+    </button>
+    <button className="w-10 h-10 rounded-full bg-blue-500 text-white shadow-md flex items-center justify-center">
+      <Icon name="chat" className="w-4 h-4"/>
+    </button>
+  </div>
+);
+
+/* ---------- Bottom Right Zoom ---------- */
+const ZoomBar = () => (
+  <div className="absolute bottom-3 right-72 bg-white rounded-md shadow border border-[var(--line)] px-2.5 py-1 text-[11px] text-gray-600 flex items-center gap-2 z-10 hidden xl:flex">
+    <span>69%</span>
+    <span className="text-gray-300">|</span>
+    <Icon name="grid" className="w-3.5 h-3.5"/>
+  </div>
+);
+
+/* ---------- App ---------- */
+const App = () => (
+  <div className="min-h-screen flex">
+    <LeftPanel />
+
+    <div className="flex-1 relative overflow-auto bg-[var(--bg)]">
+      <Toolbar />
+
+      <div className="flex items-start gap-8 px-12 pt-20 pb-16 min-w-max">
+        <Phone title="Home Feed"><HomeFeed /></Phone>
+        <Phone title="Explore"><Explore /></Phone>
+        <Phone title="Profile"><Profile /></Phone>
+        <Phone title="Create Post"><CreatePost /></Phone>
+      </div>
+
+      <FloatingButtons />
+      <ZoomBar />
+    </div>
+
+    <RightPanel />
+  </div>
+);
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

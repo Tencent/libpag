@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720, initial-scale=1.0">
+<title>Ardot产品概述与定位</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .geo-circle {
+    border: 1px solid #111111;
+    border-radius: 50%;
+  }
+  .bullet-arrow {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .section-card {
+    background: rgba(17,17,17,0.04);
+    padding: 14px 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(17,17,17,0.08);
+  }
+</style>
+</head>
+<body class="bg-noise">
+<div class="relative w-[1280px] h-[720px] overflow-hidden">
+
+  <!-- Decorative geometric circle -->
+  <div class="absolute geo-circle" style="bottom: -120px; right: -60px; width: 280px; height: 280px; opacity: 0.12;"></div>
+
+  <!-- Hairline Grid Lines -->
+  <div class="absolute" style="top: 110px; left: 48px; width: 1184px; height: 1px; background: rgba(17,17,17,0.15);"></div>
+
+  <!-- Header Zone -->
+  <div class="absolute" style="top: 40px; left: 48px; width: 1184px; height: 60px;">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="ph-duotone ph-compass-tool" style="font-size: 28px; color: #111111;"></i>
+        <h1 class="font-semibold" style="font-size: 56px; letter-spacing: -0.01em; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif;">Ardot产品概述与定位</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-[2px]" style="background: #111111; opacity: 0.3;"></div>
+        <span style="font-size: 12px; color: #111111; opacity: 0.4;">03</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Body Zone -->
+  <div class="absolute" style="top: 130px; left: 48px; width: 560px; height: 520px;">
+    <div class="flex flex-col gap-5 h-full">
+      <p style="font-size: 14px; line-height: 1.7; color: #111111; opacity: 0.85;">
+        Ardot是腾讯设计推出的下一代AI驱动智能设计工具，基于腾讯混元大模型与优图视觉算法，为设计师与产品经理提供从创意到交付的全流程智能化解决方案。
+      </p>
+
+      <!-- Core Positioning -->
+      <div class="section-card">
+        <div class="flex items-center gap-2 pb-2 mb-3" style="border-bottom: 1px solid rgba(17,17,17,0.1);">
+          <i class="ph ph-compass-tool" style="font-size: 16px; color: #111111;"></i>
+          <span class="font-semibold" style="font-size: 14px; color: #111111;">核心定位</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          <div class="flex items-start gap-3">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; line-height: 1.5;">AI驱动的产设研协作平台</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; line-height: 1.5;">可编辑、可复用、可交付的团队资产</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slogan -->
+      <div class="section-card" style="border-left: 2px solid #111111;">
+        <div class="flex items-center gap-2 mb-1">
+          <i class="ph ph-chat-quote" style="font-size: 16px; color: #111111; opacity: 0.6;"></i>
+          <span class="font-semibold" style="font-size: 14px; color: #111111; opacity: 0.7;">产品口号</span>
+        </div>
+        <p style="font-size: 18px; font-weight: 600; color: #111111; line-height: 1.4; letter-spacing: -0.01em;">
+          "智能设计工具，让灵感鲜活落地"
+        </p>
+      </div>
+
+      <!-- Target Users -->
+      <div class="section-card">
+        <div class="flex items-center gap-2 pb-2 mb-3" style="border-bottom: 1px solid rgba(17,17,17,0.1);">
+          <i class="ph ph-users-three" style="font-size: 16px; color: #111111;"></i>
+          <span class="font-semibold" style="font-size: 14px; color: #111111;">目标用户</span>
+        </div>
+        <div class="flex items-start gap-3">
+          <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+            <path d="M7 7l10 10M17 7v10H7"/>
+          </svg>
+          <span style="font-size: 13px; color: #111111; line-height: 1.5;">设计师与产品经理</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="absolute" style="top: 130px; left: 624px; width: 1px; height: 520px; background: rgba(17,17,17,0.2);"></div>
+
+  <!-- Right Body Zone -->
+  <div class="absolute" style="top: 130px; left: 648px; width: 584px; height: 520px;">
+    <div class="flex flex-col gap-5 h-full">
+      <!-- Technical Architecture -->
+      <div class="section-card">
+        <div class="flex items-center gap-2 pb-2 mb-3" style="border-bottom: 1px solid rgba(17,17,17,0.1);">
+          <i class="ph ph-cpu" style="font-size: 16px; color: #111111;"></i>
+          <span class="font-semibold" style="font-size: 14px; color: #111111;">底层技术</span>
+        </div>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-start gap-3">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <div class="flex flex-col gap-0.5">
+              <span style="font-size: 13px; color: #111111; font-weight: 500;">腾讯混元大模型与优图视觉算法</span>
+              <span style="font-size: 12px; color: #111111; opacity: 0.5;">核心AI能力支撑</span>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <div class="flex flex-col gap-0.5">
+              <span style="font-size: 13px; color: #111111; font-weight: 500;">WorkBuddy/CodeBuddy底层架构</span>
+              <span style="font-size: 12px; color: #111111; opacity: 0.5;">智能体协同框架</span>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <div class="flex flex-col gap-0.5">
+              <span style="font-size: 13px; color: #111111; font-weight: 500;">MCP模型上下文协议</span>
+              <span style="font-size: 12px; color: #111111; opacity: 0.5;">标准化模型交互</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tech Stack Visual -->
+      <div class="flex items-center gap-4" style="margin-top: 8px;">
+        <!-- Tech blocks -->
+        <div class="flex-1" style="background: rgba(17,17,17,0.08); padding: 20px 16px; border-radius: 4px; text-align: center;">
+          <i class="ph ph-brain" style="font-size: 28px; color: #111111; display: block; margin-bottom: 8px;"></i>
+          <span style="font-size: 11px; color: #111111; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">AI ENGINE</span>
+          <span style="display: block; font-size: 12px; color: #111111; opacity: 0.5; margin-top: 2px;">混元大模型</span>
+        </div>
+        <div class="flex-1" style="background: rgba(17,17,17,0.05); padding: 20px 16px; border-radius: 4px; text-align: center;">
+          <i class="ph ph-eye" style="font-size: 28px; color: #111111; display: block; margin-bottom: 8px;"></i>
+          <span style="font-size: 11px; color: #111111; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">VISION</span>
+          <span style="display: block; font-size: 12px; color: #111111; opacity: 0.5; margin-top: 2px;">优图算法</span>
+        </div>
+        <div class="flex-1" style="background: rgba(17,17,17,0.05); padding: 20px 16px; border-radius: 4px; text-align: center;">
+          <i class="ph ph-plugs-connected" style="font-size: 28px; color: #111111; display: block; margin-bottom: 8px;"></i>
+          <span style="font-size: 11px; color: #111111; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">PROTOCOL</span>
+          <span style="display: block; font-size: 12px; color: #111111; opacity: 0.5; margin-top: 2px;">MCP协议</span>
+        </div>
+      </div>
+
+      <!-- Product Vision -->
+      <div style="background: rgba(17,17,17,0.06); padding: 16px 20px; border-left: 2px solid #111111; border-radius: 0 4px 4px 0; margin-top: 8px;">
+        <p style="font-size: 13px; line-height: 1.6; color: #111111; opacity: 0.8;">
+          Ardot致力于将AI能力深度融入设计工作流，实现从需求理解到设计输出的端到端智能化，打造产设研团队的一站式协作平台。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page Number -->
+  <div class="absolute" style="bottom: 20px; right: 48px;">
+    <span style="color: #111111; opacity: 0.4; font-size: 12px;">03</span>
+  </div>
+
+</div>
+</body>
+</html>

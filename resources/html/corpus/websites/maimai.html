@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>脉脉</title>
+</head>
+<body style="width: 375px; height: 812px; display: flex; flex-direction: column; background-color: #F2F3F5; font-family: PingFangSC; font-size: 14px; color: #1A1F36;">
+
+<!-- Status Bar -->
+<div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 14px 20px 0 20px; height: 44px; background-color: #FFFFFF;">
+  <span style="font-size: 16px; font-weight: bold; color: #1A1F36;">9:41</span>
+  <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="12" viewBox="0 0 18 12">
+      <rect x="0" y="6" width="3" height="6" rx="1" fill="#1A1F36"/>
+      <rect x="5" y="4" width="3" height="8" rx="1" fill="#1A1F36"/>
+      <rect x="10" y="2" width="3" height="10" rx="1" fill="#1A1F36"/>
+      <rect x="15" y="0" width="3" height="12" rx="1" fill="#1A1F36"/>
+    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12">
+      <path d="M8 2 C 4 2 1 4 0 6 L 2 8 C 3 6 5 5 8 5 C 11 5 13 6 14 8 L 16 6 C 15 4 12 2 8 2 Z M 8 7 C 6 7 4 8 3 9 L 5 11 C 6 10 7 9 8 9 C 9 9 10 10 11 11 L 13 9 C 12 8 10 7 8 7 Z" fill="#1A1F36"/>
+    </svg>
+    <div style="width: 26px; height: 12px; border-radius: 3px; border: 1px solid #1A1F36; padding: 1px;">
+      <div style="width: 100%; height: 100%; border-radius: 1px; background-color: #1A1F36;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Top Nav: Logo + Search + Message -->
+<div style="display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 8px 16px; height: 48px; background-color: #FFFFFF;">
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 18px; background-color: #0052D9;">
+    <span style="font-size: 16px; font-weight: bold; color: #FFFFFF;">脉</span>
+  </div>
+  <div style="flex: 1; display: flex; flex-direction: row; align-items: center; gap: 8px; height: 36px; padding: 0 12px; background-color: #F2F3F5; border-radius: 18px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+      <circle cx="7" cy="7" r="5" stroke="#86909C" stroke-width="1.5" fill="none"/>
+      <path d="M11 11 L 14 14" stroke="#86909C" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <span style="font-size: 13px; color: #86909C;">搜索人、公司、岗位</span>
+  </div>
+  <div style="width: 36px; height: 36px; display: flex; flex-direction: row; align-items: center; justify-content: center;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+      <path d="M5 9 C 5 5 8 3 11 3 C 14 3 17 5 17 9 L 17 12 L 19 15 L 3 15 L 5 12 Z" fill="none" stroke="#1A1F36" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M9 17 C 9 18.5 10 19.5 11 19.5 C 12 19.5 13 18.5 13 17" fill="none" stroke="#1A1F36" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="17" cy="5" r="3" fill="#F53F3F"/>
+    </svg>
+  </div>
+</div>
+
+<!-- Tab Bar -->
+<div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 24px; height: 44px; background-color: #FFFFFF;">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+    <span style="font-size: 16px; font-weight: bold; color: #1A1F36;">推荐</span>
+    <div style="width: 20px; height: 3px; border-radius: 2px; background-color: #0052D9;"></div>
+  </div>
+  <span style="font-size: 15px; color: #4E5969;">关注</span>
+  <span style="font-size: 15px; color: #4E5969;">同事圈</span>
+  <span style="font-size: 15px; color: #4E5969;">行业头条</span>
+  <span style="font-size: 15px; color: #4E5969;">招聘</span>
+</div>
+
+<!-- Divider -->
+<div style="width: 100%; height: 8px; background-color: #F2F3F5;"></div>
+
+<!-- Card 1 -->
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background-color: #FFFFFF;">
+  <div style="display: flex; flex-direction: row; align-items: center; gap: 10px;">
+    <div style="width: 44px; height: 44px; border-radius: 22px; background-color: #E5E6EB;">
+      <img src="images_maimai/avatar1.png" style="width: 44px; height: 44px; border-radius: 22px;"/>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+        <span style="font-size: 15px; font-weight: bold; color: #1A1F36;">李泽宇</span>
+        <div style="display: flex; flex-direction: row; align-items: center; padding: 1px 6px; border-radius: 8px; background-color: #FFF3E8;">
+          <span style="font-size: 10px; color: #FF7D00;">实名认证</span>
+        </div>
+      </div>
+      <span style="font-size: 12px; color: #86909C;">字节跳动 · 高级产品经理 · 2小时前</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; justify-content: center; padding: 4px 12px; height: 28px; border-radius: 14px; border: 1px solid #0052D9;">
+      <span style="font-size: 12px; color: #0052D9;">+ 关注</span>
+    </div>
+  </div>
+  <span style="font-size: 15px; color: #1A1F36; line-height: 22px;">最近团队招产品同学，给大家一些建议：1）多关注用户真实需求，少做表面功夫；2）数据驱动决策，但别迷信指标；3）保持好奇心和同理心。欢迎私信交流～</span>
+  <div style="width: 100%; height: 180px; border-radius: 8px; background-color: #F2F3F5;">
+    <img src="images_maimai/post1.png" style="width: 100%; height: 180px; border-radius: 8px;"/>
+  </div>
+  <div style="display: flex; flex-direction: row; align-items: center; gap: 6px; padding: 8px 12px; background-color: #F7F8FA; border-radius: 6px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">
+      <path d="M7 2 L 9 5 L 12 5.5 L 10 8 L 10.5 11 L 7 9.5 L 3.5 11 L 4 8 L 2 5.5 L 5 5 Z" fill="#FF7D00"/>
+    </svg>
+    <span style="font-size: 12px; color: #4E5969;">热门话题 · #产品经理的那些事# 1.2万人讨论</span>
+  </div>
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding-top: 4px;">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <path d="M3 8 L 6 8 L 6 15 L 3 15 Z M 6 8 L 9 3 C 10 3 10 4 10 5 L 9.5 7 L 14 7 C 15 7 15.5 8 15 9 L 13.5 14 C 13.2 14.6 12.6 15 12 15 L 6 15 Z" fill="none" stroke="#86909C" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <span style="font-size: 13px; color: #86909C;">328</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <path d="M3 4 C 3 3 4 2 5 2 L 13 2 C 14 2 15 3 15 4 L 15 11 C 15 12 14 13 13 13 L 7 13 L 4 16 L 4 13 C 3.5 13 3 12 3 11 Z" fill="none" stroke="#86909C" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <span style="font-size: 13px; color: #86909C;">86</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <path d="M11 3 L 15 7 L 11 11 L 11 8.5 C 7 8.5 5 10 4 13 C 4 9 6 6 11 5.5 Z" fill="none" stroke="#86909C" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <span style="font-size: 13px; color: #86909C;">分享</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <circle cx="4" cy="9" r="1.5" fill="#86909C"/>
+        <circle cx="9" cy="9" r="1.5" fill="#86909C"/>
+        <circle cx="14" cy="9" r="1.5" fill="#86909C"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- Divider -->
+<div style="width: 100%; height: 8px; background-color: #F2F3F5;"></div>
+
+<!-- Card 2 -->
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background-color: #FFFFFF;">
+  <div style="display: flex; flex-direction: row; align-items: center; gap: 10px;">
+    <div style="width: 44px; height: 44px; border-radius: 22px; background-color: #E5E6EB;">
+      <img src="images_maimai/avatar2.png" style="width: 44px; height: 44px; border-radius: 22px;"/>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+        <span style="font-size: 15px; font-weight: bold; color: #1A1F36;">王思琪</span>
+        <div style="display: flex; flex-direction: row; align-items: center; padding: 1px 6px; border-radius: 8px; background-color: #E8F3FF;">
+          <span style="font-size: 10px; color: #0052D9;">职场达人</span>
+        </div>
+      </div>
+      <span style="font-size: 12px; color: #86909C;">阿里巴巴 · 资深UI设计师 · 5小时前</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; justify-content: center; padding: 4px 12px; height: 28px; border-radius: 14px; background-color: #F2F3F5;">
+      <span style="font-size: 12px; color: #4E5969;">已关注</span>
+    </div>
+  </div>
+  <span style="font-size: 15px; color: #1A1F36; line-height: 22px;">分享一个最近做的设计复盘：好的设计不是华丽的视觉，而是让用户感觉不到设计的存在。简洁、克制、目标明确——这是我这五年最深的体会。</span>
+  <div style="display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; background-color: #F7F8FA; border-radius: 8px;">
+    <div style="width: 32px; height: 32px; border-radius: 6px; background-color: #0052D9; display: flex; flex-direction: row; align-items: center; justify-content: center;">
+      <span style="font-size: 14px; font-weight: bold; color: #FFFFFF;">PDF</span>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+      <span style="font-size: 13px; font-weight: bold; color: #1A1F36;">2026设计师能力模型.pdf</span>
+      <span style="font-size: 11px; color: #86909C;">2.3MB · 已下载1.5k次</span>
+    </div>
+  </div>
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding-top: 4px;">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <path d="M3 8 L 6 8 L 6 15 L 3 15 Z M 6 8 L 9 3 C 10 3 10 4 10 5 L 9.5 7 L 14 7 C 15 7 15.5 8 15 9 L 13.5 14 C 13.2 14.6 12.6 15 12 15 L 6 15 Z" fill="#F53F3F" stroke="#F53F3F" stroke-width="1.2" stroke-linejoin="round"/>
+      </svg>
+      <span style="font-size: 13px; color: #F53F3F;">1.2k</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <path d="M3 4 C 3 3 4 2 5 2 L 13 2 C 14 2 15 3 15 4 L 15 11 C 15 12 14 13 13 13 L 7 13 L 4 16 L 4 13 C 3.5 13 3 12 3 11 Z" fill="none" stroke="#86909C" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <span style="font-size: 13px; color: #86909C;">234</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <path d="M11 3 L 15 7 L 11 11 L 11 8.5 C 7 8.5 5 10 4 13 C 4 9 6 6 11 5.5 Z" fill="none" stroke="#86909C" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <span style="font-size: 13px; color: #86909C;">112</span>
+    </div>
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 6px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+        <circle cx="4" cy="9" r="1.5" fill="#86909C"/>
+        <circle cx="9" cy="9" r="1.5" fill="#86909C"/>
+        <circle cx="14" cy="9" r="1.5" fill="#86909C"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Tab -->
+<div style="position: absolute; left: 0; bottom: 0; width: 375px; height: 80px; background-color: #FFFFFF; border: 1px solid #E5E6EB;">
+  <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 8px 16px 20px 16px; height: 80px;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 56px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <path d="M3 11 L 12 3 L 21 11 L 21 20 C 21 20.5 20.5 21 20 21 L 15 21 L 15 14 L 9 14 L 9 21 L 4 21 C 3.5 21 3 20.5 3 20 Z" fill="#0052D9"/>
+      </svg>
+      <span style="font-size: 10px; color: #0052D9;">首页</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 56px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="9" cy="8" r="3.5" fill="none" stroke="#86909C" stroke-width="1.6"/>
+        <circle cx="17" cy="9" r="2.5" fill="none" stroke="#86909C" stroke-width="1.6"/>
+        <path d="M3 19 C 3 16 6 14 9 14 C 12 14 15 16 15 19" fill="none" stroke="#86909C" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M14 17 C 16 15 18 15 21 17" fill="none" stroke="#86909C" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span style="font-size: 10px; color: #86909C;">人脉</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 56px;">
+      <div style="display: flex; flex-direction: row; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 22px; background-color: #0052D9;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+          <path d="M11 4 L 11 18 M 4 11 L 18 11" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 56px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <path d="M4 6 C 4 5 5 4 6 4 L 18 4 C 19 4 20 5 20 6 L 20 16 C 20 17 19 18 18 18 L 9 18 L 5 21 L 5 18 C 4.5 18 4 17 4 16 Z" fill="none" stroke="#86909C" stroke-width="1.6" stroke-linejoin="round"/>
+        <circle cx="18" cy="6" r="3" fill="#F53F3F"/>
+      </svg>
+      <span style="font-size: 10px; color: #86909C;">消息</span>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; width: 56px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="4" fill="none" stroke="#86909C" stroke-width="1.6"/>
+        <path d="M4 21 C 4 16 7 13 12 13 C 17 13 20 16 20 21" fill="none" stroke="#86909C" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span style="font-size: 10px; color: #86909C;">我的</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

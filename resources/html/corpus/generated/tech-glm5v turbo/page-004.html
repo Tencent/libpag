@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 4 - 核心功能：AI协同设计能力</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.bg-noise {
+  background-color: #DFDDDA;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+.feature-card { border: 1px solid rgba(17,17,17,0.15); transition: border-color 0.2s; }
+.feature-card:hover { border-color: rgba(17,17,17,0.35); }
+</style>
+</head>
+<body>
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden m-auto">
+  <!-- Page Title -->
+  <div class="absolute top-[50px] left-[48px]">
+    <h1 class="text-[44px] font-semibold tracking-[-0.01em] leading-[1.2]">核心功能：AI协同设计能力</h1>
+  </div>
+
+  <!-- Horizontal Divider -->
+  <div class="absolute left-[48px] right-[48px) top-[130px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- Feature Card 1: 文生UI -->
+  <div class="feature-card absolute top-[158px] left-[48px] w-[218px] h-[236px] p-[20px] flex flex-col bg-transparent rounded-[4px]">
+    <i class="ph ph-chat-dots text-[28px] mb-[14px]"></i>
+    <h3 class="text-[17px] font-semibold mb-[8px]">文生UI</h3>
+    <p class="text-[13px]/[1.6] opacity-75">用自然语言描述需求，AI自动生成布局与组件，快速搭建起稿结构</p>
+  </div>
+
+  <!-- Feature Card 2: 图片秒变设计稿 -->
+  <div class="feature-card absolute top-[158px] left-[286px] w-[218px] h-[236px] p-[20px] flex flex-col bg-transparent rounded-[4px]">
+    <i class="ph ph-image text-[28px] mb-[14px]"></i>
+    <h3 class="text-[17px] font-semibold mb-[8px]">图片秒变设计稿</h3>
+    <p class="text-[13px]/[1.6] opacity-75">上传图片，智能分层，转为可编辑设计稿，保留完整图层结构</p>
+  </div>
+
+  <!-- Feature Card 3: AI助手 -->
+  <div class="feature-card absolute top-[158px] left-[524px] w-[218px] h-[236px] p-[20px] flex flex-col bg-transparent rounded-[4px]">
+    <i class="ph ph-sparkle text-[28px] mb-[14px]"></i>
+    <h3 class="text-[17px] font-semibold mb-[8px]">AI助手</h3>
+    <p class="text-[13px]/[1.6] opacity-75">智能重命名、生成图片、链接转UI、AI搜索，协作每个设计环节</p>
+  </div>
+
+  <!-- Feature Card 4: 文/图生图 -->
+  <div class="feature-card absolute top-[416px] left-[48px] w-[218px] h-[236px] p-[20px] flex flex-col bg-transparent rounded-[4px]">
+    <i class="ph ph-paint-brush text-[28px] mb-[14px]"></i>
+    <h3 class="text-[17px] font-semibold mb-[8px]">文/图生图</h3>
+    <p class="text-[13px]/[1.6] opacity-75">快速生成插画、配图、运营海报等视觉素材，丰富设计表现力</p>
+  </div>
+
+  <!-- Feature Card 5: 批量矢量图标 -->
+  <div class="feature-card absolute top-[416px] left-[286px] w-[218px] h-[236px] p-[20px] flex flex-col bg-transparent rounded-[4px]">
+    <i class="ph ph-shapes text-[28px] mb-[14px]"></i>
+    <h3 class="text-[17px] font-semibold mb-[8px]">批量矢量图标</h3>
+    <p class="text-[13px]/[1.6] opacity-75">一键生成整套风格统一的矢量图标，保持品牌视觉一致</p>
+  </div>
+
+  <!-- Right side decoration area -->
+  <div class="absolute right-[48px] top-[158px] w-[240px] bottom-[40px] flex items-center justify-center">
+    <div class="w-[180px] min-h-[180px] rounded-full border border-[#111111]/20 flex items-center justify-center">
+      <div class="w-[140px] min-h-[140px] rounded-full border border-[#111111]/30 flex items-center justify-center">
+        <span class="text-[12px] font-medium uppercase tracking-widest opacity-50 text-center px-[12px]">AI Core<br/>Engine</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>Ardot SWOT分析</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .list-arrow svg { display: inline-block; width: 12px; height: 12px; margin-right: 8px; flex-shrink: 0; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="bg-noise w-[1280px] h-[720px] relative overflow-hidden">
+  <!-- Header -->
+  <div class="absolute" style="top:40px;left:48px;width:1184px;height:60px;">
+    <h1 class="text-[56px] font-semibold tracking-[-0.01em]" style="color:#111111;line-height:1.15;">Ardot SWOT分析</h1>
+  </div>
+
+  <!-- Vertical divider -->
+  <div class="absolute" style="top:120px;left:640px;width:1px;height:540px;background:rgba(17,17,17,0.2);"></div>
+  <!-- Horizontal divider -->
+  <div class="absolute" style="top:390px;left:48px;width:1184px;height:1px;background:rgba(17,17,17,0.2);"></div>
+
+  <!-- S Quadrant (Strengths) - top left -->
+  <div class="absolute" style="top:120px;left:48px;width:584px;height:260px;padding:24px 28px;">
+    <div class="flex items-center mb-4">
+      <div class="flex items-center justify-center w-8 h-8 rounded-full mr-3" style="border:1px solid #111111;">
+        <i class="ph ph-thumbs-up text-[16px]" style="color:#111111;"></i>
+      </div>
+      <h2 class="text-[20px] font-semibold" style="color:#111111;">优势 Strengths</h2>
+    </div>
+    <div class="space-y-2">
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">AI生成可编辑设计稿</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">MCP一键转代码</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">混元大模型+优图算法</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">CodeBuddy深度集成</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">Figma文件无缝导入</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">企业级权限管理</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">公测免费1000 Credits</span></div>
+    </div>
+  </div>
+
+  <!-- W Quadrant (Weaknesses) - top right -->
+  <div class="absolute" style="top:120px;left:648px;width:584px;height:260px;padding:24px 28px;">
+    <div class="flex items-center mb-4">
+      <div class="flex items-center justify-center w-8 h-8 rounded-full mr-3" style="border:1px solid #111111;">
+        <i class="ph ph-warning text-[16px]" style="color:#111111;"></i>
+      </div>
+      <h2 class="text-[20px] font-semibold" style="color:#111111;">劣势 Weaknesses</h2>
+    </div>
+    <div class="space-y-2">
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">品牌知名度低于Figma</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">插件生态起步阶段</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">仅支持macOS和Web</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">Windows版未上线</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">稳定性待验证</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">国际化能力有限</span></div>
+    </div>
+  </div>
+
+  <!-- O Quadrant (Opportunities) - bottom left -->
+  <div class="absolute" style="top:396px;left:48px;width:584px;height:264px;padding:24px 28px;">
+    <div class="flex items-center mb-4">
+      <div class="flex items-center justify-center w-8 h-8 rounded-full mr-3" style="border:1px solid #111111;">
+        <i class="ph ph-arrow-up-right text-[16px]" style="color:#111111;"></i>
+      </div>
+      <h2 class="text-[20px] font-semibold" style="color:#111111;">机会 Opportunities</h2>
+    </div>
+    <div class="space-y-2">
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">国产替代政策驱动</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">AI市场高速增长</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">Figma受限带来迁移需求</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">腾讯生态协同</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">MCP先发优势</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">全链路整合趋势</span></div>
+    </div>
+  </div>
+
+  <!-- T Quadrant (Threats) - bottom right -->
+  <div class="absolute" style="top:396px;left:648px;width:584px;height:264px;padding:24px 28px;">
+    <div class="flex items-center mb-4">
+      <div class="flex items-center justify-center w-8 h-8 rounded-full mr-3" style="border:1px solid #111111;">
+        <i class="ph ph-shield-warning text-[16px]" style="color:#111111;"></i>
+      </div>
+      <h2 class="text-[20px] font-semibold" style="color:#111111;">威胁 Threats</h2>
+    </div>
+    <div class="space-y-2">
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">Figma市场地位稳固</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">国产竞品已积累用户</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">AI技术迭代快</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">工具切换成本高</span></div>
+      <div class="flex list-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg><span class="text-[14px] leading-[1.6]" style="color:#111111;">大厂入局竞争加剧</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

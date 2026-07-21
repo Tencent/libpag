@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>第4层：能力扩展 — 它能做什么</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+*, *::before, *::after { animation: none !important; transition: none !important; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body>
+<div class="slide" style="width:1280px;height:720px;overflow:hidden;position:relative;background:linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);">
+  <!-- Watermark -->
+  <div class="absolute z-0 text-[300px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="left:50%;top:55%;transform:translate(-50%,-50%);">SKILLS</div>
+  <!-- Header -->
+  <div class="absolute z-20" style="top:40px;left:100px;width:1080px;">
+    <div class="text-[14px] font-[300] text-[#FFFFFF]/40 tracking-[0.15em] uppercase mb-[8px]">Layer 4: Skills Expansion</div>
+    <h2 class="text-[36px] font-[300] text-[#FFFFFF] leading-tight">第4层：能力扩展 — 它能做什么</h2>
+    <div class="w-[48px] h-[1px] bg-[#FFFFFF]/20 mt-[16px]"></div>
+  </div>
+  <!-- Row 1: 3 cards -->
+  <!-- Card 1: Creative -->
+  <div class="absolute z-20 bg-[#FFFFFF] rounded-[10px]" style="top:140px;left:100px;width:330px;height:200px;padding:24px;">
+    <div class="flex items-center mb-[14px]">
+      <i class="ph ph-paint-brush text-[22px] text-[#14231D] mr-[10px]"></i>
+      <div class="text-[18px] font-[500] text-[#14231D]">创作类</div>
+    </div>
+    <div class="text-[13px] font-[400] text-[#14231D]/70 leading-[1.7]">图像生成 / 视频剪辑<br>文案撰写 / 音乐创作</div>
+    <div class="mt-[14px] bg-[#F5F7F6] rounded-[6px] p-[10px] border-[1px] border-[#E5E7E6]">
+      <div class="text-[11px] font-[400] text-[#14231D]/50">赛博朋克海报、小红书文案、短视频字幕</div>
+    </div>
+  </div>
+  <!-- Card 2: Social -->
+  <div class="absolute z-20 bg-[#FFFFFF] rounded-[10px]" style="top:140px;left:475px;width:330px;height:200px;padding:24px;">
+    <div class="flex items-center mb-[14px]">
+      <i class="ph ph-chat-circle-dots text-[22px] text-[#14231D] mr-[10px]"></i>
+      <div class="text-[18px] font-[500] text-[#14231D]">社交媒体类</div>
+    </div>
+    <div class="text-[13px] font-[400] text-[#14231D]/70 leading-[1.7]">微信公众号 / Twitter<br>小红书 / LinkedIn</div>
+    <div class="mt-[14px] bg-[#F5F7F6] rounded-[6px] p-[10px] border-[1px] border-[#E5E7E6]">
+      <div class="text-[11px] font-[400] text-[#14231D]/50">一键跨平台分发，自动适配格式</div>
+    </div>
+  </div>
+  <!-- Card 3: Knowledge -->
+  <div class="absolute z-20 bg-[#FFFFFF] rounded-[10px] border-[2px] border-[#82D0A4]/40" style="top:140px;left:850px;width:330px;height:200px;padding:24px;">
+    <div class="flex items-center mb-[14px]">
+      <i class="ph ph-book-open text-[22px] text-[#14231D] mr-[10px]"></i>
+      <div class="text-[18px] font-[500] text-[#14231D]">知识管理类</div>
+      <div class="ml-auto border border-[#82D0A4]/50 rounded-full px-[10px] py-[2px]">
+        <span class="text-[10px] font-[500] text-[#82D0A4]">IMA</span>
+      </div>
+    </div>
+    <div class="text-[13px] font-[400] text-[#14231D]/70 leading-[1.7]">笔记读写 / 知识库检索<br>知识卡片 / 内容归档</div>
+    <div class="mt-[14px] bg-[#F5F7F6] rounded-[6px] p-[10px] border-[1px] border-[#E5E7E6]">
+      <div class="text-[11px] font-[400] text-[#14231D]/50">直接操作 IMA 知识库</div>
+    </div>
+  </div>
+  <!-- Row 2: 2 cards -->
+  <!-- Card 4: Tools -->
+  <div class="absolute z-20 bg-[#FFFFFF] rounded-[10px]" style="top:380px;left:100px;width:330px;height:190px;padding:24px;">
+    <div class="flex items-center mb-[14px]">
+      <i class="ph ph-wrench text-[22px] text-[#14231D] mr-[10px]"></i>
+      <div class="text-[18px] font-[500] text-[#14231D]">工具集成类</div>
+    </div>
+    <div class="text-[13px] font-[400] text-[#14231D]/70 leading-[1.7]">Notion / Figma / Shopify<br>邮件管理 / 日程管理 / 文件管理</div>
+  </div>
+  <!-- Card 5: Industry -->
+  <div class="absolute z-20 bg-[#FFFFFF] rounded-[10px]" style="top:380px;left:475px;width:705px;height:190px;padding:24px;">
+    <div class="flex items-center mb-[14px]">
+      <i class="ph ph-buildings text-[22px] text-[#14231D] mr-[10px]"></i>
+      <div class="text-[18px] font-[500] text-[#14231D]">行业专属类</div>
+    </div>
+    <div class="text-[13px] font-[400] text-[#14231D]/70 leading-[1.7]">电商运营 / 教育培训 / 3D建模与动画</div>
+    <div class="mt-[10px] border-l-[2px] border-[#82D0A4]/40 pl-[14px]">
+      <div class="text-[12px] font-[400] text-[#14231D]/60 leading-[1.5]">IMA 独特优势：直接操作知识库，帮你管理第二大脑。龙虾不只是帮你「聊天」，而是能帮你管理你的知识体系。</div>
+    </div>
+  </div>
+  <!-- Footer -->
+  <div class="absolute z-50 flex flex-col items-center justify-center" style="bottom:48px;left:0;right:0;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/70">ima</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/30 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

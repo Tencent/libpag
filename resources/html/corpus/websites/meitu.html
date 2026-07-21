@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>美图秀秀</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --primary: 340 82% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 95.9%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --border: 240 5.9% 90%;
+    --radius: 0.75rem;
+  }
+  html,body,#root{height:100%;}
+  body{
+    background: linear-gradient(180deg,#fff0f5 0%,#fce7f3 30%,#fff 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .no-scrollbar::-webkit-scrollbar{display:none;}
+  .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
+  .gradient-pink{background:linear-gradient(135deg,#ff6b9d 0%,#ff8fb3 50%,#ffa8c5 100%);}
+  .gradient-purple{background:linear-gradient(135deg,#a78bfa 0%,#c084fc 100%);}
+  .gradient-orange{background:linear-gradient(135deg,#fb923c 0%,#fbbf24 100%);}
+  .gradient-blue{background:linear-gradient(135deg,#60a5fa 0%,#22d3ee 100%);}
+  .gradient-green{background:linear-gradient(135deg,#34d399 0%,#a7f3d0 100%);}
+  .gradient-red{background:linear-gradient(135deg,#f87171 0%,#fb7185 100%);}
+  .shadow-soft{box-shadow:0 4px 20px -2px rgba(244,114,182,0.15);}
+  .shadow-card{box-shadow:0 2px 12px -2px rgba(0,0,0,0.06);}
+  .tap-scale{transition:transform .15s ease;}
+  .tap-scale:active{transform:scale(.96);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+/* ---------- Icons (lucide-style inline SVG) ---------- */
+const Icon = ({ d, size=22, stroke=2, className="" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round"
+       className={className}>{d}</svg>
+);
+const IconSearch     = (p)=><Icon {...p} d={<><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></>}/>;
+const IconBell       = (p)=><Icon {...p} d={<><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></>}/>;
+const IconScan       = (p)=><Icon {...p} d={<><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></>}/>;
+const IconCamera     = (p)=><Icon {...p} d={<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>}/>;
+const IconImage      = (p)=><Icon {...p} d={<><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></>}/>;
+const IconSparkles   = (p)=><Icon {...p} d={<><path d="M9.94 14.06 7 17l-2.94-2.94a1 1 0 0 1 0-1.41L7 9.71l2.94 2.94a1 1 0 0 1 0 1.41z"/><path d="M17 3v4"/><path d="M15 5h4"/><path d="M19 13v3"/><path d="M17.5 14.5h3"/></>}/>;
+const IconWand       = (p)=><Icon {...p} d={<><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/></>}/>;
+const IconLayers     = (p)=><Icon {...p} d={<><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></>}/>;
+const IconScissors   = (p)=><Icon {...p} d={<><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></>}/>;
+const IconUser       = (p)=><Icon {...p} d={<><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>}/>;
+const IconHeart      = (p)=><Icon {...p} d={<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>}/>;
+const IconHome       = (p)=><Icon {...p} d={<><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>}/>;
+const IconPlus       = (p)=><Icon {...p} d={<><path d="M5 12h14"/><path d="M12 5v14"/></>}/>;
+const IconCompass    = (p)=><Icon {...p} d={<><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></>}/>;
+const IconMessage    = (p)=><Icon {...p} d={<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>}/>;
+const IconChevron    = (p)=><Icon {...p} d={<path d="m9 18 6-6-6-6"/>}/>;
+const IconFlame      = (p)=><Icon {...p} d={<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>}/>;
+const IconSmile      = (p)=><Icon {...p} d={<><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/></>}/>;
+const IconPalette    = (p)=><Icon {...p} d={<><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></>}/>;
+const IconSticker    = (p)=><Icon {...p} d={<><path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/></>}/>;
+const IconType       = (p)=><Icon {...p} d={<><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></>}/>;
+const IconFilter     = (p)=><Icon {...p} d={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>}/>;
+
+/* ---------- Status Bar ---------- */
+const StatusBar = () => (
+  <div className="flex items-center justify-between px-6 pt-3 pb-1 text-[13px] font-semibold text-gray-900">
+    <span>9:41</span>
+    <div className="flex items-center gap-1">
+      <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor"><path d="M8.5 11A4.5 4.5 0 0 1 13 6.5h.4A8 8 0 0 0 8.5 4a8 8 0 0 0-4.9 2.5H4A4.5 4.5 0 0 1 8.5 11z"/></svg>
+      <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor"><path d="M1 4.5a10 10 0 0 1 13 0L7.5 11z"/></svg>
+      <div className="ml-1 flex items-center">
+        <div className="w-6 h-3 border border-gray-900 rounded-sm relative">
+          <div className="absolute inset-[1.5px] bg-gray-900 rounded-[1px]" style={{width:"75%"}}/>
+        </div>
+        <div className="w-[2px] h-[5px] bg-gray-900 rounded-r ml-[1px]"/>
+      </div>
+    </div>
+  </div>
+);
+
+/* ---------- Top Bar ---------- */
+const TopBar = () => (
+  <div className="px-4 pt-2 pb-3 flex items-center gap-3">
+    <div className="flex items-center gap-1.5">
+      <div className="w-8 h-8 rounded-full gradient-pink flex items-center justify-center shadow-soft">
+        <IconSparkles size={18} className="text-white"/>
+      </div>
+      <span className="font-bold text-[17px] text-gray-900">美图秀秀</span>
+    </div>
+    <div className="flex-1 ml-2 relative">
+      <div className="flex items-center bg-white/80 backdrop-blur rounded-full pl-3 pr-3 h-9 shadow-card">
+        <IconSearch size={16} className="text-gray-400"/>
+        <span className="ml-2 text-[13px] text-gray-400 truncate">搜索 "去黑眼圈"</span>
+      </div>
+    </div>
+    <button className="tap-scale w-9 h-9 rounded-full bg-white/80 backdrop-blur flex items-center justify-center shadow-card">
+      <IconScan size={18} className="text-gray-700"/>
+    </button>
+    <button className="tap-scale w-9 h-9 rounded-full bg-white/80 backdrop-blur flex items-center justify-center shadow-card relative">
+      <IconBell size={18} className="text-gray-700"/>
+      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"/>
+    </button>
+  </div>
+);
+
+/* ---------- Hero Action Card ---------- */
+const HeroCard = () => (
+  <div className="mx-4 rounded-3xl overflow-hidden relative shadow-soft" style={{background:"linear-gradient(135deg,#ffb6c8 0%,#ff8fb3 45%,#ffa17f 100%)"}}>
+    <div className="absolute -top-6 -right-6 w-32 h-32 bg-white/20 rounded-full blur-2xl"/>
+    <div className="absolute -bottom-10 -left-8 w-40 h-40 bg-pink-300/30 rounded-full blur-3xl"/>
+    <div className="relative p-5">
+      <div className="flex items-center gap-2">
+        <span className="px-2 py-0.5 rounded-full bg-white/30 backdrop-blur text-white text-[11px] font-semibold">AI · 新</span>
+        <span className="text-white/90 text-[12px]">一键大片，10秒出图</span>
+      </div>
+      <h2 className="mt-2 text-white text-[22px] font-bold leading-tight">AI 写真馆 ✨</h2>
+      <p className="text-white/85 text-[12px] mt-1">200+ 风格模板 · 真人质感</p>
+
+      <div className="mt-4 grid grid-cols-4 gap-2">
+        {[
+          {label:"美颜",  d:<IconSmile  size={20} className="text-white"/>},
+          {label:"修图",  d:<IconWand   size={20} className="text-white"/>},
+          {label:"拼图",  d:<IconLayers size={20} className="text-white"/>},
+          {label:"抠图",  d:<IconScissors size={20} className="text-white"/>},
+        ].map((it,i)=>(
+          <button key={i} className="tap-scale flex flex-col items-center gap-1.5 py-2 rounded-2xl bg-white/15 backdrop-blur active:bg-white/25">
+            <div className="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center">{it.d}</div>
+            <span className="text-white text-[12px] font-medium">{it.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+/* ---------- Quick Tools Grid ---------- */
+const tools = [
+  { name:"美颜相机", g:"gradient-pink",   icon:<IconCamera   size={22} className="text-white"/>, tag:"热" },
+  { name:"AI 改图",  g:"gradient-purple", icon:<IconWand     size={22} className="text-white"/>, tag:"新" },
+  { name:"一键美颜", g:"gradient-orange", icon:<IconSmile    size={22} className="text-white"/> },
+  { name:"AI 抠图",  g:"gradient-blue",   icon:<IconScissors size={22} className="text-white"/> },
+  { name:"滤镜",     g:"gradient-green",  icon:<IconFilter   size={22} className="text-white"/> },
+  { name:"拼图",     g:"gradient-red",    icon:<IconLayers   size={22} className="text-white"/> },
+  { name:"贴纸",     g:"gradient-pink",   icon:<IconSticker  size={22} className="text-white"/> },
+  { name:"文字",     g:"gradient-purple", icon:<IconType     size={22} className="text-white"/> },
+];
+const ToolsGrid = () => (
+  <div className="mx-4 mt-4 p-4 bg-white rounded-3xl shadow-card">
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="text-[15px] font-bold text-gray-900">常用工具</h3>
+      <button className="flex items-center text-[12px] text-gray-400">全部 <IconChevron size={14}/></button>
+    </div>
+    <div className="grid grid-cols-4 gap-y-4">
+      {tools.map((t,i)=>(
+        <button key={i} className="tap-scale flex flex-col items-center gap-1.5 relative">
+          <div className={`w-12 h-12 rounded-2xl ${t.g} flex items-center justify-center shadow-soft`}>{t.icon}</div>
+          {t.tag && <span className="absolute -top-1 right-2 px-1.5 py-[1px] rounded-full bg-rose-500 text-white text-[9px] font-bold">{t.tag}</span>}
+          <span className="text-[11.5px] text-gray-700">{t.name}</span>
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+/* ---------- Templates Carousel ---------- */
+const templates = [
+  { title:"奶油糖霜",  sub:"温柔甜美 · 12款", from:"#fde68a", to:"#fb7185", emo:"🍰" },
+  { title:"清冷氛围",  sub:"高级灰调 · 8款",  from:"#a5b4fc", to:"#64748b", emo:"❄️" },
+  { title:"夏日海岛",  sub:"度假风 · 15款",   from:"#67e8f9", to:"#3b82f6", emo:"🌊" },
+  { title:"复古胶片",  sub:"年代感 · 10款",   from:"#fbbf24", to:"#b45309", emo:"📷" },
+];
+const Templates = () => (
+  <div className="mt-5">
+    <div className="px-4 flex items-center justify-between mb-3">
+      <div>
+        <h3 className="text-[16px] font-bold text-gray-900 flex items-center gap-1.5">
+          <IconFlame size={16} className="text-rose-500"/> 热门模板
+        </h3>
+        <p className="text-[11.5px] text-gray-400 mt-0.5">每周更新精选风格</p>
+      </div>
+      <button className="text-[12px] text-rose-500 font-medium flex items-center">更多 <IconChevron size={14}/></button>
+    </div>
+    <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-1">
+      {templates.map((t,i)=>(
+        <div key={i} className="flex-shrink-0 w-[150px] rounded-2xl overflow-hidden shadow-card tap-scale relative">
+          <div className="h-44 relative" style={{background:`linear-gradient(160deg, ${t.from} 0%, ${t.to} 100%)`}}>
+            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur text-white text-[10px]">模板</div>
+            <div className="absolute inset-0 flex items-center justify-center text-5xl drop-shadow-md">{t.emo}</div>
+            <div className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center">
+              <IconHeart size={14} className="text-rose-500"/>
+            </div>
+          </div>
+          <div className="p-2.5 bg-white">
+            <div className="text-[13px] font-semibold text-gray-900">{t.title}</div>
+            <div className="text-[11px] text-gray-400 mt-0.5">{t.sub}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/* ---------- Discover Feed (Masonry-like) ---------- */
+const feed = [
+  { h:200, from:"#fbcfe8", to:"#f9a8d4", title:"夏日穿搭 · 多巴胺女孩",  user:"小桃汽水",  likes:"2.3w", emo:"👗" },
+  { h:160, from:"#bae6fd", to:"#a5b4fc", title:"通勤元气妆教程",         user:"Mia化妆师", likes:"8624",  emo:"💄" },
+  { h:180, from:"#fed7aa", to:"#fda4af", title:"在家拍出工作室质感",      user:"摄影日记",   likes:"1.1w", emo:"📸" },
+  { h:220, from:"#ddd6fe", to:"#fbcfe8", title:"AI 写真 · 港风复古",     user:"AI 灵感库",  likes:"3.8w", emo:"🎞️" },
+];
+const Discover = () => (
+  <div className="mt-5 px-4">
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-4">
+        <h3 className="text-[16px] font-bold text-gray-900">发现</h3>
+        <div className="flex gap-3 text-[13px]">
+          <span className="font-semibold text-gray-900">推荐</span>
+          <span className="text-gray-400">关注</span>
+          <span className="text-gray-400">教程</span>
+        </div>
+      </div>
+      <IconCompass size={18} className="text-gray-400"/>
+    </div>
+
+    <div className="grid grid-cols-2 gap-3">
+      {feed.map((c,i)=>(
+        <div key={i} className="rounded-2xl overflow-hidden bg-white shadow-card tap-scale">
+          <div style={{height:c.h, background:`linear-gradient(160deg, ${c.from} 0%, ${c.to} 100%)`}}
+               className="relative flex items-center justify-center">
+            <span className="text-6xl drop-shadow">{c.emo}</span>
+            <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-black/30 backdrop-blur text-white text-[10px]">同款</div>
+          </div>
+          <div className="p-2.5">
+            <div className="text-[12.5px] text-gray-900 leading-snug line-clamp-2">{c.title}</div>
+            <div className="mt-2 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full gradient-pink"/>
+                <span className="text-[11px] text-gray-500 truncate max-w-[70px]">{c.user}</span>
+              </div>
+              <div className="flex items-center gap-1 text-gray-400">
+                <IconHeart size={12}/>
+                <span className="text-[11px]">{c.likes}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/* ---------- Floating Camera Button (Bottom Nav center) ---------- */
+const BottomNav = ({active,setActive}) => {
+  const items = [
+    { key:"home",     label:"首页",   Icon:IconHome },
+    { key:"discover", label:"社区",   Icon:IconCompass },
+    { key:"camera",   label:"",      Icon:IconCamera, center:true },
+    { key:"message",  label:"消息",   Icon:IconMessage },
+    { key:"me",       label:"我",     Icon:IconUser },
+  ];
+  return (
+    <div className="absolute left-0 right-0 bottom-0">
+      <div className="relative mx-3 mb-3 rounded-[28px] bg-white/90 backdrop-blur-xl shadow-[0_-2px_20px_-4px_rgba(244,114,182,0.25)] border border-white">
+        <div className="grid grid-cols-5 items-end h-[64px]">
+          {items.map((it)=>{
+            if (it.center){
+              return (
+                <div key={it.key} className="flex justify-center -mt-7">
+                  <button onClick={()=>setActive(it.key)}
+                          className="tap-scale w-14 h-14 rounded-full gradient-pink shadow-soft flex items-center justify-center ring-4 ring-white">
+                    <IconPlus size={26} className="text-white" stroke={2.5}/>
+                  </button>
+                </div>
+              );
+            }
+            const A = it.Icon;
+            const isActive = active===it.key;
+            return (
+              <button key={it.key} onClick={()=>setActive(it.key)}
+                      className="tap-scale flex flex-col items-center gap-0.5 pb-2">
+                <A size={22} className={isActive?"text-rose-500":"text-gray-400"}/>
+                <span className={`text-[10.5px] ${isActive?"text-rose-500 font-semibold":"text-gray-400"}`}>{it.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="h-1.5 mx-auto w-32 bg-gray-900/80 rounded-full mb-2"/>
+    </div>
+  );
+};
+
+/* ---------- App ---------- */
+const App = () => {
+  const [active, setActive] = useState("home");
+  return (
+    <div className="min-h-full w-full flex items-center justify-center py-6">
+      {/* Phone frame */}
+      <div className="relative w-[390px] h-[844px] rounded-[44px] bg-black p-[6px] shadow-2xl">
+        <div className="relative w-full h-full rounded-[40px] overflow-hidden" style={{background:"linear-gradient(180deg,#ffe4ec 0%,#fff5f7 35%,#ffffff 100%)"}}>
+          {/* Notch */}
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-full z-30"/>
+          {/* Scroll area */}
+          <div className="h-full overflow-y-auto no-scrollbar pb-[110px]">
+            <StatusBar/>
+            <TopBar/>
+            <HeroCard/>
+            <ToolsGrid/>
+            <Templates/>
+            <Discover/>
+            <div className="h-4"/>
+          </div>
+          <BottomNav active={active} setActive={setActive}/>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

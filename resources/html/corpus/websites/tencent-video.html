@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>腾讯视频</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          tx: {
+            DEFAULT: '#ff5c38',
+            orange: '#ff7d3a',
+            red: '#ff3b3b',
+            yellow: '#ffb84d',
+          },
+          background: '#ffffff',
+          foreground: '#0a0a0a',
+          muted: '#f5f5f5',
+          'muted-foreground': '#737373',
+          border: '#e5e5e5',
+        },
+        fontFamily: {
+          sans: ['-apple-system','BlinkMacSystemFont','PingFang SC','Helvetica Neue','Arial','sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { height: 100%; }
+  body {
+    background: #f2f3f5;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #0a0a0a;
+  }
+  /* 隐藏滚动条 */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  /* 顶部渐变 */
+  .hero-gradient {
+    background: linear-gradient(180deg, #ffd9c2 0%, #ffeadd 35%, #ffffff 100%);
+  }
+  /* shadcn 风格按钮 */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 9999px; font-weight: 500; transition: all .15s ease;
+  }
+  .btn:active { transform: scale(0.97); }
+  /* 卡片角标 */
+  .corner-tag {
+    position: absolute; top: 6px; left: 6px;
+    background: linear-gradient(90deg, #ff5c38, #ff8a3a);
+    color: white; font-size: 10px; padding: 1px 6px; border-radius: 6px;
+    font-weight: 600; letter-spacing: .5px;
+  }
+  .vip-tag {
+    position: absolute; top: 6px; right: 6px;
+    background: linear-gradient(90deg, #f9d27d, #f5b53b);
+    color: #4a2b00; font-size: 10px; padding: 1px 6px; border-radius: 6px;
+    font-weight: 700;
+  }
+  .play-info {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,.65));
+    color: #fff; font-size: 11px; padding: 14px 8px 6px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  /* 状态栏伪装 */
+  .status-bar { height: 44px; }
+  /* 安全区底部 */
+  .home-indicator {
+    height: 8px; width: 134px; background: #0a0a0a;
+    border-radius: 4px; margin: 6px auto 8px;
+    opacity: .85;
+  }
+  /* 轮播指示点动画 */
+  .dot { transition: all .3s ease; }
+  /* 渐变文字 */
+  .grad-text {
+    background: linear-gradient(90deg, #ff5c38, #ff8a3a);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  /* Tab 高亮下划线 */
+  .tab-underline {
+    position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+    width: 18px; height: 3px; border-radius: 2px;
+    background: linear-gradient(90deg, #ff5c38, #ff8a3a);
+  }
+  /* 图标尺寸 */
+  .lucide { stroke-width: 2; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+// ============= 图标封装 =============
+const Icon = ({ name, size = 18, className = "", color }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current && window.lucide) {
+      ref.current.innerHTML = "";
+      const svg = window.lucide.createElement(window.lucide.icons[name] || window.lucide.icons.Circle);
+      svg.setAttribute("width", size);
+      svg.setAttribute("height", size);
+      if (color) svg.setAttribute("stroke", color);
+      ref.current.appendChild(svg);
+    }
+  }, [name, size, color]);
+  return <span ref={ref} className={`inline-flex ${className}`} />;
+};
+
+// ============= 数据 =============
+const topTabs = ["精选", "电视剧", "电影", "综艺", "动漫", "少儿", "纪录片", "教育"];
+
+const banners = [
+  {
+    title: "庆余年 第二季",
+    sub: "范闲归来 · 庙堂江湖再起波澜",
+    cover: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=900&q=80",
+    badge: "VIP 抢先看",
+  },
+  {
+    title: "繁花",
+    sub: "王家卫执导 · 胡歌主演",
+    cover: "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=900&q=80",
+    badge: "热播中",
+  },
+  {
+    title: "三体",
+    sub: "硬核科幻 · 全球同步",
+    cover: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=900&q=80",
+    badge: "独播",
+  },
+];
+
+const quickEntries = [
+  { name: "VIP会员", icon: "Crown", color: "from-yellow-400 to-orange-400" },
+  { name: "电视剧", icon: "Tv", color: "from-pink-400 to-rose-500" },
+  { name: "电影", icon: "Clapperboard", color: "from-violet-400 to-purple-500" },
+  { name: "综艺", icon: "Mic2", color: "from-sky-400 to-blue-500" },
+  { name: "动漫", icon: "Sparkles", color: "from-emerald-400 to-teal-500" },
+  { name: "少儿", icon: "Baby", color: "from-amber-400 to-orange-400" },
+  { name: "短剧", icon: "Film", color: "from-fuchsia-400 to-pink-500" },
+  { name: "直播", icon: "Radio", color: "from-red-400 to-rose-500" },
+  { name: "游戏", icon: "Gamepad2", color: "from-indigo-400 to-blue-500" },
+  { name: "全部", icon: "LayoutGrid", color: "from-slate-400 to-slate-500" },
+];
+
+const hotList = [
+  { rank: 1, title: "庆余年 第二季", score: "9.6", tag: "古装/权谋", hot: "热度 9982" },
+  { rank: 2, title: "繁花", score: "9.2", tag: "年代/都市", hot: "热度 8821" },
+  { rank: 3, title: "玫瑰的故事", score: "8.9", tag: "都市/情感", hot: "热度 7560" },
+  { rank: 4, title: "新生", score: "8.7", tag: "悬疑/犯罪", hot: "热度 6643" },
+];
+
+const dramas = [
+  { title: "与凤行", info: "赵丽颖 / 林更新", img: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=600&q=80", tag: "VIP", corner: "更新至24集" },
+  { title: "唐朝诡事录2", info: "杨旭文 / 杨志刚", img: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&q=80", tag: "独播", corner: "全36集" },
+  { title: "山花烂漫时", info: "宋佳 主演", img: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=600&q=80", tag: "热播", corner: "更新至18集" },
+  { title: "城中之城", info: "于和伟 / 冯绍峰", img: "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=600&q=80", tag: "VIP", corner: "全38集" },
+  { title: "南来北往", info: "白敬亭 / 丁勇岱", img: "https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&q=80", tag: "热播", corner: "全39集" },
+  { title: "猎冰", info: "姚安娜 / 张颂文", img: "https://images.unsplash.com/photo-1574267432553-4b4628081c31?w=600&q=80", tag: "独播", corner: "全16集" },
+];
+
+const variety = [
+  { title: "脱口秀大会S6", info: "今晚 20:00 更新", img: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&q=80", tag: "VIP" },
+  { title: "明星大侦探8", info: "周五 12:00", img: "https://images.unsplash.com/photo-1574267432553-4b4628081c31?w=600&q=80", tag: "独播" },
+  { title: "向往的生活7", info: "全季完结", img: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600&q=80", tag: "VIP" },
+];
+
+const bottomTabs = [
+  { name: "首页", icon: "House" },
+  { name: "频道", icon: "LayoutGrid" },
+  { name: "VIP", icon: "Crown", center: true },
+  { name: "看点", icon: "Sparkles" },
+  { name: "我的", icon: "User" },
+];
+
+// ============= 顶部状态栏 =============
+function StatusBar() {
+  return (
+    <div className="status-bar flex items-center justify-between px-6 text-[14px] font-semibold text-black/90">
+      <span>9:41</span>
+      <div className="flex items-center gap-1.5">
+        <Icon name="Signal" size={14} />
+        <Icon name="Wifi" size={14} />
+        <Icon name="BatteryFull" size={18} />
+      </div>
+    </div>
+  );
+}
+
+// ============= 顶部搜索 + Tabs =============
+function TopBar({ activeTab, setActiveTab }) {
+  return (
+    <div className="hero-gradient sticky top-0 z-30 backdrop-blur">
+      <StatusBar />
+      {/* 搜索行 */}
+      <div className="px-3 pt-1 pb-2 flex items-center gap-2">
+        <Icon name="Menu" size={22} className="text-black/80" />
+        <div className="flex-1 h-9 rounded-full bg-white/80 border border-white shadow-sm flex items-center px-3 gap-2">
+          <Icon name="Search" size={16} className="text-tx" />
+          <span className="text-[13px] text-neutral-500 truncate">庆余年第二季 · 全网热搜第一</span>
+          <span className="ml-auto text-[11px] text-white bg-tx px-2 py-0.5 rounded-full">搜索</span>
+        </div>
+        <Icon name="Mic" size={22} className="text-black/80" />
+        <Icon name="Cast" size={22} className="text-black/80" />
+      </div>
+      {/* Tabs */}
+      <div className="relative">
+        <div className="flex items-center gap-4 px-4 pb-2 overflow-x-auto no-scrollbar text-[15px]">
+          {topTabs.map((t) => {
+            const active = activeTab === t;
+            return (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                className={`relative shrink-0 py-1.5 ${active ? "font-bold text-black" : "text-neutral-600"}`}
+              >
+                {t}
+                {active && <span className="tab-underline"></span>}
+              </button>
+            );
+          })}
+          <Icon name="Plus" size={18} className="text-neutral-600 ml-auto shrink-0" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= 轮播 Banner =============
+function HeroBanner() {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setIdx((p) => (p + 1) % banners.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+  const item = banners[idx];
+
+  return (
+    <div className="px-3 pt-2">
+      <div className="relative rounded-2xl overflow-hidden shadow-md aspect-[16/9] bg-neutral-200">
+        {banners.map((b, i) => (
+          <img
+            key={i}
+            src={b.cover}
+            alt={b.title}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${i === idx ? "opacity-100" : "opacity-0"}`}
+            onError={(e)=>{e.target.style.background='linear-gradient(135deg,#ff7d3a,#ff5c38)';e.target.style.display='block'}}
+          />
+        ))}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
+        <div className="absolute top-3 left-3 bg-white/25 backdrop-blur-sm text-white text-[11px] font-semibold px-2 py-0.5 rounded-md border border-white/30">
+          {item.badge}
+        </div>
+        <div className="absolute bottom-3 left-3 right-3 text-white">
+          <div className="text-[18px] font-bold drop-shadow-md">{item.title}</div>
+          <div className="text-[12px] opacity-90 mt-0.5">{item.sub}</div>
+        </div>
+        <button className="absolute bottom-3 right-3 btn bg-white/90 text-tx text-[12px] font-bold h-7 px-3">
+          <Icon name="Play" size={12} className="mr-1" /> 立即播放
+        </button>
+
+        {/* 指示点 */}
+        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-1">
+          {banners.map((_, i) => (
+            <span
+              key={i}
+              className={`dot rounded-full ${i === idx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/60"}`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= 快捷入口 =============
+function QuickEntries() {
+  return (
+    <div className="px-3 pt-3">
+      <div className="bg-white rounded-2xl py-3 grid grid-cols-5 gap-y-3 shadow-sm">
+        {quickEntries.map((q) => (
+          <button key={q.name} className="flex flex-col items-center gap-1.5">
+            <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${q.color} flex items-center justify-center text-white shadow-md`}>
+              <Icon name={q.icon} size={22} color="#fff" />
+            </div>
+            <span className="text-[11px] text-neutral-700">{q.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============= VIP 横幅 =============
+function VipBanner() {
+  return (
+    <div className="px-3 pt-3">
+      <div className="rounded-2xl p-3 flex items-center gap-3 shadow-sm overflow-hidden relative"
+           style={{background: "linear-gradient(120deg,#2a1a08 0%,#4a2e0e 60%,#7a4a16 100%)"}}>
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center shadow-md">
+          <Icon name="Crown" size={20} color="#3a2400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] font-bold text-yellow-200">开通VIP · 看庆余年2全集</div>
+          <div className="text-[11px] text-yellow-100/70 mt-0.5">连续包月 ¥15 · 立省 ¥10</div>
+        </div>
+        <button className="btn bg-gradient-to-r from-yellow-300 to-amber-500 text-[#3a2400] text-[12px] font-bold h-7 px-3">
+          立即开通
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============= 通用区块标题 =============
+function SectionTitle({ title, sub, more = "更多" }) {
+  return (
+    <div className="flex items-end justify-between px-1 pb-2">
+      <div className="flex items-baseline gap-2">
+        <h3 className="text-[16px] font-bold tracking-tight">{title}</h3>
+        {sub && <span className="text-[11px] text-neutral-500">{sub}</span>}
+      </div>
+      <button className="text-[12px] text-neutral-500 flex items-center">
+        {more}<Icon name="ChevronRight" size={14} />
+      </button>
+    </div>
+  );
+}
+
+// ============= 热播榜 =============
+function HotRank() {
+  return (
+    <div className="px-3 pt-4">
+      <div className="bg-white rounded-2xl p-3 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-tx to-orange-400 flex items-center justify-center">
+              <Icon name="Flame" size={14} color="#fff" />
+            </div>
+            <span className="text-[15px] font-bold">热播榜</span>
+            <span className="text-[10px] text-neutral-400">实时更新</span>
+          </div>
+          <button className="text-[12px] text-neutral-500 flex items-center">
+            完整榜单<Icon name="ChevronRight" size={14} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          {hotList.map((h) => (
+            <div key={h.rank} className="flex items-center gap-2 py-1">
+              <span className={`text-[15px] font-extrabold w-4 ${h.rank <= 2 ? "text-tx" : "text-neutral-400"}`}>{h.rank}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium truncate">{h.title}</div>
+                <div className="text-[10px] text-neutral-400 truncate">{h.tag} · {h.hot}</div>
+              </div>
+              <span className="text-[12px] font-bold grad-text">{h.score}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= 海报卡片 =============
+function PosterCard({ d }) {
+  return (
+    <div className="relative">
+      <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-neutral-200 shadow-sm">
+        <img src={d.img} alt={d.title} className="w-full h-full object-cover" />
+        {d.tag === "VIP" && <span className="vip-tag">VIP</span>}
+        {d.tag !== "VIP" && <span className="corner-tag">{d.tag}</span>}
+        {d.corner && (
+          <div className="play-info">
+            <Icon name="Play" size={11} color="#fff" />
+            <span className="truncate">{d.corner}</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-1.5">
+        <div className="text-[13px] font-medium truncate">{d.title}</div>
+        <div className="text-[11px] text-neutral-500 truncate">{d.info}</div>
+      </div>
+    </div>
+  );
+}
+
+// ============= 推荐剧集 =============
+function DramaSection() {
+  return (
+    <div className="px-3 pt-4">
+      <SectionTitle title="精选好剧" sub="为你推荐" />
+      <div className="grid grid-cols-3 gap-2.5">
+        {dramas.map((d) => <PosterCard key={d.title} d={d} />)}
+      </div>
+    </div>
+  );
+}
+
+// ============= 综艺横向滚动 =============
+function VarietySection() {
+  return (
+    <div className="pt-4">
+      <div className="px-4">
+        <SectionTitle title="综艺直播间" sub="边看边聊" />
+      </div>
+      <div className="flex gap-3 overflow-x-auto no-scrollbar px-4 pb-1">
+        {variety.map((v) => (
+          <div key={v.title} className="shrink-0 w-44">
+            <div className="relative aspect-video rounded-xl overflow-hidden bg-neutral-200 shadow-sm">
+              <img src={v.img} alt={v.title} className="w-full h-full object-cover" />
+              <span className={v.tag === "VIP" ? "vip-tag" : "corner-tag"}>{v.tag}</span>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-black/40 backdrop-blur flex items-center justify-center">
+                  <Icon name="Play" size={18} color="#fff" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-[13px] font-medium truncate">{v.title}</div>
+              <div className="text-[11px] text-neutral-500 truncate">{v.info}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============= 看点短视频 =============
+function ShortFeed() {
+  const items = [
+    { title: "庆余年2 · 范闲笑点合集", up: "腾讯视频", views: "238万", img: "https://images.unsplash.com/photo-1574267432553-4b4628081c31?w=600&q=80" },
+    { title: "繁花 · 阿宝爷叔名场面", up: "上海故事", views: "156万", img: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=600&q=80" },
+  ];
+  return (
+    <div className="px-3 pt-4">
+      <SectionTitle title="看点速递" sub="精彩短视频" />
+      <div className="grid grid-cols-2 gap-2.5">
+        {items.map((it) => (
+          <div key={it.title}>
+            <div className="relative aspect-video rounded-xl overflow-hidden bg-neutral-200 shadow-sm">
+              <img src={it.img} alt={it.title} className="w-full h-full object-cover" />
+              <div className="absolute bottom-1.5 left-1.5 bg-black/55 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Icon name="Play" size={10} color="#fff" /> {it.views}
+              </div>
+            </div>
+            <div className="mt-1.5">
+              <div className="text-[13px] font-medium line-clamp-2 leading-tight">{it.title}</div>
+              <div className="text-[11px] text-neutral-500 mt-0.5">@{it.up}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============= 底部 TabBar =============
+function BottomBar({ active, setActive }) {
+  return (
+    <div className="sticky bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-neutral-200 z-30">
+      <div className="flex items-end justify-around px-2 pt-1.5">
+        {bottomTabs.map((t) => {
+          const isActive = active === t.name;
+          if (t.center) {
+            return (
+              <button key={t.name} onClick={() => setActive(t.name)} className="flex flex-col items-center -mt-5">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center shadow-lg ring-4 ring-white">
+                  <Icon name={t.icon} size={22} color="#3a2400" />
+                </div>
+                <span className="text-[10px] font-semibold text-amber-600 mt-0.5">{t.name}</span>
+              </button>
+            );
+          }
+          return (
+            <button key={t.name} onClick={() => setActive(t.name)} className="flex flex-col items-center py-1 px-3">
+              <Icon name={t.icon} size={22} color={isActive ? "#ff5c38" : "#737373"} />
+              <span className={`text-[10px] mt-0.5 ${isActive ? "text-tx font-semibold" : "text-neutral-500"}`}>
+                {t.name}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="home-indicator"></div>
+    </div>
+  );
+}
+
+// ============= 主应用 =============
+function App() {
+  const [activeTab, setActiveTab] = useState("精选");
+  const [activeBottom, setActiveBottom] = useState("首页");
+
+  return (
+    <div className="min-h-screen flex justify-center bg-neutral-200">
+      {/* 手机外壳 */}
+      <div className="w-full max-w-[420px] min-h-screen bg-white shadow-2xl flex flex-col relative">
+        <TopBar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+        <div className="flex-1 overflow-y-auto pb-2">
+          <HeroBanner />
+          <QuickEntries />
+          <VipBanner />
+          <HotRank />
+          <DramaSection />
+          <VarietySection />
+          <ShortFeed />
+
+          <div className="text-center text-[11px] text-neutral-400 py-6">
+            — 没有更多内容了 —
+          </div>
+        </div>
+
+        <BottomBar active={activeBottom} setActive={setActiveBottom} />
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>

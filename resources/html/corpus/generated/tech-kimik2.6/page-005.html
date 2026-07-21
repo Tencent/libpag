@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ardot产品定位</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .arrow-icon { width: 20px; height: 20px; flex-shrink: 0; margin-top: 3px; }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">05 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">Ardot产品定位</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 内容区 -->
+  <div class="absolute top-[180px] left-[80px] w-[1120px] flex flex-col gap-[20px]">
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-brain text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">腾讯设计推出的下一代AI驱动智能设计工具</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">由开发腾讯CodeBuddy的同一团队打造，确保与开发工具链的无缝衔接</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-cpu text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">底层基于腾讯混元大模型与优图视觉算法</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">提供自然语言理解与生成能力，支撑图像识别、分层与转换</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-target text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">核心定位：AI驱动的产设研协作平台</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">让AI生成的每一个设计稿都成为可编辑、可复用、可交付的团队资产</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-quotes text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">产品口号：智能设计工具，让灵感鲜活落地</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">面向设计师与产品经理，支持多人实时协作的UI/UX设计工具</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-devices text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">多平台支持，Windows和小程序即将上线</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">当前支持Web端、macOS（Apple Silicon/Intel），微信小程序版本即将上线</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-currency-dollar text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">公测期间免费使用，注册即享1000 Credits</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">降低试用门槛，让团队零成本体验AI设计能力</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

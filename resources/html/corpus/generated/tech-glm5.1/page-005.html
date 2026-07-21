@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>专业设计与企业协作</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .grid-line {
+      position: absolute;
+      background: rgba(17,17,17,0.2);
+    }
+    .grid-line-h {
+      width: 100%;
+      height: 1px;
+      left: 0;
+    }
+    .grid-line-v {
+      height: 100%;
+      width: 1px;
+      top: 0;
+    }
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .feature-item:last-child {
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- Grid lines -->
+    <div class="grid-line grid-line-h" style="top: 100px;"></div>
+    <div class="grid-line grid-line-v" style="left: 640px;"></div>
+
+    <!-- zone-1: Title area -->
+    <div style="position:absolute; top:30px; left:60px; width:1160px; height:70px;">
+      <h1 style="font-size:56px; font-weight:600; letter-spacing:-0.025em; margin:0; line-height:1.2;">专业设计与企业协作</h1>
+      <p style="font-size:20px; font-weight:500; color:rgba(17,17,17,0.5); margin:8px 0 0 0;">设计专业度与企业级安全的双重保障</p>
+    </div>
+
+    <!-- zone-2: Left column - Professional Design -->
+    <div style="position:absolute; top:120px; left:60px; width:560px; height:500px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:28px; padding-bottom:12px; border-bottom:1px solid rgba(17,17,17,0.2);">
+        <i class="ph ph-vector-three" style="font-size:24px;"></i>
+        <span style="font-size:20px; font-weight:500;">专业设计特性</span>
+      </div>
+
+      <div class="feature-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="flex-shrink:0; margin-top:3px;"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p style="font-size:16px; font-weight:500; margin:0;">矢量编辑</p>
+          <p style="font-size:14px; font-weight:400; line-height:1.5; color:rgba(17,17,17,0.6); margin:4px 0 0 0;">从W3C标准的斜切、3D旋转到增强形状工具</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="flex-shrink:0; margin-top:3px;"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p style="font-size:16px; font-weight:500; margin:0;">动态布局系统</p>
+          <p style="font-size:14px; font-weight:400; line-height:1.5; color:rgba(17,17,17,0.6); margin:4px 0 0 0;">Grid布局、百分比定位、真实比例锁定</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="flex-shrink:0; margin-top:3px;"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p style="font-size:16px; font-weight:500; margin:0;">设计变量系统</p>
+          <p style="font-size:14px; font-weight:400; line-height:1.5; color:rgba(17,17,17,0.6); margin:4px 0 0 0;">建立颜色、数值、字符串等设计令牌，支持多主题自动切换</p>
+        </div>
+      </div>
+
+      <!-- Geometric decoration -->
+      <div style="position:absolute; bottom:40px; right:30px; width:100px; height:100px; border:1px solid #111111; border-radius:50%; opacity:0.1;"></div>
+    </div>
+
+    <!-- zone-3: Right column - Enterprise Collaboration -->
+    <div style="position:absolute; top:120px; left:660px; width:560px; height:500px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:28px; padding-bottom:12px; border-bottom:1px solid rgba(17,17,17,0.2);">
+        <i class="ph ph-shield-check" style="font-size:24px;"></i>
+        <span style="font-size:20px; font-weight:500;">企业级安全协作</span>
+      </div>
+
+      <div class="feature-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="flex-shrink:0; margin-top:3px;"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p style="font-size:16px; font-weight:500; margin:0;">智能权限中心</p>
+          <p style="font-size:14px; font-weight:400; line-height:1.5; color:rgba(17,17,17,0.6); margin:4px 0 0 0;">超管精细分配权限，关键资源更安全</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="flex-shrink:0; margin-top:3px;"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p style="font-size:16px; font-weight:500; margin:0;">全方位行为追溯</p>
+          <p style="font-size:14px; font-weight:400; line-height:1.5; color:rgba(17,17,17,0.6); margin:4px 0 0 0;">操作日志全记录，资产变更清晰可查</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="flex-shrink:0; margin-top:3px;"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p style="font-size:16px; font-weight:500; margin:0;">多人协同评审决策</p>
+          <p style="font-size:14px; font-weight:400; line-height:1.5; color:rgba(17,17,17,0.6); margin:4px 0 0 0;">支持多人在线实时评论、标注反馈和版本比对</p>
+        </div>
+      </div>
+
+      <!-- Geometric decoration -->
+      <div style="position:absolute; bottom:40px; right:30px; width:80px; height:80px; border:1px solid #111111; border-radius:50%; opacity:0.1;"></div>
+    </div>
+
+    <!-- zone-4: Highlight bar -->
+    <div style="position:absolute; top:640px; left:60px; width:1160px; height:40px; display:flex; align-items:center; gap:8px; border-top:1px solid rgba(17,17,17,0.2); padding-top:8px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+      <span style="font-size:16px; font-weight:500; color:rgba(17,17,17,0.8);">专业设计能力 + 企业级安全协作</span>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute; bottom:20px; left:60px; width:1160px; height:20px; display:flex; justify-content:space-between;">
+      <span style="font-size:14px; font-weight:400; color:rgba(17,17,17,0.4);">腾讯Ardot设计平台</span>
+      <span style="font-size:14px; font-weight:400; color:rgba(17,17,17,0.4);">05 / 15</span>
+    </div>
+
+  </div>
+</body>
+</html>

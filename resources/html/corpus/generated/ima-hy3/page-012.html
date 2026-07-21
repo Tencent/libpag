@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <!-- 背景水印 -->
+    <div class="absolute text-[500px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="top: -100px; left: -50px;">
+      ESSENCE
+    </div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-[32px] right-[48px] z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+    </div>
+
+    <!-- 主标题区域 (Z-TITLE: x=0, y=200, w=1280, h=200) -->
+    <div class="absolute z-20" style="top: 180px; left: 0; width: 1280px; height: 200px;">
+      <div class="flex flex-col items-center justify-center h-full gap-[16px]">
+        <div class="flex items-center gap-[24px]">
+          <span class="text-[100px] font-[300] text-[#FFFFFF] leading-none">(</span>
+          <div class="flex flex-col items-center">
+            <h1 class="text-[60px] font-[400] text-[#FFFFFF] leading-[1.1] tracking-[0.05em]">养成系人格</h1>
+            <h1 class="text-[60px] font-[400] text-[#FFFFFF] leading-[1.1] tracking-[0.05em]">体系的本质</h1>
+          </div>
+          <span class="text-[100px] font-[300] text-[#FFFFFF] leading-none">)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 引用文字 (Z-QUOTE: x=140, y=450, w=1000, h=120) -->
+    <div class="absolute z-20" style="top: 450px; left: 140px; width: 1000px; height: 120px;">
+      <div class="bg-[#1E332A]/60 rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10 text-center">
+        <div class="text-[16px] font-[300] text-[#FFFFFF]/70 leading-[1.8] italic">
+          它不是一个功能，而是一种产品哲学——从<span class="text-[#82D0A4]">人使用工具</span>变成<span class="text-[#82D0A4]">人养育伙伴</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 总结表格 (Z-FOOTER: x=0, y=600, w=1280, h=100) -->
+    <div class="absolute z-20" style="top: 600px; left: 120px; width: 1040px; height: 100px;">
+      <div class="grid grid-cols-5 gap-[12px] text-center">
+        <div class="bg-[#1E332A]/40 rounded-[8px] p-[10px]">
+          <div class="text-[11px] text-[#82D0A4] mb-[4px]">灵魂层</div>
+          <div class="text-[11px] text-[#FFFFFF]/50">SOUL + IDENTITY</div>
+        </div>
+        <div class="bg-[#1E332A]/40 rounded-[8px] p-[10px]">
+          <div class="text-[11px] text-[#82D0A4] mb-[4px]">关系层</div>
+          <div class="text-[11px] text-[#FFFFFF]/50">USER + MEMORY</div>
+        </div>
+        <div class="bg-[#1E332A]/40 rounded-[8px] p-[10px]">
+          <div class="text-[11px] text-[#82D0A4] mb-[4px]">流程层</div>
+          <div class="text-[11px] text-[#FFFFFF]/50">AGENTS</div>
+        </div>
+        <div class="bg-[#1E332A]/40 rounded-[8px] p-[10px]">
+          <div class="text-[11px] text-[#82D0A4] mb-[4px]">能力层</div>
+          <div class="text-[11px] text-[#FFFFFF]/50">Skills</div>
+        </div>
+        <div class="bg-[#1E332A]/40 rounded-[8px] p-[10px]">
+          <div class="text-[11px] text-[#82D0A4] mb-[4px]">行为层</div>
+          <div class="text-[11px] text-[#FFFFFF]/50">Heartbeat/Cron</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部总结文字 -->
+    <div class="absolute z-20" style="top: 720px; left: 0; width: 1280px;">
+      <div class="flex items-center justify-center">
+        <span class="text-[13px] font-[400] text-[#FFFFFF]/40">五层加在一起，就是一个完整的数字人格</span>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+      <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+    </div>
+  </div>
+</body>
+</html>

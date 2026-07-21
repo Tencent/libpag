@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>脉脉 · React + Tailwind + shadcn 风格</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          border: "hsl(214.3 31.8% 91.4%)",
+          input: "hsl(214.3 31.8% 91.4%)",
+          ring: "hsl(221.2 83.2% 53.3%)",
+          background: "hsl(0 0% 100%)",
+          foreground: "hsl(222.2 47.4% 11.2%)",
+          primary: { DEFAULT: "#0052D9", foreground: "#FFFFFF" },
+          secondary: { DEFAULT: "#F2F3F5", foreground: "#1A1F36" },
+          muted: { DEFAULT: "#F7F8FA", foreground: "#86909C" },
+          destructive: { DEFAULT: "#F53F3F", foreground: "#FFFFFF" },
+          accent: { DEFAULT: "#FFF3E8", foreground: "#FF7D00" },
+          card: { DEFAULT: "#FFFFFF", foreground: "#1A1F36" },
+        },
+        borderRadius: {
+          lg: "0.75rem",
+          md: "0.5rem",
+          sm: "0.375rem",
+        },
+        fontFamily: {
+          sans: ['"PingFang SC"', '"Helvetica Neue"', "Helvetica", "Arial", "sans-serif"],
+        },
+        boxShadow: {
+          card: "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)",
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { height: 100%; }
+  body {
+    background: linear-gradient(135deg, #e0e7ff 0%, #f5f3ff 50%, #fce7f3 100%);
+    -webkit-font-smoothing: antialiased;
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .phone-shell {
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25), 0 10px 30px rgba(15, 23, 42, 0.1);
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+/* ---------- shadcn 风格基础组件 ---------- */
+function cn(...classes) { return classes.filter(Boolean).join(" "); }
+
+const Avatar = ({ src, fallback, className }) => (
+  <div className={cn("relative inline-flex shrink-0 overflow-hidden rounded-full bg-secondary items-center justify-center", className)}>
+    {src ? (
+      <img src={src} alt="" className="aspect-square h-full w-full object-cover" onError={(e)=>{e.currentTarget.style.display='none';}}/>
+    ) : null}
+    <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-secondary-foreground">{fallback}</span>
+  </div>
+);
+
+const Badge = ({ children, variant = "default", className }) => {
+  const variants = {
+    default: "bg-primary/10 text-primary",
+    orange: "bg-accent text-accent-foreground",
+    blue: "bg-blue-50 text-primary",
+    green: "bg-emerald-50 text-emerald-600",
+    gray: "bg-secondary text-muted-foreground",
+  };
+  return (
+    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none", variants[variant], className)}>
+      {children}
+    </span>
+  );
+};
+
+const Button = ({ children, variant = "default", size = "default", className, ...props }) => {
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 active:scale-[0.97]";
+  const variants = {
+    default: "bg-primary text-primary-foreground hover:bg-primary/90",
+    outline: "border border-primary text-primary hover:bg-primary/5",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    ghost: "hover:bg-secondary text-foreground",
+  };
+  const sizes = { default: "h-7 px-3", sm: "h-6 px-2.5", lg: "h-9 px-4" };
+  return <button className={cn(base, variants[variant], sizes[size], className)} {...props}>{children}</button>;
+};
+
+const Card = ({ children, className }) => (
+  <div className={cn("rounded-none bg-card text-card-foreground", className)}>{children}</div>
+);
+
+const Separator = ({ className }) => <div className={cn("h-2 w-full bg-secondary", className)}/>;
+
+const TabsTrigger = ({ active, children, onClick }) => (
+  <button onClick={onClick} className="relative flex flex-col items-center gap-1 py-1 outline-none">
+    <span className={cn("text-[15px] transition-colors", active ? "font-bold text-foreground" : "text-[#4E5969]")}>{children}</span>
+    <span className={cn("h-[3px] w-5 rounded-full transition-all", active ? "bg-primary" : "bg-transparent")}/>
+  </button>
+);
+
+/* ---------- 图标 ---------- */
+const Icon = {
+  Search: (p)=>(<svg viewBox="0 0 16 16" fill="none" {...p}><circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/><path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>),
+  Bell: (p)=>(<svg viewBox="0 0 22 22" fill="none" {...p}><path d="M5 9c0-4 3-6 6-6s6 2 6 6v3l2 3H3l2-3V9z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/><path d="M9 17c0 1.5 1 2.5 2 2.5s2-1 2-2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>),
+  Like: (p)=>(<svg viewBox="0 0 18 18" fill="none" {...p}><path d="M3 8h3v7H3V8zm3 0l3-5c1 0 1 1 1 2l-.5 2H14c1 0 1.5 1 1 2l-1.5 5c-.3.6-.9 1-1.5 1H6V8z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>),
+  LikeFill: (p)=>(<svg viewBox="0 0 18 18" {...p}><path d="M3 8h3v7H3V8zm3 0l3-5c1 0 1 1 1 2l-.5 2H14c1 0 1.5 1 1 2l-1.5 5c-.3.6-.9 1-1.5 1H6V8z" fill="currentColor"/></svg>),
+  Comment: (p)=>(<svg viewBox="0 0 18 18" fill="none" {...p}><path d="M3 4c0-1 1-2 2-2h8c1 0 2 1 2 2v7c0 1-1 2-2 2H7l-3 3v-3c-.5 0-1-1-1-2V4z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>),
+  Share: (p)=>(<svg viewBox="0 0 18 18" fill="none" {...p}><path d="M11 3l4 4-4 4V8.5C7 8.5 5 10 4 13c0-4 2-7 7-7.5V3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>),
+  More: (p)=>(<svg viewBox="0 0 18 18" {...p}><circle cx="4" cy="9" r="1.5" fill="currentColor"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><circle cx="14" cy="9" r="1.5" fill="currentColor"/></svg>),
+  Star: (p)=>(<svg viewBox="0 0 14 14" {...p}><path d="M7 2l2 3 3 .5-2 2.5L10.5 11 7 9.5 3.5 11 4 8 2 5.5 5 5z" fill="currentColor"/></svg>),
+  Home: (p)=>(<svg viewBox="0 0 24 24" {...p}><path d="M3 11l9-8 9 8v9c0 .5-.5 1-1 1h-5v-7H9v7H4c-.5 0-1-.5-1-1v-9z" fill="currentColor"/></svg>),
+  HomeOutline: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><path d="M3 11l9-8 9 8v9c0 .5-.5 1-1 1h-5v-7H9v7H4c-.5 0-1-.5-1-1v-9z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>),
+  Network: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><circle cx="9" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6"/><circle cx="17" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.6"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M14 17c2-2 4-2 7 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>),
+  Plus: (p)=>(<svg viewBox="0 0 22 22" fill="none" {...p}><path d="M11 4v14M4 11h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"/></svg>),
+  Msg: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><path d="M4 6c0-1 1-2 2-2h12c1 0 2 1 2 2v10c0 1-1 2-2 2H9l-4 3v-3c-.5 0-1-1-1-2V6z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>),
+  User: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.6"/><path d="M4 21c0-5 3-8 8-8s8 3 8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>),
+  Doc: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><path d="M6 3h9l5 5v13c0 1-1 2-2 2H6c-1 0-2-1-2-2V5c0-1 1-2 2-2z" fill="currentColor" /></svg>),
+  Verified: (p)=>(<svg viewBox="0 0 12 12" fill="none" {...p}><path d="M6 1l1.5 1L9 1.7 9.8 3l1.3.8L11 5l.8 1.3-.7 1.5L11 9.3l-1.3.4-.7 1.3L7.5 11 6 12l-1.5-1L3 11.3 2.2 10l-1.3-.8L1 8 .2 6.7.9 5.2 1 3.7l1.3-.4L3 2 4.5 1z" fill="currentColor"/><path d="M3.5 6l1.7 1.7L8.5 4.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>),
+};
+
+/* ---------- 模拟数据 ---------- */
+const POSTS = [
+  {
+    id: 1,
+    name: "李泽宇",
+    company: "字节跳动",
+    title: "高级产品经理",
+    time: "2小时前",
+    avatar: "https://i.pravatar.cc/120?img=12",
+    badge: { text: "实名认证", variant: "orange" },
+    followed: false,
+    content: "最近团队招产品同学，给大家一些建议：1）多关注用户真实需求，少做表面功夫；2）数据驱动决策，但别迷信指标；3）保持好奇心和同理心。欢迎私信交流～",
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80",
+    topic: "热门话题 · #产品经理的那些事# 1.2万人讨论",
+    stats: { like: 328, comment: 86, liked: false },
+  },
+  {
+    id: 2,
+    name: "王思琪",
+    company: "阿里巴巴",
+    title: "资深UI设计师",
+    time: "5小时前",
+    avatar: "https://i.pravatar.cc/120?img=47",
+    badge: { text: "职场达人", variant: "blue" },
+    followed: true,
+    content: "分享一个最近做的设计复盘：好的设计不是华丽的视觉，而是让用户感觉不到设计的存在。简洁、克制、目标明确——这是我这五年最深的体会。",
+    file: { name: "2026设计师能力模型.pdf", size: "2.3MB · 已下载1.5k次" },
+    stats: { like: 1200, comment: 234, liked: true },
+  },
+  {
+    id: 3,
+    name: "陈默",
+    company: "腾讯",
+    title: "技术专家 · T11",
+    time: "昨天 21:30",
+    avatar: "https://i.pravatar.cc/120?img=68",
+    badge: { text: "技术大牛", variant: "green" },
+    followed: false,
+    content: "AI Coding 已经不再是辅助工具，而是新一代研发范式。团队从今年 Q1 开始全员上手，效率提升约 40%。最关键的不是模型多强，而是把工程化做到位。",
+    poll: [
+      { label: "已经全面采用", percent: 62 },
+      { label: "部分场景使用", percent: 28 },
+      { label: "还在观望", percent: 10 },
+    ],
+    stats: { like: 856, comment: 192, liked: false },
+  },
+];
+
+const TABS = ["推荐", "关注", "同事圈", "行业头条", "招聘"];
+
+/* ---------- 组件 ---------- */
+function StatusBar() {
+  return (
+    <div className="flex h-11 items-center justify-between bg-white px-5 pt-3.5">
+      <span className="text-[16px] font-semibold text-foreground">9:41</span>
+      <div className="flex items-center gap-1.5 text-foreground">
+        <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="6" width="3" height="6" rx="1" fill="currentColor"/><rect x="5" y="4" width="3" height="8" rx="1" fill="currentColor"/><rect x="10" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2C4 2 1 4 0 6l2 2c1-2 3-3 6-3s5 1 6 3l2-2c-1-2-4-4-8-4zm0 5c-2 0-4 1-5 2l2 2c1-1 2-2 3-2s2 1 3 2l2-2c-1-1-3-2-5-2z" fill="currentColor"/></svg>
+        <div className="h-3 w-[26px] rounded-[3px] border border-current p-[1px]"><div className="h-full w-full rounded-[1px] bg-current"/></div>
+      </div>
+    </div>
+  );
+}
+
+function TopNav() {
+  return (
+    <div className="flex h-12 items-center gap-2.5 bg-white px-4">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary">
+        <span className="text-base font-bold text-primary-foreground">脉</span>
+      </div>
+      <div className="flex h-9 flex-1 items-center gap-2 rounded-full bg-secondary px-3">
+        <Icon.Search className="h-4 w-4 text-muted-foreground"/>
+        <span className="text-[13px] text-muted-foreground">搜索人、公司、岗位</span>
+      </div>
+      <button className="relative flex h-9 w-9 items-center justify-center text-foreground">
+        <Icon.Bell className="h-[22px] w-[22px]"/>
+        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-white"/>
+      </button>
+    </div>
+  );
+}
+
+function Tabs({ active, onChange }) {
+  return (
+    <div className="flex h-11 items-center justify-between bg-white px-6">
+      {TABS.map((t)=>(
+        <TabsTrigger key={t} active={active===t} onClick={()=>onChange(t)}>{t}</TabsTrigger>
+      ))}
+    </div>
+  );
+}
+
+function PostHeader({ post, onToggleFollow }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <Avatar src={post.avatar} fallback={post.name[0]} className="h-11 w-11"/>
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[15px] font-semibold text-foreground">{post.name}</span>
+          {post.badge && <Badge variant={post.badge.variant}>{post.badge.text}</Badge>}
+        </div>
+        <span className="text-xs text-muted-foreground">{post.company} · {post.title} · {post.time}</span>
+      </div>
+      {post.followed ? (
+        <Button variant="secondary" onClick={()=>onToggleFollow(post.id)}>已关注</Button>
+      ) : (
+        <Button variant="outline" onClick={()=>onToggleFollow(post.id)}>+ 关注</Button>
+      )}
+    </div>
+  );
+}
+
+function PostActions({ stats, onLike }) {
+  return (
+    <div className="flex items-center justify-between pt-1">
+      <button onClick={onLike} className={cn("flex items-center gap-1.5 text-[13px] transition-colors", stats.liked ? "text-destructive" : "text-muted-foreground")}>
+        {stats.liked ? <Icon.LikeFill className="h-[18px] w-[18px]"/> : <Icon.Like className="h-[18px] w-[18px]"/>}
+        <span>{stats.like >= 1000 ? (stats.like/1000).toFixed(1)+"k" : stats.like}</span>
+      </button>
+      <button className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <Icon.Comment className="h-[18px] w-[18px]"/>
+        <span>{stats.comment}</span>
+      </button>
+      <button className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <Icon.Share className="h-[18px] w-[18px]"/>
+        <span>分享</span>
+      </button>
+      <button className="flex items-center text-muted-foreground">
+        <Icon.More className="h-[18px] w-[18px]"/>
+      </button>
+    </div>
+  );
+}
+
+function PollBlock({ poll }) {
+  return (
+    <div className="space-y-2 rounded-lg bg-muted p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">投票</span>
+        <span>你的团队 AI Coding 进展如何？</span>
+      </div>
+      {poll.map((p,i)=>(
+        <div key={i} className="relative h-8 overflow-hidden rounded-md bg-white">
+          <div className="absolute inset-y-0 left-0 bg-primary/15" style={{ width: p.percent+"%" }}/>
+          <div className="relative flex h-full items-center justify-between px-3 text-xs">
+            <span className="text-foreground">{p.label}</span>
+            <span className="font-medium text-primary">{p.percent}%</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PostCard({ post, onToggleFollow, onLike }) {
+  return (
+    <Card className="flex flex-col gap-2.5 px-4 py-3.5">
+      <PostHeader post={post} onToggleFollow={onToggleFollow}/>
+      <p className="text-[15px] leading-[22px] text-foreground">{post.content}</p>
+      {post.image && (
+        <img src={post.image} className="h-44 w-full rounded-lg object-cover" alt=""/>
+      )}
+      {post.file && (
+        <div className="flex items-center gap-2 rounded-lg bg-muted p-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">PDF</div>
+          <div className="flex flex-1 flex-col">
+            <span className="text-[13px] font-semibold text-foreground">{post.file.name}</span>
+            <span className="text-[11px] text-muted-foreground">{post.file.size}</span>
+          </div>
+          <Button size="sm" variant="outline">下载</Button>
+        </div>
+      )}
+      {post.poll && <PollBlock poll={post.poll}/>}
+      {post.topic && (
+        <div className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-2">
+          <Icon.Star className="h-3.5 w-3.5 text-accent-foreground"/>
+          <span className="text-xs text-[#4E5969]">{post.topic}</span>
+        </div>
+      )}
+      <PostActions stats={post.stats} onLike={()=>onLike(post.id)}/>
+    </Card>
+  );
+}
+
+function BottomTab({ active, onChange }) {
+  const items = [
+    { key: "home", label: "首页", icon: Icon.Home, outline: Icon.HomeOutline },
+    { key: "network", label: "人脉", icon: Icon.Network, outline: Icon.Network },
+    { key: "plus", label: "", icon: Icon.Plus, isPlus: true },
+    { key: "msg", label: "消息", icon: Icon.Msg, outline: Icon.Msg, dot: true },
+    { key: "me", label: "我的", icon: Icon.User, outline: Icon.User },
+  ];
+  return (
+    <div className="absolute inset-x-0 bottom-0 flex h-20 items-start justify-between border-t border-border bg-white px-4 pb-5 pt-2">
+      {items.map((it)=>{
+        if (it.isPlus) {
+          return (
+            <button key={it.key} className="flex w-14 items-center justify-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary shadow-md shadow-primary/30 active:scale-95 transition-transform">
+                <it.icon className="h-[22px] w-[22px] text-primary-foreground"/>
+              </div>
+            </button>
+          );
+        }
+        const isActive = active === it.key;
+        const I = isActive ? it.icon : (it.outline || it.icon);
+        return (
+          <button key={it.key} onClick={()=>onChange(it.key)} className="flex w-14 flex-col items-center gap-0.5">
+            <div className="relative">
+              <I className={cn("h-6 w-6", isActive ? "text-primary" : "text-muted-foreground")}/>
+              {it.dot && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-white"/>}
+            </div>
+            <span className={cn("text-[10px]", isActive ? "text-primary" : "text-muted-foreground")}>{it.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- 主页面 ---------- */
+function App() {
+  const [tab, setTab] = useState("推荐");
+  const [activeTab, setActiveTab] = useState("home");
+  const [posts, setPosts] = useState(POSTS);
+
+  const toggleFollow = (id) => {
+    setPosts((s)=>s.map(p=>p.id===id?{...p, followed: !p.followed}:p));
+  };
+  const toggleLike = (id) => {
+    setPosts((s)=>s.map(p=>{
+      if (p.id !== id) return p;
+      const liked = !p.stats.liked;
+      return { ...p, stats: { ...p.stats, liked, like: p.stats.like + (liked?1:-1) } };
+    }));
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+      <div className="phone-shell relative w-[375px] overflow-hidden rounded-[40px] border-[10px] border-slate-900 bg-slate-100" style={{height: 812}}>
+        {/* 屏幕区域 */}
+        <div className="relative flex h-full flex-col overflow-y-auto no-scrollbar bg-secondary">
+          <StatusBar/>
+          <TopNav/>
+          <Tabs active={tab} onChange={setTab}/>
+          <Separator/>
+
+          {posts.map((p, idx)=>(
+            <React.Fragment key={p.id}>
+              <PostCard post={p} onToggleFollow={toggleFollow} onLike={toggleLike}/>
+              {idx < posts.length - 1 && <Separator/>}
+            </React.Fragment>
+          ))}
+
+          {/* 底部占位避免被底部 tab 遮挡 */}
+          <div className="h-24"/>
+        </div>
+
+        {/* 底部 tab 固定 */}
+        <BottomTab active={activeTab} onChange={setActiveTab}/>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

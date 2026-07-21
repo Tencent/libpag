@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>通义千问 Qwen</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          border: "hsl(220 13% 91%)",
+          input: "hsl(220 13% 91%)",
+          ring: "hsl(262 83% 58%)",
+          background: "hsl(0 0% 100%)",
+          foreground: "hsl(222 47% 11%)",
+          primary: {
+            DEFAULT: "hsl(262 83% 58%)",
+            foreground: "hsl(0 0% 100%)",
+          },
+          secondary: {
+            DEFAULT: "hsl(220 14% 96%)",
+            foreground: "hsl(222 47% 11%)",
+          },
+          muted: {
+            DEFAULT: "hsl(220 14% 96%)",
+            foreground: "hsl(220 9% 46%)",
+          },
+          accent: {
+            DEFAULT: "hsl(220 14% 96%)",
+            foreground: "hsl(222 47% 11%)",
+          },
+          qwen: {
+            purple: "#615CED",
+            blue: "#3B82F6",
+            gradient1: "#615CED",
+            gradient2: "#8B5CF6",
+          }
+        },
+        borderRadius: {
+          lg: "0.75rem",
+          md: "0.5rem",
+          sm: "0.375rem",
+        },
+        animation: {
+          'fade-in': 'fadeIn 0.3s ease-in-out',
+          'slide-up': 'slideUp 0.4s ease-out',
+        },
+        keyframes: {
+          fadeIn: {
+            '0%': { opacity: '0' },
+            '100%': { opacity: '1' },
+          },
+          slideUp: {
+            '0%': { opacity: '0', transform: 'translateY(10px)' },
+            '100%': { opacity: '1', transform: 'translateY(0)' },
+          },
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+  .qwen-gradient {
+    background: linear-gradient(135deg, #615CED 0%, #8B5CF6 50%, #EC4899 100%);
+  }
+  .qwen-gradient-text {
+    background: linear-gradient(135deg, #615CED 0%, #8B5CF6 50%, #EC4899 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+</style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/30 min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+// ===== Icons (Lucide-style inline SVG) =====
+const Icon = ({ name, className = "w-5 h-5", strokeWidth = 2 }) => {
+  const icons = {
+    menu: <><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    send: <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>,
+    sparkles: <><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></>,
+    image: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><polyline points="21 15 16 10 5 21"/></>,
+    paperclip: <><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 17.93 8.83l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></>,
+    mic: <><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></>,
+    code: <><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></>,
+    file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+    user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    edit: <><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></>,
+    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
+    moreH: <><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></>,
+    copy: <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
+    thumbsUp: <><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7"/></>,
+    thumbsDown: <><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17"/></>,
+    refresh: <><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>,
+    chevronDown: <><polyline points="6 9 12 15 18 9"/></>,
+    chevronRight: <><polyline points="9 18 15 12 9 6"/></>,
+    sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
+    globe: <><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>,
+    bot: <><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></>,
+    palette: <><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></>,
+    fileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
+    languages: <><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></>,
+    lightbulb: <><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></>,
+    pen: <><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></>,
+    book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>,
+    arrowUp: <><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></>,
+    stop: <><rect x="6" y="6" width="12" height="12" rx="1"/></>,
+    x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+  };
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {icons[name]}
+    </svg>
+  );
+};
+
+// ===== shadcn-style Button =====
+const Button = ({ children, variant = "default", size = "default", className = "", ...props }) => {
+  const variants = {
+    default: "bg-primary text-primary-foreground hover:bg-primary/90",
+    ghost: "hover:bg-accent hover:text-accent-foreground",
+    outline: "border border-border bg-background hover:bg-accent hover:text-accent-foreground",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+  };
+  const sizes = {
+    default: "h-10 px-4 py-2",
+    sm: "h-8 px-3 text-sm",
+    icon: "h-9 w-9",
+    iconSm: "h-7 w-7",
+  };
+  return (
+    <button
+      className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none ${variants[variant]} ${sizes[size]} ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+// ===== Avatar =====
+const Avatar = ({ children, className = "" }) => (
+  <div className={`relative flex shrink-0 overflow-hidden rounded-full ${className}`}>{children}</div>
+);
+
+// ===== Sidebar =====
+const Sidebar = ({ collapsed, onToggle, conversations, activeId, setActiveId, onNew }) => {
+  return (
+    <aside className={`${collapsed ? "w-0 -ml-72" : "w-72"} transition-all duration-300 bg-white/60 backdrop-blur-xl border-r border-slate-200/60 flex flex-col h-screen overflow-hidden`}>
+      <div className="p-3 flex flex-col gap-2 border-b border-slate-200/60">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2 px-2">
+            <div className="w-8 h-8 rounded-lg qwen-gradient flex items-center justify-center">
+              <Icon name="sparkles" className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-base text-slate-800">通义千问</span>
+          </div>
+          <Button variant="ghost" size="iconSm" onClick={onToggle} className="text-slate-600">
+            <Icon name="menu" className="w-4 h-4" />
+          </Button>
+        </div>
+        <Button onClick={onNew} className="w-full justify-start gap-2 qwen-gradient text-white hover:opacity-90 shadow-md shadow-purple-500/20" size="default">
+          <Icon name="plus" className="w-4 h-4" />
+          <span>新建对话</span>
+        </Button>
+        <div className="relative mt-1">
+          <Icon name="search" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="搜索历史对话"
+            className="w-full h-9 pl-9 pr-3 rounded-md bg-slate-100/80 border border-transparent focus:bg-white focus:border-slate-200 outline-none text-sm placeholder:text-slate-400"
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-2 py-3">
+        <div className="text-xs font-medium text-slate-500 px-3 py-2">今天</div>
+        {conversations.filter(c => c.group === "today").map(c => (
+          <ConvItem key={c.id} conv={c} active={c.id === activeId} onClick={() => setActiveId(c.id)} />
+        ))}
+        <div className="text-xs font-medium text-slate-500 px-3 py-2 mt-2">7 天内</div>
+        {conversations.filter(c => c.group === "week").map(c => (
+          <ConvItem key={c.id} conv={c} active={c.id === activeId} onClick={() => setActiveId(c.id)} />
+        ))}
+        <div className="text-xs font-medium text-slate-500 px-3 py-2 mt-2">30 天内</div>
+        {conversations.filter(c => c.group === "month").map(c => (
+          <ConvItem key={c.id} conv={c} active={c.id === activeId} onClick={() => setActiveId(c.id)} />
+        ))}
+      </div>
+
+      <div className="border-t border-slate-200/60 p-3 space-y-1">
+        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100 transition-colors text-sm text-slate-700">
+          <Icon name="palette" className="w-4 h-4" />
+          <span>智能体广场</span>
+          <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 font-medium">NEW</span>
+        </button>
+        <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-100 transition-colors text-sm text-slate-700">
+          <Icon name="book" className="w-4 h-4" />
+          <span>我的知识库</span>
+        </button>
+        <div className="flex items-center gap-3 px-2 py-2 mt-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer">
+          <Avatar className="w-8 h-8">
+            <div className="w-full h-full qwen-gradient flex items-center justify-center text-white text-xs font-bold">Y</div>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-slate-800 truncate">Yucong</div>
+            <div className="text-xs text-slate-500 truncate">Plus 会员</div>
+          </div>
+          <Icon name="settings" className="w-4 h-4 text-slate-400" />
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+const ConvItem = ({ conv, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`group w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-sm ${
+      active ? "bg-purple-50 text-purple-700" : "text-slate-700 hover:bg-slate-100"
+    }`}
+  >
+    <span className="flex-1 text-left truncate">{conv.title}</span>
+    <span className={`opacity-0 group-hover:opacity-100 transition-opacity ${active ? "opacity-100" : ""}`}>
+      <Icon name="moreH" className="w-4 h-4 text-slate-400" />
+    </span>
+  </button>
+);
+
+// ===== Top Bar =====
+const TopBar = ({ onToggleSidebar, sidebarCollapsed, model, setModel }) => {
+  const [open, setOpen] = useState(false);
+  const models = [
+    { id: "qwen3-max", name: "Qwen3-Max", desc: "最新旗舰模型，推理能力最强", tag: "推荐" },
+    { id: "qwen3-plus", name: "Qwen3-Plus", desc: "均衡的性能与速度", tag: "" },
+    { id: "qwen3-turbo", name: "Qwen3-Turbo", desc: "更快的响应速度", tag: "快速" },
+    { id: "qwen-vl-max", name: "Qwen-VL-Max", desc: "视觉理解模型", tag: "多模态" },
+    { id: "qwen-coder", name: "Qwen-Coder", desc: "代码专家模型", tag: "代码" },
+  ];
+  return (
+    <header className="h-14 px-4 flex items-center justify-between border-b border-slate-200/60 bg-white/60 backdrop-blur-xl">
+      <div className="flex items-center gap-2">
+        {sidebarCollapsed && (
+          <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="text-slate-600">
+            <Icon name="menu" />
+          </Button>
+        )}
+        <div className="relative">
+          <button
+            onClick={() => setOpen(!open)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors"
+          >
+            <span className="font-semibold text-slate-800">{models.find(m => m.id === model)?.name}</span>
+            <Icon name="chevronDown" className={`w-4 h-4 text-slate-500 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+          {open && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+              <div className="absolute left-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-20 p-2 animate-fade-in">
+                {models.map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setModel(m.id); setOpen(false); }}
+                    className={`w-full flex items-start gap-3 p-3 rounded-lg transition-colors text-left ${
+                      model === m.id ? "bg-purple-50" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg qwen-gradient flex items-center justify-center flex-shrink-0">
+                      <Icon name="sparkles" className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-800">{m.name}</span>
+                        {m.tag && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 font-medium">{m.tag}</span>}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">{m.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" className="text-slate-600 gap-1.5">
+          <Icon name="sparkles" className="w-4 h-4 text-purple-500" />
+          <span>升级 Plus</span>
+        </Button>
+        <Button variant="ghost" size="icon" className="text-slate-600">
+          <Icon name="sun" />
+        </Button>
+        <Button variant="ghost" size="icon" className="text-slate-600">
+          <Icon name="globe" />
+        </Button>
+      </div>
+    </header>
+  );
+};
+
+// ===== Welcome Screen =====
+const WelcomeScreen = ({ onSendPrompt }) => {
+  const suggestions = [
+    { icon: "pen", color: "from-purple-500 to-pink-500", title: "帮我写作", desc: "撰写一封商务邮件" },
+    { icon: "code", color: "from-blue-500 to-cyan-500", title: "代码助手", desc: "用 Python 实现快速排序" },
+    { icon: "lightbulb", color: "from-amber-500 to-orange-500", title: "创意启发", desc: "为新产品起一个好名字" },
+    { icon: "languages", color: "from-emerald-500 to-teal-500", title: "翻译润色", desc: "翻译这段文字到英文" },
+    { icon: "fileText", color: "from-rose-500 to-red-500", title: "文档总结", desc: "总结一篇长文的核心要点" },
+    { icon: "bot", color: "from-indigo-500 to-purple-500", title: "知识问答", desc: "解释量子计算的基本原理" },
+  ];
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-4 pb-8 animate-fade-in">
+      <div className="w-20 h-20 rounded-2xl qwen-gradient flex items-center justify-center mb-6 shadow-lg shadow-purple-500/30">
+        <Icon name="sparkles" className="w-10 h-10 text-white" strokeWidth={2.5} />
+      </div>
+      <h1 className="text-4xl font-bold mb-3">
+        <span className="qwen-gradient-text">你好，我是通义千问</span>
+      </h1>
+      <p className="text-slate-500 mb-10 text-center max-w-md">
+        我可以帮你写作、答疑、编程、翻译，让我们一起开始吧～
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-3xl">
+        {suggestions.map((s, i) => (
+          <button
+            key={i}
+            onClick={() => onSendPrompt(s.desc)}
+            className="group p-4 rounded-xl bg-white/80 backdrop-blur border border-slate-200/60 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/10 transition-all text-left animate-slide-up"
+            style={{ animationDelay: `${i * 50}ms` }}
+          >
+            <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${s.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+              <Icon name={s.icon} className="w-5 h-5 text-white" />
+            </div>
+            <div className="font-medium text-slate-800 text-sm mb-1">{s.title}</div>
+            <div className="text-xs text-slate-500">{s.desc}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ===== Message =====
+const MessageBubble = ({ msg }) => {
+  const isUser = msg.role === "user";
+  return (
+    <div className={`group flex gap-3 mb-6 animate-fade-in ${isUser ? "flex-row-reverse" : ""}`}>
+      <Avatar className="w-8 h-8 flex-shrink-0">
+        {isUser ? (
+          <div className="w-full h-full bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center text-white text-xs font-bold">
+            Y
+          </div>
+        ) : (
+          <div className="w-full h-full qwen-gradient flex items-center justify-center">
+            <Icon name="sparkles" className="w-4 h-4 text-white" />
+          </div>
+        )}
+      </Avatar>
+      <div className={`flex-1 min-w-0 ${isUser ? "flex flex-col items-end" : ""}`}>
+        <div className={`inline-block max-w-[85%] px-4 py-3 rounded-2xl text-[15px] leading-relaxed whitespace-pre-wrap ${
+          isUser
+            ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-tr-sm shadow-md shadow-purple-500/20"
+            : "bg-white border border-slate-200/60 text-slate-800 rounded-tl-sm shadow-sm"
+        }`}>
+          {msg.content}
+          {msg.streaming && <span className="inline-block w-1.5 h-4 bg-purple-500 ml-0.5 align-middle animate-pulse"></span>}
+        </div>
+        {!isUser && !msg.streaming && (
+          <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button variant="ghost" size="iconSm" className="text-slate-400 hover:text-slate-700">
+              <Icon name="copy" className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="iconSm" className="text-slate-400 hover:text-slate-700">
+              <Icon name="refresh" className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="iconSm" className="text-slate-400 hover:text-slate-700">
+              <Icon name="thumbsUp" className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="iconSm" className="text-slate-400 hover:text-slate-700">
+              <Icon name="thumbsDown" className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ===== Input Area =====
+const InputArea = ({ onSend, loading, onStop }) => {
+  const [input, setInput] = useState("");
+  const [deepThink, setDeepThink] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
+  const textareaRef = useRef(null);
+
+  const handleSend = () => {
+    if (!input.trim() || loading) return;
+    onSend(input.trim());
+    setInput("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleInput = (e) => {
+    setInput(e.target.value);
+    const ta = textareaRef.current;
+    if (ta) {
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+    }
+  };
+
+  return (
+    <div className="px-4 pb-4 pt-2">
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-lg shadow-slate-200/40 overflow-hidden focus-within:border-purple-300 focus-within:shadow-purple-200/40 transition-all">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={handleInput}
+            onKeyDown={handleKeyDown}
+            placeholder='给"通义千问"发送消息  (Shift + Enter 换行)'
+            rows={1}
+            className="w-full px-4 pt-4 pb-2 resize-none outline-none text-[15px] placeholder:text-slate-400 max-h-[200px]"
+          />
+          <div className="flex items-center justify-between px-3 pb-2.5">
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="iconSm" className="text-slate-500 hover:text-slate-700" title="上传图片">
+                <Icon name="image" className="w-[18px] h-[18px]" />
+              </Button>
+              <Button variant="ghost" size="iconSm" className="text-slate-500 hover:text-slate-700" title="上传文件">
+                <Icon name="paperclip" className="w-[18px] h-[18px]" />
+              </Button>
+              <div className="w-px h-4 bg-slate-200 mx-1"></div>
+              <button
+                onClick={() => setDeepThink(!deepThink)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  deepThink
+                    ? "bg-purple-100 text-purple-700 border border-purple-200"
+                    : "text-slate-600 hover:bg-slate-100 border border-transparent"
+                }`}
+              >
+                <Icon name="lightbulb" className="w-3.5 h-3.5" />
+                <span>深度思考</span>
+              </button>
+              <button
+                onClick={() => setWebSearch(!webSearch)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  webSearch
+                    ? "bg-blue-100 text-blue-700 border border-blue-200"
+                    : "text-slate-600 hover:bg-slate-100 border border-transparent"
+                }`}
+              >
+                <Icon name="globe" className="w-3.5 h-3.5" />
+                <span>联网搜索</span>
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="iconSm" className="text-slate-500 hover:text-slate-700">
+                <Icon name="mic" className="w-[18px] h-[18px]" />
+              </Button>
+              {loading ? (
+                <button
+                  onClick={onStop}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition-all"
+                >
+                  <Icon name="stop" className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className="w-8 h-8 rounded-full qwen-gradient text-white flex items-center justify-center transition-all hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed shadow-md shadow-purple-500/20"
+                >
+                  <Icon name="arrowUp" className="w-4 h-4" strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="text-center text-xs text-slate-400 mt-2">
+          内容由 AI 生成，请仔细甄别。<span className="text-purple-500 hover:underline cursor-pointer">用户协议</span> ·{" "}
+          <span className="text-purple-500 hover:underline cursor-pointer">隐私政策</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ===== Main App =====
+const App = () => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [model, setModel] = useState("qwen3-max");
+  const [conversations] = useState([
+    { id: "1", title: "如何提升团队协作效率", group: "today" },
+    { id: "2", title: "React 性能优化方案", group: "today" },
+    { id: "3", title: "帮我写一份产品需求文档", group: "today" },
+    { id: "4", title: "Python 数据分析入门", group: "week" },
+    { id: "5", title: "周末杭州旅行规划", group: "week" },
+    { id: "6", title: "营销文案创意头脑风暴", group: "week" },
+    { id: "7", title: "深度学习模型对比", group: "month" },
+    { id: "8", title: "古诗词翻译练习", group: "month" },
+  ]);
+  const [activeId, setActiveId] = useState("1");
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const mockReplies = [
+    "好的！让我来帮你解决这个问题。\n\n首先，我们需要明确几个关键点：\n\n1. **目标定义**：清晰的目标是成功的基石\n2. **方法选择**：选择适合的工具和方法\n3. **执行落地**：将想法转化为实际行动\n\n如果你有更具体的需求或场景，欢迎进一步告诉我，我会给出更精准的建议～",
+    "这是一个很有意思的问题。从我的理解来看，可以从以下几个维度来思考：\n\n• **技术维度**：考虑可行性和实现成本\n• **业务维度**：关注用户价值和商业回报\n• **体验维度**：注重交互流畅和视觉美感\n\n你希望我重点展开哪个方面？",
+    "我已经理解了你的需求。基于通义千问大模型的能力，我建议这样处理：\n\n**步骤一**：收集和整理相关信息\n**步骤二**：分析数据找出关键模式\n**步骤三**：制定可执行的方案\n**步骤四**：评估并持续优化\n\n需要我帮你详细展开任何一步吗？",
+  ];
+
+  const sendMessage = (text) => {
+    const userMsg = { id: Date.now(), role: "user", content: text };
+    const aiMsg = { id: Date.now() + 1, role: "assistant", content: "", streaming: true };
+    setMessages(prev => [...prev, userMsg, aiMsg]);
+    setLoading(true);
+
+    const reply = mockReplies[Math.floor(Math.random() * mockReplies.length)];
+    let i = 0;
+    timerRef.current = setInterval(() => {
+      i += 2;
+      if (i >= reply.length) {
+        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: reply, streaming: false } : m));
+        setLoading(false);
+        clearInterval(timerRef.current);
+      } else {
+        setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: reply.slice(0, i) } : m));
+      }
+    }, 30);
+  };
+
+  const handleStop = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setMessages(prev => prev.map(m => m.streaming ? { ...m, streaming: false } : m));
+    setLoading(false);
+  };
+
+  const handleNew = () => {
+    setMessages([]);
+    setLoading(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        conversations={conversations}
+        activeId={activeId}
+        setActiveId={setActiveId}
+        onNew={handleNew}
+      />
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        <TopBar
+          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          sidebarCollapsed={sidebarCollapsed}
+          model={model}
+          setModel={setModel}
+        />
+        {messages.length === 0 ? (
+          <WelcomeScreen onSendPrompt={sendMessage} />
+        ) : (
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="max-w-3xl mx-auto">
+              {messages.map(m => <MessageBubble key={m.id} msg={m} />)}
+            </div>
+          </div>
+        )}
+        <InputArea onSend={sendMessage} loading={loading} onStop={handleStop} />
+      </main>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

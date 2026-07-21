@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <!-- 背景水印 -->
+    <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="top: 100px; left: -50px;">SKILLS</div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-[32px] right-[48px] z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+    </div>
+
+    <!-- 标题区域 -->
+    <div class="absolute z-20" style="top: 40px; left: 0; width: 1280px; height: 70px;">
+      <div class="flex flex-col items-center justify-center h-full gap-[8px]">
+        <div class="text-[16px] font-[300] text-[#FFFFFF]/60 tracking-[0.1em] uppercase">Skills</div>
+        <h1 class="text-[36px] font-[300] text-[#FFFFFF] leading-[1.1]">第4层：能力扩展层</h1>
+      </div>
+    </div>
+
+    <!-- 卡片网格 (Z-GRID: x=64, y=140, w=1152, h=500) -->
+    <div class="absolute z-20" style="top: 140px; left: 64px; width: 1152px; height: 500px;">
+      <div class="grid grid-cols-3 gap-[20px] h-full">
+
+        <!-- 创作类 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10 flex flex-col">
+          <div class="flex items-center gap-[10px] mb-[16px]">
+            <i class="ph ph-paint-brush text-[28px] text-[#82D0A4]"></i>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">创作类</h3>
+          </div>
+          <div class="text-[13px] text-[#FFFFFF]/40 mb-[12px]">图像生成、视频剪辑、文案撰写、音乐创作</div>
+          <div class="flex-1 bg-[#051014]/40 rounded-[8px] p-[12px]">
+            <div class="text-[11px] text-[#82D0A4] mb-[6px]">典型场景</div>
+            <div class="space-y-[4px]">
+              <div class="text-[12px] text-[#FFFFFF]/50">赛博朋克海报设计</div>
+              <div class="text-[12px] text-[#FFFFFF]/50">短视频裁剪与字幕</div>
+              <div class="text-[12px] text-[#FFFFFF]/50">小红书文案撰写</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 社交媒体类 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10 flex flex-col">
+          <div class="flex items-center gap-[10px] mb-[16px]">
+            <i class="ph ph-share-network text-[28px] text-[#82D0A4]"></i>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">社交媒体类</h3>
+          </div>
+          <div class="text-[13px] text-[#FFFFFF]/40 mb-[12px]">微信公众号、Twitter/X、小红书、LinkedIn</div>
+          <div class="flex-1 bg-[#051014]/40 rounded-[8px] p-[12px]">
+            <div class="text-[11px] text-[#82D0A4] mb-[6px]">典型场景</div>
+            <div class="space-y-[4px]">
+              <div class="text-[12px] text-[#FFFFFF]/50">公众号自动发布</div>
+              <div class="text-[12px] text-[#FFFFFF]/50">Twitter 定时发帖</div>
+              <div class="text-[12px] text-[#FFFFFF]/50">小红书内容同步</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 知识管理类 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#82D0A4]/20 flex flex-col">
+          <div class="flex items-center gap-[10px] mb-[16px]">
+            <i class="ph ph-brain text-[28px] text-[#82D0A4]"></i>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">知识管理类</h3>
+            <span class="text-[10px] text-[#82D0A4] bg-[#82D0A4]/10 px-[6px] py-[2px] rounded">IMA 特色</span>
+          </div>
+          <div class="text-[13px] text-[#FFFFFF]/40 mb-[12px]">ima 笔记读写、知识库检索、知识卡片生成</div>
+          <div class="flex-1 bg-[#82D0A4]/5 rounded-[8px] p-[12px] border-[1px] border-[#82D0A4]/10">
+            <div class="text-[11px] text-[#82D0A4] mb-[6px]">IMA 独特优势</div>
+            <div class="space-y-[4px]">
+              <div class="text-[12px] text-[#FFFFFF]/60">直接操作 IMA 知识库</div>
+              <div class="text-[12px] text-[#FFFFFF]/60">搜笔记、读笔记、写笔记</div>
+              <div class="text-[12px] text-[#FFFFFF]/60">不只是聊天，而是管理第二大脑</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 工具集成类 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10 flex flex-col">
+          <div class="flex items-center gap-[10px] mb-[16px]">
+            <i class="ph ph-plug text-[28px] text-[#82D0A4]"></i>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">工具集成类</h3>
+          </div>
+          <div class="text-[13px] text-[#FFFFFF]/40 mb-[12px]">Notion / Figma / Shopify、邮件、日程、文件</div>
+          <div class="flex-1 bg-[#051014]/40 rounded-[8px] p-[12px]">
+            <div class="text-[11px] text-[#82D0A4] mb-[6px]">典型场景</div>
+            <div class="space-y-[4px]">
+              <div class="text-[12px] text-[#FFFFFF]/50">Notion 数据库操作</div>
+              <div class="text-[12px] text-[#FFFFFF]/50">Figma 设计稿导出</div>
+              <div class="text-[12px] text-[#FFFFFF]/50">邮件自动分类回复</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 行业专属类 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10 flex flex-col col-span-2">
+          <div class="flex items-center gap-[10px] mb-[16px]">
+            <i class="ph ph-buildings text-[28px] text-[#82D0A4]"></i>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">行业专属类</h3>
+          </div>
+          <div class="text-[13px] text-[#FFFFFF]/40 mb-[12px]">电商运营、教育培训、3D 建模 / 动画</div>
+          <div class="flex-1 grid grid-cols-3 gap-[12px]">
+            <div class="bg-[#051014]/40 rounded-[8px] p-[12px]">
+              <div class="text-[12px] text-[#82D0A4] mb-[4px]">电商运营</div>
+              <div class="text-[11px] text-[#FFFFFF]/50">商品上下架、订单处理、数据报表</div>
+            </div>
+            <div class="bg-[#051014]/40 rounded-[8px] p-[12px]">
+              <div class="text-[12px] text-[#82D0A4] mb-[4px]">教育培训</div>
+              <div class="text-[11px] text-[#FFFFFF]/50">课件生成、作业批改、学习报告</div>
+            </div>
+            <div class="bg-[#051014]/40 rounded-[8px] p-[12px]">
+              <div class="text-[12px] text-[#82D0A4] mb-[4px]">3D 建模</div>
+              <div class="text-[11px] text-[#FFFFFF]/50">模型生成、动画渲染、格式转换</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+      <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+    </div>
+  </div>
+</body>
+</html>

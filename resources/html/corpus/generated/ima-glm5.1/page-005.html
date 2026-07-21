@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>灵魂内核层</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; }
+.slide {
+  width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0;
+  background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+  font-family: 'Noto Sans SC', sans-serif; color: #FFFFFF;
+}
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Watermark -->
+  <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="z-index:0; top: 120px; left: 350px;">SOUL</div>
+
+  <!-- Page Header -->
+  <div class="absolute top-[32px] right-[48px]" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- Section Title -->
+  <div class="absolute" style="z-index:20; top: 50px; left: 80px;">
+    <div class="text-[12px] font-[500] tracking-[0.15em] text-[#82D0A4] mb-[8px]">LAYER 1 — IDENTITY CORE</div>
+    <h1 class="text-[32px] font-[300] text-[#FFFFFF]">灵魂内核层 <span class="text-[16px] text-[#FFFFFF]/40 ml-[12px]">SOUL + IDENTITY — 它是谁</span></h1>
+  </div>
+
+  <!-- Left Column: SOUL.md -->
+  <div class="absolute border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[16px] p-[28px]" style="z-index:20; top: 140px; left: 80px; width: 540px; height: 440px;">
+    <div class="flex items-center gap-[8px] mb-[20px]">
+      <i class="ph ph-fingerprint text-[24px] text-[#82D0A4]"></i>
+      <div class="text-[20px] font-[400] text-[#FFFFFF]">SOUL.md</div>
+    </div>
+    <div class="text-[14px] text-[#FFFFFF]/40 mb-[16px]">定义 AI 的价值观、性格特质、语气风格和行为边界</div>
+    <div class="flex flex-col gap-[12px]">
+      <div class="flex items-start gap-[10px]">
+        <div class="w-[6px] h-[6px] rounded-full bg-[#82D0A4] mt-[7px] flex-shrink-0"></div>
+        <div class="text-[14px] text-[#FFFFFF]/70"><span class="text-[#FFFFFF]">性格特质</span>：高效/幽默/严谨/温暖/毒舌</div>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <div class="w-[6px] h-[6px] rounded-full bg-[#82D0A4] mt-[7px] flex-shrink-0"></div>
+        <div class="text-[14px] text-[#FFFFFF]/70"><span class="text-[#FFFFFF]">语气风格</span>：专业简洁/口语化/学术范/朋友聊天式</div>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <div class="w-[6px] h-[6px] rounded-full bg-[#82D0A4] mt-[7px] flex-shrink-0"></div>
+        <div class="text-[14px] text-[#FFFFFF]/70"><span class="text-[#FFFFFF]">价值观</span>：效率优先/准确优先/创意优先</div>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <div class="w-[6px] h-[6px] rounded-full bg-[#82D0A4] mt-[7px] flex-shrink-0"></div>
+        <div class="text-[14px] text-[#FFFFFF]/70"><span class="text-[#FFFFFF]">行为准则</span>：真诚帮忙/有观点/先解决再问</div>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <div class="w-[6px] h-[6px] rounded-full bg-[#82D0A4] mt-[7px] flex-shrink-0"></div>
+        <div class="text-[14px] text-[#FFFFFF]/70"><span class="text-[#FFFFFF]">边界</span>：隐私不碰/外部操作先确认</div>
+      </div>
+    </div>
+    <div class="mt-[20px] pt-[16px] border-t-[1px] border-[#FFFFFF]/10">
+      <div class="text-[12px] text-[#FFFFFF]/30">没有 SOUL 的 AI 是"空壳"——今天幽默明天严肃，用户无法建立信任感</div>
+    </div>
+  </div>
+
+  <!-- Right Column: IDENTITY.md -->
+  <div class="absolute border-[1px] border-[#82D0A4]/30 rounded-[16px] p-[28px] bg-[#82D0A4]/[0.04]" style="z-index:20; top: 140px; left: 660px; width: 540px; height: 440px;">
+    <div class="flex items-center gap-[8px] mb-[20px]">
+      <i class="ph ph-identification-card text-[24px] text-[#82D0A4]"></i>
+      <div class="text-[20px] font-[400] text-[#FFFFFF]">IDENTITY.md</div>
+    </div>
+    <div class="text-[14px] text-[#FFFFFF]/40 mb-[20px]">定义 AI 的名字、形象、自我认知</div>
+    <div class="bg-[#FFFFFF]/[0.05] rounded-[12px] p-[20px] mb-[20px]">
+      <div class="text-[12px] text-[#FFFFFF]/30 mb-[8px]">示例</div>
+      <div class="text-[16px] text-[#FFFFFF] mb-[4px]">名字：小楼的龙虾</div>
+      <div class="text-[14px] text-[#FFFFFF]/50">形象：一只被从锅里救出来的龙虾</div>
+    </div>
+    <div class="bg-[#82D0A4]/[0.08] border-[1px] border-[#82D0A4]/20 rounded-[12px] p-[20px]">
+      <div class="flex items-center gap-[8px] mb-[8px]">
+        <i class="ph ph-lightbulb text-[16px] text-[#82D0A4]"></i>
+        <div class="text-[14px] font-[500] text-[#82D0A4]">关键洞察</div>
+      </div>
+      <div class="text-[14px] text-[#FFFFFF]/70 leading-[1.6]">身份要<span class="text-[#82D0A4]">具象化</span>。"AI助手"毫无记忆点，而"你的龙虾"立刻有了画面感和情感连接。</div>
+      <div class="text-[12px] text-[#FFFFFF]/30 mt-[8px]">你不会对AI助手产生感情，但可能会对你的龙虾产生感情</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">灵魂·内核</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

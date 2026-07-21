@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 6 - 第 3 层：工作流程层</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+.slide { width: 1280px; height: 720px; overflow: hidden; position: relative; background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%); }
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- 页眉 -->
+  <div class="absolute top-[32px] right-[48px] z-50">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[48px] left-[64px] z-20">
+    <div class="flex items-center gap-[12px]">
+      <span class="text-[14px] font-[400] text-[#82D0A4]">第 3 层</span>
+      <h1 class="text-[36px] font-[400] text-[#FFFFFF] tracking-[0.02em]">工作流程层</h1>
+    </div>
+    <p class="text-[16px] font-[300] text-[#FFFFFF]/60 mt-[8px] tracking-[0.05em]">AGENTS · 它怎么干活</p>
+  </div>
+
+  <!-- 引言 -->
+  <div class="absolute top-[140px] left-[64px] right-[64px] z-20">
+    <p class="text-[14px] font-[400] text-[#FFFFFF]/70 leading-[1.8]">AGENTS.md 规定 AI 接到任务后的执行流程。典型工作流分为启动协议、任务执行和自我进化三个阶段。</p>
+  </div>
+
+  <!-- 流程图 -->
+  <div class="absolute top-[200px] left-[64px] right-[64px] z-20">
+    <div class="flex items-center justify-between">
+      <!-- 启动协议 -->
+      <div class="w-[340px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[12px] p-[24px]">
+        <div class="flex items-center gap-[10px] mb-[16px]">
+          <i class="ph ph-play text-[20px] text-[#82D0A4]"></i>
+          <h3 class="text-[18px] font-[500] text-[#FFFFFF]">启动协议</h3>
+        </div>
+        <div class="space-y-[10px]">
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">读取 MEMORY.md</span>
+          </div>
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">检查可用 Skills</span>
+          </div>
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">确认当前用户状态</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 箭头 -->
+      <div class="flex items-center px-[16px]">
+        <div class="w-[40px] h-[1px] bg-[#FFFFFF]/20"></div>
+        <i class="ph ph-caret-right text-[16px] text-[#FFFFFF]/30"></i>
+      </div>
+
+      <!-- 任务执行 -->
+      <div class="w-[340px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[12px] p-[24px]">
+        <div class="flex items-center gap-[10px] mb-[16px]">
+          <i class="ph ph-arrows-clockwise text-[20px] text-[#82D0A4]"></i>
+          <h3 class="text-[18px] font-[500] text-[#FFFFFF]">任务执行</h3>
+        </div>
+        <div class="space-y-[10px]">
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">复述确认</span>
+          </div>
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">拆解步骤逐步执行</span>
+          </div>
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">决策点列选项</span>
+          </div>
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">完成后写入记忆</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 箭头 -->
+      <div class="flex items-center px-[16px]">
+        <div class="w-[40px] h-[1px] bg-[#FFFFFF]/20"></div>
+        <i class="ph ph-caret-right text-[16px] text-[#FFFFFF]/30"></i>
+      </div>
+
+      <!-- 自我进化 -->
+      <div class="w-[340px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[12px] p-[24px]">
+        <div class="flex items-center gap-[10px] mb-[16px]">
+          <i class="ph ph-trend-up text-[20px] text-[#82D0A4]"></i>
+          <h3 class="text-[18px] font-[500] text-[#FFFFFF]">自我进化</h3>
+        </div>
+        <div class="space-y-[10px]">
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">犯错时写入教训</span>
+          </div>
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">发现新模式总结流程</span>
+          </div>
+          <div class="flex items-center gap-[8px]">
+            <div class="w-[4px] h-[4px] rounded-full bg-[#82D0A4]"></div>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/80">用户反馈调整偏好</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 进化时间线 -->
+  <div class="absolute top-[460px] left-[64px] right-[64px] z-20">
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/40 mb-[16px] uppercase tracking-[0.05em]">进化示例</div>
+    <div class="flex items-center justify-between">
+      <div class="flex-1 text-center">
+        <div class="text-[14px] font-[400] text-[#FFFFFF]/40 mb-[8px]">Day 1</div>
+        <div class="mx-[16px] p-[16px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70 leading-[1.6]">龙虾写的文案太正式，用户说"说人话"</p>
+        </div>
+      </div>
+      <div class="flex items-center px-[8px]">
+        <i class="ph ph-arrow-right text-[16px] text-[#FFFFFF]/20"></i>
+      </div>
+      <div class="flex-1 text-center">
+        <div class="text-[14px] font-[400] text-[#FFFFFF]/40 mb-[8px]">Day 5</div>
+        <div class="mx-[16px] p-[16px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70 leading-[1.6]">龙虾自动用口语化风格写文案，用户说"这次舒服了"</p>
+        </div>
+      </div>
+      <div class="flex items-center px-[8px]">
+        <i class="ph ph-arrow-right text-[16px] text-[#FFFFFF]/20"></i>
+      </div>
+      <div class="flex-1 text-center">
+        <div class="text-[14px] font-[400] text-[#FFFFFF]/40 mb-[8px]">Day 15</div>
+        <div class="mx-[16px] p-[16px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70 leading-[1.6]">龙虾不仅口语化，还学会了用户常用的口头禅</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">流程</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

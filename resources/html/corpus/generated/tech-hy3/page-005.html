@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>核心功能：专业设计特性</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid -->
+    <div class="absolute left-[50%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-pen-nib text-[20px]"></i>
+      <span class="text-[14px]/[20px]">核心功能 · 专业设计</span>
+    </div>
+
+    <!-- Page Title -->
+    <div class="absolute top-[60px] left-[80px] z-[10]">
+      <h1 class="text-[56px] font-[600] leading-[1.2] tracking-[-0.01em]">核心功能：专业设计特性</h1>
+      <div class="w-[80px] h-[2px] bg-[#111111] mt-[12px]"></div>
+    </div>
+
+    <!-- Left Column -->
+    <div class="absolute top-[200px] left-[80px] w-[520px] z-[10] space-y-[32px]">
+      <div>
+        <div class="flex items-center gap-[10px] mb-[12px]">
+          <i class="ph ph-pen-nib text-[18px]"></i>
+          <h2 class="text-[18px] font-[600]">矢量编辑特性</h2>
+        </div>
+        <p class="text-[15px]/[24px] leading-[1.625] text-[#111111]/80">从W3C标准的斜切、3D旋转到增强形状工具，专业矢量编辑能力</p>
+      </div>
+      <div>
+        <div class="flex items-center gap-[10px] mb-[12px]">
+          <i class="ph ph-grid-four text-[18px]"></i>
+          <h2 class="text-[18px] font-[600]">动态布局系统</h2>
+        </div>
+        <p class="text-[15px]/[24px] leading-[1.625] text-[#111111]/80">Grid布局、百分比定位、真实比例锁定，灵活响应不同屏幕尺寸</p>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="absolute top-[200px] left-[680px] w-[520px] z-[10] space-y-[32px]">
+      <div>
+        <div class="flex items-center gap-[10px] mb-[12px]">
+          <i class="ph ph-puzzle-piece text-[18px]"></i>
+          <h2 class="text-[18px] font-[600]">自由的设计系统</h2>
+        </div>
+        <p class="text-[15px]/[24px] leading-[1.625] text-[#111111]/80">组件、颜色、文本样式全局同步，自由组合，一键复用</p>
+      </div>
+      <div>
+        <div class="flex items-center gap-[10px] mb-[12px]">
+          <i class="ph ph-sliders text-[18px]"></i>
+          <h2 class="text-[18px] font-[600]">设计变量系统</h2>
+        </div>
+        <p class="text-[15px]/[24px] leading-[1.625] text-[#111111]/80">建立颜色、数值、字符串等设计令牌，支持多主题自动切换</p>
+      </div>
+    </div>
+
+    <!-- Bottom border -->
+    <div class="absolute bottom-[40px] left-[80px] right-[80px] h-[1px] bg-[#111111]/20 z-[10]"></div>
+  </div>
+</body>
+</html>

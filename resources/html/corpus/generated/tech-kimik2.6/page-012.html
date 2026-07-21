@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>竞品分析：墨刀与其他</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .arrow-icon { width: 20px; height: 20px; flex-shrink: 0; margin-top: 3px; }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">12 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">竞品分析：墨刀与其他</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 内容区 -->
+  <div class="absolute top-[180px] left-[80px] w-[1120px] flex flex-col gap-[20px]">
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-cursor-click text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">墨刀：原型交互能力极强</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">支持复杂交互、逻辑、条件判断，覆盖高保真原型全链路</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-robot text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">墨刀AI Agent</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">支持生成产品原型、产品方案和PRD，降低上手门槛</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-check-circle text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">墨刀优势</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">中文界面、行业模板库丰富、上手门槛低、产品逻辑深度理解能力强</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-x-circle text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">墨刀劣势</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">高级设计能力有限，更偏向原型交互，免费版仅支持3个文件</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-chart-pie text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">市场格局总结</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">市场呈现一超多强格局，各工具围绕自身优势差异化竞争，国产工具聚焦本土化与数据安全</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

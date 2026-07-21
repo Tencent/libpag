@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>grid-template-areas</title>
+    <style>
+      .layout { display: grid; grid-template-columns: 80px 1fr; grid-template-rows: 40px 1fr;
+                grid-template-areas: "head head" "side main"; gap: 6px; height: 100%; }
+      .head { grid-area: head; background-color: #6366F1; }
+      .side { grid-area: side; background-color: #8B5CF6; }
+      .main { grid-area: main; background-color: #EC4899; }
+    </style>
+  </head>
+  <body style="width: 240px; height: 160px; padding: 8px;">
+    <div class="layout">
+      <div class="head"></div>
+      <div class="side"></div>
+      <div class="main"></div>
+    </div>
+  </body>
+</html>

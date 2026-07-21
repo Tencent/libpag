@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ardot SWOT分析</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .card-border {
+      border: 1px solid rgba(17,17,17,0.2);
+    }
+    .arrow-bullet {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+    .quadrant-s { background: rgba(17,17,17,0.06); }
+    .quadrant-w { background: rgba(17,17,17,0.03); }
+    .quadrant-o { background: rgba(17,17,17,0.06); }
+    .quadrant-t { background: rgba(17,17,17,0.03); }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- 极细网格线装饰 -->
+    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(rgba(17,17,17,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,0.06) 1px, transparent 1px); background-size: 80px 80px;"></div>
+
+    <!-- 页眉线 -->
+    <div class="absolute top-0 left-0 w-full h-[2px]" style="background: rgba(17,17,17,0.2);"></div>
+
+    <!-- zone-1: 标题区 -->
+    <div class="absolute" style="top:30px; left:60px; width:1160px; height:50px;">
+      <h1 class="text-[56px] font-semibold" style="letter-spacing: -0.025em; line-height: 1.1;">Ardot SWOT分析</h1>
+    </div>
+
+    <!-- zone-2: S-优势象限 -->
+    <div class="absolute card-border quadrant-s" style="top:100px; left:60px; width:580px; height:260px; border-radius:8px; padding:20px;">
+      <div class="flex items-center gap-2 mb-3">
+        <i class="ph ph-shield-chevron text-[20px]"></i>
+        <h3 class="text-[20px] font-medium">S - 优势</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">AI生成可编辑设计稿（非静态图片）</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">MCP协议实现设计一键转代码</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">腾讯混元大模型+优图视觉算法</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">与CodeBuddy/WorkBuddy深度集成</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">Figma文件无缝导入；企业级权限管理与行为追溯</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">公测免费，注册送1000 Credits</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-3: W-劣势象限 -->
+    <div class="absolute card-border quadrant-w" style="top:100px; left:660px; width:580px; height:260px; border-radius:8px; padding:20px;">
+      <div class="flex items-center gap-2 mb-3">
+        <i class="ph ph-warning-circle text-[20px]"></i>
+        <h3 class="text-[20px] font-medium">W - 劣势</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">品牌知名度低于Figma</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">插件生态尚在起步阶段</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">仅支持macOS和Web端</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">Windows版和小程序尚未上线</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">新产品稳定性和成熟度待验证</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">国际化能力有限</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-4: O-机会象限 -->
+    <div class="absolute card-border quadrant-o" style="top:380px; left:60px; width:580px; height:260px; border-radius:8px; padding:20px;">
+      <div class="flex items-center gap-2 mb-3">
+        <i class="ph ph-arrow-up-right text-[20px]"></i>
+        <h3 class="text-[20px] font-medium">O - 机会</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">国产替代政策驱动，国内企业寻求本土方案</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">AI设计工具市场高速增长 CAGR 22.25%</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">Figma国内访问受限带来用户迁移需求</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">与腾讯生态（微信、企业微信）协同</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">MCP协议成为行业标准先发优势</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-5: T-威胁象限 -->
+    <div class="absolute card-border quadrant-t" style="top:380px; left:660px; width:580px; height:260px; border-radius:8px; padding:20px;">
+      <div class="flex items-center gap-2 mb-3">
+        <i class="ph ph-lightning text-[20px]"></i>
+        <h3 class="text-[20px] font-medium">T - 威胁</h3>
+      </div>
+      <div class="space-y-2">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">Figma市场地位稳固用户粘性强</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">MasterGo、即时设计、Pixso等国产竞品已积累用户</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">AI技术迭代快需持续投入研发</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">设计工具切换成本高用户迁移难度大</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-0.5" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">大厂纷纷入局AI设计赛道竞争加剧</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-6: 亮点条 -->
+    <div class="absolute" style="top:660px; left:60px; width:1160px; height:30px;">
+      <div class="flex items-center gap-3 px-5 py-2 card-border" style="border-radius:6px; background: rgba(17,17,17,0.04);">
+        <i class="ph ph-star text-[16px]"></i>
+        <span class="text-[14px] font-medium">资产化思维+MCP协议构筑核心壁垒，生态建设是当务之急</span>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-0 left-0 w-full flex justify-between items-center px-[60px]" style="height:30px;">
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">腾讯Ardot设计平台 - 分析与竞品分析报告</span>
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">13</span>
+    </div>
+
+    <!-- 几何圆环装饰 -->
+    <div class="absolute" style="top:20px; right:60px; width:40px; height:40px; border:1px solid #111111; border-radius:50%; opacity:0.15;"></div>
+    <div class="absolute" style="top:32px; right:72px; width:16px; height:16px; border:1px solid #111111; border-radius:50%; opacity:0.1;"></div>
+  </div>
+</body>
+</html>

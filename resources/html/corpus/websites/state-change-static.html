@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>状态变化动效画廊 · State Change Showcase</title>
+<style>
+:root {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --surface-2: #fafafa;
+    --text: #1d1d1f;
+    --text-2: #6e6e73;
+    --border: #e5e5ea;
+
+    /* iOS */
+    --ios-blue: #007aff;
+    --ios-green: #34c759;
+    --ios-red: #ff3b30;
+    --ios-gray: #e9e9eb;
+
+    /* Material 3 */
+    --md-primary: #6750a4;
+    --md-on-primary: #ffffff;
+    --md-surface-variant: #e7e0ec;
+    --md-outline: #79747e;
+    --md-error: #b3261e;
+
+    /* 缓动 */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+* { box-sizing: border-box; }
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+      "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+.page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 64px 32px 96px;
+  }
+header.hero {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+header.hero h1 {
+    font-size: 40px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #1d1d1f, #6750a4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+header.hero p {
+    font-size: 16px;
+    color: var(--text-2);
+    margin: 0;
+  }
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+  }
+.card.half {
+    grid-column: 1 / -1;
+  }
+@media (max-width: 720px) {
+    .half-pair { grid-template-columns: 1fr; }
+  }
+@media (max-width: 720px) {
+    .third-row { grid-template-columns: 1fr; }
+  }
+.card {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 8px 24px rgba(0, 0, 0, 0.04);
+  }
+.card h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+.card .desc {
+    font-size: 13px;
+    color: var(--text-2);
+    margin: 0 0 24px;
+  }
+.demo-row {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    padding: 20px 0;
+    border-top: 1px solid var(--border);
+  }
+.demo-row:first-of-type { border-top: none; padding-top: 0; }
+.demo-row .label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    width: 70px;
+    flex-shrink: 0;
+  }
+.demo-row .controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+.ios-switch {
+    position: relative;
+    width: 51px;
+    height: 31px;
+    background: var(--ios-gray);
+    border-radius: 31px;
+    cursor: pointer;
+  }
+.ios-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 27px;
+    height: 27px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow:
+      0 3px 8px rgba(0, 0, 0, 0.15),
+      0 1px 1px rgba(0, 0, 0, 0.06);
+  }
+.ios-switch.on { background: var(--ios-green); }
+.ios-switch.on::after { transform: translateX(20px); }
+.md-switch {
+    position: relative;
+    width: 52px;
+    height: 32px;
+    background: var(--md-surface-variant);
+    border: 2px solid var(--md-outline);
+    border-radius: 32px;
+    cursor: pointer;
+  }
+.md-switch::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 6px;
+    width: 16px;
+    height: 16px;
+    background: var(--md-outline);
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+.md-switch.on {
+    background: var(--md-primary);
+    border-color: var(--md-primary);
+  }
+.md-switch.on::after {
+    width: 24px;
+    height: 24px;
+    left: 22px;
+    background: var(--md-on-primary);
+  }
+.checkbox {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--md-outline);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+.checkbox.on {
+    background: var(--md-primary);
+    border-color: var(--md-primary);
+  }
+.checkbox svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+.checkbox svg path {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 24;
+    stroke-dashoffset: 24;
+  }
+.checkbox.on svg path { stroke-dashoffset: 0; }
+.ios-check {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid #c7c7cc;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+.ios-check.on {
+    background: var(--ios-blue);
+    border-color: var(--ios-blue);
+  }
+.ios-check svg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+.ios-check svg path {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 18;
+    stroke-dashoffset: 18;
+  }
+.ios-check.on svg path { stroke-dashoffset: 0; }
+.radio-group {
+    display: flex;
+    gap: 16px;
+  }
+.radio {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--md-outline);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+.radio::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 12px;
+    height: 12px;
+    background: var(--md-primary);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+  }
+.radio.on { border-color: var(--md-primary); }
+.radio.on::after { transform: translate(-50%, -50%) scale(1); }
+.ios-radio {
+    position: relative;
+    width: 24px; height: 24px;
+    cursor: pointer;
+  }
+.ios-radio svg {
+    width: 100%; height: 100%;
+    overflow: visible;
+  }
+.ios-radio svg path {
+    fill: none;
+    stroke: var(--ios-blue);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 20;
+    stroke-dashoffset: 20;
+  }
+.ios-radio.on svg path { stroke-dashoffset: 0; }
+.btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+.btn {
+    position: relative;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 12px;
+    background: var(--ios-blue);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    overflow: hidden;
+  }
+.btn-md {
+    background: var(--md-primary);
+    border-radius: 100px;
+    padding: 10px 24px;
+  }
+.ripple-container {
+    position: relative;
+    overflow: hidden;
+  }
+.btn-loading {
+    pointer-events: none;
+  }
+.btn-loading .btn-text { opacity: 0; }
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+  }
+.input-field {
+    position: relative;
+    width: 100%;
+    max-width: 280px;
+  }
+.input-field input {
+    width: 100%;
+    padding: 18px 14px 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--border);
+    outline: none;
+    color: var(--text);
+  }
+.input-field label {
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    transform: translateY(-50%);
+    font-size: 15px;
+    color: var(--text-2);
+    pointer-events: none;
+  }
+.input-ios {
+    position: relative;
+    width: 100%;
+    max-width: 280px;
+  }
+.input-ios input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    color: var(--text);
+  }
+.input-ios.error input {
+    border-color: var(--ios-red);
+  }
+.err-btn {
+    margin-top: 10px;
+    background: transparent;
+    color: var(--ios-red);
+    border: 1px solid var(--ios-red);
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+.tabs {
+    position: relative;
+    display: flex;
+    gap: 4px;
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    width: 100%;
+  }
+.tab {
+    flex: 1;
+    padding: 12px 16px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    position: relative;
+    z-index: 1;
+  }
+.tab.active { color: var(--md-primary); font-weight: 600; }
+.tab-indicator {
+    position: absolute;
+    bottom: 0;
+    height: 3px;
+    background: var(--md-primary);
+    border-radius: 3px 3px 0 0;
+  }
+.pill-tabs {
+    position: relative;
+    display: inline-flex;
+    background: var(--ios-gray);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 0;
+  }
+.pill-tab {
+    position: relative;
+    z-index: 1;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+  }
+.pill-indicator {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+.badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
+  }
+.badge.ios { background: rgba(0, 122, 255, 0.12); color: var(--ios-blue); }
+.badge.md { background: rgba(103, 80, 164, 0.12); color: var(--md-primary); }
+.section-divider {
+    margin: 80px 0 40px;
+    text-align: center;
+    position: relative;
+  }
+.section-divider::before,
+  .section-divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 30%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+  }
+.section-divider::before { left: 0; }
+.section-divider::after { right: 0; }
+.section-divider .section-title {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ff3b30, #ff9500);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin: 0 0 6px;
+  }
+.section-divider .section-sub {
+    font-size: 13px;
+    color: var(--text-2);
+  }
+.section-divider.loading-divider .section-title {
+    background: linear-gradient(135deg, #007aff, #5ac8fa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+.ios-spinner {
+    width: 28px; height: 28px;
+    position: relative;
+  }
+.ios-spinner span {
+    position: absolute;
+    top: 0; left: 50%;
+    width: 2.4px; height: 8px;
+    background: var(--text-2);
+    border-radius: 2px;
+    transform-origin: 50% 14px;
+  }
+.ios-spinner span:nth-child(1) { transform: translateX(-50%) rotate(0deg); }
+.ios-spinner span:nth-child(2) { transform: translateX(-50%) rotate(45deg); }
+.ios-spinner span:nth-child(3) { transform: translateX(-50%) rotate(90deg); }
+.ios-spinner span:nth-child(4) { transform: translateX(-50%) rotate(135deg); }
+.ios-spinner span:nth-child(5) { transform: translateX(-50%) rotate(180deg); }
+.ios-spinner span:nth-child(6) { transform: translateX(-50%) rotate(225deg); }
+.ios-spinner span:nth-child(7) { transform: translateX(-50%) rotate(270deg); }
+.ios-spinner span:nth-child(8) { transform: translateX(-50%) rotate(315deg); }
+.ios-spinner.large { width: 40px; height: 40px; }
+.ios-spinner.large span { transform-origin: 50% 20px; height: 11px; width: 3px; }
+.ios-spinner.blue span { background: var(--ios-blue); }
+.md-spinner {
+    width: 36px; height: 36px;
+  }
+.md-spinner circle {
+    fill: none;
+    stroke: var(--md-primary);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 90 200;
+    stroke-dashoffset: 0;
+  }
+.md-pull-circle {
+    position: absolute;
+    top: 14px; left: 50%;
+    transform: translate(-50%, -50px);
+    width: 36px; height: 36px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2;
+  }
+.md-pull-circle.show { transform: translate(-50%, 12px); }
+.md-pull-circle .md-spinner { width: 22px; height: 22px; }
+.loader-stage .loader-tile.dark .ios-spinner span { background: rgba(255,255,255,0.85); }
+.section-divider.onboarding-divider .section-title {
+    background: linear-gradient(135deg, #34c759, #5ac8fa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+.badge-stage {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 8px 0;
+  }
+.badge-icon {
+    position: relative;
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text);
+  }
+.badge-icon svg { width: 24px; height: 24px; }
+.badge-num {
+    position: absolute;
+    top: -4px; right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--ios-red);
+    color: #fff;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 2px var(--surface);
+    transform: scale(0);
+    font-variant-numeric: tabular-nums;
+  }
+.badge-num.show { transform: scale(1); }
+.badge-num.bumping {
+  }
+.badge-dot {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 8px; height: 8px;
+    background: var(--ios-red);
+    border-radius: 50%;
+    transform: scale(0);
+  }
+.badge-dot.show {
+    transform: scale(1);
+  }
+.badge-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+.badge-actions button {
+    padding: 5px 12px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+.section-divider.scroll-divider .section-title {
+    background: linear-gradient(135deg, #ff9500, #ff3b30);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+.section-divider.gesture-divider .section-title {
+    background: linear-gradient(135deg, #af52de, #ff2d55);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+.section-divider.system-divider .section-title {
+    background: linear-gradient(135deg, #1d1d1f, #5856d6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+.cc-tile.active {
+    background: rgba(255,255,255,0.95);
+    color: var(--ios-blue);
+  }
+.z1-section .section-title {
+    text-align: center;
+    margin-bottom: 8px;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    background: linear-gradient(135deg, #1d1d1f, #e50914);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+.z1-section .section-sub {
+    text-align: center;
+    margin: 0 0 36px;
+    color: var(--text-2);
+    font-size: 14px;
+  }
+.nf-poster-cats span.active {
+    color: #fff;
+    border-bottom: 2px solid #e50914;
+    padding-bottom: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <h1>状态变化动效画廊（精简版）</h1>
+      <p>从产品同事提供的完整画廊中抽出"状态变化模块"6 张卡片</p>
+    </header>
+    <div class="section-divider" style="margin-top:0; margin-bottom:40px;">
+      <h2 class="section-title" style="background:linear-gradient(135deg,#1d1d1f,#6750a4); -webkit-background-clip:text; background-clip:text; color:transparent;">状态变化模块 · State Change</h2>
+      <p class="section-sub">组件在不同状态间的过渡 — Toggle / Checkbox / Radio / Button / Input / Tabs</p>
+    </div>
+
+    <div class="grid">
+
+      <!-- ============ 1. Toggle ============ -->
+      <div class="card">
+        <h2>1. 开关 Toggle</h2>
+        <p class="desc">滑块位移 + 颜色过渡，按压时滑块横向拉伸增强弹性感。</p>
+
+        <div class="demo-row">
+          <span class="label">iOS</span>
+          <div class="controls">
+            <div class="ios-switch" data-toggle></div>
+            <div class="ios-switch on" data-toggle></div>
+            <span class="badge ios">Spring 0.35s</span>
+          </div>
+        </div>
+        <div class="demo-row">
+          <span class="label">M3</span>
+          <div class="controls">
+            <div class="md-switch" data-toggle></div>
+            <div class="md-switch on" data-toggle></div>
+            <span class="badge md">Emphasized 0.3s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 2. Checkbox ============ -->
+      <div class="card">
+        <h2>2. 复选框 Checkbox</h2>
+        <p class="desc">勾选路径使用 stroke-dashoffset 绘制，背景同步填充。</p>
+
+        <div class="demo-row">
+          <span class="label">iOS</span>
+          <div class="controls">
+            <div class="ios-check" data-toggle>
+              <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg>
+            </div>
+            <div class="ios-check on" data-toggle>
+              <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg>
+            </div>
+            <span class="badge ios">圆形 / 蓝</span>
+          </div>
+        </div>
+        <div class="demo-row">
+          <span class="label">M3</span>
+          <div class="controls">
+            <div class="checkbox" data-toggle>
+              <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg>
+            </div>
+            <div class="checkbox on" data-toggle>
+              <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" /></svg>
+            </div>
+            <span class="badge md">方形 / 紫</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 3. Radio ============ -->
+      <div class="card">
+        <h2>3. 单选 Radio</h2>
+        <p class="desc">中心圆点 Spring 缩放入场，传递选中的"落地感"。</p>
+
+        <div class="demo-row">
+          <span class="label">M3</span>
+          <div class="controls radio-group" data-radio-group>
+            <div class="radio on" data-radio></div>
+            <div class="radio" data-radio></div>
+            <div class="radio" data-radio></div>
+            <span class="badge md">Spring 0.35s</span>
+          </div>
+        </div>
+        <div class="demo-row">
+          <span class="label">iOS</span>
+          <div class="controls radio-group" data-radio-group>
+            <div class="ios-radio on" data-radio>
+              <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" /></svg>
+            </div>
+            <div class="ios-radio" data-radio>
+              <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" /></svg>
+            </div>
+            <div class="ios-radio" data-radio>
+              <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7" /></svg>
+            </div>
+            <span class="badge ios">勾选样式</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 4. Button States ============ -->
+      <div class="card">
+        <h2>4. 按钮状态</h2>
+        <p class="desc">Default → Hover → Pressed → Loading → Disabled。</p>
+
+        <div class="demo-row">
+          <span class="label">iOS</span>
+          <div class="controls btn-row">
+            <button class="btn">Default</button>
+            <button class="btn btn-loading"><span class="btn-text">Loading</span></button>
+            <button class="btn disabled">Disabled</button>
+          </div>
+        </div>
+        <div class="demo-row">
+          <span class="label">M3</span>
+          <div class="controls btn-row">
+            <button class="btn btn-md ripple-container" data-ripple>Ripple</button>
+            <button class="btn btn-md ripple-container" data-ripple>Click Me</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 5. Input ============ -->
+      <div class="card">
+        <h2>5. 输入框 Focus</h2>
+        <p class="desc">Material 浮动 Label · iOS 边框扩展 + 抖动错误反馈。</p>
+
+        <div class="demo-row">
+          <span class="label">M3</span>
+          <div class="controls">
+            <div class="input-field">
+              <input type="text" placeholder=" " />
+              <label>邮箱地址</label>
+            </div>
+          </div>
+        </div>
+        <div class="demo-row">
+          <span class="label">iOS</span>
+          <div class="controls" style="flex-direction:column; align-items:flex-start;">
+            <div class="input-ios" id="iosInput">
+              <input type="password" placeholder="请输入密码" />
+            </div>
+            <button class="btn err-btn" id="triggerErr">触发错误抖动</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 6. Tabs ============ -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <h2>6. 标签页切换 Tabs</h2>
+        <p class="desc">指示器在 Tab 之间用 Emphasized 缓动滑动；iOS Pill 用 Spring 弹性。</p>
+
+        <div class="demo-row">
+          <span class="label">M3</span>
+          <div class="controls" style="flex:1; max-width:520px;">
+            <div class="tabs" id="mdTabs" style="width:100%;">
+              <button class="tab active">Photos</button>
+              <button class="tab">Videos</button>
+              <button class="tab">Albums</button>
+              <button class="tab">Shared</button>
+              <span class="tab-indicator"></span>
+            </div>
+          </div>
+        </div>
+        <div class="demo-row">
+          <span class="label">iOS</span>
+          <div class="controls">
+            <div class="pill-tabs" id="iosPills">
+              <button class="pill-tab active">日</button>
+              <button class="pill-tab">周</button>
+              <button class="pill-tab">月</button>
+              <button class="pill-tab">年</button>
+              <span class="pill-indicator"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- /grid (状态变化模块结束) -->
+  </div>
+
+
+</body>
+</html>

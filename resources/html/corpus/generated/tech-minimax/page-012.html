@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>Ardot技术架构与差异化优势</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; background-color: #DFDDDA; font-family: 'Plus Jakarta Sans', sans-serif; color: #111111; box-sizing: border-box; }
+  .bg-noise { background-color: #DFDDDA; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); }
+  .hairline { position: absolute; background-color: rgba(17,17,17,0.2); }
+  .meta-text { font-size: 14px; font-weight: 400; color: rgba(17,17,17,0.6); }
+  .top-label { font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(17,17,17,0.5); }
+  .section-title { font-size: 48px; font-weight: 600; letter-spacing: -0.01em; color: #111111; line-height: 1.1; }
+  .heading-xl { font-size: 88px; font-weight: 600; letter-spacing: -0.025em; color: #111111; line-height: 1.05; }
+  .body-text { font-size: 14px; font-weight: 400; color: #111111; line-height: 1.6; }
+  .sub-label { font-size: 13px; font-weight: 500; color: rgba(17,17,17,0.7); }
+  .card { background-color: rgba(17,17,17,0.04); border: 1px solid rgba(17,17,17,0.15); padding: 28px; }
+  .highlight-box { background-color: rgba(17,17,17,0.06); border: 1px solid rgba(17,17,17,0.2); padding: 20px 28px; }
+  .vline { position: absolute; background-color: rgba(17,17,17,0.2); width: 1px; }
+  .hl { position: absolute; left: 48px; right: 48px; height: 1px; background-color: rgba(17,17,17,0.2); }
+  .circle-deco { border: 1px solid rgba(17,17,17,0.25); border-radius: 50%; position: absolute; }
+  .arrow-icon { stroke: rgba(17,17,17,0.4); stroke-width: 1.5; fill: none; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="slide bg-noise">
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+  <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.5)" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+  <span class="meta-text">Salford & Co.</span>
+</div>
+<div class="absolute top-[40px] right-[48px]">
+  <span class="meta-text">May 2026</span>
+</div>
+  <div class="hl" style="top:0px;"></div>
+  <div class="absolute top-[90px] left-[48px]"><span class="top-label">TECH ARCHITECTURE</span></div>
+  <div class="absolute" style="top:120px;left:48px;"><h2 class="section-title" style="margin:0;">Ardot技术架构与差异化优势</h2></div>
+  <div class="hl" style="top:200px;"></div>
+  <div class="highlight-box" style="position:absolute;top:220px;left:48px;width:560px;height:60px;display:flex;align-items:center;">
+    <div style="font-size:13px;font-weight:600;color:#111111;">资产化思维 — 不是「生成图片」，而是「生成资产」</div>
+  </div>
+  <div class="card" style="position:absolute;top:310px;left:48px;width:260px;height:90px;padding:20px;">
+      <div style="font-size:13px;font-weight:600;color:#111111;margin-bottom:6px;">腾讯混元大模型</div>
+      <div class="body-text" style="font-size:12px;color:rgba(17,17,17,0.6);">自然语言理解与生成能力</div>
+    </div><div class="card" style="position:absolute;top:310px;left:328px;width:260px;height:90px;padding:20px;">
+      <div style="font-size:13px;font-weight:600;color:#111111;margin-bottom:6px;">优图视觉算法</div>
+      <div class="body-text" style="font-size:12px;color:rgba(17,17,17,0.6);">图像识别、分层与转换</div>
+    </div><div class="card" style="position:absolute;top:420px;left:48px;width:260px;height:90px;padding:20px;">
+      <div style="font-size:13px;font-weight:600;color:#111111;margin-bottom:6px;">WorkBuddy/CodeBuddy</div>
+      <div class="body-text" style="font-size:12px;color:rgba(17,17,17,0.6);">与开发工具链无缝衔接</div>
+    </div><div class="card" style="position:absolute;top:420px;left:328px;width:260px;height:90px;padding:20px;">
+      <div style="font-size:13px;font-weight:600;color:#111111;margin-bottom:6px;">MCP协议</div>
+      <div class="body-text" style="font-size:12px;color:rgba(17,17,17,0.6);">实现设计与代码的无缝连接</div>
+    </div>
+  <div style="position:absolute;top:220px;left:660px;width:570px;">
+    <div class="card" style="height:320px;padding:24px;">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(17,17,17,0.4);margin-bottom:16px;">核心差异化对比</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(17,17,17,0.15);">
+            <th style="text-align:left;padding:8px 0;color:rgba(17,17,17,0.5);font-weight:500;">维度</th>
+            <th style="text-align:left;padding:8px 12px;color:rgba(17,17,17,0.5);font-weight:500;">传统AI工具</th>
+            <th style="text-align:left;padding:8px 0;color:#111111;font-weight:600;">Ardot</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid rgba(17,17,17,0.08);">
+            <td style="padding:10px 0;font-weight:500;">输出类型</td>
+            <td style="padding:10px 12px;color:rgba(17,17,17,0.55);">静态图片</td>
+            <td style="padding:10px 0;font-weight:600;color:#111111;">可编辑结构化设计资产</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(17,17,17,0.08);">
+            <td style="padding:10px 0;font-weight:500;">图层结构</td>
+            <td style="padding:10px 12px;color:rgba(17,17,17,0.55);">无/扁平化</td>
+            <td style="padding:10px 0;font-weight:600;color:#111111;">保留完整图层与组件属性</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(17,17,17,0.08);">
+            <td style="padding:10px 0;font-weight:500;">团队协作</td>
+            <td style="padding:10px 12px;color:rgba(17,17,17,0.55);">有限</td>
+            <td style="padding:10px 0;font-weight:600;color:#111111;">企业级权限+行为追溯</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;font-weight:500;">开发交付</td>
+            <td style="padding:10px 12px;color:rgba(17,17,17,0.55);">需手动标注切图</td>
+            <td style="padding:10px 0;font-weight:600;color:#111111;">MCP一键转代码</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="hl" style="bottom:0px;"></div>
+</div>
+</body></html>

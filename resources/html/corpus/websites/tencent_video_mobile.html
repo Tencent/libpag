@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>腾讯视频</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      background: #f3f4f6;
+    }
+    /* 隐藏滚动条 */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    /* 手机框样式 */
+    .phone-frame {
+      width: 390px;
+      height: 844px;
+      background: #fff;
+      border-radius: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // 状态栏
+    const StatusBar = () => (
+      <div className="flex justify-between items-center px-6 py-2 text-xs font-semibold text-black bg-white">
+        <span>9:41</span>
+        <div className="flex items-center gap-1">
+          <svg className="w-4 h-3" viewBox="0 0 16 12" fill="currentColor">
+            <path d="M1 8h2v3H1zM5 6h2v5H5zM9 4h2v7H9zM13 1h2v10h-2z"/>
+          </svg>
+          <svg className="w-4 h-3" viewBox="0 0 16 12" fill="currentColor">
+            <path d="M8 3C5.5 3 3.2 3.9 1.5 5.5l1 1C3.9 5.2 5.9 4.5 8 4.5s4.1.7 5.5 2l1-1C12.8 3.9 10.5 3 8 3zm0 3c-1.7 0-3.2.6-4.4 1.7l1 1C5.6 7.9 6.7 7.5 8 7.5s2.4.4 3.4 1.2l1-1C11.2 6.6 9.7 6 8 6zm0 3c-.8 0-1.6.3-2.2.8l2.2 2.2 2.2-2.2c-.6-.5-1.4-.8-2.2-.8z"/>
+          </svg>
+          <div className="w-6 h-3 border border-black rounded-sm relative">
+            <div className="absolute inset-0.5 bg-black rounded-sm" style={{width: '80%'}}></div>
+          </div>
+        </div>
+      </div>
+    );
+
+    // 顶部导航
+    const TopNav = ({ activeTab, setActiveTab }) => {
+      const tabs = ['推荐', 'VIP', '电视剧', '综艺', '电影', '动漫', '少儿'];
+      return (
+        <div className="bg-white">
+          {/* 搜索栏 */}
+          <div className="flex items-center px-4 py-2 gap-3">
+            <div className="flex-1 flex items-center bg-gray-100 rounded-full px-4 py-2">
+              <svg className="w-4 h-4 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span className="text-sm text-gray-500">庆余年第二季</span>
+            </div>
+            <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </div>
+          {/* 频道导航 */}
+          <div className="flex overflow-x-auto no-scrollbar px-2">
+            {tabs.map((tab, idx) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(idx)}
+                className={`px-3 py-2 text-sm whitespace-nowrap relative ${
+                  activeTab === idx ? 'text-black font-bold' : 'text-gray-600'
+                }`}
+              >
+                {tab === 'VIP' ? <span className="text-yellow-600">VIP</span> : tab}
+                {activeTab === idx && (
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-orange-500 rounded"></div>
+                )}
+              </button>
+            ))}
+            <div className="px-2 py-2 flex items-center">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Banner 轮播
+    const Banner = () => (
+      <div className="px-4 pt-3">
+        <div className="relative rounded-xl overflow-hidden h-44 bg-gradient-to-br from-purple-700 via-pink-600 to-orange-500">
+          <div className="absolute inset-0 flex items-end p-4">
+            <div className="text-white">
+              <div className="inline-block bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded mb-2">VIP尊享</div>
+              <h2 className="text-xl font-bold drop-shadow">庆余年 第二季</h2>
+              <p className="text-xs opacity-90 mt-1">范闲重返京都 朝堂风云再起</p>
+            </div>
+          </div>
+          <div className="absolute top-3 right-3 bg-black/40 text-white text-xs px-2 py-1 rounded">1/5</div>
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            {[0,1,2,3,4].map(i => (
+              <div key={i} className={`h-1 rounded-full ${i === 0 ? 'w-4 bg-white' : 'w-1 bg-white/50'}`}></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+    // 功能图标区
+    const QuickIcons = () => {
+      const icons = [
+        { name: '会员', color: 'from-yellow-400 to-orange-500', icon: 'V' },
+        { name: '排行榜', color: 'from-red-400 to-pink-500', icon: '榜' },
+        { name: '热播', color: 'from-blue-400 to-cyan-500', icon: '热' },
+        { name: '免费', color: 'from-green-400 to-emerald-500', icon: '免' },
+        { name: '分类', color: 'from-purple-400 to-indigo-500', icon: '类' },
+      ];
+      return (
+        <div className="flex justify-around py-4 bg-white">
+          {icons.map(item => (
+            <div key={item.name} className="flex flex-col items-center gap-1">
+              <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${item.color} flex items-center justify-center text-white font-bold shadow-md`}>
+                {item.icon}
+              </div>
+              <span className="text-xs text-gray-700">{item.name}</span>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    // 视频卡片
+    const VideoCard = ({ title, subtitle, badge, gradient, score }) => (
+      <div className="flex-shrink-0 w-32">
+        <div className={`relative h-44 rounded-lg overflow-hidden bg-gradient-to-br ${gradient}`}>
+          {badge && (
+            <div className="absolute top-1 left-1 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded">
+              {badge}
+            </div>
+          )}
+          {score && (
+            <div className="absolute top-1 right-1 bg-black/60 text-yellow-400 text-[10px] font-bold px-1.5 py-0.5 rounded">
+              ★ {score}
+            </div>
+          )}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+            <div className="text-white text-[10px]">{subtitle}</div>
+          </div>
+        </div>
+        <div className="mt-1.5 text-sm font-medium text-gray-800 truncate">{title}</div>
+      </div>
+    );
+
+    // 横向视频列表
+    const VideoSection = ({ title, more = '更多', videos }) => (
+      <div className="bg-white mt-2 py-3">
+        <div className="flex justify-between items-center px-4 mb-2">
+          <h3 className="text-base font-bold text-gray-900">{title}</h3>
+          <button className="text-xs text-gray-500 flex items-center">
+            {more}
+            <svg className="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar px-4">
+          {videos.map((v, i) => <VideoCard key={i} {...v} />)}
+        </div>
+      </div>
+    );
+
+    // 单条横排卡片（每日推荐）
+    const FeatureCard = () => (
+      <div className="bg-white mt-2 p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-base font-bold text-gray-900">猜你喜欢</h3>
+          <span className="text-xs text-gray-500">换一批 ↻</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { title: '与凤行', sub: '更新至24集', g: 'from-pink-400 to-rose-600' },
+            { title: '繁花', sub: '全30集', g: 'from-amber-400 to-red-600' },
+            { title: '南来北往', sub: '全39集', g: 'from-emerald-400 to-teal-600' },
+            { title: '热辣滚烫', sub: '电影', g: 'from-orange-400 to-pink-600' },
+            { title: '飞驰人生2', sub: '电影', g: 'from-blue-400 to-indigo-600' },
+            { title: '第二十条', sub: '电影', g: 'from-violet-400 to-purple-600' },
+          ].map((it, i) => (
+            <div key={i}>
+              <div className={`relative h-32 rounded-lg overflow-hidden bg-gradient-to-br ${it.g}`}>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-1.5">
+                  <div className="text-white text-[10px]">{it.sub}</div>
+                </div>
+              </div>
+              <div className="mt-1 text-xs text-gray-800 truncate">{it.title}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+    // 底部 Tab Bar
+    const TabBar = ({ active, setActive }) => {
+      const tabs = [
+        { name: '首页', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+        { name: 'VIP', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+        { name: '小视频', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
+        { name: '我的', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+      ];
+      return (
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center py-2 pb-5">
+          {tabs.map((t, i) => (
+            <button key={t.name} onClick={() => setActive(i)} className="flex flex-col items-center gap-0.5">
+              <svg className={`w-6 h-6 ${active === i ? (t.name === 'VIP' ? 'text-yellow-500' : 'text-orange-500') : 'text-gray-400'}`}
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={t.icon} />
+              </svg>
+              <span className={`text-[10px] ${active === i ? (t.name === 'VIP' ? 'text-yellow-500' : 'text-orange-500') : 'text-gray-500'}`}>
+                {t.name}
+              </span>
+            </button>
+          ))}
+        </div>
+      );
+    };
+
+    // App 主组件
+    const App = () => {
+      const [activeTab, setActiveTab] = useState(0);
+      const [bottomTab, setBottomTab] = useState(0);
+
+      const hotDramas = [
+        { title: '庆余年2', subtitle: '更新至36集', badge: 'VIP', gradient: 'from-purple-500 via-pink-500 to-red-500' },
+        { title: '玫瑰的故事', subtitle: '全38集', badge: '热播', gradient: 'from-rose-400 to-fuchsia-600' },
+        { title: '墨雨云间', subtitle: '更新至40集', badge: 'VIP', gradient: 'from-indigo-500 to-purple-700' },
+        { title: '承欢记', subtitle: '全38集', gradient: 'from-amber-400 to-orange-600' },
+        { title: '城中之城', subtitle: '全40集', gradient: 'from-slate-500 to-gray-800' },
+      ];
+
+      const movies = [
+        { title: '热辣滚烫', subtitle: '电影', score: '7.7', gradient: 'from-orange-500 to-red-600' },
+        { title: '飞驰人生2', subtitle: '电影', score: '7.8', gradient: 'from-blue-500 to-indigo-700' },
+        { title: '第二十条', subtitle: '电影', score: '7.6', gradient: 'from-violet-500 to-purple-700' },
+        { title: '熊出没·逆转时空', subtitle: '动画电影', score: '6.8', gradient: 'from-cyan-400 to-blue-600' },
+        { title: '红毯先生', subtitle: '电影', score: '6.5', gradient: 'from-red-500 to-pink-700' },
+      ];
+
+      const variety = [
+        { title: '奔跑吧', subtitle: '第12季', badge: 'VIP', gradient: 'from-yellow-400 to-orange-500' },
+        { title: '王牌对王牌', subtitle: '综艺', gradient: 'from-pink-400 to-red-500' },
+        { title: '脱口秀大会', subtitle: '更新中', gradient: 'from-teal-400 to-cyan-600' },
+        { title: '密室大逃脱', subtitle: '第6季', gradient: 'from-gray-600 to-slate-900' },
+        { title: '向往的生活', subtitle: '第7季', gradient: 'from-green-400 to-emerald-600' },
+      ];
+
+      return (
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-200 to-gray-400">
+          <div className="phone-frame">
+            <div className="h-full overflow-y-auto no-scrollbar pb-20">
+              <StatusBar />
+              <TopNav activeTab={activeTab} setActiveTab={setActiveTab} />
+              <Banner />
+              <QuickIcons />
+              <VideoSection title="热播剧集" videos={hotDramas} />
+              <VideoSection title="精选电影" videos={movies} />
+              <VideoSection title="综艺热播" videos={variety} />
+              <FeatureCard />
+              <div className="text-center text-xs text-gray-400 py-4">— 我也是有底线的 —</div>
+            </div>
+            <TabBar active={bottomTab} setActive={setBottomTab} />
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

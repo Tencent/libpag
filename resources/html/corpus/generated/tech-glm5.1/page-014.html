@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>战略建议</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .card-border {
+      border: 1px solid rgba(17,17,17,0.2);
+    }
+    .arrow-bullet {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- 极细网格线装饰 -->
+    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(rgba(17,17,17,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,0.06) 1px, transparent 1px); background-size: 80px 80px;"></div>
+
+    <!-- 页眉线 -->
+    <div class="absolute top-0 left-0 w-full h-[2px]" style="background: rgba(17,17,17,0.2);"></div>
+
+    <!-- zone-1: 标题区 -->
+    <div class="absolute" style="top:30px; left:60px; width:1160px; height:60px;">
+      <h1 class="text-[56px] font-semibold" style="letter-spacing: -0.025em; line-height: 1.1;">战略建议</h1>
+      <p class="text-[20px] font-medium mt-1" style="color: rgba(17,17,17,0.6);">对产品团队与企业用户的行动指引</p>
+    </div>
+
+    <!-- 中间竖线分隔 -->
+    <div class="absolute" style="top:110px; left:640px; width:1px; height:530px; background: rgba(17,17,17,0.15);"></div>
+
+    <!-- zone-2: 左栏-产品团队建议 -->
+    <div class="absolute" style="top:110px; left:60px; width:560px; height:530px;">
+      <div class="flex items-center gap-2 mb-5">
+        <i class="ph ph-wrench text-[22px]"></i>
+        <h3 class="text-[20px] font-medium">对Ardot产品团队</h3>
+      </div>
+
+      <div class="space-y-5">
+        <!-- 建议1 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-plug text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">完善插件生态</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">加速完善插件生态，尽快开放插件API吸引第三方开发者</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 建议2 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-desktop text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">加快跨平台布局</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">Windows桌面版和小程序应尽快上线</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 建议3 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-swatch text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">强化设计系统能力</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">在组件变体、变量系统等方向持续投入</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 建议4 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-chat-circle-dots text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">深耕腾讯生态协同</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">充分利用与微信、企业微信、腾讯会议的集成能力</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-3: 右栏-企业用户建议 -->
+    <div class="absolute" style="top:110px; left:660px; width:560px; height:530px;">
+      <div class="flex items-center gap-2 mb-5">
+        <i class="ph ph-buildings text-[22px]"></i>
+        <h3 class="text-[20px] font-medium">对企业用户</h3>
+      </div>
+
+      <div class="space-y-5">
+        <!-- 建议1 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-lock-key text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">优先考虑国产工具</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">关注数据安全合规需求的企业可优先考虑国产工具</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 建议2 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-arrow-right text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">Figma零成本迁移</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">已使用Figma的团队可利用Ardot的Figma导入功能实现零成本迁移测试</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 建议3 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-code text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">关注MCP代码交付</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">重视AI能力的团队建议关注Ardot的MCP代码交付能力</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 建议4 -->
+        <div class="card-border bg-white/40 backdrop-blur-sm" style="border-radius:8px; padding:16px;">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center" style="background: rgba(17,17,17,0.08); border-radius:6px;">
+              <i class="ph ph-path text-[16px]"></i>
+            </div>
+            <div>
+              <p class="text-[14px] font-medium mb-1">渐进式迁移策略</p>
+              <p class="text-[13px] leading-[1.5]" style="color:rgba(17,17,17,0.6);">建议采用渐进式迁移策略，降低切换风险</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-4: 亮点条 -->
+    <div class="absolute" style="top:660px; left:60px; width:1160px; height:30px;">
+      <div class="flex items-center gap-3 px-5 py-2 card-border" style="border-radius:6px; background: rgba(17,17,17,0.04);">
+        <i class="ph ph-star text-[16px]"></i>
+        <span class="text-[14px] font-medium">产品侧建生态、跨平台；用户侧先试后迁、关注MCP</span>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-0 left-0 w-full flex justify-between items-center px-[60px]" style="height:30px;">
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">腾讯Ardot设计平台 - 分析与竞品分析报告</span>
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">14</span>
+    </div>
+
+    <!-- 几何圆环装饰 -->
+    <div class="absolute" style="top:20px; right:60px; width:40px; height:40px; border:1px solid #111111; border-radius:50%; opacity:0.15;"></div>
+    <div class="absolute" style="top:32px; right:72px; width:16px; height:16px; border:1px solid #111111; border-radius:50%; opacity:0.1;"></div>
+  </div>
+</body>
+</html>

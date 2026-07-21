@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ardot SWOT 与战略展望</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid -->
+    <div class="absolute left-[50%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-strategy text-[20px]"></i>
+      <span class="text-[14px]/[20px]">总结 · 战略展望</span>
+    </div>
+
+    <!-- Page Title -->
+    <div class="absolute top-[60px] left-[80px] z-[10]">
+      <h1 class="text-[56px] font-[600] leading-[1.2] tracking-[-0.01em]">Ardot SWOT 与战略展望</h1>
+      <div class="w-[80px] h-[2px] bg-[#111111] mt-[12px]"></div>
+    </div>
+
+    <!-- SWOT Grid: 2x2 -->
+    <!-- Strengths (top-left) -->
+    <div class="absolute top-[190px] left-[60px] w-[540px] z-[10]">
+      <div class="flex items-center gap-[8px] mb-[10px]">
+        <i class="ph ph-check-circle text-[16px]"></i>
+        <h3 class="text-[15px] font-[600]">优势 Strengths</h3>
+      </div>
+      <div class="space-y-[5px]">
+        <p class="text-[13px]/[20px] leading-[1.5]">AI生成可编辑设计稿（非静态图片）</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">MCP协议实现设计一键转代码</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">腾讯混元大模型+优图视觉算法</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">与CodeBuddy/WorkBuddy深度集成</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">企业级权限管理与行为追溯</p>
+      </div>
+    </div>
+
+    <!-- Weaknesses (top-right) -->
+    <div class="absolute top-[190px] left-[660px] w-[540px] z-[10]">
+      <div class="flex items-center gap-[8px] mb-[10px]">
+        <i class="ph ph-warning-circle text-[16px]"></i>
+        <h3 class="text-[15px] font-[600]">劣势 Weaknesses</h3>
+      </div>
+      <div class="space-y-[5px]">
+        <p class="text-[13px]/[20px] leading-[1.5]">品牌知名度低于Figma</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">插件生态尚在起步阶段</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">仅支持macOS和Web端</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">Windows版和小程序尚未上线</p>
+      </div>
+    </div>
+
+    <!-- Opportunities (bottom-left) -->
+    <div class="absolute top-[430px] left-[60px] w-[540px] z-[10]">
+      <div class="flex items-center gap-[8px] mb-[10px]">
+        <i class="ph ph-arrow-up-right text-[16px]"></i>
+        <h3 class="text-[15px] font-[600]">机会 Opportunities</h3>
+      </div>
+      <div class="space-y-[5px]">
+        <p class="text-[13px]/[20px] leading-[1.5]">国产替代政策驱动，国内企业寻求本土方案</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">AI设计工具市场高速增长（CAGR 22.25%）</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">Figma国内访问受限带来用户迁移需求</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">MCP协议成为行业标准，先发优势</p>
+      </div>
+    </div>
+
+    <!-- Threats (bottom-right) -->
+    <div class="absolute top-[430px] left-[660px] w-[540px] z-[10]">
+      <div class="flex items-center gap-[8px] mb-[10px]">
+        <i class="ph ph-arrow-down-right text-[16px]"></i>
+        <h3 class="text-[15px] font-[600]">威胁 Threats</h3>
+      </div>
+      <div class="space-y-[5px]">
+        <p class="text-[13px]/[20px] leading-[1.5]">Figma市场地位稳固，用户粘性强</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">MasterGo、即时设计等国产竞品已积累用户</p>
+        <p class="text-[13px]/[20px] leading-[1.5]">设计工具切换成本高，用户迁移难度大</p>
+      </div>
+    </div>
+
+    <!-- Outlook Banner -->
+    <div class="absolute bottom-[50px] left-[80px] right-[80px] z-[10]">
+      <div class="border-[1px] border-[#111111]/20 rounded-[8px] px-[24px] py-[14px]">
+        <p class="text-[14px]/[22px] leading-[1.6] text-center">展望：设计工具竞争将不再局限于"谁的功能更多"，而是"谁的AI更懂设计"、"谁的生态更完整"、"谁的流转更顺畅"。Ardot凭借腾讯技术积累，有望成为国产AI设计工具的重要引领者。</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

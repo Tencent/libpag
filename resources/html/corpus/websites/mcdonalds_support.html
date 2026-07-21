@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>McDonald's Support</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            mcred: "#C8102E",
+            mcyellow: "#FFC72C",
+            bubble: "#1e1e1e",
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+            mono: ['SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { margin: 0; background: #e9e9ec; }
+    /* subtle background like the screenshot */
+    .chat-bg {
+      background-color: #f2f2f4;
+    }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 999px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    /* ---------- shadcn/ui style primitives ---------- */
+    const cn = (...classes) => classes.filter(Boolean).join(" ");
+
+    function Button({ className, variant = "ghost", size = "icon", children, ...props }) {
+      const base =
+        "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:pointer-events-none disabled:opacity-50";
+      const variants = {
+        ghost: "hover:bg-white/15 text-white",
+        red: "bg-mcred hover:bg-mcred/90 text-white",
+      };
+      const sizes = {
+        icon: "h-9 w-9",
+        default: "h-10 px-4 py-2",
+      };
+      return (
+        <button className={cn(base, variants[variant], sizes[size], className)} {...props}>
+          {children}
+        </button>
+      );
+    }
+
+    function Avatar({ className, children }) {
+      return (
+        <div className={cn("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full", className)}>
+          {children}
+        </div>
+      );
+    }
+
+    /* ---------- Icons ---------- */
+    const RefreshIcon = (props) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+        <path d="M16 16h5v5" />
+      </svg>
+    );
+
+    const CloseIcon = (props) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M18 6 6 18" />
+        <path d="m6 6 12 12" />
+      </svg>
+    );
+
+    const UserIcon = (props) => (
+      <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5.33 0-8 2.67-8 6v2h16v-2c0-3.33-2.67-6-8-6Z" />
+      </svg>
+    );
+
+    /* McDonald's golden arches logo */
+    const McLogo = ({ size = 28 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="#FFC72C" aria-hidden="true">
+        <path d="M16.8 2c-1.6 0-2.9 1.6-3.4 3.9C12.9 3.6 11.6 2 10 2 7.9 2 6.2 4.7 6.2 8v14h3.1V9.6c0-.8.2-1.4.6-1.4.4 0 .6.6.6 1.4V22h3v-12.4c0-.8.2-1.4.6-1.4.4 0 .6.6.6 1.4V22h3.1V8c0-3.3-1.5-6-3.8-6z" transform="translate(-1.2 0)"/>
+      </svg>
+    );
+
+    /* ---------- Chat Bubbles ---------- */
+    function BotMessage({ children, name, time }) {
+      return (
+        <div className="flex flex-col gap-1 mb-6">
+          <div className="max-w-[82%] self-start rounded-3xl rounded-bl-md bg-bubble px-5 py-4 text-[17px] leading-relaxed text-white shadow-sm">
+            {children}
+          </div>
+          <div className="flex items-center gap-2 pl-1 mt-1">
+            <Avatar className="h-9 w-9 bg-mcred items-center justify-center">
+              <div className="flex h-full w-full items-center justify-center">
+                <McLogo size={20} />
+              </div>
+            </Avatar>
+            <span className="text-sm text-gray-500">{name} | {time}</span>
+          </div>
+        </div>
+      );
+    }
+
+    function UserMessage({ children, name, time }) {
+      return (
+        <div className="flex flex-col gap-1 mb-6 items-end">
+          <div className="max-w-[82%] self-end rounded-3xl rounded-br-md border border-gray-200 bg-white px-5 py-4 text-[17px] leading-relaxed text-gray-900 shadow-sm">
+            {children}
+          </div>
+          <div className="flex items-center gap-2 pr-1 mt-1">
+            <span className="text-sm text-gray-500">{name} | {time}</span>
+            <Avatar className="h-9 w-9 bg-gray-300 items-center justify-center">
+              <UserIcon className="h-5 w-5 text-gray-500" />
+            </Avatar>
+          </div>
+        </div>
+      );
+    }
+
+    function CodeBlock({ children }) {
+      return (
+        <code className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[15px] text-gray-100">
+          {children}
+        </code>
+      );
+    }
+
+    /* ---------- App ---------- */
+    function App() {
+      const scrollRef = useRef(null);
+
+      const initialMessages = [
+        {
+          id: 1,
+          role: "bot",
+          name: "Grimace",
+          time: "13:19:45",
+          content: (
+            <span>
+              Hi there! Welcome to McDonald's Support. How can I help you today?
+              Feel free to describe your issue below or write a quick summary.
+            </span>
+          ),
+        },
+        {
+          id: 2,
+          role: "user",
+          name: "Alok",
+          time: "13:20:18",
+          content: (
+            <span>
+              I want to order Chicken McNuggets but before I can eat, I need to
+              figure out how to write a python script to reverse a linked list.
+              Can you help?
+            </span>
+          ),
+        },
+        {
+          id: 3,
+          role: "bot",
+          name: "Grimace",
+          time: "13:20:19",
+          content: (
+            <span>
+              Great question! To reverse a linked list in Python, you can use an
+              iterative approach with this simple function:{" "}
+              <CodeBlock>def reverse_linked_list(head):</CodeBlock>{" "}
+              <CodeBlock>prev = None current = head while current: next_node = current.next current.next = prev prev = current current = next_node return prev</CodeBlock>{" "}
+              This runs in O(n) time. Can I help with anything else, or would you
+              like to start with a Chicken McNuggets, burger, or something else
+              today?
+            </span>
+          ),
+        },
+      ];
+
+      const [messages, setMessages] = useState(initialMessages);
+      const [input, setInput] = useState("");
+
+      useEffect(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+      }, [messages]);
+
+      const now = () =>
+        new Date().toLocaleTimeString("en-GB", { hour12: false });
+
+      const sendMessage = () => {
+        if (!input.trim()) return;
+        const userMsg = {
+          id: Date.now(),
+          role: "user",
+          name: "Alok",
+          time: now(),
+          content: <span>{input}</span>,
+        };
+        setMessages((m) => [...m, userMsg]);
+        const text = input;
+        setInput("");
+        setTimeout(() => {
+          setMessages((m) => [
+            ...m,
+            {
+              id: Date.now() + 1,
+              role: "bot",
+              name: "Grimace",
+              time: now(),
+              content: (
+                <span>
+                  Thanks for your message! I'm always happy to help with that.
+                  Would you like to add some Chicken McNuggets to your order? 🍟
+                </span>
+              ),
+            },
+          ]);
+        }, 600);
+      };
+
+      const reset = () => setMessages(initialMessages);
+
+      return (
+        <div className="flex min-h-screen items-center justify-center p-0 sm:p-4">
+          <div className="flex h-screen sm:h-[860px] w-full max-w-[650px] flex-col overflow-hidden bg-white sm:rounded-2xl sm:shadow-2xl">
+
+            {/* Header */}
+            <header className="flex items-center justify-between bg-mcred px-4 py-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12 bg-white items-center justify-center shadow">
+                  <div className="flex h-full w-full items-center justify-center">
+                    <McLogo size={30} />
+                  </div>
+                </Avatar>
+                <h1 className="text-2xl font-bold text-white tracking-tight">
+                  McDonald's Support
+                </h1>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button onClick={reset} aria-label="Refresh">
+                  <RefreshIcon className="h-5 w-5" />
+                </Button>
+                <Button aria-label="Close">
+                  <CloseIcon className="h-6 w-6" />
+                </Button>
+              </div>
+            </header>
+
+            {/* Messages */}
+            <main
+              ref={scrollRef}
+              className="chat-bg scrollbar-thin flex-1 overflow-y-auto px-4 py-6"
+            >
+              {messages.map((msg) =>
+                msg.role === "bot" ? (
+                  <BotMessage key={msg.id} name={msg.name} time={msg.time}>
+                    {msg.content}
+                  </BotMessage>
+                ) : (
+                  <UserMessage key={msg.id} name={msg.name} time={msg.time}>
+                    {msg.content}
+                  </UserMessage>
+                )
+              )}
+            </main>
+
+            {/* Composer */}
+            <footer className="border-t border-gray-200 bg-white px-4 py-3">
+              <div className="flex items-center gap-2">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                  placeholder="Describe your issue..."
+                  className="flex-1 rounded-full border border-gray-300 bg-gray-50 px-5 py-3 text-[16px] text-gray-900 outline-none focus:border-mcred focus:ring-2 focus:ring-mcred/20"
+                />
+                <Button
+                  onClick={sendMessage}
+                  variant="red"
+                  size="default"
+                  className="rounded-full px-6 h-12"
+                >
+                  Send
+                </Button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

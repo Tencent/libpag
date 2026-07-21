@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <!-- 背景水印 -->
+    <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="top: 80px; left: -50px;">STRATEGY</div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-[32px] right-[48px] z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+    </div>
+
+    <!-- 标题区域 -->
+    <div class="absolute z-20" style="top: 40px; left: 0; width: 1280px; height: 70px;">
+      <div class="flex flex-col items-center justify-center h-full gap-[8px]">
+        <div class="text-[16px] font-[300] text-[#FFFFFF]/60 tracking-[0.1em] uppercase">Strategic Differentiation</div>
+        <h1 class="text-[36px] font-[300] text-[#FFFFFF] leading-[1.1]">为什么是战略级差异化</h1>
+      </div>
+    </div>
+
+    <!-- 卡片网格 (Z-CARDS: x=64, y=140, w=1152, h=500) -->
+    <div class="absolute z-20" style="top: 140px; left: 64px; width: 1152px; height: 500px;">
+      <div class="grid grid-cols-2 gap-[24px] h-full">
+
+        <!-- 卡片1: 产生不可替代的粘性 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[28px] border-[1px] border-[#FFFFFF]/10 flex flex-col">
+          <div class="flex items-center gap-[12px] mb-[16px]">
+            <div class="w-[40px] h-[40px] rounded-full bg-[#82D0A4]/20 flex items-center justify-center">
+              <i class="ph ph-handshake text-[20px] text-[#82D0A4]"></i>
+            </div>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">产生不可替代的粘性</h3>
+          </div>
+          <div class="text-[14px] text-[#FFFFFF]/60 leading-[1.8] flex-1">
+            养了三个月的龙虾，积累了你所有的偏好、记忆、工作流，<span class="text-[#82D0A4]">你舍不得换</span>。这是比功能更强大的留存机制。
+          </div>
+          <div class="mt-[16px] bg-[#051014]/40 rounded-[8px] p-[12px] border-[1px] border-[#FFFFFF]/5">
+            <div class="text-[12px] text-[#FFFFFF]/40">类比</div>
+            <div class="text-[12px] text-[#FFFFFF]/50 mt-[4px]">你可以随时换一部手机，但你不会轻易换掉养了三年的宠物</div>
+          </div>
+        </div>
+
+        <!-- 卡片2: 天然的网络效应 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[28px] border-[1px] border-[#FFFFFF]/10 flex flex-col">
+          <div class="flex items-center gap-[12px] mb-[16px]">
+            <div class="w-[40px] h-[40px] rounded-full bg-[#82D0A4]/20 flex items-center justify-center">
+              <i class="ph ph-share-network text-[20px] text-[#82D0A4]"></i>
+            </div>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">天然的网络效应</h3>
+          </div>
+          <div class="text-[14px] text-[#FFFFFF]/60 leading-[1.8] flex-1">
+            每个人养出来的龙虾都不一样，用户会<span class="text-[#82D0A4]">分享自己的养成成果</span>。Skills 可以被社区创建和分享，形成生态飞轮。
+          </div>
+          <div class="mt-[16px] bg-[#051014]/40 rounded-[8px] p-[12px] border-[1px] border-[#FFFFFF]/5">
+            <div class="text-[12px] text-[#FFFFFF]/40">社交话题</div>
+            <div class="text-[12px] text-[#FFFFFF]/50 mt-[4px]">你的龙虾会什么技能成为社交话题</div>
+          </div>
+        </div>
+
+        <!-- 卡片3: 数据飞轮 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[28px] border-[1px] border-[#FFFFFF]/10 flex flex-col">
+          <div class="flex items-center gap-[12px] mb-[16px]">
+            <div class="w-[40px] h-[40px] rounded-full bg-[#82D0A4]/20 flex items-center justify-center">
+              <i class="ph ph-database text-[20px] text-[#82D0A4]"></i>
+            </div>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">数据飞轮</h3>
+          </div>
+          <div class="flex-1 flex items-center justify-center">
+            <div class="text-center">
+              <div class="text-[13px] text-[#FFFFFF]/50] leading-[2]">
+                <span class="text-[#82D0A4]">用户使用</span>
+                <i class="ph ph-arrow-right text-[#FFFFFF]/30 mx-[8px]"></i>
+                <span class="text-[#FFFFFF]/60">产生偏好数据</span>
+              </div>
+              <div class="text-[13px] text-[#FFFFFF]/50] leading-[2]">
+                <i class="ph ph-arrow-right text-[#FFFFFF]/30 mx-[8px]"></i>
+                <span class="text-[#82D0A4]">龙虾更懂你</span>
+              </div>
+              <div class="text-[13px] text-[#FFFFFF]/50] leading-[2]">
+                <i class="ph ph-arrow-right text-[#FFFFFF]/30 mx-[8px]"></i>
+                <span class="text-[#FFFFFF]/60">体验更好</span>
+              </div>
+              <div class="text-[13px] text-[#FFFFFF]/50] leading-[2]">
+                <i class="ph ph-arrow-right text-[#FFFFFF]/30 mx-[8px]"></i>
+                <span class="text-[#82D0A4]">用得更多</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片4: 与IMA知识库形成闭环 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[28px] border-[1px] border-[#82D0A4]/20 flex flex-col">
+          <div class="flex items-center gap-[12px] mb-[16px]">
+            <div class="w-[40px] h-[40px] rounded-full bg-[#82D0A4]/20 flex items-center justify-center">
+              <i class="ph ph-infinity text-[20px] text-[#82D0A4]"></i>
+            </div>
+            <h3 class="text-[18px] font-[400] text-[#FFFFFF]">与 IMA 知识库形成闭环</h3>
+            <span class="text-[10px] text-[#82D0A4] bg-[#82D0A4]/10 px-[6px] py-[2px] rounded">IMA 独有</span>
+          </div>
+          <div class="text-[14px] text-[#FFFFFF]/60 leading-[1.8] flex-1">
+            IMA 知识库<span class="text-[#82D0A4]">（记）</span> + 龙虾 Agent<span class="text-[#82D0A4]">（找 + 用）</span> = <span class="text-[#82D0A4]">完整的第二大脑</span>
+          </div>
+          <div class="mt-[12px] space-y-[6px]">
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-check text-[#82D0A4] mt-[2px]"></i>
+              <span class="text-[12px] text-[#FFFFFF]/50">记：IMA 帮你收集、整理、存储知识</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-check text-[#82D0A4] mt-[2px]"></i>
+              <span class="text-[12px] text-[#FFFFFF]/50">找：龙虾帮你从知识库中检索需要的信息</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-check text-[#82D0A4] mt-[2px]"></i>
+              <span class="text-[12px] text-[#FFFFFF]/50">用：龙虾基于你的知识库自动完成创作任务</span>
+            </div>
+          </div>
+          <div class="mt-[12px] bg-[#82D0A4]/5 rounded-[8px] p-[10px] border-[1px] border-[#82D0A4]/10">
+            <div class="text-[11px] text-[#FFFFFF]/40 text-center">OpenClaw 没有知识库，WorkBuddy 没有养成系人格。<span class="text-[#82D0A4]">只有 IMA 能把这三者打通。</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+      <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+    </div>
+  </div>
+</body>
+</html>
