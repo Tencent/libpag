@@ -421,6 +421,16 @@ class LayerBuilderContext {
     for (auto* element : oldElements) {
       untrackElementColorSource(element);
     }
+    // Clear old TextHolder entries for surviving Text elements before convertText rebuilds them.
+    // convertText's setTarget destroys the old TextRuntimeTarget for the node, but the old
+    // TextHolder still references it via entry.target; wireTextRuntime then appends a fresh holder
+    // without removing the stale one. Removing the binding now erases the old target and prunes the
+    // holder entry, so no dangling entry.target survives into flushTextHolders (use-after-free).
+    for (auto* element : oldElements) {
+      if (element->nodeType() == NodeType::Text) {
+        _result.binding.remove(element);
+      }
+    }
     if (node->composition == nullptr && layer->type() == tgfx::LayerType::Vector) {
       auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
       std::vector<std::shared_ptr<tgfx::VectorElement>> contents = {};
