@@ -293,9 +293,10 @@ struct HTMLBoxAttributes {
   std::string maskSize = {};
   std::string maskPosition = {};
 
-  // CSS `clip-path: url(#id)` reference (raw, including the `url(...)` wrapper and any quotes).
-  // The importer resolves the referenced hidden `<clipPath>` def into a contour mask layer (the
-  // inverse of `HTMLWriter::writeClipDef`). Empty means "no clip-path authored".
+  // CSS `clip-path` value, kept raw. Either a `url(#id)` reference to a hidden `<clipPath>` def
+  // (including the `url(...)` wrapper and any quotes) or a CSS basic shape (`polygon()` / `path()`
+  // / `circle()` / `ellipse()` / `inset()`). The importer rebuilds both into a contour mask layer
+  // (the `url` form is the inverse of `HTMLWriter::writeClipDef`). Empty means "no clip-path".
   std::string clipPathRef = {};
 
   float opacity = 1.0f;

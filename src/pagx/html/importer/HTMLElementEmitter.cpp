@@ -243,6 +243,223 @@ void ResolveBackgroundRepeat(const std::string& repeat, TileMode& outX, TileMode
   }
 }
 
+// Reads a DOM element attribute by (case-insensitive) name, or empty when absent. `name` must be
+// supplied lowercased. Inline SVG attribute names keep their authored casing (`clipPathUnits`), so
+// the comparison lowercases the stored name before matching.
+std::string GetDomAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name) {
+  if (node == nullptr) return {};
+  for (const auto& attr : node->attributes) {
+    if (ToLower(attr.name) == name) return attr.value;
+  }
+  return {};
+}
+
+// Resolves a CSS `<length-percentage>` clip coordinate against `axis` (the box width or height in
+// px). Percentages resolve against the axis; unitless (only `0` is valid unitless in CSS, but any
+// number is accepted leniently) and `px` lengths are taken verbatim. Returns NaN for anything else
+// (calc(), unsupported units) so the caller can drop the clip-path with a diagnostic.
+float ResolveClipCoord(const std::string& token, float axis) {
+  std::string t = Trim(token);
+  if (t.empty()) return NAN;
+  float fraction = 0;
+  if (ParseCssPercentage(t, fraction)) return fraction * axis;
+  const char* c = t.c_str();
+  char* end = nullptr;
+  float num = std::strtof(c, &end);
+  if (end == c) return NAN;
+  std::string suffix = ToLower(Trim(std::string(end)));
+  if (suffix.empty() || suffix == "px") return num;
+  return NAN;
+}
+
+// Resolves the horizontal (`horizontal=true`) or vertical component of a clip-shape position token
+// (`left/right/top/bottom/center` keyword or a `<length-percentage>`) into a pixel coordinate in
+// the masked box's local space.
+float ResolveClipPositionAxis(const std::string& token, float axis, bool horizontal) {
+  std::string t = ToLower(Trim(token));
+  if (t == "center") return axis / 2.0f;
+  if (horizontal) {
+    if (t == "left") return 0.0f;
+    if (t == "right") return axis;
+  } else {
+    if (t == "top") return 0.0f;
+    if (t == "bottom") return axis;
+  }
+  return ResolveClipCoord(token, axis);
+}
+
+// Splits `fn(args)` into a lowercased function name and the raw argument string between the
+// outermost parentheses. Returns false when `value` is not a function form.
+bool SplitCssFunction(const std::string& value, std::string& outName, std::string& outArgs) {
+  std::string t = Trim(value);
+  auto open = t.find('(');
+  auto close = t.rfind(')');
+  if (open == std::string::npos || close == std::string::npos || close <= open) return false;
+  outName = ToLower(Trim(t.substr(0, open)));
+  outArgs = Trim(t.substr(open + 1, close - open - 1));
+  return true;
+}
+
+// Converts a CSS `clip-path` basic shape into SVG geometry expressed in the masked box's local
+// pixel space (0..w, 0..h). The emitted shape(s) are painted opaque white by the framing <svg> and
+// parsed through SVGImporter into a contour mask, exactly like a resolved `url(#id)` <clipPath>.
+// Supports `polygon()`, `path()`, `circle()`, `ellipse()` and `inset()`; returns empty when the
+// shape is malformed or uses an out-of-subset feature so the caller can drop it with a diagnostic.
+std::string BuildClipShapeGeometry(const std::string& value, float w, float h) {
+  std::string name;
+  std::string args;
+  if (!SplitCssFunction(value, name, args)) return {};
+
+  if (name == "polygon") {
+    auto items = SplitTopLevelCommas(args);
+    if (items.empty()) return {};
+    // An optional leading `<fill-rule>` (`nonzero` | `evenodd`) is its own comma-separated token.
+    std::string fillRule;
+    size_t start = 0;
+    std::string firstLc = ToLower(Trim(items[0]));
+    if (firstLc == "evenodd" || firstLc == "nonzero") {
+      if (firstLc == "evenodd") fillRule = "evenodd";
+      start = 1;
+    }
+    std::string points;
+    for (size_t i = start; i < items.size(); ++i) {
+      auto xy = SplitTopLevelWhitespace(items[i]);
+      if (xy.size() < 2) return {};
+      float x = ResolveClipCoord(xy[0], w);
+      float y = ResolveClipCoord(xy[1], h);
+      if (std::isnan(x) || std::isnan(y)) return {};
+      if (!points.empty()) points += ' ';
+      points += CssFloatToString(x) + "," + CssFloatToString(y);
+    }
+    if (points.empty()) return {};
+    std::string el = "<polygon points=\"" + points + "\"";
+    if (!fillRule.empty()) el += " fill-rule=\"" + fillRule + "\"";
+    el += "/>";
+    return el;
+  }
+
+  if (name == "path") {
+    // path( [<fill-rule>,]? <string> ). A `<fill-rule>` prefix is only present when the value does
+    // not start with the quoted path string (whose `d` data itself contains commas).
+    std::string rest = Trim(args);
+    if (!rest.empty() && rest.front() != '"' && rest.front() != '\'') {
+      auto comma = rest.find(',');
+      if (comma != std::string::npos) rest = Trim(rest.substr(comma + 1));
+    }
+    if (rest.size() >= 2 && (rest.front() == '"' || rest.front() == '\'') &&
+        rest.back() == rest.front()) {
+      rest = rest.substr(1, rest.size() - 2);
+    }
+    if (rest.empty()) return {};
+    return "<path d=\"" + rest + "\"/>";
+  }
+
+  if (name == "circle") {
+    // circle( [<radius>]? [at <position>]? )
+    auto tokens = SplitTopLevelWhitespace(args);
+    std::string radiusTok;
+    std::vector<std::string> posTokens;
+    size_t i = 0;
+    if (i < tokens.size() && ToLower(tokens[i]) != "at") {
+      radiusTok = tokens[i];
+      ++i;
+    }
+    if (i < tokens.size() && ToLower(tokens[i]) == "at") {
+      for (++i; i < tokens.size(); ++i) posTokens.push_back(tokens[i]);
+    }
+    float cx = posTokens.size() >= 1 ? ResolveClipPositionAxis(posTokens[0], w, true) : w / 2.0f;
+    float cy = posTokens.size() >= 2 ? ResolveClipPositionAxis(posTokens[1], h, false) : h / 2.0f;
+    if (std::isnan(cx) || std::isnan(cy)) return {};
+    float r = NAN;
+    std::string rl = ToLower(Trim(radiusTok));
+    if (rl.empty() || rl == "closest-side") {
+      r = std::min(std::min(cx, w - cx), std::min(cy, h - cy));
+    } else if (rl == "farthest-side") {
+      r = std::max(std::max(cx, w - cx), std::max(cy, h - cy));
+    } else {
+      float fraction = 0;
+      // A percentage radius resolves against `sqrt(w^2 + h^2) / sqrt(2)` per the CSS shapes spec.
+      if (ParseCssPercentage(radiusTok, fraction)) {
+        r = fraction * std::sqrt(w * w + h * h) / std::sqrt(2.0f);
+      } else {
+        r = ResolveClipCoord(radiusTok, w);
+      }
+    }
+    if (std::isnan(r) || r <= 0) return {};
+    return "<circle cx=\"" + CssFloatToString(cx) + "\" cy=\"" + CssFloatToString(cy) + "\" r=\"" +
+           CssFloatToString(r) + "\"/>";
+  }
+
+  if (name == "ellipse") {
+    // ellipse( [<rx> <ry>]? [at <position>]? )
+    auto tokens = SplitTopLevelWhitespace(args);
+    std::vector<std::string> radii;
+    std::vector<std::string> posTokens;
+    size_t i = 0;
+    for (; i < tokens.size() && ToLower(tokens[i]) != "at"; ++i) radii.push_back(tokens[i]);
+    if (i < tokens.size() && ToLower(tokens[i]) == "at") {
+      for (++i; i < tokens.size(); ++i) posTokens.push_back(tokens[i]);
+    }
+    float cx = posTokens.size() >= 1 ? ResolveClipPositionAxis(posTokens[0], w, true) : w / 2.0f;
+    float cy = posTokens.size() >= 2 ? ResolveClipPositionAxis(posTokens[1], h, false) : h / 2.0f;
+    if (std::isnan(cx) || std::isnan(cy)) return {};
+    auto resolveRadius = [](const std::string& tok, float axis, float center) -> float {
+      std::string t = ToLower(Trim(tok));
+      if (t.empty() || t == "closest-side") return std::min(center, axis - center);
+      if (t == "farthest-side") return std::max(center, axis - center);
+      return ResolveClipCoord(tok, axis);
+    };
+    float rx = resolveRadius(radii.size() > 0 ? radii[0] : "", w, cx);
+    float ry = resolveRadius(radii.size() > 1 ? radii[1] : "", h, cy);
+    if (std::isnan(rx) || std::isnan(ry) || rx <= 0 || ry <= 0) return {};
+    return "<ellipse cx=\"" + CssFloatToString(cx) + "\" cy=\"" + CssFloatToString(cy) + "\" rx=\"" +
+           CssFloatToString(rx) + "\" ry=\"" + CssFloatToString(ry) + "\"/>";
+  }
+
+  if (name == "inset") {
+    // inset( <top> <right>? <bottom>? <left>? [round <border-radius>]? )
+    auto tokens = SplitTopLevelWhitespace(args);
+    std::vector<std::string> offs;
+    std::vector<std::string> roundToks;
+    bool afterRound = false;
+    for (auto& tk : tokens) {
+      if (!afterRound && ToLower(tk) == "round") {
+        afterRound = true;
+        continue;
+      }
+      (afterRound ? roundToks : offs).push_back(tk);
+    }
+    if (offs.empty() || offs.size() > 4) return {};
+    // CSS edge shorthand: 1 -> all, 2 -> (top/bottom, left/right), 3 -> (top, left/right, bottom),
+    // 4 -> (top, right, bottom, left).
+    std::string tS = offs[0];
+    std::string rS = offs.size() >= 2 ? offs[1] : offs[0];
+    std::string bS = offs.size() >= 3 ? offs[2] : tS;
+    std::string lS = offs.size() >= 4 ? offs[3] : rS;
+    float top = ResolveClipCoord(tS, h);
+    float right = ResolveClipCoord(rS, w);
+    float bottom = ResolveClipCoord(bS, h);
+    float left = ResolveClipCoord(lS, w);
+    if (std::isnan(top) || std::isnan(right) || std::isnan(bottom) || std::isnan(left)) return {};
+    float rw = w - left - right;
+    float rh = h - top - bottom;
+    if (rw <= 0 || rh <= 0) return {};
+    std::string rect = "<rect x=\"" + CssFloatToString(left) + "\" y=\"" + CssFloatToString(top) +
+                       "\" width=\"" + CssFloatToString(rw) + "\" height=\"" + CssFloatToString(rh) +
+                       "\"";
+    // Only the uniform `round <r>` form is modelled; the elliptical / per-corner border-radius
+    // grammar collapses to the first radius token applied to both axes.
+    if (!roundToks.empty()) {
+      float rr = ResolveClipCoord(roundToks[0], w);
+      if (!std::isnan(rr) && rr > 0) rect += " rx=\"" + CssFloatToString(rr) + "\"";
+    }
+    rect += "/>";
+    return rect;
+  }
+
+  return {};
+}
+
 }  // namespace
 
 bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
@@ -418,31 +635,50 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
     }
     maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
   } else {
-    std::string id = ExtractCssUrl(box.clipPathRef);
-    if (!id.empty() && id.front() == '#') {
-      id = id.substr(1);
-    }
-    auto clipNode = id.empty() ? nullptr : _svgEmitter->lookupSharedDef(id);
-    if (clipNode == nullptr) {
-      warn("html: clip-path references an unknown <clipPath> id; ignored");
-      return;
-    }
-    // Frame the <clipPath> children inside an <svg> sized to the masked box so the contour lands
-    // in the masked layer's local coordinate space. The clip shapes are painted opaque white;
+    // CSS `clip-path`: either a `url(#id)` reference to a hidden <clipPath> def, or a basic shape
+    // (`polygon()/path()/circle()/ellipse()/inset()`). Both are rebuilt into a contour mask framed
+    // to the masked box's local coordinate space; the clip shapes are painted opaque white because
     // contour masking only reads their coverage, not their colour.
     float w = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
     float h = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+    std::string trimmedClip = Trim(box.clipPathRef);
+    bool isUrl = ToLower(trimmedClip).compare(0, 4, "url(") == 0;
     std::string inner;
-    for (auto child = clipNode->getFirstChild(); child; child = child->getNextSibling()) {
-      inner += _svgEmitter->serialize(child);
-    }
-    if (inner.empty()) {
-      warn("html: clip-path <clipPath> has no geometry; ignored");
-      return;
+    // The framing viewBox maps geometry coordinates onto the pixel box. Basic shapes and
+    // `userSpaceOnUse` clipPaths carry pixel coordinates (0..w / 0..h); `objectBoundingBox`
+    // clipPaths carry 0..1 fractions, mapped by a unit-square viewBox at the box's pixel size.
+    std::string viewBox = "0 0 " + CssFloatToString(w) + " " + CssFloatToString(h);
+    if (isUrl) {
+      std::string id = ExtractCssUrl(box.clipPathRef);
+      if (!id.empty() && id.front() == '#') {
+        id = id.substr(1);
+      }
+      auto clipNode = id.empty() ? nullptr : _svgEmitter->lookupSharedDef(id);
+      if (clipNode == nullptr) {
+        warn("html: clip-path references an unknown <clipPath> id; ignored");
+        return;
+      }
+      for (auto child = clipNode->getFirstChild(); child; child = child->getNextSibling()) {
+        inner += _svgEmitter->serialize(child);
+      }
+      if (inner.empty()) {
+        warn("html: clip-path <clipPath> has no geometry; ignored");
+        return;
+      }
+      std::string units = ToLower(Trim(GetDomAttribute(clipNode, "clippathunits")));
+      if (units == "objectboundingbox") {
+        viewBox = "0 0 1 1";
+      }
+    } else {
+      inner = BuildClipShapeGeometry(trimmedClip, w, h);
+      if (inner.empty()) {
+        warn("html: unsupported clip-path basic shape; ignored");
+        return;
+      }
     }
     svgContent = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + CssFloatToString(w) +
-                 "\" height=\"" + CssFloatToString(h) + "\" viewBox=\"0 0 " + CssFloatToString(w) +
-                 " " + CssFloatToString(h) + "\" fill=\"white\">" + inner + "</svg>";
+                 "\" height=\"" + CssFloatToString(h) + "\" viewBox=\"" + viewBox +
+                 "\" fill=\"white\">" + inner + "</svg>";
     maskType = MaskType::Contour;
   }
 

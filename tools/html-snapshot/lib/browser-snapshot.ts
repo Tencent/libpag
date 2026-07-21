@@ -155,14 +155,17 @@ function normalizeBackgroundClip(value) {
   return value.trim().toLowerCase() === 'text' ? 'text' : '';
 }
 
-// PAGX models `clip-path` only as a reference to a <clipPath> def (`url(#id)`),
-// which the importer turns into a contour mask layer. Chromium reports the
-// reference verbatim as `url("#id")`. Geometric forms (`inset()`, `circle()`,
-// `ellipse()`, `polygon()`, `path()`) and `none` are out of subset and collapse
-// to '' so STYLE_SCHEMA's `defaults` filter drops the property entirely.
+// PAGX rebuilds `clip-path` into a contour mask layer, either from a `url(#id)`
+// reference to a <clipPath> def (Chromium reports it verbatim as `url("#id")`) or
+// from a CSS basic shape — `polygon()`, `path()`, `circle()`, `ellipse()`,
+// `inset()` — which the importer synthesises into equivalent SVG geometry in the
+// masked box's local space. Both forms are kept; other values (`none`, `shape()`,
+// unknown functions) collapse to '' so STYLE_SCHEMA's `defaults` filter drops the
+// property entirely.
 function normalizeClipPath(value) {
   if (!value) return '';
-  return /^url\(/i.test(value.trim()) ? value.trim() : '';
+  const trimmed = value.trim();
+  return /^(url|polygon|path|circle|ellipse|inset)\(/i.test(trimmed) ? trimmed : '';
 }
 
 // PAGX models only `WritingMode::Horizontal` and `WritingMode::Vertical`.
@@ -3736,8 +3739,9 @@ const STYLE_SCHEMA = [
   { prop: 'mask-image',       scope: 'box',  defaults: ['none'] },
   // clip-path: url(#id) references a hidden clipPath def the snapshot keeps as an
   // inline svg; the importer resolves the def into a contour mask layer (the
-  // inverse of HTMLWriter::writeClipDef). Geometric clip-path forms (inset/ellipse)
-  // are out of subset and collapse to '' so the defaults filter drops them.
+  // inverse of HTMLWriter::writeClipDef). CSS basic shapes (polygon/path/circle/
+  // ellipse/inset) are also kept and rebuilt into the same contour mask by the
+  // importer; other clip-path values collapse to '' so the defaults filter drops them.
   { prop: 'clip-path',        scope: 'box',  defaults: ['none'], normalize: normalizeClipPath },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },

@@ -2138,7 +2138,7 @@ PAG_TEST(PAGXHTMLImporterTest, DisallowedLayoutPropertiesEmitWarnings) {
 PAG_TEST(PAGXHTMLImporterTest, DisallowedVisualPropertiesEmitWarnings) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="outline:1px solid red;clip-path:circle(20px);
+      <div style="outline:1px solid red;clip-path:margin-box;
                   perspective:200px;width:50px;height:50px"></div>
     </body></html>
   )HTML");
@@ -6221,12 +6221,12 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, StrictModeFailsOnUnsupportedProperty) {
   pagx::HTMLSubsetTransformer::Options opts = {};
   opts.strict = true;
   std::shared_ptr<pagx::DOMNode> root;
-  // `clip-path` stays on the explicit-drop list (PAGX has no equivalent geometry primitive),
-  // so it remains a clean trigger for strict-mode failures even after `margin` was promoted
-  // out of the drop set in MarginIsResolvedThroughPaddingWrapper.
+  // A geometry-box-only `clip-path` (`margin-box`) has no url(#id) reference and is not a supported
+  // basic shape, so it stays on the explicit-drop list (PAGX has no equivalent primitive) and
+  // remains a clean trigger for strict-mode failures.
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
-               <div style="clip-path: inset(10px)"></div></body></html>)HTML",
+               <div style="clip-path: margin-box"></div></body></html>)HTML",
       &root, opts);
   EXPECT_FALSE(result.ok);
   EXPECT_FALSE(result.diagnostics.empty());
@@ -7760,6 +7760,90 @@ PAG_TEST(PAGXHTMLImporterTest, ClipPathRebuildsContourMask) {
   bool hasGeometry = FindElementOfType<pagx::Path>(masked->mask) != nullptr ||
                      FindElementOfType<pagx::Rectangle>(masked->mask) != nullptr;
   EXPECT_TRUE(hasGeometry);
+}
+
+// A CSS `clip-path` basic shape (`polygon()`) with no <clipPath> def is synthesised into contour
+// mask geometry framed to the masked box, with percentage coordinates resolved against the box.
+PAG_TEST(PAGXHTMLImporterTest, ClipPathPolygonShapeRebuildsContourMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-color:#6366F1;clip-path:polygon(50% 0, 100% 100%, 0 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "clip-path"));
+  auto* masked = doc->layers.front()->children.back();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
+  auto* path = FindElementOfType<pagx::Path>(masked->mask);
+  ASSERT_NE(path, nullptr);
+  ASSERT_NE(path->data, nullptr);
+  // The triangle's `%` coordinates resolve against the 100x100 box, not a 0..1 unit square.
+  auto bounds = path->data->getBounds();
+  EXPECT_TRUE(NearlyEqual(bounds.width, 100.0f, 0.5f));
+  EXPECT_TRUE(NearlyEqual(bounds.height, 100.0f, 0.5f));
+}
+
+// A `clip-path: circle()` basic shape is synthesised into an SVG <circle> in box space, imported
+// as an Ellipse contour geometry; the radius resolves against the box (default `closest-side`).
+PAG_TEST(PAGXHTMLImporterTest, ClipPathCircleShapeRebuildsContourMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:80px">
+      <div style="width:100px;height:80px;background-color:#6366F1;clip-path:circle(30px at 50% 50%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "clip-path"));
+  auto* masked = doc->layers.front()->children.back();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
+  auto* ellipse = FindElementOfType<pagx::Ellipse>(masked->mask);
+  ASSERT_NE(ellipse, nullptr);
+}
+
+// A CSS `clip-path: inset()` basic shape is synthesised into an SVG <rect> in box space; the four
+// edge offsets carve an inner rectangle (left/right against width, top/bottom against height).
+PAG_TEST(PAGXHTMLImporterTest, ClipPathInsetShapeRebuildsContourMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-color:#6366F1;clip-path:inset(10px 20px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "clip-path"));
+  auto* masked = doc->layers.front()->children.back();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
+  bool hasGeometry = FindElementOfType<pagx::Rectangle>(masked->mask) != nullptr ||
+                     FindElementOfType<pagx::Path>(masked->mask) != nullptr;
+  EXPECT_TRUE(hasGeometry);
+}
+
+// A `clip-path: url(#id)` whose <clipPath> uses `clipPathUnits="objectBoundingBox"` carries 0..1
+// fractional coordinates; the importer maps that unit square onto the masked box so the contour
+// fills it (rather than collapsing to a ~1px region at the origin).
+PAG_TEST(PAGXHTMLImporterTest, ClipPathObjectBoundingBoxScalesToBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <svg style="position:absolute;width:0;height:0">
+        <defs>
+          <clipPath id="hexClip" clipPathUnits="objectBoundingBox">
+            <polygon points="0.5 0, 1 0.25, 1 0.75, 0.5 1, 0 0.75, 0 0.25"/>
+          </clipPath>
+        </defs>
+      </svg>
+      <div style="width:200px;height:200px;background-color:#6366F1;clip-path:url(#hexClip)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.back();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
+  // The unit-square (0..1) clip geometry is mapped onto the 200x200 box, so the mask carries a
+  // `scale(200, 200)` transform. Without the objectBoundingBox handling the geometry would stay in
+  // 0..1 pixel space and collapse to a ~1px region at the origin (no scale emitted).
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("scale=\"200,200\""), std::string::npos);
 }
 
 // The rebuilt mask layer carries a generated id so the `mask="@id"` reference survives a PAGX
