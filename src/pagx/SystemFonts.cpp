@@ -678,6 +678,7 @@ FontLocation SystemFonts::FindFont(const std::string& family, const std::string&
 #elif defined(__linux__)
 
 #include <fontconfig/fontconfig.h>
+#include <strings.h>
 #include <unistd.h>
 #include <map>
 #include <set>
