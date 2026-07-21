@@ -123,6 +123,17 @@ void ResetLayoutAnchors(Layer* inner) {
 
 }  // namespace
 
+BlendMode HTMLLayerBuilder::resolveBackgroundBlendMode(const std::string& value) {
+  if (value.empty()) return BlendMode::Normal;
+  // `background-blend-mode` may list one keyword per background layer. We apply a single blend
+  // to every gradient/image Fill, so key off the first top-level token (the common single-value
+  // case is unaffected). `SVGBlendModeFromString` maps the CSS keyword directly and returns
+  // Normal for `normal` / any unrecognised value.
+  auto tokens = SplitTopLevelCommas(value);
+  std::string first = tokens.empty() ? value : Trim(tokens.front());
+  return SVGBlendModeFromString(first);
+}
+
 HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
                                    HTMLInlineSvgEmitter& svgEmitter)
     : _diagnostics(sink), _valueParser(valueParser), _filterDecoder(sink, svgEmitter, valueParser) {
@@ -364,10 +375,28 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   }
 
   if (!colors.empty()) {
+    // `background-blend-mode` blends each background layer against the layers *below* it, with
+    // the background-color as the bottom-most layer. Emit the solid colour first so the blended
+    // gradient Fill has a backdrop to composite against; without a blend mode an opaque gradient
+    // fully hides the colour, so the no-blend path keeps dropping it to avoid an inert extra Fill.
+    BlendMode blend = resolveBackgroundBlendMode(box.backgroundBlendMode);
+    // Tracks whether a background layer has already been painted beneath the current Fill. The
+    // bottom-most layer has nothing below it in the element's own background, so it must draw
+    // with Normal (matching CSS, where a lone/bottom layer's blend mode is a no-op) rather than
+    // blending against whatever sits behind the whole layer.
+    bool hasBackdrop = false;
+    if (blend != BlendMode::Normal && box.backgroundColorSet) {
+      layer->contents.push_back(buildSolidFill(box.backgroundColor));
+      hasBackdrop = true;
+    }
+    // Gradients are pushed in reverse CSS order (the CSS-last layer first), so the first Fill
+    // emitted here is the bottom-most background layer.
     for (auto it = colors.rbegin(); it != colors.rend(); ++it) {
       auto fill = _document->makeNode<Fill>();
       fill->color = *it;
+      fill->blendMode = hasBackdrop ? blend : BlendMode::Normal;
       layer->contents.push_back(fill);
+      hasBackdrop = true;
     }
     emitted = true;
     return;

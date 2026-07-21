@@ -634,6 +634,13 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
 
   auto fill = _document->makeNode<Fill>();
   fill->color = pattern;
+  // A `background-blend-mode` blends this url() image against the background-color that
+  // applyBackgroundFill emits underneath it, mirroring the gradient path. With no colour the
+  // image is the bottom-most background layer and has nothing to blend against, so it draws
+  // Normal (matching CSS, where a lone layer's blend mode is a no-op).
+  if (box.backgroundColorSet) {
+    fill->blendMode = HTMLLayerBuilder::resolveBackgroundBlendMode(box.backgroundBlendMode);
+  }
   layer->contents.push_back(fill);
   return true;
 }

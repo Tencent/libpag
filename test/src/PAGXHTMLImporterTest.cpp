@@ -412,6 +412,82 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundColorPlusUrlImageKeepsColorUnderneath) 
   EXPECT_EQ(pattern->image->filePath, "noise.png");
 }
 
+// `background-blend-mode` composites the gradient against the background-color beneath it.
+// Unlike the plain (opaque) gradient path — which drops the now-hidden colour — the blended
+// path keeps the solid colour fill underneath and tags the gradient Fill with the blend mode
+// so the multiply has a backdrop to composite against.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundColorPlusGradientBlendMode) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#6366F1;
+                  background-image:linear-gradient(90deg, #FBBF24, #EC4899);
+                  background-blend-mode:multiply"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+
+  // Two fills: the solid colour first (painted underneath) then the multiply-blended gradient.
+  std::vector<pagx::Fill*> fills;
+  for (auto* e : div->contents) {
+    if (auto* f = As<pagx::Fill>(e)) fills.push_back(f);
+  }
+  ASSERT_EQ(fills.size(), 2u);
+  auto* solid = As<pagx::SolidColor>(fills[0]->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x6366F1)));
+  EXPECT_EQ(fills[0]->blendMode, pagx::BlendMode::Normal);
+  auto* lg = As<pagx::LinearGradient>(fills[1]->color);
+  ASSERT_NE(lg, nullptr);
+  EXPECT_EQ(fills[1]->blendMode, pagx::BlendMode::Multiply);
+}
+
+// Without a `background-blend-mode`, an opaque gradient over a background-color fully hides the
+// colour, so the importer drops the colour and emits only the gradient Fill (no inert extra
+// Fill, no blend mode). Guards the gating that keeps the blend-mode path from churning the
+// common no-blend case.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundColorPlusGradientNoBlendDropsColor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#6366F1;
+                  background-image:linear-gradient(90deg, #FBBF24, #EC4899)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  std::vector<pagx::Fill*> fills;
+  for (auto* e : div->contents) {
+    if (auto* f = As<pagx::Fill>(e)) fills.push_back(f);
+  }
+  ASSERT_EQ(fills.size(), 1u);
+  auto* lg = As<pagx::LinearGradient>(fills[0]->color);
+  ASSERT_NE(lg, nullptr);
+  EXPECT_EQ(fills[0]->blendMode, pagx::BlendMode::Normal);
+}
+
+// `background-blend-mode` blends a layer only against the background layers below it. A lone
+// gradient with no background-color is the bottom-most layer, so it has nothing to blend against
+// and must draw Normal — otherwise it would wrongly blend against content behind the whole layer
+// (CSS treats a lone/bottom layer's blend mode as a no-op).
+PAG_TEST(PAGXHTMLImporterTest, BackgroundBlendModeNoColorLoneGradientStaysNormal) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:linear-gradient(90deg, #FBBF24, #EC4899);
+                  background-blend-mode:multiply"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  std::vector<pagx::Fill*> fills;
+  for (auto* e : div->contents) {
+    if (auto* f = As<pagx::Fill>(e)) fills.push_back(f);
+  }
+  ASSERT_EQ(fills.size(), 1u);
+  ASSERT_NE(As<pagx::LinearGradient>(fills[0]->color), nullptr);
+  EXPECT_EQ(fills[0]->blendMode, pagx::BlendMode::Normal);
+}
+
 // A higher-priority shorthand resets every background longhand supplied by a lower-priority rule.
 // In particular, an inline colour-only background must clear a class-provided image.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundShorthandResetsLowerPriorityLonghands) {

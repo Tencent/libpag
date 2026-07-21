@@ -375,6 +375,10 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"background-color", PropAction::Keep, nullptr, nullptr},
     {"background-image", PropAction::Transform, &TransformBackgroundImage, nullptr},
     {"background-clip", PropAction::Transform, &TransformBackgroundClip, nullptr},
+    // `background-blend-mode` blends an element's background layers among themselves; the
+    // importer maps it onto the gradient/image Fill's blendMode. Kept verbatim (a CSS blend
+    // keyword) and consumed in HTMLStyleCascade::parseBoxVisuals.
+    {"background-blend-mode", PropAction::Keep, nullptr, nullptr},
     // `background-size` / `background-repeat` / `background-position` are kept verbatim and
     // consumed only when paired with a `url(...)` background, where they drive the recovered
     // ImagePattern's scaleMode / tile modes / matrix.

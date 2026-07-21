@@ -248,6 +248,13 @@ struct HTMLBoxAttributes {
   std::string backgroundRepeat = {};
   std::string backgroundPosition = {};
 
+  // CSS `background-blend-mode`, lower-cased and trimmed. Blends the element's background
+  // layers (gradient / image over background-color) among themselves. A non-empty, non-`normal`
+  // value drives the gradient/image Fill's `blendMode`; the importer then also keeps the
+  // background-color Fill underneath so the blend composites against a backdrop. Empty (or
+  // `normal`) means "no blending" and the background paints with its default opaque stacking.
+  std::string backgroundBlendMode = {};
+
   // CSS `border-radius` expanded to four corners (TL, TR, BR, BL) in pixels, after applying the
   // CSS "edge overlap" scaling clamp (radii are shrunk uniformly so adjacent corner pairs never
   // exceed the box's edge length). When the input was uniform — or all four resolved values are

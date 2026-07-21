@@ -22,6 +22,7 @@
 #include <string>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
+#include "pagx/types/BlendMode.h"
 
 namespace pagx {
 
@@ -88,6 +89,11 @@ class HTMLLayerBuilder {
 
   /** Builds a `Fill` chain whose colour is a single solid `color`. */
   Fill* buildSolidFill(const Color& color);
+
+  /** Maps a CSS `background-blend-mode` value onto a PAGX `BlendMode` (the first top-level
+   *  keyword when a per-layer list is given). Returns `BlendMode::Normal` for an empty,
+   *  `normal`, or unrecognised value. */
+  static BlendMode resolveBackgroundBlendMode(const std::string& value);
 
   /** Resolves a CSS gradient string into a registered gradient node. `boxWidth` / `boxHeight`
    *  are the painted box size in px, used to normalise radial-gradient size/position descriptors;

@@ -3715,6 +3715,11 @@ const STYLE_SCHEMA = [
   { prop: 'background-color', scope: 'box',  defaults: ['rgba(0, 0, 0, 0)', 'transparent'] },
   { prop: 'background-image', scope: 'box',  defaults: ['none'], normalize: normalizeBackgroundImage },
   { prop: 'background-clip',  scope: 'box',  defaults: ['border-box'], normalize: normalizeBackgroundClip },
+  // background-blend-mode blends an element's background layers (image/gradient over
+  // background-color) among themselves. The importer maps a non-default value onto the
+  // gradient/image Fill's blendMode and keeps the background-color Fill underneath so the
+  // blend has a backdrop (the inverse of a plain opaque gradient that would hide the colour).
+  { prop: 'background-blend-mode', scope: 'box', defaults: ['normal'] },
   { prop: 'border-radius',    scope: 'box',  defaults: ['0px', '0px 0px 0px 0px'], normalize: normalizeBorderRadius },
   { prop: 'overflow',         scope: 'box',  defaults: ['visible'], normalize: normalizeOverflow },
   { prop: 'opacity',          scope: 'box',  defaults: ['1'] },
@@ -4194,6 +4199,7 @@ async function materializeDecorativePseudoElements() {
     'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
     'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
     'background-color', 'background-image', 'background-clip',
+    'background-blend-mode',
     'background-size', 'background-repeat', 'background-position',
     'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
     'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
@@ -4222,6 +4228,7 @@ async function materializeDecorativePseudoElements() {
     ['background-color', 'rgba(0, 0, 0, 0)'],
     ['background-image', 'none'],
     ['background-clip', 'border-box'],
+    ['background-blend-mode', 'normal'],
     ['background-size', 'auto'],
     ['background-repeat', 'repeat'],
     ['background-position', '0% 0%'],
