@@ -427,6 +427,189 @@ html, body {
     white-space: nowrap;
 }
 
+/* Playback bar - centered compact pill, mimicking the macOS player control bar */
+.playback-bar {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 16px;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 24px;
+    background: #20202A;
+    border-radius: 8px;
+    /* Lock the pill to its natural content width so a narrow viewport clips the sides evenly
+       instead of collapsing the internal controls (buttons, time display, progress bar). This
+       relies on the parent .container having overflow: hidden so the overflowing edges are
+       clipped rather than pushing the layout wider or leaking onto the editor panel. */
+    min-width: max-content;
+}
+
+.playback-bar.hidden {
+    display: none;
+}
+
+.playback-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.15s ease;
+}
+
+.playback-btn:hover {
+    opacity: 0.9;
+}
+
+.playback-btn:active {
+    opacity: 1;
+}
+
+.playback-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Play / Pause - reuse desktop client icon (blue circle with glow) */
+.playback-btn-primary {
+    width: 48px;
+    height: 48px;
+    margin-right: 4px;
+}
+
+.playback-btn-primary img {
+    display: block;
+    width: 48px;
+    height: 48px;
+}
+
+/* Frame-step buttons (prev/next frame) - reuse desktop client icons */
+.playback-btn-step {
+    width: 24px;
+    height: 48px;
+}
+
+.playback-btn-step img {
+    display: block;
+    width: 24px;
+    height: 20px;
+    /* Nudge the arrow glyphs down so they sit on the progress bar center line */
+    margin-top: 5px;
+}
+
+/* Widen the gap between the prev/next frame buttons */
+#next-frame-btn {
+    margin-left: 20px;
+}
+
+.progress-wrapper {
+    width: 260px;
+    margin-left: 16px;
+    margin-right: 8px;
+}
+
+.time-display {
+    display: flex;
+    align-items: center;
+    /* Right-align so the frame counter stays close to the loop button; the fixed width keeps
+       the bar length stable while the time/frame digit counts change, absorbing slack on the left. */
+    justify-content: flex-end;
+    gap: 16px;
+    margin-left: 8px;
+    width: 168px;
+    color: #ffffff;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.time-divider {
+    width: 1px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.28);
+}
+
+/* Loop toggle - shows the sequence (repeat) icon when looping is off, and the single (repeat-one,
+   marked with a "1") icon when looping is on. Both inline SVGs follow the button's currentColor so
+   the state switch needs no swapped image assets. */
+.playback-btn-loop {
+    width: 24px;
+    height: 48px;
+    margin-left: 16px;
+    color: #ffffff;
+    opacity: 1;
+}
+
+.playback-btn-loop svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+/* The single-loop icon uses a wider viewBox (26x20) to accommodate the arrowhead protruding
+   from the rounded rectangle, so it needs a wider box to stay in proportion. */
+.playback-btn-loop .loop-icon-single {
+    width: 24px;
+    height: 18px;
+}
+
+/* The icon reflects the current playback mode: play-once shows the "1" (single) icon,
+   loop shows the sequence-loop icon. */
+.playback-btn-loop .loop-icon-sequence {
+    display: none;
+}
+
+.playback-btn-loop.active .loop-icon-single {
+    display: none;
+}
+
+.playback-btn-loop.active .loop-icon-sequence {
+    display: block;
+}
+
+.progress-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.progress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s ease;
+}
+
+.progress-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.progress-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
 /* Mobile */
 @media (max-width: 600px) {
     .drop-zone {
@@ -451,6 +634,22 @@ html, body {
 
     .file-name {
         max-width: 150px;
+    }
+
+    /* On small screens fall back to a full-width bar with a flexible progress track. */
+    .playback-bar {
+        left: 16px;
+        right: 16px;
+        transform: none;
+        /* Override the desktop min-width: on narrow layouts the bar stretches with the viewport
+           and its internal controls shrink instead of overflowing. */
+        min-width: 0;
+    }
+
+    .progress-wrapper {
+        width: auto;
+        flex: 1;
+        min-width: 80px;
     }
 }
 
@@ -564,4 +763,31 @@ html, body {
     .samples-list .sample-name {
         font-size: 10px;
     }
+
+    .playback-bar {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        padding: 8px 12px;
+        gap: 8px;
+    }
+
+    .playback-btn-primary,
+    .playback-btn-primary img {
+        width: 40px;
+        height: 40px;
+    }
+
+    .playback-btn-step,
+    .playback-btn-step img {
+        width: 22px;
+        height: 18px;
+    }
+
+    .time-display {
+        font-size: 11px;
+        gap: 10px;
+        margin-left: 4px;
+    }
 }
+

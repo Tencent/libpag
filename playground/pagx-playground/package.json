@@ -10,6 +10,9 @@
     "prebuild": "node scripts/prebuild.js",
     "build": "npm run prebuild && rollup -c ./scripts/rollup.js",
     "build:release": "node scripts/prebuild.js --release && BUILD_MODE=release rollup -c ./scripts/rollup.js",
+    "prebuild:st": "node scripts/prebuild.js --arch st",
+    "build:st": "npm run prebuild:st && ARCH=st rollup -c ./scripts/rollup.js",
+    "build:release:st": "node scripts/prebuild.js --arch st --release && ARCH=st BUILD_MODE=release rollup -c ./scripts/rollup.js",
     "publish": "node scripts/publish.js",
     "server": "node static/server.js"
   },
@@ -28,6 +31,13 @@
     "typescript": "~5.0.3"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/search": "^6.7.1",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.6",
+    "@lezer/highlight": "^1.2.3",
     "express": "^4.21.1",
     "highlight.js": "^11.9.0",
     "marked": "^15.0.0",

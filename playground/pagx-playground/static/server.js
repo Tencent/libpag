@@ -19,6 +19,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { execFile } from 'child_process';
 import { fileURLToPath } from 'url';
 
@@ -27,14 +28,22 @@ const __dirname = path.dirname(__filename);
 const playgroundDir = path.resolve(__dirname, '..');
 const libpagDir = path.resolve(__dirname, '../../..');
 
+// Detect whether the current build is single-threaded or multi-threaded by checking
+// which pagx-viewer artifact exists. Multi-threaded builds require COOP/COEP headers
+// for SharedArrayBuffer support; single-threaded builds do not.
+const isSingleThreaded = fs.existsSync(path.join(playgroundDir, 'wasm-mt/pagx-viewer.st.wasm')) &&
+                         !fs.existsSync(path.join(playgroundDir, 'wasm-mt/pagx-viewer.wasm'));
+
 const app = express();
 
-// Enable SharedArrayBuffer (required for multi-threaded builds)
-app.use((req, res, next) => {
-  res.set('Cross-Origin-Opener-Policy', 'same-origin');
-  res.set('Cross-Origin-Embedder-Policy', 'require-corp');
-  next();
-});
+// Only enable COOP/COEP for multi-threaded (SharedArrayBuffer) builds
+if (!isSingleThreaded) {
+  app.use((req, res, next) => {
+    res.set('Cross-Origin-Opener-Policy', 'same-origin');
+    res.set('Cross-Origin-Embedder-Policy', 'require-corp');
+    next();
+  });
+}
 
 app.use('', express.static(playgroundDir, {
   setHeaders: (res, filePath) => {
@@ -71,17 +80,39 @@ app.get('/', (req, res) => {
   res.redirect('/index.html');
 });
 
-const port = 8080;
-app.listen(port, () => {
-  const url = `http://localhost:${port}/`;
+const port = 8000;
+
+/** Returns the first non-internal IPv4 address for LAN sharing, or 'localhost' if none. */
+function getLanIp() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const net of interfaces[name] ?? []) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
+// LAN sharing is opt-in for security: set PAGX_LAN=1 to expose the server on the local
+// network so other devices (e.g. phones) can access it. Defaults to localhost-only.
+const enableLan = process.env.PAGX_LAN === '1';
+const host = enableLan ? '0.0.0.0' : '127.0.0.1';
+
+app.listen(port, host, () => {
+  const localUrl = `http://localhost:${port}/`;
   if (process.platform === 'darwin') {
-    execFile('open', [url]);
+    execFile('open', [localUrl]);
   } else if (process.platform === 'win32') {
     // `start` is a cmd.exe builtin, not a standalone executable; invoke via cmd /c.
     // The empty string after `start` is the window title placeholder.
-    execFile('cmd', ['/c', 'start', '', url]);
+    execFile('cmd', ['/c', 'start', '', localUrl]);
   } else {
-    execFile('xdg-open', [url]);
+    execFile('xdg-open', [localUrl]);
   }
-  console.log(`PAGX Playground running at ${url}`);
+  console.log(`PAGX Playground running at ${localUrl}`);
+  if (enableLan) {
+    console.log(`LAN access: http://${getLanIp()}:${port}/`);
+  }
 });

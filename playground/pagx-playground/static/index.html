@@ -77,6 +77,12 @@
                 <path d="M3 3v5h5"/>
             </svg>
         </button>
+        <button id="source-editor-btn" class="toolbar-btn" title="Source Editor (L)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+            </svg>
+        </button>
         <span class="toolbar-divider"></span>
         <button id="leave-btn" class="toolbar-btn" title="Leave">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -86,9 +92,27 @@
             </svg>
         </button>
     </div>
+    <div id="editor-panel">
+        <div class="editor-resizer" title="Drag to resize"></div>
+        <div class="editor-header">
+            <span class="editor-title">Source Editor</span>
+            <button class="editor-close-btn" title="Close (L)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="editor-host"></div>
+        <div class="editor-button-bar">
+            <button class="editor-btn discard" title="Discard">Discard</button>
+            <button class="editor-btn apply" title="Apply">Apply</button>
+            <button class="editor-btn save" title="Save">Save</button>
+        </div>
+    </div>
     <div id="drop-zone" class="drop-zone">
         <div class="brand">
-            <img class="logo" src="./logo.png" alt="PAGX Logo"/>
+            <img class="logo" src="./logo.png" alt="PAGX Logo" draggable="false"/>
             <h1 class="title">PAGX Playground</h1>
         </div>
         <div id="drop-zone-content" class="drop-zone-content">
@@ -117,6 +141,47 @@
             <p class="error-title">Failed to load file</p>
             <p id="error-message" class="error-message"></p>
         </div>
+    </div>
+    <div id="playback-bar" class="playback-bar hidden">
+        <button id="play-pause-btn" class="playback-btn playback-btn-primary" aria-label="Play / Pause">
+            <img id="play-pause-img" src="./play.png" alt="Play / Pause" draggable="false"/>
+        </button>
+        <button id="prev-frame-btn" class="playback-btn playback-btn-step" aria-label="Previous Frame">
+            <img src="./previous.png" alt="Previous Frame" draggable="false"/>
+        </button>
+        <button id="next-frame-btn" class="playback-btn playback-btn-step" aria-label="Next Frame">
+            <img src="./next.png" alt="Next Frame" draggable="false"/>
+        </button>
+        <div class="progress-wrapper">
+            <input id="progress-slider" class="progress-slider" type="range" min="0" max="1000" value="0" step="1"/>
+        </div>
+        <div id="time-display" class="time-display">
+            <span id="time-text" class="time-text">0.00s / 0.00s</span>
+            <span class="time-divider"></span>
+            <span id="frame-text" class="frame-text">0 / 0</span>
+        </div>
+        <button id="loop-btn" class="playback-btn playback-btn-loop" aria-label="Loop">
+            <svg class="loop-icon-sequence" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="17 1 21 5 17 9"></polyline>
+                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                <polyline points="7 23 3 19 7 15"></polyline>
+                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+            </svg>
+            <svg class="loop-icon-single" viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <!-- Flat rounded-rectangle loop with an independent chevron arrowhead attached at
+                     the top-right. The outline is a full closed rounded rectangle; the arrowhead is
+                     a separate ">"-shaped polyline whose vertex sits exactly on the top edge of the
+                     rectangle, so the two strokes visually merge without leaving a gap. This matches
+                     the Feather-Icons "repeat" style used by the sibling loop-icon above. -->
+                <path d="M20 6v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h14"></path>
+                <polyline points="15 1 19 3 15 5"></polyline>
+                <!-- Digit "1": a single polyline (short top serif joined into the vertical stem)
+                     so the two strokes share a proper round-join instead of stacking two round caps.
+                     The serif is intentionally short and centered inside the rounded rectangle to
+                     stop it from visually merging with the outline. -->
+                <polyline points="10 8 11 7.2 11 14"></polyline>
+            </svg>
+        </button>
     </div>
 </div>
 <div id="samples-page" class="samples-page hidden">
