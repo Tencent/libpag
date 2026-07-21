@@ -27,10 +27,9 @@ namespace pagx {
 /**
  * Evaluates the interpolated value between two adjacent keyframes at a given point within their
  * span. The caller computes `rawT = (framePosition - keyIn.time) / (keyOut.time - keyIn.time)`
- * and passes it in; this function only applies the interpolation behavior.
- *
- * When `rawT` is outside [0, 1], the function clamps the result to the left or right boundary
- * value respectively, so the caller is not required to normalize before calling.
+ * and passes it in; this function only applies the interpolation behavior. The caller is
+ * expected to pass `rawT` in [0, 1]; for Hold and Bezier modes, out-of-range values are
+ * clamped to the boundaries, while Linear may extrapolate outside that range.
  *
  * Supported KeyValue types: float, bool, int, std::string, ImageRef, Color, Matrix, PAGImage.
  *
