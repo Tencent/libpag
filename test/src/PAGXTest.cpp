@@ -13569,8 +13569,9 @@ PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
 // Verifies the demo pagx's animation and viewmodel both reshape text through the runtime holder:
 // after advancing the default timeline past the second keyframe, the animated Text's blob width
 // changes to the "Animated" glyph extent; after driving the ViewModel's "title" property, the
-// bound Text's blob width changes to the new content. Both go through PAGScene::draw so the
-// holder's flush (setTextBlob) reflects in the bound tgfx::Text.
+// bound Text's blob width changes to the new content; after driving the ViewModel's "size"
+// property, the bound Text's blob width grows to the larger fontSize extent. All go through
+// PAGScene::draw so the holder's flush (setTextBlob) reflects in the bound tgfx::Text.
 PAGX_TEST(PAGXTest, TextReshapeDemoAnimationAndViewModel) {
   auto doc =
       pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/text/text_reshape_demo.pagx"));
@@ -13620,6 +13621,14 @@ PAGX_TEST(PAGXTest, TextReshapeDemoAnimationAndViewModel) {
   ASSERT_NE(vmRuntime->textBlob(), nullptr);
   float vmWidthAfter = vmRuntime->textBlob()->getBounds().width();
   EXPECT_NE(vmWidthAfter, vmWidthBefore) << "viewmodel did not reshape vmText to 'ReshapedByVM'";
+
+  // Drive the ViewModel's "size" property and draw: the bound vmText's fontSize DataBind must
+  // reshape the blob to a wider extent at fontSize 60 than at fontSize 40 for the same string.
+  scene->viewModel()->propertyNumber("size")->value(60.0f);
+  EXPECT_TRUE(scene->draw(surface));
+  ASSERT_NE(vmRuntime->textBlob(), nullptr);
+  float vmWidthAfterSize = vmRuntime->textBlob()->getBounds().width();
+  EXPECT_GT(vmWidthAfterSize, vmWidthAfter) << "viewmodel did not reshape vmText fontSize to 60";
 }
 
 // Canonical scene render test: Composition-wrapped layer with animation via scene.
