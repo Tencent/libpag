@@ -472,33 +472,15 @@ void PAGComposition::updateDataBinds(float mix) {
   }
 }
 
-void PAGComposition::flushTextHolders(FontConfig* fontConfig) {
+void PAGComposition::collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const {
   if (binding != nullptr) {
-    binding->flushTextHolders(fontConfig);
+    binding->collectTextHolders(out);
   }
   std::vector<PAGComposition*> childComps = {};
   CollectChildCompositions(this, childComps);
   for (auto* childComp : childComps) {
-    childComp->flushTextHolders(fontConfig);
+    childComp->collectTextHolders(out);
   }
-}
-
-bool PAGComposition::hasDirtyTextHolders() const {
-  if (binding != nullptr && binding->hasDirtyTextHolders()) {
-    return true;
-  }
-  std::vector<PAGComposition*> childComps = {};
-  CollectChildCompositions(this, childComps);
-  for (auto* childComp : childComps) {
-    if (childComp->hasDirtyTextHolders()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool PAGComposition::hasTextHolders() const {
-  return binding != nullptr && binding->hasTextHolders();
 }
 
 }  // namespace pagx

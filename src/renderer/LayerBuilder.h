@@ -38,7 +38,6 @@ namespace pagx {
 class ColorSource;
 class ImagePattern;
 class TextHolder;
-class FontConfig;
 
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
@@ -314,20 +313,16 @@ struct RuntimeBinding {
     }
   }
 
-  // Returns true if this binding has any TextHolder registered. Used as a cheap pre-check so
-  // hasDirtyTextHolders / flushTextHolders can skip the tree walk entirely when the document has
-  // no text reshape at all.
-  bool hasTextHolders() const {
-    return !textHolders.empty();
+  // Appends every TextHolder registered on this binding to `out`. Used by PAGScene to collect a
+  // flat list of all holders across the composition tree so per-frame flush / dirty checks can
+  // skip the tree walk entirely.
+  void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const {
+    for (const auto& holder : textHolders) {
+      if (holder != nullptr) {
+        out.push_back(holder);
+      }
+    }
   }
-
-  // Reshapes every dirty TextHolder. Called from the pre-draw commit stage after ViewModel and
-  // Animation channels have been applied. fontConfig is borrowed for the duration of the call.
-  void flushTextHolders(FontConfig* fontConfig);
-
-  // Returns true if any TextHolder has a pending reshape (apply recorded a change since the last
-  // flush). Used by PAGScene's content-changed check so a dirty holder is not skipped before flush.
-  bool hasDirtyTextHolders() const;
 
  private:
   // Returns the existing target for the node, creating a plain RuntimeTarget if none exists yet.

@@ -123,23 +123,6 @@
 
 namespace pagx {
 
-void RuntimeBinding::flushTextHolders(FontConfig* fontConfig) {
-  for (auto& holder : textHolders) {
-    if (holder != nullptr) {
-      holder->flush(fontConfig);
-    }
-  }
-}
-
-bool RuntimeBinding::hasDirtyTextHolders() const {
-  for (const auto& holder : textHolders) {
-    if (holder != nullptr && holder->isDirty()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 void RuntimeBinding::remove(const Node* node) {
   targets.erase(node);
   std::vector<std::shared_ptr<TextHolder>> stillAlive;

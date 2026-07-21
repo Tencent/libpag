@@ -45,6 +45,7 @@ class PAGViewModel;
 class PAGXDocument;
 class SuppressDelegation;
 class PAGViewModelValue;
+class TextHolder;
 class ViewModel;
 class Image;
 struct Matrix;
@@ -216,9 +217,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
       std::unordered_set<const ViewModel*>& visited);
   void flushDataBinds();
   void flushTextHolders();
-  // Walks the composition tree once and returns true if any composition's binding has a
-  // TextHolder registered. Called at the end of buildRuntimeTree to cache hasAnyTextHolder.
-  bool computeHasAnyTextHolder() const;
+  // Rebuilds the flat `textHolders` list from the current runtime tree. Called at the end of
+  // buildRuntimeTree and after refreshNodes so the list stays in sync with the binding state.
+  void collectTextHolders();
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 
@@ -255,10 +256,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   bool suppressNotify = false;
   std::vector<PAGViewModelValue*> pendingNotifications = {};
 
-  // True if any composition in the runtime tree has a TextHolder registered. Set once at the end
-  // of buildRuntimeTree and used as an early-out by hasContentChanged / flushTextHolders so the
+  // Flat list of every TextHolder registered across the runtime composition tree. Rebuilt at the
+  // end of buildRuntimeTree and after refreshNodes (which can replace a binding's holders via
+  // RefreshLayerInPlace). flushTextHolders and hasContentChanged iterate this list directly so the
   // common case (no text reshape in the document) avoids walking the composition tree every frame.
-  bool hasAnyTextHolder = false;
+  std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};

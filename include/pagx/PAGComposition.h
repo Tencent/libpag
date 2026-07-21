@@ -37,8 +37,8 @@ class PAGXDocument;
 class Composition;
 class DataBindRuntime;
 class DataContext;
-class FontConfig;
 class Node;
+class TextHolder;
 struct RuntimeBinding;
 
 /**
@@ -186,19 +186,11 @@ class PAGComposition : public PAGLayer {
 
   void updateDataBinds(float mix = 1.0f);
 
-  // Flushes every TextHolder in this composition's binding and its child compositions, reshaping
-  // ViewModel/Animation-driven text once per draw. fontConfig is borrowed for the call.
-  void flushTextHolders(FontConfig* fontConfig);
-
-  // Returns true if any TextHolder in this composition's binding (or a descendant composition's)
-  // has a pending reshape. Used by PAGScene::hasContentChanged so a dirty holder is not dropped by
-  // the dirty gate before flush runs.
-  bool hasDirtyTextHolders() const;
-
-  // Returns true if this composition's own binding has any TextHolder registered. Cheap check
-  // (no tree walk) used by PAGScene to decide whether hasDirtyTextHolders / flushTextHolders need
-  // to run at all this frame.
-  bool hasTextHolders() const;
+  // Appends every TextHolder registered in this composition's binding and its descendant
+  // compositions to `out`. Used by PAGScene to maintain a flat list of all holders across the
+  // runtime tree so per-frame flush / dirty checks can iterate it directly instead of walking the
+  // composition tree every frame.
+  void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const;
 
   friend class PAGScene;
 };
