@@ -54,8 +54,8 @@ inline int LerpKeyframeValue<int>(const int& a, const int& /*b*/, double /*t*/) 
 }
 
 template <>
-inline std::string LerpKeyframeValue<std::string>(const std::string& a,
-                                                  const std::string& /*b*/, double /*t*/) {
+inline std::string LerpKeyframeValue<std::string>(const std::string& a, const std::string& /*b*/,
+                                                  double /*t*/) {
   return a;
 }
 
@@ -108,11 +108,10 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
       return left->value;
     case KeyframeInterpolationType::Bezier:
       return LerpKeyframeValue<T>(left->value, right->value,
-                                  SolveBezierEasing(
-                                      static_cast<double>(left->bezierOut.x),
-                                      static_cast<double>(left->bezierOut.y),
-                                      static_cast<double>(right->bezierIn.x),
-                                      static_cast<double>(right->bezierIn.y), rawT));
+                                  SolveBezierEasing(static_cast<double>(left->bezierOut.x),
+                                                    static_cast<double>(left->bezierOut.y),
+                                                    static_cast<double>(right->bezierIn.x),
+                                                    static_cast<double>(right->bezierIn.y), rawT));
     case KeyframeInterpolationType::Linear:
     default:
       return LerpKeyframeValue<T>(left->value, right->value, rawT);

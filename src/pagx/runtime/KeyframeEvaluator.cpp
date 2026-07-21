@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/runtime/KeyframeEvaluator.h"
-
 #include <variant>
-
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/MatrixDecompose.h"
 #include "pagx/types/ColorSpace.h"
@@ -36,9 +34,13 @@ inline float LerpKeyValueFloat(float a, float b, double t) {
   return a + static_cast<float>((b - a) * t);
 }
 
-inline bool LerpKeyValueBool(bool a, bool /*b*/, double /*t*/) { return a; }
+inline bool LerpKeyValueBool(bool a, bool /*b*/, double /*t*/) {
+  return a;
+}
 
-inline int LerpKeyValueInt(int a, int /*b*/, double /*t*/) { return a; }
+inline int LerpKeyValueInt(int a, int /*b*/, double /*t*/) {
+  return a;
+}
 
 inline std::string LerpKeyValueString(const std::string& a, const std::string& /*b*/,
                                       double /*t*/) {
@@ -62,9 +64,9 @@ inline Matrix LerpKeyValueMatrix(const Matrix& a, const Matrix& b, double t) {
   return result;
 }
 
-inline std::shared_ptr<PAGImage> LerpKeyValuePAGImage(
-    const std::shared_ptr<PAGImage>& a, const std::shared_ptr<PAGImage>& /*b*/,
-    double /*t*/) {
+inline std::shared_ptr<PAGImage> LerpKeyValuePAGImage(const std::shared_ptr<PAGImage>& a,
+                                                      const std::shared_ptr<PAGImage>& /*b*/,
+                                                      double /*t*/) {
   return a;
 }
 
@@ -95,11 +97,9 @@ inline KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
   return a;
 }
 
-KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue,
-                                 const KeyValue& rightValue,
-                                 KeyframeInterpolationType interp,
-                                 const Point* bezierOut, const Point* bezierIn,
-                                 double rawT) {
+KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& rightValue,
+                                 KeyframeInterpolationType interp, const Point* bezierOut,
+                                 const Point* bezierIn, double rawT) {
   switch (interp) {
     case KeyframeInterpolationType::None:
     case KeyframeInterpolationType::Hold:
@@ -109,10 +109,9 @@ KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue,
     case KeyframeInterpolationType::Bezier:
       return EvaluateLerp(
           leftValue, rightValue,
-          SolveBezierEasing(static_cast<double>(bezierOut->x),
-                            static_cast<double>(bezierOut->y),
-                            static_cast<double>(bezierIn->x),
-                            static_cast<double>(bezierIn->y), rawT));
+          SolveBezierEasing(static_cast<double>(bezierOut->x), static_cast<double>(bezierOut->y),
+                            static_cast<double>(bezierIn->x), static_cast<double>(bezierIn->y),
+                            rawT));
   }
   return leftValue;
 }
