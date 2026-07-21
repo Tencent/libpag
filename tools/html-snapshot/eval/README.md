@@ -4,6 +4,11 @@ Quantify the fidelity of the `snapshot.js → pagx import → pagx render`
 pipeline against the source HTML corpus. Used to drive iteration on the
 snapshot's layout-preserving rewrites.
 
+The eval harness supports Puppeteer 23.0.0 or newer only. This matches the
+tested minimum declared by `tools/html-snapshot/package.json`; ad-hoc installs
+must stay at or above that floor because baseline capture passes the
+`captureBeyondViewport` screenshot option.
+
 ## Layout
 
 | File | Role |

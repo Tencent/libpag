@@ -300,6 +300,15 @@ bool SplitCssFunction(const std::string& value, std::string& outName, std::strin
   return true;
 }
 
+// Resolves one ellipse radius against its box axis. CSS permits the closest-side / farthest-side
+// keywords independently on each axis; an omitted radius defaults to closest-side.
+float ResolveEllipseRadius(const std::string& token, float axis, float center) {
+  std::string value = ToLower(Trim(token));
+  if (value.empty() || value == "closest-side") return std::min(center, axis - center);
+  if (value == "farthest-side") return std::max(center, axis - center);
+  return ResolveClipCoord(token, axis);
+}
+
 // Converts a CSS `clip-path` basic shape into SVG geometry expressed in the masked box's local
 // pixel space (0..w, 0..h). The emitted shape(s) are painted opaque white by the framing <svg> and
 // parsed through SVGImporter into a contour mask, exactly like a resolved `url(#id)` <clipPath>.
@@ -403,14 +412,8 @@ std::string BuildClipShapeGeometry(const std::string& value, float w, float h) {
     float cx = posTokens.size() >= 1 ? ResolveClipPositionAxis(posTokens[0], w, true) : w / 2.0f;
     float cy = posTokens.size() >= 2 ? ResolveClipPositionAxis(posTokens[1], h, false) : h / 2.0f;
     if (std::isnan(cx) || std::isnan(cy)) return {};
-    auto resolveRadius = [](const std::string& tok, float axis, float center) -> float {
-      std::string t = ToLower(Trim(tok));
-      if (t.empty() || t == "closest-side") return std::min(center, axis - center);
-      if (t == "farthest-side") return std::max(center, axis - center);
-      return ResolveClipCoord(tok, axis);
-    };
-    float rx = resolveRadius(radii.size() > 0 ? radii[0] : "", w, cx);
-    float ry = resolveRadius(radii.size() > 1 ? radii[1] : "", h, cy);
+    float rx = ResolveEllipseRadius(radii.size() > 0 ? radii[0] : "", w, cx);
+    float ry = ResolveEllipseRadius(radii.size() > 1 ? radii[1] : "", h, cy);
     if (std::isnan(rx) || std::isnan(ry) || rx <= 0 || ry <= 0) return {};
     return "<ellipse cx=\"" + CssFloatToString(cx) + "\" cy=\"" + CssFloatToString(cy) +
            "\" rx=\"" + CssFloatToString(rx) + "\" ry=\"" + CssFloatToString(ry) + "\"/>";

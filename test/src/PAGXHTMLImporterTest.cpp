@@ -176,6 +176,20 @@ inline std::shared_ptr<pagx::PAGXDocument> ParseFromString(const std::string& ht
   return pagx::HTMLImporter::ParseString(html);
 }
 
+pagx::ColorMatrixFilter* ParseColorMatrixFilter(const std::string& filter,
+                                                std::shared_ptr<pagx::PAGXDocument>& document) {
+  document = ParseFromString(
+      "<html><body style=\"width:50px;height:50px\"><div style=\"width:50px;"
+      "height:50px;background-color:#6366F1;filter:" +
+      filter + "\"></div></body></html>");
+  if (!document || document->layers.empty() || document->layers.front()->children.empty()) {
+    return nullptr;
+  }
+  auto* layer = document->layers.front()->children.back();
+  if (layer->filters.size() != 1) return nullptr;
+  return As<pagx::ColorMatrixFilter>(layer->filters.front());
+}
+
 inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
   auto* fill = FindElementOfType<pagx::Fill>(layer);
   if (!fill) return {};
@@ -486,6 +500,25 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundBlendModeNoColorLoneGradientStaysNormal
   ASSERT_EQ(fills.size(), 1u);
   ASSERT_NE(As<pagx::LinearGradient>(fills[0]->color), nullptr);
   EXPECT_EQ(fills[0]->blendMode, pagx::BlendMode::Normal);
+}
+
+// PAGX has one blend mode per Fill rather than CSS's independently repeated per-background list.
+// Equal repeated values are lossless; differing values use the first mode and report the
+// approximation instead of silently producing a potentially different composite.
+PAG_TEST(PAGXHTMLImporterTest, DifferentPerLayerBackgroundBlendModesWarn) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:linear-gradient(#F00,#0F0),linear-gradient(#00F,#FFF);
+                  background-blend-mode:multiply,screen"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& message : doc->errors) {
+    if (message.find("per-layer background-blend-mode") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
 }
 
 // A higher-priority shorthand resets every background longhand supplied by a lower-priority rule.
@@ -4473,6 +4506,87 @@ PAG_TEST(PAGXHTMLImporterTest, FilterAmountClampedToBrowserRange) {
   EXPECT_NEAR(cm->matrix[4], 1.0f, 0.001f);
 }
 
+// Cover the remaining scalar colour-adjustment functions and their distinguishing coefficients:
+// contrast pivots around 0.5, saturate uses the Rec.709 matrix, sepia mixes RGB, and opacity only
+// scales alpha.
+PAG_TEST(PAGXHTMLImporterTest, RemainingColorAdjustmentFiltersBecomeColorMatrices) {
+  std::shared_ptr<pagx::PAGXDocument> contrastDoc;
+  auto* contrast = ParseColorMatrixFilter("contrast(150%)", contrastDoc);
+  ASSERT_NE(contrast, nullptr);
+  EXPECT_NEAR(contrast->matrix[0], 1.5f, kEps);
+  EXPECT_NEAR(contrast->matrix[4], -0.25f, kEps);
+
+  std::shared_ptr<pagx::PAGXDocument> saturateDoc;
+  auto* saturate = ParseColorMatrixFilter("saturate(25%)", saturateDoc);
+  ASSERT_NE(saturate, nullptr);
+  EXPECT_NEAR(saturate->matrix[0], 0.40975f, kEps);
+  EXPECT_NEAR(saturate->matrix[1], 0.53625f, kEps);
+  EXPECT_NEAR(saturate->matrix[12], 0.304f, kEps);
+
+  std::shared_ptr<pagx::PAGXDocument> sepiaDoc;
+  auto* sepia = ParseColorMatrixFilter("sepia(100%)", sepiaDoc);
+  ASSERT_NE(sepia, nullptr);
+  EXPECT_NEAR(sepia->matrix[0], 0.393f, kEps);
+  EXPECT_NEAR(sepia->matrix[1], 0.769f, kEps);
+  EXPECT_NEAR(sepia->matrix[12], 0.131f, kEps);
+
+  std::shared_ptr<pagx::PAGXDocument> opacityDoc;
+  auto* opacity = ParseColorMatrixFilter("opacity(25%)", opacityDoc);
+  ASSERT_NE(opacity, nullptr);
+  EXPECT_NEAR(opacity->matrix[0], 1.0f, kEps);
+  EXPECT_NEAR(opacity->matrix[18], 0.25f, kEps);
+}
+
+// hue-rotate accepts all three CSS angle units. A quarter turn must produce the same matrix as
+// 90deg and pi/2 radians, including the non-trivial off-diagonal coefficients.
+PAG_TEST(PAGXHTMLImporterTest, FilterHueRotateSupportsDegTurnAndRad) {
+  std::shared_ptr<pagx::PAGXDocument> degreesDoc;
+  auto* degrees = ParseColorMatrixFilter("hue-rotate(90deg)", degreesDoc);
+  ASSERT_NE(degrees, nullptr);
+  EXPECT_NEAR(degrees->matrix[0], 0.0f, kEps);
+  EXPECT_NEAR(degrees->matrix[2], 1.0f, kEps);
+  EXPECT_NEAR(degrees->matrix[11], 1.43f, kEps);
+
+  std::shared_ptr<pagx::PAGXDocument> turnsDoc;
+  auto* turns = ParseColorMatrixFilter("hue-rotate(0.25turn)", turnsDoc);
+  ASSERT_NE(turns, nullptr);
+  std::shared_ptr<pagx::PAGXDocument> radiansDoc;
+  auto* radians = ParseColorMatrixFilter("hue-rotate(1.57079632679rad)", radiansDoc);
+  ASSERT_NE(radians, nullptr);
+  for (size_t i = 0; i < degrees->matrix.size(); ++i) {
+    EXPECT_NEAR(turns->matrix[i], degrees->matrix[i], kEps);
+    EXPECT_NEAR(radians->matrix[i], degrees->matrix[i], kEps);
+  }
+}
+
+// Unlike the [0,1]-bounded filters, contrast and saturate retain values above 1. Negative values
+// still clamp to zero, so neither function can invert its adjustment matrix.
+PAG_TEST(PAGXHTMLImporterTest, FilterContrastAndSaturateClampOnlyAtLowerBound) {
+  std::shared_ptr<pagx::PAGXDocument> highContrastDoc;
+  auto* highContrast = ParseColorMatrixFilter("contrast(250%)", highContrastDoc);
+  ASSERT_NE(highContrast, nullptr);
+  EXPECT_NEAR(highContrast->matrix[0], 2.5f, kEps);
+  EXPECT_NEAR(highContrast->matrix[4], -0.75f, kEps);
+
+  std::shared_ptr<pagx::PAGXDocument> highSaturateDoc;
+  auto* highSaturate = ParseColorMatrixFilter("saturate(200%)", highSaturateDoc);
+  ASSERT_NE(highSaturate, nullptr);
+  EXPECT_NEAR(highSaturate->matrix[0], 1.787f, kEps);
+  EXPECT_NEAR(highSaturate->matrix[1], -0.715f, kEps);
+
+  std::shared_ptr<pagx::PAGXDocument> lowContrastDoc;
+  auto* lowContrast = ParseColorMatrixFilter("contrast(-1)", lowContrastDoc);
+  ASSERT_NE(lowContrast, nullptr);
+  EXPECT_NEAR(lowContrast->matrix[0], 0.0f, kEps);
+  EXPECT_NEAR(lowContrast->matrix[4], 0.5f, kEps);
+
+  std::shared_ptr<pagx::PAGXDocument> lowSaturateDoc;
+  auto* lowSaturate = ParseColorMatrixFilter("saturate(-1)", lowSaturateDoc);
+  ASSERT_NE(lowSaturate, nullptr);
+  EXPECT_NEAR(lowSaturate->matrix[0], 0.213f, kEps);
+  EXPECT_NEAR(lowSaturate->matrix[1], 0.715f, kEps);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RawBackdropFilterDropShadowUnsupportedWarns) {
   // `backdrop-filter` only models blur(); other functions emit a warning.
   pagx::HTMLImporter::Options opts;
@@ -7777,10 +7891,21 @@ PAG_TEST(PAGXHTMLImporterTest, ClipPathPolygonShapeRebuildsContourMask) {
   auto* path = FindElementOfType<pagx::Path>(masked->mask);
   ASSERT_NE(path, nullptr);
   ASSERT_NE(path->data, nullptr);
-  // The triangle's `%` coordinates resolve against the 100x100 box, not a 0..1 unit square.
-  auto bounds = path->data->getBounds();
-  EXPECT_TRUE(NearlyEqual(bounds.width, 100.0f, 0.5f));
-  EXPECT_TRUE(NearlyEqual(bounds.height, 100.0f, 0.5f));
+  // The triangle's `%` coordinates resolve to these exact vertices in the 100x100 box.
+  const auto& verbs = path->data->verbs();
+  const auto& points = path->data->points();
+  ASSERT_EQ(verbs.size(), 4u);
+  EXPECT_EQ(verbs[0], pagx::PathVerb::Move);
+  EXPECT_EQ(verbs[1], pagx::PathVerb::Line);
+  EXPECT_EQ(verbs[2], pagx::PathVerb::Line);
+  EXPECT_EQ(verbs[3], pagx::PathVerb::Close);
+  ASSERT_EQ(points.size(), 3u);
+  EXPECT_NEAR(points[0].x, 50.0f, kEps);
+  EXPECT_NEAR(points[0].y, 0.0f, kEps);
+  EXPECT_NEAR(points[1].x, 100.0f, kEps);
+  EXPECT_NEAR(points[1].y, 100.0f, kEps);
+  EXPECT_NEAR(points[2].x, 0.0f, kEps);
+  EXPECT_NEAR(points[2].y, 100.0f, kEps);
 }
 
 // A `clip-path: circle()` basic shape is synthesised into an SVG <circle> in box space, imported
@@ -7798,6 +7923,10 @@ PAG_TEST(PAGXHTMLImporterTest, ClipPathCircleShapeRebuildsContourMask) {
   EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
   auto* ellipse = FindElementOfType<pagx::Ellipse>(masked->mask);
   ASSERT_NE(ellipse, nullptr);
+  EXPECT_NEAR(ellipse->size.width, 60.0f, kEps);
+  EXPECT_NEAR(ellipse->size.height, 60.0f, kEps);
+  EXPECT_NEAR(ellipse->position.x, 50.0f, kEps);
+  EXPECT_NEAR(ellipse->position.y, 40.0f, kEps);
 }
 
 // A CSS `clip-path: inset()` basic shape is synthesised into an SVG <rect> in box space; the four
@@ -7813,9 +7942,12 @@ PAG_TEST(PAGXHTMLImporterTest, ClipPathInsetShapeRebuildsContourMask) {
   auto* masked = doc->layers.front()->children.back();
   ASSERT_NE(masked->mask, nullptr);
   EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
-  bool hasGeometry = FindElementOfType<pagx::Rectangle>(masked->mask) != nullptr ||
-                     FindElementOfType<pagx::Path>(masked->mask) != nullptr;
-  EXPECT_TRUE(hasGeometry);
+  auto* rectangle = FindElementOfType<pagx::Rectangle>(masked->mask);
+  ASSERT_NE(rectangle, nullptr);
+  EXPECT_NEAR(rectangle->size.width, 60.0f, kEps);
+  EXPECT_NEAR(rectangle->size.height, 80.0f, kEps);
+  EXPECT_NEAR(rectangle->position.x, 50.0f, kEps);
+  EXPECT_NEAR(rectangle->position.y, 50.0f, kEps);
 }
 
 // A `clip-path: url(#id)` whose <clipPath> uses `clipPathUnits="objectBoundingBox"` carries 0..1

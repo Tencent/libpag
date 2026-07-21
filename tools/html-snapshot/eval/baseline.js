@@ -167,6 +167,9 @@ async function main() {
       type: 'png',
       clip: { x: 0, y: 0, width, height },
       omitBackground: false,
+      // The eval harness supports Puppeteer >= 23.0.0 only (the minimum declared
+      // in tools/html-snapshot/package.json). Keep ad-hoc installs at or above
+      // that tested floor when using this full-page clipping option.
       captureBeyondViewport: true,
     });
     console.log(`baseline: wrote ${opts.output} (${width}x${height})`);
