@@ -478,20 +478,20 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentDiscreteTypes) {
 
   pagx::KeyValue leftInt = 42;
   pagx::KeyValue rightInt = 99;
-  result = pagx::EvaluateKeyframeSegment(leftInt, rightInt,
-                                         pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
+  result = pagx::EvaluateKeyframeSegment(leftInt, rightInt, pagx::KeyframeInterpolationType::Linear,
+                                         {}, {}, 0.5);
   EXPECT_EQ(std::get<int>(result), 42);
 
   pagx::KeyValue leftStr = std::string("hello");
   pagx::KeyValue rightStr = std::string("world");
-  result = pagx::EvaluateKeyframeSegment(leftStr, rightStr,
-                                         pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
+  result = pagx::EvaluateKeyframeSegment(leftStr, rightStr, pagx::KeyframeInterpolationType::Linear,
+                                         {}, {}, 0.5);
   EXPECT_EQ(std::get<std::string>(result), "hello");
 
   pagx::KeyValue leftImg = pagx::ImageRef{"img_a"};
   pagx::KeyValue rightImg = pagx::ImageRef{"img_b"};
-  result = pagx::EvaluateKeyframeSegment(leftImg, rightImg,
-                                         pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
+  result = pagx::EvaluateKeyframeSegment(leftImg, rightImg, pagx::KeyframeInterpolationType::Linear,
+                                         {}, {}, 0.5);
   EXPECT_EQ(std::get<pagx::ImageRef>(result).id, "img_a");
 }
 
@@ -512,10 +512,8 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentColor) {
  * Test case: EvaluateKeyframeSegment interpolates Matrix via decomposition at midpoint.
  */
 PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentMatrix) {
-  pagx::KeyValue leftMat =
-      pagx::Matrix{2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f};
-  pagx::KeyValue rightMat =
-      pagx::Matrix{4.0f, 0.0f, 0.0f, 4.0f, 0.0f, 0.0f};
+  pagx::KeyValue leftMat = pagx::Matrix{2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f};
+  pagx::KeyValue rightMat = pagx::Matrix{4.0f, 0.0f, 0.0f, 4.0f, 0.0f, 0.0f};
   pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
       leftMat, rightMat, pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
   auto mat = std::get<pagx::Matrix>(result);

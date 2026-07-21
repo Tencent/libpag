@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pagx/nodes/Channel.h"
+#include "pagx/nodes/KeyValue.h"
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/types/Point.h"
 

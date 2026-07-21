@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <vector>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/MatrixDecompose.h"

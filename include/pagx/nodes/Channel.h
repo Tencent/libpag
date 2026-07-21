@@ -21,38 +21,11 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <variant>
 #include <vector>
-#include "pagx/nodes/Keyframe.h"
+#include "pagx/nodes/KeyValue.h"
 #include "pagx/nodes/Node.h"
-#include "pagx/types/Matrix.h"
 
 namespace pagx {
-
-class PAGImage;
-
-/**
- * KeyValue is the value carried by a Channel's keyframes. Its std::variant alternatives are
- * ordered to match ChannelValueType, so the active alternative index equals the corresponding
- * ChannelValueType value.
- */
-using KeyValue = std::variant<float, bool, int, std::string, ImageRef, Color, Matrix,
-                               std::shared_ptr<PAGImage>>;
-
-/**
- * Discriminator for the value type carried by a Channel's keyframes. Aligned with the order of
- * KeyValue's std::variant alternatives.
- */
-enum class ChannelValueType : uint8_t {
-  Float = 0,
-  Bool = 1,
-  Int = 2,
-  String = 3,
-  ImageRef = 4,
-  Color = 5,
-  Matrix = 6,
-  PAGImage = 7,
-};
 
 /**
  * Channel is the abstract base for a single animated channel within an AnimationObject. Concrete

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/runtime/KeyframeEvaluator.h"
-
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 
@@ -50,10 +49,8 @@ static KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
   return a;
 }
 
-KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue,
-                                 const KeyValue& rightValue,
-                                 KeyframeInterpolationType interp,
-                                 Point bezierOut, Point bezierIn,
+KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& rightValue,
+                                 KeyframeInterpolationType interp, Point bezierOut, Point bezierIn,
                                  double rawT) {
   switch (interp) {
     case KeyframeInterpolationType::None:
@@ -64,10 +61,9 @@ KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue,
     case KeyframeInterpolationType::Bezier:
       return EvaluateLerp(
           leftValue, rightValue,
-          SolveBezierEasing(static_cast<double>(bezierOut.x),
-                            static_cast<double>(bezierOut.y),
-                            static_cast<double>(bezierIn.x),
-                            static_cast<double>(bezierIn.y), rawT));
+          SolveBezierEasing(static_cast<double>(bezierOut.x), static_cast<double>(bezierOut.y),
+                            static_cast<double>(bezierIn.x), static_cast<double>(bezierIn.y),
+                            rawT));
   }
   return leftValue;
 }
