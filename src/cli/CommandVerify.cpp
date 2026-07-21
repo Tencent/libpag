@@ -408,6 +408,24 @@ static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std
       }
       if (comp->viewModel != nullptr && !comp->viewModel->id.empty()) {
         refs.insert(comp->viewModel->id);
+        for (auto* prop : comp->viewModel->properties) {
+          if (prop != nullptr && !prop->id.empty()) {
+            refs.insert(prop->id);
+          }
+        }
+      }
+      for (auto* bind : comp->dataBinds) {
+        CollectRefsFromDataBind(bind, refs);
+      }
+      for (auto* animChild : comp->animations) {
+        if (animChild == nullptr) {
+          continue;
+        }
+        if (animChild->nodeType() == NodeType::Animation) {
+          CollectRefsFromAnimation(static_cast<const Animation*>(animChild), refs);
+        } else if (animChild->nodeType() == NodeType::StateMachine) {
+          CollectRefsFromStateMachine(static_cast<const StateMachine*>(animChild), refs);
+        }
       }
     }
   }
