@@ -191,11 +191,18 @@ bool TextHolder::removeNode(const Node* node) {
   if (node == nullptr) {
     return entries.empty();
   }
-  for (auto it = entries.begin(); it != entries.end(); ++it) {
-    if (static_cast<const Node*>(it->node) == node) {
-      entries.erase(it);
-      break;
+  size_t writeIndex = 0;
+  for (size_t i = 0; i < entries.size(); ++i) {
+    if (static_cast<const Node*>(entries[i].node) == node) {
+      continue;
     }
+    if (writeIndex != i) {
+      entries[writeIndex] = std::move(entries[i]);
+    }
+    ++writeIndex;
+  }
+  if (writeIndex < entries.size()) {
+    entries.resize(writeIndex);
   }
   return entries.empty();
 }
