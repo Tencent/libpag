@@ -445,8 +445,7 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
 
   auto eval = [&]() {
     return std::get<float>(pagx::EvaluateKeyframeSegment(
-        left.value, right.value, progress, left.interpolation, &left.bezierOut,
-        &right.bezierIn));
+        left.value, right.value, progress, left.interpolation, &left.bezierOut, &right.bezierIn));
   };
 
   // Hold / None: left value throughout the segment.
@@ -473,8 +472,8 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
 PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentDiscreteTypes) {
   pagx::KeyValue leftBool = true;
   pagx::KeyValue rightBool = false;
-  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftBool, rightBool, 0.5, pagx::KeyframeInterpolationType::Linear);
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftBool, rightBool, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(std::get<bool>(result), true);
 
   pagx::KeyValue leftInt = 42;
@@ -502,8 +501,8 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentDiscreteTypes) {
 PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentColor) {
   pagx::KeyValue leftColor = pagx::Color{0.2f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   pagx::KeyValue rightColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
-  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftColor, rightColor, 0.5, pagx::KeyframeInterpolationType::Linear);
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftColor, rightColor, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
   auto color = std::get<pagx::Color>(result);
   EXPECT_GT(color.red, 0.2f);
   EXPECT_LT(color.red, 1.0f);
@@ -515,8 +514,8 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentColor) {
 PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentMatrix) {
   pagx::KeyValue leftMat = pagx::Matrix{2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f};
   pagx::KeyValue rightMat = pagx::Matrix{4.0f, 0.0f, 0.0f, 4.0f, 0.0f, 0.0f};
-  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftMat, rightMat, 0.5, pagx::KeyframeInterpolationType::Linear);
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftMat, rightMat, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
   auto mat = std::get<pagx::Matrix>(result);
   EXPECT_GT(mat.a, 2.0f);
   EXPECT_LT(mat.a, 4.0f);
@@ -528,8 +527,8 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentMatrix) {
 PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentTypeMismatch) {
   pagx::KeyValue leftFloat = 10.0f;
   pagx::KeyValue leftInt = 42;
-  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftFloat, leftInt, 0.5, pagx::KeyframeInterpolationType::Linear);
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftFloat, leftInt, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(result, leftFloat);
 }
 
