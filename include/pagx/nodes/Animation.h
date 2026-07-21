@@ -52,18 +52,9 @@ enum class LoopMode {
 class Animation : public Node {
  public:
   /**
-   * The total length of the animation, in frames. Together with startOffset it defines the
-   * visibility window [startOffset, startOffset + duration) of the content this animation drives.
+   * The total length of the animation, in frames.
    */
   Frame duration = 0;
-
-  /**
-   * The frame position (in this animation's own frameRate) at which this animation begins on the
-   * owning composition's timeline. Before startOffset and after startOffset + duration, the target
-   * nodes this animation drives are hidden. Carries the semantics of PAG's Layer.startTime combined
-   * with the layer visibility window. Default is 0 (visible from the first frame).
-   */
-  Frame startOffset = 0;
 
   /**
    * The frame rate used to convert between time and frames when sampling keyframes.

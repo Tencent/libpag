@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGComposition.h"
-#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 #include "pagx/DataBindRuntime.h"
@@ -68,10 +67,6 @@ bool PAGComposition::isTimelinePlaying(const std::string& id) const {
 }
 
 void PAGComposition::advance(int64_t deltaMicroseconds) {
-  // Accumulate this composition's own timeline clock, clamped to >= 0 so rewinds do not push it
-  // negative. Unlike per-timeline playback, this advances regardless of pause state because the
-  // visibility window is defined on the composition's absolute timeline.
-  elapsedUs = std::max<int64_t>(0, elapsedUs + deltaMicroseconds);
   for (auto& timeline : timelines) {
     if (isTimelinePlaying(timeline->getId())) {
       timeline->advance(deltaMicroseconds);
@@ -82,13 +77,7 @@ void PAGComposition::advance(int64_t deltaMicroseconds) {
 
 void PAGComposition::apply(float mix) {
   for (auto& timeline : timelines) {
-    // Animation timelines are gated by their visibility window against this composition's elapsed
-    // clock; other timeline kinds (state machines) apply unconditionally.
-    if (timeline->type() == TimelineType::Animation) {
-      static_cast<PAGAnimation*>(timeline.get())->applyWithVisibilityWindow(elapsedUs, mix);
-    } else {
-      timeline->apply(mix);
-    }
+    timeline->apply(mix);
   }
   PAGLayer::apply(mix);
 }
@@ -158,13 +147,13 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       }
       auto timeline = std::shared_ptr<PAGAnimation>(
           new PAGAnimation(animation, binding.get(), document, scene));
-      if (animationDriver->compositionStartOffset != 0 && animation->frameRate > 0.0f) {
-        // Convert compositionStartOffset from frames to microseconds using the animation's own
-        // frameRate. Both signs are honored: a positive offset delays content playback (freezes
-        // at the first frame until the offset elapses), a negative offset skips ahead (content
-        // starts from that point).
-        timeline->compositionStartOffsetMicros =
-            FramesToUs(animationDriver->compositionStartOffset, animation->frameRate);
+      if (animationDriver->evaluationOffset != 0 && animation->frameRate > 0.0f) {
+        // Convert evaluationOffset from frames to microseconds.
+        // Both signs are honored: a positive offset delays content playback (freezes at the first
+        // frame until the offset elapses), a negative offset skips ahead (content starts from that
+        // point).
+        timeline->evaluationOffsetUs =
+            FramesToUs(animationDriver->evaluationOffset, animation->frameRate);
       }
       if (!animationDriver->playing) {
         pausedTimelineIds.insert(animation->id);

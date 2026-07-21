@@ -26,7 +26,6 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
-#include "renderer/LayerBuilder.h"
 
 namespace pagx {
 
@@ -56,24 +55,9 @@ static void ApplyResolved(
   }
 }
 
-// Forces the "visible" property of every resolved target node, used to gate rendering by the
-// animation's visibility window. mix is ignored: visible is a discrete bool property whose writer
-// overwrites the current value.
-static void ApplyVisibility(
-    const std::vector<std::pair<Node*, std::vector<Channel*>>>& resolvedTargets,
-    RuntimeBinding* binding, bool visible) {
-  if (binding == nullptr) {
-    return;
-  }
-  for (const auto& entry : resolvedTargets) {
-    binding->apply(entry.first, "visible", KeyValue{visible}, 1.0f);
-  }
-}
-
 PAGAnimation::PAGAnimation(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc,
-                           std::weak_ptr<PAGScene> owner, int64_t compositionStartOffsetMicros)
-    : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc),
-      compositionStartOffsetMicros(compositionStartOffsetMicros) {
+                           std::weak_ptr<PAGScene> owner)
+    : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
 void PAGAnimation::resolveTargets(const RuntimeBinding* effectiveBinding) {
@@ -121,11 +105,7 @@ float PAGAnimation::frameRate() const {
 }
 
 void PAGAnimation::setCurrentTime(int64_t microseconds) {
-  currentTimeUs = std::max<int64_t>(0, microseconds);
-}
-
-int64_t PAGAnimation::currentTime() const {
-  return currentTimeUs;
+  elapsedUs = std::max<int64_t>(0, microseconds);
 }
 
 // Maps an absolute time to a valid playback position according to the loop mode. Once clamps to
@@ -157,6 +137,13 @@ static int64_t WrapTime(int64_t time, int64_t duration, LoopMode loop) {
   return time;
 }
 
+int64_t PAGAnimation::currentTime() const {
+  if (animation == nullptr) {
+    return 0;
+  }
+  return WrapTime(elapsedUs, DurationMicros(animation), animation->loop);
+}
+
 bool PAGAnimation::advance(int64_t deltaMicroseconds) {
   if (owner.expired() || deltaMicroseconds == 0 || animation == nullptr) {
     return false;
@@ -165,18 +152,19 @@ bool PAGAnimation::advance(int64_t deltaMicroseconds) {
   if (duration <= 0) {
     return false;
   }
-  auto previous = currentTimeUs;
+  auto previousPhase = WrapTime(elapsedUs, duration, animation->loop);
   // Use saturating add to prevent signed overflow UB when deltaMicroseconds is extreme.
   int64_t next = 0;
-  if (deltaMicroseconds > 0 && currentTimeUs > INT64_MAX - deltaMicroseconds) {
+  if (deltaMicroseconds > 0 && elapsedUs > INT64_MAX - deltaMicroseconds) {
     next = INT64_MAX;
-  } else if (deltaMicroseconds < 0 && currentTimeUs < INT64_MIN - deltaMicroseconds) {
+  } else if (deltaMicroseconds < 0 && elapsedUs < INT64_MIN - deltaMicroseconds) {
     next = INT64_MIN;
   } else {
-    next = currentTimeUs + deltaMicroseconds;
+    next = elapsedUs + deltaMicroseconds;
   }
-  currentTimeUs = WrapTime(next, duration, animation->loop);
-  return currentTimeUs != previous;
+  elapsedUs = next;
+  auto newPhase = WrapTime(elapsedUs, duration, animation->loop);
+  return newPhase != previousPhase;
 }
 
 void PAGAnimation::apply(float mix) {
@@ -205,39 +193,24 @@ void PAGAnimation::apply(float mix) {
     resolveTargets(effectiveBinding);
     targetsDirty = false;
   }
-  auto evaluationTimeUs = std::max<int64_t>(0, currentTimeUs - compositionStartOffsetMicros);
+  // Apply content offset on raw time. Fold first, then subtract, to avoid signed overflow when
+  // elapsedUs is at an int64 extreme (setCurrentTime(INT64_MAX) or sustained rewind). Under Once
+  // the fold is a clamp; under Loop/PingPong it is a mod over the period. The clamped/moded value
+  // is bounded, so the subsequent subtraction cannot overflow. A positive offset delays the first
+  // frame; a negative offset skips ahead.
+  auto duration = DurationMicros(animation);
+  int64_t evaluationTimeUs;
+  if (duration <= 0) {
+    evaluationTimeUs = elapsedUs - evaluationOffsetUs;
+  } else if (animation->loop == LoopMode::Once) {
+    evaluationTimeUs = std::clamp(elapsedUs, evaluationOffsetUs, evaluationOffsetUs + duration) -
+                       evaluationOffsetUs;
+  } else {
+    int64_t period = (animation->loop == LoopMode::PingPong) ? duration * 2 : duration;
+    evaluationTimeUs =
+        WrapTime((elapsedUs % period) - evaluationOffsetUs, duration, animation->loop);
+  }
   ApplyResolved(resolvedTargets, animation, effectiveBinding, evaluationTimeUs, clamped);
-}
-
-void PAGAnimation::applyWithVisibilityWindow(int64_t compositionElapsedUs, float mix) {
-  // Visibility window gate (PAG Layer.startTime + duration semantics): outside [startOffset,
-  // startOffset + duration) the driven targets are hidden. The window is measured on the owning
-  // composition's monotonic elapsed clock, so it still closes after the animation has played its
-  // full duration (unlike currentTimeUs, which loop mode wraps). A zero duration means "no window"
-  // and applies unconditionally, so ordinary animations keep their default visibility.
-  if (animation == nullptr || animation->duration <= 0) {
-    apply(mix);
-    return;
-  }
-  RuntimeBinding* effectiveBinding = binding;
-  if (effectiveBinding == nullptr) {
-    auto scene = owner.lock();
-    effectiveBinding = scene != nullptr ? scene->mutableBinding() : nullptr;
-  }
-  if (effectiveBinding == nullptr) {
-    return;
-  }
-  if (!resolved) {
-    resolveTargets();
-  }
-  auto startUs = FramesToUs(animation->startOffset, animation->frameRate);
-  auto endUs = FramesToUs(animation->startOffset + animation->duration, animation->frameRate);
-  if (compositionElapsedUs < startUs || compositionElapsedUs >= endUs) {
-    ApplyVisibility(resolvedTargets, effectiveBinding, false);
-    return;
-  }
-  ApplyVisibility(resolvedTargets, effectiveBinding, true);
-  apply(mix);
 }
 
 }  // namespace pagx

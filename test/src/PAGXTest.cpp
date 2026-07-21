@@ -5601,8 +5601,8 @@ PAGX_TEST(PAGXTest, LayerTimelinesRoundTrip) {
 }
 
 /**
- * Test case: Animation's startOffset and AnimationTimeline's compositionStartOffset survive an
- * export/import round-trip when non-default, and default (zero) values are omitted from the XML.
+ * Test case: AnimationTimeline's evaluationOffset survives an export/import round-trip when non-default,
+ * and the default (zero) value is omitted from the XML.
  */
 PAGX_TEST(PAGXTest, AnimationTimelineOffsetsRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
@@ -5613,20 +5613,18 @@ PAGX_TEST(PAGXTest, AnimationTimelineOffsetsRoundTrip) {
 
   auto anim = doc->makeNode<pagx::Animation>("enter");
   anim->duration = 30;
-  anim->startOffset = 12;
   card->animations.push_back(anim);
 
   auto slot = doc->makeNode<pagx::Layer>("slot");
   slot->composition = card;
   auto driver = std::make_unique<pagx::AnimationTimeline>();
   driver->animationId = "enter";
-  driver->compositionStartOffset = 5;
+  driver->evaluationOffset = 5;
   slot->timelines.push_back(std::move(driver));
   doc->layers.push_back(slot);
 
   auto xml = pagx::PAGXExporter::ToXML(*doc);
-  EXPECT_NE(xml.find("start-offset=\"12\""), std::string::npos);
-  EXPECT_NE(xml.find("composition-start-offset=\"5\""), std::string::npos);
+  EXPECT_NE(xml.find("evaluationOffset=\"5\""), std::string::npos);
 
   auto loaded = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(loaded != nullptr);
@@ -5635,10 +5633,7 @@ PAGX_TEST(PAGXTest, AnimationTimelineOffsetsRoundTrip) {
   auto* slot2 = loaded->layers[0];
   ASSERT_EQ(slot2->timelines.size(), 1u);
   auto* loadedDriver = static_cast<pagx::AnimationTimeline*>(slot2->timelines[0].get());
-  EXPECT_EQ(loadedDriver->compositionStartOffset, 5);
-  auto* loadedAnim = loaded->findNode<pagx::Animation>("enter");
-  ASSERT_TRUE(loadedAnim != nullptr);
-  EXPECT_EQ(loadedAnim->startOffset, 12);
+  EXPECT_EQ(loadedDriver->evaluationOffset, 5);
 
   auto doc2 = pagx::PAGXDocument::Make(100, 100);
   auto card2 = doc2->makeNode<pagx::Composition>("card");
@@ -5653,8 +5648,7 @@ PAGX_TEST(PAGXTest, AnimationTimelineOffsetsRoundTrip) {
   doc2->layers.push_back(slotDefault);
 
   auto xmlDefault = pagx::PAGXExporter::ToXML(*doc2);
-  EXPECT_EQ(xmlDefault.find("start-offset"), std::string::npos);
-  EXPECT_EQ(xmlDefault.find("composition-start-offset"), std::string::npos);
+  EXPECT_EQ(xmlDefault.find("evaluationOffset"), std::string::npos);
 }
 
 /**
@@ -5756,9 +5750,12 @@ PAGX_TEST(PAGXTest, PAGTimelinePingPong) {
   EXPECT_TRUE(timeline->advance(-500'000));
   EXPECT_EQ(timeline->currentTime(), 500'000);
 
-  // Negative delta across the turn-around from within the mirror half.
+  // Negative delta continues down the raw timeline. currentTime folds the raw time once, so at raw
+  // = -1_100_000 the phase is WrapTime(-1_100_000) = (-1_100_000 + 2_000_000) = 900_000. Folding the
+  // raw time in a single step (rather than folding the intermediate phase and subtracting again) is
+  // what makes this consistent with continuous advancement.
   EXPECT_TRUE(timeline->advance(-600'000));
-  EXPECT_EQ(timeline->currentTime(), 100'000);
+  EXPECT_EQ(timeline->currentTime(), 900'000);
 }
 
 /**
@@ -6457,6 +6454,7 @@ namespace {
 struct NestedCompFixture {
   pagx::Composition* comp = nullptr;
   std::string animationId;
+  pagx::Animation* animation = nullptr;
   pagx::Layer* childLayer = nullptr;
   pagx::SolidColor* solid = nullptr;
   pagx::TypedChannel<float>* alphaChannel = nullptr;
@@ -6490,6 +6488,7 @@ NestedCompFixture MakeAlphaComposition(pagx::PAGXDocument* doc, const std::strin
   anim->frameRate = 60;
   fx.comp->animations.push_back(anim);
   fx.animationId = animId;
+  fx.animation = anim;
 
   auto* obj = doc->makeNode<pagx::AnimationObject>();
   obj->target = childLayerId;
@@ -6544,13 +6543,94 @@ PAGX_TEST(PAGXTest, CompositionSlotSingleDriver) {
   EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
   EXPECT_TRUE(tgfxChild->visible());
 
-  // Advance to and past the window end: 60 frames reaches the end of the [0, 60) visibility
-  // window. The target is hidden and the alpha stays at the last evaluation (0.5) because the
-  // channel is no longer applied. This matches PAG's "contentVisible: contentFrame >= duration
-  // hides the layer" semantics.
+  // Advance to frame 60 (the end of the Once animation). WrapTime clamps to the duration, so the
+  // channel evaluates the final keyframe: alpha = 1.0. Visibility is a plain property, untouched
+  // by the animation, so it stays at its default.
   file->advanceAndApply(500'000);
-  EXPECT_NEAR(tgfxChild->alpha(), 0.5f, 1.0e-3f);
-  EXPECT_FALSE(tgfxChild->visible());
+  EXPECT_NEAR(tgfxChild->alpha(), 1.0f, 1.0e-3f);
+  EXPECT_TRUE(tgfxChild->visible());
+}
+
+/**
+ * Test case: under LoopMode::Loop a non-zero evaluationOffset must shift the content on
+ * every cycle, not just the first. The animation is a Linear alpha ramp 0->1 over 60 frames with
+ * evaluationOffset = 15 frames. At timeline frame 65 (second cycle, wrapped phase = 5) the
+ * evaluated frame is (5 - 15) wrapped into [0, 60) = 50, so alpha = 50/60. The pre-wrap fold makes
+ * this correct; the old post-wrap subtraction would have clamped this cycle's start to the first
+ * frame (alpha = 0).
+ */
+PAGX_TEST(PAGXTest, CompositionOffsetLoopsEveryCycle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto fx = MakeAlphaComposition(doc.get(), "card", "cardEnter", "cardChild");
+  fx.animation->loop = pagx::LoopMode::Loop;
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = fx.animationId;
+  driver->playing = true;
+  driver->evaluationOffset = 15;
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->rootComposition()->children.size(), 1u);
+
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
+  ASSERT_TRUE(tgfxChild != nullptr);
+
+  // Advance to timeline frame 65 (1_083_333 us): wrapped phase = 5, evalFrame = (5 - 15) wrapped
+  // = 50, so alpha = 50/60. The buggy post-wrap subtraction would clamp this cycle's start to
+  // alpha = 0.
+  file->advanceAndApply(1'083'333);
+  EXPECT_NEAR(tgfxChild->alpha(), 50.0f / 60.0f, 1.0e-2f);
+}
+
+/**
+ * Test case: under PingPong a non-zero evaluationOffset shifts the content on the raw timeline before
+ * the single triangle-wave fold. Linear alpha ramp 0->1 over 60 frames, evaluationOffset=15. At
+ * timeline frame 70 the content frame is WrapTime(70-15)=55 (alpha 55/60); at frame 100 it is
+ * WrapTime(100-15)=85, mirrored to 35 (alpha 35/60).
+ */
+PAGX_TEST(PAGXTest, CompositionOffsetPingPongFoldsOnRawTimeline) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto fx = MakeAlphaComposition(doc.get(), "card", "cardEnter", "cardChild");
+  fx.animation->loop = pagx::LoopMode::PingPong;
+
+  auto slot = doc->makeNode<pagx::Layer>("slot");
+  slot->composition = fx.comp;
+  slot->width = 50;
+  slot->height = 50;
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = fx.animationId;
+  driver->playing = true;
+  driver->evaluationOffset = 15;
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  auto file = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(file->rootComposition()->children.size(), 1u);
+
+  auto& slotTree =
+      *static_cast<pagx::PAGComposition*>(file->rootComposition()->children[0].get())->binding;
+  auto tgfxChild = slotTree.get<tgfx::Layer>(fx.childLayer);
+  ASSERT_TRUE(tgfxChild != nullptr);
+
+  // Advance to timeline frame 70 (1_166_667 us). raw frame 70, content = WrapTime(70 - 15) =
+  // WrapTime(55) = 55, so alpha = 55/60. The old fold-then-subtract path gave 35/60.
+  file->advanceAndApply(1'166'667);
+  EXPECT_NEAR(tgfxChild->alpha(), 55.0f / 60.0f, 1.0e-2f);
+
+  // Advance another 30 frames to timeline frame 100 (+500_000 us). raw frame 100, content =
+  // WrapTime(100 - 15) = WrapTime(85) = 120 - 85 = 35, so alpha = 35/60. The old path gave 5/60.
+  file->advanceAndApply(500'000);
+  EXPECT_NEAR(tgfxChild->alpha(), 35.0f / 60.0f, 1.0e-2f);
 }
 
 /**
@@ -6657,11 +6737,11 @@ PAGX_TEST(PAGXTest, CompositionNestedDriver) {
   EXPECT_NEAR(tgfxInnerChild->alpha(), 0.5f, 1.0e-3f);
   EXPECT_TRUE(tgfxInnerChild->visible());
 
-  // Advance past the window end. The nested layer is hidden, alpha holds the last in-window
-  // value, matching PAG's "contentFrame >= duration hides the layer" semantics.
+  // Advance to frame 60 (the end of the Once animation). WrapTime clamps to the duration, so the
+  // channel evaluates the final keyframe: alpha = 1.0.
   file->advanceAndApply(500'000);
-  EXPECT_NEAR(tgfxInnerChild->alpha(), 0.5f, 1.0e-3f);
-  EXPECT_FALSE(tgfxInnerChild->visible());
+  EXPECT_NEAR(tgfxInnerChild->alpha(), 1.0f, 1.0e-3f);
+  EXPECT_TRUE(tgfxInnerChild->visible());
 }
 
 /**
