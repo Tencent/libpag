@@ -30,6 +30,7 @@
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -521,6 +522,10 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
         drop->blurY = step.shadow.blur;
         drop->color = step.shadow.color;
         layer->filters.push_back(drop);
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
+        auto cm = _document->makeNode<ColorMatrixFilter>();
+        cm->matrix = step.matrix;
+        layer->filters.push_back(cm);
       } else if (step.kind == HTMLValueParser::FilterStep::Kind::SvgRef) {
         // `plus-darker` has no CSS mix-blend-mode; the exporter bakes the backdrop into a PNG and
         // applies it through a `pagx_pd_*` feImage+feComposite(arithmetic) filter. That baked filter

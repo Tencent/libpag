@@ -48,6 +48,126 @@ bool ExtractGradientParts(const std::string& value, std::vector<std::string>& ou
   return outParts.size() >= 2;
 }
 
+// Parses a CSS filter amount, which is a number or a percentage (e.g. `1.4` or `140%`). An empty
+// argument selects the function's default. Returns false when the token is present but malformed.
+bool ParseFilterAmount(const std::string& raw, float defaultValue, float& out) {
+  std::string token = Trim(raw);
+  if (token.empty()) {
+    out = defaultValue;
+    return true;
+  }
+  float fraction = 0.0f;
+  if (ParseCssPercentage(token, fraction)) {
+    out = fraction;
+    return true;
+  }
+  char* end = nullptr;
+  float v = std::strtof(token.c_str(), &end);
+  if (end == token.c_str() || static_cast<size_t>(end - token.c_str()) != token.size()) {
+    return false;
+  }
+  out = v;
+  return true;
+}
+
+// The 20-element identity matrix (4x5, row-major, normalised colour space) used as the starting
+// point for the colour-adjustment filter functions.
+std::array<float, 20> IdentityColorMatrix() {
+  return {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+          0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+}
+
+// CSS `brightness(a)` / `contrast(a)`: per-channel linear ramp `out = a * in + bias`. brightness
+// uses bias 0; contrast uses bias `0.5 - 0.5a` so the transform pivots around mid-grey.
+std::array<float, 20> BrightnessContrastMatrix(float amount, float bias) {
+  auto m = IdentityColorMatrix();
+  m[0] = amount;
+  m[6] = amount;
+  m[12] = amount;
+  m[4] = bias;
+  m[9] = bias;
+  m[14] = bias;
+  return m;
+}
+
+// CSS `saturate(s)` matrix (Rec.709 luma coefficients), per the Filter Effects spec. `s == 1` is
+// the identity; `s == 0` collapses to greyscale.
+std::array<float, 20> SaturateMatrix(float s) {
+  auto m = IdentityColorMatrix();
+  m[0] = 0.213f + 0.787f * s;
+  m[1] = 0.715f - 0.715f * s;
+  m[2] = 0.072f - 0.072f * s;
+  m[5] = 0.213f - 0.213f * s;
+  m[6] = 0.715f + 0.285f * s;
+  m[7] = 0.072f - 0.072f * s;
+  m[10] = 0.213f - 0.213f * s;
+  m[11] = 0.715f - 0.715f * s;
+  m[12] = 0.072f + 0.928f * s;
+  return m;
+}
+
+// CSS `grayscale(a)` matrix, interpolating from identity (a == 0) to full luma greyscale (a == 1).
+// The caller clamps `a` to [0, 1].
+std::array<float, 20> GrayscaleMatrix(float a) {
+  return SaturateMatrix(1.0f - a);
+}
+
+// CSS `sepia(a)` matrix, per the Filter Effects spec, interpolating from identity to full sepia.
+// The caller clamps `a` to [0, 1].
+std::array<float, 20> SepiaMatrix(float a) {
+  float inv = 1.0f - a;
+  auto m = IdentityColorMatrix();
+  m[0] = 0.393f + 0.607f * inv;
+  m[1] = 0.769f - 0.769f * inv;
+  m[2] = 0.189f - 0.189f * inv;
+  m[5] = 0.349f - 0.349f * inv;
+  m[6] = 0.686f + 0.314f * inv;
+  m[7] = 0.168f - 0.168f * inv;
+  m[10] = 0.272f - 0.272f * inv;
+  m[11] = 0.534f - 0.534f * inv;
+  m[12] = 0.131f + 0.869f * inv;
+  return m;
+}
+
+// CSS `invert(a)`: per-channel `out = a + (1 - 2a) * in`, so `a == 1` fully inverts each channel.
+std::array<float, 20> InvertMatrix(float a) {
+  auto m = IdentityColorMatrix();
+  float diag = 1.0f - 2.0f * a;
+  m[0] = diag;
+  m[6] = diag;
+  m[12] = diag;
+  m[4] = a;
+  m[9] = a;
+  m[14] = a;
+  return m;
+}
+
+// CSS `opacity(a)`: scales only the alpha channel.
+std::array<float, 20> OpacityMatrix(float a) {
+  auto m = IdentityColorMatrix();
+  m[18] = a;
+  return m;
+}
+
+// CSS `hue-rotate(angle)` matrix, per the Filter Effects spec (Rec.709 luma with the standard
+// rotation coefficients). `angleDeg` rotates the hue around the colour wheel.
+std::array<float, 20> HueRotateMatrix(float angleDeg) {
+  float rad = angleDeg * 3.14159265358979323846f / 180.0f;
+  float c = std::cos(rad);
+  float s = std::sin(rad);
+  auto m = IdentityColorMatrix();
+  m[0] = 0.213f + c * 0.787f - s * 0.213f;
+  m[1] = 0.715f - c * 0.715f - s * 0.715f;
+  m[2] = 0.072f - c * 0.072f + s * 0.928f;
+  m[5] = 0.213f - c * 0.213f + s * 0.143f;
+  m[6] = 0.715f + c * 0.285f + s * 0.140f;
+  m[7] = 0.072f - c * 0.072f - s * 0.283f;
+  m[10] = 0.213f - c * 0.213f - s * 0.787f;
+  m[11] = 0.715f - c * 0.715f + s * 0.715f;
+  m[12] = 0.072f + c * 0.928f + s * 0.072f;
+  return m;
+}
+
 }  // namespace
 
 HTMLValueParser::HTMLValueParser(HTMLDiagnosticSink& sink, const float& canvasWidth,
@@ -343,6 +463,47 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
       }
       step.kind = ref.empty() ? FilterStep::Kind::Unsupported : FilterStep::Kind::SvgRef;
       step.refId = ref;
+    } else if (name == "brightness" || name == "contrast" || name == "saturate" ||
+               name == "grayscale" || name == "sepia" || name == "invert" ||
+               name == "opacity") {
+      // Colour-adjustment functions taking a <number>|<percentage> amount. brightness / contrast /
+      // saturate / opacity default to 1 (identity); grayscale / sepia / invert default to 0.
+      float defaultValue = (name == "brightness" || name == "contrast" || name == "saturate" ||
+                            name == "opacity")
+                               ? 1.0f
+                               : 0.0f;
+      float amount = defaultValue;
+      if (!ParseFilterAmount(args, defaultValue, amount)) {
+        _diagnostics.warn("html: invalid amount in filter '" + step.raw + "'; ignored");
+        step.kind = FilterStep::Kind::Unsupported;
+      } else {
+        // Match the clamping browsers apply: grayscale / sepia / invert / opacity saturate at 1,
+        // while brightness / contrast / saturate only forbid negatives (no upper bound).
+        if (name == "grayscale" || name == "sepia" || name == "invert" || name == "opacity") {
+          amount = std::clamp(amount, 0.0f, 1.0f);
+        } else {
+          amount = std::max(amount, 0.0f);
+        }
+        step.kind = FilterStep::Kind::ColorMatrix;
+        if (name == "brightness") {
+          step.matrix = BrightnessContrastMatrix(amount, 0.0f);
+        } else if (name == "contrast") {
+          step.matrix = BrightnessContrastMatrix(amount, 0.5f - 0.5f * amount);
+        } else if (name == "saturate") {
+          step.matrix = SaturateMatrix(amount);
+        } else if (name == "grayscale") {
+          step.matrix = GrayscaleMatrix(amount);
+        } else if (name == "sepia") {
+          step.matrix = SepiaMatrix(amount);
+        } else if (name == "invert") {
+          step.matrix = InvertMatrix(amount);
+        } else {  // opacity
+          step.matrix = OpacityMatrix(amount);
+        }
+      }
+    } else if (name == "hue-rotate") {
+      step.kind = FilterStep::Kind::ColorMatrix;
+      step.matrix = HueRotateMatrix(ParseAngle(args));
     } else {
       step.kind = FilterStep::Kind::Unsupported;
     }

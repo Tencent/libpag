@@ -4328,18 +4328,74 @@ PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedFilterWarns) {
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:50px;height:50px">
-      <div style="width:50px;height:50px;background-color:#000;filter:grayscale(50%)"></div>
+      <div style="width:50px;height:50px;background-color:#000;filter:not-a-filter(50%)"></div>
     </body></html>
   )HTML",
                                              opts);
   ASSERT_NE(doc, nullptr);
   bool warned = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("filter") != std::string::npos && msg.find("grayscale") != std::string::npos) {
+    if (msg.find("filter") != std::string::npos &&
+        msg.find("not-a-filter") != std::string::npos) {
       warned = true;
     }
   }
   EXPECT_TRUE(warned);
+}
+
+// CSS `filter: brightness(x)` maps to a ColorMatrixFilter scaling the RGB channels by `x` while
+// leaving alpha untouched.
+PAG_TEST(PAGXHTMLImporterTest, FilterBrightnessBecomesColorMatrix) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#6366F1;filter:brightness(1.4)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* cm = As<pagx::ColorMatrixFilter>(div->filters[0]);
+  ASSERT_NE(cm, nullptr);
+  EXPECT_NEAR(cm->matrix[0], 1.4f, 0.001f);
+  EXPECT_NEAR(cm->matrix[6], 1.4f, 0.001f);
+  EXPECT_NEAR(cm->matrix[12], 1.4f, 0.001f);
+  EXPECT_NEAR(cm->matrix[18], 1.0f, 0.001f);
+  EXPECT_NEAR(cm->matrix[4], 0.0f, 0.001f);
+}
+
+// `filter: grayscale(100%)` collapses to the Rec.709 luma greyscale ColorMatrixFilter (a fully
+// desaturated `saturate(0)`), accepting the percentage form of the amount.
+PAG_TEST(PAGXHTMLImporterTest, FilterGrayscaleBecomesColorMatrix) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#6366F1;filter:grayscale(100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* cm = As<pagx::ColorMatrixFilter>(div->filters[0]);
+  ASSERT_NE(cm, nullptr);
+  EXPECT_NEAR(cm->matrix[0], 0.213f, 0.001f);
+  EXPECT_NEAR(cm->matrix[1], 0.715f, 0.001f);
+  EXPECT_NEAR(cm->matrix[2], 0.072f, 0.001f);
+}
+
+// Out-of-range amounts are clamped to match browsers: invert / opacity saturate at 1, so
+// `invert(150%)` == `invert(100%)` (full inversion: diagonal -1, bias 1).
+PAG_TEST(PAGXHTMLImporterTest, FilterAmountClampedToBrowserRange) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:#6366F1;filter:invert(150%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.back();
+  ASSERT_EQ(div->filters.size(), 1u);
+  auto* cm = As<pagx::ColorMatrixFilter>(div->filters[0]);
+  ASSERT_NE(cm, nullptr);
+  EXPECT_NEAR(cm->matrix[0], -1.0f, 0.001f);
+  EXPECT_NEAR(cm->matrix[4], 1.0f, 0.001f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawBackdropFilterDropShadowUnsupportedWarns) {

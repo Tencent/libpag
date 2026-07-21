@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <string>
 #include <utility>
@@ -61,16 +62,20 @@ class HTMLValueParser {
   /**
    * One step of a CSS `filter` / `backdrop-filter` chain. `SvgRef` carries a `url(#id)`
    * reference to an SVG `<filter>` def, whose `refId` the caller resolves through the
-   * shared-defs table. `Unsupported` is emitted for anything outside the
-   * {`blur`, `drop-shadow`, `url(#…)`} subset; the caller can surface a diagnostic using `raw`.
+   * shared-defs table. `ColorMatrix` carries the 4x5 (20-element, row-major, normalised colour
+   * space) transform that the colour-adjustment functions — `brightness`, `contrast`, `saturate`,
+   * `grayscale`, `sepia`, `invert`, `opacity`, `hue-rotate` — resolve to. `Unsupported` is emitted
+   * for anything outside the supported subset; the caller can surface a diagnostic using `raw`.
    */
   struct FilterStep {
-    enum class Kind { Blur, DropShadow, SvgRef, Unsupported };
+    enum class Kind { Blur, DropShadow, SvgRef, ColorMatrix, Unsupported };
     Kind kind = Kind::Unsupported;
     float blurX = 0;
     float blurY = 0;
     ShadowSpec shadow = {};
     std::string refId = {};
+    std::array<float, 20> matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                                    0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
     std::string raw = {};
   };
 
