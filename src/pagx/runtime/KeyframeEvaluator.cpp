@@ -59,6 +59,9 @@ KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& righ
     case KeyframeInterpolationType::Linear:
       return EvaluateLerp(leftValue, rightValue, progress);
     case KeyframeInterpolationType::Bezier:
+      if (bezierOut == nullptr || bezierIn == nullptr) {
+        return EvaluateLerp(leftValue, rightValue, progress);
+      }
       return EvaluateLerp(
           leftValue, rightValue,
           SolveBezierEasing(static_cast<double>(bezierOut->x), static_cast<double>(bezierOut->y),
