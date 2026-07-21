@@ -28,6 +28,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
+#include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -426,6 +427,109 @@ PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
   linear.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   linear.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(linear, 30.0), 15.0f);
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment evaluates a single keyframe pair at the boundary and mid
+ * point for each interpolation mode. Hold/None returns the left value, Linear returns exact lerp,
+ * and Bezier returns the eased lerp (verified against a known control curve).
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
+  pagx::Keyframe<float> left{0, 10.0f};
+  pagx::Keyframe<float> right{60, 40.0f};
+
+  // Midpoint t = 0.5 between frame 0 and frame 60.
+  double mid = 30.0;
+  double progress = (mid - static_cast<double>(left.time)) /
+                    (static_cast<double>(right.time) - static_cast<double>(left.time));
+
+  auto eval = [&]() {
+    return std::get<float>(pagx::EvaluateKeyframeSegment(
+        left.value, right.value, progress, left.interpolation, &left.bezierOut, &right.bezierIn));
+  };
+
+  // Hold / None: left value throughout the segment.
+  left.interpolation = pagx::KeyframeInterpolationType::Hold;
+  EXPECT_FLOAT_EQ(eval(), 10.0f);
+  left.interpolation = pagx::KeyframeInterpolationType::None;
+  EXPECT_FLOAT_EQ(eval(), 10.0f);
+
+  // Linear: exact lerp — midpoint yields 25.0.
+  left.interpolation = pagx::KeyframeInterpolationType::Linear;
+  EXPECT_FLOAT_EQ(eval(), 25.0f);
+
+  // Bezier with identity curve (control points on diagonal) behaves like linear.
+  left.interpolation = pagx::KeyframeInterpolationType::Bezier;
+  left.bezierOut = {0.5f, 0.5f};
+  right.bezierIn = {0.5f, 0.5f};
+  EXPECT_FLOAT_EQ(eval(), 25.0f);
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment handles Hold semantics for discrete value types — bool, int,
+ * string, and ImageRef — always returning the left value regardless of interp or rawT.
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentDiscreteTypes) {
+  pagx::KeyValue leftBool = true;
+  pagx::KeyValue rightBool = false;
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftBool, rightBool, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
+  EXPECT_EQ(std::get<bool>(result), true);
+
+  pagx::KeyValue leftInt = 42;
+  pagx::KeyValue rightInt = 99;
+  result = pagx::EvaluateKeyframeSegment(leftInt, rightInt, 0.5,
+                                         pagx::KeyframeInterpolationType::Linear);
+  EXPECT_EQ(std::get<int>(result), 42);
+
+  pagx::KeyValue leftStr = std::string("hello");
+  pagx::KeyValue rightStr = std::string("world");
+  result = pagx::EvaluateKeyframeSegment(leftStr, rightStr, 0.5,
+                                         pagx::KeyframeInterpolationType::Linear);
+  EXPECT_EQ(std::get<std::string>(result), "hello");
+
+  pagx::KeyValue leftImg = pagx::ImageRef{"img_a"};
+  pagx::KeyValue rightImg = pagx::ImageRef{"img_b"};
+  result = pagx::EvaluateKeyframeSegment(leftImg, rightImg, 0.5,
+                                         pagx::KeyframeInterpolationType::Linear);
+  EXPECT_EQ(std::get<pagx::ImageRef>(result).id, "img_a");
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment interpolates Color between two SRGB values at midpoint.
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentColor) {
+  pagx::KeyValue leftColor = pagx::Color{0.2f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  pagx::KeyValue rightColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftColor, rightColor, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
+  auto color = std::get<pagx::Color>(result);
+  EXPECT_GT(color.red, 0.2f);
+  EXPECT_LT(color.red, 1.0f);
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment interpolates Matrix via decomposition at midpoint.
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentMatrix) {
+  pagx::KeyValue leftMat = pagx::Matrix{2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f};
+  pagx::KeyValue rightMat = pagx::Matrix{4.0f, 0.0f, 0.0f, 4.0f, 0.0f, 0.0f};
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftMat, rightMat, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
+  auto mat = std::get<pagx::Matrix>(result);
+  EXPECT_GT(mat.a, 2.0f);
+  EXPECT_LT(mat.a, 4.0f);
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment returns the left value when the two KeyValue types differ.
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentTypeMismatch) {
+  pagx::KeyValue leftFloat = 10.0f;
+  pagx::KeyValue leftInt = 42;
+  pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftFloat, leftInt, 0.5,
+                                                        pagx::KeyframeInterpolationType::Linear);
+  EXPECT_EQ(result, leftFloat);
 }
 
 }  // namespace pag

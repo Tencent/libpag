@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <vector>
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/runtime/BezierEasing.h"
 #include "pagx/runtime/MatrixDecompose.h"
@@ -106,7 +107,6 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
   if (framePosition >= static_cast<double>(keyframes.back().time)) {
     return keyframes.back().value;
   }
-  // Locate the segment whose right endpoint exceeds framePosition.
   auto upper = std::upper_bound(keyframes.begin(), keyframes.end(), framePosition,
                                 FramePositionBeforeKeyframe<T>);
   auto right = upper;
@@ -122,12 +122,12 @@ T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double fra
     case KeyframeInterpolationType::None:
     case KeyframeInterpolationType::Hold:
       return left->value;
-    case KeyframeInterpolationType::Bezier: {
-      double eased = SolveBezierEasing(
-          static_cast<double>(left->bezierOut.x), static_cast<double>(left->bezierOut.y),
-          static_cast<double>(right->bezierIn.x), static_cast<double>(right->bezierIn.y), rawT);
-      return LerpKeyframeValue<T>(left->value, right->value, eased);
-    }
+    case KeyframeInterpolationType::Bezier:
+      return LerpKeyframeValue<T>(left->value, right->value,
+                                  SolveBezierEasing(static_cast<double>(left->bezierOut.x),
+                                                    static_cast<double>(left->bezierOut.y),
+                                                    static_cast<double>(right->bezierIn.x),
+                                                    static_cast<double>(right->bezierIn.y), rawT));
     case KeyframeInterpolationType::Linear:
     default:
       return LerpKeyframeValue<T>(left->value, right->value, rawT);
