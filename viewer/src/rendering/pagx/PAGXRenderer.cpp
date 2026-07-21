@@ -76,20 +76,24 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
 
-  // Detect play-state transitions to reset the advance/seek trackers so a paused→resumed cycle
-  // does not count the pause time as animation delta, and the next paused frame always re-seeks.
+  // Reset the advance/seek trackers on a play-state transition OR a content reload (generation
+  // bump), so a paused→resumed cycle does not count pause time as animation delta, and a freshly
+  // loaded scene always re-seats to its start instead of inheriting the previous file's timers.
   bool playStateChanged = state.isPlaying != lastIsPlaying;
-  if (playStateChanged) {
+  bool generationChanged = state.generation != lastGeneration;
+  bool reseat = playStateChanged || generationChanged;
+  if (reseat) {
     lastIsPlaying = state.isPlaying;
+    lastGeneration = state.generation;
     lastAdvanceTimeUs = -1;
     lastSeekTimeUs = -1;
     playbackFinishNotified = false;
   }
 
-  if (state.isPlaying && state.timeline != nullptr && state.timeline->duration() > 0) {
-    advancePlayback(state, playStateChanged);
-  } else if (state.timeline != nullptr && state.timeline->duration() > 0) {
-    seekPaused(state, playStateChanged);
+  if (state.isPlaying && state.animation != nullptr && state.animation->duration() > 0) {
+    advancePlayback(state, reseat);
+  } else if (state.animation != nullptr && state.animation->duration() > 0) {
+    seekPaused(state, reseat);
   }
 
   metrics.currentFrame = computeProfileFrame(state);
@@ -105,9 +109,11 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
     return metrics;
   }
   auto recording = pagx::Record(context, state.scene, pagSurface, true);
-  if (recording) {
-    context->submit(std::move(recording));
+  if (!recording) {
+    device->unlock();
+    return metrics;
   }
+  context->submit(std::move(recording));
   metrics.renderTime = tgfx::Clock::Now() - renderStart;
   // PAGX rendering via pagx::Record has no distinct image-decode phase, so imageDecodeTime stays 0.
 
@@ -120,21 +126,25 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   return metrics;
 }
 
-void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool playStateChanged) {
-  // On a fresh play request, re-arm the timeline. PAGTimeline gates advance() on an internal
-  // playing flag that a non-looping animation clears once it reaches the end, so replaying after
-  // it finished requires rewinding to the start and calling play() again.
-  if (playStateChanged) {
+void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool reseat) {
+  // On a fresh play request or content reload, re-seat the animation at the requested position.
+  // PAGAnimation holds no play/pause state of its own (playback is gated by the owning
+  // PAGComposition's pausedTimelineIds), so replaying only requires seeking to the target time and
+  // applying it; the per-frame advanceAndApply below then drives it forward.
+  if (reseat) {
     // Seek to the requested progress so playback starts from the position the UI shows,
-    // regardless of where the timeline was left. A finished timeline is instead rewound to the
-    // start: the replay path (play button) leaves progress at ~1.0, and the user expects a
-    // restart rather than resuming stuck at the end. state.progress is in [0, 1].
-    auto durationUs = state.timeline->duration();
-    int64_t targetUs = state.timeline->currentTime() >= durationUs
-                           ? 0
-                           : static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
-    state.timeline->setCurrentTime(targetUs);
-    state.timeline->play();
+    // regardless of where the timeline was left. A finished non-looping (Once) animation is
+    // rewound to the start: the replay path (play button) leaves progress at ~1.0, and the user
+    // expects a restart rather than resuming stuck at the end. Looping animations (Loop/PingPong)
+    // are never rewound here because PingPong can legitimately sit at currentTime == duration at
+    // the mirror peak; they always resume from their reported progress. state.progress is in [0,1].
+    auto durationUs = state.animation->duration();
+    int64_t targetUs =
+        state.loopMode == pagx::LoopMode::Once && state.animation->currentTime() >= durationUs
+            ? 0
+            : static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+    state.animation->setCurrentTime(targetUs);
+    state.animation->apply();
   }
   auto now = tgfx::Clock::Now();
   if (lastAdvanceTimeUs < 0) {
@@ -143,12 +153,12 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool playS
   int64_t deltaUs = now - lastAdvanceTimeUs;
   lastAdvanceTimeUs = now;
   if (deltaUs > 0) {
-    state.timeline->advanceAndApply(deltaUs);
+    state.animation->advanceAndApply(deltaUs);
     state.scene->advanceAndApply(deltaUs);
   }
   // Report the current playback progress back to the main thread for UI updates.
-  auto durationUs = state.timeline->duration();
-  auto currentUs = state.timeline->currentTime();
+  auto durationUs = state.animation->duration();
+  auto currentUs = state.animation->currentTime();
   auto renderProgress = static_cast<double>(currentUs) / static_cast<double>(durationUs);
   if (renderProgress < 0.0) {
     renderProgress = 0.0;
@@ -157,52 +167,65 @@ void PAGXRenderer::advancePlayback(PAGXViewModel::RenderState& state, bool playS
     renderProgress = 1.0;
   }
   viewModel->updateProgressFromRender(renderProgress, state.generation);
-  // A non-looping animation clears its playing flag once it reaches the end. Notify the main
+  // A non-looping animation stays at the last frame once it reaches the end. Notify the main
   // thread so it flips the UI back to the paused state and stops requesting further renders.
-  if (!state.timeline->isPlaying() && !playbackFinishNotified) {
+  // Looping modes (Loop/PingPong) never report finished: Loop keeps currentTime in [0, duration),
+  // while PingPong can momentarily land exactly on duration at the mirror peak, which must NOT be
+  // treated as finished.
+  if (state.loopMode == pagx::LoopMode::Once &&
+      state.animation->currentTime() >= state.animation->duration() && !playbackFinishNotified) {
     playbackFinishNotified = true;
     viewModel->notifyPlaybackFinished(state.generation);
   }
 }
 
-void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool playStateChanged) {
-  auto durationUs = state.timeline->duration();
-  if (playStateChanged) {
-    // Just paused: the timeline already sits at the true playback position, which leads the main
-    // thread's progress snapshot by up to one queued frame. Keep the timeline where it is and
-    // report its actual position so the UI catches up, rather than seeking back to the stale
-    // progress (which would visibly jump the frame backward).
-    auto currentUs = state.timeline->currentTime();
-    lastSeekTimeUs = currentUs;
-    auto pausedProgress = static_cast<double>(currentUs) / static_cast<double>(durationUs);
-    if (pausedProgress < 0.0) {
-      pausedProgress = 0.0;
+void PAGXRenderer::seekPaused(PAGXViewModel::RenderState& state, bool reseat) {
+  auto durationUs = state.animation->duration();
+  if (reseat) {
+    if (state.seekRequested) {
+      // An explicit seek was requested alongside the pause (frame-step controls or slider while
+      // transitioning). Honor the target progress instead of reporting the timeline's actual
+      // position, which would overwrite the user's intent.
+      auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
+      lastSeekTimeUs = targetUs;
+      state.animation->setCurrentTime(targetUs);
+      state.animation->apply();
+    } else {
+      // Pure pause (play button): the timeline already sits at the true playback position, which
+      // leads the main thread's progress snapshot by up to one queued frame. Keep the timeline
+      // where it is and report its actual position so the UI catches up.
+      auto currentUs = state.animation->currentTime();
+      lastSeekTimeUs = currentUs;
+      auto pausedProgress = static_cast<double>(currentUs) / static_cast<double>(durationUs);
+      if (pausedProgress < 0.0) {
+        pausedProgress = 0.0;
+      }
+      if (pausedProgress > 1.0) {
+        pausedProgress = 1.0;
+      }
+      viewModel->updateProgressFromRender(pausedProgress, state.generation);
     }
-    if (pausedProgress > 1.0) {
-      pausedProgress = 1.0;
-    }
-    viewModel->updateProgressFromRender(pausedProgress, state.generation);
   } else {
     // Steady-state paused (e.g. slider scrubbing): seek to the requested progress position.
     auto targetUs = static_cast<int64_t>(state.progress * static_cast<double>(durationUs));
     if (lastSeekTimeUs < 0 || std::abs(targetUs - lastSeekTimeUs) >= SeekThresholdUs) {
       lastSeekTimeUs = targetUs;
-      state.timeline->setCurrentTime(targetUs);
-      state.timeline->apply();
+      state.animation->setCurrentTime(targetUs);
+      state.animation->apply();
     }
   }
 }
 
 int64_t PAGXRenderer::computeProfileFrame(const PAGXViewModel::RenderState& state) const {
-  if (state.timeline == nullptr || state.timeline->duration() <= 0) {
+  if (state.animation == nullptr || state.animation->duration() <= 0) {
     return -1;
   }
-  auto rate = state.timeline->frameRate();
+  auto rate = state.animation->frameRate();
   if (rate <= 0) {
     return -1;
   }
-  auto durationUs = state.timeline->duration();
-  auto currentUs = state.timeline->currentTime();
+  auto durationUs = state.animation->duration();
+  auto currentUs = state.animation->currentTime();
   auto totalFrames =
       static_cast<int64_t>(std::round(static_cast<double>(durationUs) * rate / 1000000.0));
   auto frame = static_cast<int64_t>(static_cast<double>(currentUs) * rate / 1000000.0);

@@ -184,8 +184,15 @@ void PAGXViewModel::handlePlaybackFinished(quint64 generation) {
 
 PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
   std::lock_guard<std::mutex> lock(renderMutex);
-  return {scene,    defaultTimeline,          pagxWidth, pagxHeight, isPlaying_.load(),
-          progress, playbackGeneration.load()};
+  return {scene,
+          defaultAnimation,
+          defaultLoopMode,
+          pagxWidth,
+          pagxHeight,
+          isPlaying_.load(),
+          progress,
+          pendingSeek.exchange(false),
+          playbackGeneration.load()};
 }
 
 bool PAGXViewModel::hasContent() {
@@ -216,6 +223,7 @@ void PAGXViewModel::setProgress(double newProgress) {
     return;
   }
   progress = newProgress;
+  pendingSeek = true;
   Q_EMIT progressChanged(progress);
   needsRender = true;
   Q_EMIT requestFlush();
@@ -266,7 +274,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     currentFilePath = strPath;
     pagxDocument = document;
     scene = newScene;
-    defaultTimeline = scene->getDefaultTimeline();
+    resolveDefaultAnimation(document);
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
     updateAnimationState();
@@ -324,7 +332,21 @@ void PAGXViewModel::previousFrame() {
 void PAGXViewModel::clearContent() {
   pagxDocument = nullptr;
   scene = nullptr;
-  defaultTimeline = nullptr;
+  defaultAnimation = nullptr;
+  defaultLoopMode = pagx::LoopMode::Once;
+}
+
+void PAGXViewModel::resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document) {
+  defaultAnimation = nullptr;
+  defaultLoopMode = pagx::LoopMode::Once;
+  if (!document->animations.empty()) {
+    auto* firstAnim = document->animations[0];
+    if (firstAnim != nullptr && firstAnim->nodeType() == pagx::NodeType::Animation) {
+      auto* anim = static_cast<pagx::Animation*>(firstAnim);
+      defaultAnimation = scene->getAnimation(anim->id);
+      defaultLoopMode = anim->loop;
+    }
+  }
 }
 
 void PAGXViewModel::emitContentStateReset() {
@@ -335,9 +357,9 @@ void PAGXViewModel::emitContentStateReset() {
 }
 
 void PAGXViewModel::updateAnimationState() {
-  if (defaultTimeline != nullptr && defaultTimeline->duration() > 0) {
-    auto durationUs = defaultTimeline->duration();
-    auto rate = defaultTimeline->frameRate();
+  if (defaultAnimation != nullptr && defaultAnimation->duration() > 0) {
+    auto durationUs = defaultAnimation->duration();
+    auto rate = defaultAnimation->frameRate();
     totalFrames =
         static_cast<int64_t>(std::round(static_cast<double>(durationUs) * rate / 1000000.0));
     if (totalFrames < 1) {
@@ -382,7 +404,7 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
     pagxWidth = static_cast<int>(document->width);
     pagxHeight = static_cast<int>(document->height);
     scene = newScene;
-    defaultTimeline = scene->getDefaultTimeline();
+    resolveDefaultAnimation(document);
     updateAnimationState();
     needsRender = true;
   }

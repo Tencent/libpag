@@ -40,13 +40,15 @@ class PAGXRenderer : public IContentRenderer {
  private:
   // Advances the playing timeline and scene by the wall-clock delta since the last flush, reports
   // progress back to the main thread, and notifies playback-finished for non-looping animations.
-  // playStateChanged is true on the flush that first observes a paused→playing transition, which
-  // re-arms the timeline (seek to the shown progress or rewind a finished one, then play).
-  void advancePlayback(PAGXViewModel::RenderState& state, bool playStateChanged);
+  // reseat is true on the flush that first observes a paused→playing transition or a content reload
+  // (generation bump), which re-arms the timeline (seek to the shown progress or rewind a finished
+  // one, then play).
+  void advancePlayback(PAGXViewModel::RenderState& state, bool reseat);
 
-  // Handles the paused timeline: on the pause transition it reports the timeline's actual position
-  // so the UI catches up; in steady state it seeks to the requested progress (slider scrubbing).
-  void seekPaused(PAGXViewModel::RenderState& state, bool playStateChanged);
+  // Handles the paused timeline: on a play-state transition or content reload it reports the
+  // timeline's actual position so the UI catches up; in steady state it seeks to the requested
+  // progress (slider scrubbing).
+  void seekPaused(PAGXViewModel::RenderState& state, bool reseat);
 
   // Returns the current frame index for the profiling histogram, clamped to the last valid frame.
   // Returns -1 when no frame applies (no timeline, zero duration, or non-positive frame rate).
@@ -66,6 +68,9 @@ class PAGXRenderer : public IContentRenderer {
   int64_t lastSeekTimeUs = -1;
   // Tracks the playback state from the previous flush to detect transitions.
   bool lastIsPlaying = false;
+  // Tracks the playback generation from the previous flush to detect content reloads, so a freshly
+  // loaded scene re-seats to its start instead of inheriting the previous file's advance timers.
+  uint64_t lastGeneration = 0;
   // Guards against posting duplicate finish notifications every frame after a non-looping
   // animation ends, until the main thread flips the playing state off.
   bool playbackFinishNotified = false;

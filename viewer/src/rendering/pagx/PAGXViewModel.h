@@ -20,8 +20,8 @@
 
 #include <atomic>
 #include <mutex>
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
-#include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
 #include "rendering/pagx/XmlLinesModel.h"
@@ -73,11 +73,13 @@ class PAGXViewModel : public ContentViewModel {
 
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
-    std::shared_ptr<pagx::PAGTimeline> timeline;
+    std::shared_ptr<pagx::PAGAnimation> animation;
+    pagx::LoopMode loopMode = pagx::LoopMode::Once;
     int contentWidth = 0;
     int contentHeight = 0;
     bool isPlaying = false;
     double progress = 0.0;
+    bool seekRequested = false;
     uint64_t generation = 0;
   };
 
@@ -91,7 +93,7 @@ class PAGXViewModel : public ContentViewModel {
    * This is safe even though PAGScene/PAGTimeline are not thread-safe, because each content load
    * builds brand-new scene/timeline objects (never reused) and swaps them into the members under
    * renderMutex. The main thread performs all of its accesses to a given object (build,
-   * getDefaultTimeline, updateAnimationState) inside that lock and never touches the object again
+   * getAnimation, updateAnimationState) inside that lock and never touches the object again
    * after the swap. The render thread reaches an object only via this snapshot, whose lock
    * establishes a happens-before ordering with the main thread's setup. So any single
    * scene/timeline is accessed by the main thread first (under the lock) and by the render thread
@@ -124,6 +126,7 @@ class PAGXViewModel : public ContentViewModel {
 
  private:
   void clearContent();
+  void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
   // Emits the content-state reset signals shared by loadFile (both success and failure paths) and
@@ -144,10 +147,12 @@ class PAGXViewModel : public ContentViewModel {
 
   QQuickWindow* window = nullptr;
   std::atomic_bool needsRender = false;
+  std::atomic<bool> pendingSeek = false;
   std::mutex renderMutex = {};
   std::shared_ptr<pagx::PAGXDocument> pagxDocument = nullptr;
   std::shared_ptr<pagx::PAGScene> scene = nullptr;
-  std::shared_ptr<pagx::PAGTimeline> defaultTimeline = nullptr;
+  std::shared_ptr<pagx::PAGAnimation> defaultAnimation = nullptr;
+  pagx::LoopMode defaultLoopMode = pagx::LoopMode::Once;
   int pagxWidth = 0;
   int pagxHeight = 0;
   std::string currentFilePath = {};
