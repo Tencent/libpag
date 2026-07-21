@@ -12,7 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const { openAndSettlePage } = require('../dist/lib/page-loader');
 const { makeFail, parseNumber, MAX_CAPTURE_HEIGHT_PX } = require('../dist/lib/common');
-const { launchBrowser, resolveEngine, setViewport } = require('../dist/lib/browser-engine');
+const { launchBrowser, resolveEngine } = require('../dist/lib/browser-engine');
+const { applyCanvasViewport } = require('../dist/lib/canvas-viewport');
 
 const fail = makeFail('baseline');
 
@@ -91,6 +92,14 @@ async function captureBodyRect(page, maxHeightPx) {
       de.style.padding = '0';
       de.style.display = 'block';
     }
+    // Mirror prepareBodyForSnapshot (browser-snapshot.ts): force the scroll
+    // reset instant so `html { scroll-behavior: smooth }` can't leave the
+    // scrollTo(0, 0) below animating. Kept symmetric with the subset so the two
+    // "prepare" steps stay mirror images even though this one's outputs (body
+    // dimensions + a captureBeyondViewport clip at the document origin) are
+    // already scroll-independent.
+    if (de && de.style) de.style.setProperty('scroll-behavior', 'auto', 'important');
+    if (body && body.style) body.style.setProperty('scroll-behavior', 'auto', 'important');
     if (typeof window.scrollTo === 'function') {
       try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
     }
@@ -129,20 +138,36 @@ async function main() {
       },
     });
     const { width, height } = await captureBodyRect(page, MAX_CAPTURE_HEIGHT_PX);
-    // Re-size the viewport to the captured body rect so the screenshot is
-    // taken at the canvas dimensions (matches `pagx render --scale 1` output
-    // size). `setViewport` is engine-aware: puppeteer keeps the legacy
-    // per-page setter, playwright forwards to setViewportSize.
-    await setViewport(page, engine, { width, height, deviceScaleFactor: 1 });
-    await new Promise((r) => setTimeout(r, 50));
+    // Resize the viewport to the captured body rect so the screenshot is taken
+    // at the canvas dimensions (matches `pagx render --scale 1` output size),
+    // then keep it only if it was safe. `applyCanvasViewport` is the SAME guard
+    // the subset uses (lib/canvas-viewport.ts): it reverts to the settle
+    // viewport for fluid / viewport-driven pages whose `vh` sections balloon or
+    // whose scroll-driven content resets under a full-canvas viewport. Sharing
+    // it keeps the baseline and subset in lock-step — both resize, or both
+    // revert, so the diff compares the same page state.
+    await applyCanvasViewport(
+      page,
+      engine,
+      { width, height },
+      { width: opts.viewportWidth, height: opts.viewportHeight },
+      (msg) => console.error(msg),
+    );
     // captureBodyRect neutralised the `<html>` box, so <body> sits at the
     // viewport origin — the same body-rooted framing `pagx render` produces for
-    // the subset. Clipping at (0,0) therefore keeps the two aligned.
+    // the subset. Clip at (0,0) to the canvas rect measured before any resize:
+    // it equals the subset's emitted canvas in both branches (kept: viewport ==
+    // canvas; reverted: the subset re-measures at the settle viewport, which is
+    // where this rect was measured). `captureBeyondViewport` lets the reverted
+    // case screenshot the full canvas height at the shorter settle viewport
+    // WITHOUT resizing the layout back up (which is exactly what would re-balloon
+    // a `vh` page).
     await page.screenshot({
       path: opts.output,
       type: 'png',
       clip: { x: 0, y: 0, width, height },
       omitBackground: false,
+      captureBeyondViewport: true,
     });
     console.log(`baseline: wrote ${opts.output} (${width}x${height})`);
   } finally {

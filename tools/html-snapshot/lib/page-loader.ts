@@ -193,6 +193,18 @@ async function settleLazyContent(page: Page, engine: EngineName): Promise<void> 
   let lastHeight = -1;
   let stable = 0;
   try {
+    // Neutralise `html { scroll-behavior: smooth }` for the duration of the
+    // warm-up. Under smooth behaviour every `window.scrollTo(...)` below eases
+    // to its target over several hundred ms instead of jumping, so the sweep's
+    // 120ms-per-step cadence would outrun the animation (below-the-fold lazy
+    // triggers never actually enter view) and the finalize `scrollTo(0, 0)`
+    // would leave the page mid-animation away from the origin. Forcing
+    // `auto !important` on <html>/<body> makes every scroll here synchronous.
+    await page.evaluate(`(() => {
+      var d = document.documentElement, b = document.body;
+      if (d && d.style) d.style.setProperty('scroll-behavior', 'auto', 'important');
+      if (b && b.style) b.style.setProperty('scroll-behavior', 'auto', 'important');
+    })()`);
     for (let round = 0; round < cfg.maxRounds; round++) {
       if (Date.now() - startedAt >= cfg.maxTotalMs) break;
       const height: number = await page.evaluate(

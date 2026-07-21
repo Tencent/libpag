@@ -3487,6 +3487,18 @@ function prepareBodyForSnapshot() {
     docEl.style.padding = '0';
     docEl.style.display = 'block';
   }
+  // Force the scroll reset to be instant. A page that sets
+  // `html { scroll-behavior: smooth }` (increasingly common) turns the
+  // `window.scrollTo(0, 0)` below into an ASYNCHRONOUS animation: it does not
+  // jump to the origin, it eases there over several hundred ms. The very next
+  // `getBoundingClientRect` / `body.offsetHeight` runs mid-animation while the
+  // page is still scrolled down, so every element's measured `top` is offset by
+  // the residual scroll (e.g. a whole page rendered at `top: -1542px`, with a
+  // matching blank band at the bottom of the canvas). Overriding
+  // `scroll-behavior: auto !important` on <html> and <body> makes the reset the
+  // synchronous jump this function assumes.
+  if (docEl && docEl.style) docEl.style.setProperty('scroll-behavior', 'auto', 'important');
+  if (body && body.style) body.style.setProperty('scroll-behavior', 'auto', 'important');
   if (typeof window.scrollTo === 'function') {
     try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
   }

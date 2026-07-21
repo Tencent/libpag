@@ -33,7 +33,8 @@ import {
   type CaptureResponseListener,
 } from './capture-listener';
 import { errMessage, SNAPSHOT_DEFAULTS } from './common';
-import { responseBytes, setViewport } from './browser-engine';
+import { applyCanvasViewport } from './canvas-viewport';
+import { responseBytes } from './browser-engine';
 import type {
   BrowserResponse,
   CookieParam,
@@ -353,27 +354,34 @@ export async function runSnapshot(
     // reads `left: 1300px`) that the body-rooted render can't reproduce.
     //
     // `measureCanvas` neutralises <html>/<body> and returns the canvas size the
-    // same way baseline.js's `captureBodyRect` does. We pass those pre-resize
-    // dimensions back into `takeSnapshot` so the emitted canvas matches the
-    // baseline's screenshot clip exactly (re-measuring after the resize's reflow
-    // could drift by a pixel), while element geometry is measured against the
-    // resized viewport.
+    // same way baseline.js's `captureBodyRect` does. `applyCanvasViewport`
+    // (shared with the baseline) resizes the viewport to that canvas and decides
+    // whether the resize was safe — see lib/canvas-viewport.ts for the full
+    // rationale and the viewport-dependence guard. When the resize is kept we
+    // pass the pre-resize dimensions back into `takeSnapshot` so the emitted
+    // canvas matches the baseline's screenshot clip exactly (re-measuring after
+    // the resize's reflow could drift by a pixel), while element geometry is
+    // measured against the resized viewport. When the guard reverts the resize,
+    // we fall back to the no-arg snapshot, which re-measures the canvas at the
+    // settle viewport — exactly what the baseline clips to in that case.
     let snapshotExpr = TAKE_SNAPSHOT_EXPR;
     try {
       const canvas = await page.evaluate(MEASURE_CANVAS_EXPR) as {
         width: number; height: number;
       };
       if (canvas && canvas.width > 0 && canvas.height > 0) {
-        await setViewport(page, engine, {
-          width: canvas.width,
-          height: canvas.height,
-          deviceScaleFactor: 1,
-        });
-        // Let the resize's reflow settle before geometry is read.
-        await new Promise((r) => setTimeout(r, 50));
-        snapshotExpr =
-          `(() => window.__pagxSnapshot.takeSnapshot(` +
-          `{canvasWidth:${canvas.width},canvasHeight:${canvas.height}}))()`;
+        const { reverted } = await applyCanvasViewport(
+          page,
+          engine,
+          canvas,
+          { width: viewportWidth, height: viewportHeight },
+          log,
+        );
+        if (!reverted) {
+          snapshotExpr =
+            `(() => window.__pagxSnapshot.takeSnapshot(` +
+            `{canvasWidth:${canvas.width},canvasHeight:${canvas.height}}))()`;
+        }
       }
     } catch (err) {
       // Non-fatal: fall back to the no-arg snapshot at the current viewport.
