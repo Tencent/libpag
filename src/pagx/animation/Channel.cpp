@@ -18,7 +18,7 @@
 
 #include "pagx/nodes/Channel.h"
 #include <string>
-#include "pagx/runtime/KeyframeEvaluator.h"
+#include "pagx/runtime/KeyframeEvaluatorImpl.h"
 
 namespace pagx {
 

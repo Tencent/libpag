@@ -28,6 +28,7 @@
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
+#include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
@@ -426,6 +427,75 @@ PAGX_TEST(PAGXRuntimeTest, NoneInterpolationHoldsValue) {
   linear.push_back({0, 10.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   linear.push_back({60, 20.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
   EXPECT_FLOAT_EQ(pagx::EvaluateKeyframeSequence(linear, 30.0), 15.0f);
+}
+
+/**
+ * Test case: EvaluateKeyframeSegment evaluates a single keyframe pair at the boundary and mid
+ * point for each interpolation mode. Hold/None returns the left value, Linear returns exact lerp,
+ * and Bezier returns the eased lerp (verified against a known control curve).
+ */
+PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
+  pagx::Keyframe<float> left{0, 10.0f};
+  pagx::Keyframe<float> right{60, 40.0f};
+
+  // Midpoint t = 0.5 between frame 0 and frame 60.
+  double mid = 30.0;
+  double rawT = (mid - static_cast<double>(left.time)) /
+                (static_cast<double>(right.time) - static_cast<double>(left.time));
+
+  // Hold / None: left value throughout the segment.
+  left.interpolation = pagx::KeyframeInterpolationType::Hold;
+  EXPECT_FLOAT_EQ(
+      std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value,
+                                                     left.interpolation,
+                                                     &left.bezierOut, &right.bezierIn,
+                                                     rawT)),
+      10.0f);
+  left.interpolation = pagx::KeyframeInterpolationType::None;
+  EXPECT_FLOAT_EQ(
+      std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value,
+                                                     left.interpolation,
+                                                     &left.bezierOut, &right.bezierIn,
+                                                     rawT)),
+      10.0f);
+
+  // Linear: exact lerp — midpoint yields 25.0.
+  left.interpolation = pagx::KeyframeInterpolationType::Linear;
+  EXPECT_FLOAT_EQ(
+      std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value,
+                                                     left.interpolation,
+                                                     &left.bezierOut, &right.bezierIn,
+                                                     rawT)),
+      25.0f);
+
+  // Bezier with identity curve (control points on diagonal) behaves like linear.
+  left.interpolation = pagx::KeyframeInterpolationType::Bezier;
+  left.bezierOut = {0.5f, 0.5f};
+  right.bezierIn = {0.5f, 0.5f};
+  EXPECT_FLOAT_EQ(
+      std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value,
+                                                     left.interpolation,
+                                                     &left.bezierOut, &right.bezierIn,
+                                                     rawT)),
+      25.0f);
+
+  // Start boundary returns the left keyframe value.
+  double startT = 0.0;
+  EXPECT_FLOAT_EQ(
+      std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value,
+                                                     left.interpolation,
+                                                     &left.bezierOut, &right.bezierIn,
+                                                     startT)),
+      10.0f);
+
+  // End boundary returns the right keyframe value.
+  double endT = 1.0;
+  EXPECT_FLOAT_EQ(
+      std::get<float>(pagx::EvaluateKeyframeSegment(left.value, right.value,
+                                                     left.interpolation,
+                                                     &left.bezierOut, &right.bezierIn,
+                                                     endT)),
+      40.0f);
 }
 
 }  // namespace pag
