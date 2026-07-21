@@ -30,6 +30,9 @@
 
 namespace pagx {
 
+// Continuous lerp for value types that support smooth interpolation. Discrete types specialize
+// below to ignore the eased fraction and return the start value (Hold semantics). The primary
+// template is intentionally unimplemented — every supported KeyValue alternative must specialize.
 template <typename T>
 T LerpKeyframeValue(const T& a, const T& b, double t) = delete;
 
@@ -67,6 +70,9 @@ inline ImageRef LerpKeyframeValue<ImageRef>(const ImageRef& a, const ImageRef& /
 
 template <>
 inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double t) {
+  // See MatrixDecompose.h for the winding limitation: matrix rotation interpolation cannot recover
+  // full turns, so keyframes needing precise multi-turn or +/-pi-boundary rotation should target a
+  // scalar rotation channel (e.g. Group::rotation) instead of a Matrix.
   auto da = DecomposeAffine(a.a, a.b, a.c, a.d, a.tx, a.ty);
   auto db = DecomposeAffine(b.a, b.b, b.c, b.d, b.tx, b.ty);
   auto mixed = MixDecomposed(da, db, static_cast<float>(t));
@@ -75,11 +81,20 @@ inline Matrix LerpKeyframeValue<Matrix>(const Matrix& a, const Matrix& b, double
   return result;
 }
 
+// Comparator for std::upper_bound: returns true when framePosition precedes the keyframe's time.
+// Defined as a named function template because the project forbids lambdas.
 template <typename T>
 static bool FramePositionBeforeKeyframe(double value, const Keyframe<T>& kf) {
   return value < static_cast<double>(kf.time);
 }
 
+// Evaluates a Hold/None/Linear/Bezier-segmented keyframe sequence at the given continuous frame
+// position. Boundary policy is clamp-to-end: positions outside [keyframes.front().time,
+// keyframes.back().time] return the boundary value.
+//
+// `interpolation` and bezier control points come from `keyframes[i]` (the segment start) per the
+// plan's ownership rule: keyframes[i].interpolation describes the i -> i+1 segment, with
+// keyframes[i].bezierOut and keyframes[i+1].bezierIn forming the Bezier handles.
 template <typename T>
 T EvaluateKeyframeSequence(const std::vector<Keyframe<T>>& keyframes, double framePosition) {
   if (keyframes.empty()) {

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cmath>
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Keyframe.h"
 #include "pagx/types/Point.h"
@@ -30,6 +29,9 @@ namespace pagx {
  * span. The caller computes `rawT = (framePosition - keyIn.time) / (keyOut.time - keyIn.time)`
  * and passes it in; this function only applies the interpolation behavior.
  *
+ * When `rawT` is outside [0, 1], the function clamps the result to the left or right boundary
+ * value respectively, so the caller is not required to normalize before calling.
+ *
  * Supported KeyValue types: float, bool, int, std::string, ImageRef, Color, Matrix, PAGImage.
  *
  * @param leftValue the value at keyIn.
@@ -37,13 +39,13 @@ namespace pagx {
  * @param interp the interpolation mode from keyIn.
  * @param bezierOut the outgoing bezier handle from keyIn, used when interp is Bezier.
  * @param bezierIn the incoming bezier handle from keyOut, used when interp is Bezier.
- * @param rawT the normalized position in [0, 1] within the segment.
+ * @param rawT the normalized position within the segment.
  * @return the interpolated KeyValue at the given position.
  */
 KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue,
                                  const KeyValue& rightValue,
                                  KeyframeInterpolationType interp,
-                                 const Point* bezierOut, const Point* bezierIn,
+                                 Point bezierOut, Point bezierIn,
                                  double rawT);
 
 }  // namespace pagx
