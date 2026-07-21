@@ -412,8 +412,8 @@ std::string BuildClipShapeGeometry(const std::string& value, float w, float h) {
     float rx = resolveRadius(radii.size() > 0 ? radii[0] : "", w, cx);
     float ry = resolveRadius(radii.size() > 1 ? radii[1] : "", h, cy);
     if (std::isnan(rx) || std::isnan(ry) || rx <= 0 || ry <= 0) return {};
-    return "<ellipse cx=\"" + CssFloatToString(cx) + "\" cy=\"" + CssFloatToString(cy) + "\" rx=\"" +
-           CssFloatToString(rx) + "\" ry=\"" + CssFloatToString(ry) + "\"/>";
+    return "<ellipse cx=\"" + CssFloatToString(cx) + "\" cy=\"" + CssFloatToString(cy) +
+           "\" rx=\"" + CssFloatToString(rx) + "\" ry=\"" + CssFloatToString(ry) + "\"/>";
   }
 
   if (name == "inset") {
@@ -445,8 +445,8 @@ std::string BuildClipShapeGeometry(const std::string& value, float w, float h) {
     float rh = h - top - bottom;
     if (rw <= 0 || rh <= 0) return {};
     std::string rect = "<rect x=\"" + CssFloatToString(left) + "\" y=\"" + CssFloatToString(top) +
-                       "\" width=\"" + CssFloatToString(rw) + "\" height=\"" + CssFloatToString(rh) +
-                       "\"";
+                       "\" width=\"" + CssFloatToString(rw) + "\" height=\"" +
+                       CssFloatToString(rh) + "\"";
     // Only the uniform `round <r>` form is modelled; the elliptical / per-corner border-radius
     // grammar collapses to the first radius token applied to both axes.
     if (!roundToks.empty()) {

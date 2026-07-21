@@ -4411,8 +4411,7 @@ PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedFilterWarns) {
   ASSERT_NE(doc, nullptr);
   bool warned = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("filter") != std::string::npos &&
-        msg.find("not-a-filter") != std::string::npos) {
+    if (msg.find("filter") != std::string::npos && msg.find("not-a-filter") != std::string::npos) {
       warned = true;
     }
   }

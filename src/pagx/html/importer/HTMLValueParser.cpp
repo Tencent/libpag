@@ -464,14 +464,13 @@ std::vector<HTMLValueParser::FilterStep> HTMLValueParser::parseFilterChain(
       step.kind = ref.empty() ? FilterStep::Kind::Unsupported : FilterStep::Kind::SvgRef;
       step.refId = ref;
     } else if (name == "brightness" || name == "contrast" || name == "saturate" ||
-               name == "grayscale" || name == "sepia" || name == "invert" ||
-               name == "opacity") {
+               name == "grayscale" || name == "sepia" || name == "invert" || name == "opacity") {
       // Colour-adjustment functions taking a <number>|<percentage> amount. brightness / contrast /
       // saturate / opacity default to 1 (identity); grayscale / sepia / invert default to 0.
-      float defaultValue = (name == "brightness" || name == "contrast" || name == "saturate" ||
-                            name == "opacity")
-                               ? 1.0f
-                               : 0.0f;
+      float defaultValue =
+          (name == "brightness" || name == "contrast" || name == "saturate" || name == "opacity")
+              ? 1.0f
+              : 0.0f;
       float amount = defaultValue;
       if (!ParseFilterAmount(args, defaultValue, amount)) {
         _diagnostics.warn("html: invalid amount in filter '" + step.raw + "'; ignored");
