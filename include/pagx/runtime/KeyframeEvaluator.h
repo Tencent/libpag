@@ -26,25 +26,26 @@ namespace pagx {
 
 /**
  * Evaluates the interpolated value between two adjacent keyframes at a given point within their
- * span. The caller computes `rawT = (framePosition - keyIn.time) / (keyOut.time - keyIn.time)`
+ * span. The caller computes `progress = (framePosition - keyIn.time) / (keyOut.time - keyIn.time)`
  * and passes it in; this function only applies the interpolation behavior. The caller is
- * expected to pass `rawT` in [0, 1]; for Hold and Bezier modes, out-of-range values are
+ * expected to pass `progress` in [0, 1]; for Hold and Bezier modes, out-of-range values are
  * clamped to the boundaries, while Linear may extrapolate outside that range.
  *
  * Supported KeyValue types: float, bool, int, std::string, ImageRef, Color, Matrix, PAGImage.
  *
  * @param leftValue the value at keyIn.
  * @param rightValue the value at keyOut.
+ * @param progress the normalized position within the segment.
  * @param interp the interpolation mode from keyIn.
  * @param bezierOut the outgoing bezier handle from keyIn, used when interp is Bezier.
  * @param bezierIn the incoming bezier handle from keyOut, used when interp is Bezier.
- * @param rawT the normalized position within the segment.
  * @return the interpolated KeyValue at the given position.
  */
 KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue,
                                  const KeyValue& rightValue,
+                                 double progress,
                                  KeyframeInterpolationType interp,
-                                 Point bezierOut, Point bezierIn,
-                                 double rawT);
+                                 const Point* bezierOut = nullptr,
+                                 const Point* bezierIn = nullptr);
 
 }  // namespace pagx

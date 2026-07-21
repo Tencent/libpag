@@ -440,12 +440,13 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentBasic) {
 
   // Midpoint t = 0.5 between frame 0 and frame 60.
   double mid = 30.0;
-  double rawT = (mid - static_cast<double>(left.time)) /
-                (static_cast<double>(right.time) - static_cast<double>(left.time));
+  double progress = (mid - static_cast<double>(left.time)) /
+                    (static_cast<double>(right.time) - static_cast<double>(left.time));
 
   auto eval = [&]() {
     return std::get<float>(pagx::EvaluateKeyframeSegment(
-        left.value, right.value, left.interpolation, left.bezierOut, right.bezierIn, rawT));
+        left.value, right.value, progress, left.interpolation, &left.bezierOut,
+        &right.bezierIn));
   };
 
   // Hold / None: left value throughout the segment.
@@ -473,25 +474,25 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentDiscreteTypes) {
   pagx::KeyValue leftBool = true;
   pagx::KeyValue rightBool = false;
   pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftBool, rightBool, pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
+      leftBool, rightBool, 0.5, pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(std::get<bool>(result), true);
 
   pagx::KeyValue leftInt = 42;
   pagx::KeyValue rightInt = 99;
-  result = pagx::EvaluateKeyframeSegment(leftInt, rightInt, pagx::KeyframeInterpolationType::Linear,
-                                         {}, {}, 0.5);
+  result = pagx::EvaluateKeyframeSegment(leftInt, rightInt, 0.5,
+                                         pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(std::get<int>(result), 42);
 
   pagx::KeyValue leftStr = std::string("hello");
   pagx::KeyValue rightStr = std::string("world");
-  result = pagx::EvaluateKeyframeSegment(leftStr, rightStr, pagx::KeyframeInterpolationType::Linear,
-                                         {}, {}, 0.5);
+  result = pagx::EvaluateKeyframeSegment(leftStr, rightStr, 0.5,
+                                         pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(std::get<std::string>(result), "hello");
 
   pagx::KeyValue leftImg = pagx::ImageRef{"img_a"};
   pagx::KeyValue rightImg = pagx::ImageRef{"img_b"};
-  result = pagx::EvaluateKeyframeSegment(leftImg, rightImg, pagx::KeyframeInterpolationType::Linear,
-                                         {}, {}, 0.5);
+  result = pagx::EvaluateKeyframeSegment(leftImg, rightImg, 0.5,
+                                         pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(std::get<pagx::ImageRef>(result).id, "img_a");
 }
 
@@ -502,7 +503,7 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentColor) {
   pagx::KeyValue leftColor = pagx::Color{0.2f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   pagx::KeyValue rightColor = pagx::Color{1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
   pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftColor, rightColor, pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
+      leftColor, rightColor, 0.5, pagx::KeyframeInterpolationType::Linear);
   auto color = std::get<pagx::Color>(result);
   EXPECT_GT(color.red, 0.2f);
   EXPECT_LT(color.red, 1.0f);
@@ -515,7 +516,7 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentMatrix) {
   pagx::KeyValue leftMat = pagx::Matrix{2.0f, 0.0f, 0.0f, 2.0f, 0.0f, 0.0f};
   pagx::KeyValue rightMat = pagx::Matrix{4.0f, 0.0f, 0.0f, 4.0f, 0.0f, 0.0f};
   pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftMat, rightMat, pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
+      leftMat, rightMat, 0.5, pagx::KeyframeInterpolationType::Linear);
   auto mat = std::get<pagx::Matrix>(result);
   EXPECT_GT(mat.a, 2.0f);
   EXPECT_LT(mat.a, 4.0f);
@@ -528,7 +529,7 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentTypeMismatch) {
   pagx::KeyValue leftFloat = 10.0f;
   pagx::KeyValue leftInt = 42;
   pagx::KeyValue result = pagx::EvaluateKeyframeSegment(
-      leftFloat, leftInt, pagx::KeyframeInterpolationType::Linear, {}, {}, 0.5);
+      leftFloat, leftInt, 0.5, pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(result, leftFloat);
 }
 

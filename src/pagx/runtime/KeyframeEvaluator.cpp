@@ -50,20 +50,20 @@ static KeyValue EvaluateLerp(const KeyValue& a, const KeyValue& b, double t) {
 }
 
 KeyValue EvaluateKeyframeSegment(const KeyValue& leftValue, const KeyValue& rightValue,
-                                 KeyframeInterpolationType interp, Point bezierOut, Point bezierIn,
-                                 double rawT) {
+                                 double progress, KeyframeInterpolationType interp,
+                                 const Point* bezierOut, const Point* bezierIn) {
   switch (interp) {
     case KeyframeInterpolationType::None:
     case KeyframeInterpolationType::Hold:
       return leftValue;
     case KeyframeInterpolationType::Linear:
-      return EvaluateLerp(leftValue, rightValue, rawT);
+      return EvaluateLerp(leftValue, rightValue, progress);
     case KeyframeInterpolationType::Bezier:
       return EvaluateLerp(
           leftValue, rightValue,
-          SolveBezierEasing(static_cast<double>(bezierOut.x), static_cast<double>(bezierOut.y),
-                            static_cast<double>(bezierIn.x), static_cast<double>(bezierIn.y),
-                            rawT));
+          SolveBezierEasing(static_cast<double>(bezierOut->x), static_cast<double>(bezierOut->y),
+                            static_cast<double>(bezierIn->x), static_cast<double>(bezierIn->y),
+                            progress));
   }
   return leftValue;
 }
