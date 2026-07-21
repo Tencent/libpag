@@ -157,9 +157,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns true if the scene's content has changed since the last render, i.e. a redraw would
    * produce different pixels. Hosts driving their own render loop can consult this to skip
-   * redundant full renders on idle frames. Reflects only the runtime layer tree state captured
-   * by the last renderTo()/Record(); pending ViewModel data binds flushed at the next Record()
-   * are not accounted for here.
+   * redundant full renders on idle frames. Returns true when either the underlying display list
+   * has changed or a pending TextHolder reshape (driven by a ViewModel data bind or animation
+   * text-shaping channel) has not yet been flushed — flush runs inside Record().
    */
   bool hasContentChanged() const;
 
