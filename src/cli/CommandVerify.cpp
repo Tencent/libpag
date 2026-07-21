@@ -376,8 +376,7 @@ static void CollectRefsFromAnimation(const Animation* animation,
   }
 }
 
-// Records ids referenced by a StateMachine: each AnimationState.animation points at an Animation,
-// and each StateMachineInput.defaultImage (if any) points at an Image resource.
+// Records ids referenced by a StateMachine: each AnimationState.animation points at an Animation.
 static void CollectRefsFromStateMachine(const StateMachine* sm,
                                         std::unordered_set<std::string>& refs) {
   if (sm == nullptr) {
