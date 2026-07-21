@@ -2029,6 +2029,57 @@ PAGX_TEST(PAGXViewModelTest, DataBindRuntimeNullDataBindSafety) {
   runtime->update(binding.get(), 1.0f);
 }
 
+// ========== DataBind scope filtering ==========
+
+PAGX_TEST(PAGXViewModelTest, DataBindDropsOutOfScopeTarget) {
+  // A DataBind whose target resolves (document-wide) to a node that is NOT in this binding is
+  // dropped: in the real runtime such a node lives inside a nested composition's own binding, so
+  // binding to it here would cross the composition boundary. Mirrors PAGTimeline's scope filter.
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("T");
+  auto* prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "val";
+  prop->propertyType = pagx::ViewModelPropertyType::Number;
+  schema->properties.push_back(prop);
+  doc->viewModel = schema;
+
+  auto inScope = doc->makeNode<pagx::Layer>("inScope");
+  inScope->width = 200;
+  inScope->height = 200;
+  doc->layers.push_back(inScope);
+  auto outOfScope = doc->makeNode<pagx::Layer>("outOfScope");
+  outOfScope->width = 200;
+  outOfScope->height = 200;
+  doc->layers.push_back(outOfScope);
+
+  auto scene = pagx::PAGScene::Make(
+      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  ASSERT_NE(scene, nullptr);
+  auto ctx = std::make_shared<pagx::DataContext>(scene->viewModel());
+
+  auto dbOut = doc->makeNode<pagx::DataBind>();
+  dbOut->source = "$vm.val";
+  dbOut->target = "@outOfScope";
+  dbOut->channel = "alpha";
+  auto dbIn = doc->makeNode<pagx::DataBind>();
+  dbIn->source = "$vm.val";
+  dbIn->target = "@inScope";
+  dbIn->channel = "alpha";
+
+  // A binding that only contains inScope. outOfScope resolves via findNode but is not a member of
+  // this binding, so bind() must drop it while keeping the in-scope bind.
+  auto binding = std::make_unique<pagx::RuntimeBinding>();
+  binding->set(inScope, std::make_shared<int>(0));
+
+  auto runtime = std::make_unique<pagx::DataBindRuntime>();
+  std::vector<pagx::DataBind*> binds = {dbOut, dbIn};
+  runtime->bind(binds, ctx.get(), doc.get(), binding.get());
+
+  // Exactly one entry survives — the in-scope one; the out-of-scope target was filtered out.
+  ASSERT_EQ(runtime->entries.size(), 1u);
+  EXPECT_EQ(runtime->entries[0].targetNode, inScope);
+}
+
 // ========== DataBindRuntime destructor safety ==========
 
 PAGX_TEST(PAGXViewModelTest, DataBindRuntimeDestructorWithDeadSource) {

@@ -748,6 +748,17 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // from the current tree so flushTextHolders / hasContentChanged stay consistent with the
     // binding state.
     collectTextHolders();
+    // An incremental refresh adds or removes layers, changing binding membership in place without
+    // recreating the reused timelines or their binding. Mark every timeline's resolved target cache
+    // stale so the next apply() re-resolves; no other signal covers this case. Top-level
+    // PAGAnimation instances (held in instantiatedTimelines with a lazily-resolved root binding) are
+    // marked separately.
+    _rootComposition->markTimelineTargetsDirty();
+    for (auto& entry : instantiatedTimelines) {
+      if (entry.second != nullptr && entry.second->type() == TimelineType::Animation) {
+        static_cast<PAGAnimation*>(entry.second.get())->targetsDirty = true;
+      }
+    }
   }
   // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
   // state machines that play them) can share targets and cross-reference, so the whole timeline

@@ -262,10 +262,9 @@ struct RuntimeBinding {
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {
     auto it = targets.find(node);
     if (it == targets.end()) {
-      // Callers (PAGTimeline::resolveTargets, DataBindRuntime::bind) already drop out-of-scope
-      // targets via contains(), so a miss here means that scope contract was broken upstream. The
-      // return false below keeps release builds graceful.
-      DEBUG_ASSERT(false);
+      // A miss is legitimate when a cached target was removed from the binding after cache
+      // population (e.g. a Layer targeted by a top-level timeline is deleted without resetting the
+      // timeline's resolved cache). Fail gracefully.
       return false;
     }
     return it->second->apply(channel, value, mix);
