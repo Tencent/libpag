@@ -124,7 +124,7 @@ class PAGComposition : public PAGLayer {
   // compositions themselves. Used by the composition-tree walks (view-model build, data-bind
   // update, view-model advance) so that compositions nested under plain container layers are not
   // skipped.
-  static void CollectChildCompositions(PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
+  static void CollectChildCompositions(const PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
 
   // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
   // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
@@ -194,6 +194,11 @@ class PAGComposition : public PAGLayer {
   // has a pending reshape. Used by PAGScene::hasContentChanged so a dirty holder is not dropped by
   // the dirty gate before flush runs.
   bool hasDirtyTextHolders() const;
+
+  // Returns true if this composition's own binding has any TextHolder registered. Cheap check
+  // (no tree walk) used by PAGScene to decide whether hasDirtyTextHolders / flushTextHolders need
+  // to run at all this frame.
+  bool hasTextHolders() const;
 
   friend class PAGScene;
 };

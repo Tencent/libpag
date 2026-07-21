@@ -133,6 +133,10 @@ void PAGScene::buildRuntimeTree() {
     }
   }
   buildViewModels();
+  // Cache whether any composition in the tree registered a TextHolder. hasContentChanged and
+  // flushTextHolders consult this every frame; without it they would each walk the composition
+  // tree even when the document has no text reshape at all.
+  hasAnyTextHolder = computeHasAnyTextHolder();
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -566,9 +570,27 @@ void PAGScene::flushDataBinds() {
 }
 
 void PAGScene::flushTextHolders() {
-  if (_rootComposition != nullptr && document != nullptr) {
-    _rootComposition->flushTextHolders(&document->_fontConfig);
+  if (!hasAnyTextHolder || _rootComposition == nullptr || document == nullptr) {
+    return;
   }
+  _rootComposition->flushTextHolders(&document->_fontConfig);
+}
+
+bool PAGScene::computeHasAnyTextHolder() const {
+  if (_rootComposition == nullptr) {
+    return false;
+  }
+  if (_rootComposition->hasTextHolders()) {
+    return true;
+  }
+  std::vector<PAGComposition*> childComps = {};
+  PAGComposition::CollectChildCompositions(_rootComposition.get(), childComps);
+  for (auto* childComp : childComps) {
+    if (childComp->hasTextHolders()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void PAGScene::clearAllViewModelsDirty() {
@@ -769,8 +791,9 @@ bool PAGScene::hasContentChanged() const {
   }
   // A pending TextHolder reshape (ViewModel/Animation drove a text-shaping channel) has not yet
   // touched the tgfx objects — flush runs inside Record(). Without this check the dirty gate would
-  // skip the frame and the reshape would never reach the screen.
-  if (_rootComposition != nullptr && _rootComposition->hasDirtyTextHolders()) {
+  // skip the frame and the reshape would never reach the screen. The hasAnyTextHolder cache avoids
+  // the composition-tree walk on every frame for documents without any text reshape.
+  if (hasAnyTextHolder && _rootComposition != nullptr && _rootComposition->hasDirtyTextHolders()) {
     return true;
   }
   return displayList->hasContentChanged();

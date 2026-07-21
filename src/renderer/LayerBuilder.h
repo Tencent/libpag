@@ -314,6 +314,13 @@ struct RuntimeBinding {
     }
   }
 
+  // Returns true if this binding has any TextHolder registered. Used as a cheap pre-check so
+  // hasDirtyTextHolders / flushTextHolders can skip the tree walk entirely when the document has
+  // no text reshape at all.
+  bool hasTextHolders() const {
+    return !textHolders.empty();
+  }
+
   // Reshapes every dirty TextHolder. Called from the pre-draw commit stage after ViewModel and
   // Animation channels have been applied. fontConfig is borrowed for the duration of the call.
   void flushTextHolders(FontConfig* fontConfig);

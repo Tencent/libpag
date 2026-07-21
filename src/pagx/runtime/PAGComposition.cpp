@@ -213,7 +213,7 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
   }
 }
 
-void PAGComposition::CollectChildCompositions(PAGLayer* layer,
+void PAGComposition::CollectChildCompositions(const PAGLayer* layer,
                                               std::vector<PAGComposition*>& outChildren) {
   if (layer == nullptr) {
     return;
@@ -488,13 +488,17 @@ bool PAGComposition::hasDirtyTextHolders() const {
     return true;
   }
   std::vector<PAGComposition*> childComps = {};
-  CollectChildCompositions(const_cast<PAGComposition*>(this), childComps);
+  CollectChildCompositions(this, childComps);
   for (auto* childComp : childComps) {
     if (childComp->hasDirtyTextHolders()) {
       return true;
     }
   }
   return false;
+}
+
+bool PAGComposition::hasTextHolders() const {
+  return binding != nullptr && binding->hasTextHolders();
 }
 
 }  // namespace pagx

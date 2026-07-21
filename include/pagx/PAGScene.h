@@ -216,6 +216,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
       std::unordered_set<const ViewModel*>& visited);
   void flushDataBinds();
   void flushTextHolders();
+  // Walks the composition tree once and returns true if any composition's binding has a
+  // TextHolder registered. Called at the end of buildRuntimeTree to cache hasAnyTextHolder.
+  bool computeHasAnyTextHolder() const;
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 
@@ -251,6 +254,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   bool suppressNotify = false;
   std::vector<PAGViewModelValue*> pendingNotifications = {};
+
+  // True if any composition in the runtime tree has a TextHolder registered. Set once at the end
+  // of buildRuntimeTree and used as an early-out by hasContentChanged / flushTextHolders so the
+  // common case (no text reshape in the document) avoids walking the composition tree every frame.
+  bool hasAnyTextHolder = false;
 
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
