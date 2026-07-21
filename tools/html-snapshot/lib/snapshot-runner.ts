@@ -9,6 +9,7 @@
 
 import {
   TAKE_SNAPSHOT_EXPR,
+  MEASURE_CANVAS_EXPR,
   SNAPSHOT_INIT_SCRIPT,
   inlineExternalImages,
   inlineCanvases,
@@ -32,6 +33,7 @@ import {
   type CaptureResponseListener,
 } from './capture-listener';
 import { errMessage, SNAPSHOT_DEFAULTS } from './common';
+import { applyCanvasViewport } from './canvas-viewport';
 import { responseBytes } from './browser-engine';
 import type {
   BrowserResponse,
@@ -340,10 +342,58 @@ export async function runSnapshot(
       }
     }
 
+    // Resize the viewport to the body canvas before measuring geometry, exactly
+    // as baseline.js does before it screenshots the ground truth. `pagx render`
+    // roots the subset at <body> (0,0), and the baseline is captured in a
+    // viewport equal to the body canvas, so any element whose containing block
+    // is the initial containing block — a `position: absolute` box anchored by
+    // `right`/`bottom` with no positioned ancestor, `position: fixed`, or a
+    // `vw`/`vh` length — must be measured against that same box. Measured at the
+    // default 1400x900 viewport instead, such an element resolves to
+    // viewport-relative coordinates (e.g. `right: 20px` on a 200px-wide body
+    // reads `left: 1300px`) that the body-rooted render can't reproduce.
+    //
+    // `measureCanvas` neutralises <html>/<body> and returns the canvas size the
+    // same way baseline.js's `captureBodyRect` does. `applyCanvasViewport`
+    // (shared with the baseline) resizes the viewport to that canvas and decides
+    // whether the resize was safe — see lib/canvas-viewport.ts for the full
+    // rationale and the viewport-dependence guard. When the resize is kept we
+    // pass the pre-resize dimensions back into `takeSnapshot` so the emitted
+    // canvas matches the baseline's screenshot clip exactly (re-measuring after
+    // the resize's reflow could drift by a pixel), while element geometry is
+    // measured against the resized viewport. When the guard reverts the resize,
+    // we fall back to the no-arg snapshot, which re-measures the canvas at the
+    // settle viewport — exactly what the baseline clips to in that case.
+    let snapshotExpr = TAKE_SNAPSHOT_EXPR;
+    try {
+      const canvas = await page.evaluate(MEASURE_CANVAS_EXPR) as {
+        width: number; height: number;
+      };
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        const { reverted } = await applyCanvasViewport(
+          page,
+          engine,
+          canvas,
+          { width: viewportWidth, height: viewportHeight },
+          log,
+        );
+        if (!reverted) {
+          snapshotExpr =
+            `(() => window.__pagxSnapshot.takeSnapshot(` +
+            `{canvasWidth:${canvas.width},canvasHeight:${canvas.height}}))()`;
+        }
+      }
+    } catch (err) {
+      // Non-fatal: fall back to the no-arg snapshot at the current viewport.
+      // A measurement/resize hiccup should degrade to the previous behaviour,
+      // not abort a snapshot we can still produce.
+      if (log) log(`viewport resize to canvas skipped: ${errMessage(err)}`);
+    }
+
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
     // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
     // ships the ~70-byte entry expression now.
-    const snapshot = await page.evaluate(TAKE_SNAPSHOT_EXPR) as {
+    const snapshot = await page.evaluate(snapshotExpr) as {
       html: string; width: number; height: number;
     };
 

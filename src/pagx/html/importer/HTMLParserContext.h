@@ -119,7 +119,9 @@ class HTMLParserContext {
                           const HTMLInheritedStyle& inherited);
 
   // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
-  // `clip-path: url(#id)` (contour) and attaches it to `layer` as `layer->mask` / `maskType`
+  // `clip-path` (contour) — the latter from a `url(#id)` <clipPath> reference or a CSS basic
+  // shape (`polygon()` / `path()` / `circle()` / `ellipse()` / `inset()`) synthesised into
+  // equivalent SVG geometry — and attaches it to `layer` as `layer->mask` / `maskType`
   // (the inverse of `HTMLWriter::writeMaskCSS` / `writeClipDef`). The mask geometry SVG is parsed
   // through `SVGImporter`, and its nodes are transplanted into `_document`. The mask layer is added
   // as an invisible, layout-excluded child of `layer` so it shares the masked layer's local

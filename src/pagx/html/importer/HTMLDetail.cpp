@@ -132,10 +132,163 @@ std::vector<std::pair<std::string, std::string>> ParseStyleDeclarations(const st
   return out;
 }
 
+namespace {
+
+bool IsBackgroundImageToken(const std::string& lower) {
+  return lower.rfind("url(", 0) == 0 || lower.find("gradient(") != std::string::npos;
+}
+
+bool IsBackgroundRepeatToken(const std::string& lower) {
+  return lower == "repeat" || lower == "no-repeat" || lower == "repeat-x" || lower == "repeat-y" ||
+         lower == "space" || lower == "round";
+}
+
+bool IsBackgroundBoxOrAttachmentToken(const std::string& lower) {
+  return lower == "scroll" || lower == "fixed" || lower == "local" || lower == "border-box" ||
+         lower == "padding-box" || lower == "content-box";
+}
+
+bool IsBackgroundColorToken(const std::string& token) {
+  std::string lower = ToLower(Trim(token));
+  if (lower.empty()) return false;
+  if (lower[0] == '#') return true;
+  static const char* kColorFns[] = {"rgb(", "rgba(", "hsl(",   "hsla(",  "hwb(",
+                                    "lab(", "lch(",  "oklab(", "oklch(", "color("};
+  for (const char* fn : kColorFns) {
+    if (lower.rfind(fn, 0) == 0) return true;
+  }
+  if (lower == "currentcolor") return true;
+  return NamedColors().find(lower) != NamedColors().end();
+}
+
+std::vector<std::string> SplitBackgroundLayerTokens(const std::string& layer) {
+  std::string spaced;
+  spaced.reserve(layer.size() + 8);
+  int depth = 0;
+  for (char c : layer) {
+    if (c == '(') {
+      depth++;
+    } else if (c == ')' && depth > 0) {
+      depth--;
+    }
+    if (c == '/' && depth == 0) {
+      spaced += " / ";
+    } else {
+      spaced += c;
+    }
+  }
+  return SplitTopLevelWhitespace(spaced);
+}
+
+std::string JoinStyleTokens(const std::vector<std::string>& tokens) {
+  std::string out;
+  for (const auto& token : tokens) {
+    if (!out.empty()) out.push_back(' ');
+    out += token;
+  }
+  return out;
+}
+
+// Applies one `background` declaration at its exact position in a declaration list. Empty values
+// are intentional cascade tombstones: they override lower-priority/earlier longhands but are
+// omitted by the property filter and style emitter, thereby representing the shorthand's initial
+// values without serialising noise such as `background-image:none`.
+void ApplyBackgroundShorthand(const std::string& value,
+                              std::unordered_map<std::string, std::string>& out) {
+  static const char* kResetProperties[] = {
+      "background-color", "background-image",  "background-position",
+      "background-size",  "background-repeat", "background-clip",
+  };
+  for (const char* property : kResetProperties) {
+    out[property].clear();
+  }
+
+  auto layers = SplitTopLevelCommas(Trim(value));
+  std::vector<std::string> imageLayers;
+  bool hasURLImage = false;
+  std::string colorToken;
+  std::string positionValue;
+  std::string sizeValue;
+  std::string repeatValue;
+
+  for (size_t layerIndex = 0; layerIndex < layers.size(); ++layerIndex) {
+    bool isLastLayer = layerIndex + 1 == layers.size();
+    std::string imageToken;
+    std::vector<std::string> positionTokens;
+    std::vector<std::string> sizeTokens;
+    std::vector<std::string> repeatTokens;
+    bool afterSlash = false;
+    for (const auto& token : SplitBackgroundLayerTokens(layers[layerIndex])) {
+      if (token == "/") {
+        afterSlash = true;
+        continue;
+      }
+      std::string lower = ToLower(token);
+      if (IsBackgroundImageToken(lower)) {
+        imageToken = token;
+      } else if (lower == "none") {
+        // The reset above already represents `background-image:none`.
+      } else if (isLastLayer && colorToken.empty() && IsBackgroundColorToken(token)) {
+        colorToken = token;
+      } else if (IsBackgroundRepeatToken(lower)) {
+        repeatTokens.push_back(lower);
+      } else if (IsBackgroundBoxOrAttachmentToken(lower)) {
+        // These reset correctly above but have no PAGX visual analogue.
+      } else if (afterSlash) {
+        sizeTokens.push_back(token);
+      } else {
+        positionTokens.push_back(token);
+      }
+    }
+    if (!imageToken.empty()) {
+      bool isURLImage = ToLower(imageToken).rfind("url(", 0) == 0;
+      imageLayers.push_back(std::move(imageToken));
+      hasURLImage |= isURLImage;
+      // PAGX can stack gradients, but its ImagePattern path consumes only one image layer. Keep
+      // the fitting values from the CSS-topmost image so they stay paired with the same layer if
+      // the shorthand has to be reduced to one image below.
+      if (imageLayers.size() == 1) {
+        positionValue = JoinStyleTokens(positionTokens);
+        sizeValue = JoinStyleTokens(sizeTokens);
+        repeatValue = JoinStyleTokens(repeatTokens);
+      }
+    }
+  }
+
+  if (!imageLayers.empty()) {
+    std::string joinedImages;
+    if (hasURLImage) {
+      // Mixed/url stacks cannot be represented by one PAGX ImagePattern. CSS paints the first
+      // listed image on top, so retain that layer and its position/size/repeat values rather than
+      // pairing a multi-layer image list with unrelated fitting data.
+      joinedImages = imageLayers.front();
+    } else {
+      for (const auto& image : imageLayers) {
+        if (!joinedImages.empty()) joinedImages += ", ";
+        joinedImages += image;
+      }
+    }
+    out["background-image"] = std::move(joinedImages);
+    out["background-position"] = std::move(positionValue);
+    out["background-size"] = std::move(sizeValue);
+    out["background-repeat"] = std::move(repeatValue);
+  }
+  if (!colorToken.empty()) {
+    out["background-color"] = std::move(colorToken);
+  }
+}
+
+}  // namespace
+
 void ParseStyleString(const std::string& styleStr,
                       std::unordered_map<std::string, std::string>& out) {
   for (auto& decl : ParseStyleDeclarations(styleStr)) {
-    out[ToLower(decl.first)] = std::move(decl.second);
+    std::string property = ToLower(decl.first);
+    if (property == "background") {
+      ApplyBackgroundShorthand(decl.second, out);
+    } else {
+      out[property] = std::move(decl.second);
+    }
   }
 }
 

@@ -30,6 +30,7 @@
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
@@ -121,6 +122,17 @@ void ResetLayoutAnchors(Layer* inner) {
 }
 
 }  // namespace
+
+BlendMode HTMLLayerBuilder::resolveBackgroundBlendMode(const std::string& value) {
+  if (value.empty()) return BlendMode::Normal;
+  // `background-blend-mode` may list one keyword per background layer. We apply a single blend
+  // to every gradient/image Fill, so key off the first top-level token (the common single-value
+  // case is unaffected). `SVGBlendModeFromString` maps the CSS keyword directly and returns
+  // Normal for `normal` / any unrecognised value.
+  auto tokens = SplitTopLevelCommas(value);
+  std::string first = tokens.empty() ? value : Trim(tokens.front());
+  return SVGBlendModeFromString(first);
+}
 
 HTMLLayerBuilder::HTMLLayerBuilder(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser,
                                    HTMLInlineSvgEmitter& svgEmitter)
@@ -322,17 +334,22 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
 void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box,
                                            Element* geometry, bool& emitted) {
   if (!geometry) return;
-  if (box.backgroundColorSet && box.backgroundImage.empty()) {
-    layer->contents.push_back(buildSolidFill(box.backgroundColor));
-    emitted = true;
-    return;
-  }
-  if (box.backgroundImage.empty()) return;
 
   // A `url(...)` background is recovered as an `ImagePattern` fill by `HTMLParserContext`
-  // (it owns the image-resource registry and native-size decoding). The geometry is already
-  // on the layer; leave the fill to the caller and emit nothing here.
-  if (ToLower(box.backgroundImage).find("url(") != std::string::npos) return;
+  // (it owns the image-resource registry and native-size decoding) and pushed onto the layer
+  // right after this call, so it paints on top. CSS layers the image over the
+  // background-color, and decorative url() backgrounds are frequently partly transparent
+  // (e.g. a low-opacity noise overlay), so the colour must still be emitted underneath here
+  // rather than dropped.
+  bool urlImage = !box.backgroundImage.empty() &&
+                  ToLower(box.backgroundImage).find("url(") != std::string::npos;
+  if (box.backgroundImage.empty() || urlImage) {
+    if (box.backgroundColorSet) {
+      layer->contents.push_back(buildSolidFill(box.backgroundColor));
+      emitted = true;
+    }
+    return;
+  }
 
   // CSS allows stacking multiple gradients in `background-image` separated by top-level
   // commas, with the first listed gradient painted on top. PAGX paints Fills in the order
@@ -358,10 +375,28 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   }
 
   if (!colors.empty()) {
+    // `background-blend-mode` blends each background layer against the layers *below* it, with
+    // the background-color as the bottom-most layer. Emit the solid colour first so the blended
+    // gradient Fill has a backdrop to composite against; without a blend mode an opaque gradient
+    // fully hides the colour, so the no-blend path keeps dropping it to avoid an inert extra Fill.
+    BlendMode blend = resolveBackgroundBlendMode(box.backgroundBlendMode);
+    // Tracks whether a background layer has already been painted beneath the current Fill. The
+    // bottom-most layer has nothing below it in the element's own background, so it must draw
+    // with Normal (matching CSS, where a lone/bottom layer's blend mode is a no-op) rather than
+    // blending against whatever sits behind the whole layer.
+    bool hasBackdrop = false;
+    if (blend != BlendMode::Normal && box.backgroundColorSet) {
+      layer->contents.push_back(buildSolidFill(box.backgroundColor));
+      hasBackdrop = true;
+    }
+    // Gradients are pushed in reverse CSS order (the CSS-last layer first), so the first Fill
+    // emitted here is the bottom-most background layer.
     for (auto it = colors.rbegin(); it != colors.rend(); ++it) {
       auto fill = _document->makeNode<Fill>();
       fill->color = *it;
+      fill->blendMode = hasBackdrop ? blend : BlendMode::Normal;
       layer->contents.push_back(fill);
+      hasBackdrop = true;
     }
     emitted = true;
     return;
@@ -516,6 +551,10 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
         drop->blurY = step.shadow.blur;
         drop->color = step.shadow.color;
         layer->filters.push_back(drop);
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
+        auto cm = _document->makeNode<ColorMatrixFilter>();
+        cm->matrix = step.matrix;
+        layer->filters.push_back(cm);
       } else if (step.kind == HTMLValueParser::FilterStep::Kind::SvgRef) {
         // `plus-darker` has no CSS mix-blend-mode; the exporter bakes the backdrop into a PNG and
         // applies it through a `pagx_pd_*` feImage+feComposite(arithmetic) filter. That baked filter
@@ -536,21 +575,31 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
   }
 
   // data-* attributes -> customData
-  for (const auto& attr : element->attributes) {
-    if (attr.name.compare(0, 5, "data-") == 0) {
-      std::string key = attr.name.substr(5);
-      if (IsValidCustomDataKey(key)) {
-        layer->customData[key] = attr.value;
-      } else {
-        _diagnostics.warn("html: invalid data-* attribute name '" + attr.name + "'");
-      }
-    }
-  }
+  forwardDataAttributes(layer, element);
   // href on <a>
   if (element->name == "a") {
     auto* href = element->findAttribute("href");
     if (href && !href->empty() && IsValidCustomDataKey("href")) {
       layer->customData["href"] = *href;
+    }
+  }
+}
+
+void HTMLLayerBuilder::forwardDataAttributes(Layer* layer,
+                                             const std::shared_ptr<DOMNode>& element) {
+  if (layer == nullptr || element == nullptr) return;
+  for (const auto& attr : element->attributes) {
+    if (attr.name.compare(0, 5, "data-") != 0) continue;
+    std::string key = attr.name.substr(5);
+    if (IsValidCustomDataKey(key)) {
+      auto existing = layer->customData.find(key);
+      if (existing != layer->customData.end() && existing->second != attr.value) {
+        _diagnostics.warn("html: data-* attribute '" + attr.name +
+                          "' overrides an existing custom data value");
+      }
+      layer->customData[key] = attr.value;
+    } else {
+      _diagnostics.warn("html: invalid data-* attribute name '" + attr.name + "'");
     }
   }
 }

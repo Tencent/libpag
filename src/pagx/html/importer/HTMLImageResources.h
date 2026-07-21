@@ -59,6 +59,11 @@ class HTMLImageResources {
    *  underlying resource. Returns nullptr when `imageSource` is empty. */
   Image* registerResource(const std::string& imageSource);
 
+  /** Creates a fresh, unresolved `Image` node (empty `filePath`) with a unique id. Used to
+   *  preserve the image slot of an `<img>` whose `src` is missing/empty/invalid so the element
+   *  is not silently dropped from the PAGX. Never deduplicated — each placeholder is distinct. */
+  Image* createPlaceholder();
+
  private:
   HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;

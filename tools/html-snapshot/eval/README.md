@@ -4,11 +4,23 @@ Quantify the fidelity of the `snapshot.js → pagx import → pagx render`
 pipeline against the source HTML corpus. Used to drive iteration on the
 snapshot's layout-preserving rewrites.
 
+The eval harness supports Puppeteer 23.0.0 or newer only. This matches the
+tested minimum declared by `tools/html-snapshot/package.json`; ad-hoc installs
+must stay at or above that floor because baseline capture passes the
+`captureBeyondViewport` screenshot option.
+
 ## Layout
 
 | File | Role |
 |------|------|
 | `baseline.js` | Render an original HTML in headless Chromium, save a PNG cropped to the body's measured rect — this is the ground truth. |
+
+> Baseline and snapshot share `lib/page-loader.ts`, which walks the viewport
+> top-to-bottom before capturing so lazy-loaded content (IntersectionObserver /
+> scroll listeners / native `loading="lazy"`, and infinite-scroll feeds) is
+> realised instead of captured as skeleton placeholders. The pass is bounded
+> (pass count / height / time) so infinite feeds settle at a sane length. Set
+> `HTML_SNAPSHOT_NO_AUTOSCROLL=1` to disable it.
 | `compare.js`  | Pixel metrics (pixelmatch + mean RGB delta + luma SSIM), Chromium-based flex container counter (same method for live and subset), importer-warning parser. Importable as a module or runnable per-case. |
 | `run.js`      | Per-case driver: baseline → snapshot → import → resolve → render → compare. Emits `report.csv`, `report.md`, and `index.html`. |
 | `run.sh`      | Wrapper around `run.js`. |
