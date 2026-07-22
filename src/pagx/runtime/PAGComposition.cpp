@@ -213,7 +213,7 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
   }
 }
 
-void PAGComposition::CollectChildCompositions(PAGLayer* layer,
+void PAGComposition::CollectChildCompositions(const PAGLayer* layer,
                                               std::vector<PAGComposition*>& outChildren) {
   if (layer == nullptr) {
     return;
@@ -469,6 +469,17 @@ void PAGComposition::updateDataBinds(float mix) {
   CollectChildCompositions(this, childComps);
   for (auto* childComp : childComps) {
     childComp->updateDataBinds(mix);
+  }
+}
+
+void PAGComposition::collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const {
+  if (binding != nullptr) {
+    binding->collectTextHolders(out);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  CollectChildCompositions(this, childComps);
+  for (auto* childComp : childComps) {
+    childComp->collectTextHolders(out);
   }
 }
 

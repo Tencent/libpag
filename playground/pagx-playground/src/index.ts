@@ -101,8 +101,15 @@ function t(): I18nStrings {
 // time for the official pagx site because the ~21 MB of fonts + wasm come from a
 // geographically-close edge instead of the origin server. Ends without a trailing slash;
 // concatenation sites (assetUrl below) prepend '/' explicitly.
+//
+// Uses `globalThis.location` rather than `window.location` because the pagx-viewer
+// multi-threaded build starts Emscripten pthread workers whose script is this same rollup
+// bundle. Worker context has `self.location` but no `window`, so probing `window.location`
+// at module-init time (below) would throw ReferenceError on every worker spawn. `location`
+// is present on both Window and DedicatedWorkerGlobalScope, so this call reads the correct
+// hostname in either environment.
 function computeResourceBase(): string {
-    const host = window.location.hostname;
+    const host = globalThis.location?.hostname;
     if (host === 'localhost' || host === '127.0.0.1') {
         return '';
     }
@@ -180,6 +187,10 @@ let player: PAGXPlayer | null = null;
 let sampleFiles: string[] = [];
 let currentPlayingFile: string | null = null;
 let currentFileName: string = 'export.pagx';
+// Snapshot of the player's playing state at the moment the samples overlay is opened. Used
+// by hideSamplesPage() to restore the exact play/pause state on return so the samples page
+// visit is transparent to the user - a running animation resumes, a paused one stays paused.
+let wasPlayingBeforeSamples: boolean = false;
 const DEFAULT_TITLE = 'PAGX Playground';
 
 function updateProgressUI(): void {
@@ -718,6 +729,11 @@ function goHome(pushHistory: boolean = true): void {
     document.title = DEFAULT_TITLE;
     currentPlayingFile = null;
     currentFileName = 'export.pagx';
+    // Going home discards any pre-samples playback state: hideSamplesPage may still fire
+    // afterwards (popstate path that leaves #samples), and without this reset it would call
+    // player.play() on the just-hidden player, resuming the render loop against a hidden
+    // canvas.
+    wasPlayingBeforeSamples = false;
 
     if (pushHistory) {
         history.pushState(null, '', window.location.pathname);
@@ -919,9 +935,26 @@ function renderSampleList(): void {
 function showSamplesPage(): void {
     const container = document.getElementById('container') as HTMLDivElement;
     const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
+    // Idempotent guard: hashchange -> handleRoute() and other routing edges can fire this
+    // twice in a row for the same navigation. A second call would re-snapshot the player's
+    // isPlaying() state after our own pause() from the first call already forced it to
+    // false, silently losing the pre-samples playing flag that hideSamplesPage relies on
+    // to restore playback on return.
+    if (!samplesPage.classList.contains('hidden')) {
+        return;
+    }
     container.classList.add('hidden');
     samplesPage.classList.remove('hidden');
     document.title = t().samplesTitle;
+
+    // Explicitly stop the wasm render loop while the samples overlay is on screen. Browser
+    // rAF throttling on display:none already lightens the load, but pagx-viewer's internal
+    // ticker isn't guaranteed to be pure-rAF driven; pausing here guarantees zero GPU cost
+    // and avoids ResizeObserver / draw() churn behind the overlay. Snapshot the pre-samples
+    // playing state so hideSamplesPage can restore it - a running animation must resume on
+    // return, a paused one must stay paused.
+    wasPlayingBeforeSamples = player?.getView()?.isPlaying() ?? false;
+    player?.pause();
 
     loadSampleList().then(renderSampleList).catch((error) => {
         console.error('Failed to load samples:', error);
@@ -931,8 +964,18 @@ function showSamplesPage(): void {
 function hideSamplesPage(): void {
     const container = document.getElementById('container') as HTMLDivElement;
     const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
+    // Idempotent guard mirrors showSamplesPage - a second hide would clobber the snapshot
+    // that was already consumed, and could call player.play() on a player whose canvas is
+    // no longer visible if goHome ran between the two hide calls.
+    if (samplesPage.classList.contains('hidden')) {
+        return;
+    }
     container.classList.remove('hidden');
     samplesPage.classList.add('hidden');
+    if (wasPlayingBeforeSamples) {
+        player?.play();
+    }
+    wasPlayingBeforeSamples = false;
 }
 
 function handlePopState(): void {

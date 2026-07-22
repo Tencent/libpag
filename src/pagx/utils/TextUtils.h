@@ -214,6 +214,12 @@ TextLayoutParams MakeTextBoxParams(const TextBox* box);
 TextLayoutParams MakeStandaloneParams(const Text* text);
 
 /**
+ * Builds per-Text shaping attributes (text content, font, size, spacing, faux flags) from a Text
+ * element's document fields. Used to feed the shaper without reading the Text node directly.
+ */
+TextGlyphParams MakeGlyphParams(const Text* text);
+
+/**
  * Logical Start / End describe the *paragraph-relative* edges; the physical
  * visual edge a renderer should hit depends on the paragraph base direction
  * (UBA P2/P3). For RTL paragraphs Start sits on the visual right edge and End

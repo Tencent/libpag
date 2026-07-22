@@ -45,6 +45,7 @@ class PAGViewModel;
 class PAGXDocument;
 class SuppressDelegation;
 class PAGViewModelValue;
+class TextHolder;
 class ViewModel;
 class Image;
 struct Matrix;
@@ -156,9 +157,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns true if the scene's content has changed since the last render, i.e. a redraw would
    * produce different pixels. Hosts driving their own render loop can consult this to skip
-   * redundant full renders on idle frames. Reflects only the runtime layer tree state captured
-   * by the last renderTo()/Record(); pending ViewModel data binds flushed at the next Record()
-   * are not accounted for here.
+   * redundant full renders on idle frames. Returns true when either the underlying display list
+   * has changed or a pending TextHolder reshape (driven by a ViewModel data bind or animation
+   * text-shaping channel) has not yet been flushed — flush runs inside Record().
    */
   bool hasContentChanged() const;
 
@@ -215,6 +216,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
       ViewModel* schema, const std::shared_ptr<PAGScene>& scene,
       std::unordered_set<const ViewModel*>& visited);
   void flushDataBinds();
+  void flushTextHolders();
+  // Rebuilds the flat `textHolders` list from the current runtime tree. Called at the end of
+  // buildRuntimeTree and after refreshNodes so the list stays in sync with the binding state.
+  void collectTextHolders();
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 
@@ -250,6 +255,12 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   bool suppressNotify = false;
   std::vector<PAGViewModelValue*> pendingNotifications = {};
+
+  // Flat list of every TextHolder registered across the runtime composition tree. Rebuilt at the
+  // end of buildRuntimeTree and after refreshNodes (which can replace a binding's holders via
+  // RefreshLayerInPlace). flushTextHolders and hasContentChanged iterate this list directly so the
+  // common case (no text reshape in the document) avoids walking the composition tree every frame.
+  std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};

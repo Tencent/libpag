@@ -41,6 +41,7 @@
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
+#include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -133,6 +134,9 @@ void PAGScene::buildRuntimeTree() {
     }
   }
   buildViewModels();
+  // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
+  // instead of walking the composition tree every frame.
+  collectTextHolders();
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -508,6 +512,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
     return false;
   }
   flushDataBinds();
+  flushTextHolders();
   auto& drawable = surface->drawable;
   auto device = drawable->getDevice();
   if (device == nullptr) {
@@ -562,6 +567,25 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
 
 void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
+}
+
+void PAGScene::flushTextHolders() {
+  if (document == nullptr) {
+    return;
+  }
+  auto* fontConfig = &document->_fontConfig;
+  for (auto& holder : textHolders) {
+    if (holder != nullptr) {
+      holder->flush(fontConfig);
+    }
+  }
+}
+
+void PAGScene::collectTextHolders() {
+  textHolders.clear();
+  if (_rootComposition != nullptr) {
+    _rootComposition->collectTextHolders(textHolders);
+  }
 }
 
 void PAGScene::clearAllViewModelsDirty() {
@@ -718,6 +742,12 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
     std::unordered_set<const Composition*> visited = {};
     _rootComposition->refreshNodes(dirtyNodes, dirtySet, visited);
+    // refreshNodes may have replaced a binding's textHolders (RefreshLayerInPlace moves a fresh
+    // binding in and back out, rebuilding its holder vector), and syncChildren /
+    // refreshPlainContainerChildren can add or remove child compositions. Re-collect the flat list
+    // from the current tree so flushTextHolders / hasContentChanged stay consistent with the
+    // binding state.
+    collectTextHolders();
   }
   // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
   // state machines that play them) can share targets and cross-reference, so the whole timeline
@@ -757,7 +787,20 @@ tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {
 }
 
 bool PAGScene::hasContentChanged() const {
-  return displayList != nullptr && displayList->hasContentChanged();
+  if (displayList == nullptr) {
+    return false;
+  }
+  // A pending TextHolder reshape (ViewModel/Animation drove a text-shaping channel) has not yet
+  // touched the tgfx objects — flush runs inside Record(). Without this check the dirty gate would
+  // skip the frame and the reshape would never reach the screen. The flat `textHolders` list is
+  // iterated directly so the common case (no text reshape in the document) costs only a vector
+  // size check.
+  for (const auto& holder : textHolders) {
+    if (holder != nullptr && holder->isDirty()) {
+      return true;
+    }
+  }
+  return displayList->hasContentChanged();
 }
 
 std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
@@ -768,6 +811,7 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
     return nullptr;
   }
   scene->flushDataBinds();
+  scene->flushTextHolders();
   if (!scene->renderTo(surface, context, autoClear)) {
     return nullptr;
   }
