@@ -41,8 +41,11 @@ import { buildToolbar, setToolbarVisible } from './toolbar';
 import { EditorPanel, EDITOR_STATUS_DURATION_MS } from './editor/index';
 import { ensureStylesInjected } from './styles';
 
-/** Canvas element id assigned by the player. Kept stable so external CSS or debug tooling that
- *  targets '#pagx-canvas' keeps working. Assumes a single player instance per page. */
+/** Canvas element id assigned by the player. Kept stable so external CSS or debug tooling
+ *  that targets '#pagx-canvas' keeps working on the (dominant) single-instance case. The
+ *  player itself no longer depends on this id for view initialization - initView() hands the
+ *  canvas element directly to PAGXView.init - so multiple PAGXPlayer instances on the same
+ *  document remain functionally isolated even though their canvases share this id. */
 const CANVAS_ID = 'pagx-canvas';
 
 /** Default background: fully transparent so the checkered canvas backdrop shows through for
@@ -263,6 +266,9 @@ export class PAGXPlayer extends EventTarget {
                 if (pending !== null) return;
                 pending = window.requestAnimationFrame(() => {
                     pending = null;
+                    // updateSize() itself skips zero-sized rects to protect the GL backing
+                    // store when a host ancestor is display:none (samples overlay, hidden
+                    // tab, etc.), so we don't need a separate guard here.
                     this.updateSize();
                     this.view?.draw();
                 });
@@ -668,7 +674,12 @@ export class PAGXPlayer extends EventTarget {
         if (this.view) {
             return;
         }
-        const view = this.module.PAGXView.init('#' + CANVAS_ID);
+        // Pass the canvas element directly rather than a `#pagx-canvas` selector. Selector
+        // form would fail as soon as two PAGXPlayer instances share the same document: their
+        // canvases both carry id=pagx-canvas, and querySelector picks the first one, so the
+        // second player would try to init on a canvas it doesn't own. Handing the element in
+        // decouples init from any document-global lookup and keeps multi-instance use safe.
+        const view = this.module.PAGXView.init(this.canvas);
         if (!view) {
             throw new Error('PAGXView.init returned null');
         }
@@ -694,12 +705,19 @@ export class PAGXPlayer extends EventTarget {
     }
 
     /** Sync the canvas backing store size to the current DPR-scaled container rect and notify
-     *  the wasm view. Called on window resize, ResizeObserver ticks, and after ensureView(). */
+     *  the wasm view. Called on window resize, ResizeObserver ticks, and after ensureView().
+     *  Bails out on zero rects (typically when a host ancestor is display:none, e.g. a route
+     *  overlay covering the player): resizing the canvas to 0x0 would destroy its GL drawing
+     *  buffer and force a full redraw on return, so we keep the last known good dimensions
+     *  and let the next non-zero tick reconcile. */
     private updateSize(): void {
         if (!this.view) {
             return;
         }
         const rect = this.sizeContainer.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+            return;
+        }
         const scaleFactor = window.devicePixelRatio;
         this.canvas.width = rect.width * scaleFactor;
         this.canvas.height = rect.height * scaleFactor;
@@ -738,6 +756,13 @@ export class PAGXPlayer extends EventTarget {
         const isRangeSlider = target instanceof HTMLInputElement && target.type === 'range';
         if (isRangeSlider && !isPlayPause) return;
         if (this.canvas.classList.contains('hidden')) return;
+        // Also short-circuit when an ancestor is display:none (e.g. the host toggled its own
+        // container off while routing to a full-page overlay like a samples list). Without
+        // this check the canvas can be off-screen yet its .hidden class is untouched, so the
+        // shortcuts would still drive the invisible player behind the overlay. offsetParent
+        // is null for elements whose computed display is none anywhere on the ancestor chain
+        // (except the body, which the player is not).
+        if (this.canvas.offsetParent === null) return;
         if (!this.playbackBar.isVisible()) return;
         event.preventDefault();
         if (isPlayPause) {

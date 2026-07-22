@@ -2,6 +2,7 @@
   "name": "pagx-player",
   "version": "0.1.0",
   "description": "PAGX Player - Shared player UI (canvas gestures, playback bar, toolbar, source editor) reused by pagx-playground and pagx-preview.",
+  "private": true,
   "type": "module",
   "main": "lib/pagx-player.esm.js",
   "module": "lib/pagx-player.esm.js",

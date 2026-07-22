@@ -108,6 +108,20 @@ function validateXml(xmlText: string): string {
     return '';
 }
 
+/** Yield the main thread for one frame + one macrotask so the browser can paint any DOM
+ *  changes made just before the caller `await`s a heavy synchronous operation. Apply/Save
+ *  callbacks typically enter player.load() which runs long synchronous wasm calls
+ *  (parsePAGX, buildLayers, ...) that block the paint queue - without this yield the
+ *  Applying/Saving sticky pill and the disabled button state would only reach the screen
+ *  after the whole load resolves, effectively invisible to the user. */
+function yieldToBrowser(): Promise<void> {
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+            setTimeout(resolve, 0);
+        });
+    });
+}
+
 export class EditorPanel {
     private readonly parent: HTMLElement;
     private readonly canvasContainer: HTMLElement;
@@ -433,17 +447,20 @@ export class EditorPanel {
         // loopback (host.load -> player.load -> editor.setDocumentXml with this same content)
         // and skip the generation bump. See pendingApplyXml field comment for the full story.
         this.pendingApplyXml = xmlText;
+        // Yield to the browser before invoking the host's onApply callback. onApply typically
+        // enters player.load() which runs synchronous wasm work (parsePAGX / buildLayers)
+        // long enough to block the paint queue; without this yield the sticky "Applying..."
+        // pill and the disabled apply/discard/save buttons would only reach the screen once
+        // the load resolves, i.e. they would never be visible to the user during a fast load
+        // and only flash briefly during a slow one.
+        await yieldToBrowser();
         try {
             const error = await this.callbacks.onApply(xmlText);
             const documentSwapped = this.documentGeneration !== applyDocGen;
             if (documentSwapped) {
                 // A fresher document already took over: leave currentXmlText / status alone
-                // so the newer content stays authoritative. Only dismiss our own sticky
-                // "Applying..." pill; the dismiss is a no-op if the swapping producer has
-                // already replaced the pill with its own message, which is exactly the
-                // behavior we want (don't clobber the newer status). The button row still
-                // needs to re-enable via the finally block below.
-                this.dismiss(applyingToken);
+                // so the newer content stays authoritative. The sticky "Applying..." pill is
+                // dismissed unconditionally in finally, so we don't need to touch it here.
                 return;
             }
             // Promote the applied XML to the new baseline immediately on success: a
@@ -461,9 +478,16 @@ export class EditorPanel {
             if (this.documentGeneration === applyDocGen) {
                 this.report(err instanceof Error ? err.message : String(err), 'error');
             }
+            // A reject during a document swap used to leak the sticky "Applying..." pill
+            // (no report ran here, and load doesn't touch the status slot itself), so it
+            // stayed pinned until the next showStatus call. The unconditional dismiss in
+            // finally covers this case; it's a safe no-op on the non-swap paths because
+            // report() above already replaced the pill via a fresh token, which makes
+            // dismiss(applyingToken) mismatch and skip.
         } finally {
             this.pendingApplyXml = null;
             this.setBusy(false);
+            this.dismiss(applyingToken);
         }
     }
 
@@ -478,7 +502,11 @@ export class EditorPanel {
             return;
         }
         this.setBusy(true);
-        this.report('Saving...', 'info', { sticky: true });
+        const savingToken = this.report('Saving...', 'info', { sticky: true });
+        // Same rationale as handleApply's yield: paint the sticky "Saving..." pill and the
+        // disabled button state before the host callback (which may run heavy synchronous
+        // work) enters the microtask queue.
+        await yieldToBrowser();
         try {
             const error = await this.callbacks.onSave(xmlText);
             if (error === '') {
@@ -490,6 +518,10 @@ export class EditorPanel {
             this.report(err instanceof Error ? err.message : String(err), 'error');
         } finally {
             this.setBusy(false);
+            // Safety-net dismiss: successful and error paths already replaced the sticky pill
+            // via report() (whose fresh token makes this dismiss a no-op), but a synchronous
+            // throw before any report() would otherwise leak the "Saving..." pill.
+            this.dismiss(savingToken);
         }
     }
 }
