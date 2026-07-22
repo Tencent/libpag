@@ -38,6 +38,7 @@ class Composition;
 class DataBindRuntime;
 class DataContext;
 class Node;
+class TextHolder;
 struct RuntimeBinding;
 
 /**
@@ -123,7 +124,7 @@ class PAGComposition : public PAGLayer {
   // compositions themselves. Used by the composition-tree walks (view-model build, data-bind
   // update, view-model advance) so that compositions nested under plain container layers are not
   // skipped.
-  static void CollectChildCompositions(PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
+  static void CollectChildCompositions(const PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
 
   // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
   // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
@@ -184,6 +185,12 @@ class PAGComposition : public PAGLayer {
   std::shared_ptr<DataContext> dataContext = nullptr;
 
   void updateDataBinds(float mix = 1.0f);
+
+  // Appends every TextHolder registered in this composition's binding and its descendant
+  // compositions to `out`. Used by PAGScene to maintain a flat list of all holders across the
+  // runtime tree so per-frame flush / dirty checks can iterate it directly instead of walking the
+  // composition tree every frame.
+  void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const;
 
   friend class PAGScene;
 };

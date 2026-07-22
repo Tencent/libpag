@@ -37,6 +37,7 @@ namespace pagx {
 
 class ColorSource;
 class ImagePattern;
+class TextHolder;
 
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
@@ -155,10 +156,10 @@ struct RuntimeBinding {
   }
 
   // Drops the mapping for the given node, including its tgfx object and channel writers. Used when
-  // a node is removed from the document so the binding does not keep a stale entry alive.
-  void remove(const Node* node) {
-    targets.erase(node);
-  }
+  // a node is removed from the document so the binding does not keep a stale entry alive. Also
+  // cleans up TextHolder entries for the node to prevent use-after-free when targets are
+  // deleted before a subsequent flush.
+  void remove(const Node* node);
 
   // Returns the node whose bound tgfx object is the given pointer, or nullptr if none. Linear scan;
   // used by in-place refresh to map a tgfx child layer back to its source node when reconciling
@@ -303,6 +304,26 @@ struct RuntimeBinding {
     return it != targets.end() ? it->second.get() : nullptr;
   }
 
+  // Registers a TextHolder that owns the runtime text objects for a text layout source. Holders
+  // are flushed once per draw so ViewModel/Animation-driven text-shaping changes reshape at most
+  // once per frame instead of on every channel write.
+  void registerTextHolder(std::shared_ptr<TextHolder> holder) {
+    if (holder != nullptr) {
+      textHolders.push_back(std::move(holder));
+    }
+  }
+
+  // Appends every TextHolder registered on this binding to `out`. Used by PAGScene to collect a
+  // flat list of all holders across the composition tree so per-frame flush / dirty checks can
+  // skip the tree walk entirely.
+  void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const {
+    for (const auto& holder : textHolders) {
+      if (holder != nullptr) {
+        out.push_back(holder);
+      }
+    }
+  }
+
  private:
   // Returns the existing target for the node, creating a plain RuntimeTarget if none exists yet.
   RuntimeTarget* ensureTarget(const Node* node) {
@@ -328,6 +349,12 @@ struct RuntimeBinding {
   // reference it. Maintained incrementally so unbindImageIfUnreferenced can check for surviving
   // references in O(1).
   std::unordered_map<const Node*, std::vector<const Node*>> imageUsers = {};
+
+  // TextHolders owning runtime text objects for this layer tree. shared_ptr so the
+  // TextRuntimeTarget can co-own its holder via its holder member. TextHolder entries are cleaned
+  // up when their RuntimeTargets are removed via remove(node) to prevent use-after-free on
+  // subsequent flush.
+  std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 };
 
 /**

@@ -8850,6 +8850,11 @@
         "text_line_break": "60a88e548",
         "text_punctuation_squash": "60a88e548",
         "text_special_chars": "60a88e548",
-        "text_vertical": "51b7d1ea"
+        "text_text_reshape_demo": "c0dc88be4",
+        "text_vertical": "c0dc88be4"
+    },
+    "PAGXViewModelTest": {
+        "TextReshapeByAnimation": "093b0b8a",
+        "TextReshapeByViewModel": "093b0b8a"
     }
 }

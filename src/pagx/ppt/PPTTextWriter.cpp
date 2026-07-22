@@ -376,7 +376,8 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   TextLayoutResult localResult;
   if (!precomputed) {
     auto params = hasTextBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
-    localResult = TextLayout::Layout({mutableText}, params, _layoutContext);
+    localResult =
+        TextLayout::Layout({{mutableText, MakeGlyphParams(mutableText)}}, params, _layoutContext);
     precomputed = &localResult;
   }
   auto* lines = precomputed->getTextLines(mutableText);
@@ -820,7 +821,8 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     mutableTexts.push_back(const_cast<Text*>(run.text));
   }
   auto params = MakeTextBoxParams(box);
-  auto layoutResult = TextLayout::Layout(mutableTexts, params, _layoutContext);
+  auto layoutResult =
+      TextLayout::Layout(TextLayout::MakeElements(mutableTexts), params, _layoutContext);
 
   float boxWidth = EffectiveTextBoxWidth(box);
   float boxHeight = EffectiveTextBoxHeight(box);

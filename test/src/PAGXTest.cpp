@@ -2261,7 +2261,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
-  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
+  auto origBounds =
+      pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params, &layoutContext);
   float origWidth = origBounds.bounds.width;
   float origHeight = origBounds.bounds.height;
 
@@ -2308,7 +2309,8 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   pagx::LayoutContext layoutContext(&fontConfig);
   pagx::TextLayoutParams params = {};
   params.baseline = text->baseline;
-  auto origBounds = pagx::TextLayout::Layout({text}, params, &layoutContext);
+  auto origBounds =
+      pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params, &layoutContext);
   float origWidth = origBounds.bounds.width;
 
   layer->contents.push_back(text);
@@ -9815,6 +9817,20 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   modifier->selectors.push_back(selector);
   layer->contents.push_back(modifier);
 
+  // A standalone Text exercises the text-shaping channel writers (text / font / size / ...).
+  // Text needs a registered fallback font to shape, so apply layout with one before building.
+  auto text = doc->makeNode<pagx::Text>("textNode");
+  text->text = "A";
+  text->fontSize = 20;
+  auto textFill = doc->makeNode<pagx::Fill>();
+  auto textColor = doc->makeNode<pagx::SolidColor>();
+  textColor->color = {0, 0, 0, 1};
+  textFill->color = textColor;
+  auto textGroup = doc->makeNode<pagx::Group>();
+  textGroup->elements.push_back(text);
+  textGroup->elements.push_back(textFill);
+  layer->contents.push_back(textGroup);
+
   // One of each layer style and filter kind so their animatable writers are covered.
   auto dropStyle = doc->makeNode<pagx::DropShadowStyle>();
   layer->styles.push_back(dropStyle);
@@ -9831,19 +9847,33 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   auto blendFilter = doc->makeNode<pagx::BlendFilter>();
   layer->filters.push_back(blendFilter);
 
+  // Text needs a registered fallback font to shape; apply layout with one before the scene build
+  // so the Text node's runtime target (and TextHolder) are created.
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_TRUE(scene != nullptr);
   auto* binding = scene->mutableBinding();
   ASSERT_TRUE(binding != nullptr);
 
-  // For each built node, every Animatable channel in the registry must have a runtime writer. Text
-  // and TextBox are intentionally omitted: they require a registered font to build, while every
-  // other node type with animatable channels is covered here.
-  pagx::Node* nodes[] = {
-      layer,      rect,       ellipse,     polystar,   trim,      roundCorner, repeater,
-      fill,       stroke,     solid,       group,      linear,    linearStop,  radial,
-      conic,      diamond,    modifier,    selector,   dropStyle, innerStyle,  backgroundBlurStyle,
-      blurFilter, dropFilter, innerFilter, blendFilter};
+  // For each built node, every Animatable channel in the registry must have a runtime writer.
+  pagx::Node* nodes[] = {layer,       rect,
+                         ellipse,     polystar,
+                         trim,        roundCorner,
+                         repeater,    fill,
+                         stroke,      solid,
+                         group,       linear,
+                         linearStop,  radial,
+                         conic,       diamond,
+                         modifier,    selector,
+                         text,        dropStyle,
+                         innerStyle,  backgroundBlurStyle,
+                         blurFilter,  dropFilter,
+                         innerFilter, blendFilter};
   for (auto* node : nodes) {
     for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
       if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
@@ -13534,6 +13564,71 @@ PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
   vmBool->value(true);
   smTimeline->advance(0);
   EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
+}
+
+// Verifies the demo pagx's animation and viewmodel both reshape text through the runtime holder:
+// after advancing the default timeline past the second keyframe, the animated Text's blob width
+// changes to the "Animated" glyph extent; after driving the ViewModel's "title" property, the
+// bound Text's blob width changes to the new content; after driving the ViewModel's "size"
+// property, the bound Text's blob width grows to the larger fontSize extent. All go through
+// PAGScene::draw so the holder's flush (setTextBlob) reflects in the bound tgfx::Text.
+PAGX_TEST(PAGXTest, TextReshapeDemoAnimationAndViewModel) {
+  auto doc =
+      pagx::PAGXImporter::FromFile(ProjectPath::Absolute("resources/text/text_reshape_demo.pagx"));
+  ASSERT_NE(doc, nullptr);
+  pagx::FontConfig fontConfig;
+  for (const auto& fontPath : GetFallbackFontPaths()) {
+    fontConfig.addFallbackFont(fontPath, 0);
+  }
+  doc->applyLayout(&fontConfig);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(400, 200);
+  ASSERT_NE(surface, nullptr);
+
+  auto* animText = doc->findNode<pagx::Text>("animText");
+  ASSERT_NE(animText, nullptr);
+  auto* vmTextNode = doc->findNode<pagx::Text>("vmText");
+  ASSERT_NE(vmTextNode, nullptr);
+
+  // First frame: animation at time 0 ("Hello"), viewmodel default ("VM Default").
+  EXPECT_TRUE(scene->draw(surface));
+  auto binding = scene->mutableBinding();
+  ASSERT_NE(binding, nullptr);
+  auto animRuntime = binding->get<tgfx::Text>(animText);
+  ASSERT_NE(animRuntime, nullptr);
+  ASSERT_NE(animRuntime->textBlob(), nullptr);
+  float animWidthBefore = animRuntime->textBlob()->getBounds().width();
+  auto vmRuntime = binding->get<tgfx::Text>(vmTextNode);
+  ASSERT_NE(vmRuntime, nullptr);
+  ASSERT_NE(vmRuntime->textBlob(), nullptr);
+  float vmWidthBefore = vmRuntime->textBlob()->getBounds().width();
+
+  // Advance the document-level animation past frame 60 (1s at 60fps) so the Hold keyframe value
+  // "Animated" takes effect, then draw.
+  auto defaultTimeline = scene->getDefaultTimeline();
+  ASSERT_NE(defaultTimeline, nullptr);
+  defaultTimeline->advanceAndApply(1'000'000);
+  EXPECT_TRUE(scene->draw(surface));
+  ASSERT_NE(animRuntime->textBlob(), nullptr);
+  float animWidthAfter = animRuntime->textBlob()->getBounds().width();
+  // "Animated" is longer than "Hello", so the blob width must grow.
+  EXPECT_GT(animWidthAfter, animWidthBefore) << "animation did not reshape animText to 'Animated'";
+
+  // Drive the ViewModel's "title" property and draw: the bound vmText must reshape.
+  scene->viewModel()->propertyString("title")->value("ReshapedByVM");
+  EXPECT_TRUE(scene->draw(surface));
+  ASSERT_NE(vmRuntime->textBlob(), nullptr);
+  float vmWidthAfter = vmRuntime->textBlob()->getBounds().width();
+  EXPECT_NE(vmWidthAfter, vmWidthBefore) << "viewmodel did not reshape vmText to 'ReshapedByVM'";
+
+  // Drive the ViewModel's "size" property and draw: the bound vmText's fontSize DataBind must
+  // reshape the blob to a wider extent at fontSize 60 than at fontSize 40 for the same string.
+  scene->viewModel()->propertyNumber("size")->value(60.0f);
+  EXPECT_TRUE(scene->draw(surface));
+  ASSERT_NE(vmRuntime->textBlob(), nullptr);
+  float vmWidthAfterSize = vmRuntime->textBlob()->getBounds().width();
+  EXPECT_GT(vmWidthAfterSize, vmWidthAfter) << "viewmodel did not reshape vmText fontSize to 60";
 }
 
 // Canonical scene render test: Composition-wrapped layer with animation via scene.

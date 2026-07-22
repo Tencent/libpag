@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="400" height="200" viewModel="@MainVM">
+  <Resources>
+    <ViewModel id="MainVM">
+      <Property id="title" name="title" type="String" default="VM Default"/>
+      <Property id="size" name="size" type="Number" default="40"/>
+    </ViewModel>
+  </Resources>
+
+  <Layer id="animLayer" name="AnimText" width="400" height="100">
+    <Text id="animText" text="Hello" fontFamily="NotoSansSC" fontSize="40" position="20,70"/>
+    <Fill color="#000000"/>
+    <Timelines>
+      <Animation ref="@textAnim"/>
+    </Timelines>
+  </Layer>
+
+  <Layer id="vmLayer" name="VMText" width="400" height="100" y="100">
+    <Text id="vmText" text="VM Default" fontFamily="NotoSansSC" fontSize="40" position="20,170"/>
+    <Fill color="#0000FF"/>
+  </Layer>
+
+  <DataBind source="$vm.title" target="@vmText" channel="text"/>
+  <DataBind source="$vm.size" target="@vmText" channel="fontSize"/>
+
+  <Animations>
+    <Animation id="textAnim" duration="120" frameRate="60" loop="once">
+      <Object target="animText">
+        <Channel name="text" type="string">
+          <Key time="0" value="Hello" interpolation="hold"/>
+          <Key time="60" value="Animated" interpolation="hold"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
