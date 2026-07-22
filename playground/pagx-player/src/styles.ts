@@ -69,7 +69,12 @@ const CSS = `
     position: absolute;
     top: 16px;
     right: 16px;
-    z-index: 150;
+    /* Higher than the playback bar (150) so host overlays wanting to hide playback while
+       keeping global controls (Samples / Leave / etc.) accessible can pick a z-index in the
+       gap between them - e.g. a loading screen that covers the canvas and playback bar but
+       lets the user still navigate away. Stays below the status pill (200) and editor
+       panel (300) which are more prominent surfaces. */
+    z-index: 175;
     display: flex;
     align-items: center;
     gap: 8px;

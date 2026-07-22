@@ -600,7 +600,9 @@ async function loadPAGXData(
     name: string,
     resolveResource?: (relPath: string) => Promise<Uint8Array | null>,
 ): Promise<void> {
-    await prepareForLoading();
+    // Callers (loadPAGXFile / loadPAGXSample) invoke prepareForLoading() and closeEditor()
+    // before their own file / network read so the loading overlay is visible - and the editor
+    // panel is out of the way - while the bytes are being fetched, not just after.
     const p = ensurePlayer();
 
     // Hide the nav-btns overlay so it doesn't sit on top of the player's own toolbar. It is
@@ -624,10 +626,19 @@ async function loadPAGXData(
 
 async function loadPAGXFile(file: File): Promise<void> {
     try {
+        // Close the source editor and show the loading overlay before reading the file so
+        // users get immediate feedback that the drop was accepted, and don't see the editor
+        // panel lingering over the loading screen while arrayBuffer() reads the bytes.
+        // Only user-initiated new loads (drag-drop, samples click, ?sample= URL) close the
+        // editor; editor Apply/Save go through applyXml -> player.load directly and preserve
+        // the editor state.
+        player?.closeEditor();
+        await prepareForLoading();
+        const fileBuffer = await file.arrayBuffer();
         // Drag-and-drop files have no baseURL for external references (external assets
         // packaged next to a .pagx aren't accessible over http); pass undefined so the
         // player's default (no external fetches) applies.
-        await loadPAGXData(new Uint8Array(await file.arrayBuffer()), file.name);
+        await loadPAGXData(new Uint8Array(fileBuffer), file.name);
         currentPlayingFile = null;
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
@@ -655,6 +666,10 @@ async function loadPAGXSample(name: string, pushHistory: boolean = true): Promis
         return;
     }
     try {
+        // Mirror loadPAGXFile: close the editor and reveal the loading overlay before the
+        // network round-trip so click feedback is immediate even on slow CDN networks.
+        player?.closeEditor();
+        await prepareForLoading();
         const url = assetUrl(`samples/${name}`);
         // Fetch the sample bytes ourselves (rather than delegating to prepareForLoading) so a
         // 404 from the CDN surfaces as a network error in the drop-zone instead of stalling
@@ -739,8 +754,13 @@ function setupDragAndDrop(): void {
             if (!isFileDrag(e as DragEvent)) {
                 return;
             }
+            // Only toggle the drag-over visual cue. Do NOT clear `hidden` here: when a document
+            // is already loaded, drop-zone is hidden and its internal sub-state is still frozen
+            // on the previous load's "loading" screen (hideDropZone only touches the outer
+            // hidden class). Revealing it on hover would flash that stale loading UI. Users see
+            // the loading page only after actually dropping the file, when loadPAGXData ->
+            // prepareForLoading -> showLoadingUI takes over deliberately.
             dropZone.classList.add('drag-over');
-            dropZone.classList.remove('hidden');
         }, false);
     });
 

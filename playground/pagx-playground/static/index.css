@@ -21,14 +21,17 @@ html, body {
 }
 
 /* Host container for the pagx-player component. The player attaches its own canvas / toolbar /
-   playback bar / editor panel inside this element (its wrapper stretches to 100% of the host),
-   so we just need to give it the full container box. Sits below the drop-zone overlay (z-index
-   100) and the top-level nav (z-index 150) so those layers can obscure the player when the app
-   is on its home screen. */
+   playback bar / editor panel inside this element. Intentionally has NO z-index: setting one
+   would create a new stacking context that traps the player's toolbar (z:175) and editor panel
+   (z:300) below the .drop-zone overlay (z:160). We want the toolbar visible above the loading
+   screen so users can still access controls (Samples / Leave / etc.) during a slow load. The
+   editor panel would also sit above the loading overlay by its own z-index, but loadPAGXData
+   calls player.closeEditor() before switching documents, so the editor is never visible while
+   the loading screen is up. Tree order alone keeps this host below the drop-zone / nav-btns
+   siblings when the app is on its home screen, which is the intended stacking there. */
 .player-host {
     position: absolute;
     inset: 0;
-    z-index: 1;
 }
 
 .drop-zone {
@@ -37,7 +40,12 @@ html, body {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 100;
+    /* Sits above the player's canvas (z:1) and playback bar (z:150) so the loading overlay
+       covers the previous document's visuals and playback controls during a reload. Stays
+       below the player's toolbar (z:175) so users can still hit Samples / Leave / Reset
+       while a slow load is in progress - the toolbar is a global navigation surface that
+       shouldn't be gated by the current document's loading state. */
+    z-index: 160;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -127,7 +135,12 @@ html, body {
     position: absolute;
     top: 16px;
     right: 16px;
-    z-index: 150;
+    /* Higher than the drop-zone loading overlay (z:160) so the Samples / Docs buttons stay
+       clickable on the home screen (where the drop-zone is the base backdrop) and during a
+       slow initial load. Mirrors the player toolbar's z:175 so the two right-anchored
+       button clusters never fight each other; they're mutually exclusive at any given time
+       (nav-btns visible on home, player toolbar visible after a file loads). */
+    z-index: 175;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
