@@ -11473,6 +11473,130 @@ PAGX_TEST(PAGXTest, SMRuntimeInitialState) {
   EXPECT_EQ(timeline->getCurrentState("main"), "start");
 }
 
+/**
+ * Test case: a state machine handle cached by the caller survives a runtime-tree rebuild. A
+ * top-level state machine is constructed with a null binding, so the inner PAGAnimation of each
+ * animation state resolves the scene's current root binding lazily at apply time. Rebuilding the
+ * runtime tree (here via a document-node notifyChange) frees the old root binding; re-driving the
+ * cached handle must resolve the new binding and drive the target instead of dereferencing the
+ * freed one.
+ */
+PAGX_TEST(PAGXTest, SMHandleSurvivesRuntimeTreeRebuild) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("mainLayer");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "mainLayer";
+  anim->objects.push_back(object);
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaProp->name = "alpha";
+  alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(alphaProp);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "play";
+  auto state = doc->makeNode<pagx::AnimationState>();
+  state->name = "play";
+  state->animationId = "anim";
+  region->states.push_back(state);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  ASSERT_TRUE(scene != nullptr);
+
+  // Cache the handle BEFORE the rebuild, like a caller that keeps it per frame. Drive to a mid
+  // value (0.5) distinct from the default alpha (1.0) so the assertion proves the machine wrote
+  // through the binding rather than the value happening to match.
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->advanceAndApply(500'000);
+  EXPECT_NEAR(scene->mutableBinding()->get<tgfx::Layer>(layer)->alpha(), 0.5f, 1.0e-3f);
+
+  // A document-node notifyChange rebuilds the whole runtime tree, freeing the old root binding the
+  // machine's inner PAGAnimation was originally built against.
+  doc->notifyChange({doc.get()}, /*layoutChanged=*/true);
+
+  // Re-driving the CACHED handle with a zero delta re-applies the held time (500ms) through the new
+  // binding: it must resolve the new binding and drive the value to 0.5 again, not crash or write
+  // through the freed binding.
+  timeline->advanceAndApply(0);
+  EXPECT_NEAR(scene->mutableBinding()->get<tgfx::Layer>(layer)->alpha(), 0.5f, 1.0e-3f);
+}
+
+/**
+ * Test case: an incremental tree refresh that changes binding membership must re-resolve the
+ * targets of a state machine's inner PAGAnimation, not just top-level and composition timelines.
+ * The inner animations live in the machine's regions, not in the composition's timeline list, so
+ * they need their own dirty signal. Here the state's target is out of scope at first (its layer is
+ * not yet in the tree, so it is filtered out of the resolved targets), then an incremental refresh
+ * brings the layer into scope; the machine must pick it up and drive it.
+ */
+PAGX_TEST(PAGXTest, SMInnerTimelineReresolvesAfterLayerRefresh) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto anchor = doc->makeNode<pagx::Layer>("anchor");
+  anchor->width = 50;
+  anchor->height = 50;
+  doc->layers.push_back(anchor);
+
+  // Created up front so findNode resolves it, but NOT added to the tree yet: it is absent from the
+  // binding, so the state's first resolve filters it out as out-of-scope.
+  auto lateLayer = doc->makeNode<pagx::Layer>("lateLayer");
+  lateLayer->width = 50;
+  lateLayer->height = 50;
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "lateLayer";
+  anim->objects.push_back(object);
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaProp->name = "alpha";
+  alphaProp->keyframes.push_back({0, 0.5f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(alphaProp);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "play";
+  auto state = doc->makeNode<pagx::AnimationState>();
+  state->name = "play";
+  state->animationId = "anim";
+  region->states.push_back(state);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  ASSERT_TRUE(scene != nullptr);
+
+  // First apply: lateLayer is not in the binding, so the inner animation resolves to no targets.
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->advanceAndApply(0);
+
+  // Bring lateLayer into scope via an incremental refresh (a plain layer add, not a timeline edit).
+  doc->layers.push_back(lateLayer);
+  doc->notifyChange({doc->layers.back()}, /*layoutChanged=*/true);
+
+  // The inner animation must re-resolve and now drive lateLayer's alpha to 0.5.
+  timeline->advanceAndApply(0);
+  auto tgfxLate = scene->mutableBinding()->get<tgfx::Layer>(lateLayer);
+  ASSERT_TRUE(tgfxLate != nullptr);
+  EXPECT_NEAR(tgfxLate->alpha(), 0.5f, 1.0e-3f);
+}
+
 PAGX_TEST(PAGXTest, SMBoolTransition) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
 

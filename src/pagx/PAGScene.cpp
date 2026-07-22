@@ -125,8 +125,12 @@ void PAGScene::buildRuntimeTree() {
     if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
       auto* smNode = static_cast<StateMachine*>(node);
       if (instantiatedTimelines.find(smNode) == instantiatedTimelines.end()) {
-        auto instance = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
-            smNode, _rootComposition->binding.get(), document.get(), shared_from_this()));
+        // Construct with a null binding so the state machine's inner PAGAnimation instances resolve
+        // the scene's current root binding lazily at apply time. A user-cached handle then survives
+        // a runtime-tree rebuild (foreign external-doc edit) that replaces _rootComposition and
+        // frees the old binding, instead of dereferencing a dangling binding.
+        auto instance = std::shared_ptr<PAGStateMachine>(
+            new PAGStateMachine(smNode, nullptr, document.get(), shared_from_this()));
         instantiatedTimelines.emplace(smNode, instance);
         _rootComposition->binding->setTarget(
             smNode, std::make_unique<StateMachineInputTarget>(instance, smNode));
@@ -492,8 +496,11 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   if (_rootComposition == nullptr) {
     return nullptr;
   }
-  auto timeline = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
-      matched, _rootComposition->binding.get(), document.get(), weak_from_this()));
+  // Construct with a null binding so the state machine's inner PAGAnimation instances resolve the
+  // scene's current root binding lazily at apply time, keeping a user-cached handle valid across a
+  // runtime-tree rebuild that frees the old binding (mirrors getAnimation).
+  auto timeline = std::shared_ptr<PAGStateMachine>(
+      new PAGStateMachine(matched, nullptr, document.get(), weak_from_this()));
   instantiatedTimelines.emplace(matched, timeline);
   _rootComposition->binding->setTarget(
       matched, std::make_unique<StateMachineInputTarget>(timeline, matched));
@@ -755,8 +762,13 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // marked separately.
     _rootComposition->markTimelineTargetsDirty();
     for (auto& entry : instantiatedTimelines) {
-      if (entry.second != nullptr && entry.second->type() == TimelineType::Animation) {
+      if (entry.second == nullptr) {
+        continue;
+      }
+      if (entry.second->type() == TimelineType::Animation) {
         static_cast<PAGAnimation*>(entry.second.get())->targetsDirty = true;
+      } else if (entry.second->type() == TimelineType::StateMachine) {
+        static_cast<PAGStateMachine*>(entry.second.get())->markInternalTargetsDirty();
       }
     }
   }

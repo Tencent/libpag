@@ -179,8 +179,13 @@ void PAGComposition::resetTimelines() {
 
 void PAGComposition::MarkCompositionTimelinesDirty(PAGComposition* comp) {
   for (const auto& timeline : comp->timelines) {
-    if (timeline != nullptr && timeline->type() == TimelineType::Animation) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    if (timeline->type() == TimelineType::Animation) {
       static_cast<PAGAnimation*>(timeline.get())->targetsDirty = true;
+    } else if (timeline->type() == TimelineType::StateMachine) {
+      static_cast<PAGStateMachine*>(timeline.get())->markInternalTargetsDirty();
     }
   }
 }
