@@ -913,6 +913,16 @@ function main() {
     path.join(outputDir, 'logo.png')
   );
 
+  // Copy playback bar icons. pagx-player's built-in playback bar loads these via <img src="..">
+  // relative to the iconBaseUrl option we pass at construction time (site root), so they must
+  // sit alongside index.html once published.
+  for (const icon of ['play.png', 'pause.png', 'previous.png', 'next.png']) {
+    copyFile(
+      path.join(staticDir, icon),
+      path.join(outputDir, icon)
+    );
+  }
+
   // Copy fonts from resources/font
   console.log('\n  Copying fonts...');
   copyFile(
