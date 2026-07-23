@@ -36,7 +36,8 @@ cmake --build cmake-build-debug --target PAGFullTest
 ## HTML 测试集（浏览器保真度评测）
 
 `resources/html/` 收录 HTML 测试语料（`cases/`、`corpus/cli`、`corpus/websites`、
-`corpus/generated`，仅提交 `.html` 源文件）。`HTMLTest` 目标对它们统一做浏览器保真度
+`corpus/generated`），以及浏览器正确渲染所必需的本地图片和字体；PNG 由 Git LFS 管理。
+`HTMLTest` 目标对它们统一做浏览器保真度
 评测：`snapshot.js`(Chromium) → `pagx import` → `pagx render` → 与 Chromium 基准图比对，
 只出报告（`report.md`/`index.html`），不做通过/失败门禁。
 
@@ -47,7 +48,8 @@ cmake --build cmake-build-debug --target HTMLTest   # 依赖并先构建 pagx
 
 - 底层由 `test/run_html_eval.sh` 驱动，可单独运行并只跑部分语料：
   `test/run_html_eval.sh cases cli`。
-- 前置条件：已构建 `pagx`、Node.js + 无头 Chromium（脚本会自动 `npm install`/`npm run build`）；
+- 前置条件：已构建 `pagx`、Node.js（脚本会自动 `npm install`/`npm run build`，默认
+  Playwright 引擎还会自动安装 Chromium）；
   评测 `websites`/`generated` 需要联网（拉 CDN CSS/字体/图片）。
 - 用法与指标详见 [resources/html/README.md](../../resources/html/README.md)。
 

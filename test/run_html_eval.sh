@@ -13,8 +13,8 @@
 #
 # Prerequisites:
 #   - a built `pagx` binary (default: <repo>/cmake-build-debug/pagx, or $PAGX_BIN)
-#   - Node.js + a headless Chromium (installed via `npm install` in
-#     tools/html-snapshot; the script bootstraps it on first run)
+#   - Node.js. The script installs html-snapshot dependencies on every run and,
+#     when Playwright is selected, also installs its Chromium binary.
 #   - network access for `corpus/websites` and `corpus/generated` (they pull
 #     CDN CSS / web fonts / external images at eval time)
 #
@@ -49,7 +49,11 @@ corpus_dir() {
 }
 
 ALL_CORPORA="cases cli websites generated"
-CORPORA="${*:-$ALL_CORPORA}"
+if [ "$#" -gt 0 ]; then
+  CORPORA=("$@")
+else
+  CORPORA=(cases cli websites generated)
+fi
 
 # --- prerequisites ---------------------------------------------------------
 
@@ -67,9 +71,56 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+# Reject bad corpus names/directories before doing the comparatively expensive
+# npm/browser bootstrap. A typo must not turn into a successful no-op run.
+declare -a CORPUS_DIRS=()
+for name in "${CORPORA[@]}"; do
+  rel="$(corpus_dir "$name")"
+  if [ -z "$rel" ]; then
+    echo "run_html_eval: unknown corpus '$name' (valid: $ALL_CORPORA)" >&2
+    exit 2
+  fi
+  dir="$ROOT/resources/html/$rel"
+  if [ ! -d "$dir" ]; then
+    echo "run_html_eval: corpus dir missing: $dir" >&2
+    exit 1
+  fi
+  CORPUS_DIRS+=("$dir")
+done
+
+# PNG fixtures are tracked by Git LFS. If a clone has not materialized them,
+# Chromium would render broken images and still produce superficially valid
+# fidelity reports. Detect pointer files before spending time on npm/eval.
+MISSING_LFS=0
+for corpus_root in "${CORPUS_DIRS[@]}"; do
+  while IFS= read -r -d '' asset; do
+    if dd if="$asset" bs=128 count=1 2>/dev/null \
+        | grep -q '^version https://git-lfs.github.com/spec/v1'; then
+      echo "run_html_eval: Git LFS asset is not materialized: $asset" >&2
+      MISSING_LFS=1
+    fi
+  done < <(find "$corpus_root" -type f -name '*.png' -print0)
+done
+if [ "$MISSING_LFS" -ne 0 ]; then
+  echo "run_html_eval: run 'git lfs pull' before HTML evaluation" >&2
+  exit 1
+fi
+
 # Always refresh the html-snapshot toolchain (deps + compiled dist/) before a run.
 echo "run_html_eval: installing html-snapshot dependencies (npm install)..."
 (cd "$SNAPSHOT_DIR" && npm install) || { echo "run_html_eval: npm install failed" >&2; exit 1; }
+
+# Installing the playwright npm package does not guarantee that its matching
+# Chromium binary exists on a fresh machine. Keep the default Playwright path
+# self-contained; --no-install prevents npx from fetching an undeclared package.
+if [ "$BROWSER_ENGINE" = "playwright" ]; then
+  echo "run_html_eval: installing Playwright Chromium..."
+  (cd "$SNAPSHOT_DIR" && npx --no-install playwright install chromium) || {
+    echo "run_html_eval: Playwright Chromium installation failed" >&2
+    exit 1
+  }
+fi
+
 echo "run_html_eval: building html-snapshot (npm run build)..."
 (cd "$SNAPSHOT_DIR" && npm run build) || { echo "run_html_eval: npm run build failed" >&2; exit 1; }
 
@@ -77,45 +128,77 @@ echo "run_html_eval: building html-snapshot (npm run build)..."
 
 declare -a REPORTS=()
 declare -a LABELS=()
-for name in $CORPORA; do
+declare -a FAILED_CORPORA=()
+RUN_STATUS=0
+OUT_ROOT="$SNAPSHOT_DIR/eval/out"
+
+# Do not leave a previous all-corpus summary looking like the result of this run.
+rm -f "$OUT_ROOT/summary.html"
+
+for name in "${CORPORA[@]}"; do
   rel="$(corpus_dir "$name")"
-  if [ -z "$rel" ]; then
-    echo "run_html_eval: unknown corpus '$name' (valid: $ALL_CORPORA)" >&2
-    continue
-  fi
   dir="$ROOT/resources/html/$rel"
-  if [ ! -d "$dir" ]; then
-    echo "run_html_eval: corpus dir missing, skipping: $dir" >&2
-    continue
-  fi
   label="html-$name"
+  out="$OUT_ROOT/$label"
 
   echo ""
   echo "=== HTML eval: $name  ($rel)  [concurrency=$CONCURRENCY engine=$BROWSER_ENGINE] ==="
+  # A failed invocation must not be summarized from a report left by an older
+  # run. Preserve per-case artifacts (needed by --skip-existing), but invalidate
+  # the three run-level reports until eval recreates them.
+  rm -f "$out/report.csv" "$out/report.md" "$out/index.html"
   # Aligned with: run.sh --recursive --corpus <dir> --label <name> \
   #                       --concurrency 16 --browser-engine playwright
   # shellcheck disable=SC2086
-  "$EVAL" --recursive --corpus "$dir" --label "$label" \
-          --concurrency "$CONCURRENCY" --browser-engine "$BROWSER_ENGINE" $EVAL_EXTRA_ARGS
-
-  REPORTS+=("$SNAPSHOT_DIR/eval/out/$label")
-  LABELS+=("$label")
+  if "$EVAL" --recursive --corpus "$dir" --label "$label" \
+             --concurrency "$CONCURRENCY" --browser-engine "$BROWSER_ENGINE" $EVAL_EXTRA_ARGS; then
+    if [ -f "$out/report.csv" ] && [ -f "$out/report.md" ] && [ -f "$out/index.html" ]; then
+      REPORTS+=("$out")
+      LABELS+=("$label")
+    else
+      echo "run_html_eval: '$name' completed without all expected report files" >&2
+      FAILED_CORPORA+=("$name")
+      RUN_STATUS=1
+    fi
+  else
+    echo "run_html_eval: eval failed for corpus '$name'" >&2
+    FAILED_CORPORA+=("$name")
+    RUN_STATUS=1
+  fi
 done
 
 # --- summary ---------------------------------------------------------------
 
 echo ""
 echo "=== HTML eval reports (report-only, no pass/fail gate) ==="
-for out in "${REPORTS[@]}"; do
-  echo "  report:  $out/report.md"
-  echo "  viewer:  $out/index.html"
-done
+if [ "${#REPORTS[@]}" -gt 0 ]; then
+  for out in "${REPORTS[@]}"; do
+    echo "  report:  $out/report.md"
+    echo "  viewer:  $out/index.html"
+  done
+else
+  echo "  (none generated successfully)"
+fi
 
 # Aggregate every corpus that ran into one cross-corpus summary: print the
 # rolled-up table to the console and write out/summary.html.
 if [ "${#LABELS[@]}" -gt 0 ]; then
-  node "$SNAPSHOT_DIR/eval/summary.js" --out "$SNAPSHOT_DIR/eval/out" "${LABELS[@]}"
-  echo ""
-  echo "Open the summary:      open $SNAPSHOT_DIR/eval/out/summary.html"
-  echo "Open a corpus viewer:  open ${REPORTS[0]}/index.html"
+  if node "$SNAPSHOT_DIR/eval/summary.js" --out "$OUT_ROOT" "${LABELS[@]}"; then
+    echo ""
+    echo "Open the summary:      open $OUT_ROOT/summary.html"
+    echo "Open a corpus viewer:  open ${REPORTS[0]}/index.html"
+  else
+    echo "run_html_eval: failed to generate cross-corpus summary" >&2
+    RUN_STATUS=1
+  fi
+else
+  echo "run_html_eval: no corpus completed successfully; no summary was generated" >&2
+  RUN_STATUS=1
 fi
+
+if [ "${#FAILED_CORPORA[@]}" -gt 0 ]; then
+  echo "" >&2
+  echo "run_html_eval: failed corpora: ${FAILED_CORPORA[*]}" >&2
+fi
+
+exit "$RUN_STATUS"
