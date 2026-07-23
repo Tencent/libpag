@@ -6048,9 +6048,8 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
                                              opts);
   ASSERT_NE(doc, nullptr);
   ASSERT_EQ(doc->animations.size(), 1u);
-  auto* ch =
-      dynamic_cast<pagx::TypedChannel<float>*>(
-          FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
   ASSERT_NE(ch, nullptr);
   // forwards fill-mode keeps the last value; no trailing baseline keyframe is inserted.
   ASSERT_EQ(ch->keyframes.size(), 2u);
@@ -6078,9 +6077,8 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsCubicBezier) {
                                              opts);
   ASSERT_NE(doc, nullptr);
   ASSERT_EQ(doc->animations.size(), 1u);
-  auto* ch =
-      dynamic_cast<pagx::TypedChannel<float>*>(
-          FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
   ASSERT_NE(ch, nullptr);
   ASSERT_EQ(ch->keyframes.size(), 2u);
   // ease-in is (0.42, 0, 1, 1); reversed it must become ease-out (0, 0, 0.58, 1).
@@ -6110,9 +6108,8 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsStepsJump) {
                                              opts);
   ASSERT_NE(doc, nullptr);
   ASSERT_EQ(doc->animations.size(), 1u);
-  auto* ch =
-      dynamic_cast<pagx::TypedChannel<float>*>(
-          FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
   ASSERT_NE(ch, nullptr);
   // 4 steps + the trailing endpoint = 5 hold keyframes.
   ASSERT_EQ(ch->keyframes.size(), 5u);
@@ -6312,9 +6309,8 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationSurvivesDefaultNormalization) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   ASSERT_EQ(doc->animations.size(), 1u);
-  auto* ch =
-      dynamic_cast<pagx::TypedChannel<float>*>(
-          FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
   ASSERT_NE(ch, nullptr);
   EXPECT_EQ(ch->keyframes.size(), 2u);
 }
