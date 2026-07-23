@@ -504,9 +504,21 @@ int RunImport(int argc, char* argv[]) {
     // inline `<svg>` as directive content, so no base directory prefix is needed here.
     auto resolveStats = ResolveDocument(result.document.get(), "", options.formatOptions);
     if (resolveStats.errorCount > 0) {
-      std::cerr << "pagx import: error: failed to resolve " << resolveStats.errorCount
-                << " import directive(s)\n";
-      return 1;
+      // A directive that cannot be resolved must not abort the whole conversion. This happens for
+      // an external SVG `<img>` whose source the snapshot pass could not inline into a
+      // `data:`/local reference — e.g. a site-absolute `/icon.svg` path from a URL import, a 404 /
+      // cross-origin fetch, or an image that mounted only after the inline pass (common on
+      // JS-rendered pages, where the animation-capture virtual clock defers DOM mounts). Such a
+      // source ends up as a bare `import` directive that resolve then tries to read as a local
+      // file and fails. Treat this like the non-fatal handling of an unresolvable raster `<img>`
+      // (preserved as an empty image slot): one missing external asset must not discard an
+      // otherwise-complete document. Drop the leftover directive so the Layer becomes a plain
+      // (empty) box and the output stays fully flattened — `pagx render` rejects any document that
+      // still carries an unresolved directive.
+      int dropped = DropUnresolvedDirectives(result.document.get());
+      std::cerr << "pagx import: warning: failed to resolve " << resolveStats.errorCount
+                << " import directive(s); dropped " << dropped
+                << " unresolvable reference(s) from the output\n";
     }
   }
 

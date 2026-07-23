@@ -375,6 +375,40 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
 }
 
 //--------------------------------------------------------------------------------------------------
+// Dropping unresolvable directives
+//--------------------------------------------------------------------------------------------------
+
+static void DropUnresolvedInLayers(const std::vector<Layer*>& layers, int& droppedCount) {
+  for (auto* layer : layers) {
+    if (!layer->importDirective.source.empty() || !layer->importDirective.content.empty()) {
+      // The directive could not be expanded (e.g. an unreachable external SVG). Clear it so the
+      // Layer is a plain, directive-free box instead of a dangling reference that `pagx render`
+      // would reject. The Layer's own attributes (size/position/id/data-*) are preserved.
+      layer->importDirective.source.clear();
+      layer->importDirective.content.clear();
+      layer->importDirective.format.clear();
+      droppedCount++;
+    }
+    DropUnresolvedInLayers(layer->children, droppedCount);
+  }
+}
+
+int DropUnresolvedDirectives(PAGXDocument* doc) {
+  if (doc == nullptr) {
+    return 0;
+  }
+  int droppedCount = 0;
+  DropUnresolvedInLayers(doc->layers, droppedCount);
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      DropUnresolvedInLayers(comp->layers, droppedCount);
+    }
+  }
+  return droppedCount;
+}
+
+//--------------------------------------------------------------------------------------------------
 // Entry point
 //--------------------------------------------------------------------------------------------------
 
