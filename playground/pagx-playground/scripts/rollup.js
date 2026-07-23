@@ -51,6 +51,10 @@ function detectGlueInfix() {
 }
 const glueInfix = detectGlueInfix();
 const glueTarget = path.resolve(playgroundRoot, `wasm-mt/pagx-viewer${glueInfix}.esm.js`);
+// pagx-player ESM bundle is copied into wasm-mt/ by scripts/prebuild.js; alias imports of the
+// bare `pagx-player` module specifier to that copied artifact so we don't need a filesystem
+// symlink or a monorepo path exports entry.
+const playerTarget = path.resolve(playgroundRoot, 'wasm-mt/pagx-player.esm.js');
 
 // Clean up old source map files in release mode
 if (isRelease) {
@@ -78,6 +82,8 @@ const plugins = [
             // Map the virtual `pagx-viewer-glue` import in src/index.ts to the selected
             // arch's pagx-viewer ES module (single-threaded adds a `.st` infix).
             { find: 'pagx-viewer-glue', replacement: glueTarget },
+            // Map bare `pagx-player` imports to the ESM bundle copied by prebuild.js.
+            { find: 'pagx-player', replacement: playerTarget },
         ],
     }),
     {

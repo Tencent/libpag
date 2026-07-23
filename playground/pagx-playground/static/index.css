@@ -20,25 +20,18 @@ html, body {
     display: none;
 }
 
-.canvas {
-    cursor: grab;
+/* Host container for the pagx-player component. The player attaches its own canvas / toolbar /
+   playback bar / editor panel inside this element. Intentionally has NO z-index: setting one
+   would create a new stacking context that traps the player's toolbar (z:175) and editor panel
+   (z:300) below the .drop-zone overlay (z:160). We want the toolbar visible above the loading
+   screen so users can still access controls (Samples / Leave / etc.) during a slow load. The
+   editor panel would also sit above the loading overlay by its own z-index, but loadPAGXData
+   calls player.closeEditor() before switching documents, so the editor is never visible while
+   the loading screen is up. Tree order alone keeps this host below the drop-zone / nav-btns
+   siblings when the app is on its home screen, which is the intended stacking there. */
+.player-host {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 1;
-    touch-action: none;
-    background:
-        repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%) 0 0 / 32px 32px;
-}
-
-.canvas.hidden {
-    display: none;
-}
-
-.canvas:active {
-    cursor: grabbing;
+    inset: 0;
 }
 
 .drop-zone {
@@ -47,7 +40,12 @@ html, body {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 100;
+    /* Sits above the player's canvas (z:1) and playback bar (z:150) so the loading overlay
+       covers the previous document's visuals and playback controls during a reload. Stays
+       below the player's toolbar (z:175) so users can still hit Samples / Leave / Reset
+       while a slow load is in progress - the toolbar is a global navigation surface that
+       shouldn't be gated by the current document's loading state. */
+    z-index: 160;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -137,7 +135,12 @@ html, body {
     position: absolute;
     top: 16px;
     right: 16px;
-    z-index: 150;
+    /* Higher than the drop-zone loading overlay (z:160) so the Samples / Docs buttons stay
+       clickable on the home screen (where the drop-zone is the base backdrop) and during a
+       slow initial load. Mirrors the player toolbar's z:175 so the two right-anchored
+       button clusters never fight each other; they're mutually exclusive at any given time
+       (nav-btns visible on home, player toolbar visible after a file loads). */
+    z-index: 175;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
@@ -356,260 +359,6 @@ html, body {
     white-space: pre-line;
 }
 
-.toolbar {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    z-index: 150;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.6);
-    border-radius: 8px;
-    backdrop-filter: blur(8px);
-}
-
-.toolbar.hidden {
-    display: none;
-}
-
-.toolbar-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    padding: 6px;
-    box-sizing: border-box;
-    background: transparent;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    text-decoration: none;
-    transition: background 0.2s ease;
-}
-
-.toolbar-btn svg {
-    width: 24px;
-    height: 24px;
-    color: #ccc;
-}
-
-.toolbar-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.toolbar-btn:hover svg {
-    color: #fff;
-}
-
-.toolbar-btn:active {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.toolbar-btn.hidden {
-    display: none;
-}
-
-.toolbar-divider {
-    width: 1px;
-    height: 20px;
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.file-name {
-    color: #aaa;
-    font-size: 14px;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Playback bar - centered compact pill, mimicking the macOS player control bar */
-.playback-bar {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 16px;
-    z-index: 150;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 24px;
-    background: #20202A;
-    border-radius: 8px;
-    /* Lock the pill to its natural content width so a narrow viewport clips the sides evenly
-       instead of collapsing the internal controls (buttons, time display, progress bar). This
-       relies on the parent .container having overflow: hidden so the overflowing edges are
-       clipped rather than pushing the layout wider or leaking onto the editor panel. */
-    min-width: max-content;
-}
-
-.playback-bar.hidden {
-    display: none;
-}
-
-.playback-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    opacity: 0.8;
-    transition: opacity 0.15s ease;
-}
-
-.playback-btn:hover {
-    opacity: 0.9;
-}
-
-.playback-btn:active {
-    opacity: 1;
-}
-
-.playback-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-/* Play / Pause - reuse desktop client icon (blue circle with glow) */
-.playback-btn-primary {
-    width: 48px;
-    height: 48px;
-    margin-right: 4px;
-}
-
-.playback-btn-primary img {
-    display: block;
-    width: 48px;
-    height: 48px;
-}
-
-/* Frame-step buttons (prev/next frame) - reuse desktop client icons */
-.playback-btn-step {
-    width: 24px;
-    height: 48px;
-}
-
-.playback-btn-step img {
-    display: block;
-    width: 24px;
-    height: 20px;
-    /* Nudge the arrow glyphs down so they sit on the progress bar center line */
-    margin-top: 5px;
-}
-
-/* Widen the gap between the prev/next frame buttons */
-#next-frame-btn {
-    margin-left: 20px;
-}
-
-.progress-wrapper {
-    width: 260px;
-    margin-left: 16px;
-    margin-right: 8px;
-}
-
-.time-display {
-    display: flex;
-    align-items: center;
-    /* Right-align so the frame counter stays close to the loop button; the fixed width keeps
-       the bar length stable while the time/frame digit counts change, absorbing slack on the left. */
-    justify-content: flex-end;
-    gap: 16px;
-    margin-left: 8px;
-    width: 168px;
-    color: #ffffff;
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-.time-divider {
-    width: 1px;
-    height: 14px;
-    background: rgba(255, 255, 255, 0.28);
-}
-
-/* Loop toggle - shows the sequence (repeat) icon when looping is off, and the single (repeat-one,
-   marked with a "1") icon when looping is on. Both inline SVGs follow the button's currentColor so
-   the state switch needs no swapped image assets. */
-.playback-btn-loop {
-    width: 24px;
-    height: 48px;
-    margin-left: 16px;
-    color: #ffffff;
-    opacity: 1;
-}
-
-.playback-btn-loop svg {
-    display: block;
-    width: 20px;
-    height: 20px;
-}
-
-/* The single-loop icon uses a wider viewBox (26x20) to accommodate the arrowhead protruding
-   from the rounded rectangle, so it needs a wider box to stay in proportion. */
-.playback-btn-loop .loop-icon-single {
-    width: 24px;
-    height: 18px;
-}
-
-/* The icon reflects the current playback mode: play-once shows the "1" (single) icon,
-   loop shows the sequence-loop icon. */
-.playback-btn-loop .loop-icon-sequence {
-    display: none;
-}
-
-.playback-btn-loop.active .loop-icon-single {
-    display: none;
-}
-
-.playback-btn-loop.active .loop-icon-sequence {
-    display: block;
-}
-
-.progress-slider {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
-}
-
-.progress-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px;
-    height: 12px;
-    background: #fff;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-    transition: transform 0.15s ease;
-}
-
-.progress-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
-}
-
-.progress-slider::-moz-range-thumb {
-    width: 12px;
-    height: 12px;
-    background: #fff;
-    border: none;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-}
-
 /* Mobile */
 @media (max-width: 600px) {
     .drop-zone {
@@ -630,26 +379,6 @@ html, body {
         max-width: 100%;
         box-sizing: border-box;
         padding: 60px 40px;
-    }
-
-    .file-name {
-        max-width: 150px;
-    }
-
-    /* On small screens fall back to a full-width bar with a flexible progress track. */
-    .playback-bar {
-        left: 16px;
-        right: 16px;
-        transform: none;
-        /* Override the desktop min-width: on narrow layouts the bar stretches with the viewport
-           and its internal controls shrink instead of overflowing. */
-        min-width: 0;
-    }
-
-    .progress-wrapper {
-        width: auto;
-        flex: 1;
-        min-width: 80px;
     }
 }
 
@@ -763,31 +492,4 @@ html, body {
     .samples-list .sample-name {
         font-size: 10px;
     }
-
-    .playback-bar {
-        left: 8px;
-        right: 8px;
-        bottom: 8px;
-        padding: 8px 12px;
-        gap: 8px;
-    }
-
-    .playback-btn-primary,
-    .playback-btn-primary img {
-        width: 40px;
-        height: 40px;
-    }
-
-    .playback-btn-step,
-    .playback-btn-step img {
-        width: 22px;
-        height: 18px;
-    }
-
-    .time-display {
-        font-size: 11px;
-        gap: 10px;
-        margin-left: 4px;
-    }
 }
-

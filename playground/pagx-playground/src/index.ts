@@ -1,4 +1,4 @@
-/////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
@@ -14,13 +14,16 @@
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
-/////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
 
 // Resolved to the selected arch's pagx-viewer glue at build time via the
 // `pagx-viewer-glue` alias in scripts/rollup.js (single-threaded adds a `.st` infix).
 import { PAGXInit } from 'pagx-viewer-glue';
 import type { PAGXView, PAGXModule } from '../../pagx-viewer/src/ts/pagx';
-import { init as initEditor, togglePanel as toggleEditorPanel } from './editor';
+// Aliased in scripts/rollup.js to the pre-built ESM bundle inside wasm-mt/. pagx-player owns
+// the canvas / toolbar / playback bar / gestures / source editor, so the playground is left as
+// a thin shell that provides resource loading, i18n, drop zone UI, samples page and routing.
+import { PAGXPlayer, type ToolbarSlot } from 'pagx-player';
 
 interface I18nStrings {
     dropText: string;
@@ -28,22 +31,15 @@ interface I18nStrings {
     loading: string;
     errorTitle: string;
     errorFormat: string;
-    errorWasm: string;
-    errorFont: string;
-    errorNetwork: string;
     errorBrowser: string;
     openFile: string;
-    resetView: string;
     invalidFile: string;
-    spec: string;
-    specTitle: string;
     docs: string;
     specification: string;
     aiSkills: string;
     leave: string;
     samples: string;
     samplesTitle: string;
-    home: string;
     back: string;
 }
 
@@ -54,22 +50,15 @@ const i18n: Record<string, I18nStrings> = {
         loading: 'Loading...',
         errorTitle: 'Failed to load',
         errorFormat: 'Invalid file format. Please use a valid .pagx file.',
-        errorWasm: 'Failed to load WebAssembly module.',
-        errorFont: 'Failed to load fonts.',
-        errorNetwork: 'Network error. Please check your connection.',
         errorBrowser: 'Minimum browser versions required:',
         openFile: 'Open PAGX File',
-        resetView: 'Reset View',
         invalidFile: 'Please drop a .pagx file',
-        spec: 'Spec',
-        specTitle: 'PAGX Specification',
         docs: 'Docs',
         specification: 'Specification',
         aiSkills: 'AI Skills',
         leave: 'Leave',
         samples: 'Samples',
         samplesTitle: 'PAGX Samples',
-        home: 'Home',
         back: 'Back',
     },
     zh: {
@@ -78,22 +67,15 @@ const i18n: Record<string, I18nStrings> = {
         loading: '加载中...',
         errorTitle: '加载失败',
         errorFormat: '无效的文件格式，请使用有效的 .pagx 文件。',
-        errorWasm: 'WebAssembly 模块加载失败。',
-        errorFont: '字体加载失败。',
-        errorNetwork: '网络错误，请检查网络连接。',
         errorBrowser: '浏览器最低版本要求：',
         openFile: '打开 PAGX 文件',
-        resetView: '重置视图',
         invalidFile: '请拖放 .pagx 文件',
-        spec: '格式',
-        specTitle: 'PAGX 格式规范',
         docs: '文档',
         specification: '格式规范',
         aiSkills: 'AI Skills',
         leave: '离开',
         samples: '示例',
         samplesTitle: 'PAGX 示例',
-        home: '首页',
         back: '返回',
     },
 };
@@ -112,33 +94,52 @@ function t(): I18nStrings {
     return i18n[getLocale()];
 }
 
-const MIN_ZOOM = 0.001;
-const MAX_ZOOM = 1000.0;
+// Base URL used to fetch every remote asset the playground consumes (wasm, fonts, .pagx
+// samples, sample thumbnails, player icons). Local development (localhost / 127.0.0.1) keeps
+// relative paths so `npm run server` continues serving out of the working tree, while any
+// other host is redirected to the PAG CDN. The CDN version substantially reduces first-load
+// time for the official pagx site because the ~21 MB of fonts + wasm come from a
+// geographically-close edge instead of the origin server. Ends without a trailing slash;
+// concatenation sites (assetUrl below) prepend '/' explicitly.
+//
+// Uses `globalThis.location` rather than `window.location` because the pagx-viewer
+// multi-threaded build starts Emscripten pthread workers whose script is this same rollup
+// bundle. Worker context has `self.location` but no `window`, so probing `window.location`
+// at module-init time (below) would throw ReferenceError on every worker spawn. `location`
+// is present on both Window and DedicatedWorkerGlobalScope, so this call reads the correct
+// hostname in either environment.
+function computeResourceBase(): string {
+    const host = globalThis.location?.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return '';
+    }
+    return 'https://pag.qq.com/pagx';
+}
 
-// Font URLs for preloading
-const FONT_URL = './fonts/NotoSansSC-Regular.otf';
-const EMOJI_FONT_URL = './fonts/NotoColorEmoji.ttf';
+const RESOURCE_BASE = computeResourceBase();
+
+// Build an absolute (CDN) or root-relative asset URL. relPath must be a path relative to the
+// site root, e.g. 'wasm-mt/pagx-viewer.wasm' or 'samples/index.json'. Do NOT pass a leading
+// '/'; passing one on the CDN branch would produce an invalid double-slash URL.
+function assetUrl(relPath: string): string {
+    return RESOURCE_BASE === '' ? `./${relPath}` : `${RESOURCE_BASE}/${relPath}`;
+}
+
+// Font URLs for preloading. Fonts and wasm live under the same CDN prefix in production so
+// the browser can multiplex both downloads over a single connection.
+const FONT_URL = assetUrl('fonts/NotoSansSC-Regular.otf');
+const EMOJI_FONT_URL = assetUrl('fonts/NotoColorEmoji.ttf');
 
 // __PAGX_INFIX__ is injected at build time by scripts/rollup.js: empty for the
 // multi-threaded build, ".st" for the single-threaded build. The matching wasm is
 // placed at wasm-mt/ by scripts/prebuild.js.
 declare const __PAGX_INFIX__: string;
-const WASM_URL = `./wasm-mt/pagx-viewer${__PAGX_INFIX__}.wasm`;
+const WASM_URL = assetUrl(`wasm-mt/pagx-viewer${__PAGX_INFIX__}.wasm`);
 
 // Estimated sizes for progress calculation (in bytes)
 const ESTIMATED_WASM_SIZE = 2400000;
 const ESTIMATED_FONT_SIZE = 8800000;
 const ESTIMATED_EMOJI_FONT_SIZE = 10300000;
-
-class PlaygroundState {
-    module: PAGXModule | null = null;
-    pagxView: PAGXView | null = null;
-    zoom: number = 1.0;
-    offsetX: number = 0;
-    offsetY: number = 0;
-    fontData: Uint8Array | null = null;
-    emojiFontData: Uint8Array | null = null;
-}
 
 class LoadingProgress {
     wasmLoaded: number = 0;
@@ -150,10 +151,6 @@ class LoadingProgress {
     emojiFontLoaded: number = 0;
     emojiFontTotal: number = ESTIMATED_EMOJI_FONT_SIZE;
     emojiFontDone: boolean = false;
-
-    isAllResourcesCached(): boolean {
-        return this.wasmDone && this.fontDone && this.emojiFontDone;
-    }
 
     getOverallProgress(): number {
         // Only count resources that are not yet done
@@ -180,347 +177,21 @@ class LoadingProgress {
     }
 }
 
-enum ErrorType {
-    WASM = 'wasm',
-    FONT = 'font',
-    FORMAT = 'format',
-    NETWORK = 'network',
-}
-
-class PlaygroundError extends Error {
-    type: ErrorType;
-    constructor(type: ErrorType, message?: string) {
-        super(message);
-        this.type = type;
-    }
-}
-
-interface GestureEvent extends UIEvent {
-    scale: number;
-    rotation: number;
-    clientX: number;
-    clientY: number;
-}
-
-enum ScaleGestureState {
-    SCALE_START = 0,
-    SCALE_CHANGE = 1,
-    SCALE_END = 2,
-}
-
-enum ScrollGestureState {
-    SCROLL_START = 0,
-    SCROLL_CHANGE = 1,
-    SCROLL_END = 2,
-}
-
-enum DeviceType {
-    TOUCH = 0,
-    MOUSE = 1,
-}
-
-class GestureManager {
-    private scaleY = 1.0;
-    private pinchTimeout = 150;
-    private timer: number | undefined;
-    private scaleStartZoom = 1.0;
-    private lastEventTime = 0;
-    private lastDeltaY = 0;
-    private timeThreshold = 50;
-    private deltaYThreshold = 50;
-    private deltaYChangeThreshold = 10;
-    private mouseWheelRatio = 800;
-    private touchWheelRatio = 100;
-
-    // Drag state
-    private isDragging = false;
-    private dragStartX = 0;
-    private dragStartY = 0;
-    private dragStartOffsetX = 0;
-    private dragStartOffsetY = 0;
-
-    // Touch state
-    private startTouchDistance = 0;
-    private lastTouchCenterX = 0;
-    private lastTouchCenterY = 0;
-    private isTouchPanning = false;
-    private isTouchZooming = false;
-    public zoom = 1.0;
-    public offsetX = 0;
-    public offsetY = 0;
-
-    private handleScrollEvent(
-        event: WheelEvent,
-        state: ScrollGestureState,
-        playgroundState: PlaygroundState,
-    ) {
-        if (state === ScrollGestureState.SCROLL_CHANGE) {
-            this.scaleStartZoom = this.zoom;
-            this.scaleY = 1.0;
-            if (event.shiftKey && event.deltaX === 0 && event.deltaY !== 0) {
-                this.offsetX -= event.deltaY * window.devicePixelRatio;
-            } else {
-                this.offsetX -= event.deltaX * window.devicePixelRatio;
-                this.offsetY -= event.deltaY * window.devicePixelRatio;
-            }
-            playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
-        }
-    }
-
-    private handleScaleEvent(
-        event: WheelEvent,
-        state: ScaleGestureState,
-        canvas: HTMLElement,
-        playgroundState: PlaygroundState,
-    ) {
-        if (state === ScaleGestureState.SCALE_START) {
-            this.scaleY = 1.0;
-            this.scaleStartZoom = this.zoom;
-        }
-        if (state === ScaleGestureState.SCALE_CHANGE) {
-            const rect = canvas.getBoundingClientRect();
-            const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
-            const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
-            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * this.scaleY));
-            this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
-            this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
-            this.zoom = newZoom;
-        }
-        if (state === ScaleGestureState.SCALE_END) {
-            this.scaleY = 1.0;
-            this.scaleStartZoom = this.zoom;
-        }
-        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
-    }
-
-    public clearState() {
-        this.scaleY = 1.0;
-        this.timer = undefined;
-    }
-
-    public resetTransform(playgroundState: PlaygroundState) {
-        this.zoom = 1.0;
-        this.offsetX = 0;
-        this.offsetY = 0;
-        this.clearState();
-        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
-    }
-
-    private resetScrollTimeout(
-        event: WheelEvent,
-        playgroundState: PlaygroundState,
-    ) {
-        clearTimeout(this.timer);
-        this.timer = window.setTimeout(() => {
-            this.timer = undefined;
-            this.handleScrollEvent(event, ScrollGestureState.SCROLL_END, playgroundState);
-            this.clearState();
-        }, this.pinchTimeout);
-    }
-
-    private resetScaleTimeout(
-        event: WheelEvent,
-        canvas: HTMLElement,
-        playgroundState: PlaygroundState,
-    ) {
-        clearTimeout(this.timer);
-        this.timer = window.setTimeout(() => {
-            this.timer = undefined;
-            this.handleScaleEvent(event, ScaleGestureState.SCALE_END, canvas, playgroundState);
-            this.clearState();
-        }, this.pinchTimeout);
-    }
-
-    private getDeviceType(event: WheelEvent): DeviceType {
-        const now = Date.now();
-        const timeDifference = now - this.lastEventTime;
-        const deltaYChange = Math.abs(event.deltaY - this.lastDeltaY);
-        let isTouchpad = false;
-        if (event.deltaMode === event.DOM_DELTA_PIXEL && timeDifference < this.timeThreshold) {
-            if (Math.abs(event.deltaY) < this.deltaYThreshold && deltaYChange < this.deltaYChangeThreshold) {
-                isTouchpad = true;
-            }
-        }
-        this.lastEventTime = now;
-        this.lastDeltaY = event.deltaY;
-        return isTouchpad ? DeviceType.TOUCH : DeviceType.MOUSE;
-    }
-
-    public onWheel(event: WheelEvent, canvas: HTMLElement, playgroundState: PlaygroundState) {
-        const deviceType = this.getDeviceType(event);
-        let wheelRatio = (deviceType === DeviceType.MOUSE ? this.mouseWheelRatio : this.touchWheelRatio);
-        if (!event.deltaY || (!event.ctrlKey && !event.metaKey)) {
-            this.resetScrollTimeout(event, playgroundState);
-            this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, playgroundState);
-        } else {
-            this.scaleY *= Math.exp(-(event.deltaY) / wheelRatio);
-            if (!this.timer) {
-                this.resetScaleTimeout(event, canvas, playgroundState);
-                this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, playgroundState);
-            } else {
-                this.resetScaleTimeout(event, canvas, playgroundState);
-                this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, playgroundState);
-            }
-        }
-    }
-
-    // Mouse drag handlers
-    public onMouseDown(event: MouseEvent, canvas: HTMLElement) {
-        // Only handle left mouse button
-        if (event.button !== 0) {
-            return;
-        }
-        this.isDragging = true;
-        this.dragStartX = event.clientX;
-        this.dragStartY = event.clientY;
-        this.dragStartOffsetX = this.offsetX;
-        this.dragStartOffsetY = this.offsetY;
-        canvas.style.cursor = 'grabbing';
-    }
-
-    public onMouseMove(event: MouseEvent, playgroundState: PlaygroundState) {
-        if (!this.isDragging) {
-            return;
-        }
-        const deltaX = (event.clientX - this.dragStartX) * window.devicePixelRatio;
-        const deltaY = (event.clientY - this.dragStartY) * window.devicePixelRatio;
-        this.offsetX = this.dragStartOffsetX + deltaX;
-        this.offsetY = this.dragStartOffsetY + deltaY;
-        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
-    }
-
-    public onMouseUp(canvas: HTMLElement) {
-        this.isDragging = false;
-        canvas.style.cursor = 'grab';
-    }
-
-    // Touch handlers
-    private getTouchDistance(touches: TouchList): number {
-        if (touches.length < 2) {
-            return 0;
-        }
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
-    private getTouchCenter(touches: TouchList): { x: number; y: number } {
-        if (touches.length < 2) {
-            return { x: touches[0].clientX, y: touches[0].clientY };
-        }
-        return {
-            x: (touches[0].clientX + touches[1].clientX) / 2,
-            y: (touches[0].clientY + touches[1].clientY) / 2,
-        };
-    }
-
-    public onTouchStart(event: TouchEvent, canvas: HTMLElement) {
-        if (event.touches.length === 1) {
-            // Single finger pan
-            this.isTouchPanning = true;
-            this.isTouchZooming = false;
-            this.dragStartX = event.touches[0].clientX;
-            this.dragStartY = event.touches[0].clientY;
-            this.dragStartOffsetX = this.offsetX;
-            this.dragStartOffsetY = this.offsetY;
-        } else if (event.touches.length === 2) {
-            // Two finger zoom/pan
-            this.isTouchPanning = false;
-            this.isTouchZooming = true;
-            this.startTouchDistance = this.getTouchDistance(event.touches);
-            const center = this.getTouchCenter(event.touches);
-            this.lastTouchCenterX = center.x;
-            this.lastTouchCenterY = center.y;
-            this.scaleStartZoom = this.zoom;
-            this.dragStartOffsetX = this.offsetX;
-            this.dragStartOffsetY = this.offsetY;
-        }
-    }
-
-    public onTouchMove(event: TouchEvent, canvas: HTMLElement, playgroundState: PlaygroundState) {
-        if (event.touches.length === 1 && this.isTouchPanning) {
-            // Single finger pan
-            const deltaX = (event.touches[0].clientX - this.dragStartX) * window.devicePixelRatio;
-            const deltaY = (event.touches[0].clientY - this.dragStartY) * window.devicePixelRatio;
-            this.offsetX = this.dragStartOffsetX + deltaX;
-            this.offsetY = this.dragStartOffsetY + deltaY;
-            playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
-        } else if (event.touches.length === 2 && this.isTouchZooming) {
-            // Two finger zoom and pan
-            const currentDistance = this.getTouchDistance(event.touches);
-            const center = this.getTouchCenter(event.touches);
-            const rect = canvas.getBoundingClientRect();
-            const pixelX = (center.x - rect.left) * window.devicePixelRatio;
-            const pixelY = (center.y - rect.top) * window.devicePixelRatio;
-
-            // Calculate zoom using absolute ratio relative to the start distance.
-            if (this.startTouchDistance > 0) {
-                const scale = currentDistance / this.startTouchDistance;
-                const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * scale));
-
-                // Zoom around pinch center
-                this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
-                this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
-                this.zoom = newZoom;
-            }
-
-            // Also handle pan during pinch
-            const centerDeltaX = (center.x - this.lastTouchCenterX) * window.devicePixelRatio;
-            const centerDeltaY = (center.y - this.lastTouchCenterY) * window.devicePixelRatio;
-            this.offsetX += centerDeltaX;
-            this.offsetY += centerDeltaY;
-
-            this.lastTouchCenterX = center.x;
-            this.lastTouchCenterY = center.y;
-
-            playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
-        }
-    }
-
-    public onTouchEnd(event: TouchEvent, canvas: HTMLElement) {
-        if (event.touches.length === 0) {
-            this.isTouchPanning = false;
-            this.isTouchZooming = false;
-        } else if (event.touches.length === 1) {
-            // Switched from pinch to single finger
-            this.isTouchPanning = true;
-            this.isTouchZooming = false;
-            this.dragStartX = event.touches[0].clientX;
-            this.dragStartY = event.touches[0].clientY;
-            this.dragStartOffsetX = this.offsetX;
-            this.dragStartOffsetY = this.offsetY;
-        }
-    }
-
-    // Safari gesture handlers
-    public onGestureStart(event: GestureEvent) {
-        this.scaleStartZoom = this.zoom;
-        this.dragStartOffsetX = this.offsetX;
-        this.dragStartOffsetY = this.offsetY;
-    }
-
-    public onGestureChange(event: GestureEvent, canvas: HTMLElement,
-                           playgroundState: PlaygroundState) {
-        // event.scale is already an absolute ratio relative to gesturestart.
-        const rect = canvas.getBoundingClientRect();
-        const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
-        const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * event.scale));
-        this.offsetX = (this.offsetX - pixelX) * (newZoom / this.zoom) + pixelX;
-        this.offsetY = (this.offsetY - pixelY) * (newZoom / this.zoom) + pixelY;
-        this.zoom = newZoom;
-        playgroundState.pagxView?.updateZoomScaleAndOffset(this.zoom, this.offsetX, this.offsetY);
-    }
-
-    public onGestureEnd() {
-    }
-}
-
-const playgroundState = new PlaygroundState();
-const gestureManager = new GestureManager();
 const loadingProgress = new LoadingProgress();
-let wasmLoadPromise: Promise<void> | null = null;
+let fontData: Uint8Array | null = null;
+let emojiFontData: Uint8Array | null = null;
+let cachedModule: PAGXModule | null = null;
+let wasmLoadPromise: Promise<PAGXModule> | null = null;
 let fontLoadPromise: Promise<void> | null = null;
+let player: PAGXPlayer | null = null;
+let sampleFiles: string[] = [];
+let currentPlayingFile: string | null = null;
+let currentFileName: string = 'export.pagx';
+// Snapshot of the player's playing state at the moment the samples overlay is opened. Used
+// by hideSamplesPage() to restore the exact play/pause state on return so the samples page
+// visit is transparent to the user - a running animation resumes, a paused one stays paused.
+let wasPlayingBeforeSamples: boolean = false;
+const DEFAULT_TITLE = 'PAGX Playground';
 
 function updateProgressUI(): void {
     const progressBar = document.getElementById('progress-bar');
@@ -598,6 +269,11 @@ async function loadFonts(): Promise<void> {
             updateProgressUI();
             return new Uint8Array(buffer);
         } catch (error) {
+            // Silent degradation: if the CDN or local font is unreachable we log a warning
+            // and return null instead of failing loadPAGXData. registerFontsToView then feeds
+            // an empty Uint8Array into the view, and pagx-viewer falls back to system fonts
+            // for text layers. Users see a visibly less accurate render rather than a hard
+            // failure that would strand them on the error UI.
             console.warn(`Error loading font ${url}:`, error);
             onDone();
             updateProgressUI();
@@ -605,7 +281,7 @@ async function loadFonts(): Promise<void> {
         }
     };
 
-    const [fontData, emojiFontData] = await Promise.all([
+    const [font, emojiFont] = await Promise.all([
         loadFont(
             FONT_URL,
             (loaded, total) => {
@@ -629,12 +305,17 @@ async function loadFonts(): Promise<void> {
             () => { loadingProgress.emojiFontDone = true; }
         ),
     ]);
-    playgroundState.fontData = fontData;
-    playgroundState.emojiFontData = emojiFontData;
+    fontData = font;
+    emojiFontData = emojiFont;
 }
 
-async function loadWasm(): Promise<void> {
-    // First fetch the WASM file with progress tracking
+// Fetches the wasm binary with progress reporting, then instantiates PAGXModule. The result
+// is cached: the player's `moduleFactory` hits the cache after the first load(). Errors
+// clear wasmLoadPromise upstream so a retry can start over cleanly.
+async function loadWasmModule(): Promise<PAGXModule> {
+    if (cachedModule) {
+        return cachedModule;
+    }
     const wasmBuffer = await fetchWithProgress(WASM_URL, (loaded, total) => {
         loadingProgress.wasmLoaded = loaded;
         if (total > 0) {
@@ -644,146 +325,20 @@ async function loadWasm(): Promise<void> {
     });
     loadingProgress.wasmDone = true;
     updateProgressUI();
-    // Initialize PAGX module
-    const module = await PAGXInit({
-        locateFile: (file: string) => './wasm-mt/' + file,
+    // locateFile is called by emscripten glue for sidecar files like *.mem or *.data. wasm
+    // itself is provided via wasmBinary so this fallback rarely fires; when it does, we still
+    // want it to go through the same asset base as everything else.
+    const module = (await PAGXInit({
+        locateFile: (file: string) => assetUrl(`wasm-mt/${file}`),
         wasmBinary: wasmBuffer,
-    });
-    playgroundState.module = module;
-    const pagxView = module.PAGXView.init('#pagx-canvas');
-    if (!pagxView) {
-        throw new Error('Failed to create PAGXView');
-    }
-    playgroundState.pagxView = pagxView;
-    pagxView.setBackgroundColor('#000000', 0);
-    updateSize();
-    pagxView.updateZoomScaleAndOffset(1.0, 0, 0);
-    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-    bindCanvasEvents(canvas);
-    pagxView.start();
-    setupVisibilityListeners();
+    })) as PAGXModule;
+    cachedModule = module;
+    return module;
 }
 
-function registerFontsToView(): void {
-    if (!playgroundState.pagxView) {
-        return;
-    }
-    const fontData = playgroundState.fontData || new Uint8Array(0);
-    const emojiFontData = playgroundState.emojiFontData || new Uint8Array(0);
-    playgroundState.pagxView.registerFonts(fontData, emojiFontData);
-}
-
-function updateSize() {
-    if (!playgroundState.pagxView) {
-        return;
-    }
-    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-    const container = document.getElementById('container') as HTMLDivElement;
-    const screenRect = container.getBoundingClientRect();
-    const scaleFactor = window.devicePixelRatio;
-    canvas.width = screenRect.width * scaleFactor;
-    canvas.height = screenRect.height * scaleFactor;
-    canvas.style.width = screenRect.width + "px";
-    canvas.style.height = screenRect.height + "px";
-    playgroundState.pagxView.updateSize();
-}
-
-function handleVisibilityChange() {
-    if (document.hidden) {
-        playgroundState.pagxView?.stop();
-    } else {
-        playgroundState.pagxView?.start();
-    }
-}
-
-function setupVisibilityListeners() {
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', () => {
-        playgroundState.pagxView?.stop();
-    });
-}
-
-function bindCanvasEvents(canvas: HTMLElement) {
-    // Set initial cursor style
-    canvas.style.cursor = 'grab';
-
-    // A press whose pointer barely moves is treated as a click that toggles playback,
-    // while a larger movement is a pan gesture handled by the gesture manager.
-    const CLICK_MOVE_THRESHOLD = 5;
-    let pressStartX = 0;
-    let pressStartY = 0;
-
-    // Wheel events for scroll and zoom
-    canvas.addEventListener('wheel', (e: WheelEvent) => {
-        e.preventDefault();
-        gestureManager.onWheel(e, canvas, playgroundState);
-    }, { passive: false });
-
-    // Mouse drag events
-    canvas.addEventListener('mousedown', (e: MouseEvent) => {
-        e.preventDefault();
-        pressStartX = e.clientX;
-        pressStartY = e.clientY;
-        gestureManager.onMouseDown(e, canvas);
-    });
-    canvas.addEventListener('mousemove', (e: MouseEvent) => {
-        gestureManager.onMouseMove(e, playgroundState);
-    });
-    canvas.addEventListener('mouseup', (e: MouseEvent) => {
-        gestureManager.onMouseUp(canvas);
-        if (e.button === 0 &&
-            Math.abs(e.clientX - pressStartX) < CLICK_MOVE_THRESHOLD &&
-            Math.abs(e.clientY - pressStartY) < CLICK_MOVE_THRESHOLD) {
-            togglePlayback();
-        }
-    });
-    canvas.addEventListener('mouseleave', () => {
-        gestureManager.onMouseUp(canvas);
-    });
-
-    // Touch events for mobile
-    canvas.addEventListener('touchstart', (e: TouchEvent) => {
-        e.preventDefault();
-        if (e.touches.length === 1) {
-            pressStartX = e.touches[0].clientX;
-            pressStartY = e.touches[0].clientY;
-        }
-        gestureManager.onTouchStart(e, canvas);
-    }, { passive: false });
-    canvas.addEventListener('touchmove', (e: TouchEvent) => {
-        e.preventDefault();
-        gestureManager.onTouchMove(e, canvas, playgroundState);
-    }, { passive: false });
-    canvas.addEventListener('touchend', (e: TouchEvent) => {
-        const wasSingleTouch = e.touches.length === 0 && e.changedTouches.length === 1;
-        gestureManager.onTouchEnd(e, canvas);
-        if (wasSingleTouch) {
-            const touch = e.changedTouches[0];
-            if (Math.abs(touch.clientX - pressStartX) < CLICK_MOVE_THRESHOLD &&
-                Math.abs(touch.clientY - pressStartY) < CLICK_MOVE_THRESHOLD) {
-                togglePlayback();
-            }
-        }
-    });
-    canvas.addEventListener('touchcancel', (e: TouchEvent) => {
-        gestureManager.onTouchEnd(e, canvas);
-    });
-
-    // Safari gesture events for pinch-to-zoom
-    canvas.addEventListener('gesturestart', (e: Event) => {
-        e.preventDefault();
-        gestureManager.onGestureStart(e as GestureEvent);
-    });
-    canvas.addEventListener('gesturechange', (e: Event) => {
-        e.preventDefault();
-        gestureManager.onGestureChange(e as GestureEvent, canvas, playgroundState);
-    });
-    canvas.addEventListener('gestureend', (e: Event) => {
-        e.preventDefault();
-        gestureManager.onGestureEnd();
-    });
-}
-
+// ---------------------------------------------------------------------------------------------
+// Drop zone UI state machine.
+// ---------------------------------------------------------------------------------------------
 type DropZoneState = 'dropzone' | 'loading' | 'error';
 
 function setDropZoneState(state: DropZoneState, errorMessage?: string): void {
@@ -825,257 +380,177 @@ function hideDropZone(): void {
     }
 }
 
-function showPlaybackBar(): void {
-    const playbackBar = document.getElementById('playback-bar') as HTMLDivElement;
-    if (!playbackBar) {
-        return;
-    }
-    // Static PAGX has no animation (zero duration); hide the playback bar for it.
-    const hasAnimation = !!playgroundState.pagxView && playgroundState.pagxView.durationMicros() > 0;
-    if (hasAnimation) {
-        playbackBar.classList.remove('hidden');
-        updatePlaybackUI();
-        updateLoopIcon();
-    } else {
-        playbackBar.classList.add('hidden');
-    }
+// ---------------------------------------------------------------------------------------------
+// Player integration.
+// ---------------------------------------------------------------------------------------------
+
+// External resources referenced from within a pagx (relative to the loaded sample's directory).
+// Guards against path traversal and protocol schemes so a malicious document can't force a
+// fetch into a different origin or the local filesystem.
+function isSafeRelativePath(p: string): boolean {
+    return !p.includes('://') && !p.startsWith('/') && !p.includes('..');
 }
 
-function formatTime(microseconds: number): string {
-    const seconds = Math.max(0, microseconds / 1_000_000);
-    return seconds.toFixed(2) + 's';
-}
-
-function getCurrentFrame(): number {
-    const view = playgroundState.pagxView;
-    if (!view) return 0;
-    const rate = view.frameRate();
-    if (rate <= 0) return 0;
-    return Math.round(Math.max(0, view.currentTimeMicros()) * rate / 1_000_000);
-}
-
-function getTotalFrames(): number {
-    const view = playgroundState.pagxView;
-    if (!view) return 0;
-    const rate = view.frameRate();
-    if (rate <= 0) return 0;
-    return Math.ceil(view.durationMicros() * rate / 1_000_000);
-}
-
-function updatePlayPauseIcon(): void {
-    const playPauseImg = document.getElementById('play-pause-img') as HTMLImageElement;
-    if (!playgroundState.pagxView || !playPauseImg) {
-        return;
-    }
-    const playing = playgroundState.pagxView.isPlaying();
-    playPauseImg.src = playing ? './pause.png' : './play.png';
-}
-
-function updateSliderFill(slider: HTMLInputElement): void {
-    const pct = (parseFloat(slider.value) / 1000) * 100;
-    slider.style.background =
-        'linear-gradient(90deg, #4c7cf3, #8b5cf0, #ec5b9c) no-repeat 0 0 / ' +
-        pct + '% 100%, rgba(255, 255, 255, 0.18)';
-}
-
-function updateProgressSlider(): void {
-    const slider = document.getElementById('progress-slider') as HTMLInputElement;
-    if (!playgroundState.pagxView || !slider) {
-        return;
-    }
-    const duration = playgroundState.pagxView.durationMicros();
-    if (duration <= 0) {
-        slider.value = '0';
-        updateSliderFill(slider);
-        return;
-    }
-    const current = Math.max(0, playgroundState.pagxView.currentTimeMicros());
-    slider.value = String(Math.round((current / duration) * 1000));
-    updateSliderFill(slider);
-}
-
-function updateTimeDisplay(): void {
-    const timeText = document.getElementById('time-text');
-    const frameText = document.getElementById('frame-text');
-    if (!playgroundState.pagxView || !timeText || !frameText) {
-        return;
-    }
-    const current = playgroundState.pagxView.currentTimeMicros();
-    const duration = playgroundState.pagxView.durationMicros();
-    timeText.textContent = formatTime(current) + ' / ' + formatTime(duration);
-    frameText.textContent = String(getCurrentFrame()) + ' / ' + String(getTotalFrames());
-}
-
-function updateLoopIcon(): void {
-    const loopBtn = document.getElementById('loop-btn');
-    if (!playgroundState.pagxView || !loopBtn) {
-        return;
-    }
-    const looping = playgroundState.pagxView.isLoop();
-    loopBtn.classList.toggle('active', looping);
-}
-
-function updatePlaybackUI(): void {
-    updatePlayPauseIcon();
-    updateProgressSlider();
-    updateTimeDisplay();
-    // updateLoopIcon is intentionally NOT called here: the loop state only changes on user
-    // click, so refreshing it on the 100ms playback tick would be wasted DOM work. Call sites
-    // that toggle the loop state (loop button handler, initial showPlaybackBar) update it
-    // explicitly.
-}
-
-function togglePlayback(): void {
-    const view = playgroundState.pagxView;
-    if (!view || view.durationMicros() <= 0) {
-        return;
-    }
-    if (view.isPlaying()) {
-        view.pause();
-    } else {
-        // Restart from the head when starting playback at the last frame (the user stepped or
-        // dragged the playhead to the end), so play replays instead of being stuck at the end.
-        if (view.currentTimeMicros() >= view.durationMicros()) {
-            view.setCurrentTimeMicros(0);
+// Build a resolveResource callback for the player from a base URL. The player invokes the
+// callback for every path reported by getExternalFilePaths() after parsePAGX; returning null
+// tells the render pipeline to fall back to default data for that resource.
+function makeResourceResolver(baseUrl: string) {
+    return async (relPath: string): Promise<Uint8Array | null> => {
+        if (!isSafeRelativePath(relPath)) {
+            console.warn(`Skipping unsafe external file path: ${relPath}`);
+            return null;
         }
-        view.play();
-    }
-    updatePlaybackUI();
-}
-
-// Steps the playhead by one frame in the given direction (-1 previous, +1 next). Stepping always
-// pauses first, then seeks by a single frame duration clamped to the animation range. Composed from
-// the view's playback primitives so the frame-navigation policy lives in the UI layer.
-function stepFrame(direction: number): void {
-    const view = playgroundState.pagxView;
-    if (!view) {
-        return;
-    }
-    const rate = view.frameRate();
-    const duration = view.durationMicros();
-    if (rate <= 0 || duration <= 0) {
-        return;
-    }
-    view.pause();
-    const frameDurationUs = 1_000_000 / rate;
-    const target = view.currentTimeMicros() + direction * frameDurationUs;
-    view.setCurrentTimeMicros(Math.max(0, Math.min(duration, target)));
-    updatePlaybackUI();
-}
-
-function hidePlaybackUI(): void {
-    document.getElementById('pagx-canvas')?.classList.add('hidden');
-    document.getElementById('toolbar')?.classList.add('hidden');
-    document.getElementById('playback-bar')?.classList.add('hidden');
-}
-
-const DEFAULT_TITLE = 'PAGX Playground';
-
-function goHome(pushHistory: boolean = true): void {
-    if (playgroundState.pagxView) {
-        playgroundState.pagxView.clear();
-        gestureManager.resetTransform(playgroundState);
-    }
-    document.getElementById('pagx-canvas')?.classList.add('hidden');
-    document.getElementById('toolbar')?.classList.add('hidden');
-    document.getElementById('playback-bar')?.classList.add('hidden');
-    document.getElementById('nav-btns')?.classList.remove('hidden');
-    document.title = DEFAULT_TITLE;
-    showDropZoneUI();
-    currentPlayingFile = null;
-
-    // Clear sample parameter from URL
-    if (pushHistory) {
-        history.pushState(null, '', window.location.pathname);
-    }
-
-    // Notify the Source Editor module that the document has been cleared.
-    window.dispatchEvent(new CustomEvent('pagx:loaded', { detail: { xmlText: null } }));
-}
-
-function isSafeRelativePath(path: string): boolean {
-    // Reject protocol schemes, absolute paths, and path traversal.
-    return !path.includes('://') && !path.startsWith('/') && !path.includes('..');
-}
-
-async function loadExternalFiles(baseURL: string): Promise<void> {
-    if (!playgroundState.pagxView) {
-        return;
-    }
-    const paths = playgroundState.pagxView.getExternalFilePaths();
-    if (paths.length === 0) {
-        return;
-    }
-    const fetches: Promise<void>[] = [];
-    for (const filePath of paths) {
-        if (!isSafeRelativePath(filePath)) {
-            console.warn(`Skipping unsafe external file path: ${filePath}`);
-            continue;
+        try {
+            const response = await fetch(baseUrl + relPath);
+            if (!response.ok) {
+                console.warn(`Failed to fetch ${baseUrl + relPath}: ${response.status}`);
+                return null;
+            }
+            return new Uint8Array(await response.arrayBuffer());
+        } catch (error) {
+            console.warn(`Failed to load external file ${relPath}:`, error);
+            return null;
         }
-        const fileURL = baseURL + filePath;
-        fetches.push(
-            fetch(fileURL)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch ${fileURL}: ${response.status}`);
-                    }
-                    return response.arrayBuffer();
-                })
-                .then(buffer => {
-                    playgroundState.pagxView?.loadFileData(filePath, new Uint8Array(buffer));
-                })
-                .catch(error => {
-                    console.warn(`Failed to load external file ${filePath}:`, error);
-                })
-        );
+    };
+}
+
+// Feed cached font bytes into the freshly parsed view. pagx-viewer's PAGXView.registerFonts
+// is not on the structural PlayerView interface exposed by pagx-player, so we cast to reach it
+// - the wasm module we injected via moduleFactory really is a pagx-viewer instance underneath.
+async function registerFontsToView(view: unknown): Promise<void> {
+    const font = fontData || new Uint8Array(0);
+    const emoji = emojiFontData || new Uint8Array(0);
+    (view as PAGXView).registerFonts(font, emoji);
+}
+
+// Buttons added around pagx-player's built-in Reset + Source Editor toolbar entries. `before`
+// is prepended, `after` is appended - we want Samples/Open on the left, Leave on the right so
+// the visual order matches the original playground toolbar (Samples | divider | Open | Reset
+// | Editor | divider | Leave). Labels/titles are set here rather than in i18n so the toolbar
+// text always stays in sync with the current locale at construction time.
+function buildToolbarSlots(): { before: ToolbarSlot[]; after: ToolbarSlot[] } {
+    const strings = t();
+    const before: ToolbarSlot[] = [
+        {
+            id: 'toolbar-samples-btn',
+            title: strings.samplesTitle,
+            html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+            </svg>`,
+            onClick: () => {
+                window.location.hash = '#samples';
+            },
+        },
+        { id: 'toolbar-divider-samples', divider: true },
+        {
+            id: 'open-btn',
+            title: strings.openFile,
+            html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>`,
+            onClick: () => {
+                const fileInput = document.getElementById('file-input') as HTMLInputElement | null;
+                fileInput?.click();
+            },
+        },
+    ];
+    const after: ToolbarSlot[] = [
+        { id: 'toolbar-divider-leave', divider: true },
+        {
+            id: 'leave-btn',
+            title: strings.leave,
+            html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>`,
+            onClick: () => {
+                goHome();
+            },
+        },
+    ];
+    return { before, after };
+}
+
+// Apply an edited XML through the currently-loaded player. Used by both the source editor's
+// Apply and Save callbacks. Returns an empty string on success, or an error message.
+async function applyXml(xmlText: string): Promise<string> {
+    if (!player) {
+        return 'Player not initialized';
     }
-    await Promise.all(fetches);
-}
-
-// Shared post-reparse UI refresh. Any call site that runs parsePAGX + buildLayers must invoke
-// this so the canvas backing store, playback bar visibility and playback UI values stay in sync
-// with the newly parsed document; forgetting it leaves the UI stuck on the previous file's
-// duration/dimensions.
-function refreshUIAfterReparse(): void {
-    updateSize();
-    // showPlaybackBar handles the static-image case (duration === 0 → hide) and refreshes the
-    // slider / time / loop icon internally when the bar becomes visible.
-    showPlaybackBar();
-}
-
-async function loadPAGXData(data: Uint8Array, name: string, baseURL: string) {
-    const navBtns = document.getElementById('nav-btns') as HTMLDivElement;
-    const toolbar = document.getElementById('toolbar') as HTMLDivElement;
-    const canvas = document.getElementById('pagx-canvas') as HTMLCanvasElement;
-
-    if (!playgroundState.pagxView) {
-        throw new Error('PAGXView not initialized');
+    try {
+        const bytes = new TextEncoder().encode(xmlText);
+        // Preserve playback position so an Apply doesn't jump the animation back to frame 0.
+        // baseURL for external resources stays the same as the currently loaded sample (or
+        // empty for drag-and-drop) - re-editing XML keeps the same resource root.
+        await player.load(bytes, {
+            preserveCurrentTime: true,
+            xmlText,
+            registerFonts: registerFontsToView,
+            resolveResource: currentPlayingFile
+                ? makeResourceResolver(assetUrl('samples/'))
+                : undefined,
+        });
+        return '';
+    } catch (e) {
+        return e instanceof Error ? e.message : String(e);
     }
-
-    registerFontsToView();
-    playgroundState.pagxView.parsePAGX(data);
-    await loadExternalFiles(baseURL);
-    playgroundState.pagxView.buildLayers();
-    // The view is a reused singleton, so reset loop to its default enabled state so each newly
-    // opened file starts fresh instead of inheriting the previous file's loop toggle.
-    playgroundState.pagxView.setLoop(true);
-    gestureManager.resetTransform(playgroundState);
-    refreshUIAfterReparse();
-    // Draw the first frame before showing canvas to avoid flashing old content
-    playgroundState.pagxView.draw();
-    hideDropZone();
-    canvas.classList.remove('hidden');
-    toolbar.classList.remove('hidden');
-    navBtns.classList.add('hidden');
-    document.title = 'PAGX Playground - ' + name;
-    currentFileName = name;
-
-    // Notify the Source Editor module that a new XML document is available.
-    const decoder = new TextDecoder('utf-8');
-    const xmlText = decoder.decode(data);
-    window.dispatchEvent(new CustomEvent('pagx:loaded', { detail: { xmlText } }));
 }
 
+// Instantiate the pagx-player on first use. The player owns canvas/toolbar/playback bar and
+// the source editor; the playground just gives it a container and callbacks. The moduleFactory
+// wires wasm loading through our fetchWithProgress path so the progress overlay keeps working
+// during the initial load; subsequent load() calls hit the cachedModule fast-path with no
+// additional network I/O.
+function ensurePlayer(): PAGXPlayer {
+    if (player) {
+        return player;
+    }
+    const host = document.getElementById('player-host');
+    if (!host) {
+        throw new Error('#player-host element not found');
+    }
+    const slots = buildToolbarSlots();
+    player = new PAGXPlayer({
+        container: host,
+        moduleFactory: () => loadWasmModule(),
+        iconBaseUrl: RESOURCE_BASE === '' ? './' : `${RESOURCE_BASE}/`,
+        enableEditor: true,
+        editorCallbacks: {
+            onApply: applyXml,
+            onSave: async (xmlText: string) => {
+                const error = await applyXml(xmlText);
+                if (error !== '') {
+                    return error;
+                }
+                // Save = apply + local download. The playground can't write back to the source
+                // file (no filesystem access), so we drop a copy in the user's Downloads folder
+                // using the currently loaded file's name.
+                const blob = new Blob([xmlText], { type: 'application/xml' });
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement('a');
+                anchor.href = url;
+                anchor.download = currentFileName.endsWith('.pagx')
+                    ? currentFileName
+                    : `${currentFileName}.pagx`;
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+                URL.revokeObjectURL(url);
+                return '';
+            },
+        },
+        extraMenuItems: slots,
+    });
+    return player;
+}
+
+// ---------------------------------------------------------------------------------------------
+// PAGX load flow.
+// ---------------------------------------------------------------------------------------------
 const LOADING_TIMEOUT_MS = 60000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -1093,16 +568,16 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     }) as Promise<T>;
 }
 
+// Show the loading overlay and wait for wasm + fonts to be ready. Both fetches are kicked off
+// concurrently at page load and cached on their promises so retries and second-file-loads
+// share the same in-flight or completed downloads.
 async function prepareForLoading(): Promise<void> {
-    if (playgroundState.pagxView) {
-        hidePlaybackUI();
-    }
     showLoadingUI();
     resetProgressUI();
     await new Promise(resolve => requestAnimationFrame(resolve));
 
     if (!wasmLoadPromise) {
-        wasmLoadPromise = loadWasm();
+        wasmLoadPromise = loadWasmModule();
     }
     if (!fontLoadPromise) {
         fontLoadPromise = loadFonts();
@@ -1122,6 +597,8 @@ async function prepareForLoading(): Promise<void> {
     }
     updateProgressUI();
 
+    // Keep the loading overlay visible for a minimum window even when everything is cached; a
+    // sub-100ms flash of the overlay is more distracting than reassuring.
     const elapsed = Date.now() - loadingStartTime;
     const minDisplayTime = 300;
     if (elapsed < minDisplayTime) {
@@ -1129,23 +606,64 @@ async function prepareForLoading(): Promise<void> {
     }
 }
 
-async function loadPAGXFile(file: File) {
+async function loadPAGXData(
+    data: Uint8Array,
+    name: string,
+    resolveResource?: (relPath: string) => Promise<Uint8Array | null>,
+): Promise<void> {
+    // Callers (loadPAGXFile / loadPAGXSample) invoke prepareForLoading() and closeEditor()
+    // before their own file / network read so the loading overlay is visible - and the editor
+    // panel is out of the way - while the bytes are being fetched, not just after.
+    const p = ensurePlayer();
+
+    // Hide the nav-btns overlay so it doesn't sit on top of the player's own toolbar. It is
+    // restored on goHome().
+    document.getElementById('nav-btns')?.classList.add('hidden');
+
+    // Decode xmlText once for the source editor; the player forwards it into the editor via
+    // the load option so the editor doesn't have to redo the TextDecoder work.
+    const xmlText = new TextDecoder('utf-8').decode(data);
+    await p.load(data, {
+        xmlText,
+        registerFonts: registerFontsToView,
+        resolveResource,
+    });
+
+    p.show();
+    hideDropZone();
+    document.title = `PAGX Playground - ${name}`;
+    currentFileName = name;
+}
+
+async function loadPAGXFile(file: File): Promise<void> {
     try {
+        // Close the source editor and show the loading overlay before reading the file so
+        // users get immediate feedback that the drop was accepted, and don't see the editor
+        // panel lingering over the loading screen while arrayBuffer() reads the bytes.
+        // Only user-initiated new loads (drag-drop, samples click, ?sample= URL) close the
+        // editor; editor Apply/Save go through applyXml -> player.load directly and preserve
+        // the editor state.
+        player?.closeEditor();
         await prepareForLoading();
-
         const fileBuffer = await file.arrayBuffer();
-        await loadPAGXData(new Uint8Array(fileBuffer), file.name, '');
+        // Drag-and-drop files have no baseURL for external references (external assets
+        // packaged next to a .pagx aren't accessible over http); pass undefined so the
+        // player's default (no external fetches) applies.
+        await loadPAGXData(new Uint8Array(fileBuffer), file.name);
         currentPlayingFile = null;
-
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
         console.error('Failed to load PAGX file:', error);
-        const message = error instanceof Error ? error.message : t().errorFormat;
-        showErrorUI(message);
+        // Load failed: the player has already torn down its own UI via its failure path, but
+        // we still own the outer chrome (nav-btns overlay + currentPlayingFile pointer for
+        // downstream resource resolution). Restore both so the user can navigate to Samples
+        // from the error state and so a stale sample name doesn't leak into any subsequent
+        // editor Apply that would otherwise fetch resources from the previous sample's base.
+        currentPlayingFile = null;
+        document.getElementById('nav-btns')?.classList.remove('hidden');
+        showErrorUI(error instanceof Error ? error.message : t().errorFormat);
     }
 }
-
-const SAMPLES_DIR = './samples/';
 
 function isValidSampleName(name: string): boolean {
     // Only allow filenames like "foo.pagx" or "foo-bar_baz.pagx".
@@ -1153,32 +671,44 @@ function isValidSampleName(name: string): boolean {
     return /^[\w][\w.\-]*\.pagx$/.test(name);
 }
 
-async function loadPAGXSample(name: string, pushHistory: boolean = true) {
+async function loadPAGXSample(name: string, pushHistory: boolean = true): Promise<void> {
     if (!isValidSampleName(name)) {
         showErrorUI(t().errorFormat);
         return;
     }
     try {
+        // Mirror loadPAGXFile: close the editor and reveal the loading overlay before the
+        // network round-trip so click feedback is immediate even on slow CDN networks.
+        player?.closeEditor();
         await prepareForLoading();
-
-        const url = SAMPLES_DIR + name;
+        const url = assetUrl(`samples/${name}`);
+        // Fetch the sample bytes ourselves (rather than delegating to prepareForLoading) so a
+        // 404 from the CDN surfaces as a network error in the drop-zone instead of stalling
+        // the player.
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
         }
         const fileBuffer = await response.arrayBuffer();
-
-        await loadPAGXData(new Uint8Array(fileBuffer), name, SAMPLES_DIR);
+        await loadPAGXData(
+            new Uint8Array(fileBuffer),
+            name,
+            makeResourceResolver(assetUrl('samples/')),
+        );
         currentPlayingFile = name;
 
-        const cleanUrl = window.location.pathname + '?sample=' + encodeURIComponent(name);
+        const cleanUrl = `${window.location.pathname}?sample=${encodeURIComponent(name)}`;
         if (pushHistory) {
             history.pushState(null, '', cleanUrl);
         }
     } catch (error) {
         console.error('Failed to load PAGX sample:', error);
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        showErrorUI(message);
+        // Same recovery as loadPAGXFile's catch: reveal the nav overlay so the user isn't
+        // stranded on the error UI, and null out currentPlayingFile so a stale name from a
+        // prior successful load doesn't drive resource resolution on the next Apply.
+        currentPlayingFile = null;
+        document.getElementById('nav-btns')?.classList.remove('hidden');
+        showErrorUI(error instanceof Error ? error.message : 'Unknown error');
     }
 }
 
@@ -1187,15 +717,38 @@ function getSampleNameFromParams(): string | null {
     return params.get('sample');
 }
 
-function setupDragAndDrop() {
+function goHome(pushHistory: boolean = true): void {
+    // The player retains its wasm view / cached wasm module across hides so a subsequent
+    // open() (drag-drop, samples click) can jump straight to load() without re-initializing.
+    player?.hide();
+
+    // Restore the top-level Samples / Docs overlay and drop the currently loaded file
+    // metadata so a fresh open() starts from a clean slate.
+    document.getElementById('nav-btns')?.classList.remove('hidden');
+    showDropZoneUI();
+    document.title = DEFAULT_TITLE;
+    currentPlayingFile = null;
+    currentFileName = 'export.pagx';
+    // Going home discards any pre-samples playback state: hideSamplesPage may still fire
+    // afterwards (popstate path that leaves #samples), and without this reset it would call
+    // player.play() on the just-hidden player, resuming the render loop against a hidden
+    // canvas.
+    wasPlayingBeforeSamples = false;
+
+    if (pushHistory) {
+        history.pushState(null, '', window.location.pathname);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Drag & drop.
+// ---------------------------------------------------------------------------------------------
+function setupDragAndDrop(): void {
     const dropZone = document.getElementById('drop-zone') as HTMLDivElement;
     const dropZoneContent = document.getElementById('drop-zone-content') as HTMLDivElement;
     const errorContent = document.getElementById('error-content') as HTMLDivElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const fileInput = document.getElementById('file-input') as HTMLInputElement;
-    const leaveBtn = document.getElementById('leave-btn') as HTMLButtonElement;
-    const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
-    const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 
     const preventDefaults = (e: Event) => {
         e.preventDefault();
@@ -1217,8 +770,13 @@ function setupDragAndDrop() {
             if (!isFileDrag(e as DragEvent)) {
                 return;
             }
+            // Only toggle the drag-over visual cue. Do NOT clear `hidden` here: when a document
+            // is already loaded, drop-zone is hidden and its internal sub-state is still frozen
+            // on the previous load's "loading" screen (hideDropZone only touches the outer
+            // hidden class). Revealing it on hover would flash that stale loading UI. Users see
+            // the loading page only after actually dropping the file, when loadPAGXData ->
+            // prepareForLoading -> showLoadingUI takes over deliberately.
             dropZone.classList.add('drag-over');
-            dropZone.classList.remove('hidden');
         }, false);
     });
 
@@ -1248,18 +806,6 @@ function setupDragAndDrop() {
         fileInput.click();
     });
 
-    leaveBtn.addEventListener('click', () => {
-        goHome();
-    });
-
-    openBtn.addEventListener('click', () => {
-        fileInput.click();
-    });
-
-    resetBtn.addEventListener('click', () => {
-        gestureManager.resetTransform(playgroundState);
-    });
-
     fileInput.addEventListener('change', () => {
         const files = fileInput.files;
         if (files && files.length > 0) {
@@ -1269,128 +815,9 @@ function setupDragAndDrop() {
     });
 }
 
-function setupPlaybackControls(): void {
-    const playPauseBtn = document.getElementById('play-pause-btn') as HTMLButtonElement;
-    const prevFrameBtn = document.getElementById('prev-frame-btn') as HTMLButtonElement;
-    const nextFrameBtn = document.getElementById('next-frame-btn') as HTMLButtonElement;
-    const progressSlider = document.getElementById('progress-slider') as HTMLInputElement;
-
-    if (playPauseBtn) {
-        playPauseBtn.addEventListener('click', () => {
-            togglePlayback();
-        });
-    }
-
-    if (prevFrameBtn) {
-        prevFrameBtn.addEventListener('click', () => {
-            stepFrame(-1);
-        });
-    }
-
-    if (nextFrameBtn) {
-        nextFrameBtn.addEventListener('click', () => {
-            stepFrame(1);
-        });
-    }
-
-    const loopBtn = document.getElementById('loop-btn') as HTMLButtonElement;
-    if (loopBtn) {
-        loopBtn.addEventListener('click', () => {
-            if (!playgroundState.pagxView) return;
-            playgroundState.pagxView.setLoop(!playgroundState.pagxView.isLoop());
-            updateLoopIcon();
-            // Release focus so the Space shortcut keeps working after clicking.
-            loopBtn.blur();
-        });
-    }
-
-    let isDraggingSlider = false;
-    let wasPlayingBeforeDrag = false;
-    if (progressSlider) {
-        const seekToSliderValue = () => {
-            if (!playgroundState.pagxView) return;
-            const duration = playgroundState.pagxView.durationMicros();
-            if (duration <= 0) return;
-            const value = parseFloat(progressSlider.value);
-            const targetTime = (value / 1000) * duration;
-            playgroundState.pagxView.setCurrentTimeMicros(targetTime);
-        };
-        progressSlider.addEventListener('input', () => {
-            if (!playgroundState.pagxView) return;
-            // Pause on drag start so the frame follows the slider instead of the render loop
-            // advancing over it; remember the state to restore on release.
-            if (!isDraggingSlider) {
-                isDraggingSlider = true;
-                wasPlayingBeforeDrag = playgroundState.pagxView.isPlaying();
-                if (wasPlayingBeforeDrag) {
-                    playgroundState.pagxView.pause();
-                }
-            }
-            updateSliderFill(progressSlider);
-            seekToSliderValue();
-            updateTimeDisplay();
-            updatePlayPauseIcon();
-        });
-        progressSlider.addEventListener('change', () => {
-            isDraggingSlider = false;
-            if (!playgroundState.pagxView) return;
-            seekToSliderValue();
-            if (wasPlayingBeforeDrag) {
-                playgroundState.pagxView.play();
-                wasPlayingBeforeDrag = false;
-            }
-            updatePlaybackUI();
-            // Release focus so the Space shortcut keeps working after dragging.
-            progressSlider.blur();
-        });
-    }
-
-    // Keyboard shortcuts: Space toggles play/pause, ArrowLeft/ArrowRight step one frame.
-    // Guards are shared across shortcuts:
-    //   - text-entry targets (input/textarea/contentEditable) never trigger playback shortcuts;
-    //   - when the progress slider itself holds focus, ArrowLeft/Right must fall through to the
-    //     native range control (fine-grained scrub) rather than jumping a whole frame; Space
-    //     however still toggles playback so the user can pause without leaving the slider;
-    //   - no file loaded (canvas hidden) → do nothing so the shortcut can't be misused before
-    //     the drop-zone is dismissed.
-    document.addEventListener('keydown', (e: KeyboardEvent) => {
-        const isPlayPause = e.code === 'Space';
-        const stepDirection = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
-        if (!isPlayPause && stepDirection === 0) return;
-        const target = e.target;
-        const isTextInput =
-            (target instanceof HTMLInputElement && target.type !== 'range') ||
-            target instanceof HTMLTextAreaElement ||
-            (target instanceof HTMLElement && target.isContentEditable);
-        if (isTextInput) return;
-        // Range slider owns Arrow keys for scrub; only Space passes through to play/pause.
-        const isRangeSlider = target instanceof HTMLInputElement && target.type === 'range';
-        if (isRangeSlider && !isPlayPause) return;
-        const canvas = document.getElementById('pagx-canvas');
-        if (!canvas || canvas.classList.contains('hidden')) return;
-        e.preventDefault();
-        if (isPlayPause) {
-            togglePlayback();
-        } else {
-            stepFrame(stepDirection);
-        }
-    });
-
-    // Update playback UI periodically. Also fire once on the play -> stop transition so the slider,
-    // time and icon settle on the final frame after a single (non-looping) playback ends.
-    let wasPlaying = false;
-    setInterval(() => {
-        if (!playgroundState.pagxView) return;
-        const canvas = document.getElementById('pagx-canvas');
-        if (!canvas || canvas.classList.contains('hidden')) return;
-        const playing = playgroundState.pagxView.isPlaying();
-        if (!isDraggingSlider && (playing || wasPlaying)) {
-            updatePlaybackUI();
-        }
-        wasPlaying = playing;
-    }, 100);
-}
-
+// ---------------------------------------------------------------------------------------------
+// Environment probes.
+// ---------------------------------------------------------------------------------------------
 function checkWebGL2Support(): boolean {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl2');
@@ -1418,6 +845,9 @@ function getBrowserRequirements(): string {
 • Edge 79+`;
 }
 
+// ---------------------------------------------------------------------------------------------
+// i18n / static text application.
+// ---------------------------------------------------------------------------------------------
 function applyI18n(): void {
     const strings = t();
     const locale = getLocale();
@@ -1427,25 +857,16 @@ function applyI18n(): void {
     const dropSubtext = document.querySelector('.drop-subtext');
     const loadingText = document.querySelector('.loading-text');
     const errorTitle = document.querySelector('.error-title');
-    const openBtn = document.getElementById('open-btn');
-    const resetBtn = document.getElementById('reset-btn');
-    const leaveBtn = document.getElementById('leave-btn');
 
     if (dropText) dropText.textContent = strings.dropText;
     if (dropSubtext) dropSubtext.textContent = strings.dropSubtext;
     if (loadingText) loadingText.textContent = strings.loading;
     if (errorTitle) errorTitle.textContent = strings.errorTitle;
-    if (openBtn) openBtn.title = strings.openFile;
-    if (resetBtn) resetBtn.title = strings.resetView;
-    if (leaveBtn) leaveBtn.title = strings.leave;
 
     const samplesBtn = document.getElementById('samples-btn');
     const samplesBtnText = document.getElementById('samples-btn-text');
     if (samplesBtn) samplesBtn.title = strings.samplesTitle;
     if (samplesBtnText) samplesBtnText.textContent = strings.samples;
-
-    const toolbarSamplesBtn = document.getElementById('toolbar-samples-btn');
-    if (toolbarSamplesBtn) toolbarSamplesBtn.title = strings.samplesTitle;
 
     const samplesTitle = document.querySelector('.samples-title');
     if (samplesTitle) samplesTitle.textContent = strings.samplesTitle;
@@ -1472,15 +893,14 @@ function applyI18n(): void {
     });
 }
 
-let sampleFiles: string[] = [];
-let currentPlayingFile: string | null = null;
-let currentFileName: string = 'export.pagx';
-
+// ---------------------------------------------------------------------------------------------
+// Samples page.
+// ---------------------------------------------------------------------------------------------
 async function loadSampleList(): Promise<void> {
     if (sampleFiles.length > 0) {
         return;
     }
-    const response = await fetch('./samples/index.json');
+    const response = await fetch(assetUrl('samples/index.json'));
     if (!response.ok) {
         throw new Error('Failed to load samples index');
     }
@@ -1495,7 +915,7 @@ function renderSampleList(): void {
         a.href = '#';
 
         const baseName = file.replace(/\.pagx$/, '');
-        const imageUrl = `./samples/images/${baseName}.webp`;
+        const imageUrl = assetUrl(`samples/images/${baseName}.webp`);
 
         a.innerHTML = `
             <img class="sample-image" src="${imageUrl}" alt="${baseName}" loading="lazy">
@@ -1515,9 +935,26 @@ function renderSampleList(): void {
 function showSamplesPage(): void {
     const container = document.getElementById('container') as HTMLDivElement;
     const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
+    // Idempotent guard: hashchange -> handleRoute() and other routing edges can fire this
+    // twice in a row for the same navigation. A second call would re-snapshot the player's
+    // isPlaying() state after our own pause() from the first call already forced it to
+    // false, silently losing the pre-samples playing flag that hideSamplesPage relies on
+    // to restore playback on return.
+    if (!samplesPage.classList.contains('hidden')) {
+        return;
+    }
     container.classList.add('hidden');
     samplesPage.classList.remove('hidden');
     document.title = t().samplesTitle;
+
+    // Explicitly stop the wasm render loop while the samples overlay is on screen. Browser
+    // rAF throttling on display:none already lightens the load, but pagx-viewer's internal
+    // ticker isn't guaranteed to be pure-rAF driven; pausing here guarantees zero GPU cost
+    // and avoids ResizeObserver / draw() churn behind the overlay. Snapshot the pre-samples
+    // playing state so hideSamplesPage can restore it - a running animation must resume on
+    // return, a paused one must stay paused.
+    wasPlayingBeforeSamples = player?.getView()?.isPlaying() ?? false;
+    player?.pause();
 
     loadSampleList().then(renderSampleList).catch((error) => {
         console.error('Failed to load samples:', error);
@@ -1527,8 +964,18 @@ function showSamplesPage(): void {
 function hideSamplesPage(): void {
     const container = document.getElementById('container') as HTMLDivElement;
     const samplesPage = document.getElementById('samples-page') as HTMLDivElement;
+    // Idempotent guard mirrors showSamplesPage - a second hide would clobber the snapshot
+    // that was already consumed, and could call player.play() on a player whose canvas is
+    // no longer visible if goHome ran between the two hide calls.
+    if (samplesPage.classList.contains('hidden')) {
+        return;
+    }
     container.classList.remove('hidden');
     samplesPage.classList.add('hidden');
+    if (wasPlayingBeforeSamples) {
+        player?.play();
+    }
+    wasPlayingBeforeSamples = false;
 }
 
 function handlePopState(): void {
@@ -1552,17 +999,19 @@ function handleRoute(): void {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Bootstrap.
+// ---------------------------------------------------------------------------------------------
 if (typeof window !== 'undefined') {
     window.onload = async () => {
-        // Apply i18n texts
         applyI18n();
 
-        // Setup routing
+        // Routing wires up first so back/forward and #samples clicks resolve immediately even
+        // during the async wasm/font prefetch below.
         window.addEventListener('hashchange', handleRoute);
         window.addEventListener('popstate', handlePopState);
         handleRoute();
 
-        // Setup samples back button
         const samplesBackBtn = document.getElementById('samples-back-btn');
         if (samplesBackBtn) {
             samplesBackBtn.addEventListener('click', (e) => {
@@ -1574,7 +1023,6 @@ if (typeof window !== 'undefined') {
 
         // Setup drag and drop early so UI is responsive
         setupDragAndDrop();
-        setupPlaybackControls();
 
         if (!checkWasmSupport() || !checkWebGL2Support()) {
             showErrorUI(getBrowserRequirements());
@@ -1587,7 +1035,7 @@ if (typeof window !== 'undefined') {
         }
 
         // Start preloading resources in background (will be awaited when file is selected)
-        wasmLoadPromise = loadWasm().catch(error => {
+        wasmLoadPromise = loadWasmModule().catch(error => {
             console.error('WASM load failed:', error);
             throw error;
         });
@@ -1601,85 +1049,5 @@ if (typeof window !== 'undefined') {
         if (sampleName) {
             loadPAGXSample(sampleName, false);
         }
-
-        // Encodes XML, reparses and redraws the view. Shared by the editor's Apply
-        // and Save actions. Returns '' on success, otherwise an error message.
-        //
-        // Runs the same UI refresh as loadPAGXData's post-parse step so that an edit which
-        // changes the canvas dimensions (width/height attrs) or the animation duration (static
-        // ↔ animated) is fully reflected: canvas backing store is resized, the playback bar
-        // shows/hides, and the time/frame display picks up the new duration instead of showing
-        // the previous file's values.
-        const applyXmlToView = (xmlText: string): string => {
-            if (playgroundState.pagxView === null) {
-                return 'PAGXView not initialized';
-            }
-            try {
-                const data = new TextEncoder().encode(xmlText);
-                playgroundState.pagxView.parsePAGX(data);
-                playgroundState.pagxView.buildLayers();
-                refreshUIAfterReparse();
-                playgroundState.pagxView.draw();
-                return '';
-            } catch (e) {
-                return e instanceof Error ? e.message : String(e);
-            }
-        };
-        // Initialize the Source Editor module (keyboard shortcut L to toggle).
-        initEditor({
-            onApply: applyXmlToView,
-            onSave: (xmlText: string): string => {
-                const error = applyXmlToView(xmlText);
-                if (error !== '') {
-                    return error;
-                }
-                const blob = new Blob([xmlText], { type: 'application/xml' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = currentFileName.endsWith('.pagx') ? currentFileName : currentFileName + '.pagx';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                return '';
-            },
-        });
-
-        const sourceEditorBtn = document.getElementById('source-editor-btn');
-        if (sourceEditorBtn) {
-            sourceEditorBtn.addEventListener('click', () => {
-                toggleEditorPanel();
-            });
-        }
     };
-
-    // Observe container resize. The C++ PAGXView::draw() now auto-detects
-    // canvas drawing-buffer size changes and rebuilds its render surface in
-    // the same frame, so we can sync canvas.width/height and trigger a draw
-    // synchronously in the callback. This keeps resize + new frame within a
-    // single browser paint tick, eliminating the flicker that the old 300ms
-    // setTimeout debounce was trying to mask.
-    //
-    // rAF throttle: ResizeObserver may fire multiple times per frame during a
-    // fast drag. Coalesce into one updateSize() + draw() per frame to cap GL
-    // surface rebuild cost on low-end devices.
-    const container = document.getElementById('container');
-    if (container) {
-        let pendingResizeFrame: number | null = null;
-        const resizeObserver = new ResizeObserver(() => {
-            if (!playgroundState.pagxView || pendingResizeFrame !== null) {
-                return;
-            }
-            pendingResizeFrame = window.requestAnimationFrame(() => {
-                pendingResizeFrame = null;
-                if (!playgroundState.pagxView) {
-                    return;
-                }
-                updateSize();
-                playgroundState.pagxView.draw();
-            });
-        });
-        resizeObserver.observe(container);
-    }
 }

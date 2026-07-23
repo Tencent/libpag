@@ -20,10 +20,15 @@
 /**
  * Prebuild script for pagx-playground.
  *
- * This script copies the pre-built pagx-viewer wasm/glue files to wasm-mt/
- * before the main rollup build starts. It does NOT build pagx-viewer itself;
- * if the required artifacts are missing, the user must build them first in
- * the pagx-viewer directory.
+ * This script copies two sets of pre-built artifacts into wasm-mt/ before the main rollup
+ * build starts:
+ *   1. pagx-viewer wasm + glue ESM (from ../pagx-viewer/lib/) - provides the wasm runtime.
+ *   2. pagx-player ESM bundle    (from ../pagx-player/lib/)  - provides the player component
+ *      that the playground imports as `pagx-player` (aliased in rollup.js).
+ *
+ * The script does NOT build either component itself; it only copies. If the required
+ * artifacts are missing the script fails with a message directing the user to build the
+ * missing component in its own directory.
  *
  * Usage:
  *   node scripts/prebuild.js                  # multi-threaded (default), debug
@@ -42,6 +47,8 @@ const __dirname = path.dirname(__filename);
 const PLAYGROUND_DIR = path.dirname(__dirname);
 const PAGX_VIEWER_DIR = path.resolve(PLAYGROUND_DIR, '../pagx-viewer');
 const PAGX_VIEWER_LIB_DIR = path.join(PAGX_VIEWER_DIR, 'lib');
+const PAGX_PLAYER_DIR = path.resolve(PLAYGROUND_DIR, '../pagx-player');
+const PAGX_PLAYER_LIB_DIR = path.join(PAGX_PLAYER_DIR, 'lib');
 const OUTPUT_DIR = path.join(PLAYGROUND_DIR, 'wasm-mt');
 
 // Parse CLI arguments: --arch <mt|st> selects the wasm flavor (default: auto-detect).
@@ -120,11 +127,43 @@ function copyWasmFiles() {
   console.log('');
 }
 
+/**
+ * Copy the pre-built pagx-player ESM bundle into wasm-mt/ so rollup can inline it via the
+ * `pagx-player` alias. pagx-player is a sibling in-tree component package; the playground
+ * consumes its build artifact from ../pagx-player/lib/ directly instead of resolving through
+ * the npm registry. If the artifact is missing, we fail with a helpful message pointing at
+ * the pagx-player build script.
+ */
+function copyPlayerFiles() {
+  console.log('Copying pagx-player ESM bundle to wasm-mt/...');
+  if (!fs.existsSync(OUTPUT_DIR)) {
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  }
+  const src = path.join(PAGX_PLAYER_LIB_DIR, 'pagx-player.esm.js');
+  const dest = path.join(OUTPUT_DIR, 'pagx-player.esm.js');
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dest);
+    console.log(`  Copied: pagx-player.esm.js`);
+  } else {
+    // The pagx-player bundle is not tracked by git (lib/ is gitignored). Direct the user to
+    // build it locally rather than second-guessing why the file is missing.
+    console.error(`\nERROR: Required artifact not found: ${src}`);
+    console.error('Please build pagx-player first:');
+    const playerBuildCmd = isRelease ? 'npm run build:release' : 'npm run build';
+    console.error(`  cd ${PAGX_PLAYER_DIR} && npm install && ${playerBuildCmd}\n`);
+    process.exit(1);
+  }
+  console.log('');
+}
+
 function main() {
   const archLabel = isSingleThreaded ? 'single-threaded' : 'multi-threaded';
-  console.log(`Prebuild: Preparing pagx-viewer (${archLabel}) wasm files...\n`);
+  console.log(
+    `Prebuild: Preparing pagx-viewer (${archLabel}) wasm files and pagx-player bundle...\n`,
+  );
 
   copyWasmFiles();
+  copyPlayerFiles();
 
   console.log('Prebuild complete.\n');
 }

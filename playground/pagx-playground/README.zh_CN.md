@@ -39,8 +39,9 @@ pagx-playground/
 包括 Emscripten。
 
 > 重要：Playground 本身不编译任何 WebAssembly，它直接使用 [pagx-viewer](../pagx-viewer) 编译出的
-> WASM 产物。你必须先构建 pagx-viewer，并且多线程（MT）/ 单线程（ST）的选择是在 pagx-viewer 中完成的，
-> 而不是在这里。构建 playground 前请先阅读 [pagx-viewer README](../pagx-viewer/README.zh_CN.md)。
+> WASM 产物，以及 [pagx-player](../pagx-player) 编译出的 ESM 组件包。你必须先分别构建这两个模块，
+> 且多线程（MT）/ 单线程（ST）的选择是在 pagx-viewer 中完成的，而不是在这里。构建 playground 前
+> 请先阅读 [pagx-viewer README](../pagx-viewer/README.zh_CN.md)。
 
 ### 先构建 pagx-viewer
 
@@ -54,6 +55,22 @@ npm run build:release:st    # 单线程（无需 SharedArrayBuffer）
 ```
 
 完整的构建命令矩阵参见 [pagx-viewer README](../pagx-viewer/README.zh_CN.md)。
+
+### 构建 pagx-player
+
+Playground 以预编译 ESM 包的形式引用 [pagx-player](../pagx-player) 组件。请先在其目录下完成构建，
+再构建 playground，这样 prebuild 步骤才能拿到产物：
+
+```bash
+# 在 playground/pagx-player 中
+npm install
+npm run build               # 带 sourcemap 的调试版本
+npm run build:release       # 压缩后的 release 版本
+```
+
+构建后会生成 `playground/pagx-player/lib/pagx-player.esm.js`（不纳入 git 版本管理）。
+Playground 的 prebuild 步骤会读取该文件并复制到 `wasm-mt/`；若文件缺失，prebuild 会以清晰的
+错误提示中止，引导你回到 pagx-player 执行构建。
 
 ### 安装依赖
 
