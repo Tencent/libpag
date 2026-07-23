@@ -9287,11 +9287,12 @@ PAG_TEST(PAGXHTMLImporterTest, ClipPathObjectBoundingBoxScalesToBox) {
   auto* masked = doc->layers.front()->children.back();
   ASSERT_NE(masked->mask, nullptr);
   EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
-  // The unit-square (0..1) clip geometry is mapped onto the 200x200 box, so the mask carries a
-  // `scale(200, 200)` transform. Without the objectBoundingBox handling the geometry would stay in
-  // 0..1 pixel space and collapse to a ~1px region at the origin (no scale emitted).
+  // The unit-square (0..1) clip geometry is mapped onto the 200x200 box, so the mask layer carries
+  // a `scale(200, 200)` transform, serialised as the layer matrix `200,0,0,200,0,0`. Without the
+  // objectBoundingBox handling the geometry would stay in 0..1 pixel space and collapse to a ~1px
+  // region at the origin (an identity matrix, no attribute emitted).
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
-  EXPECT_NE(xml.find("scale=\"200,200\""), std::string::npos);
+  EXPECT_NE(xml.find("matrix=\"200,0,0,200,0,0\""), std::string::npos);
 }
 
 // The rebuilt mask layer carries a generated id so the `mask="@id"` reference survives a PAGX
