@@ -58,7 +58,13 @@ const ROOT_HAS_CHILDREN_SCRIPT =
 // (round count, document height, wall-clock budget) so a feed settles at a
 // reasonable length instead of scrolling forever.
 const AUTO_SCROLL_SWEEP_SCRIPT = `(async (cfg) => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Use the *native* setTimeout (stashed by PAGX_VIRTUAL_CLOCK_INIT_SCRIPT
+  // before it froze the page's timers for deterministic animation capture).
+  // Falling through to the page's setTimeout would enqueue on the virtual
+  // scheduler, which only fires when advanceTo() is called — so this real-time
+  // settle sweep would never resolve and the snapshot would hang forever.
+  const st = window.__pagxRealSetTimeout || setTimeout;
+  const sleep = (ms) => new Promise((r) => st(r, ms));
   const docHeight = () => Math.max(
     document.body ? document.body.scrollHeight : 0,
     document.documentElement ? document.documentElement.scrollHeight : 0,
@@ -85,7 +91,11 @@ const AUTO_SCROLL_SWEEP_SCRIPT = `(async (cfg) => {
 // paint, then return to the origin so downstream rect measurement / screenshot
 // framing (which also resets scroll) starts clean, and flush layout.
 const AUTO_SCROLL_FINALIZE_SCRIPT = `(async (cfg) => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Native setTimeout (see AUTO_SCROLL_SWEEP_SCRIPT) — the virtual clock freezes
+  // the page's own setTimeout, so the image-decode race below must use the real
+  // timer or it would never time out.
+  const st = window.__pagxRealSetTimeout || setTimeout;
+  const sleep = (ms) => new Promise((r) => st(r, ms));
   try {
     const imgs = Array.prototype.slice.call(document.images || [])
       .filter((im) => im && !im.complete);

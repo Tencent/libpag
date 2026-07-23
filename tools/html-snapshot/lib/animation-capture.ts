@@ -114,6 +114,20 @@ export const PAGX_ANIM_PAUSE_INIT_SCRIPT = `(function() {
 // bad handler cannot abort the whole advance.
 export const PAGX_VIRTUAL_CLOCK_INIT_SCRIPT = `(function(){
   if (window.__pagxClock) return;
+  // Preserve the *native* timer functions before we override them below. Our
+  // own infrastructure helpers (the auto-scroll settle sweep in
+  // lib/page-loader.ts and the optional scroll-reveal walk in
+  // lib/snapshot-runner.ts) run via page.evaluate and use setTimeout-based
+  // sleeps to pace real-time scrolling / lazy-load waits. Once setTimeout is
+  // replaced by the virtual scheduler below it only fires when advanceTo() is
+  // called, so those in-page sleeps would never resolve and the snapshot would
+  // hang forever during settle. Stashing the real setTimeout here lets that
+  // infrastructure opt back into wall-clock delays while the page's own timers
+  // stay frozen for deterministic animation capture.
+  try {
+    window.__pagxRealSetTimeout = window.setTimeout.bind(window);
+    window.__pagxRealClearTimeout = window.clearTimeout.bind(window);
+  } catch(_){}
   var FRAME = 1000 / 60;
   var EPOCH = 1700000000000;
   var GUARD = 5000000;

@@ -214,7 +214,12 @@ export interface RunSnapshotOptions {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: number): Promise<void> {
   await page.evaluate(async (perStepMs: number) => {
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    // Native setTimeout stashed by PAGX_VIRTUAL_CLOCK_INIT_SCRIPT before it froze
+    // the page's timers. The page's own setTimeout only fires when the virtual
+    // clock is advanced, so a sleep on it here would never resolve and this
+    // real-time reveal walk would hang.
+    const st = (window as unknown as { __pagxRealSetTimeout?: typeof setTimeout }).__pagxRealSetTimeout || setTimeout;
+    const sleep = (ms: number) => new Promise((r) => st(r, ms));
     const docHeight = () =>
       Math.max(
         document.body ? document.body.scrollHeight : 0,
