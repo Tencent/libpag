@@ -4243,6 +4243,28 @@ function measureCanvas() {
   prepareBodyForSnapshot();
   const body = document.body;
   const bodyRect = body.getBoundingClientRect();
+  // `prepareBodyForSnapshot` forces an inline `position: relative` on the live
+  // <body> so that `right`/`bottom`-anchored absolute children resolve against
+  // the body (not the initial containing block) during the emission walk. But
+  // that role change also makes every body-anchored `position: absolute` child
+  // part of the body's scrollable overflow, so `scrollWidth`/`scrollHeight`
+  // would grow to include any such child that overflows the body's own box —
+  // e.g. a bottom-pinned nav bar whose inner content is wider than the bar,
+  // which inflates the canvas past the body (weibo: 390x780 -> 422x796).
+  //
+  // The canvas must match the eval baseline's screenshot clip, and baseline.js
+  // measures `body.scrollWidth/scrollHeight` WITHOUT injecting any position (it
+  // only zeroes margin/padding), i.e. against the body's *authored* position.
+  // Mirror that here: drop the injected inline `relative` for the scroll read so
+  // the body falls back to its authored containing-block role (`static` unless
+  // the page's own CSS set it otherwise). In-flow content that overflows the
+  // declared size (fixed-size mocks, fluid feeds) still grows the canvas, while
+  // an absolute child whose containing block is the initial containing block —
+  // not the body — no longer does. The injected `relative` is restored right
+  // afterward so the tree walk keeps its body-anchored geometry.
+  const savedPosition = body.style.position;
+  body.style.position = '';
+  void body.offsetHeight;
   const width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
   // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
   // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
@@ -4252,6 +4274,8 @@ function measureCanvas() {
     MAX_CAPTURE_HEIGHT_PX,
     Math.max(body.scrollHeight, Math.round(bodyRect.height)),
   );
+  body.style.position = savedPosition;
+  void body.offsetHeight;
   return { width, height };
 }
 
