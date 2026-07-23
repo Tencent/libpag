@@ -323,6 +323,10 @@ async function processCase(entry, outDir, opts) {
       output: subsetHtml,
       scriptDir: TOOL_DIR,
       browserEngine: opts.browserEngine || undefined,
+      // This is the *animation* eval: capture the page's motion into the subset
+      // so the timeline diff has something to compare. Snapshot capture is off
+      // by default (static frame), so opt in explicitly here.
+      captureAnimations: true,
       // Image download writes the page's images into the shared cache and
       // rewrites the subset HTML to reference them by absolute path. The path is
       // baked into the .pagx by `pagx import`, so render reads the files

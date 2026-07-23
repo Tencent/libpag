@@ -56,6 +56,12 @@ describe('parseArgs — file inputs', () => {
     expect(opts.inlineIconFonts).toBe(false);
   });
 
+  test('captureAnimations is off by default and enabled by --capture-animations', () => {
+    expect(parseArgs(argv('/tmp/page.html')).captureAnimations).toBe(false);
+    const opts = parseArgs(argv('/tmp/page.html', '--capture-animations'));
+    expect(opts.captureAnimations).toBe(true);
+  });
+
   test('--download-fonts defaults --font-dir to a sibling .fonts dir', () => {
     const opts = parseArgs(argv('/tmp/page.html', '-o', '/tmp/out.subset.html', '--download-fonts'));
     expect(opts.downloadFonts).toBe(true);

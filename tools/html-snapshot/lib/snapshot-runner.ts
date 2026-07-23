@@ -193,6 +193,8 @@ export interface RunSnapshotOptions {
   cookies?: CookieParam[];
   headers?: Array<[string, string]>;
   inlineIconFonts?: boolean;
+  // Capture the page's animations into the subset (default false → static
+  // single frame). See the destructured default in `runSnapshot` for details.
   captureAnimations?: boolean;
   scrollReveal?: boolean;
   downloadFonts?: boolean;
@@ -352,7 +354,13 @@ export async function runSnapshot(
     cookies = [],
     headers = [],
     inlineIconFonts = true,
-    captureAnimations = true,
+    // Static by default: the snapshot emits a single frozen frame and no
+    // animation-capture machinery (virtual clock, transition recorder, WAAPI/
+    // GSAP/anime.js sampler) runs. Callers that want the page's motion baked
+    // into the subset as `@keyframes` + `animation` opt in via
+    // `captureAnimations: true` (surfaced as `--capture-animations` on the
+    // CLIs). See the init-script / sampler branches below.
+    captureAnimations = false,
     scrollReveal = false,
     downloadFonts = false,
     fontDir = '',

@@ -110,6 +110,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
         cookies: cookieParams,
         headers: headerPairs,
         inlineIconFonts: snapshotArgs.inlineIconFonts,
+        captureAnimations: snapshotArgs.captureAnimations,
         scrollReveal: snapshotArgs.scrollReveal,
         downloadFonts: snapshotArgs.downloadFonts,
         fontDir: snapshotArgs.fontDir,
@@ -147,6 +148,7 @@ export interface RunBatchOptions {
   imageDir?: string;
   pagxImages?: 'external' | 'embed';
   inlineIconFonts?: boolean;
+  captureAnimations?: boolean;
   scrollReveal?: boolean;
   cookies?: string[];
   headers?: string[];
@@ -251,6 +253,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           pagxImages: opts.pagxImages,
           browserEngine: opts.browserEngine,
           inlineIconFonts: opts.inlineIconFonts,
+          captureAnimations: opts.captureAnimations,
           scrollReveal: opts.scrollReveal,
           cookies: opts.cookies,
           headers: opts.headers,
