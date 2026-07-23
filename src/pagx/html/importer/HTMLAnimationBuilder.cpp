@@ -41,6 +41,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/runtime/KeyframeEvaluator.h"
+#include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/svg/SVGPathParser.h"
 
 namespace pagx {

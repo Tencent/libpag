@@ -1773,9 +1773,10 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
 // and Path node type instead of being rewritten to a Rectangle/Ellipse (which would orphan the
 // per-point runtime channels that drive the mask).
 void CollectAnimatedTargets(PAGXDocument* doc, std::unordered_set<std::string>& targets) {
-  auto collectFrom = [&targets](const std::vector<Animation*>& animations) {
-    for (const auto* animation : animations) {
-      if (animation == nullptr) continue;
+  auto collectFrom = [&targets](const std::vector<Node*>& animations) {
+    for (const auto* node : animations) {
+      if (node == nullptr || node->nodeType() != NodeType::Animation) continue;
+      const auto* animation = static_cast<const Animation*>(node);
       for (const auto* object : animation->objects) {
         if (object != nullptr && !object->target.empty()) {
           targets.insert(object->target);

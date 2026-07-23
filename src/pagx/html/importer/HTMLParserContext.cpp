@@ -285,14 +285,23 @@ void HTMLParserContext::coalesceAnimations() {
   // dropped from the list. Leaders are scanned linearly because a page has only a handful of
   // distinct timings even when it animates hundreds of elements. Order is preserved so the
   // resulting `<Animations>` block still follows document order.
-  std::vector<Animation*> coalesced;
+  std::vector<Node*> coalesced;
   coalesced.reserve(_document->animations.size());
-  for (auto* anim : _document->animations) {
-    if (anim == nullptr) {
+  // Parallel list of the Animation* leaders held in `coalesced`, used to match subsequent
+  // animations by timing. Non-animation timelines (e.g. state machines) are passed through
+  // untouched and never participate in coalescing.
+  std::vector<Animation*> leaders;
+  for (auto* node : _document->animations) {
+    if (node == nullptr) {
       continue;
     }
+    if (node->nodeType() != NodeType::Animation) {
+      coalesced.push_back(node);
+      continue;
+    }
+    auto* anim = static_cast<Animation*>(node);
     Animation* group = nullptr;
-    for (auto* leader : coalesced) {
+    for (auto* leader : leaders) {
       if (leader->duration == anim->duration && leader->loop == anim->loop &&
           std::fabs(leader->frameRate - anim->frameRate) < 1e-6f) {
         group = leader;
@@ -301,6 +310,7 @@ void HTMLParserContext::coalesceAnimations() {
     }
     if (group == nullptr) {
       coalesced.push_back(anim);
+      leaders.push_back(anim);
       continue;
     }
     for (auto* obj : anim->objects) {
@@ -317,10 +327,11 @@ void HTMLParserContext::suppressBackdropBlurUnderOpacityFade() {
   }
   // Gather the ids of every layer whose opacity is animated below 1 at some point in the timeline.
   std::unordered_set<std::string> fadingIds;
-  for (const auto* anim : _document->animations) {
-    if (anim == nullptr) {
+  for (const auto* node : _document->animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) {
       continue;
     }
+    const auto* anim = static_cast<const Animation*>(node);
     for (const auto* obj : anim->objects) {
       if (obj == nullptr || obj->target.empty()) {
         continue;
