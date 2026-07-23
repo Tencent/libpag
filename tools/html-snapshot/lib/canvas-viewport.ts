@@ -107,7 +107,23 @@ export async function applyCanvasViewport(
   );
 
   const lostContent = beforeScore > 0 && afterScore < beforeScore * 0.85;
-  const ballooned = afterHeight > canvas.height * 1.02 + 2;
+  // Distinguish a viewport-proportional (`vh`/`dvh`) balloon from the benign
+  // reflow a fixed-size stage produces when a `fit()`-style resize handler
+  // rescales it to the new viewport. Resizing from the settle viewport up to the
+  // canvas enlarges it by `viewportGrew` px vertically. A `vh` layout re-inflates
+  // by MORE than that — each stacked viewport-height band adds ~`viewportGrew`,
+  // so N bands grow the body by ~N×`viewportGrew` and the canvas runs away. A
+  // fixed stage (a 1920x1080 mock scaled by `transform: scale(min(w/W, h/H))` on
+  // `resize`) reflows by a bounded amount that does NOT track the viewport, so
+  // its growth stays at or below the delta. Allow growth up to the viewport
+  // increase (with a 2% slack floor for sub-pixel reflow jitter) before calling
+  // it a balloon, so fit-to-window stages keep the resize and fill the canvas
+  // instead of freezing at the smaller settle-viewport scale. This only ever
+  // relaxes the old `canvas.height * 1.02 + 2` bound — a real `vh` balloon whose
+  // growth outpaces the viewport still reverts.
+  const viewportGrew = Math.max(0, canvas.height - settleViewport.height);
+  const balloonAllowance = Math.max(viewportGrew, canvas.height * 0.02) + 2;
+  const ballooned = afterHeight > canvas.height + balloonAllowance;
   if (lostContent || ballooned) {
     if (log) {
       const why = lostContent

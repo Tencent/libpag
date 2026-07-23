@@ -27,7 +27,15 @@ const fs = require('fs');
 const path = require('path');
 const { openAndSettlePage } = require('../dist/lib/page-loader');
 const { makeFail, parseNumber } = require('../dist/lib/common');
-const { launchBrowser, resolveEngine, setViewport } = require('../dist/lib/browser-engine');
+const { launchBrowser, resolveEngine } = require('../dist/lib/browser-engine');
+// The SAME viewport guard the subset capture (lib/snapshot-runner.ts) and the
+// static baseline (eval/baseline.js) use. Sharing it keeps the animation
+// baseline and the imported PAGX in lock-step: both resize the viewport to the
+// canvas (so a fit-to-window stage re-runs its `resize` handler and fills the
+// canvas) or both revert to the settle viewport (for a genuinely viewport-
+// dependent `vh`/scroll page). An unconditional resize here would drift the
+// baseline off the subset whenever the guard reverts.
+const { applyCanvasViewport } = require('../dist/lib/canvas-viewport');
 // Shared "clock": the same global-duration measurement, deterministic seek, and
 // pause init-script the animation *capture* (lib/animation-capture.ts) uses, so
 // the baseline and the imported PAGX timeline are sampled on one clock. These
@@ -191,7 +199,20 @@ async function main() {
     });
 
     const { width, height } = await captureBodyRect(page);
-    await setViewport(page, engine, { width, height, deviceScaleFactor: 1 });
+    // Resize the viewport to the captured canvas so each frame is shot at the
+    // `pagx render --scale 1` output size — but through the shared guard, which
+    // reverts to the settle viewport for pages whose layout depends on the
+    // viewport size (see lib/canvas-viewport.ts). This is the SAME decision the
+    // subset capture makes, so a fit-to-window stage fills on both sides and a
+    // `vh`/scroll page stays frozen on both sides — the baseline never drifts
+    // off the subset.
+    await applyCanvasViewport(
+      page,
+      engine,
+      { width, height },
+      { width: opts.viewportWidth, height: opts.viewportHeight },
+      (msg) => console.error(msg),
+    );
 
     // Measure + seek via the shared clock (lib/animation-clock.ts) so the
     // baseline and the animation capture sample on one timeline. The functions
@@ -211,6 +232,12 @@ async function main() {
         type: 'png',
         clip: { x: 0, y: 0, width, height },
         omitBackground: false,
+        // Clip the full canvas rect even when the guard reverted to the shorter
+        // settle viewport (canvas taller/wider than the viewport): capture
+        // beyond the viewport instead of resizing the layout back up, which
+        // would re-balloon a `vh` page or re-scale a fit-to-window stage away
+        // from the frozen subset state. Matches eval/baseline.js.
+        captureBeyondViewport: true,
       });
       samples.push({ index: i, timeSec: timesMs[i] / 1000 });
     }
