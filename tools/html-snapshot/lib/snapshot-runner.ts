@@ -248,6 +248,64 @@ async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: numbe
   }
 }
 
+// After `applyCanvasViewport` reverts a ballooned, viewport-dependent page, the
+// probe's tall-viewport resize has usually left the layout stuck inflated when
+// the virtual clock is installed (animation-capture path). The page's own
+// resize handler grew the layout on the tall probe viewport, but its matching
+// shrink is queued on the page's timers — which the virtual clock froze — so
+// restoring the settle viewport does NOT collapse it. Measured on
+// ardot.tencent.com: the canvas balloons from ~4320px to ~12040px and the
+// no-arg `takeSnapshot` below then re-measures (and emits) that inflated height,
+// producing a hugely over-tall PAGX whose content is spread across mostly-empty
+// space.
+//
+// A plain `resize` event or a wall-clock wait does not help (the shrink is
+// debounced on the page's own, frozen, setTimeout); only nudging the virtual
+// clock fires the pending timer. So flush those timers by advancing the clock a
+// bounded amount (dispatching `resize` first so event-only handlers also
+// re-run), which lets the debounced shrink run and the layout collapse back to
+// the settle-viewport size. The forward-only clock also stepped WAAPI/GSAP
+// animations forward while flushing, so re-pin them to the timeline start
+// (mirroring `pagxSeekAllToTime(0)`) — otherwise the emitted static base frame
+// would bake in a mid-animation state on top of the captured @keyframes. The
+// layout collapse is a JS/style state change, not an animation, so resetting
+// animation time does not undo it.
+//
+// Best-effort and a no-op without the virtual clock (the non-animation path
+// never installs it). Only runs on the revert branch, i.e. the already-degraded
+// viewport-dependent case; fixed-size animated mocks keep canvas ≈ viewport,
+// never balloon, and never reach here.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resettleAfterViewportRevert(page: any): Promise<void> {
+  await page.evaluate(() => {
+    const clock = (window as unknown as {
+      __pagxClock?: { now?: () => number; advanceTo?: (ms: number) => void };
+    }).__pagxClock;
+    if (!clock || typeof clock.advanceTo !== 'function' || typeof clock.now !== 'function') return;
+    // Clear typical resize/layout debounces (100–1000ms) with margin; three
+    // 2s steps also let a handler that reschedules itself settle.
+    for (let i = 0; i < 3; i++) {
+      try { window.dispatchEvent(new Event('resize')); } catch (_) { /* ignore */ }
+      try { clock.advanceTo((clock.now() as number) + 2000); } catch (_) { /* ignore */ }
+      void document.body.offsetHeight;
+    }
+    // Re-pin declarative animations to the timeline start (t=0). WAAPI/CSS:
+    // pause + currentTime=0. GSAP: seek the global timeline to 0.
+    try {
+      if (typeof document.getAnimations === 'function') {
+        for (const a of document.getAnimations()) {
+          try { a.pause(); a.currentTime = 0; } catch (_) { /* ignore */ }
+        }
+      }
+    } catch (_) { /* ignore */ }
+    try {
+      const gsap = (window as unknown as { gsap?: { globalTimeline?: { pause: () => void; time: (t: number, suppress?: boolean) => void } } }).gsap;
+      if (gsap && gsap.globalTimeline) { gsap.globalTimeline.pause(); gsap.globalTimeline.time(0, true); }
+    } catch (_) { /* ignore */ }
+    void document.body.offsetHeight;
+  });
+}
+
 export interface RunSnapshotResult {
   html: string;
   width: number;
@@ -535,6 +593,17 @@ export async function runSnapshot(
           { width: viewportWidth, height: viewportHeight },
           log,
         );
+        if (reverted && captureAnimations) {
+          // The revert left the frozen-clock page's layout stuck inflated by
+          // the probe resize; flush the debounced shrink and re-pin animations
+          // so the no-arg `takeSnapshot` below re-measures the collapsed,
+          // settle-viewport canvas instead of the ballooned one. Best-effort.
+          try {
+            await resettleAfterViewportRevert(page);
+          } catch (err) {
+            if (log) log(`layout re-settle after viewport revert skipped: ${errMessage(err)}`);
+          }
+        }
         if (!reverted) {
           snapshotExpr =
             `(() => window.__pagxSnapshot.takeSnapshot(` +
