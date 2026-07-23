@@ -37,6 +37,20 @@ export const SNAPSHOT_DEFAULTS: SnapshotDefaults = Object.freeze({
   waitMs: 800,
 });
 
+// Hard cap on either captured canvas dimension (px). Infinite-scroll feeds
+// (search portals, weibo, video sites, …) grow without bound while the
+// auto-scroll warm-up sweeps them, producing pages tens of thousands of
+// pixels tall. `pagx render` backs the output with a single GL surface, so a
+// canvas taller than the driver's max texture size fails outright
+// (`failed to create surface (1440x31141)`), and even below that the diff
+// against the baseline is dominated by junk feed content. 16384 is the max
+// texture size reported by the GL backends we render on, so clamping here
+// keeps every capture renderable at scale 1. Both the baseline and the subset
+// clamp to the same value so the eval comparison stays aligned; content past
+// the cap is simply off-canvas (the importer/renderer clip it) rather than
+// re-flowed. Callers that render at scale > 1 should lower this accordingly.
+export const MAX_CAPTURE_HEIGHT_PX = 16384;
+
 export type FailFn = (msg: string, code?: number) => never;
 
 // Print an error message with the standard CLI prefix and abort with the

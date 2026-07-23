@@ -290,13 +290,13 @@ static tgfx::Bitmap RenderAnimatedFrame(const std::shared_ptr<PAGXDocument>& doc
   }
 
   auto timeUs = static_cast<int64_t>(llround(static_cast<double>(options.timeSeconds) * 1e6));
-  for (const auto& id : scene->getTimelineIds()) {
-    auto timeline = scene->getTimeline(id);
-    if (timeline == nullptr) {
+  for (const auto& id : scene->getAnimationIds()) {
+    auto animation = scene->getAnimation(id);
+    if (animation == nullptr) {
       continue;
     }
-    timeline->setCurrentTime(timeUs);
-    timeline->apply(1.0f);
+    animation->setCurrentTime(timeUs);
+    animation->apply(1.0f);
   }
 
   int outputWidth = static_cast<int>(ceilf(document->width * options.scale));

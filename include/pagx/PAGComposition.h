@@ -20,12 +20,16 @@
 
 #include <cstdint>
 #include <memory>
+#include <set>
+#include <string>
 #include <unordered_set>
 #include <vector>
 #include "pagx/PAGLayer.h"
 
 namespace pagx {
 
+class PAGAnimation;
+class PAGStateMachine;
 class PAGTimeline;
 class PAGScene;
 class PAGViewModel;
@@ -34,6 +38,7 @@ class Composition;
 class DataBindRuntime;
 class DataContext;
 class Node;
+class TextHolder;
 struct RuntimeBinding;
 
 /**
@@ -56,6 +61,23 @@ class PAGComposition : public PAGLayer {
    * ViewModel schema.
    */
   std::shared_ptr<PAGViewModel> viewModel() const;
+
+  /**
+   * Resumes advancing the named timeline (animation or state machine). The timeline continues to
+   * apply() each frame regardless of this state.
+   */
+  void playTimeline(const std::string& id);
+
+  /**
+   * Stops advancing the named timeline. apply() still runs, so the timeline's current frame
+   * continues to be written to the content. Call playTimeline() to resume advancing.
+   */
+  void pauseTimeline(const std::string& id);
+
+  /**
+   * Returns true if the named timeline is advancing (not paused).
+   */
+  bool isTimelinePlaying(const std::string& id) const;
 
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
@@ -102,7 +124,7 @@ class PAGComposition : public PAGLayer {
   // compositions themselves. Used by the composition-tree walks (view-model build, data-bind
   // update, view-model advance) so that compositions nested under plain container layers are not
   // skipped.
-  static void CollectChildCompositions(PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
+  static void CollectChildCompositions(const PAGLayer* layer, std::vector<PAGComposition*>& outChildren);
 
   // Refreshes this composition after edits: reconciles its child layer list and refreshes any dirty
   // leaf layers in place, then recurses into child compositions. Called by PAGScene::onNodesChanged.
@@ -154,11 +176,21 @@ class PAGComposition : public PAGLayer {
   PAGXDocument* document = nullptr;
   std::unique_ptr<RuntimeBinding> binding;
   std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
+  // Timeline ids that are paused. advance() skips these, but apply() still runs so the current
+  // frame keeps contributing to the output. Mirrors Rive's NestedSimpleAnimation.isPlaying, which
+  // gates time advancement but not application.
+  std::set<std::string> pausedTimelineIds = {};
   std::shared_ptr<PAGViewModel> compositionViewModel = nullptr;
   std::unique_ptr<DataBindRuntime> dataBindRuntime;
   std::shared_ptr<DataContext> dataContext = nullptr;
 
   void updateDataBinds(float mix = 1.0f);
+
+  // Appends every TextHolder registered in this composition's binding and its descendant
+  // compositions to `out`. Used by PAGScene to maintain a flat list of all holders across the
+  // runtime tree so per-frame flush / dirty checks can iterate it directly instead of walking the
+  // composition tree every frame.
+  void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const;
 
   friend class PAGScene;
 };

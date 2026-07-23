@@ -474,15 +474,19 @@ static std::vector<ChannelDef> BuildPathFields() {
 
 static std::vector<ChannelDef> BuildTextFields() {
   std::vector<ChannelDef> table = {
-      FIELD_STRING(Text, "text", text, Layout),
+      // text-shaping channels carry a runtime writer (TextHolder) so animation/viewmodel can drive
+      // them in place; they also require a reshape (layout-equivalent) to take effect, hence
+      // AnimLayout. textAnchor / baseline have no writer (container-level params, not per-Text
+      // overrides) and stay Layout.
+      FIELD_STRING(Text, "text", text, AnimLayout),
       FIELD_POINT_X(Text, "x", position, AnimLayout),
       FIELD_POINT_Y(Text, "y", position, AnimLayout),
-      FIELD_STRING(Text, "fontFamily", fontFamily, Layout),
-      FIELD_STRING(Text, "fontStyle", fontStyle, Layout),
-      FIELD_FLOAT(Text, "fontSize", fontSize, Layout),
-      FIELD_FLOAT(Text, "letterSpacing", letterSpacing, Layout),
-      FIELD_BOOL(Text, "fauxBold", fauxBold, Layout),
-      FIELD_BOOL(Text, "fauxItalic", fauxItalic, Layout),
+      FIELD_STRING(Text, "fontFamily", fontFamily, AnimLayout),
+      FIELD_STRING(Text, "fontStyle", fontStyle, AnimLayout),
+      FIELD_FLOAT(Text, "fontSize", fontSize, AnimLayout),
+      FIELD_FLOAT(Text, "letterSpacing", letterSpacing, AnimLayout),
+      FIELD_BOOL(Text, "fauxBold", fauxBold, AnimLayout),
+      FIELD_BOOL(Text, "fauxItalic", fauxItalic, AnimLayout),
       FIELD_ENUM(Text, "textAnchor", textAnchor, Layout, TextAnchor),
       FIELD_ENUM(Text, "baseline", baseline, Layout, TextBaseline),
   };

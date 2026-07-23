@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="200" height="200">
+  <Layer>
+    <Rectangle left="10" top="10" width="80" height="80"/>
+    <Fill>
+      <ImagePattern image="@remote" matrix="0.3,0,0,0.3,0,0" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  <Layer>
+    <Rectangle left="110" top="10" width="80" height="80"/>
+    <Fill>
+      <ImagePattern image="@fileurl" matrix="0.3,0,0,0.3,0,0" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  <Layer>
+    <Rectangle left="10" top="110" width="80" height="80"/>
+    <Fill>
+      <ImagePattern image="@local" matrix="0.3,0,0,0.3,0,0" tileModeX="clamp" tileModeY="clamp"/>
+    </Fill>
+  </Layer>
+  <Resources>
+    <Image id="remote" source="https://cdn.example.com/logo.png"/>
+    <Image id="fileurl" source="file:///nonexistent/path/file.png"/>
+    <Image id="local" source="image_as_mask.png"/>
+  </Resources>
+</pagx>

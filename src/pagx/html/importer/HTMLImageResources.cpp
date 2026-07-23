@@ -51,4 +51,10 @@ Image* HTMLImageResources::registerResource(const std::string& imageSource) {
   return imageNode;
 }
 
+Image* HTMLImageResources::createPlaceholder() {
+  auto imageNode = _document->makeNode<Image>();
+  imageNode->id = _idAllocator.generateUnique("image");
+  return imageNode;
+}
+
 }  // namespace pagx

@@ -62,11 +62,10 @@ class HTMLValueParser {
   /**
    * One step of a CSS `filter` / `backdrop-filter` chain. `SvgRef` carries a `url(#id)`
    * reference to an SVG `<filter>` def, whose `refId` the caller resolves through the
-   * shared-defs table. `ColorMatrix` carries the 4x5 colour matrix a CSS colour filter
-   * function (`hue-rotate`, `saturate`, `brightness`, `contrast`, `grayscale`, `sepia`,
-   * `invert`, `opacity`) lowers to, ready to drive a `ColorMatrixFilter`. `Unsupported` is
-   * emitted for anything outside the recognised subset; the caller can surface a diagnostic
-   * using `raw`.
+   * shared-defs table. `ColorMatrix` carries the 4x5 (20-element, row-major, normalised colour
+   * space) transform that the colour-adjustment functions — `brightness`, `contrast`, `saturate`,
+   * `grayscale`, `sepia`, `invert`, `opacity`, `hue-rotate` — resolve to. `Unsupported` is emitted
+   * for anything outside the supported subset; the caller can surface a diagnostic using `raw`.
    */
   struct FilterStep {
     enum class Kind { Blur, DropShadow, SvgRef, ColorMatrix, Unsupported };
@@ -77,7 +76,8 @@ class HTMLValueParser {
     std::string refId = {};
     // 4x5 colour matrix (row-major R, G, B, A rows; last column bias), applied as
     // [R' G' B' A'] = [R G B A 1] * matrix. Only meaningful when `kind == ColorMatrix`.
-    std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
+    std::array<float, 20> matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+                                    0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
     std::string raw = {};
   };
 

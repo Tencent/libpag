@@ -106,6 +106,16 @@ bool DowngradeShellChildren(PAGXDocument* doc, std::vector<Layer*>& layers,
                             const std::unordered_set<const Layer*>& maskRefs);
 
 bool IsMergeableShellLayer(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs);
+
+bool ChildFillsParent(const Layer* parent, const Layer* child);
+bool ChildHasNoPaintAffectingEffect(const Layer* child);
+bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
+                           const std::unordered_set<const Layer*>& maskRefs);
+void AbsorbFillingChild(Layer* parent, Layer* child);
+bool CanDropShellParent(const Layer* parent, const Layer* child,
+                        const std::unordered_set<const Layer*>& maskRefs);
+bool CollapseSingleChildLayersInList(std::vector<Layer*>& layers,
+                                     const std::unordered_set<const Layer*>& maskRefs);
 template <class T>
 void BeginMutation(std::vector<T>& source, std::vector<T>& result, size_t upTo, bool& changed);
 bool MergeAdjacentShellLayersInList(PAGXDocument* doc, std::vector<Layer*>& layers,
@@ -1238,6 +1248,197 @@ bool MergeAdjacentGroupsInLayer(Layer* layer) {
   return changed;
 }
 
+// ----------------------------------------------------------------------------
+// Collapse redundant single-child Layer nesting.
+//
+// Importers wrap many leaves in a double Layer: an outer box that positions / sizes / clips, and an
+// inner Layer that only carries the payload (an icon's resolved <svg>, a divider's <Path>, a text
+// run, ...). When the inner child sits at the outer's content-box origin with the same size, every
+// role the outer plays over it (layout, alignment, arrangement, clip) is a no-op, so the two Layers
+// render identically whether nested or flattened. Two shapes are collapsed:
+//
+//   * absorb-child : the child fills the parent and carries no effect of its own -> move the child's
+//                    payload up into the parent; the parent keeps its frame / clip / effects.
+//   * drop-shell   : the parent is a plain shell (every attribute default, no contents) -> replace
+//                    the parent with its only child, which already carries the real attributes.
+//
+// Both only move existing nodes; neither is applied to a Layer referenced as a mask, and neither
+// drops a referenced `id`. Runs bottom-up to a fixed point via the optimizer's iteration loop.
+// ----------------------------------------------------------------------------
+
+// The child occupies the parent's whole content box with no offset / transform of its own, so
+// flattening it leaves its payload in exactly the same place. A content-sized (NaN) axis is not
+// proof of equality: parent and child may measure from different contents, and percentage-sized
+// descendants would then resolve against a different box after reparenting. Require each axis to
+// be either an exact concrete match or an explicit 100% fill.
+bool IsZeroOrUnset(float value) {
+  return std::isnan(value) || value == 0.0f;
+}
+
+bool AxisFills(float childSize, float parentSize, float childPercent) {
+  // Percentage sizing takes precedence over the absolute field in constraint layout, so a
+  // programmatically-built node carrying both must be judged by its percentage.
+  if (!std::isnan(childPercent)) {
+    return childPercent == 100.0f;
+  }
+  return !std::isnan(childSize) && !std::isnan(parentSize) && childSize == parentSize;
+}
+
+bool ChildFillsParent(const Layer* parent, const Layer* child) {
+  if (child->x != 0.0f || child->y != 0.0f) {
+    return false;
+  }
+  if (!child->matrix.isIdentity() || !child->matrix3D.isIdentity()) {
+    return false;
+  }
+  if (!IsZeroOrUnset(child->left) || !IsZeroOrUnset(child->top)) {
+    return false;
+  }
+  if (!std::isnan(child->right) || !std::isnan(child->bottom) || !std::isnan(child->centerX) ||
+      !std::isnan(child->centerY)) {
+    return false;
+  }
+  // Padding on the parent would inset the child's frame, so only a zero-padding parent qualifies.
+  if (!parent->padding.isZero()) {
+    return false;
+  }
+  return AxisFills(child->width, parent->width, child->percentWidth) &&
+         AxisFills(child->height, parent->height, child->percentHeight);
+}
+
+// The child applies nothing that would change how its payload is painted once it is reparented into
+// the (identically-framed) parent. Attributes that describe the child's own frame / layout role
+// (size, constraints, flex, includeInLayout) are intentionally not checked here — those are covered
+// by ChildFillsParent or are meaningless once the child is dissolved. `layout` must be None because
+// a container layout would reposition child layers, and the child keeps none after the merge.
+bool ChildHasNoPaintAffectingEffect(const Layer* child) {
+  return child->visible && child->alpha == 1.0f && child->blendMode == BlendMode::Normal &&
+         child->matrix3D.isIdentity() && !child->preserve3D && child->antiAlias &&
+         child->groupOpacity && child->passThroughBackground && !child->hasScrollRect &&
+         !child->clipToBounds && child->mask == nullptr && child->composition == nullptr &&
+         child->compositionFilePath.empty() && child->externalDoc == nullptr &&
+         child->timelines.empty() && child->styles.empty() && child->filters.empty() &&
+         child->customData.empty() && child->vmContext.empty() && child->padding.isZero() &&
+         child->layout == LayoutMode::None;
+}
+
+bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
+                           const std::unordered_set<const Layer*>& maskRefs) {
+  if (!child->children.empty()) {
+    return false;  // only leaf payload wrappers; child layers would need layout re-parenting
+  }
+  if (parent->composition != nullptr || !parent->compositionFilePath.empty() ||
+      parent->externalDoc != nullptr) {
+    return false;  // a composition-backed layer renders its comp, not its own contents/children
+  }
+  if (LayerNeedsKeeping(child, maskRefs)) {
+    return false;  // child is referenced as a mask elsewhere
+  }
+  // An identified/named layer is externally observable even when no current document node points
+  // at it: animations, data binds, host lookups, and later edits may target it. Moving its identity
+  // onto the parent changes the scope of those operations (and assigning an id directly would also
+  // leave PAGXDocument's id index pointing at the detached child), so only anonymous wrappers may
+  // be dissolved.
+  if (!child->id.empty() || !child->name.empty()) {
+    return false;
+  }
+  if (!ChildHasNoPaintAffectingEffect(child)) {
+    return false;
+  }
+  if (!ChildFillsParent(parent, child)) {
+    return false;
+  }
+  // An import directive resolves into `contents`, so mixing it with pre-existing content on either
+  // layer is unsafe (it can reorder paints), and two imports cannot share one layer.
+  bool parentImport = HasUnresolvedImport(parent);
+  bool childImport = HasUnresolvedImport(child);
+  if (parentImport && childImport) {
+    return false;
+  }
+  if (parentImport && !child->contents.empty()) {
+    return false;
+  }
+  if (childImport && !parent->contents.empty()) {
+    return false;
+  }
+  return true;
+}
+
+// Move the filling leaf child's payload into the parent, preserving paint order (any existing
+// parent content stays behind the child's). The parent survives with its own frame / clip / effects;
+// only the child's now-meaningless container-layout role is reset.
+void AbsorbFillingChild(Layer* parent, Layer* child) {
+  for (auto* element : child->contents) {
+    parent->contents.push_back(element);
+  }
+  child->contents.clear();
+  if (HasUnresolvedImport(child)) {
+    parent->importDirective = child->importDirective;
+  }
+  parent->children.clear();
+  parent->layout = LayoutMode::None;
+  parent->gap = 0.0f;
+  parent->alignment = Alignment::Stretch;
+  parent->arrangement = Arrangement::Start;
+}
+
+// The parent is a pure shell (all attributes default, no contents), so it contributes nothing and
+// can be replaced by its only child. The child must keep the exact flex-item role the shell had
+// (flex 0, participating in layout) so a surrounding container's layout is unaffected.
+bool CanDropShellParent(const Layer* parent, const Layer* child,
+                        const std::unordered_set<const Layer*>& maskRefs) {
+  if (!parent->contents.empty()) {
+    return false;
+  }
+  if (!IsLayerShell(parent)) {
+    return false;
+  }
+  // IsLayerShell intentionally ignores these semantic-but-non-geometric fields; dropping the parent
+  // would discard them, so a shell carrying any of them is not a pure structural wrapper here.
+  if (!parent->compositionFilePath.empty() || parent->externalDoc != nullptr ||
+      !parent->timelines.empty() || !parent->vmContext.empty() || !parent->customData.empty()) {
+    return false;
+  }
+  if (LayerNeedsKeeping(parent, maskRefs)) {
+    return false;
+  }
+  if (HasUnresolvedImport(parent)) {
+    return false;
+  }
+  if (child->flex != 0.0f || !child->includeInLayout) {
+    return false;
+  }
+  return true;
+}
+
+// Recursively collapse single-child nests in `layers`. Children are processed first (bottom-up), so
+// a fully-collapsed child is seen when its parent is considered; the per-layer while-loop then
+// collapses multi-level nests in one pass.
+bool CollapseSingleChildLayersInList(std::vector<Layer*>& layers,
+                                     const std::unordered_set<const Layer*>& maskRefs) {
+  bool changed = false;
+  for (size_t i = 0; i < layers.size(); i++) {
+    Layer* layer = layers[i];
+    changed |= CollapseSingleChildLayersInList(layer->children, maskRefs);
+    while (layer->children.size() == 1) {
+      Layer* child = layer->children[0];
+      if (CanDropShellParent(layer, child, maskRefs)) {
+        layers[i] = child;
+        layer = child;  // child's subtree is already collapsed
+        changed = true;
+        continue;
+      }
+      if (CanAbsorbFillingChild(layer, child, maskRefs)) {
+        AbsorbFillingChild(layer, child);  // clears layer->children -> loop exits next check
+        changed = true;
+        continue;
+      }
+      break;
+    }
+  }
+  return changed;
+}
+
 // ============================================================================
 // Driver
 // ============================================================================
@@ -1555,6 +1756,9 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
     }
     if (options.mergeAdjacentShellLayers) {
       changed |= MergeAdjacentShellLayers(doc, layers, maskRefs);
+    }
+    if (options.collapseSingleChildLayers) {
+      changed |= CollapseSingleChildLayersInList(layers, maskRefs);
     }
     if (!changed) {
       return iter + 1;

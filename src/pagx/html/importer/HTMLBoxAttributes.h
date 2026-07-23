@@ -39,6 +39,19 @@ static constexpr float HTML_DEFAULT_FONT_SIZE = 14.0f;
 static constexpr const char* HTML_DEFAULT_FONT_FAMILY = "Arial";
 
 /**
+ * Default font style/variant name written to every imported `Text` node. The synthesis in
+ * `ResolveFontStyleSynthesis` leaves the style label empty for the plain base face (bold / italic
+ * are carried by `fauxBold` / `fauxItalic`); this constant substitutes the canonical "Regular"
+ * name so every HTML-imported `Text` node always carries a concrete `fontStyle`.
+ */
+static constexpr const char* HTML_DEFAULT_FONT_STYLE = "Regular";
+
+/** Returns a concrete PAGX font style name for a resolved HTML face. */
+inline std::string ResolveHTMLFontStyleName(const std::string& fontStyleName) {
+  return fontStyleName.empty() ? HTML_DEFAULT_FONT_STYLE : fontStyleName;
+}
+
+/**
  * Default text colour used when no `color` is inherited; matches the CSS default for
  * <body> in `ElementDefaults()`.
  */
@@ -235,6 +248,13 @@ struct HTMLBoxAttributes {
   std::string backgroundRepeat = {};
   std::string backgroundPosition = {};
 
+  // CSS `background-blend-mode`, lower-cased and trimmed. Blends the element's background
+  // layers (gradient / image over background-color) among themselves. A non-empty, non-`normal`
+  // value drives the gradient/image Fill's `blendMode`; the importer then also keeps the
+  // background-color Fill underneath so the blend composites against a backdrop. Empty (or
+  // `normal`) means "no blending" and the background paints with its default opaque stacking.
+  std::string backgroundBlendMode = {};
+
   // CSS `border-radius` expanded to four corners (TL, TR, BR, BL) in pixels, after applying the
   // CSS "edge overlap" scaling clamp (radii are shrunk uniformly so adjacent corner pairs never
   // exceed the box's edge length). When the input was uniform — or all four resolved values are
@@ -273,9 +293,10 @@ struct HTMLBoxAttributes {
   std::string maskSize = {};
   std::string maskPosition = {};
 
-  // CSS `clip-path: url(#id)` reference (raw, including the `url(...)` wrapper and any quotes).
-  // The importer resolves the referenced hidden `<clipPath>` def into a contour mask layer (the
-  // inverse of `HTMLWriter::writeClipDef`). Empty means "no clip-path authored".
+  // CSS `clip-path` value, kept raw. Either a `url(#id)` reference to a hidden `<clipPath>` def
+  // (including the `url(...)` wrapper and any quotes) or a CSS basic shape (`polygon()` / `path()`
+  // / `circle()` / `ellipse()` / `inset()`). The importer rebuilds both into a contour mask layer
+  // (the `url` form is the inverse of `HTMLWriter::writeClipDef`). Empty means "no clip-path".
   std::string clipPathRef = {};
 
   float opacity = 1.0f;

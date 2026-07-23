@@ -20,8 +20,11 @@
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGImage.h"
 #include "pagx/PAGLayer.h"
+#include "pagx/PAGStateMachine.h"
+#include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGViewModel.h"
 #include "pagx/PAGXDocument.h"
@@ -31,12 +34,14 @@
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
+#include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -104,7 +109,7 @@ void PAGScene::buildRuntimeTree() {
   // deferred notifications surviving a runtime-tree rebuild.
   pendingNotifications.clear();
   suppressNotify = false;
-  timelinesByAnimation.clear();
+  instantiatedTimelines.clear();
   auto buildResult = LayerBuilder::BuildForRuntime(document.get());
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
@@ -114,7 +119,24 @@ void PAGScene::buildRuntimeTree() {
   std::unordered_set<const Composition*> visited = {};
   _rootComposition->buildChildren(document->layers, visited);
   displayList->root()->addChild(rootComp->runtimeLayer);
+  // Eagerly create top-level PAGStateMachine instances so DataBindRuntime can resolve
+  // DataBind targets that reference state machines during buildViewModels().
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+      auto* smNode = static_cast<StateMachine*>(node);
+      if (instantiatedTimelines.find(smNode) == instantiatedTimelines.end()) {
+        auto instance = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
+            smNode, _rootComposition->binding.get(), document.get(), shared_from_this()));
+        instantiatedTimelines.emplace(smNode, instance);
+        _rootComposition->binding->setTarget(
+            smNode, std::make_unique<StateMachineInputTarget>(instance, smNode));
+      }
+    }
+  }
   buildViewModels();
+  // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
+  // instead of walking the composition tree every frame.
+  collectTextHolders();
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -193,8 +215,7 @@ std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
         break;
       }
       case ViewModelPropertyType::Trigger: {
-        auto v = std::make_shared<PAGViewModelValueBoolean>();
-        v->propertyValue = false;
+        auto v = std::make_shared<PAGViewModelValueTrigger>();
         v->type = ViewModelPropertyType::Trigger;
         value = std::move(v);
         break;
@@ -373,44 +394,46 @@ PAGScene::~PAGScene() {
   }
 }
 
-std::vector<std::string> PAGScene::getTimelineIds() const {
+std::vector<std::string> PAGScene::getAnimationIds() const {
   std::vector<std::string> ids = {};
   if (document == nullptr) {
     return ids;
   }
-  ids.reserve(document->animations.size());
-  for (auto* animation : document->animations) {
-    if (animation != nullptr) {
-      ids.push_back(animation->id);
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+      ids.push_back(static_cast<Animation*>(node)->id);
     }
   }
   return ids;
 }
 
-std::shared_ptr<PAGTimeline> PAGScene::getTimeline(const std::string& id) {
+std::shared_ptr<PAGAnimation> PAGScene::getAnimation(const std::string& id) {
   if (document == nullptr) {
     return nullptr;
   }
   Animation* matched = nullptr;
-  for (auto* animation : document->animations) {
-    if (animation != nullptr && animation->id == id) {
-      matched = animation;
-      break;
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+      auto* animation = static_cast<Animation*>(node);
+      if (animation->id == id) {
+        matched = animation;
+        break;
+      }
     }
   }
   if (matched == nullptr) {
     return nullptr;
   }
-  auto it = timelinesByAnimation.find(matched);
-  if (it != timelinesByAnimation.end()) {
-    return it->second;
+  auto it = instantiatedTimelines.find(matched);
+  if (it != instantiatedTimelines.end()) {
+    return std::static_pointer_cast<PAGAnimation>(it->second);
   }
   // Construct with a null binding so the timeline resolves the scene's current root binding lazily
   // at apply time. A user-cached handle then survives a runtime-tree rebuild (foreign external-doc
   // edit) that replaces _rootComposition and frees the old binding, instead of dangling.
-  auto timeline = std::shared_ptr<PAGTimeline>(
-      new PAGTimeline(matched, nullptr, document.get(), weak_from_this()));
-  timelinesByAnimation.emplace(matched, timeline);
+  auto timeline = std::shared_ptr<PAGAnimation>(
+      new PAGAnimation(matched, nullptr, document.get(), weak_from_this()));
+  instantiatedTimelines.emplace(matched, timeline);
   return timeline;
 }
 
@@ -418,11 +441,63 @@ std::shared_ptr<PAGTimeline> PAGScene::getDefaultTimeline() {
   if (document == nullptr || document->animations.empty()) {
     return nullptr;
   }
-  auto* first = document->animations.front();
-  if (first == nullptr) {
+  for (auto* node : document->animations) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() == NodeType::Animation) {
+      return getAnimation(static_cast<Animation*>(node)->id);
+    }
+    if (node->nodeType() == NodeType::StateMachine) {
+      return getStateMachineTimeline(static_cast<StateMachine*>(node)->id);
+    }
+  }
+  return nullptr;
+}
+
+std::vector<std::string> PAGScene::getStateMachineIds() const {
+  std::vector<std::string> ids = {};
+  if (document == nullptr) {
+    return ids;
+  }
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+      ids.push_back(static_cast<StateMachine*>(node)->id);
+    }
+  }
+  return ids;
+}
+
+std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::string& id) {
+  if (document == nullptr) {
     return nullptr;
   }
-  return getTimeline(first->id);
+  StateMachine* matched = nullptr;
+  for (auto* node : document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
+      auto* stateMachine = static_cast<StateMachine*>(node);
+      if (stateMachine->id == id) {
+        matched = stateMachine;
+        break;
+      }
+    }
+  }
+  if (matched == nullptr) {
+    return nullptr;
+  }
+  auto it = instantiatedTimelines.find(matched);
+  if (it != instantiatedTimelines.end()) {
+    return std::static_pointer_cast<PAGStateMachine>(it->second);
+  }
+  if (_rootComposition == nullptr) {
+    return nullptr;
+  }
+  auto timeline = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
+      matched, _rootComposition->binding.get(), document.get(), weak_from_this()));
+  instantiatedTimelines.emplace(matched, timeline);
+  _rootComposition->binding->setTarget(
+      matched, std::make_unique<StateMachineInputTarget>(timeline, matched));
+  return timeline;
 }
 
 std::shared_ptr<PAGComposition> PAGScene::rootComposition() const {
@@ -437,6 +512,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
     return false;
   }
   flushDataBinds();
+  flushTextHolders();
   auto& drawable = surface->drawable;
   auto device = drawable->getDevice();
   if (device == nullptr) {
@@ -491,6 +567,25 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
 
 void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
+}
+
+void PAGScene::flushTextHolders() {
+  if (document == nullptr) {
+    return;
+  }
+  auto* fontConfig = &document->_fontConfig;
+  for (auto& holder : textHolders) {
+    if (holder != nullptr) {
+      holder->flush(fontConfig);
+    }
+  }
+}
+
+void PAGScene::collectTextHolders() {
+  textHolders.clear();
+  if (_rootComposition != nullptr) {
+    _rootComposition->collectTextHolders(textHolders);
+  }
 }
 
 void PAGScene::clearAllViewModelsDirty() {
@@ -647,11 +742,19 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
     std::unordered_set<const Composition*> visited = {};
     _rootComposition->refreshNodes(dirtyNodes, dirtySet, visited);
+    // refreshNodes may have replaced a binding's textHolders (RefreshLayerInPlace moves a fresh
+    // binding in and back out, rebuilding its holder vector), and syncChildren /
+    // refreshPlainContainerChildren can add or remove child compositions. Re-collect the flat list
+    // from the current tree so flushTextHolders / hasContentChanged stay consistent with the
+    // binding state.
+    collectTextHolders();
   }
-  // Reset every timeline only when a timeline node (Animation / AnimationObject / Channel) changed.
-  // Timelines can share targets and cross-reference, so the whole timeline tree is rebuilt rather
-  // than patched in place; a removed animation node then simply produces no timeline. Edits that do
-  // not touch a timeline node leave playback untouched.
+  // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
+  // state machines that play them) can share targets and cross-reference, so the whole timeline
+  // tree is rebuilt rather than patched in place; a removed animation or state machine then simply
+  // produces no timeline, and structural edits to a state machine (added/removed states,
+  // transitions, inputs) drop the stale instance instead of running off dangling pointers. Edits
+  // that do not touch a timeline node leave playback untouched.
   bool timelineDirty = false;
   for (auto* node : dirtyNodes) {
     if (node == nullptr) {
@@ -659,7 +762,10 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     }
     auto type = node->nodeType();
     if (type == NodeType::Animation || type == NodeType::AnimationObject ||
-        type == NodeType::Channel) {
+        type == NodeType::Channel || type == NodeType::StateMachine ||
+        type == NodeType::StateRegion || type == NodeType::State ||
+        type == NodeType::StateTransition || type == NodeType::TransitionCondition ||
+        type == NodeType::StateMachineInput) {
       timelineDirty = true;
       break;
     }
@@ -668,7 +774,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     if (_rootComposition != nullptr) {
       _rootComposition->resetTimelines();
     }
-    timelinesByAnimation.clear();
+    instantiatedTimelines.clear();
   }
 }
 
@@ -681,7 +787,20 @@ tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {
 }
 
 bool PAGScene::hasContentChanged() const {
-  return displayList != nullptr && displayList->hasContentChanged();
+  if (displayList == nullptr) {
+    return false;
+  }
+  // A pending TextHolder reshape (ViewModel/Animation drove a text-shaping channel) has not yet
+  // touched the tgfx objects — flush runs inside Record(). Without this check the dirty gate would
+  // skip the frame and the reshape would never reach the screen. The flat `textHolders` list is
+  // iterated directly so the common case (no text reshape in the document) costs only a vector
+  // size check.
+  for (const auto& holder : textHolders) {
+    if (holder != nullptr && holder->isDirty()) {
+      return true;
+    }
+  }
+  return displayList->hasContentChanged();
 }
 
 std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
@@ -692,6 +811,7 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
     return nullptr;
   }
   scene->flushDataBinds();
+  scene->flushTextHolders();
   if (!scene->renderTo(surface, context, autoClear)) {
     return nullptr;
   }

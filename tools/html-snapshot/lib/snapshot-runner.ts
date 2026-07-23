@@ -9,8 +9,8 @@
 
 import {
   TAKE_SNAPSHOT_EXPR,
+  MEASURE_CANVAS_EXPR,
   SNAPSHOT_INIT_SCRIPT,
-  buildTakeSnapshotExprWithHint,
   inlineExternalImages,
   inlineCanvases,
   materializeDecorativePseudoElements,
@@ -39,7 +39,8 @@ import {
   type CaptureResponseListener,
 } from './capture-listener';
 import { errMessage, SNAPSHOT_DEFAULTS } from './common';
-import { responseBytes, setViewport } from './browser-engine';
+import { applyCanvasViewport } from './canvas-viewport';
+import { responseBytes } from './browser-engine';
 import type {
   BrowserResponse,
   CookieParam,
@@ -249,43 +250,6 @@ export interface RunSnapshotResult {
   images: SavedImage[];
 }
 
-// Read the body's intrinsic content size (the same `body.scrollWidth /
-// body.scrollHeight` that snapshotMain() will pick later as the canvas size,
-// see lib/browser-snapshot.ts §snapshotMain), without committing the same
-// destructive layout edits snapshotMain() makes. Used by the second-pass
-// viewport settle in runSnapshot() to detect pages whose script-driven layout
-// (e.g. a `fit()` handler that reads window.innerWidth and writes
-// transform: scale(...) on a fixed-size stage) reflows when the viewport
-// is resized off the launch default.
-//
-// We deliberately do NOT zero body margin/padding or `position: relative`
-// here — those land later in snapshotMain(). Most pages already reset their
-// own UA margin (see e.g. game_ui's `*{margin:0;padding:0;box-sizing:border-box}`
-// and the `<body style="margin:0">`), so a transient 8px UA margin only shifts
-// the measured rect by a few pixels and doesn't change whether the second
-// setViewport pass is needed. Keeping this read non-destructive means a
-// failure to converge can't damage the page state the rest of the pipeline
-// runs against.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function measureBodyScrollSize(page: any): Promise<{ width: number; height: number }> {
-  return page.evaluate(() => {
-    const body = document.body;
-    if (!body) return { width: 0, height: 0 };
-    void body.offsetHeight;
-    const rect = body.getBoundingClientRect();
-    return {
-      width: Math.max(body.scrollWidth, Math.round(rect.width)),
-      height: Math.max(body.scrollHeight, Math.round(rect.height)),
-    };
-  });
-}
-
-// Wait roughly two display frames for the engine compositor to flush a layout
-// change. Matches the SEEK_SETTLE_MS budget in eval-animation/baseline-frames.js
-// for the same reason: a single frame is racy under headless Chromium, two
-// frames are a comfortable budget that has held across the eval corpus.
-const VIEWPORT_RESETTLE_MS = 60;
-
 // Run a best-effort save step (fonts or images): on success, log the count;
 // on failure, log the error and return an empty array so the rest of the
 // pipeline still proceeds. Centralised so the font and image branches stop
@@ -412,52 +376,6 @@ export async function runSnapshot(
       }
     }
 
-    // Second-pass viewport settle. Some pages register a `resize` handler that
-    // reads `window.innerWidth/innerHeight` and writes a derived transform
-    // back onto a fixed-size stage element — e.g. a 1920x1080 mock with
-    // `fit() { screen.style.transform = 'scale(min(w/1920, h/1080))' }`. The
-    // launch viewport (1400x900 by default) feeds that handler one set of
-    // numbers; the resulting `body.scrollWidth/scrollHeight` (which
-    // snapshotMain() will later pick as the canvas size) is different — and
-    // would freeze the inline `transform: matrix(scale)` at the *launch*
-    // viewport's scale even though the canvas, and any downstream rendering
-    // (eval-animation/baseline-frames.js, `pagx render`), runs at the
-    // *measured* canvas size. The two scales then disagree and the rendered
-    // stage lands smaller than the baseline.
-    //
-    // Detect this by comparing the measured body to the launch viewport;
-    // when they differ, resize the viewport to the measured size and wait
-    // one frame so the page's own resize handler reruns at the canvas
-    // dimensions everything else uses. Lock that initial measurement as the
-    // canvas size: a follow-up resize handler may chain into a layout-
-    // mutating step (e.g. an `alignWeapons()` that writes a `--wy` custom
-    // property which extends the body), and re-measuring after that would
-    // pick a different value than baseline-frames.js (which captures the
-    // body rect once, *before* the viewport resize, with all transforms
-    // suppressed) — leaving the snapshot's PNG and the baseline PNG at
-    // different sizes despite living on the same source page. Best-effort:
-    // a measurement failure leaves the viewport at its launch size and the
-    // rest of the pipeline proceeds (matching the pre-fix behaviour).
-    let lockedCanvas: { width: number; height: number } | null = null;
-    try {
-      const measured = await measureBodyScrollSize(page);
-      if (measured.width > 0 && measured.height > 0
-          && (measured.width !== viewportWidth || measured.height !== viewportHeight)) {
-        await setViewport(page, engine, {
-          width: measured.width,
-          height: measured.height,
-          deviceScaleFactor: 1,
-        });
-        await new Promise((r) => setTimeout(r, VIEWPORT_RESETTLE_MS));
-        lockedCanvas = { width: measured.width, height: measured.height };
-        if (log) {
-          log(`viewport resettled ${viewportWidth}x${viewportHeight} -> ${measured.width}x${measured.height} (page reflow)`);
-        }
-      }
-    } catch (err) {
-      if (log) log(`viewport resettle skipped: ${errMessage(err)}`);
-    }
-
     // Optionally walk the page top-to-bottom first so scroll-triggered reveal
     // animations fire and lazy media is fetched (the image `response` listener
     // is already attached, so anything loaded during the scroll lands in
@@ -555,17 +473,57 @@ export async function runSnapshot(
       }
     }
 
+    // Resize the viewport to the body canvas before measuring geometry, exactly
+    // as baseline.js does before it screenshots the ground truth. `pagx render`
+    // roots the subset at <body> (0,0), and the baseline is captured in a
+    // viewport equal to the body canvas, so any element whose containing block
+    // is the initial containing block — a `position: absolute` box anchored by
+    // `right`/`bottom` with no positioned ancestor, `position: fixed`, or a
+    // `vw`/`vh` length — must be measured against that same box. Measured at the
+    // default 1400x900 viewport instead, such an element resolves to
+    // viewport-relative coordinates (e.g. `right: 20px` on a 200px-wide body
+    // reads `left: 1300px`) that the body-rooted render can't reproduce.
+    //
+    // `measureCanvas` neutralises <html>/<body> and returns the canvas size the
+    // same way baseline.js's `captureBodyRect` does. `applyCanvasViewport`
+    // (shared with the baseline) resizes the viewport to that canvas and decides
+    // whether the resize was safe — see lib/canvas-viewport.ts for the full
+    // rationale and the viewport-dependence guard. When the resize is kept we
+    // pass the pre-resize dimensions back into `takeSnapshot` so the emitted
+    // canvas matches the baseline's screenshot clip exactly (re-measuring after
+    // the resize's reflow could drift by a pixel), while element geometry is
+    // measured against the resized viewport. When the guard reverts the resize,
+    // we fall back to the no-arg snapshot, which re-measures the canvas at the
+    // settle viewport — exactly what the baseline clips to in that case.
+    let snapshotExpr = TAKE_SNAPSHOT_EXPR;
+    try {
+      const canvas = await page.evaluate(MEASURE_CANVAS_EXPR) as {
+        width: number; height: number;
+      };
+      if (canvas && canvas.width > 0 && canvas.height > 0) {
+        const { reverted } = await applyCanvasViewport(
+          page,
+          engine,
+          canvas,
+          { width: viewportWidth, height: viewportHeight },
+          log,
+        );
+        if (!reverted) {
+          snapshotExpr =
+            `(() => window.__pagxSnapshot.takeSnapshot(` +
+            `{canvasWidth:${canvas.width},canvasHeight:${canvas.height}}))()`;
+        }
+      }
+    } catch (err) {
+      // Non-fatal: fall back to the no-arg snapshot at the current viewport.
+      // A measurement/resize hiccup should degrade to the previous behaviour,
+      // not abort a snapshot we can still produce.
+      if (log) log(`viewport resize to canvas skipped: ${errMessage(err)}`);
+    }
+
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
     // `SNAPSHOT_INIT_SCRIPT` registered above; the evaluate call only
-    // ships the ~70-byte entry expression now. When the second-pass
-    // viewport settle locked an initial canvas size (a `fit()`-style
-    // resize handler reflowed the page), pass it as a hint so
-    // snapshotMain() does not reread `body.scrollWidth/scrollHeight`
-    // after a follow-up layout mutator (e.g. an `alignWeapons()` that
-    // chained off the resize handler) extends the body further.
-    const snapshotExpr = lockedCanvas
-      ? buildTakeSnapshotExprWithHint(lockedCanvas.width, lockedCanvas.height)
-      : TAKE_SNAPSHOT_EXPR;
+    // ships the ~70-byte entry expression now.
     const snapshot = await page.evaluate(snapshotExpr) as {
       html: string; width: number; height: number;
     };

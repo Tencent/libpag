@@ -166,6 +166,7 @@
 | `background-image: conic-gradient(from angle, …)` | 内嵌 `<ConicGradient>`（CSS 0° = 顶，PAGX 0° = 右，自动 −90°） |
 | `background-clip: text`（别名 `-webkit-background-clip: text`） | 与 gradient `background-image` 同时设置时，渐变下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变），本元素的矩形背景被抑制。无 gradient `background-image` 时该属性为无操作。 |
 | `background-image: url(...)` | 还原为背景矩形上的 `<ImagePattern>` 填充；`background-size` / `background-repeat` / `background-position` 决定该 pattern 的 `scaleMode` / 平铺模式 / 矩阵 |
+| `background-blend-mode: <mode>` | 在渐变 / 图像填充上设置 `Fill.blendMode`，使其与 `background-color` 混合；此时会保留底部的纯色 `<Fill>` 作为混合所需的背景。`normal`（默认）为空操作，不透明的渐变 / 图像仍会覆盖底色 |
 | `mask-image: url(data:image/svg+xml,...)`（+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`） | 引用的 SVG 变成一层 PAGX mask；`mask-mode` 选择 Alpha 还是 Luminance，`mask-size` / `mask-position` 决定其缩放/偏移 |
 | `clip-path: url(#id)` | 解析引用的隐藏 `<clipPath>` 为一层轮廓 mask。静态几何形式（`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`）在 PAGX 无对应原语，告警丢弃——但*动画*的几何 `clip-path` 作为轮廓 mask 变形受支持（见 §13.2） |
 | `border-radius: N`（px）、`N%`（按 `min(width, height)` 解析；固定 px 宽高且 `border-radius: 50%` 的元素会变成 `Ellipse`），或 1–4 值缩写（`T`、`T R`、`T R B`、`T R B L`） | `Rectangle.roundness = N`（`50%` 输出 `Ellipse`）。椭圆 `W / H` 双半径形式告警并忽略 |

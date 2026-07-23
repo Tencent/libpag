@@ -131,6 +131,54 @@ export interface _PAGXView {
   _contentHeight(): number;
 
   /**
+   * Starts or resumes playback of the default timeline.
+   */
+  _play(): void;
+
+  /**
+   * Pauses playback of the default timeline.
+   */
+  _pause(): void;
+
+  /**
+   * Returns whether the default timeline is currently playing.
+   */
+  _isPlaying(): boolean;
+
+  /**
+   * Returns the current playback time in microseconds.
+   */
+  _currentTimeMicros(): number;
+
+  /**
+   * Returns the total duration in microseconds.
+   */
+  _durationMicros(): number;
+
+  /**
+   * Returns the frame rate of the animation.
+   */
+  _frameRate(): number;
+
+  /**
+   * Sets the current playback time in microseconds.
+   * @param micros Time in microseconds
+   */
+  _setCurrentTimeMicros(micros: number): void;
+
+  /**
+   * Sets whether playback loops, overriding the file's loop mode.
+   * @param loop true to repeat after each cycle, false to rewind to the first frame and stop after
+   *   a single pass
+   */
+  _setLoop(loop: boolean): void;
+
+  /**
+   * Returns whether playback is set to loop.
+   */
+  _isLoop(): boolean;
+
+  /**
    * Releases the native resources. Must be called when done.
    */
   delete(): void;

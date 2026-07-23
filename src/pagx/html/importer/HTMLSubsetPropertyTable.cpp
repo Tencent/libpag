@@ -207,16 +207,21 @@ std::string TransformBackgroundClip(const std::string& value, const PropertyCont
   return DropProperty("background-clip", value, "is not a supported value", diags);
 }
 
-// `clip-path` is modelled only as a reference to a `<clipPath>` def (`url(#id)`), which the
-// importer rebuilds into a contour mask layer. Geometric forms (`inset()` / `circle()` /
-// `ellipse()` / `polygon()` / `path()`) have no PAGX geometry primitive and are dropped with a
-// diagnostic (the strict-mode trigger), matching the snapshot's own `normalizeClipPath` filter.
+// `clip-path` is rebuilt by the importer into a contour mask layer, either from a `url(#id)`
+// reference to a hidden `<clipPath>` def or from a CSS basic shape (`polygon()` / `path()` /
+// `circle()` / `ellipse()` / `inset()`), whose geometry is synthesised into an equivalent SVG in
+// the masked box's local space. Both forms are kept; anything else (e.g. `shape()`, unknown
+// functions) is dropped with a diagnostic. Mirrors the snapshot's own `normalizeClipPath` filter.
 std::string TransformClipPath(const std::string& value, const PropertyContext&,
                               HTMLTransformContext& diags) {
   std::string lc = ToLower(Trim(value));
   if (lc.empty() || lc == "none") return std::string();
   if (lc.compare(0, 4, "url(") == 0) return Trim(value);
-  return DropProperty("clip-path", value, "only url(#id) references are supported", diags);
+  static const char* kSupportedShapes[] = {"polygon(", "path(", "circle(", "ellipse(", "inset("};
+  for (const char* shape : kSupportedShapes) {
+    if (lc.compare(0, std::strlen(shape), shape) == 0) return Trim(value);
+  }
+  return DropProperty("clip-path", value, "only url(#id) and basic shapes are supported", diags);
 }
 
 std::string TransformBorder(const std::string& value, const PropertyContext&,
@@ -375,6 +380,10 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"background-color", PropAction::Keep, nullptr, nullptr},
     {"background-image", PropAction::Transform, &TransformBackgroundImage, nullptr},
     {"background-clip", PropAction::Transform, &TransformBackgroundClip, nullptr},
+    // `background-blend-mode` blends an element's background layers among themselves; the
+    // importer maps it onto the gradient/image Fill's blendMode. Kept verbatim (a CSS blend
+    // keyword) and consumed in HTMLStyleCascade::parseBoxVisuals.
+    {"background-blend-mode", PropAction::Keep, nullptr, nullptr},
     // `background-size` / `background-repeat` / `background-position` are kept verbatim and
     // consumed only when paired with a `url(...)` background, where they drive the recovered
     // ImagePattern's scaleMode / tile modes / matrix.
@@ -391,8 +400,8 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"mask-position", PropAction::Keep, nullptr, nullptr},
     {"mask-repeat", PropAction::Keep, nullptr, nullptr},
     // `clip-path: url(#id)` references a hidden <clipPath> def; the importer resolves it into a
-    // contour mask layer (the inverse of HTMLWriter::writeClipDef). Geometric clip-path forms
-    // (inset/circle/ellipse/polygon/path) have no PAGX primitive and are dropped with a diagnostic.
+    // contour mask layer (the inverse of HTMLWriter::writeClipDef). CSS basic shapes
+    // (polygon/path/circle/ellipse/inset) are also kept and synthesised into the same contour mask.
     {"clip-path", PropAction::Transform, &TransformClipPath, nullptr},
     {"border", PropAction::Transform, &TransformBorder, nullptr},
     // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.

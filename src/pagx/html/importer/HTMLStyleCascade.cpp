@@ -813,6 +813,25 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     box.backgroundRepeat = LookupLowerTrimmed(props, "background-repeat");
     box.backgroundPosition = LookupLowerTrimmed(props, "background-position");
   }
+  // `background-blend-mode` blends the element's background layers among themselves. Kept
+  // lower-cased so the keyword comparison in applyBackgroundFill is case-insensitive; `normal`
+  // is treated as "no blending" there.
+  box.backgroundBlendMode = LookupLowerTrimmed(props, "background-blend-mode");
+  auto backgroundBlendModes = SplitTopLevelCommas(box.backgroundBlendMode);
+  if (backgroundBlendModes.size() > 1) {
+    std::string firstMode = ToLower(Trim(backgroundBlendModes.front()));
+    bool hasDifferentMode = false;
+    for (size_t i = 1; i < backgroundBlendModes.size(); ++i) {
+      if (ToLower(Trim(backgroundBlendModes[i])) != firstMode) {
+        hasDifferentMode = true;
+        break;
+      }
+    }
+    if (hasDifferentMode) {
+      _diagnostics.warn("html: per-layer background-blend-mode values are not supported; using '" +
+                        firstMode + "' for every background layer");
+    }
+  }
   // `background-clip: text` is the only clip value the importer models. The subset transformer
   // already normalises every other keyword to empty, so a non-empty value here equals `text`.
   std::string bgClip = LookupLowerTrimmed(props, "background-clip");

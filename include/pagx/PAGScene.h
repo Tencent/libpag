@@ -23,8 +23,10 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGComposition.h"
 #include "pagx/PAGDisplayOptions.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
 
 namespace tgfx {
@@ -43,6 +45,7 @@ class PAGViewModel;
 class PAGXDocument;
 class SuppressDelegation;
 class PAGViewModelValue;
+class TextHolder;
 class ViewModel;
 class Image;
 struct Matrix;
@@ -57,7 +60,8 @@ struct RuntimeBinding;
  * PAGScene keeps the source PAGXDocument alive internally, so callers may release their own
  * document handle once the PAGScene is created.
  *
- * Thread safety: PAGScene and the PAGTimeline instances it vends are not thread-safe. Their
+ * Thread safety: PAGScene and the PAGAnimation / PAGStateMachine instances it vends are not
+ * thread-safe. Their
  * playback and render state carry no internal locking, so all calls on a single PAGScene (and its
  * timelines) must be serialized by the caller. Distinct PAGScene instances built from the same
  * PAGXDocument hold independent runtime state and may be driven from different threads, provided
@@ -81,22 +85,37 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Returns the ids of all top-level animations in the source document, preserving declaration
    * order. Animations declared inside child Compositions are not included.
    */
-  std::vector<std::string> getTimelineIds() const;
+  std::vector<std::string> getAnimationIds() const;
 
   /**
-   * Returns the PAGTimeline driving the named top-level animation. Repeated calls with the same
+   * Returns the PAGAnimation driving the named top-level animation. Repeated calls with the same
    * id return the same instance, so playback state is shared across all callers driving that
    * animation.
-   * @param id an animation id from getTimelineIds(). Returns nullptr if no top-level
+   * @param id an animation id from getAnimationIds(). Returns nullptr if no top-level
    *           Animation matches the given id.
    */
-  std::shared_ptr<PAGTimeline> getTimeline(const std::string& id);
+  std::shared_ptr<PAGAnimation> getAnimation(const std::string& id);
 
   /**
-   * Returns the PAGTimeline for the first top-level animation in the document, or nullptr if the
-   * document has no top-level animations.
+   * Returns the first top-level playback driver (animation or state machine) in declaration order,
+   * or nullptr if the document has none. The returned shared_ptr points to a PAGAnimation or
+   * PAGStateMachine; use getAnimation() / getStateMachineTimeline() for typed access.
    */
   std::shared_ptr<PAGTimeline> getDefaultTimeline();
+
+  /**
+   * Returns the ids of all top-level state machines in the source document, preserving declaration
+   * order.
+   */
+  std::vector<std::string> getStateMachineIds() const;
+
+  /**
+   * Returns the PAGStateMachine driving the named top-level state machine. Repeated calls
+   * with the same id return the same instance.
+   * @param id a state machine id from getStateMachineIds(). Returns nullptr if no top-level
+   *           StateMachine matches the given id.
+   */
+  std::shared_ptr<PAGStateMachine> getStateMachineTimeline(const std::string& id);
 
   /**
    * Returns the root PAGComposition of this scene.
@@ -138,9 +157,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   /**
    * Returns true if the scene's content has changed since the last render, i.e. a redraw would
    * produce different pixels. Hosts driving their own render loop can consult this to skip
-   * redundant full renders on idle frames. Reflects only the runtime layer tree state captured
-   * by the last renderTo()/Record(); pending ViewModel data binds flushed at the next Record()
-   * are not accounted for here.
+   * redundant full renders on idle frames. Returns true when either the underlying display list
+   * has changed or a pending TextHolder reshape (driven by a ViewModel data bind or animation
+   * text-shaping channel) has not yet been flushed — flush runs inside Record().
    */
   bool hasContentChanged() const;
 
@@ -148,7 +167,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * Convenience method equivalent to advance(deltaMicroseconds) followed by apply(). advance() and
    * apply() drive the animations that play automatically in this scene (including nested
    * compositions). Top-level animations are not driven here; play them explicitly via
-   * getTimeline(id)->advanceAndApply(...).
+   * getAnimation(id)->advanceAndApply(...).
    */
   void advanceAndApply(int64_t deltaMicroseconds);
 
@@ -197,6 +216,10 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
       ViewModel* schema, const std::shared_ptr<PAGScene>& scene,
       std::unordered_set<const ViewModel*>& visited);
   void flushDataBinds();
+  void flushTextHolders();
+  // Rebuilds the flat `textHolders` list from the current runtime tree. Called at the end of
+  // buildRuntimeTree and after refreshNodes so the list stays in sync with the binding state.
+  void collectTextHolders();
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 
@@ -222,7 +245,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::shared_ptr<PAGXDocument> document = nullptr;
   std::shared_ptr<PAGComposition> _rootComposition = nullptr;
   std::shared_ptr<PAGViewModel> rootViewModel = nullptr;
-  std::unordered_map<Animation*, std::shared_ptr<PAGTimeline>> timelinesByAnimation = {};
+  // Top-level timelines instantiated on demand by getAnimation/getStateMachineTimeline, keyed by
+  // their source definition node so repeated lookups return the same instance.
+  std::unordered_map<const Node*, std::shared_ptr<PAGTimeline>> instantiatedTimelines = {};
 
   std::unique_ptr<tgfx::DisplayList> displayList;
 
@@ -231,11 +256,18 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   bool suppressNotify = false;
   std::vector<PAGViewModelValue*> pendingNotifications = {};
 
+  // Flat list of every TextHolder registered across the runtime composition tree. Rebuilt at the
+  // end of buildRuntimeTree and after refreshNodes (which can replace a binding's holders via
+  // RefreshLayerInPlace). flushTextHolders and hasContentChanged iterate this list directly so the
+  // common case (no text reshape in the document) avoids walking the composition tree every frame.
+  std::vector<std::shared_ptr<TextHolder>> textHolders = {};
+
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
   friend class PAGXDocument;
-  friend class PAGTimeline;
+  friend class PAGAnimation;
+  friend class PAGStateMachine;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;

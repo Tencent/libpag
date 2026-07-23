@@ -1,13 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pagx width="640" height="520">
-
-  <!-- Background: Gray 900 -->
   <Layer name="Background" left="320" top="260">
     <Rectangle left="-320" top="-260" width="640" height="520"/>
     <Fill color="#111827"/>
   </Layer>
-
-  <!-- Background: soft color fields -->
   <Layer name="BgPattern">
     <Layer left="60" top="60">
       <Ellipse left="-160" top="-160" width="320" height="320"/>
@@ -35,12 +31,7 @@
       <BlurFilter blurX="40" blurY="40"/>
     </Layer>
   </Layer>
-
-  <!-- ==================== App Icons ==================== -->
-
-  <!-- 3-row grid: vertical container with 3 horizontal rows -->
   <Layer name="IconGrid" width="640" height="520" layout="vertical" padding="50" arrangement="spaceBetween">
-    <!-- Row 1 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
       <Layer name="Home" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
@@ -51,11 +42,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Home" fontFamily="Arial" fontSize="12"/>
+          <Text text="Home" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="1,2,3,4" positions="0,11;8.66602,11;15.3398,11;25.3359,11" bounds="0,0,32.0098,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Search" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -69,11 +61,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Search" fontFamily="Arial" fontSize="12"/>
+          <Text text="Search" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="5,4,6,7,8,9" positions="0,11;8.00391,11;14.6777,11;21.3516,11;25.3477,11;31.3477,11" bounds="0,0,38.0215,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Bell" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -91,11 +84,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Bell" fontFamily="Arial" fontSize="12"/>
+          <Text text="Bell" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="10,4,11,11" positions="0,11;8.00391,11;14.6777,11;17.3438,11" bounds="0,0,20.0098,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Heart" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -105,13 +99,13 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Heart" fontFamily="Arial" fontSize="12"/>
+          <Text text="Heart" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="1,4,6,7,12" positions="0,11;8.66602,11;15.3398,11;22.0137,11;26.0098,11" bounds="0,0,29.3438,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
     </Layer>
-
-    <!-- Row 2 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
       <Layer name="Chat" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
@@ -128,16 +122,17 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Chat" fontFamily="Arial" fontSize="12"/>
+          <Text text="Chat" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="13,9,6,12" positions="0,11;8.66602,11;15.3398,11;22.0137,11" bounds="0,0,25.3477,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Camera" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
-            <Rectangle top="5" width="38" height="26" roundness="5"/>
+            <Rectangle roundness="5" top="5" width="38" height="26"/>
             <Path data="M12 7L15 0L23 0L26 7"/>
             <Fill color="#6366F1"/>
             <Group>
@@ -151,11 +146,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Camera" fontFamily="Arial" fontSize="12"/>
+          <Text text="Camera" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="13,6,3,4,7,6" positions="0,11;8.66602,11;15.3398,11;25.3359,11;32.0098,11;36.0059,11" bounds="0,0,42.6797,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Settings" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -173,11 +169,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Settings" fontFamily="Arial" fontSize="12"/>
+          <Text text="Settings" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="5,4,12,12,14,15,16,17" positions="0,11;8.00391,11;14.6777,11;18.0117,11;21.3457,11;24.0117,11;30.6855,11;37.3594,11" bounds="0,0,43.3594,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="User" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -192,38 +189,41 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="User" fontFamily="Arial" fontSize="12"/>
+          <Text text="User" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="18,17,4,7" positions="0,11;8.66602,11;14.666,11;21.3398,11" bounds="0,0,25.3359,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
     </Layer>
-
-    <!-- Row 3 -->
     <Layer layout="horizontal" arrangement="spaceBetween">
       <Layer name="Calendar" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
           <Layer centerX="0" centerY="0">
-            <Rectangle top="4" width="38" height="38" roundness="6"/>
-            <Rectangle left="8.5" width="3" height="9" roundness="2"/>
-            <Rectangle left="26.5" width="3" height="9" roundness="2"/>
+            <Rectangle roundness="6" top="4" width="38" height="38"/>
+            <Rectangle roundness="2" left="8.5" width="3" height="9"/>
+            <Rectangle roundness="2" left="26.5" width="3" height="9"/>
             <Fill color="#EF4444"/>
             <Group>
-              <Rectangle left="4" top="16" width="30" height="22" roundness="3"/>
+              <Rectangle roundness="3" left="4" top="16" width="30" height="22"/>
               <Fill color="#1E2433"/>
             </Group>
             <Group top="15" centerX="0">
-              <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16"/>
+              <Text text="17" fontFamily="Arial" fontStyle="Bold" fontSize="16">
+                <GlyphRun font="@__embed_font_1" fontSize="16" glyphs="19,20" positions="0,14;8.89844,14" bounds="0,0,17.7969,18"/>
+              </Text>
               <Fill color="#EF4444"/>
             </Group>
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Calendar" fontFamily="Arial" fontSize="12"/>
+          <Text text="Calendar" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="13,6,11,4,15,21,6,7" positions="0,11;8.66602,11;15.3398,11;18.0059,11;24.6797,11;31.3535,11;38.0273,11;44.7012,11" bounds="0,0,48.6973,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Lock" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -231,22 +231,23 @@
             <Path data="M5 16L5 9C5 0 25 0 25 9L25 16"/>
             <Stroke color="#F97316" width="4" cap="round"/>
             <Group>
-              <Rectangle top="17" width="30" height="22" roundness="6"/>
+              <Rectangle roundness="6" top="17" width="30" height="22"/>
               <Fill color="#F97316"/>
             </Group>
             <Group>
               <Ellipse left="11.5" top="22.5" width="7" height="7"/>
-              <Rectangle left="13.5" top="29" width="3" height="6" roundness="1"/>
+              <Rectangle roundness="1" left="13.5" top="29" width="3" height="6"/>
               <Fill color="#1E2433"/>
             </Group>
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Lock" fontFamily="Arial" fontSize="12"/>
+          <Text text="Lock" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="22,2,8,23" positions="0,11;6.67383,11;13.3477,11;19.3477,11" bounds="0,0,25.3477,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Music" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -261,11 +262,12 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Music" fontFamily="Arial" fontSize="12"/>
+          <Text text="Music" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="24,25,17,14,8" positions="0,11;9.99609,11;16.6699,11;22.6699,11;25.3359,11" bounds="0,0,31.3359,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
-
       <Layer name="Download" layout="vertical" gap="10" alignment="center">
         <Layer width="72" height="72">
           <Layer composition="@card"/>
@@ -282,24 +284,52 @@
           </Layer>
         </Layer>
         <Layer>
-          <Text text="Download" fontFamily="Arial" fontSize="12"/>
+          <Text text="Download" fontFamily="Arial">
+            <GlyphRun font="@__embed_font_1" glyphs="26,2,27,15,11,2,6,21" positions="0,11;8.66602,11;15.3398,11;24.0059,11;30.6797,11;33.3457,11;40.0195,11;46.6934,11" bounds="0,0,53.3672,14"/>
+          </Text>
           <Fill color="#6B7280"/>
         </Layer>
       </Layer>
     </Layer>
   </Layer>
-
-  <!-- ==================== Resources ==================== -->
   <Resources>
     <Composition id="card" width="72" height="72">
       <Layer width="72" height="72">
-        <Rectangle width="100%" height="100%" roundness="12"/>
+        <Rectangle roundness="12" width="100%" height="100%"/>
         <Fill color="#FFFFFF" alpha="0.06"/>
         <Stroke color="#FFFFFF" width="0.5" alpha="0.25"/>
         <BackgroundBlurStyle blurX="20" blurY="20"/>
         <DropShadowStyle offsetY="4" blurX="20" blurY="20" color="#00000040"/>
       </Layer>
     </Composition>
+    <Font id="__embed_font_1">
+      <Glyph path="M81 0L81 -750L174 -750L174 -417L547 -417L547 -750L642 -750L642 0L547 0L547 -333L174 -333L174 0L81 0Z" advance="750"/>
+      <Glyph path="M34 -292Q34 -447 113 -521Q181 -583 277 -583Q384 -583 452 -508Q520 -432 520 -299Q520 -191 490 -129Q460 -68 402 -34Q345 0 277 0Q168 0 100 -74Q34 -150 34 -292ZM124 -292Q124 -188 167 -135Q211 -83 276 -83Q341 -83 384 -135Q428 -188 428 -296Q428 -396 384 -448Q341 -500 276 -500Q211 -500 167 -448Q124 -396 124 -292Z" advance="583.333"/>
+      <Glyph path="M66 0L66 -583L145 -583L145 -491Q169 -533 210 -557Q250 -583 302 -583Q359 -583 396 -557Q432 -531 448 -484Q509 -583 608 -583Q685 -583 727 -536Q768 -490 768 -392L768 0L681 0L681 -359Q681 -418 672 -443Q664 -469 641 -484Q618 -500 589 -500Q534 -500 497 -460Q462 -419 462 -332L462 0L374 0L374 -371Q374 -435 352 -467Q331 -500 283 -500Q245 -500 214 -478Q182 -457 168 -415Q154 -374 154 -297L154 0L66 0Z" advance="833.333"/>
+      <Glyph path="M421 -167L512 -167Q490 -87 431 -43Q374 0 284 0Q169 0 103 -76Q36 -151 36 -286Q36 -428 103 -505Q171 -583 279 -583Q383 -583 448 -503Q514 -422 514 -276Q514 -268 514 -250L128 -250Q133 -169 176 -126Q219 -83 284 -83Q332 -83 366 -103Q401 -124 421 -167ZM133 -333L422 -333Q417 -406 389 -443Q346 -500 280 -500Q220 -500 178 -454Q137 -409 133 -333Z" advance="583.333"/>
+      <Glyph path="M46 -250L134 -250Q141 -195 164 -160Q188 -126 236 -104Q285 -83 345 -83Q400 -83 441 -99Q483 -116 503 -145Q523 -173 523 -207Q523 -242 504 -267Q484 -293 439 -310Q410 -322 311 -345Q214 -370 174 -391Q122 -418 98 -458Q73 -499 73 -549Q73 -604 103 -652Q134 -701 193 -725Q253 -750 324 -750Q405 -750 465 -720Q526 -690 559 -632Q591 -574 594 -500L503 -500Q495 -582 453 -624Q411 -667 328 -667Q242 -667 203 -634Q164 -603 164 -557Q164 -518 191 -493Q219 -467 333 -440Q449 -414 492 -395Q555 -365 585 -320Q615 -276 615 -217Q615 -159 582 -108Q549 -57 488 -29Q427 0 350 0Q254 0 188 -29Q122 -59 85 -117Q47 -176 46 -250Z" advance="666.667"/>
+      <Glyph path="M405 -83Q355 -38 310 -18Q266 0 214 0Q128 0 82 -40Q36 -82 36 -145Q36 -182 53 -212Q72 -243 99 -262Q128 -281 163 -290Q189 -297 241 -303Q346 -316 397 -333Q397 -357 397 -363Q397 -432 372 -461Q339 -500 272 -500Q210 -500 180 -482Q151 -464 137 -417L51 -417Q63 -474 89 -509Q116 -546 167 -564Q217 -583 285 -583Q352 -583 393 -566Q435 -551 454 -525Q474 -500 482 -462Q486 -439 486 -378L486 -254Q486 -125 491 -82Q497 -39 514 0L422 0Q409 -35 405 -83ZM397 -250Q349 -234 254 -223Q199 -216 177 -208Q155 -201 142 -185Q130 -169 130 -151Q130 -122 156 -103Q184 -83 234 -83Q285 -83 324 -108Q365 -133 383 -161Q397 -184 397 -227L397 -250Z" advance="583.333"/>
+      <Glyph path="M65 0L65 -583L145 -583L145 -500Q174 -551 199 -566Q225 -583 257 -583Q301 -583 346 -566L316 -483Q284 -500 251 -500Q223 -500 199 -480Q177 -461 167 -426Q152 -372 152 -309L152 0L65 0Z" advance="333.333"/>
+      <Glyph path="M405 -167L491 -167Q477 -89 418 -44Q359 0 275 0Q168 0 103 -74Q39 -150 39 -289Q39 -380 66 -448Q95 -516 151 -549Q208 -583 276 -583Q361 -583 414 -539Q467 -496 483 -417L397 -417Q385 -458 354 -479Q323 -500 279 -500Q212 -500 171 -449Q129 -400 129 -292Q129 -182 169 -133Q210 -83 273 -83Q326 -83 361 -103Q396 -124 405 -167Z" advance="500"/>
+      <Glyph path="M66 0L66 -750L154 -750L154 -505Q215 -583 309 -583Q367 -583 409 -559Q452 -534 470 -490Q488 -445 488 -362L488 0L401 0L401 -362Q401 -434 372 -466Q344 -500 292 -500Q253 -500 217 -478Q184 -456 168 -417Q154 -379 154 -313L154 0L66 0Z" advance="583.333"/>
+      <Glyph path="M73 0L73 -750L342 -750Q424 -750 474 -728Q523 -707 551 -661Q579 -617 579 -568Q579 -522 555 -482Q530 -441 479 -417Q544 -396 578 -345Q613 -296 613 -227Q613 -172 591 -124Q570 -77 539 -51Q508 -26 461 -13Q414 0 346 0L73 0ZM168 -417L323 -417Q385 -417 413 -426Q449 -439 467 -467Q486 -496 486 -540Q486 -581 469 -612Q452 -643 419 -655Q388 -667 311 -667L168 -667L168 -417ZM168 -83L346 -83Q392 -83 410 -87Q444 -92 465 -107Q487 -121 501 -147Q516 -173 516 -208Q516 -249 495 -279Q475 -309 439 -320Q402 -333 333 -333L168 -333L168 -83Z" advance="666.667"/>
+      <Glyph path="M64 0L64 -750L152 -750L152 0L64 0Z" advance="250"/>
+      <Glyph path="M258 -91L271 -8Q233 0 204 0Q156 0 130 -16Q104 -33 92 -60Q82 -87 82 -173L82 -500L18 -500L18 -583L82 -583L82 -712L169 -764L169 -583L258 -583L258 -500L169 -500L169 -163Q169 -121 173 -109Q178 -98 189 -90Q199 -83 219 -83Q234 -83 258 -91Z" advance="250"/>
+      <Glyph path="M589 -267L682 -243Q652 -125 574 -63Q497 0 385 0Q271 0 198 -47Q125 -95 87 -185Q49 -276 49 -380Q49 -493 92 -578Q135 -663 214 -706Q293 -750 388 -750Q495 -750 568 -694Q642 -638 671 -538L577 -516Q552 -595 504 -630Q457 -667 385 -667Q303 -667 247 -626Q193 -587 169 -520Q147 -452 147 -382Q147 -289 173 -220Q201 -151 257 -117Q313 -83 379 -83Q458 -83 513 -129Q569 -176 589 -267Z" advance="750"/>
+      <Glyph path="M66 -667L66 -750L155 -750L155 -667L66 -667ZM66 0L66 -583L155 -583L155 0L66 0Z" advance="250"/>
+      <Glyph path="M66 0L66 -583L145 -583L145 -510Q202 -583 310 -583Q357 -583 396 -565Q435 -547 454 -516Q474 -486 482 -445Q487 -418 487 -350L487 0L400 0L400 -348Q400 -406 389 -435Q379 -465 353 -482Q327 -500 292 -500Q236 -500 194 -461Q154 -422 154 -313L154 0L66 0Z" advance="583.333"/>
+      <Glyph path="M49 83L135 83Q141 83 165 83Q198 83 254 83Q315 83 348 64Q382 44 393 8Q401 -13 400 -83Q342 0 257 0Q150 0 91 -85Q33 -169 33 -289Q33 -370 59 -439Q86 -508 137 -546Q189 -583 258 -583Q349 -583 409 -500L409 -583L490 -583L490 -122Q490 3 465 55Q440 107 387 137Q333 167 255 167Q161 167 104 146Q48 125 49 83ZM122 -296Q122 -185 163 -134Q203 -83 264 -83Q326 -83 366 -134Q408 -185 408 -292Q408 -396 365 -448Q323 -500 263 -500Q204 -500 163 -448Q122 -397 122 -296Z" advance="583.333"/>
+      <Glyph path="M31 -167L117 -167Q125 -126 158 -104Q191 -83 251 -83Q313 -83 341 -108Q371 -134 371 -168Q371 -198 345 -216Q327 -228 255 -246Q159 -272 121 -292Q85 -311 65 -345Q46 -380 46 -421Q46 -458 61 -491Q77 -523 104 -544Q125 -560 160 -572Q195 -583 236 -583Q297 -583 342 -563Q389 -543 411 -508Q434 -474 441 -417L355 -417Q350 -456 322 -478Q293 -500 242 -500Q182 -500 156 -479Q130 -460 130 -432Q130 -414 141 -401Q151 -387 174 -378Q188 -372 253 -354Q346 -327 383 -310Q419 -293 440 -259Q461 -227 461 -178Q461 -130 435 -87Q410 -46 362 -22Q314 0 253 0Q151 0 98 -42Q46 -85 31 -167Z" advance="500"/>
+      <Glyph path="M547 -750L642 -750L642 -324Q642 -212 617 -147Q592 -82 529 -40Q465 0 362 0Q260 0 197 -35Q133 -72 105 -139Q78 -207 78 -324L78 -750L173 -750L173 -322Q173 -225 190 -178Q208 -133 250 -108Q293 -83 353 -83Q458 -83 503 -132Q547 -181 547 -322L547 -750Z" advance="750"/>
+      <Glyph path="M373 0L285 0L285 -584Q254 -553 202 -521Q150 -489 109 -474L109 -563Q184 -599 238 -649Q294 -701 316 -750L373 -750L373 0Z" advance="562.5"/>
+      <Glyph path="M48 -688L48 -750L511 -750L511 -699Q442 -625 375 -491Q309 -358 271 -218Q245 -118 238 0L147 0Q149 -94 181 -226Q213 -357 271 -480Q331 -604 398 -688L48 -688Z" advance="562.5"/>
+      <Glyph path="M402 0L402 -89Q353 0 258 0Q195 0 143 -36Q91 -74 63 -139Q34 -206 34 -292Q34 -375 60 -443Q86 -510 138 -547Q190 -583 254 -583Q301 -583 337 -560Q374 -538 397 -501L397 -750L484 -750L484 0L402 0ZM125 -292Q125 -188 167 -135Q208 -83 266 -83Q323 -83 363 -133Q404 -182 404 -284Q404 -396 362 -448Q322 -500 262 -500Q203 -500 164 -449Q125 -400 125 -292Z" advance="583.333"/>
+      <Glyph path="M73 0L73 -750L168 -750L168 -83L521 -83L521 0L73 0Z" advance="583.333"/>
+      <Glyph path="M66 0L66 -750L155 -750L155 -358L362 -583L477 -583L277 -366L496 0L388 0L216 -298L155 -232L155 0L66 0Z" advance="500"/>
+      <Glyph path="M74 0L74 -750L217 -750L387 -243Q410 -172 421 -137Q432 -176 458 -251L630 -750L758 -750L758 0L667 0L667 -667L458 0L372 0L165 -667L165 0L74 0Z" advance="833.333"/>
+      <Glyph path="M406 0L406 -96Q345 0 241 0Q195 0 155 -20Q116 -39 96 -68Q77 -98 69 -139Q64 -168 64 -230L64 -583L152 -583L152 -267Q152 -191 158 -165Q165 -126 193 -104Q220 -83 259 -83Q298 -83 332 -105Q367 -128 382 -165Q397 -204 397 -277L397 -583L484 -583L484 0L406 0Z" advance="583.333"/>
+      <Glyph path="M77 0L77 -750L324 -750Q408 -750 452 -740Q513 -724 556 -685Q613 -635 641 -557Q669 -479 669 -379Q669 -294 650 -228Q632 -161 602 -118Q572 -76 535 -51Q500 -26 451 -13Q401 0 336 0L77 0ZM172 -83L324 -83Q396 -83 436 -98Q477 -112 500 -137Q534 -173 552 -233Q572 -294 572 -380Q572 -500 534 -564Q497 -629 445 -651Q408 -667 323 -667L172 -667L172 -83Z" advance="750"/>
+      <Glyph path="M161 0L3 -583L94 -583L176 -220L207 -121Q210 -129 234 -215L316 -583L406 -583L484 -219L510 -134L540 -221L629 -583L715 -583L552 0L461 0L379 -314L358 -449L254 0L161 0Z" advance="750"/>
+    </Font>
   </Resources>
-
 </pagx>

@@ -203,6 +203,50 @@ function findCorpusFiles(corpusDir, only, recursive) {
   return out;
 }
 
+// Optional per-case source URL manifest so the report's "source" column can
+// point its <iframe> at the live site instead of the captured local HTML.
+// Looks for a JSON file in the corpus root; supports either an array of
+// `{ slug|name, url }` (e.g. the crawler's results.json / sites.json) or a
+// plain `{ caseName: url }` object. Returns a slug->url Map (empty if none).
+function loadUrlMap(corpusDir) {
+  const map = new Map();
+  for (const fname of ['results.json', 'urls.json', 'sites.json']) {
+    const p = path.join(corpusDir, fname);
+    if (!fs.existsSync(p)) continue;
+    let data;
+    try { data = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { continue; }
+    if (Array.isArray(data)) {
+      for (const e of data) {
+        if (e && typeof e.url === 'string' && (e.slug || e.name)) {
+          map.set(String(e.slug || e.name), e.url);
+        }
+      }
+    } else if (data && typeof data === 'object') {
+      for (const [k, v] of Object.entries(data)) {
+        if (typeof v === 'string') map.set(k, v);
+        else if (v && typeof v.url === 'string') map.set(k, v.url);
+      }
+    }
+    if (map.size) break;
+  }
+  return map;
+}
+
+// Resolve a case's live URL from the manifest. Keys are usually the case's
+// directory slug (e.g. `001-A-search-portal-baidu`) while the case name adds
+// the file base (`…__snapshot`), so fall back to a longest-prefix match.
+function findUrlForCase(urlMap, caseName) {
+  if (!urlMap || urlMap.size === 0) return '';
+  if (urlMap.has(caseName)) return urlMap.get(caseName);
+  let best = '';
+  for (const slug of urlMap.keys()) {
+    if ((caseName === slug || caseName.startsWith(slug + '__')) && slug.length > best.length) {
+      best = slug;
+    }
+  }
+  return best ? urlMap.get(best) : '';
+}
+
 function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
 }
@@ -238,6 +282,7 @@ async function processCase(entry, outDir, opts, browser) {
   const row = {
     name: base,
     htmlPath,
+    sourceUrl: findUrlForCase(opts.urlMap, base),
     width: 0,
     height: 0,
     pixelDiffRatio: NaN,
@@ -549,6 +594,24 @@ function writeIndexHtml(rows, outPath, label) {
     const deltaSign = r.flexDelta > 0 ? '+' : '';
     const flagHtml = flag ? ` <span class="flag ${flag.kind}">${flag.label}</span>` : '';
     const status = r.error ? `<span class="err">${r.error}</span>` : '';
+    // The source column renders the source page live in an <iframe>: the
+    // corresponding website's URL when the corpus manifest provides one, else
+    // the captured local HTML (what baseline.png came from). The frame is laid
+    // out at the page's measured logical size (matching baseline) and scaled
+    // down to the column width by scaleFrames() below so it lines up with the
+    // PNG columns.
+    const liveUrl = r.sourceUrl || '';
+    // Embed the live URL when the corpus manifest provides one; otherwise fall
+    // back to the captured local HTML (what baseline.png came from).
+    const srcUrl = liveUrl || (r.htmlPath ? 'file://' + encodeURI(r.htmlPath) : '');
+    const fw = r.width > 0 ? r.width : 1440;
+    const fh = r.height > 0 ? r.height : 900;
+    const srcCap = liveUrl
+      ? `<a href="${liveUrl}" target="_blank" rel="noopener">source ↗</a>`
+      : 'source';
+    const srcCell = srcUrl
+      ? `<figure class="src col-source"><figcaption>${srcCap}</figcaption><div class="frame-wrap" data-fw="${fw}" data-fh="${fh}"><iframe class="frame" src="${srcUrl}" width="${fw}" height="${fh}" loading="lazy" scrolling="no" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe></div></figure>`
+      : `<figure class="src col-source"><figcaption>source</figcaption><div class="frame-missing muted">n/a</div></figure>`;
     return `
 <section class="case">
   <h2>${r.name} <span class="ssim-tag ${cls}">SSIM ${ssim}</span></h2>
@@ -561,9 +624,10 @@ function writeIndexHtml(rows, outPath, label) {
     ${status}
   </p>
   <div class="row">
-    <figure><figcaption>baseline</figcaption><img src="${dir}/baseline.png" loading="lazy"/></figure>
-    <figure><figcaption>subset</figcaption><img src="${dir}/subset.png" loading="lazy"/></figure>
-    <figure><figcaption>diff</figcaption><img src="${dir}/diff.png" loading="lazy"/></figure>
+    ${srcCell}
+    <figure class="col-baseline"><figcaption>baseline</figcaption><img src="${dir}/baseline.png" loading="lazy"/></figure>
+    <figure class="col-subset"><figcaption>subset</figcaption><img src="${dir}/subset.png" loading="lazy"/></figure>
+    <figure class="col-diff"><figcaption>diff</figcaption><img src="${dir}/diff.png" loading="lazy"/></figure>
   </div>
 </section>`;
   }).join('\n');
@@ -601,16 +665,32 @@ function writeIndexHtml(rows, outPath, label) {
   .flag.dropped  { background: #e0e7ff; color: #3730a3; }
   .err { color: #b00; font-weight: 600; }
   .muted { color: #94a3b8; font-size: 12px; }
-  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .controls { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 10px 0; margin: 0 0 12px; background: #fff; border-bottom: 1px solid #e5e7eb; font-size: 13px; }
+  .controls strong { color: #0f172a; font-weight: 600; }
+  .controls label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: #334155; }
+  .row { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 12px; }
+  body.hide-source .col-source, body.hide-baseline .col-baseline, body.hide-subset .col-subset, body.hide-diff .col-diff { display: none; }
   .row figure { margin: 0; background: #f1f5f9; padding: 6px; border-radius: 6px; }
   .row figcaption { font-size: 12px; color: #64748b; margin-bottom: 4px; }
+  .row figcaption a { color: #2563eb; text-decoration: none; }
+  .row figcaption a:hover { text-decoration: underline; }
   .row img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
+  .frame-wrap { position: relative; width: 100%; overflow: hidden; background: #fff; }
+  .frame { border: 0; transform-origin: top left; background: #fff; }
+  .frame-missing { display: flex; align-items: center; justify-content: center; height: 120px; background: #fff; border-radius: 4px; }
   p { color: #475569; font-size: 13px; }
 </style>
 </head>
 <body>
 <h1>html-snapshot eval — ${label}</h1>
 <p>${rows.length} cases (${s.ok} ok, ${s.errored} errored). Generated ${new Date().toISOString()}.</p>
+<div class="controls">
+  <strong>Columns:</strong>
+  <label><input type="checkbox" data-col="source" checked/> source</label>
+  <label><input type="checkbox" data-col="baseline" checked/> baseline</label>
+  <label><input type="checkbox" data-col="subset" checked/> subset</label>
+  <label><input type="checkbox" data-col="diff" checked/> diff</label>
+</div>
 <div class="summary">
   <h3>Corpus summary</h3>
   <ul>
@@ -623,6 +703,49 @@ function writeIndexHtml(rows, outPath, label) {
   </ul>
 </div>
 ${cards}
+<script>
+  // Lay out each source <iframe> at its page's logical size, then scale it down
+  // to the column width so it lines up with the baseline/subset/diff columns.
+  function scaleFrames() {
+    document.querySelectorAll('.frame-wrap').forEach((wrap) => {
+      const fw = parseFloat(wrap.dataset.fw) || 1440;
+      const fh = parseFloat(wrap.dataset.fh) || 900;
+      const frame = wrap.querySelector('.frame');
+      if (!frame) return;
+      const scale = wrap.clientWidth / fw;
+      frame.style.transform = 'scale(' + scale + ')';
+      wrap.style.height = (fh * scale) + 'px';
+    });
+  }
+
+  // Column show/hide: toggling a checkbox adds body.hide-<col> (CSS collapses
+  // that column's figures) and reflows the grid to the visible count. Choices
+  // persist in localStorage so a reload keeps the same layout.
+  var COL_KEY = 'html-snapshot-eval-columns';
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.controls input[data-col]'));
+  function applyColumns() {
+    var visible = 0;
+    var hidden = [];
+    boxes.forEach(function (b) {
+      document.body.classList.toggle('hide-' + b.dataset.col, !b.checked);
+      if (b.checked) visible++; else hidden.push(b.dataset.col);
+    });
+    document.documentElement.style.setProperty('--cols', String(Math.max(visible, 1)));
+    try { localStorage.setItem(COL_KEY, JSON.stringify(hidden)); } catch (e) {}
+    scaleFrames();
+  }
+  try {
+    var saved = JSON.parse(localStorage.getItem(COL_KEY) || '[]');
+    if (Array.isArray(saved)) {
+      boxes.forEach(function (b) { if (saved.indexOf(b.dataset.col) !== -1) b.checked = false; });
+    }
+  } catch (e) {}
+  boxes.forEach(function (b) { b.addEventListener('change', applyColumns); });
+
+  window.addEventListener('load', scaleFrames);
+  window.addEventListener('resize', scaleFrames);
+  applyColumns();
+</script>
 </body>
 </html>`;
   fs.writeFileSync(outPath, html, 'utf8');
@@ -636,6 +759,10 @@ async function main() {
   if (!opts.pagxBin) opts.pagxBin = defaultPagxBin();
   if (!opts.outDir) opts.outDir = path.join(SCRIPT_DIR, 'out', opts.label);
   ensureDir(opts.outDir);
+
+  // Optional slug->live-URL manifest from the corpus root; drives the report's
+  // "source" <iframe> (live site when known, else the captured local HTML).
+  opts.urlMap = loadUrlMap(opts.corpus);
 
   // Single shared, content-addressed font cache for the whole run. Every case
   // downloads into it; identical faces (the common case across a corpus that

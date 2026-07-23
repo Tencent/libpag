@@ -111,6 +111,8 @@ void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
   scene = nullptr;
   timelines.clear();
+  defaultTimeline = nullptr;
+  defaultAnimation = nullptr;
   lastRecording = nullptr;
   lastAnimationTimeMs = -1.0;
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -147,17 +149,23 @@ void PAGXView::buildLayers() {
   if (scene == nullptr) {
     return;
   }
-  // Drive every top-level animation, not just the first one. A PAGX document may declare several
-  // independent animations (e.g. one per animated element); the CLI renderer plays them all via
-  // getTimelineIds(), so the viewer must do the same or only the first animation would appear to
-  // play.
+  defaultTimeline = scene->getDefaultTimeline();
+  defaultAnimation = nullptr;
+  if (defaultTimeline != nullptr && defaultTimeline->type() == TimelineType::Animation) {
+    defaultAnimation = std::static_pointer_cast<PAGAnimation>(defaultTimeline);
+  }
+  // Collect every top-level animation other than the default one. A PAGX document (notably an
+  // HTML-imported one) may declare several independent animations (e.g. one per animated element);
+  // the default animation is driven with play/loop gating below, while these extras are advanced
+  // alongside it so all animated elements play instead of only the first.
   timelines.clear();
-  for (const auto& id : scene->getTimelineIds()) {
-    auto timeline = scene->getTimeline(id);
-    if (timeline != nullptr) {
-      timelines.push_back(std::move(timeline));
+  for (const auto& id : scene->getAnimationIds()) {
+    auto animation = scene->getAnimation(id);
+    if (animation != nullptr && animation != defaultAnimation) {
+      timelines.push_back(std::move(animation));
     }
   }
+  playing = true;
   lastAnimationTimeMs = -1.0;
   pagxWidth = scene->width();
   pagxHeight = scene->height();
@@ -175,13 +183,56 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   if (deltaUs <= 0) {
     return;
   }
-  for (const auto& timeline : timelines) {
-    if (timeline != nullptr) {
-      timeline->advanceAndApply(deltaUs);
+  if (playing) {
+    if (defaultAnimation != nullptr) {
+      int64_t duration = defaultAnimation->duration();
+      int64_t before = defaultAnimation->currentTime();
+      // Let the engine advance and wrap according to the file's loop mode; this keeps the in-cycle
+      // motion intact, including PingPong mirroring. The view only overrides what happens at a cycle
+      // boundary based on loopEnabled, so the file's loop flag never dictates repeat vs stop.
+      bool changed = defaultAnimation->advanceAndApply(deltaUs);
+      int64_t after = defaultAnimation->currentTime();
+      if (!changed) {
+        // A Once file clamps at the last frame and stops changing. Rewind to the head either way;
+        // when looping keep playing for the next cycle, otherwise park on the first frame so a
+        // finished single pass resets to the start instead of freezing on the last frame.
+        if (duration > 0) {
+          defaultAnimation->setCurrentTime(0);
+          defaultAnimation->apply();
+        }
+        if (!loopEnabled) {
+          playing = false;
+        }
+      } else if (!loopEnabled && duration > 0 && after < before) {
+        // A Loop/PingPong file wrapped or reversed past the end while the user wants a single pass.
+        // Forward motion is monotonic until the boundary, so the first backward step marks one
+        // completed pass: rewind to the first frame and stop there. For PingPong this counts the
+        // forward half as the single pass and stops as soon as it reaches the end, so the mirrored
+        // return half is not played — "single pass" is inherently ambiguous for PingPong and this
+        // is the accepted tradeoff.
+        defaultAnimation->setCurrentTime(0);
+        defaultAnimation->apply();
+        playing = false;
+      }
+    } else if (defaultTimeline != nullptr) {
+      // Non-animation timelines (state machines) have no seekable duration to gate; drive as-is.
+      defaultTimeline->advanceAndApply(deltaUs);
     }
-  }
-  if (scene != nullptr) {
-    scene->advanceAndApply(deltaUs);
+    // Drive the remaining top-level animations alongside the default so multi-animation documents
+    // (e.g. HTML imports) play every animated element. These follow the same play gate but are not
+    // subject to the single-pass loop gating above, which only governs the default animation's
+    // progress-bar semantics.
+    for (const auto& timeline : timelines) {
+      if (timeline != nullptr) {
+        timeline->advanceAndApply(deltaUs);
+      }
+    }
+    // Drive the scene inside the playing gate so pausing freezes the whole picture: this advances
+    // the auto-playing nested compositions, which would otherwise keep animating (and keep
+    // hasContentChanged() true) even while the top-level animation is paused.
+    if (scene != nullptr) {
+      scene->advanceAndApply(deltaUs);
+    }
   }
 }
 
@@ -453,6 +504,65 @@ void PAGXView::updateAdaptiveTileRefinement() {
       scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
     }
   }
+}
+
+void PAGXView::play() {
+  playing = true;
+}
+
+void PAGXView::pause() {
+  playing = false;
+}
+
+bool PAGXView::isPlaying() const {
+  return playing;
+}
+
+int64_t PAGXView::currentTimeMicros() const {
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->currentTime();
+  }
+  return 0;
+}
+
+int64_t PAGXView::durationMicros() const {
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->duration();
+  }
+  return 0;
+}
+
+float PAGXView::frameRate() const {
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->frameRate();
+  }
+  return 0.0f;
+}
+
+// Known limitation: seek only repositions the default (top-level) animation. Nested
+// auto-playing compositions rendered by `scene` are delta-driven via advanceAndApply() and have
+// no absolute-time entry point, so their frame lags behind the main timeline after a scrub:
+// the main animation jumps to `micros` while the nested compositions stay wherever their
+// accumulated delta left them. Acceptable for the MVP viewer; a future fix would need per-scene
+// seek support (or a full scene rebuild) rather than a workaround here.
+void PAGXView::setCurrentTimeMicros(int64_t micros) {
+  if (defaultAnimation != nullptr) {
+    defaultAnimation->setCurrentTime(micros);
+    // setCurrentTime only moves the playhead; apply() is required to reflect it in the content.
+    // Force a present so a manual seek (e.g. dragging the progress bar while paused) updates the
+    // frame immediately instead of being skipped by the idle dirty gate in draw().
+    defaultAnimation->apply();
+    lastAnimationTimeMs = -1.0;
+    presentImmediately = true;
+  }
+}
+
+void PAGXView::setLoop(bool loop) {
+  loopEnabled = loop;
+}
+
+bool PAGXView::isLoop() const {
+  return loopEnabled;
 }
 
 }  // namespace pagx

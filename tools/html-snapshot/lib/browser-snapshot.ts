@@ -39,6 +39,14 @@
 // @ts-nocheck
 
 import { DROP_TAG_NAMES_JSON } from './dom-tags';
+// Imported under a distinct name because the value is only embedded as a
+// literal into PAYLOAD_CONSTANTS_SRC below (Node side). The browser-scope
+// `MAX_CAPTURE_HEIGHT_PX` that `snapshotMain` references is the const defined
+// there — keeping the names apart stops tsc from rewriting `snapshotMain`'s
+// reference to `common_1.MAX_CAPTURE_HEIGHT_PX`, which would be undefined once
+// the function is stringified into the browser payload (same pattern as
+// DROP_TAG_NAMES_JSON → the browser-scope DROP_TAGS Set).
+import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 
 /* eslint-disable no-undef, no-inner-declarations */
 
@@ -98,9 +106,15 @@ function normalizeBackgroundImage(value) {
   }
   const trimmed = value.trim();
   if (/^url\(/i.test(trimmed)) {
-    const m = /^url\(\s*(['"]?)([^'")]+)\1\s*\)$/i.exec(trimmed);
+    const m = /^url\(\s*([\s\S]*?)\s*\)$/i.exec(trimmed);
     if (!m) return '';
-    let url = m[2];
+    let url = m[1].trim();
+    if (url[0] === '"' || url[0] === "'") {
+      if (url.length < 2 || url[url.length - 1] !== url[0]) return '';
+      url = url.slice(1, -1);
+    } else if (/[\s'"]/.test(url)) {
+      return '';
+    }
     if (/^file:/i.test(url)) {
       try {
         const u = new URL(url);
@@ -111,7 +125,19 @@ function normalizeBackgroundImage(value) {
         return '';
       }
     }
-    return `url("${url.replace(/"/g, "'")}")`;
+    // Emit a SINGLE-quoted url() so the value embeds safely inside the
+    // double-quoted `style="…"` attribute the snapshot writes. The <body>
+    // background path pushes this value verbatim (it does not route through
+    // `appendStyleProp`, which is the only place that rewrites embedded double
+    // quotes), so a double-quoted url() here would prematurely close the style
+    // attribute and break the importer's XML parse. CSS treats url("…") and
+    // url('…') as equivalent, and the importer's ExtractCssUrl strips either
+    // quote style, so single quotes round-trip cleanly. Escape backslashes and
+    // embedded single quotes for the CSS string; rewrite double quotes so none
+    // can close the surrounding HTML attribute. ExtractCssUrl reverses these
+    // simple CSS escapes when the snapshot is imported.
+    const escaped = url.replace(/\\/g, '\\\\').replace(/"/g, "'").replace(/'/g, "\\'");
+    return `url('${escaped}')`;
   }
   if (/url\(/i.test(value)) return '';
   return '';
@@ -141,18 +167,17 @@ function normalizeMaskImage(value) {
   return normalizeBackgroundImage(value);
 }
 
-// PAGX models `clip-path` only as a reference to a <clipPath> def (`url(#id)`),
-// which the importer turns into a contour mask layer. Chromium reports a `url()`
-// reference verbatim as `url("#id")`; this filter keeps those untouched. The
-// geometric forms (`inset()`, `circle()`, `ellipse()`, `polygon()`, `path()`)
-// are NOT handled here — they are converted into a synthesized `<clipPath>` def
-// (and rewritten to `url(#id)`) by `appendGeometricClipPath`, which needs the
-// element's box dimensions to resolve `%` / `calc()` into pixels. `none` and any
-// non-url value collapse to '' so STYLE_SCHEMA's `defaults` filter drops the
-// blind copy; the geometric synthesis then runs separately in `buildStyle`.
+// PAGX rebuilds `clip-path` into a contour mask layer, either from a `url(#id)`
+// reference to a <clipPath> def (Chromium reports it verbatim as `url("#id")`) or
+// from a CSS basic shape — `polygon()`, `path()`, `circle()`, `ellipse()`,
+// `inset()` — which the importer synthesises into equivalent SVG geometry in the
+// masked box's local space. Both forms are kept; other values (`none`, `shape()`,
+// unknown functions) collapse to '' so STYLE_SCHEMA's `defaults` filter drops the
+// property entirely.
 function normalizeClipPath(value) {
   if (!value) return '';
-  return /^url\(/i.test(value.trim()) ? value.trim() : '';
+  const trimmed = value.trim();
+  return /^(url|polygon|path|circle|ellipse|inset)\(/i.test(trimmed) ? trimmed : '';
 }
 
 // Format a number for SVG geometry: round to sub-pixel precision and drop a
@@ -1530,6 +1555,36 @@ function roundedUniformBorderSvg(computed, width, height) {
     `width="${px(W)}" height="${px(H)}" viewBox="0 0 ${roundPx(W)} ${roundPx(H)}">${paths}</svg>`;
 }
 
+// Emit one inline <svg> for a single dashed / dotted border side so the
+// importer reproduces the dash pattern. A plain background-color <div> (used
+// for solid sides) would flatten a dashed/dotted divider into a solid strip.
+// The line is stroked down the centre of the side's overlay rectangle with a
+// dash pattern matching the importer's uniform-border proportions (dashed:
+// dash 2×width, gap 1×width; dotted: zero-length dashes with a round cap so
+// each becomes a dot of diameter width, spaced 1×width apart).
+function dashedBorderSideSvg(side, width, height, b) {
+  const t = b.width;
+  const half = t / 2;
+  let d;
+  if (side === 'top') {
+    d = `M 0 ${roundPx(half)} L ${roundPx(width)} ${roundPx(half)}`;
+  } else if (side === 'bottom') {
+    d = `M 0 ${roundPx(height - half)} L ${roundPx(width)} ${roundPx(height - half)}`;
+  } else if (side === 'left') {
+    d = `M ${roundPx(half)} 0 L ${roundPx(half)} ${roundPx(height)}`;
+  } else {
+    d = `M ${roundPx(width - half)} 0 L ${roundPx(width - half)} ${roundPx(height)}`;
+  }
+  const dotted = b.style === 'dotted';
+  const cap = dotted ? 'round' : 'butt';
+  const dash = dotted ? `0 ${roundPx(2 * t)}` : `${roundPx(2 * t)} ${roundPx(t)}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; ` +
+    `left: 0px; top: 0px; width: ${px(width)}; height: ${px(height)}; pointer-events: none" ` +
+    `width="${px(width)}" height="${px(height)}" viewBox="0 0 ${roundPx(width)} ${roundPx(height)}">` +
+    `<path d="${d}" fill="none" stroke="${b.color.trim()}" stroke-width="${px(t)}" ` +
+    `stroke-linecap="${cap}" stroke-dasharray="${dash}"/></svg>`;
+}
+
 // Returns an array of HTML strings — one absolutely-positioned <div> per
 // non-zero border side — to overlay onto the host box. Used when the element
 // has an asymmetric border (e.g. `border-bottom: 1px solid #e5e7eb` on a list
@@ -1551,10 +1606,15 @@ function borderOverlayHTML(computed, width, height) {
   for (const side of SIDES) {
     const b = readBorderSide(computed, side);
     if (b.width <= 0) continue;
-    // The subset has no model for dashed/dotted/double per-side borders.
-    // Downgrade them to solid: it's an approximation but preserves the
-    // visual divider, which is what the page actually wanted.
     if (b.style === 'none' || b.style === 'hidden') continue;
+    if (colorAlpha(b.color) <= 0) continue;
+    // `dashed` / `dotted` sides are stroked as an inline <svg> line so the dash
+    // pattern survives; a solid background-color <div> would flatten them into a
+    // continuous strip. Other styles (`double`, `groove`, …) fall back to solid.
+    if (b.style === 'dashed' || b.style === 'dotted') {
+      out.push(dashedBorderSideSvg(side, width, height, b));
+      continue;
+    }
     const r = SIDE_OVERLAY[side](width, height, b.width);
     out.push(`<div style="position: absolute; left: ${px(r.left)}; top: ${px(r.top)}; ` +
       `width: ${px(r.w)}; height: ${px(r.h)}; background-color: ${b.color.trim()}"></div>`);
@@ -2618,6 +2678,80 @@ function isFlexLayoutFaithful(children, computed) {
   return true;
 }
 
+// The single cross-axis alignment a flex container will serialise to — the
+// value collectFlexProps() would emit (or the subset default `stretch` when
+// the source keyword is `stretch` / `baseline` / any value outside the
+// subset). PAGX's container layout has no per-child `align-self`, so this one
+// keyword is all that survives; `isFlexCrossAxisFaithful` checks it actually
+// reproduces every child's painted cross-axis position.
+function effectiveFlexAlignItems(computed) {
+  const align = computed.getPropertyValue('align-items').trim();
+  const alignNorm = ALIGN_ITEMS_ALIAS.get(align) || align;
+  if (alignNorm && ALIGN_ITEMS_OK.has(alignNorm) && alignNorm !== 'stretch') {
+    return alignNorm;
+  }
+  return 'stretch';
+}
+
+// Cross-axis margins of a flex item on the container's cross axis. Element
+// items forward their margins verbatim via buildStyle(); anonymous text items
+// carry none, so the faithfulness check must add these back before comparing
+// the child's painted cross-axis position to the alignment prediction.
+function flexItemCrossMargins(child, isRow) {
+  if (child.kind !== 'element') return { low: 0, high: 0 };
+  const m = readMargin(child.computed);
+  return isRow ? { low: m.top, high: m.bottom } : { low: m.left, high: m.right };
+}
+
+// Verify that re-aligning `children` with the container's single serialised
+// `align-items` (see effectiveFlexAlignItems) would land them on the cross
+// axis where the browser actually painted them. PAGX has no per-child
+// `align-self`, so a container whose children were individually shifted with
+// `align-self` (or aligned by text baseline, etc.) cannot be reproduced as a
+// flat flex container — emitting one would collapse every child onto the same
+// cross-axis edge. Bailing here keeps the exact painted pixels via absolute
+// positioning at the cost of one fewer flex container.
+//
+// Tolerance matches isFlexLayoutFaithful (1.5px) so sub-pixel rounding from
+// getBoundingClientRect is absorbed while a real align-self shift is caught.
+function isFlexCrossAxisFaithful(el, computed, children) {
+  const direction = computed.getPropertyValue('flex-direction').trim() || 'row';
+  const isRow = !direction.startsWith('column');
+  const rect = el.getBoundingClientRect();
+  const pad = readPadding(computed);
+  let contentLow;
+  let contentHigh;
+  if (isRow) {
+    contentLow = rect.top + borderWidthOf(computed, 'top') + pad.top;
+    contentHigh = rect.bottom - borderWidthOf(computed, 'bottom') - pad.bottom;
+  } else {
+    contentLow = rect.left + borderWidthOf(computed, 'left') + pad.left;
+    contentHigh = rect.right - borderWidthOf(computed, 'right') - pad.right;
+  }
+  const effective = effectiveFlexAlignItems(computed);
+  const TOLERANCE = 1.5;
+  for (const child of children) {
+    const r = child.rect;
+    if (!r) continue;
+    const lo = isRow ? r.top : r.left;
+    const hi = isRow ? r.bottom : r.right;
+    const m = flexItemCrossMargins(child, isRow);
+    let delta;
+    if (effective === 'flex-end') {
+      delta = hi - (contentHigh - m.high);
+    } else if (effective === 'center') {
+      delta = (lo + hi) / 2 - (contentLow + m.low + contentHigh - m.high) / 2;
+    } else {
+      // flex-start and stretch both anchor the child to the cross-start edge
+      // (stretch additionally grows children without an explicit cross size,
+      // which keeps the start edge unchanged).
+      delta = lo - (contentLow + m.low);
+    }
+    if (Math.abs(delta) > TOLERANCE) return false;
+  }
+  return true;
+}
+
 // Returns a curated list of flex children when `el`'s computed style declares
 // a subset-friendly flex configuration AND its border/wrapping/child shape
 // don't require absolute positioning. `null` means "render as absolute".
@@ -2635,6 +2769,10 @@ function classifyFlexContainer(el, computed) {
   const children = flexItemChildren(el);
   if (!children) return null;
   if (!isFlexLayoutFaithful(children, computed)) return null;
+  // Per-child `align-self` (or baseline alignment) can't be expressed with the
+  // single `align-items` PAGX supports; keep such containers absolute so the
+  // painted cross-axis positions survive.
+  if (!isFlexCrossAxisFaithful(el, computed, children)) return null;
   return children;
 }
 
@@ -2764,6 +2902,25 @@ function renderBoxedReplaced(rect, left, top, computed, opts, inner, extraBoxSty
   return `<div style="${composed}">${inner}${overlays}</div>`;
 }
 
+// Forward an element's author `data-*` attributes onto the emitted markup so the
+// PAGX importer can surface them as layer customData (its `applyLayerAttributes`
+// copies every `data-*` attribute into the layer's `customData`). Returns a string
+// like ` data-id="hero" data-role="cover"` (leading space, ready to splice into a
+// tag) or an empty string. The snapshot pipeline's own bookkeeping attributes
+// (`data-snapshot-*` for inlined image sources / icon-svg ids / materialised-pseudo
+// markers, `data-pagx-*` for importer diagnostics) are internal plumbing and must
+// not leak into the output as user data.
+function forwardDataAttrs(el) {
+  if (!el || typeof el.getAttributeNames !== 'function') return '';
+  let out = '';
+  for (const name of el.getAttributeNames()) {
+    if (name.indexOf('data-') !== 0) continue;
+    if (name.indexOf('data-snapshot-') === 0 || name.indexOf('data-pagx-') === 0) continue;
+    out += ` ${name}="${escapeHtml(el.getAttribute(name) || '')}"`;
+  }
+  return out;
+}
+
 // <img>: wrapper + nested <img> sized to fill it. Asymmetric borders are
 // baked into overlay rectangles painted on top.
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
@@ -2771,7 +2928,8 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const alt = escapeHtml(el.getAttribute('alt') || '');
   const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
   const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit, isSvgSource(src));
-  const inner = `<img src="${escapeHtml(src)}" alt="${alt}" style="${imgStyle}"/>`;
+  const dataAttrs = forwardDataAttrs(el);
+  const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs} style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
 }
 
@@ -3972,7 +4130,18 @@ function render(el, parentRect, opts, precomputed) {
 
 // ===== Main snapshot entry =====
 
-function snapshotMain(opts) {
+// Neutralise the <html>/<body> boxes exactly as baseline.js does before it
+// captures ground truth: zero <body>'s margin/padding, then zero <html>'s
+// margin/padding and force `display: block`. `pagx render` roots at <body> and
+// ignores <html> entirely, so any html-level padding/centring/flex the author
+// applied must not leak into the measured geometry — otherwise the subset's
+// child offsets would be shifted relative to the baseline (which measures with
+// <html> neutralised). Scroll is reset to (0,0) so every `getBoundingClientRect`
+// lands against the document origin rather than the current viewport. Shared by
+// `snapshotMain` and the standalone `measureCanvas` entry so the two always
+// agree on the neutralised layout. Keeping this in lock-step with baseline.js
+// is what makes the two renders comparable.
+function prepareBodyForSnapshot() {
   const body = document.body;
   // Reset the geometric clip-path def registry so a re-run (this function is the
   // registered `takeSnapshot` and may be evaluated more than once per page) does
@@ -3983,24 +4152,31 @@ function snapshotMain(opts) {
   body.style.margin = '0';
   body.style.padding = '0';
   // Make <body> a containing block before any measurement runs. The output
-  // <style> block below pins `body{position:relative}` so that the emitted
-  // `position: absolute` children resolve against the body's box; without
-  // mirroring that on the LIVE document here, the source page (where <body>
-  // is `position: static` by default) resolves `right`/`bottom` anchors of
-  // absolute children against the initial containing block — i.e. the
-  // puppeteer viewport (typically 1400x900). `getBoundingClientRect()` then
-  // reports those viewport-anchored coordinates, the snapshot writes them
-  // into the subset as plain `left`/`top` px values, and the importer
-  // interprets them in the body's coordinate system — pushing every
-  // right/bottom-anchored element far off the captured canvas. Setting
-  // `position: relative` here re-anchors the live containing block to <body>
-  // so the live measurements and the emitted subset share one origin.
+  // <style> block pins `body{position:relative}` so that the emitted
+  // `position: absolute` children resolve against the body's box; mirror that on
+  // the LIVE document here so the source page (where <body> is `position: static`
+  // by default) resolves `right`/`bottom` anchors of absolute children against
+  // the body rather than the initial containing block, keeping the live
+  // measurements and the emitted subset on one origin.
   body.style.position = 'relative';
-  // If the page (or the user) scrolled before snapshot, every
-  // `getBoundingClientRect` call returns viewport-relative offsets shifted
-  // by the scroll position. Reset to (0,0) so that the body's own rect
-  // lands at the origin and every nested rect is measured against the
-  // document, not the current viewport.
+  const docEl = document.documentElement;
+  if (docEl && docEl.style) {
+    docEl.style.margin = '0';
+    docEl.style.padding = '0';
+    docEl.style.display = 'block';
+  }
+  // Force the scroll reset to be instant. A page that sets
+  // `html { scroll-behavior: smooth }` (increasingly common) turns the
+  // `window.scrollTo(0, 0)` below into an ASYNCHRONOUS animation: it does not
+  // jump to the origin, it eases there over several hundred ms. The very next
+  // `getBoundingClientRect` / `body.offsetHeight` runs mid-animation while the
+  // page is still scrolled down, so every element's measured `top` is offset by
+  // the residual scroll (e.g. a whole page rendered at `top: -1542px`, with a
+  // matching blank band at the bottom of the canvas). Overriding
+  // `scroll-behavior: auto !important` on <html> and <body> makes the reset the
+  // synchronous jump this function assumes.
+  if (docEl && docEl.style) docEl.style.setProperty('scroll-behavior', 'auto', 'important');
+  if (body && body.style) body.style.setProperty('scroll-behavior', 'auto', 'important');
   if (typeof window.scrollTo === 'function') {
     try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
   }
@@ -4043,40 +4219,80 @@ function snapshotMain(opts) {
   } catch (_) { /* ignore */ }
   // Force layout flush.
   void body.offsetHeight;
+}
 
-  // Pick canvas size from the body itself. We deliberately do NOT consult
-  // `document.documentElement.scrollWidth/scrollHeight` here — the root
-  // element is sized to the viewport whenever the body is smaller, so a
-  // phone-sized mock (`<body style="width: 375px; height: 812px">`) would
-  // otherwise be inflated to the puppeteer viewport (1400x900) and rendered
-  // as a tiny island in the top-left corner. `body.scrollWidth/scrollHeight`
-  // already includes any child content that overflows past the body's
-  // declared size, so it correctly captures both fixed-size mocks and fluid
-  // pages whose content extends past the viewport.
-  //
-  // Caller may override the auto-measured size by passing `{ canvasWidth,
-  // canvasHeight }`. The runSnapshot pipeline uses this when it has just
-  // resized the viewport to a previously-measured (W, H) so a script-driven
-  // resize handler (e.g. a `fit() { stage.transform = scale(min(w/W, h/H)) }`
-  // that also calls a follow-up `alignWeapons()` that writes into the layout)
-  // does not reflow the page into a *new* size that would make `body.
-  // scrollWidth` here disagree with the value baseline-frames.js / pagx
-  // render are using as the canvas. Without the override the second resize
-  // pass keeps drifting (1400x900 -> 1660x990 -> 1790x1035 -> ...) and the
-  // PNGs land at different sizes.
+// Neutralise the page and return the canvas dimensions the subset will use.
+// Exposed as its own entry (see `MEASURE_CANVAS_EXPR`) so the snapshot runner
+// can resize the browser viewport to this canvas *before* it measures element
+// geometry — matching baseline.js, which resizes to the same box before it
+// screenshots. Without that resize, any element whose containing block is the
+// initial containing block (a `position: absolute` box anchored by
+// `right`/`bottom` with no positioned ancestor, `position: fixed`, or a
+// `vw`/`vh` length) would resolve against the default 1400x900 viewport and
+// land at coordinates the body-rooted `pagx render` can't reproduce.
+//
+// We deliberately do NOT consult `document.documentElement.scrollWidth/
+// scrollHeight` here — the root element is sized to the viewport whenever the
+// body is smaller, so a phone-sized mock (`<body style="width: 375px; height:
+// 812px">`) would otherwise be inflated to the viewport and rendered as a tiny
+// island in the top-left corner. `body.scrollWidth/scrollHeight` already
+// includes any child content that overflows past the body's declared size, so
+// it correctly captures both fixed-size mocks and fluid pages whose content
+// extends past the viewport.
+function measureCanvas() {
+  prepareBodyForSnapshot();
+  const body = document.body;
   const bodyRect = body.getBoundingClientRect();
-  const measuredWidth = Math.max(body.scrollWidth, Math.round(bodyRect.width));
-  const measuredHeight = Math.max(body.scrollHeight, Math.round(bodyRect.height));
-  const overrideW = opts && typeof opts.canvasWidth === 'number' && opts.canvasWidth > 0
-    ? opts.canvasWidth : 0;
-  const overrideH = opts && typeof opts.canvasHeight === 'number' && opts.canvasHeight > 0
-    ? opts.canvasHeight : 0;
-  const canvasWidth = overrideW || measuredWidth;
-  const canvasHeight = overrideH || measuredHeight;
+  const width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
+  // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
+  // (embedded as a literal in PAYLOAD_CONSTANTS_SRC) keeps the output renderable
+  // and matches the same clamp baseline.js applies, so the two stay aligned.
+  const height = Math.min(
+    MAX_CAPTURE_HEIGHT_PX,
+    Math.max(body.scrollHeight, Math.round(bodyRect.height)),
+  );
+  return { width, height };
+}
 
+function snapshotMain(opts) {
+  opts = opts || {};
+  // Neutralise the page and measure the canvas. When the runner has already
+  // resized the viewport to the canvas (the normal split-payload path) it
+  // passes the dimensions it measured *before* the resize via
+  // `opts.canvasWidth/canvasHeight`; we honour those so the emitted canvas
+  // matches the baseline's screenshot clip exactly, since re-measuring after
+  // the resize's reflow could drift by a pixel. Standalone callers (the
+  // browser bundle) pass nothing and we fall back to the fresh measurement.
+  const measured = measureCanvas();
+  const body = document.body;
+  const canvasWidth = (typeof opts.canvasWidth === 'number' && opts.canvasWidth > 0)
+    ? opts.canvasWidth : measured.width;
+  const canvasHeight = (typeof opts.canvasHeight === 'number' && opts.canvasHeight > 0)
+    ? opts.canvasHeight : measured.height;
+
+  // Measure the body's children against the canvas origin (0,0), NOT against
+  // `bodyRect`. When a block child's vertical margin collapses through the
+  // body (CSS parent/first-child margin collapsing: no border/padding/BFC
+  // separates them), the collapsed margin is hoisted ABOVE the body, so
+  // `bodyRect.top` is pushed down by that amount while the child's own rect
+  // stays pinned to the body edge — the rect difference then reads 0 and the
+  // visual gap is lost (e.g. `margin: 20px auto` centred a box horizontally
+  // but dropped its 20px top offset). The baseline captures from the canvas
+  // origin with the body's background propagated into that hoisted-margin
+  // band, and `pagx render` roots the body at (0,0), so anchoring children at
+  // the canvas origin reproduces the collapsed margin as leading space and
+  // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
+  // here (block body, zeroed margin), so the horizontal axis is unaffected.
+  const rootOrigin = {
+    left: 0, top: 0,
+    right: canvasWidth, bottom: canvasHeight,
+    width: canvasWidth, height: canvasHeight,
+    x: 0, y: 0,
+  };
   const parts = [];
   for (const c of body.children) {
-    parts.push(render(c, bodyRect));
+    parts.push(render(c, rootOrigin));
   }
 
   const title = (document.title || '').trim();
@@ -4189,6 +4405,8 @@ ${clipDefsSvg}${parts.join('')}
 const PAYLOAD_CONSTANTS_SRC = `
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
+const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
+
 const BOUNDARY_SPACE = '\\u00a0';
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
@@ -4237,6 +4455,11 @@ const STYLE_SCHEMA = [
   { prop: 'background-color', scope: 'box',  defaults: ['rgba(0, 0, 0, 0)', 'transparent'] },
   { prop: 'background-image', scope: 'box',  defaults: ['none'], normalize: normalizeBackgroundImage },
   { prop: 'background-clip',  scope: 'box',  defaults: ['border-box'], normalize: normalizeBackgroundClip },
+  // background-blend-mode blends an element's background layers (image/gradient over
+  // background-color) among themselves. The importer maps a non-default value onto the
+  // gradient/image Fill's blendMode and keeps the background-color Fill underneath so the
+  // blend has a backdrop (the inverse of a plain opaque gradient that would hide the colour).
+  { prop: 'background-blend-mode', scope: 'box', defaults: ['normal'] },
   { prop: 'border-radius',    scope: 'box',  defaults: ['0px', '0px 0px 0px 0px'], normalize: normalizeBorderRadius },
   { prop: 'overflow',         scope: 'box',  defaults: ['visible'], normalize: normalizeOverflow },
   { prop: 'opacity',          scope: 'box',  defaults: ['1'] },
@@ -4253,8 +4476,9 @@ const STYLE_SCHEMA = [
   { prop: 'mask-image',       scope: 'box',  defaults: ['none'], normalize: normalizeMaskImage },
   // clip-path: url(#id) references a hidden clipPath def the snapshot keeps as an
   // inline svg; the importer resolves the def into a contour mask layer (the
-  // inverse of HTMLWriter::writeClipDef). Geometric clip-path forms (inset/ellipse)
-  // are out of subset and collapse to '' so the defaults filter drops them.
+  // inverse of HTMLWriter::writeClipDef). CSS basic shapes (polygon/path/circle/
+  // ellipse/inset) are also kept and rebuilt into the same contour mask by the
+  // importer; other clip-path values collapse to '' so the defaults filter drops them.
   { prop: 'clip-path',        scope: 'box',  defaults: ['none'], normalize: normalizeClipPath },
   { prop: 'color',                 scope: 'text', defaults: ['rgb(0, 0, 0)'] },
   { prop: 'font-family',           scope: 'text', normalize: normalizeFontFamily },
@@ -4347,6 +4571,7 @@ const HELPER_FNS = [
   buildStyle,
   readCornerRadii,
   roundedUniformBorderSvg,
+  dashedBorderSideSvg,
   borderOverlayHTML,
   colorAlpha,
   transformOriginXY,
@@ -4386,10 +4611,14 @@ const HELPER_FNS = [
   isMultiLineTextLeafItem,
   flexItemChildren,
   isFlexLayoutFaithful,
+  effectiveFlexAlignItems,
+  flexItemCrossMargins,
+  isFlexCrossAxisFaithful,
   classifyFlexContainer,
   renderSvg,
   renderInlineIconSvg,
   renderBoxedReplaced,
+  forwardDataAttrs,
   renderImg,
   renderCanvas,
   renderTextInput,
@@ -4401,6 +4630,8 @@ const HELPER_FNS = [
   renderContainer,
   renderChildrenInto,
   render,
+  prepareBodyForSnapshot,
+  measureCanvas,
   snapshotMain,
 ];
 
@@ -4429,23 +4660,23 @@ ${HELPERS_SRC}
 ${PAYLOAD_CONSTANTS_SRC}
 window.__pagxSnapshot = {
   takeSnapshot: snapshotMain,
+  measureCanvas: measureCanvas,
 };
 })();`;
 
 // Entry expression matching SNAPSHOT_INIT_SCRIPT. Compact enough that the
 // CDP roundtrip per snapshot is bounded by the protocol overhead, not the
-// payload size.
+// payload size. Callers that resized the viewport pass the pre-resize canvas
+// back in via `takeSnapshot({ canvasWidth, canvasHeight })` (see
+// snapshot-runner.ts); this no-arg form re-measures.
 const TAKE_SNAPSHOT_EXPR = '(() => window.__pagxSnapshot.takeSnapshot())()';
 
-// Same as TAKE_SNAPSHOT_EXPR but forwards a caller-supplied canvas hint
-// `{canvasWidth, canvasHeight}` so script-driven layout reflow during the
-// run (a `fit()` resize handler chained with `alignWeapons()`-style follow-
-// ups) does not move the canvas size out from under the rest of the
-// pipeline.
-function buildTakeSnapshotExprWithHint(canvasWidth, canvasHeight) {
-  return '(() => window.__pagxSnapshot.takeSnapshot({canvasWidth:' +
-    String(canvasWidth) + ',canvasHeight:' + String(canvasHeight) + '}))()';
-}
+// Entry expression for the standalone canvas measurement. The runner evaluates
+// this first (it neutralises <html>/<body> and returns the body canvas size),
+// resizes the viewport to the result, then evaluates the parametrised
+// `takeSnapshot({...})` form so element geometry is measured against a viewport
+// equal to the canvas — the same box baseline.js screenshots.
+const MEASURE_CANVAS_EXPR = '(() => window.__pagxSnapshot.measureCanvas())()';
 
 // ===== Pre-snapshot pass: inline external <img> sources =====
 
@@ -4726,6 +4957,7 @@ async function materializeDecorativePseudoElements() {
     'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
     'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
     'background-color', 'background-image', 'background-clip',
+    'background-blend-mode',
     'background-size', 'background-repeat', 'background-position',
     'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
     'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
@@ -4768,6 +5000,7 @@ async function materializeDecorativePseudoElements() {
     ['background-color', 'rgba(0, 0, 0, 0)'],
     ['background-image', 'none'],
     ['background-clip', 'border-box'],
+    ['background-blend-mode', 'normal'],
     ['background-size', 'auto'],
     ['background-repeat', 'repeat'],
     ['background-position', '0% 0%'],
@@ -4976,7 +5209,7 @@ export {
   takeSnapshot,
   SNAPSHOT_INIT_SCRIPT,
   TAKE_SNAPSHOT_EXPR,
-  buildTakeSnapshotExprWithHint,
+  MEASURE_CANVAS_EXPR,
   inlineExternalImages,
   inlineCanvases,
   materializeDecorativePseudoElements,
@@ -4988,6 +5221,9 @@ export {
   pagxEvalLengthPx,
   pagxParseClipShape,
   pagxClipPathInnerMarkup,
+  dashedBorderSideSvg,
+  forwardDataAttrs,
+  normalizeBackgroundImage,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };

@@ -31,6 +31,13 @@ struct PAGXOptimizerOptions {
   bool downgradeShellChildren = true;
   /** Merge runs of adjacent shell Layers into a single Layer with one Group per source. */
   bool mergeAdjacentShellLayers = true;
+  /**
+   * Collapse a redundant single-child Layer nest: absorb a child that exactly fills its parent up
+   * into the parent (keeping the parent's frame / clip / effects), or drop a shell parent in favour
+   * of its only child. Removes the double-Layer nesting importers emit for icons, dividers and
+   * other wrapped leaves without changing the rendered result.
+   */
+  bool collapseSingleChildLayers = true;
   /** Unwrap a leading Group child when it has default transform and no painter isolation needed. */
   bool unwrapRedundantFirstGroup = true;
   /** Collapse consecutive Groups with identical painters into a single Group. */

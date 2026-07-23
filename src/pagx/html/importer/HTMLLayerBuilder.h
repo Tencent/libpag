@@ -22,6 +22,7 @@
 #include <string>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
+#include "pagx/types/BlendMode.h"
 
 namespace pagx {
 
@@ -80,8 +81,19 @@ class HTMLLayerBuilder {
   void applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
                             const HTMLBoxAttributes& box);
 
+  /** Copies the element's `data-*` attributes into `layer->customData` (invalid keys and
+   *  conflicting overwrites are warned). Split out from `applyLayerAttributes` so the
+   *  folded-image path — which reuses a parent layer and skips the rest of the layer-attribute
+   *  chain — can still forward the inner `<img>`'s custom data. */
+  void forwardDataAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element);
+
   /** Builds a `Fill` chain whose colour is a single solid `color`. */
   Fill* buildSolidFill(const Color& color);
+
+  /** Maps a CSS `background-blend-mode` value onto a PAGX `BlendMode` (the first top-level
+   *  keyword when a per-layer list is given). Returns `BlendMode::Normal` for an empty,
+   *  `normal`, or unrecognised value. */
+  static BlendMode resolveBackgroundBlendMode(const std::string& value);
 
   /** Resolves a CSS gradient string into a registered gradient node. `boxWidth` / `boxHeight`
    *  are the painted box size in px, used to normalise radial-gradient size/position descriptors;
