@@ -147,6 +147,14 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       }
       auto timeline = std::shared_ptr<PAGAnimation>(
           new PAGAnimation(animation, binding.get(), document, scene));
+      if (animationDriver->evaluationOffset != 0 && animation->frameRate > 0.0f) {
+        // Convert evaluationOffset from frames to microseconds.
+        // Both signs are honored: a positive offset delays content playback (freezes at the first
+        // frame until the offset elapses), a negative offset skips ahead (content starts from that
+        // point).
+        timeline->evaluationOffsetUs =
+            FramesToUs(animationDriver->evaluationOffset, animation->frameRate);
+      }
       if (!animationDriver->playing) {
         pausedTimelineIds.insert(animation->id);
       }
@@ -175,6 +183,23 @@ void PAGComposition::spawnTimelinesFromScene() {
 
 void PAGComposition::resetTimelines() {
   forEachComposition(ResetCompositionTimelines);
+}
+
+void PAGComposition::MarkCompositionTimelinesDirty(PAGComposition* comp) {
+  for (const auto& timeline : comp->timelines) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    if (timeline->type() == TimelineType::Animation) {
+      static_cast<PAGAnimation*>(timeline.get())->targetsDirty = true;
+    } else if (timeline->type() == TimelineType::StateMachine) {
+      static_cast<PAGStateMachine*>(timeline.get())->markInternalTargetsDirty();
+    }
+  }
+}
+
+void PAGComposition::markTimelineTargetsDirty() {
+  forEachComposition(MarkCompositionTimelinesDirty);
 }
 
 void PAGComposition::forEachComposition(void (*visitor)(PAGComposition*)) {
@@ -213,7 +238,7 @@ void PAGComposition::BuildChildren(RuntimeBinding* binding, const std::vector<La
   }
 }
 
-void PAGComposition::CollectChildCompositions(PAGLayer* layer,
+void PAGComposition::CollectChildCompositions(const PAGLayer* layer,
                                               std::vector<PAGComposition*>& outChildren) {
   if (layer == nullptr) {
     return;
@@ -469,6 +494,17 @@ void PAGComposition::updateDataBinds(float mix) {
   CollectChildCompositions(this, childComps);
   for (auto* childComp : childComps) {
     childComp->updateDataBinds(mix);
+  }
+}
+
+void PAGComposition::collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const {
+  if (binding != nullptr) {
+    binding->collectTextHolders(out);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  CollectChildCompositions(this, childComps);
+  for (auto* childComp : childComps) {
+    childComp->collectTextHolders(out);
   }
 }
 

@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/FontConfig.h"
+#include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/Rect.h"
 #include "tgfx/core/Font.h"
@@ -55,6 +56,23 @@ class Element;
 class LayoutContext;
 struct TextLayoutParams;
 class TextLayoutContext;
+
+/**
+ * Pairs a Text node with the shaping attributes to use for it. The node acts as the identity key
+ * for looking up per-Text results (bounds, glyph runs, line metadata); the glyph attributes drive
+ * shaping and may differ from the node's document fields when a runtime holder applies overrides.
+ */
+struct TextElement {
+  Text* node = nullptr;
+  TextGlyphParams glyph = {};
+};
+
+/**
+ * Offsets every glyph position and RSXform translation in the runs by (paddingLeft, paddingTop).
+ * Used by TextBox layout and runtime text reshaping so a reshaped TextBox child stays aligned with
+ * the box inset without duplicating the offset loop at each call site.
+ */
+void ApplyPaddingToRuns(std::vector<TextLayoutGlyphRun>& runs, float paddingLeft, float paddingTop);
 
 struct PositionedGlyph {
   tgfx::GlyphID glyphID = 0;
@@ -147,7 +165,7 @@ class TextLayout {
    * Shapes text, computes line/column breaks, but does not build TextBlob. The caller uses
    * GlyphRunRenderer to convert layout glyph runs to TextBlob with the appropriate inverse matrix.
    */
-  static TextLayoutResult Layout(const std::vector<Text*>& textElements,
+  static TextLayoutResult Layout(const std::vector<TextElement>& textElements,
                                  const TextLayoutParams& params, LayoutContext* context);
 
   /**
@@ -162,6 +180,13 @@ class TextLayout {
   static void CollectTextElements(const std::vector<Element*>& elements,
                                   std::vector<Text*>& outText,
                                   std::vector<tgfx::Matrix>& outMatrices);
+
+  /**
+   * Builds TextElement entries from Text nodes, deriving each node's glyph attributes from its
+   * document fields. Convenience for callers that shape directly from the document (measure/layout
+   * paths) rather than from runtime overrides.
+   */
+  static std::vector<TextElement> MakeElements(const std::vector<Text*>& textNodes);
 };
 
 }  // namespace pagx

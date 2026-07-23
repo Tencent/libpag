@@ -90,6 +90,13 @@ static std::vector<std::string> ParseSourcePath(const std::string& source) {
 void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* context,
                            PAGXDocument* doc, RuntimeBinding* binding) {
   boundBinding = binding;
+  // A null binding means there is no scope to bind against. Without a scope, the contains() check
+  // below would be skipped, so any DataBind (including cross-composition ones) would silently pass
+  // through, defeating the scope filter. Mirrors PAGTimeline::resolveTargets, which also returns
+  // early when its binding is null. All current callers pass a non-null binding.
+  if (binding == nullptr) {
+    return;
+  }
   for (auto* db : binds) {
     if (db == nullptr || context == nullptr || doc == nullptr) {
       continue;
@@ -107,6 +114,14 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     }
     if (targetNode == nullptr) {
       LOGE("DataBind skipped: target '%s' was not found in the document.", db->target.c_str());
+      continue;
+    }
+    // Drop out-of-scope targets. findNode does a flat document-wide lookup, so it can resolve a node
+    // living inside a nested composition; that node is bound in the composition's own binding, not
+    // here, so binding to it would cross the composition boundary (mirrors
+    // PAGTimeline::resolveTargets). The early return above guarantees binding is non-null here.
+    if (!binding->contains(targetNode)) {
+      LOGE("DataBind skipped: target '%s' is outside this binding's scope.", db->target.c_str());
       continue;
     }
     sourceValue->addDependent(this);

@@ -328,6 +328,19 @@ std::shared_ptr<PAGAnimation> PAGStateMachine::createTimelineForState(const Stat
   return std::shared_ptr<PAGAnimation>(new PAGAnimation(anim, binding, contextDoc, owner));
 }
 
+void PAGStateMachine::markInternalTargetsDirty() {
+  for (auto& ri : regions) {
+    if (ri.currentTimeline != nullptr) {
+      ri.currentTimeline->targetsDirty = true;
+    }
+    for (auto& fading : ri.fadingOut) {
+      if (fading.timeline != nullptr) {
+        fading.timeline->targetsDirty = true;
+      }
+    }
+  }
+}
+
 void PAGStateMachine::changeState(RegionInstance& ri, const StateTransition* t) {
   if (t == nullptr) {
     return;

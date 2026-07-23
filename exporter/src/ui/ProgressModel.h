@@ -53,6 +53,9 @@ class ProgressModel : public QObject {
   Q_SIGNAL void exportFailed();
 
  private:
+  Q_SIGNAL void requestAddFinishedSteps(uint64_t value);
+  Q_SLOT void addFinishedStepsInternal(uint64_t value);
+
   ExportStatus status = ExportStatus::Waiting;
   uint64_t totalSteps = 0;
   uint64_t finishedSteps = 0;

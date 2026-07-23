@@ -114,11 +114,12 @@ class PAGAnimation : public PAGTimeline {
   PAGAnimation(Animation* animation, RuntimeBinding* binding, PAGXDocument* contextDoc,
                std::weak_ptr<PAGScene> owner);
 
-  // Resolves each animation object's target node against contextDoc once and caches the
-  // (node, channels) pairs, so apply() avoids a per-frame findNode() hash lookup. Built lazily on
-  // the first apply(). Stale caches are replaced by rebuilding the PAGAnimation (driven by
-  // PAGXDocument::notifyChange when a timeline node is dirty); this cache is never reset in place.
-  void resolveTargets();
+  // Resolves each animation object's target node against contextDoc into the (node, channels)
+  // pairs consumed by apply(). Targets that resolve outside binding's scope (e.g. a document-level
+  // animation pointing at a node living inside a nested composition's separate binding) are dropped
+  // here, keeping the animation from reaching across a composition boundary. apply() reuses the
+  // cached result and only re-runs this when targetsDirty is set.
+  void resolveTargets(const RuntimeBinding* effectiveBinding);
 
   // Owning scene. animation / binding / contextDoc point into content this scene keeps alive, so
   // advance() and apply() bail out once the scene is gone to avoid dereferencing freed memory.
@@ -133,12 +134,23 @@ class PAGAnimation : public PAGTimeline {
   // primary document; timelines spawned by external composition layers use the layer's externalDoc
   // so internal IDs of the external file stay self-contained.
   PAGXDocument* contextDoc = nullptr;
-  // Cached target resolution: each entry pairs a resolved target node with the channels driving
-  // it. Populated by resolveTargets() on first apply(); never reset in place — stale caches are
-  // replaced by rebuilding the PAGAnimation (see resolveTargets()).
+  // Scratch buffer holding the resolved (target node, channels) pairs. Rebuilt by resolveTargets()
+  // only when targetsDirty is set, and reused across frames otherwise; its capacity is retained to
+  // avoid per-frame reallocation.
   std::vector<std::pair<Node*, std::vector<Channel*>>> resolvedTargets = {};
-  bool resolved = false;
-  int64_t currentTimeUs = 0;
+  // Whether resolvedTargets must be rebuilt before the next apply(). Set on construction and when
+  // an incremental tree refresh changes binding membership in place, which keeps this timeline and
+  // its binding pointer so no other signal would trigger a re-resolve.
+  bool targetsDirty = true;
+  // Raw accumulated time in microseconds, not folded by the loop mode. Folding is deferred to
+  // currentTime() and apply() so the content offset can be subtracted on the raw timeline. May be
+  // negative; advance() accumulates, setCurrentTime() clamps to >= 0.
+  int64_t elapsedUs = 0;
+  // Content evaluation offset in microseconds. Set by PAGComposition from the AnimationTimeline
+  // driver's startOffset (frames, converted via the animation's frameRate). Subtracted from raw
+  // elapsedUs before loop folding in apply(). A positive offset delays content; a negative
+  // offset skips ahead.
+  int64_t evaluationOffsetUs = 0;
 
   friend class PAGScene;
   friend class PAGComposition;

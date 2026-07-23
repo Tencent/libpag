@@ -130,6 +130,13 @@ class XMLBuilder {
     return *this;
   }
 
+  XMLBuilder& addAttribute(const char* name, int64_t value, int64_t defaultValue = 0) {
+    if (value != defaultValue) {
+      return attr(name, std::to_string(value).c_str());
+    }
+    return *this;
+  }
+
   XMLBuilder& addAttribute(const char* name, bool value, bool defaultValue = false) {
     if (value != defaultValue) {
       _buf += ' ';

@@ -41,6 +41,7 @@
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
 #include "renderer/LayerBuilder.h"
+#include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -124,8 +125,12 @@ void PAGScene::buildRuntimeTree() {
     if (node != nullptr && node->nodeType() == NodeType::StateMachine) {
       auto* smNode = static_cast<StateMachine*>(node);
       if (instantiatedTimelines.find(smNode) == instantiatedTimelines.end()) {
-        auto instance = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
-            smNode, _rootComposition->binding.get(), document.get(), shared_from_this()));
+        // Construct with a null binding so the state machine's inner PAGAnimation instances resolve
+        // the scene's current root binding lazily at apply time. A user-cached handle then survives
+        // a runtime-tree rebuild (foreign external-doc edit) that replaces _rootComposition and
+        // frees the old binding, instead of dereferencing a dangling binding.
+        auto instance = std::shared_ptr<PAGStateMachine>(
+            new PAGStateMachine(smNode, nullptr, document.get(), shared_from_this()));
         instantiatedTimelines.emplace(smNode, instance);
         _rootComposition->binding->setTarget(
             smNode, std::make_unique<StateMachineInputTarget>(instance, smNode));
@@ -133,6 +138,9 @@ void PAGScene::buildRuntimeTree() {
     }
   }
   buildViewModels();
+  // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
+  // instead of walking the composition tree every frame.
+  collectTextHolders();
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(
@@ -488,8 +496,11 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   if (_rootComposition == nullptr) {
     return nullptr;
   }
-  auto timeline = std::shared_ptr<PAGStateMachine>(new PAGStateMachine(
-      matched, _rootComposition->binding.get(), document.get(), weak_from_this()));
+  // Construct with a null binding so the state machine's inner PAGAnimation instances resolve the
+  // scene's current root binding lazily at apply time, keeping a user-cached handle valid across a
+  // runtime-tree rebuild that frees the old binding (mirrors getAnimation).
+  auto timeline = std::shared_ptr<PAGStateMachine>(
+      new PAGStateMachine(matched, nullptr, document.get(), weak_from_this()));
   instantiatedTimelines.emplace(matched, timeline);
   _rootComposition->binding->setTarget(
       matched, std::make_unique<StateMachineInputTarget>(timeline, matched));
@@ -508,6 +519,7 @@ bool PAGScene::draw(const std::shared_ptr<PAGSurface>& surface, bool autoClear) 
     return false;
   }
   flushDataBinds();
+  flushTextHolders();
   auto& drawable = surface->drawable;
   auto device = drawable->getDevice();
   if (device == nullptr) {
@@ -562,6 +574,25 @@ std::shared_ptr<PAGViewModel> PAGScene::viewModel() const {
 
 void PAGScene::flushDataBinds() {
   if (_rootComposition != nullptr) _rootComposition->updateDataBinds();
+}
+
+void PAGScene::flushTextHolders() {
+  if (document == nullptr) {
+    return;
+  }
+  auto* fontConfig = &document->_fontConfig;
+  for (auto& holder : textHolders) {
+    if (holder != nullptr) {
+      holder->flush(fontConfig);
+    }
+  }
+}
+
+void PAGScene::collectTextHolders() {
+  textHolders.clear();
+  if (_rootComposition != nullptr) {
+    _rootComposition->collectTextHolders(textHolders);
+  }
 }
 
 void PAGScene::clearAllViewModelsDirty() {
@@ -718,6 +749,28 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     std::unordered_set<const Node*> dirtySet(dirtyNodes.begin(), dirtyNodes.end());
     std::unordered_set<const Composition*> visited = {};
     _rootComposition->refreshNodes(dirtyNodes, dirtySet, visited);
+    // refreshNodes may have replaced a binding's textHolders (RefreshLayerInPlace moves a fresh
+    // binding in and back out, rebuilding its holder vector), and syncChildren /
+    // refreshPlainContainerChildren can add or remove child compositions. Re-collect the flat list
+    // from the current tree so flushTextHolders / hasContentChanged stay consistent with the
+    // binding state.
+    collectTextHolders();
+    // An incremental refresh adds or removes layers, changing binding membership in place without
+    // recreating the reused timelines or their binding. Mark every timeline's resolved target cache
+    // stale so the next apply() re-resolves; no other signal covers this case. Top-level
+    // PAGAnimation instances (held in instantiatedTimelines with a lazily-resolved root binding) are
+    // marked separately.
+    _rootComposition->markTimelineTargetsDirty();
+    for (auto& entry : instantiatedTimelines) {
+      if (entry.second == nullptr) {
+        continue;
+      }
+      if (entry.second->type() == TimelineType::Animation) {
+        static_cast<PAGAnimation*>(entry.second.get())->targetsDirty = true;
+      } else if (entry.second->type() == TimelineType::StateMachine) {
+        static_cast<PAGStateMachine*>(entry.second.get())->markInternalTargetsDirty();
+      }
+    }
   }
   // Reset every timeline only when a timeline node changed. Timelines (Animation drivers and the
   // state machines that play them) can share targets and cross-reference, so the whole timeline
@@ -757,7 +810,20 @@ tgfx::DisplayList* PAGScene::getDisplayListForOptions() const {
 }
 
 bool PAGScene::hasContentChanged() const {
-  return displayList != nullptr && displayList->hasContentChanged();
+  if (displayList == nullptr) {
+    return false;
+  }
+  // A pending TextHolder reshape (ViewModel/Animation drove a text-shaping channel) has not yet
+  // touched the tgfx objects — flush runs inside Record(). Without this check the dirty gate would
+  // skip the frame and the reshape would never reach the screen. The flat `textHolders` list is
+  // iterated directly so the common case (no text reshape in the document) costs only a vector
+  // size check.
+  for (const auto& holder : textHolders) {
+    if (holder != nullptr && holder->isDirty()) {
+      return true;
+    }
+  }
+  return displayList->hasContentChanged();
 }
 
 std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
@@ -768,6 +834,7 @@ std::unique_ptr<tgfx::Recording> Record(tgfx::Context* context,
     return nullptr;
   }
   scene->flushDataBinds();
+  scene->flushTextHolders();
   if (!scene->renderTo(surface, context, autoClear)) {
     return nullptr;
   }
