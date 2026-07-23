@@ -10,6 +10,8 @@ const {
   pagxCandidateElements,
   pagxDomCheckpoint,
   pagxDomRestore,
+  pagxSettleAndInlineCanvases,
+  buildCanvasSettlePayload,
   pagxBuildKeyframesIndex,
   pagxCollectWAAPI,
   pagxCollectCSS,
@@ -131,6 +133,146 @@ describe('pagxDomCheckpoint / pagxDomRestore', () => {
 
   test('pagxDomRestore(null) is a no-op', () => {
     expect(() => pagxDomRestore(null)).not.toThrow();
+  });
+});
+
+describe('pagxSettleAndInlineCanvases', () => {
+  // A canvas fake whose bitmap depends on the (virtual) clock: it draws "EMPTY"
+  // at t=0 and "FULL" once the clock has advanced, mimicking an rAF-driven chart
+  // whose entrance animation only completes after time passes.
+  function makeCanvas(clock, overrides) {
+    const map = Object.assign({ class: null, style: null }, overrides || {});
+    return {
+      nodeType: 1,
+      isConnected: true,
+      parentNode: null,
+      width: overrides && 'width' in overrides ? overrides.width : 200,
+      height: overrides && 'height' in overrides ? overrides.height : 100,
+      getAttribute(name) {
+        return Object.prototype.hasOwnProperty.call(map, name) && map[name] != null ? map[name] : null;
+      },
+      setAttribute(name, value) { map[name] = value; },
+      removeAttribute(name) { delete map[name]; },
+      toDataURL() {
+        return clock.getNow() > 0
+          ? 'data:image/png;base64,FULL'
+          : 'data:image/png;base64,EMPTY';
+      },
+    };
+  }
+
+  function installClock(startNow) {
+    const state = { now: startNow, advanceCalls: [], getNow: null };
+    state.getNow = () => state.now;
+    global.window = {
+      __pagxClock: {
+        now: () => state.now,
+        advanceTo: (t) => { state.advanceCalls.push(t); if (t > state.now) state.now = t; },
+      },
+    };
+    return state;
+  }
+
+  test('advances the clock, then inlines the settled (not t=0) bitmap', () => {
+    const clock = installClock(0);
+    const canvas = makeCanvas(clock);
+    global.document = {
+      querySelectorAll: (sel) => (sel === 'canvas' ? [canvas] : []),
+      body: { querySelectorAll: () => [canvas] },
+    };
+
+    const res = pagxSettleAndInlineCanvases(4000);
+
+    expect(res).toEqual({ count: 1 });
+    // Clock was driven forward by the settle budget from its current time.
+    expect(clock.advanceCalls).toEqual([4000]);
+    // The bitmap captured is the settled ("FULL") frame, not the frozen t=0 one.
+    expect(canvas.getAttribute('data-snapshot-canvas-src')).toBe('data:image/png;base64,FULL');
+  });
+
+  test('advances relative to the current clock time (sampler already ran)', () => {
+    const clock = installClock(2500);
+    const canvas = makeCanvas(clock);
+    global.document = {
+      querySelectorAll: (sel) => (sel === 'canvas' ? [canvas] : []),
+      body: { querySelectorAll: () => [canvas] },
+    };
+
+    pagxSettleAndInlineCanvases(4000);
+    expect(clock.advanceCalls).toEqual([6500]);
+  });
+
+  test('restores a trailing scene toggle so the base frame stays at t=0', () => {
+    const clock = installClock(0);
+    const canvas = makeCanvas(clock);
+    // A sibling whose class the settle-time advance would flip; restore must
+    // revert it so the t=0 base frame the snapshot serialises is unchanged.
+    const scene = makeEl({ class: 'scene-a' });
+    global.document = {
+      querySelectorAll: (sel) => (sel === 'canvas' ? [canvas] : []),
+      body: { querySelectorAll: () => [canvas, scene] },
+    };
+    // Emulate the advance mutating the scene (as a fired timer would).
+    const realAdvance = global.window.__pagxClock.advanceTo;
+    global.window.__pagxClock.advanceTo = (t) => {
+      scene.setAttribute('class', 'scene-b');
+      realAdvance(t);
+    };
+
+    pagxSettleAndInlineCanvases(4000);
+
+    expect(canvas.getAttribute('data-snapshot-canvas-src')).toBe('data:image/png;base64,FULL');
+    // Scene class reverted to the checkpoint captured before the advance.
+    expect(scene.getAttribute('class')).toBe('scene-a');
+  });
+
+  test('skips zero-sized canvases and swallows toDataURL failures', () => {
+    const clock = installClock(0);
+    const zero = makeCanvas(clock, { width: 0 });
+    const tainted = makeCanvas(clock);
+    tainted.toDataURL = () => { throw new Error('SecurityError: tainted canvas'); };
+    global.document = {
+      querySelectorAll: (sel) => (sel === 'canvas' ? [zero, tainted] : []),
+      body: { querySelectorAll: () => [zero, tainted] },
+    };
+
+    const res = pagxSettleAndInlineCanvases(4000);
+    expect(res).toEqual({ count: 0 });
+    expect(zero.getAttribute('data-snapshot-canvas-src')).toBeNull();
+    expect(tainted.getAttribute('data-snapshot-canvas-src')).toBeNull();
+  });
+
+  test('returns {count:0} when there are no canvases', () => {
+    installClock(0);
+    global.document = {
+      querySelectorAll: () => [],
+      body: { querySelectorAll: () => [] },
+    };
+    expect(pagxSettleAndInlineCanvases(4000)).toEqual({ count: 0 });
+  });
+
+  test('captures whatever the canvas holds when no virtual clock is present', () => {
+    // getNow() > 0 so the stub canvas returns FULL without any advance.
+    const fakeClock = { getNow: () => 1 };
+    const canvas = makeCanvas(fakeClock);
+    global.window = {}; // no __pagxClock
+    global.document = {
+      querySelectorAll: (sel) => (sel === 'canvas' ? [canvas] : []),
+      body: { querySelectorAll: () => [canvas] },
+    };
+    const res = pagxSettleAndInlineCanvases(4000);
+    expect(res).toEqual({ count: 1 });
+    expect(canvas.getAttribute('data-snapshot-canvas-src')).toBe('data:image/png;base64,FULL');
+  });
+});
+
+describe('buildCanvasSettlePayload', () => {
+  test('emits a self-contained IIFE that calls the settle entry with the budget', () => {
+    const payload = buildCanvasSettlePayload({ settleBudgetMs: 4000 });
+    expect(payload).toContain('function pagxDomCheckpoint');
+    expect(payload).toContain('function pagxDomRestore');
+    expect(payload).toContain('function pagxSettleAndInlineCanvases');
+    expect(payload).toContain('return pagxSettleAndInlineCanvases(4000);');
   });
 });
 

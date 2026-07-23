@@ -18,6 +18,7 @@ import {
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import {
   capturePagxAnimationsOnPage,
+  settleAndInlineCanvasesOnPage,
   PAGX_TRANSITION_INIT_SCRIPT,
   PAGX_ANIM_PAUSE_INIT_SCRIPT,
   PAGX_VIRTUAL_CLOCK_INIT_SCRIPT,
@@ -421,7 +422,16 @@ export async function runSnapshot(
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted
     // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
-    await page.evaluate(inlineCanvases);
+    //
+    // Non-capture path only: the real clock has already let each chart's
+    // entrance animation finish during settle, so a plain t=0 read gets the
+    // settled frame. In animation-capture mode the virtual clock froze rAF at
+    // t=0 (the chart's series has not grown yet), so canvases are settled and
+    // inlined AFTER the sampler instead — see `settleAndInlineCanvasesOnPage`
+    // below. Doing it here too would bake in the empty first frame.
+    if (!captureAnimations) {
+      await page.evaluate(inlineCanvases);
+    }
 
     if (inlineIconFonts) {
       try {
@@ -475,6 +485,18 @@ export async function runSnapshot(
         }
       } catch (err) {
         if (log) log(`animation capture failed: ${errMessage(err)}`);
+      }
+
+      // Now that the sampler has finished seeking the (forward-only) virtual
+      // clock, settle any rAF-driven <canvas> charts frozen at t=0 and inline
+      // their bitmaps as static images. Deferred to here because advancing the
+      // clock before sampling would have collapsed the declarative timeline
+      // (see `settleAndInlineCanvasesOnPage`). Best-effort: on failure the
+      // canvas simply keeps its t=0 (empty) frame, matching prior behaviour.
+      try {
+        await settleAndInlineCanvasesOnPage(page, { logger: log || (() => {}) });
+      } catch (err) {
+        if (log) log(`canvas settle failed: ${errMessage(err)}`);
       }
     }
 

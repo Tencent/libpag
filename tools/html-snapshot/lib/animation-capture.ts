@@ -1707,6 +1707,101 @@ export function pagxDomRestore(cp: {
   }
 }
 
+// Settle rAF-driven <canvas> charts (ECharts, Chart.js, D3-canvas, …) whose
+// entrance animation is frozen at t=0 by the virtual clock, then stash each
+// canvas bitmap on `data-snapshot-canvas-src` (the same attribute the snapshot
+// walker reads to emit the canvas as a static <img>).
+//
+// Why this is a separate pass from browser-snapshot.ts's `inlineCanvases`:
+// when animation capture is on, PAGX_VIRTUAL_CLOCK_INIT_SCRIPT freezes the
+// page's requestAnimationFrame at t=0, so a plain t=0 `toDataURL` captures the
+// chart before its bars/lines have grown — the axes/grid draw synchronously on
+// the first paint but the animated series does not, so the chart round-trips to
+// PAGX empty. PAGX has no canvas model, so the only faithful *static*
+// representation is the settled frame, exactly what the real-clock (non-capture)
+// path already gets after the entrance animation finishes during settle.
+//
+// Must run AFTER the animation sampler (pagxAnimMain), because the virtual clock
+// is forward-only:
+//   - The sampler seeks from t=0 forward to record each declarative animation's
+//     keyframes. Advancing the clock to settle canvases first would push it past
+//     those sample times, so every later seek would no-op and DOM / JS-timeline
+//     animations would be captured static. Settling only after the sampler is
+//     done keeps that timeline intact.
+//   - The sampler already advances the clock across the whole declarative
+//     timeline, so pages that also have DOM animations are usually settled by
+//     now; this pass just guarantees it for canvas-only pages (no CSS/JS
+//     animation → the sampler never advanced the clock at all).
+//
+// A DOM checkpoint/restore brackets the advance so any trailing
+// setTimeout/setInterval scene toggle that fires while running out the canvas
+// animation does not leak into the t=0 base frame the snapshot serialises (the
+// same class/style checkpoint contract pagxAnimMain relies on). Canvas pixels
+// are not part of that checkpoint, so the settled bitmap survives the restore;
+// `data-snapshot-canvas-src` is (re)applied afterward.
+export function pagxSettleAndInlineCanvases(settleBudgetMs: number): { count: number } {
+  let canvases: HTMLCanvasElement[] = [];
+  try {
+    canvases = Array.prototype.slice.call(document.querySelectorAll('canvas'));
+  } catch (_) {
+    canvases = [];
+  }
+  if (canvases.length === 0) return { count: 0 };
+
+  const checkpoint = pagxDomCheckpoint();
+
+  // Advance the forward-only virtual clock so rAF-driven canvas animations run
+  // to completion. advanceTo stops firing as soon as no rAF/timer is due before
+  // the target, so a generous budget is cheap for charts that finish early and
+  // merely caps perpetual rAF loops (e.g. spinner canvases). No-op when the
+  // clock init script was not installed.
+  try {
+    const clock = (window as unknown as {
+      __pagxClock?: { now?: () => number; advanceTo?: (ms: number) => void };
+    }).__pagxClock;
+    if (clock && typeof clock.advanceTo === 'function' && typeof clock.now === 'function') {
+      const budget = (typeof settleBudgetMs === 'number' && settleBudgetMs > 0)
+        ? settleBudgetMs : 4000;
+      clock.advanceTo(clock.now() + budget);
+    }
+  } catch (_) {
+    /* ignore — fall through to whatever the canvas currently holds */
+  }
+
+  // Read each settled bitmap. Mirrors browser-snapshot.ts `inlineCanvases`:
+  // skip zero-sized canvases and swallow tainted-canvas SecurityErrors.
+  const bitmaps: Array<{ canvas: HTMLCanvasElement; dataUri: string }> = [];
+  for (const canvas of canvases) {
+    if (!canvas.width || !canvas.height) continue;
+    let dataUri = '';
+    try {
+      dataUri = canvas.toDataURL('image/png');
+    } catch (_) {
+      continue;
+    }
+    if (!dataUri || dataUri === 'data:,') continue;
+    bitmaps.push({ canvas, dataUri });
+  }
+
+  // Roll the DOM back to the base scene before publishing the bitmaps, so a
+  // trailing scene toggle fired during the advance does not survive into the
+  // snapshot. The restore only touches class/style + appended nodes, never
+  // `data-snapshot-canvas-src`, so applying it afterward is safe.
+  try {
+    pagxDomRestore(checkpoint);
+  } catch (_) {
+    /* ignore */
+  }
+  for (const b of bitmaps) {
+    try {
+      b.canvas.setAttribute('data-snapshot-canvas-src', b.dataUri);
+    } catch (_) {
+      /* ignore this canvas */
+    }
+  }
+  return { count: bitmaps.length };
+}
+
 export function pagxBuildKeyframesIndex(): Record<string, unknown> {
   const idx: Record<string, unknown> = {};
   let sheets: StyleSheet[] = [];
@@ -3407,5 +3502,46 @@ export async function capturePagxAnimationsOnPage(
   } catch (err) {
     logger(`animation capture failed: ${errMessage(err)}`);
     return { count: 0, names: [] };
+  }
+}
+
+// ===== Canvas settle pass (capture-mode only) =====
+
+export interface SettleCanvasesResult {
+  count: number;
+}
+
+// Self-contained IIFE bundling the DOM checkpoint helpers + the canvas settle
+// pass. Mirrors `buildAnimationCapturePayload`.
+export function buildCanvasSettlePayload(opts: { settleBudgetMs: number }): string {
+  const fns = [pagxDomCheckpoint, pagxDomRestore, pagxSettleAndInlineCanvases];
+  const src = fns.map((fn) => fn.toString()).join('\n\n');
+  return `(() => {\n${src}\nreturn pagxSettleAndInlineCanvases(${JSON.stringify(opts.settleBudgetMs)});\n})()`;
+}
+
+// Settle rAF-driven canvas charts frozen by the virtual clock, then inline their
+// bitmaps. Only meaningful in animation-capture mode (the virtual clock is
+// installed): the non-capture path lets the real clock finish the entrance
+// animation during settle and inlines canvases directly. Best-effort — any
+// failure degrades to whatever bitmap the canvas already holds. Mirrors
+// `capturePagxAnimationsOnPage`.
+export async function settleAndInlineCanvasesOnPage(
+  page: Page,
+  opts?: { settleBudgetMs?: number; logger?: (msg: string) => void },
+): Promise<SettleCanvasesResult> {
+  const options = opts || {};
+  const logger = typeof options.logger === 'function' ? options.logger : () => {};
+  try {
+    const payload = buildCanvasSettlePayload({
+      settleBudgetMs: options.settleBudgetMs || 4000,
+    });
+    const result = (await page.evaluate(payload)) as SettleCanvasesResult;
+    if (result && result.count > 0) {
+      logger(`settled + inlined ${result.count} canvas bitmap(s)`);
+    }
+    return result || { count: 0 };
+  } catch (err) {
+    logger(`canvas settle failed: ${errMessage(err)}`);
+    return { count: 0 };
   }
 }
