@@ -1707,20 +1707,20 @@ static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
         key.value = ParseTypedValue<T>(GetAttribute(child.get(), "value"), doc, child.get());
         key.interpolation = ParseKeyframeInterpolation(GetAttribute(child.get(), "interpolation"),
                                                        doc, child.get());
-        auto bezierOut = GetAttribute(child.get(), "bezier-out");
+        auto bezierOut = GetAttribute(child.get(), "bezierOut");
         if (!bezierOut.empty()) {
           bool valid = false;
           key.bezierOut = ParsePoint(bezierOut, &valid);
           if (!valid) {
-            ReportError(doc, child.get(), "Invalid bezier-out value '" + bezierOut + "'.");
+            ReportError(doc, child.get(), "Invalid bezierOut value '" + bezierOut + "'.");
           }
         }
-        auto bezierIn = GetAttribute(child.get(), "bezier-in");
+        auto bezierIn = GetAttribute(child.get(), "bezierIn");
         if (!bezierIn.empty()) {
           bool valid = false;
           key.bezierIn = ParsePoint(bezierIn, &valid);
           if (!valid) {
-            ReportError(doc, child.get(), "Invalid bezier-in value '" + bezierIn + "'.");
+            ReportError(doc, child.get(), "Invalid bezierIn value '" + bezierIn + "'.");
           }
         }
         channel->keyframes.push_back(key);
@@ -1948,8 +1948,8 @@ static StateTransition* ParseTransition(const DOMNode* node, PAGXDocument* doc) 
   auto interp = GetAttribute(node, "interpolation", "linear");
   transition->interpolation = ParseKeyframeInterpolation(interp, doc, node);
   if (transition->interpolation == KeyframeInterpolationType::Bezier) {
-    transition->bezierOut = GetPointAttribute(node, "bezier-out", {0.0f, 0.0f}, doc);
-    transition->bezierIn = GetPointAttribute(node, "bezier-in", {0.0f, 0.0f}, doc);
+    transition->bezierOut = GetPointAttribute(node, "bezierOut", {0.0f, 0.0f}, doc);
+    transition->bezierIn = GetPointAttribute(node, "bezierIn", {0.0f, 0.0f}, doc);
   }
   transition->enableEarlyExit = GetBoolAttribute(node, "earlyExit", false, doc);
   transition->pauseOnExit = GetBoolAttribute(node, "pauseOnExit", false, doc);

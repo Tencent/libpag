@@ -5501,7 +5501,7 @@ PAGX_TEST(PAGXTest, AnimationAllTypesRoundTrip) {
 
 /**
  * Test case: Keyframe interpolation modes (None / Linear / Bezier / Hold)
- * and bezier-in / bezier-out attributes round-trip.
+ * and bezierIn / bezierOut attributes round-trip.
  */
 PAGX_TEST(PAGXTest, KeyframeInterpolationRoundTrip) {
   auto doc = pagx::PAGXDocument::Make(100, 100);

@@ -269,6 +269,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 |-----------|------|---------|-------------|
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
+| `viewModel` | idref | — | ViewModel reference `"@id"` |
 
 **Canvas Clipping**: The canvas defined by `width` and `height` acts as the rendering boundary. Any content extending beyond the canvas area is clipped and not rendered.
 
@@ -485,13 +486,13 @@ Compositions are used for content reuse (similar to After Effects pre-comps).
 |-----------|------|---------|-------------|
 | `width` | float | (required) | Composition width |
 | `height` | float | (required) | Composition height |
+| `viewModel` | idref | — | ViewModel reference `"@id"` |
 
 **Child Elements**:
 
 | Element | Category | Description |
 |---------|----------|-------------|
 | `<Animations>` | animations | Container wrapping `<Animation>` (keyframe timelines) and `<StateMachine>` (state machines) that drive properties on layers within this Composition |
-| `<ViewModel>` | viewModel | ViewModel schema declaring properties available for data binding within this Composition |
 | `<DataBind>` | dataBinds | Bindings connecting ViewModel properties to render node channels |
 
 #### 3.3.5 Font
@@ -515,6 +516,7 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `unitsPerEm` | int | 1000 | Font design space units. Rendering scale = `fontSize / unitsPerEm` |
+| `file` | string | — | External font file path. When set, the Font node references an external TTF/OTF file. Relative paths resolve against the PAGX file's directory. `pagx embed` discovers Font nodes with `file`, loads the fonts, and registers them for text shaping. After embed, `file` is preserved for source traceability while embedded glyph data lives in separate Font nodes. |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
 
@@ -964,7 +966,6 @@ Layer child elements are automatically categorized into five collections by type
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
-| `timelines` | Timeline[] | [] | Timeline entries activated when this layer references a Composition |
 | `vmContext` | string | "" | ViewModel binding context path for resolving DataBind sources |
 | `import` | string | - | External file path to import (see §7) |
 | `importFormat` | string | - | Force import format (see §7) |
@@ -2221,18 +2222,21 @@ Tools that process PAGX files handle unresolved import directives as follows:
 
 PAGX animation system consists of two parts: keyframe-based Animations and input-driven StateMachines. Animations are named timelines composed of objects, channels, and keyframes; StateMachines are state graphs composed of states, transitions, and conditions. Both are declared in the `<Animations>` container and referenced by `<Timelines>` entries on Layers (`<Animation ref="@id"/>` or `<StateMachine ref="@id"/>` drivers) to drive property changes on nodes inside the referenced composition at runtime.
 
-> [Sample](samples/animation.pagx)
-
 ### 8.1 Animation
 
 #### 8.1.1 Animation Overview
 
-`<Animation>` defines a named timeline. It is declared inside an `<Animations>` container (either at the document level or inside a Composition) and identified by `id`, which must be unique within the owning scope. Animations are referenced from a Layer's `<Timelines>` entries via `<Animation ref="@id"/>`.
+`<Animation>` defines a named timeline. It is declared inside an `<Animations>` container (either at the document level or inside a Composition) and identified by `id`, which must be unique within the owning scope. Animations are activated in one of two ways:
+
+- **Top-level scope** — an `<Animations>` container placed directly under the Document or Composition applies its animations to nodes in the same scope without needing `<Timelines>`. This is the simpler pattern when a scope owns its animations.
+- **Layer-driven scope** — a Layer references an external Composition via `composition="@id"` and attaches a `<Timelines>` child element to mount a specific Animation or StateMachine on that instance. This is how animations are bound to nested Compositions.
+
+The `ref` attribute on `<Animation ref="@id"/>` (or `<StateMachine ref="@id"/>`) inside `<Timelines>` selects the timeline to mount.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `id` | string | (required) | Unique identifier, referenced from Layer `<Timelines>` |
-| `duration` | Frame | (required) | Total animation length in frames |
+| `duration` | Frame | 0 | Total animation length in frames |
 | `frameRate` | float | 60 | Frame rate (frames per second) |
 | `loop` | LoopMode | once | Behavior after reaching the end |
 
@@ -2255,7 +2259,7 @@ PAGX animation system consists of two parts: keyframe-based Animations and input
 ```xml
 <Animations>
   <Animation id="fadePulse" duration="60" frameRate="60" loop="loop">
-    <Object target="@statusDot">
+    <Object target="statusDot">
       <Channel name="alpha" type="float">
         <Key time="0" value="0.35" interpolation="linear"/>
         <Key time="30" value="1" interpolation="linear"/>
@@ -2272,7 +2276,7 @@ PAGX animation system consists of two parts: keyframe-based Animations and input
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `target` | string | (required) | The id of the target node, e.g. `"@titleLayer"` |
+| `target` | string | (required) | The id of the target node, e.g. `"titleLayer"` |
 
 **Child Elements**:
 
@@ -2283,7 +2287,7 @@ PAGX animation system consists of two parts: keyframe-based Animations and input
 **Example**: a typical Object with Channel and Key definitions.
 
 ```xml
-<Object target="@slidingBar">
+<Object target="slidingBar">
   <Channel name="x" type="float">
     <Key time="0" value="20" interpolation="bezier"/>
     <Key time="60" value="360" interpolation="bezier"/>
@@ -2292,19 +2296,19 @@ PAGX animation system consists of two parts: keyframe-based Animations and input
 </Object>
 ```
 
-#### 8.1.3 Channel / TypedChannel
+#### 8.1.3 Channel (`<Channel>`)
 
 `<Channel>` defines a property that changes over time on a target node. Each channel carries a `name` (the property to drive, e.g. `"x"`, `"y"`, `"alpha"`, `"visible"`, `"size.width"`, `"position.x"`, or painter channels such as `"color"` on a `Fill` / `Stroke` node) and a list of keyframes stored as `<Key>` child elements.
 
-The `type` attribute specifies the value type this channel carries:
+The `type` attribute specifies the value type this channel carries. The schema enumerates the canonical forms below; the importer additionally accepts these aliases for backward compatibility: `number` (→ `float`), `enum` (→ `int`), `text` (→ `string`), `imageRef` (→ `image`).
 
 | `type` value | Description |
 |--------------|-------------|
-| `float` | Numeric scalar (opacity, scale, rotation, etc.). Also accepts `number` |
+| `float` | Numeric scalar (opacity, scale, rotation, etc.) |
 | `bool` | Boolean toggle |
-| `int` | Integer value. Also accepts `enum` |
-| `string` | Text value. Also accepts `text` |
-| `image` | Image resource reference. Also accepts `imageRef` |
+| `int` | Integer value |
+| `string` | Text value |
+| `image` | Image resource reference |
 | `color` | Color value (RGBA) |
 | `matrix` | 2D transform matrix |
 
@@ -2329,7 +2333,7 @@ A keyframe holds a property value at a specific time, together with how it trans
 |------|-------------|
 | `None` | No interpolation; holds value until the next keyframe (same as Hold) |
 | `Linear` | Linear interpolation between this keyframe and the next |
-| `Bezier` | Cubic bezier easing using `bezier-out` and the next keyframe's `bezier-in` handles |
+| `Bezier` | Cubic bezier easing using `bezierOut` and the next keyframe's `bezierIn` handles |
 | `Hold` | Holds value until the next keyframe, then jumps |
 
 **Key attributes**:
@@ -2339,8 +2343,8 @@ A keyframe holds a property value at a specific time, together with how it trans
 | `time` | Frame | `0` | The frame position of this keyframe |
 | `value` | determined by Channel `type` | type default | The property value at this frame |
 | `interpolation` | KeyframeInterpolationType | `Linear` | How the value transitions to the next keyframe |
-| `bezier-in` | string | — | Cubic bezier ease-in control point, format `"x,y"`; only used in `Bezier` mode |
-| `bezier-out` | string | — | Cubic bezier ease-out control point, format `"x,y"`; only used in `Bezier` mode |
+| `bezierIn` | string | — | Cubic bezier ease-in control point, format `"x,y"`; only used in `Bezier` mode |
+| `bezierOut` | string | — | Cubic bezier ease-out control point, format `"x,y"`; only used in `Bezier` mode |
 
 **ImageRef**: A special value for image-typed properties. It references an image resource by id, allowing keyframes to show different images at different times.
 
@@ -2348,7 +2352,7 @@ A keyframe holds a property value at a specific time, together with how it trans
 
 ```xml
 <Channel name="alpha" type="float">
-  <Key time="0" value="0" interpolation="bezier" bezier-out="0.2,0,0.4,1"/>
+  <Key time="0" value="0" interpolation="bezier" bezierOut="0.2,0,0.4,1"/>
   <Key time="30" value="1" interpolation="linear"/>
   <Key time="60" value="0" interpolation="hold"/>
 </Channel>
@@ -2360,7 +2364,7 @@ A keyframe holds a property value at a specific time, together with how it trans
 
 PAGX state machines provide an alternative to keyframe-based animation for scenarios where the timeline behavior depends on external inputs at runtime. Instead of pre-scripting every transition via keyframes, a state machine defines states (each bound to an Animation or empty), transitions conditioned on input values, and crossfade parameters for smooth switching.
 
-`<StateMachine>` defines the state graph. It is declared inside an `<Animations>` container and identified by `id`, and referenced from a Layer's `<Timelines>` via `<StateMachine ref="@id"/>`. It declares **inputs** (named ports that host code feeds values into) and **regions** (parallel state charts). Each region owns its own states and transitions and advances independently — based on the orthogonal-region concept from UML state machines, this avoids combinatorial state explosion when modeling independent behavioral dimensions. See §8.5 for a complete example.
+`<StateMachine>` defines the state graph. It is declared inside an `<Animations>` container and identified by `id`, and referenced from a Layer's `<Timelines>` via `<StateMachine ref="@id"/>`. It declares **inputs** (named ports that host code feeds values into) and **regions** (parallel state charts). Each region owns its own states and transitions and advances independently — based on the orthogonal-region concept from UML state machines, this avoids combinatorial state explosion when modeling independent behavioral dimensions. See the code examples in §8.2.5–8.2.6. A playable state machine sample is not yet available (see the note below).
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -2380,7 +2384,7 @@ PAGX state machines provide an alternative to keyframe-based animation for scena
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | string | (required) | Input name, referenced by `<Condition>`. Unique within the owning StateMachine |
-| `type` | StateMachineInputType | `bool` | The value kind of this input |
+| `type` | StateMachineInputType | (required) | The value kind of this input |
 
 **StateMachineInputType**:
 
@@ -2414,7 +2418,7 @@ Type-specific attributes:
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `name` | string | (required) | Region name, unique within the owning StateMachine |
+| `name` | string | — | Region name, unique within the owning StateMachine |
 | `initialState` | string | (required) | The name of the state this region enters on start |
 
 **Child Elements**:
@@ -2452,8 +2456,8 @@ Type-specific attributes:
 | `duration` | Frame | 0 | Crossfade duration in frames; 0 means an immediate cut |
 | `frameRate` | float | 60 | Frame rate for converting `duration` to crossfade time |
 | `interpolation` | KeyframeInterpolationType | `linear` | Crossfade weight interpolation curve |
-| `bezier-out` | string | — | Bezier ease-out handle, format `"x,y"` (only when `interpolation="bezier"`) |
-| `bezier-in` | string | — | Bezier ease-in handle, format `"x,y"` (only when `interpolation="bezier"`) |
+| `bezierOut` | string | — | Bezier ease-out handle, format `"x,y"` (only when `interpolation="bezier"`) |
+| `bezierIn` | string | — | Bezier ease-in handle, format `"x,y"` (only when `interpolation="bezier"`) |
 | `earlyExit` | bool | false | If `true`, this transition may interrupt an in-progress crossfade |
 | `pauseOnExit` | bool | false | If `true`, the source state's animation freezes when the transition begins; otherwise it keeps advancing while fading out |
 
@@ -2489,7 +2493,7 @@ Type-specific attributes:
 
 ```xml
 <Transition from="idle" to="hovered" duration="12" frameRate="60"
-            interpolation="bezier" bezier-out="0.2,0" bezier-in="0.4,1"
+            interpolation="bezier" bezierOut="0.2,0" bezierIn="0.4,1"
             earlyExit="true">
   <Condition input="isHovered" op="equal" value="true"/>
 </Transition>
@@ -2498,6 +2502,8 @@ Type-specific attributes:
   <Condition input="errorTrigger" op="trigger"/>
 </Transition>
 ```
+
+> **Note**: A playable state machine sample is not yet available. The playground currently cannot inject input values to advance state machines, so state transitions cannot be triggered in that environment. Once host-side input injection is supported, a complete `state_machine.pagx` sample covering states, transitions, conditions, and all input types will be added.
 
 ### 8.3 Layer Timeline References
 
@@ -2528,7 +2534,7 @@ Using the `composition` attribute, a Layer can import an external PAGX file as a
 
   <Animations>
     <Animation id="pulse" duration="60" frameRate="60" loop="loop">
-      <Object target="@statusDot">
+      <Object target="statusDot">
         <Channel name="alpha" type="float">
           <Key time="0" value="0.4" interpolation="linear"/>
           <Key time="30" value="1" interpolation="linear"/>
@@ -2564,7 +2570,7 @@ Unlike an AnimationTimeline, a StateMachineTimeline has no `playing` attribute: 
 </Layer>
 ```
 
-The referenced `<StateMachine>` is defined in the `<Animations>` container; see §8.2 for its structure and the §8.5 example for a complete file.
+The referenced `<StateMachine>` is defined in the `<Animations>` container; see §8.2 for its structure. A playable state machine sample is not yet available (see the note at the end of §8.2).
 
 ### 8.4 Relationship with Data Binding
 
@@ -2584,8 +2590,6 @@ The following example demonstrates combining keyframes, channels, and multiple t
 
 The ViewModel system lets you drive the UI with data: a ViewModel defines a schema of typed properties, and DataBind connects those properties to node channels. When a ViewModel property value changes, all bound targets are updated automatically.
 
-> [Sample](samples/viewmodel.pagx)
-
 ### 9.1 Overview
 
 A ViewModel is a schema that defines properties with names, types, defaults, and optional constraints. It is typically attached to a Document or Composition (a Document is itself a Composition). Code creates instances from this schema and assigns values. DataBind connects ViewModel properties to node channels using a path syntax (`"$vm.propertyName"`).
@@ -2594,7 +2598,7 @@ Each Layer may set a `vmContext` path to resolve relative DataBind source refere
 
 ### 9.2 ViewModel
 
-`<ViewModel>` defines a ViewModel schema. It is identified by `id` and can be referenced by Compositions or other ViewModels (a `<Property>` of type `viewModel`). Each `<Composition>` or document holds at most one `<ViewModel>`. Multiple `<DataBind>` and `<DataConverter>` elements may appear under the same container.
+`<ViewModel>` defines a ViewModel schema. It is identified by `id` and can be referenced by Compositions or other ViewModels (a `<Property>` of type `viewModel`). A `<ViewModel>` is declared in `<Resources>` and is attached to a Document or Composition via the `viewModel` attribute. Each container can reference at most one `<ViewModel>`. Multiple `<DataBind>` and `<DataConverter>` elements may appear under the same container.
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -2627,9 +2631,9 @@ Each Layer may set a `vmContext` path to resolve relative DataBind source refere
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `name` | string | (required) | Property name, e.g. `"speed"`, `"title"` |
-| `type` | ViewModelPropertyType | number | Value type of this property |
+| `type` | ViewModelPropertyType | (required) | Value type of this property |
 
-**ViewModelPropertyType** values (case-insensitive; both `Number` and `number` are accepted):
+**ViewModelPropertyType** values (both PascalCase such as `Number` and lowercase such as `number` are accepted; the exporter always writes PascalCase):
 
 | `type` value | Description |
 |--------------|-------------|
@@ -2949,7 +2953,7 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 
 | Enum | Values |
 |------|--------|
-| **ViewModelPropertyType** | `number`, `string`, `boolean`, `color`, `image`, `viewModel`, `enum`, `trigger` (case-insensitive) |
+| **ViewModelPropertyType** | `number`, `string`, `boolean`, `color`, `image`, `viewModel`, `enum`, `trigger` (both PascalCase and lowercase accepted; exporter writes PascalCase) |
 | **DataBindDirection** | `ToTarget`, `ToSource`, `TwoWay`, `Once` (case-sensitive) |
 
 ---

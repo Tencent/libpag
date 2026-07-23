@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Demonstrates PAGX ViewModel data binding with runtime-supported channels. -->
-<pagx width="400" height="400">
+<pagx width="400" height="400" viewModel="@deviceVM">
 
   <Resources>
     <DataConverter id="usageToWidth" type="rangeMapper">

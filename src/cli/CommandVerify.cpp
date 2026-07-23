@@ -43,6 +43,7 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
@@ -490,6 +491,9 @@ static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std
       if (prop->viewModelRef != nullptr && !prop->viewModelRef->id.empty()) {
         refs.insert(prop->viewModelRef->id);
       }
+      if (prop->defaultImage != nullptr && !prop->defaultImage->id.empty()) {
+        refs.insert(prop->defaultImage->id);
+      }
     } else if (type == NodeType::State) {
       auto* state = static_cast<const State*>(node.get());
       if (state->stateType() == StateType::Animation) {
@@ -502,6 +506,16 @@ static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std
       auto* object = static_cast<const AnimationObject*>(node.get());
       if (!object->target.empty()) {
         refs.insert(object->target);
+      }
+      for (auto* ch : object->channels) {
+        if (ch->valueType() == ChannelValueType::ImageRef) {
+          auto* typedCh = static_cast<const TypedChannel<ImageRef>*>(ch);
+          for (auto& kf : typedCh->keyframes) {
+            if (!kf.value.id.empty()) {
+              refs.insert(kf.value.id);
+            }
+          }
+        }
       }
     }
   }
