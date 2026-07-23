@@ -18,6 +18,7 @@
 
 #include "VideoSequence.h"
 #include <QApplication>
+#include <atomic>
 #include "codec/mp4/MP4BoxHelper.h"
 #include "export/encode/PAGEncodeThread.h"
 #include "export/encode/VideoEncoder.h"
@@ -260,6 +261,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     pagEncoder->init(seqWidth, seqHeight, frameRate, hasAlpha,
                      session->configParam.bitmapKeyFrameInterval,
                      session->configParam.sequenceQuality);
+    std::atomic<size_t> encodedFrameCount{0};
     std::unique_ptr<PAGEncodeThread> pagEncodeThread = std::make_unique<PAGEncodeThread>();
     pagEncodeThread->setPAGEncoder(std::move(pagEncoder));
     pagEncodeThread->setEncodeFrameCallback(
@@ -269,6 +271,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
           videoFrame->frame = index;
           videoFrame->fileBytes = data.release();
           sequence->frames.push_back(videoFrame);
+          encodedFrameCount.store(sequence->frames.size(), std::memory_order_release);
           session->progressModel.addFinishedSteps();
         });
     pagEncodeThread->setEncodeHeaderCallback([&](std::vector<pag::ByteData*> headers) {
@@ -370,7 +373,9 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
 
     pagEncodeThread->close();
 
-    while (!session->stopExport && sequence->frames.size() < static_cast<size_t>(exportFrameNum) &&
+    while (!session->stopExport &&
+           encodedFrameCount.load(std::memory_order_acquire) <
+               static_cast<size_t>(exportFrameNum) &&
            pagEncodeThread->isValid()) {
       QApplication::processEvents();
     }

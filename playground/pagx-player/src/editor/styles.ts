@@ -18,6 +18,10 @@
 
 /** CSS rules for the editor panel, injected at runtime to avoid a separate rollup CSS plugin. */
 export const EDITOR_STYLES = `
+/* z-index sits above the player toolbar / playback bar (150) so a small viewport where those
+   controls can't fully fit in the shrunken container gets them cleanly clipped by the panel
+   instead of shown floating on top of the editor's own UI. The panel's opaque background acts
+   as the actual visual clip. */
 #editor-panel {
     position: fixed;
     top: 0;
@@ -31,7 +35,7 @@ export const EDITOR_STYLES = `
     flex-direction: column;
     background: #1E1E1E;
     border-left: 1px solid #3C3C3C;
-    z-index: 10;
+    z-index: 300;
 }
 
 #editor-panel .editor-resizer {
@@ -41,7 +45,9 @@ export const EDITOR_STYLES = `
     left: -3px;
     width: 6px;
     cursor: ew-resize;
-    z-index: 20;
+    /* Sits above the panel body so the 6px-wide grabber stays clickable when the panel's
+       raised z-index brings its own children in front of it. */
+    z-index: 320;
     background: transparent;
     transition: background 0.15s ease;
 }
@@ -55,10 +61,9 @@ export const EDITOR_STYLES = `
     display: flex;
 }
 
-.container.with-editor {
-    width: calc(100% - var(--editor-width, 50%));
-    margin: 0;
-}
+/* Note: the container shrinking rule (.with-editor { width: calc(...) }) is defined on the
+   .pagx-player-root wrapper in pagx-player/src/styles.ts so the editor doesn't leak layout
+   assumptions about the host container's class name. */
 
 #editor-panel .editor-header {
     display: flex;
@@ -144,33 +149,9 @@ export const EDITOR_STYLES = `
     background-color: rgba(68, 142, 249, 0.3);
 }
 
-.editor-toast {
-    position: fixed;
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 8px 16px;
-    border-radius: 18px;
-    color: #FFFFFF;
-    font-size: 13px;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-    pointer-events: none;
-    white-space: nowrap;
-}
-
-.editor-toast.visible {
-    opacity: 0.95;
-}
-
-.editor-toast.success {
-    background: #2E7D32;
-}
-
-.editor-toast.error {
-    background: #C62828;
-}
+/* Editor feedback ("Changes applied", validation errors, etc.) now flows through the player's
+   unified status pill (pagx-player styles.ts .pagx-player-status), so no dedicated .editor-toast
+   styles live here anymore. */
 
 #editor-panel .editor-button-bar {
     display: flex;
@@ -201,6 +182,17 @@ export const EDITOR_STYLES = `
 
 #editor-panel .editor-btn:active {
     transform: scale(1.0);
+}
+
+/* While the host's onApply/onSave is in flight the buttons are disabled to prevent
+   overlapping callbacks. Fades them and neutralizes hover so the pause is visible. */
+#editor-panel .editor-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+#editor-panel .editor-btn:disabled:hover {
+    transform: none;
 }
 
 #editor-panel .editor-btn.discard {

@@ -217,6 +217,133 @@ Item {
             }
         }
 
+        /* Spacer before Node Statistics (only visible in PAGX mode) */
+        Item {
+            width: 1
+            height: sectionSpacing
+            visible: nodeStatistics.visible
+        }
+
+        /* Node Statistics for PAGX */
+        Rectangle {
+            id: nodeStatistics
+            visible: runTimeDataModel && runTimeDataModel.nodeStatsModel.totalCount > 0
+            height: visible ? nodeStatsContent.height : 0
+            width: parent.width
+            color: "#00000000"
+
+            Column {
+                id: nodeStatsContent
+                width: parent.width
+                spacing: 1
+
+                // Title row
+                Rectangle {
+                    height: 24
+                    width: parent.width
+                    color: "#2D2D37"
+                    Text {
+                        text: qsTr("Node Distribution")
+                        font.pixelSize: 11
+                        font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: parent.left
+                        anchors.leftMargin: 8
+                        color: "#FFFFFF"
+                        renderType: Text.NativeRendering
+                    }
+                    Text {
+                        text: runTimeDataModel && runTimeDataModel.nodeStatsModel ? runTimeDataModel.nodeStatsModel.totalCount + " " + qsTr("nodes") : ""
+                        font.pixelSize: 11
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        color: "#9B9B9B"
+                        renderType: Text.NativeRendering
+                    }
+                }
+
+                // Stacked bar showing distribution
+                Rectangle {
+                    height: 20
+                    width: parent.width
+                    color: "#2D2D37"
+
+                    Row {
+                        id: nodeBarRow
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        spacing: 1
+
+                        Repeater {
+                            model: runTimeDataModel ? runTimeDataModel.nodeStatsModel : null
+                            Rectangle {
+                                height: parent.height
+                                width: {
+                                    var total = runTimeDataModel && runTimeDataModel.nodeStatsModel ? Math.max(runTimeDataModel.nodeStatsModel.totalCount, 1) : 1;
+                                    return Math.max((nodeBarRow.width - 10) * count / total, 0);
+                                }
+                                color: colorCode
+                                radius: 2
+                            }
+                        }
+                    }
+                }
+
+                // Detail rows
+                Repeater {
+                    model: runTimeDataModel ? runTimeDataModel.nodeStatsModel : null
+                    Rectangle {
+                        height: 20
+                        width: nodeStatsContent.width
+                        color: "#2D2D37"
+
+                        Rectangle {
+                            width: 4
+                            height: 12
+                            radius: 2
+                            color: colorCode
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            anchors.leftMargin: 8
+                        }
+
+                        Text {
+                            text: name
+                            font.pixelSize: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            anchors.leftMargin: 18
+                            color: "#9B9B9B"
+                            renderType: Text.NativeRendering
+                        }
+
+                        Text {
+                            text: {
+                                var total = runTimeDataModel && runTimeDataModel.nodeStatsModel ? Math.max(runTimeDataModel.nodeStatsModel.totalCount, 1) : 1;
+                                return Math.round(count * 100 / total) + "%";
+                            }
+                            font.pixelSize: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            color: "#9B9B9B"
+                            renderType: Text.NativeRendering
+                        }
+
+                        Text {
+                            text: count
+                            font.pixelSize: 11
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.right: parent.right
+                            anchors.rightMargin: 8
+                            color: "#FFFFFF"
+                            renderType: Text.NativeRendering
+                        }
+                    }
+                }
+            }
+        }
+
         /* Spacer before Performance Chart (only visible in PAG mode) */
         Item {
             width: 1
@@ -657,133 +784,6 @@ Item {
                                 color: "white"
                                 renderType: Text.NativeRendering
                             }
-                        }
-                    }
-                }
-            }
-        }
-
-        /* Spacer before Node Statistics (only visible in PAGX mode) */
-        Item {
-            width: 1
-            height: sectionSpacing
-            visible: nodeStatistics.visible
-        }
-
-        /* Node Statistics for PAGX */
-        Rectangle {
-            id: nodeStatistics
-            visible: runTimeDataModel && runTimeDataModel.nodeStatsModel.totalCount > 0
-            height: visible ? nodeStatsContent.height : 0
-            width: parent.width
-            color: "#00000000"
-
-            Column {
-                id: nodeStatsContent
-                width: parent.width
-                spacing: 1
-
-                // Title row
-                Rectangle {
-                    height: 24
-                    width: parent.width
-                    color: "#2D2D37"
-                    Text {
-                        text: qsTr("Node Distribution")
-                        font.pixelSize: 11
-                        font.bold: true
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.left: parent.left
-                        anchors.leftMargin: 8
-                        color: "#FFFFFF"
-                        renderType: Text.NativeRendering
-                    }
-                    Text {
-                        text: runTimeDataModel && runTimeDataModel.nodeStatsModel ? runTimeDataModel.nodeStatsModel.totalCount + " " + qsTr("nodes") : ""
-                        font.pixelSize: 11
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.right: parent.right
-                        anchors.rightMargin: 8
-                        color: "#9B9B9B"
-                        renderType: Text.NativeRendering
-                    }
-                }
-
-                // Stacked bar showing distribution
-                Rectangle {
-                    height: 20
-                    width: parent.width
-                    color: "#2D2D37"
-
-                    Row {
-                        id: nodeBarRow
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        spacing: 1
-
-                        Repeater {
-                            model: runTimeDataModel ? runTimeDataModel.nodeStatsModel : null
-                            Rectangle {
-                                height: parent.height
-                                width: {
-                                    var total = runTimeDataModel && runTimeDataModel.nodeStatsModel ? Math.max(runTimeDataModel.nodeStatsModel.totalCount, 1) : 1;
-                                    return Math.max((nodeBarRow.width - 10) * count / total, 0);
-                                }
-                                color: colorCode
-                                radius: 2
-                            }
-                        }
-                    }
-                }
-
-                // Detail rows
-                Repeater {
-                    model: runTimeDataModel ? runTimeDataModel.nodeStatsModel : null
-                    Rectangle {
-                        height: 20
-                        width: nodeStatsContent.width
-                        color: "#2D2D37"
-
-                        Rectangle {
-                            width: 4
-                            height: 12
-                            radius: 2
-                            color: colorCode
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: parent.left
-                            anchors.leftMargin: 8
-                        }
-
-                        Text {
-                            text: name
-                            font.pixelSize: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: parent.left
-                            anchors.leftMargin: 18
-                            color: "#9B9B9B"
-                            renderType: Text.NativeRendering
-                        }
-
-                        Text {
-                            text: {
-                                var total = runTimeDataModel && runTimeDataModel.nodeStatsModel ? Math.max(runTimeDataModel.nodeStatsModel.totalCount, 1) : 1;
-                                return Math.round(count * 100 / total) + "%";
-                            }
-                            font.pixelSize: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: "#9B9B9B"
-                            renderType: Text.NativeRendering
-                        }
-
-                        Text {
-                            text: count
-                            font.pixelSize: 11
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.right: parent.right
-                            anchors.rightMargin: 8
-                            color: "#FFFFFF"
-                            renderType: Text.NativeRendering
                         }
                     }
                 }

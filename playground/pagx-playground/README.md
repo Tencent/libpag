@@ -40,8 +40,9 @@ First, ensure you have installed all the tools and dependencies listed in the
 [README.md](../../README.md#Development) in the project root, including Emscripten.
 
 > Important: The playground does not compile any WebAssembly itself. It consumes the compiled
-> WASM artifacts from [pagx-viewer](../pagx-viewer). You must build pagx-viewer first, and the
-> multi-threaded (MT) / single-threaded (ST) choice is made there, not here. Read the
+> WASM artifacts from [pagx-viewer](../pagx-viewer), and the compiled player ESM bundle from
+> [pagx-player](../pagx-player). You must build both first, and the multi-threaded (MT) /
+> single-threaded (ST) choice is made in pagx-viewer, not here. Read the
 > [pagx-viewer README](../pagx-viewer/README.md) before building the playground.
 
 ### Build pagx-viewer First
@@ -57,6 +58,23 @@ npm run build:release:st    # single-threaded (no SharedArrayBuffer required)
 ```
 
 See the [pagx-viewer README](../pagx-viewer/README.md) for the full build matrix.
+
+### Build pagx-player
+
+The playground imports the player component as a pre-built ESM bundle from
+[pagx-player](../pagx-player). Build it before building the playground so the prebuild step
+can pick up the bundle:
+
+```bash
+# In playground/pagx-player
+npm install
+npm run build               # debug bundle with sourcemaps
+npm run build:release       # minified release bundle
+```
+
+The build writes `playground/pagx-player/lib/pagx-player.esm.js` (not tracked by git). The
+playground's prebuild step reads that file and copies it into `wasm-mt/`; if the file is
+missing, prebuild fails with a message pointing you back to the pagx-player build.
 
 ### Install Dependencies
 
