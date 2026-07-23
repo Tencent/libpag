@@ -75,6 +75,21 @@
       }
     },
     {
+      "name": "libyuv",
+      "cmake": {
+        "targets": [
+          "yuv"
+        ],
+        "arguments": [
+          "-DCMAKE_C_FLAGS=\"-w -march=armv8-a\"",
+          "-DCMAKE_CXX_FLAGS=\"-w -march=armv8-a\""
+        ],
+        "platforms": [
+          "android"
+        ]
+      }
+    },
+    {
       "name": "libxml2",
       "cmake": {
         "targets": [

@@ -20,9 +20,80 @@
 #include "platform/Platform.h"
 #include "rendering/video/SoftwareData.h"
 
+#if defined(__ANDROID__) || defined(ANDROID)
+#include <atomic>
+#include "base/utils/Log.h"
+#include "libyuv/convert_argb.h"
+#include "tgfx/core/ColorSpace.h"
+#include "tgfx/platform/HardwareBuffer.h"
+#endif
+
 namespace pag {
 
 #define I420_PLANE_COUNT 3
+
+#if defined(__ANDROID__) || defined(ANDROID)
+// libyuv writes ABGR into memory as R,G,B,A byte order, matching Android's
+// AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM used by tgfx::HardwareBufferAllocate. Returns 0 on
+// success, -1 when the color space has no matching libyuv routine so the caller can fall back to
+// the plain YUV upload path.
+static int ConvertI420ToRGBA(tgfx::YUVColorSpace colorSpace, const uint8_t* srcY, int strideY,
+                             const uint8_t* srcU, int strideU, const uint8_t* srcV, int strideV,
+                             uint8_t* dst, int dstStride, int width, int height) {
+  switch (colorSpace) {
+    case tgfx::YUVColorSpace::BT601_LIMITED:
+      return libyuv::I420ToABGR(srcY, strideY, srcU, strideU, srcV, strideV, dst, dstStride, width,
+                                height);
+    case tgfx::YUVColorSpace::BT601_FULL:
+    case tgfx::YUVColorSpace::JPEG_FULL:
+      return libyuv::J420ToABGR(srcY, strideY, srcU, strideU, srcV, strideV, dst, dstStride, width,
+                                height);
+    case tgfx::YUVColorSpace::BT709_LIMITED:
+      return libyuv::H420ToABGR(srcY, strideY, srcU, strideU, srcV, strideV, dst, dstStride, width,
+                                height);
+    case tgfx::YUVColorSpace::BT2020_LIMITED:
+      return libyuv::U420ToABGR(srcY, strideY, srcU, strideU, srcV, strideV, dst, dstStride, width,
+                                height);
+    default:
+      // BT709_FULL / BT2020_FULL have no matching libyuv routine; the caller falls back to the
+      // plain YUV upload path.
+      return -1;
+  }
+}
+
+// Converts a software-decoded I420 frame into a RGBA HardwareBuffer-backed ImageBuffer. Returns
+// nullptr if the HardwareBuffer path is unavailable, allocation fails, or the frame's color space
+// has no matching libyuv routine, in which case the caller falls back to the plain YUV upload
+// path.
+static std::shared_ptr<tgfx::ImageBuffer> MakeHardwareBufferFrame(const YUVBuffer* frame,
+                                                                  const VideoFormat& videoFormat) {
+  if (!tgfx::HardwareBufferAvailable()) {
+    return nullptr;
+  }
+  auto hardwareBuffer = tgfx::HardwareBufferAllocate(videoFormat.width, videoFormat.height, false);
+  if (hardwareBuffer == nullptr) {
+    return nullptr;
+  }
+  auto info = tgfx::HardwareBufferGetInfo(hardwareBuffer);
+  auto* dst = static_cast<uint8_t*>(tgfx::HardwareBufferLock(hardwareBuffer));
+  if (dst == nullptr) {
+    tgfx::HardwareBufferRelease(hardwareBuffer);
+    return nullptr;
+  }
+  int ret =
+      ConvertI420ToRGBA(videoFormat.colorSpace, frame->data[0], frame->lineSize[0], frame->data[1],
+                        frame->lineSize[1], frame->data[2], frame->lineSize[2], dst,
+                        static_cast<int>(info.rowBytes), videoFormat.width, videoFormat.height);
+  tgfx::HardwareBufferUnlock(hardwareBuffer);
+  if (ret != 0) {
+    tgfx::HardwareBufferRelease(hardwareBuffer);
+    return nullptr;
+  }
+  auto imageBuffer = tgfx::ImageBuffer::MakeFrom(hardwareBuffer, tgfx::ColorSpace::SRGB());
+  tgfx::HardwareBufferRelease(hardwareBuffer);
+  return imageBuffer;
+}
+#endif
 
 std::unique_ptr<VideoDecoder> SoftwareDecoderWrapper::Wrap(
     std::shared_ptr<SoftwareDecoder> softwareDecoder, const VideoFormat& format) {
@@ -148,6 +219,24 @@ std::shared_ptr<tgfx::ImageBuffer> SoftwareDecoderWrapper::onRenderFrame() {
   if (frame == nullptr) {
     return nullptr;
   }
+#if defined(__ANDROID__) || defined(ANDROID)
+  // Route software-decoded frames through a RGBA HardwareBuffer bound via
+  // EGL_ANDROID_image_native_buffer instead of uploading three YUV planes with glTexSubImage2D.
+  // This avoids the cross-view frame corruption observed on Mali GPUs when multiple PAGImageView
+  // instances upload software-decoded frames concurrently. See issue #3540.
+  if (auto imageBuffer = MakeHardwareBufferFrame(frame.get(), videoFormat)) {
+    return imageBuffer;
+  }
+  // Report the first fallback so unexpected regressions on the HardwareBuffer path are visible in
+  // logs; subsequent fallbacks stay silent to avoid log spam.
+  static std::atomic_flag fallbackLogged = ATOMIC_FLAG_INIT;
+  if (!fallbackLogged.test_and_set(std::memory_order_relaxed)) {
+    LOGI(
+        "SoftwareDecoderWrapper: HardwareBuffer path unavailable, falling back to YUV upload. "
+        "size=%dx%d colorSpace=%d",
+        videoFormat.width, videoFormat.height, static_cast<int>(videoFormat.colorSpace));
+  }
+#endif
   auto yuvData =
       SoftwareData<SoftwareDecoder>::Make(videoFormat.width, videoFormat.height, frame->data,
                                           frame->lineSize, I420_PLANE_COUNT, softwareDecoder);
