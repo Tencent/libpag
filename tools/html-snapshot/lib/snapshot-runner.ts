@@ -457,25 +457,49 @@ export async function runSnapshot(
     // PAGX's renderer can read `data:` URIs and local files but not
     // `http(s)://` URLs, so every external image must be turned into one of
     // those before the snapshot is walked.
-    let images: SavedImage[] = [];
-    const srcByUrl: Record<string, string> = {};
-    if (downloadImages && imageDir) {
-      images = await bestEffortSave(
-        saveDownloadedImages,
-        imageBytesByUrl,
-        imageDir,
-        log,
-        'image',
-      );
-      for (const { url, path: filePath } of images) {
-        srcByUrl[url] = filePath;
+    //
+    // Factored into a reusable pass because a JS-driven page (Vue/React) can
+    // mount additional <img> elements *after* this first pass runs — most
+    // notably when the animation-capture virtual clock is advanced below and a
+    // component that was frozen at t=0 finally renders. Those late arrivals
+    // must be inlined too before the snapshot walk; otherwise they keep a bare
+    // site-absolute `http(s)` src (e.g. `/expert.svg`), which PAGX can neither
+    // render nor resolve, so the element is dropped from the output. Each call
+    // rebuilds `srcByUrl` from the current `imageBytesByUrl` (the `response`
+    // listener keeps filling it as new images load) and re-runs
+    // `inlineExternalImages`, which is idempotent — it skips <img> already
+    // carrying `data-snapshot-src`, so only the newly mounted images are
+    // touched.
+    const images: SavedImage[] = [];
+    const seenImageUrls = new Set<string>();
+    const inlineCapturedImages = async (): Promise<void> => {
+      const srcByUrl: Record<string, string> = {};
+      if (downloadImages && imageDir) {
+        const saved = await bestEffortSave(
+          saveDownloadedImages,
+          imageBytesByUrl,
+          imageDir,
+          log,
+          'image',
+        );
+        for (const item of saved) {
+          srcByUrl[item.url] = item.path;
+          // De-dupe across passes so the returned manifest lists each saved
+          // image once even though `saveDownloadedImages` re-reports the full
+          // set every call.
+          if (!seenImageUrls.has(item.url)) {
+            seenImageUrls.add(item.url);
+            images.push(item);
+          }
+        }
+      } else {
+        for (const [url, entry] of imageBytesByUrl) {
+          srcByUrl[url] = entryToDataUri(entry);
+        }
       }
-    } else {
-      for (const [url, entry] of imageBytesByUrl) {
-        srcByUrl[url] = entryToDataUri(entry);
-      }
-    }
-    await page.evaluate(inlineExternalImages, srcByUrl);
+      await page.evaluate(inlineExternalImages, srcByUrl);
+    };
+    await inlineCapturedImages();
 
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted
@@ -556,6 +580,22 @@ export async function runSnapshot(
       } catch (err) {
         if (log) log(`canvas settle failed: ${errMessage(err)}`);
       }
+    }
+
+    // Second image-inline pass. Advancing the virtual clock during animation
+    // capture (and the canvas settle above) can mount <img> elements that did
+    // not exist during the first pass — a common shape on JS-rendered pages
+    // where a deferred/transitioned component only renders once its timers
+    // fire. Re-inline so those late arrivals become self-contained `data:` /
+    // local references instead of unresolvable site-absolute URLs that get
+    // dropped downstream. Idempotent (the in-page pass skips already-inlined
+    // <img>s), so this only touches images that appeared after the first pass.
+    // Best-effort: a failure here just leaves late images as-is, matching prior
+    // behaviour.
+    try {
+      await inlineCapturedImages();
+    } catch (err) {
+      if (log) log(`late image inline pass skipped: ${errMessage(err)}`);
     }
 
     // Resize the viewport to the body canvas before measuring geometry, exactly

@@ -4788,6 +4788,13 @@ async function inlineExternalImages(cachedMap) {
     const rawSrc = (img.getAttribute('src') || '').trim();
     const rawSrcset = (img.getAttribute('srcset') || '').trim();
     if (!rawSrc && !rawSrcset) continue;
+    // Skip images an earlier pass already inlined (a `data:` URI or local path
+    // stamped on `data-snapshot-src`). This function may run more than once on
+    // a JS-driven page — components can mount fresh <img>s after the first pass
+    // (e.g. once the animation-capture virtual clock advances) — so this guard
+    // keeps the repeat pass from needlessly re-fetching every already-inlined
+    // image and only lets the newly mounted ones fall through.
+    if ((img.getAttribute('data-snapshot-src') || '').trim()) continue;
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
     if (!src) continue;
     if (src.startsWith('data:')) continue;
