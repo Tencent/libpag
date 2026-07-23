@@ -177,6 +177,23 @@ void PAGComposition::resetTimelines() {
   forEachComposition(ResetCompositionTimelines);
 }
 
+void PAGComposition::MarkCompositionTimelinesDirty(PAGComposition* comp) {
+  for (const auto& timeline : comp->timelines) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    if (timeline->type() == TimelineType::Animation) {
+      static_cast<PAGAnimation*>(timeline.get())->targetsDirty = true;
+    } else if (timeline->type() == TimelineType::StateMachine) {
+      static_cast<PAGStateMachine*>(timeline.get())->markInternalTargetsDirty();
+    }
+  }
+}
+
+void PAGComposition::markTimelineTargetsDirty() {
+  forEachComposition(MarkCompositionTimelinesDirty);
+}
+
 void PAGComposition::forEachComposition(void (*visitor)(PAGComposition*)) {
   PAGLayer::forEachComposition(visitor);
   visitor(this);

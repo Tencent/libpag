@@ -172,6 +172,10 @@ class PAGStateMachine : public PAGTimeline,
 
   std::weak_ptr<PAGScene> owner;
   StateMachine* stateMachine = nullptr;
+  // Binding forwarded to the inner PAGAnimation of each state. Null marks a top-level state machine:
+  // the inner PAGAnimation then resolves the scene's current root binding lazily, so the machine
+  // survives a runtime-tree rebuild that frees the old binding. A non-null binding is a fixed
+  // composition binding for a state machine nested inside a composition. Never dereferenced here.
   RuntimeBinding* binding = nullptr;
   PAGXDocument* contextDoc = nullptr;
 
@@ -190,6 +194,12 @@ class PAGStateMachine : public PAGTimeline,
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
   std::shared_ptr<PAGAnimation> createTimelineForState(const State* state);
+
+  // Marks every inner PAGAnimation (each region's current timeline and any crossfading-out ones)
+  // stale so their targets re-resolve on the next apply(). The inner animations live in regions,
+  // not in the owning composition's timeline list, so an incremental tree refresh that patches
+  // binding membership must reach them through here.
+  void markInternalTargetsDirty();
 
   friend class PAGScene;
   friend class PAGComposition;

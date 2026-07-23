@@ -161,6 +161,15 @@ class PAGComposition : public PAGLayer {
   // touches a timeline node, rebuilding the whole timeline tree rather than patching it in place.
   void resetTimelines();
 
+  // Static visitor for PAGLayer::forEachComposition. Marks every timeline's resolved target cache
+  // stale so the next apply() re-resolves against the refreshed binding membership.
+  static void MarkCompositionTimelinesDirty(PAGComposition* comp);
+
+  // Marks the resolved target cache of this composition's timelines and all descendants' stale.
+  // Called after an incremental refresh changes binding membership without touching a timeline
+  // node, so the reused timelines re-resolve on the next apply().
+  void markTimelineTargetsDirty();
+
   // Override to include this PAGComposition node itself in the traversal after visiting children.
   void forEachComposition(void (*visitor)(PAGComposition*)) override;
 

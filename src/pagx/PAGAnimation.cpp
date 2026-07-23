@@ -19,6 +19,7 @@
 #include "pagx/PAGAnimation.h"
 #include <algorithm>
 #include <cstdint>
+#include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGXDocument.h"
@@ -60,9 +61,9 @@ PAGAnimation::PAGAnimation(Animation* anim, RuntimeBinding* binding, PAGXDocumen
     : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc) {
 }
 
-void PAGAnimation::resolveTargets() {
-  resolved = true;
-  if (animation == nullptr || contextDoc == nullptr) {
+void PAGAnimation::resolveTargets(const RuntimeBinding* effectiveBinding) {
+  resolvedTargets.clear();
+  if (animation == nullptr || contextDoc == nullptr || effectiveBinding == nullptr) {
     return;
   }
   for (auto* object : animation->objects) {
@@ -71,6 +72,12 @@ void PAGAnimation::resolveTargets() {
     }
     auto* targetNode = contextDoc->findNode(object->target);
     if (targetNode == nullptr) {
+      continue;
+    }
+    // Drop targets outside this binding's scope. findNode does a flat document-wide lookup, so it
+    // can resolve a node living inside a nested composition; that node is bound in the composition's
+    // own binding, not here, so applying to it would cross the composition boundary.
+    if (!effectiveBinding->contains(targetNode)) {
       continue;
     }
     std::vector<Channel*> channels = {};
@@ -176,8 +183,12 @@ void PAGAnimation::apply(float mix) {
   if (effectiveBinding == nullptr) {
     return;
   }
-  if (!resolved) {
-    resolveTargets();
+  // Re-resolve only when needed: targetsDirty covers an incremental refresh that changed binding
+  // membership in place (same binding pointer, patched members). A runtime-tree rebuild recreates
+  // PAGAnimation instances, so no separate pointer-based invalidation is needed.
+  if (targetsDirty) {
+    resolveTargets(effectiveBinding);
+    targetsDirty = false;
   }
   ApplyResolved(resolvedTargets, animation, effectiveBinding, currentTimeUs, clamped);
 }
