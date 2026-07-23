@@ -147,6 +147,14 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       }
       auto timeline = std::shared_ptr<PAGAnimation>(
           new PAGAnimation(animation, binding.get(), document, scene));
+      if (animationDriver->evaluationOffset != 0 && animation->frameRate > 0.0f) {
+        // Convert evaluationOffset from frames to microseconds.
+        // Both signs are honored: a positive offset delays content playback (freezes at the first
+        // frame until the offset elapses), a negative offset skips ahead (content starts from that
+        // point).
+        timeline->evaluationOffsetUs =
+            FramesToUs(animationDriver->evaluationOffset, animation->frameRate);
+      }
       if (!animationDriver->playing) {
         pausedTimelineIds.insert(animation->id);
       }

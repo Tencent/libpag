@@ -709,6 +709,7 @@ static void ParseLayerTimelines(const DOMNode* node, Layer* layer, PAGXDocument*
       auto driver = std::make_unique<AnimationTimeline>();
       driver->animationId = refAttr.substr(1);
       driver->playing = GetBoolAttribute(current.get(), "playing", true, doc);
+      driver->evaluationOffset = GetInt64Attribute(current.get(), "evaluationOffset", 0, doc);
       layer->timelines.push_back(std::move(driver));
     } else if (current->name == "StateMachine") {
       auto refAttr = GetAttribute(current.get(), "ref");

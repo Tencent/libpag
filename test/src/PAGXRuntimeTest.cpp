@@ -22,7 +22,9 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
@@ -530,6 +532,238 @@ PAGX_TEST(PAGXRuntimeTest, EvaluateKeyframeSegmentTypeMismatch) {
   pagx::KeyValue result = pagx::EvaluateKeyframeSegment(leftFloat, leftInt, 0.5,
                                                         pagx::KeyframeInterpolationType::Linear);
   EXPECT_EQ(result, leftFloat);
+}
+
+/**
+ * Test case: AnimationTimeline.evaluationOffset shifts the evaluation point of an animation
+ * so its content is delayed relative to the timeline's own clock. The animation uses two Hold
+ * keyframes (green at frame 0, red at frame 10). With evaluationOffset = 5, the timeline
+ * clock reaches frame 10 at 167ms but the shifted evaluation is at frame 5 (still green); by
+ * 250ms evaluation passes frame 10 (red). This confirms the offset affects content timing without
+ * altering the timeline's own advance() clock.
+ */
+PAGX_TEST(PAGXRuntimeTest, AnimationTimelineEvaluationOffset) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto innerComp = doc->makeNode<pagx::Composition>("inner");
+  innerComp->width = 100;
+  innerComp->height = 100;
+
+  auto childLayer = doc->makeNode<pagx::Layer>("child-layer");
+  childLayer->width = 100;
+  childLayer->height = 100;
+  innerComp->layers.push_back(childLayer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  childLayer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  childLayer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("shift");
+  anim->duration = 20;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Once;
+  innerComp->animations.push_back(anim);
+
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "color";
+  anim->objects.push_back(obj);
+
+  auto* colorProp = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  colorProp->name = "color";
+  pagx::Color green{0, 1, 0, 1, pagx::ColorSpace::SRGB};
+  pagx::Color red{1, 0, 0, 1, pagx::ColorSpace::SRGB};
+  colorProp->keyframes.push_back({0, green, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  colorProp->keyframes.push_back({10, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(colorProp);
+
+  auto rootLayer = doc->makeNode<pagx::Layer>("slot");
+  rootLayer->width = 100;
+  rootLayer->height = 100;
+  rootLayer->composition = innerComp;
+
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "shift";
+  driver->evaluationOffset = 5;
+  rootLayer->timelines.push_back(std::move(driver));
+
+  doc->layers.push_back(rootLayer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+
+  // At frame 10 (167ms), evalFrame = max(0, 10-5) = 5, still in the green (frame 0) Hold.
+  // Without the offset, frame 10 would already be at the red (frame 10) keyframe.
+  scene->advanceAndApply(167000);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "PAGXRuntimeTest/AnimationTimelineEvaluationOffset_green"));
+
+  // At frame 15 (250ms), evalFrame = max(0, 15-5) = 10, reaching the red keyframe.
+  scene->advanceAndApply(83000);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AnimationTimelineEvaluationOffset_red"));
+}
+
+/**
+ * Test case: a negative AnimationTimeline.evaluationOffset skips the animation ahead so its
+ * content starts partway in, matching PAG's signed compositionStartTime (negative = trim from the
+ * front). The animation is green at frame 0 and red at frame 10 (Hold). With
+ * evaluationOffset = -10, the evaluation frame is currentFrame + 10, so even at timeline
+ * frame 0 the content is already at the red keyframe.
+ */
+PAGX_TEST(PAGXRuntimeTest, AnimationTimelineNegativeEvaluationOffset) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto innerComp = doc->makeNode<pagx::Composition>("inner");
+  innerComp->width = 100;
+  innerComp->height = 100;
+
+  auto childLayer = doc->makeNode<pagx::Layer>("child-layer");
+  childLayer->width = 100;
+  childLayer->height = 100;
+  innerComp->layers.push_back(childLayer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  childLayer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("color");
+  solid->color = {0, 0, 0, 1};
+  fill->color = solid;
+  childLayer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("shift");
+  anim->duration = 20;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Once;
+  innerComp->animations.push_back(anim);
+
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "color";
+  anim->objects.push_back(obj);
+
+  auto* colorProp = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  colorProp->name = "color";
+  pagx::Color green{0, 1, 0, 1, pagx::ColorSpace::SRGB};
+  pagx::Color red{1, 0, 0, 1, pagx::ColorSpace::SRGB};
+  colorProp->keyframes.push_back({0, green, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  colorProp->keyframes.push_back({10, red, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(colorProp);
+
+  auto rootLayer = doc->makeNode<pagx::Layer>("slot");
+  rootLayer->width = 100;
+  rootLayer->height = 100;
+  rootLayer->composition = innerComp;
+
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "shift";
+  driver->evaluationOffset = -10;
+  rootLayer->timelines.push_back(std::move(driver));
+
+  doc->layers.push_back(rootLayer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+
+  // At frame 2 (33ms), evalFrame = max(0, 2-(-10)) = 12, already past the red (frame 10) keyframe.
+  // Without the negative offset, frame 2 would still be green. The skip-ahead lands on red.
+  scene->advanceAndApply(33000);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(
+      Baseline::Compare(surface, "PAGXRuntimeTest/AnimationTimelineNegativeEvaluationOffset_red"));
+}
+
+/**
+ * Test case: visibility driven by a "visible" bool channel with Hold keyframes (0, false) ->
+ * (30, true) -> (60, false). The target fills the frame red, so the three sampled instants
+ * distinguish before-window (hidden), inside-window (visible red), and after-window (hidden).
+ */
+PAGX_TEST(PAGXRuntimeTest, AnimationVisibleChannelWindow) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto innerComp = doc->makeNode<pagx::Composition>("inner");
+  innerComp->width = 100;
+  innerComp->height = 100;
+
+  auto childLayer = doc->makeNode<pagx::Layer>("color");
+  childLayer->width = 100;
+  childLayer->height = 100;
+  innerComp->layers.push_back(childLayer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 100;
+  rect->size.height = 100;
+  childLayer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {1, 0, 0, 1};
+  fill->color = solid;
+  childLayer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("window");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Once;
+  innerComp->animations.push_back(anim);
+
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "color";
+  anim->objects.push_back(obj);
+
+  auto* visibleProp = doc->makeNode<pagx::TypedChannel<bool>>();
+  visibleProp->name = "visible";
+  visibleProp->keyframes.push_back({0, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  visibleProp->keyframes.push_back({30, true, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  visibleProp->keyframes.push_back({60, false, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(visibleProp);
+
+  auto rootLayer = doc->makeNode<pagx::Layer>("slot");
+  rootLayer->width = 100;
+  rootLayer->height = 100;
+  rootLayer->composition = innerComp;
+
+  auto driver = std::make_unique<pagx::AnimationTimeline>();
+  driver->animationId = "window";
+  rootLayer->timelines.push_back(std::move(driver));
+
+  doc->layers.push_back(rootLayer);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+
+  // At 0.25s the animation clock is before the window start (frame 30 = 0.5s): the target is hidden.
+  scene->advanceAndApply(250000);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AnimationVisibleChannelWindow_hidden"));
+
+  // At 0.75s the clock is inside [0.5s, 1.0s): the target is visible (red).
+  scene->advanceAndApply(500000);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AnimationVisibleChannelWindow_visible"));
+
+  // At 1.25s the clock is past the window end (frame 60 = 1.0s): the target is hidden again.
+  scene->advanceAndApply(500000);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AnimationVisibleChannelWindow_hidden"));
 }
 
 }  // namespace pag

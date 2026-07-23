@@ -142,7 +142,15 @@ class PAGAnimation : public PAGTimeline {
   // an incremental tree refresh changes binding membership in place, which keeps this timeline and
   // its binding pointer so no other signal would trigger a re-resolve.
   bool targetsDirty = true;
-  int64_t currentTimeUs = 0;
+  // Raw accumulated time in microseconds, not folded by the loop mode. Folding is deferred to
+  // currentTime() and apply() so the content offset can be subtracted on the raw timeline. May be
+  // negative; advance() accumulates, setCurrentTime() clamps to >= 0.
+  int64_t elapsedUs = 0;
+  // Content evaluation offset in microseconds. Set by PAGComposition from the AnimationTimeline
+  // driver's startOffset (frames, converted via the animation's frameRate). Subtracted from raw
+  // elapsedUs before loop folding in apply(). A positive offset delays content; a negative
+  // offset skips ahead.
+  int64_t evaluationOffsetUs = 0;
 
   friend class PAGScene;
   friend class PAGComposition;

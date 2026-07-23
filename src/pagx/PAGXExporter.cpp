@@ -1736,6 +1736,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
           xml.openElement("Animation");
           xml.addRequiredAttribute("ref", "@" + anim->animationId);
           xml.addAttribute("playing", anim->playing, true);
+          xml.addAttribute("evaluationOffset", anim->evaluationOffset, static_cast<int64_t>(0));
           xml.closeElementSelfClosing();
           break;
         }
