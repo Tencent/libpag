@@ -189,7 +189,7 @@
     <message>
         <location filename="../qml/MainForm.qml" line="296"/>
         <source>Reset View</source>
-        <translation type="unfinished"></translation>
+        <translation>重置视图</translation>
     </message>
     <message>
         <location filename="../qml/MainForm.qml" line="803"/>
@@ -334,19 +334,19 @@
         <location filename="../qml/Menu.qml" line="165"/>
         <location filename="../qml/Menu.qml" line="409"/>
         <source>Zoom In</source>
-        <translation type="unfinished"></translation>
+        <translation>放大</translation>
     </message>
     <message>
         <location filename="../qml/Menu.qml" line="173"/>
         <location filename="../qml/Menu.qml" line="417"/>
         <source>Zoom Out</source>
-        <translation type="unfinished"></translation>
+        <translation>缩小</translation>
     </message>
     <message>
         <location filename="../qml/Menu.qml" line="181"/>
         <location filename="../qml/Menu.qml" line="425"/>
         <source>Reset Zoom</source>
-        <translation type="unfinished"></translation>
+        <translation>重置缩放</translation>
     </message>
     <message>
         <location filename="../qml/Menu.qml" line="192"/>
