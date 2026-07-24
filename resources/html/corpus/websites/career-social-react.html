@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>职脉 · React + Tailwind + shadcn 风格</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          border: "hsl(214.3 31.8% 91.4%)",
+          input: "hsl(214.3 31.8% 91.4%)",
+          ring: "hsl(221.2 83.2% 53.3%)",
+          background: "hsl(0 0% 100%)",
+          foreground: "hsl(222.2 47.4% 11.2%)",
+          primary: { DEFAULT: "#0052D9", foreground: "#FFFFFF" },
+          secondary: { DEFAULT: "#F2F3F5", foreground: "#1A1F36" },
+          muted: { DEFAULT: "#F7F8FA", foreground: "#86909C" },
+          destructive: { DEFAULT: "#F53F3F", foreground: "#FFFFFF" },
+          accent: { DEFAULT: "#FFF3E8", foreground: "#FF7D00" },
+          card: { DEFAULT: "#FFFFFF", foreground: "#1A1F36" },
+        },
+        borderRadius: {
+          lg: "0.75rem",
+          md: "0.5rem",
+          sm: "0.375rem",
+        },
+        fontFamily: {
+          sans: ['"PingFang SC"', '"Helvetica Neue"', "Helvetica", "Arial", "sans-serif"],
+        },
+        boxShadow: {
+          card: "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)",
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { height: 100%; }
+  body {
+    background: linear-gradient(135deg, #e0e7ff 0%, #f5f3ff 50%, #fce7f3 100%);
+    -webkit-font-smoothing: antialiased;
+  }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .phone-shell {
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25), 0 10px 30px rgba(15, 23, 42, 0.1);
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+/* ---------- shadcn 风格基础组件 ---------- */
+function cn(...classes) { return classes.filter(Boolean).join(" "); }
+
+const Avatar = ({ src, fallback, className }) => (
+  <div className={cn("relative inline-flex shrink-0 overflow-hidden rounded-full bg-secondary items-center justify-center", className)}>
+    {src ? (
+      <img src={src} alt="" className="aspect-square h-full w-full object-cover" onError={(e)=>{e.currentTarget.style.display='none';}}/>
+    ) : null}
+    <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-secondary-foreground">{fallback}</span>
+  </div>
+);
+
+const Badge = ({ children, variant = "default", className }) => {
+  const variants = {
+    default: "bg-primary/10 text-primary",
+    orange: "bg-accent text-accent-foreground",
+    blue: "bg-blue-50 text-primary",
+    green: "bg-emerald-50 text-emerald-600",
+    gray: "bg-secondary text-muted-foreground",
+  };
+  return (
+    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none", variants[variant], className)}>
+      {children}
+    </span>
+  );
+};
+
+const Button = ({ children, variant = "default", size = "default", className, ...props }) => {
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 active:scale-[0.97]";
+  const variants = {
+    default: "bg-primary text-primary-foreground hover:bg-primary/90",
+    outline: "border border-primary text-primary hover:bg-primary/5",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    ghost: "hover:bg-secondary text-foreground",
+  };
+  const sizes = { default: "h-7 px-3", sm: "h-6 px-2.5", lg: "h-9 px-4" };
+  return <button className={cn(base, variants[variant], sizes[size], className)} {...props}>{children}</button>;
+};
+
+const Card = ({ children, className }) => (
+  <div className={cn("rounded-none bg-card text-card-foreground", className)}>{children}</div>
+);
+
+const Separator = ({ className }) => <div className={cn("h-2 w-full bg-secondary", className)}/>;
+
+const TabsTrigger = ({ active, children, onClick }) => (
+  <button onClick={onClick} className="relative flex flex-col items-center gap-1 py-1 outline-none">
+    <span className={cn("text-[15px] transition-colors", active ? "font-bold text-foreground" : "text-[#4E5969]")}>{children}</span>
+    <span className={cn("h-[3px] w-5 rounded-full transition-all", active ? "bg-primary" : "bg-transparent")}/>
+  </button>
+);
+
+/* ---------- 图标 ---------- */
+const Icon = {
+  Search: (p)=>(<svg viewBox="0 0 16 16" fill="none" {...p}><circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/><path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>),
+  Bell: (p)=>(<svg viewBox="0 0 22 22" fill="none" {...p}><path d="M5 9c0-4 3-6 6-6s6 2 6 6v3l2 3H3l2-3V9z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/><path d="M9 17c0 1.5 1 2.5 2 2.5s2-1 2-2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>),
+  Like: (p)=>(<svg viewBox="0 0 18 18" fill="none" {...p}><path d="M3 8h3v7H3V8zm3 0l3-5c1 0 1 1 1 2l-.5 2H14c1 0 1.5 1 1 2l-1.5 5c-.3.6-.9 1-1.5 1H6V8z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>),
+  LikeFill: (p)=>(<svg viewBox="0 0 18 18" {...p}><path d="M3 8h3v7H3V8zm3 0l3-5c1 0 1 1 1 2l-.5 2H14c1 0 1.5 1 1 2l-1.5 5c-.3.6-.9 1-1.5 1H6V8z" fill="currentColor"/></svg>),
+  Comment: (p)=>(<svg viewBox="0 0 18 18" fill="none" {...p}><path d="M3 4c0-1 1-2 2-2h8c1 0 2 1 2 2v7c0 1-1 2-2 2H7l-3 3v-3c-.5 0-1-1-1-2V4z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>),
+  Share: (p)=>(<svg viewBox="0 0 18 18" fill="none" {...p}><path d="M11 3l4 4-4 4V8.5C7 8.5 5 10 4 13c0-4 2-7 7-7.5V3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>),
+  More: (p)=>(<svg viewBox="0 0 18 18" {...p}><circle cx="4" cy="9" r="1.5" fill="currentColor"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><circle cx="14" cy="9" r="1.5" fill="currentColor"/></svg>),
+  Star: (p)=>(<svg viewBox="0 0 14 14" {...p}><path d="M7 2l2 3 3 .5-2 2.5L10.5 11 7 9.5 3.5 11 4 8 2 5.5 5 5z" fill="currentColor"/></svg>),
+  Home: (p)=>(<svg viewBox="0 0 24 24" {...p}><path d="M3 11l9-8 9 8v9c0 .5-.5 1-1 1h-5v-7H9v7H4c-.5 0-1-.5-1-1v-9z" fill="currentColor"/></svg>),
+  HomeOutline: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><path d="M3 11l9-8 9 8v9c0 .5-.5 1-1 1h-5v-7H9v7H4c-.5 0-1-.5-1-1v-9z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>),
+  Network: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><circle cx="9" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6"/><circle cx="17" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.6"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M14 17c2-2 4-2 7 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>),
+  Plus: (p)=>(<svg viewBox="0 0 22 22" fill="none" {...p}><path d="M11 4v14M4 11h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"/></svg>),
+  Msg: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><path d="M4 6c0-1 1-2 2-2h12c1 0 2 1 2 2v10c0 1-1 2-2 2H9l-4 3v-3c-.5 0-1-1-1-2V6z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/></svg>),
+  User: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.6"/><path d="M4 21c0-5 3-8 8-8s8 3 8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>),
+  Doc: (p)=>(<svg viewBox="0 0 24 24" fill="none" {...p}><path d="M6 3h9l5 5v13c0 1-1 2-2 2H6c-1 0-2-1-2-2V5c0-1 1-2 2-2z" fill="currentColor" /></svg>),
+  Verified: (p)=>(<svg viewBox="0 0 12 12" fill="none" {...p}><path d="M6 1l1.5 1L9 1.7 9.8 3l1.3.8L11 5l.8 1.3-.7 1.5L11 9.3l-1.3.4-.7 1.3L7.5 11 6 12l-1.5-1L3 11.3 2.2 10l-1.3-.8L1 8 .2 6.7.9 5.2 1 3.7l1.3-.4L3 2 4.5 1z" fill="currentColor"/><path d="M3.5 6l1.7 1.7L8.5 4.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>),
+};
+
+/* ---------- 模拟数据 ---------- */
+const POSTS = [
+  {
+    id: 1,
+    name: "李泽宇",
+    company: "跃动科技",
+    title: "高级产品经理",
+    time: "2小时前",
+    avatar: "data:image/png;base64,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",
+    badge: { text: "实名认证", variant: "orange" },
+    followed: false,
+    content: "最近团队招产品同学，给大家一些建议：1）多关注用户真实需求，少做表面功夫；2）数据驱动决策，但别迷信指标；3）保持好奇心和同理心。欢迎私信交流～",
+    image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAyAAAAMgCAIAAABUEpE/AAA6aklEQVR4nO3d51MdaYLoadzBO+FBEhLy3ttyXV1d3dUz3RMb90bs/n/7ZTdi4sbcnW1bXV2+VCXvvYSEEF4CgfD2bKh0twZlHiFALwjzPJ9KyTknKV7g/Mh88830P33+XRoAAOFkBHwtAAAEFgBAeI5gAQAEJrAAAALLivx72+YNoXcBALDC3W18NP2fjmABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAgsAIClzREsAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAAgsAYGlzBAsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQ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QGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAIDABBYAQGACCwAgMIEFABCYwAIACExgAQAEJrAAAAITWAAAgQksAACBBQCwtDmCBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAIDCBBQAQmMACAAhMYAEABCawAAACE1gAAIEJLACAwAQWAEBgAgsAQGABACxtjmABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAAQmsAAAAhNYAACBCSwAgMAEFgBAYAILACAwgQUAEJjAAgAITGABAASWFfn33cZHoXcBALC6OIIFABCYwAIACExgAQAEJrAAANLC+v8ABq5AV4RavIAAAAAASUVORK5CYII=",
+    topic: "热门话题 · #产品经理的那些事# 1.2万人讨论",
+    stats: { like: 328, comment: 86, liked: false },
+  },
+  {
+    id: 2,
+    name: "王思琪",
+    company: "云图科技",
+    title: "资深UI设计师",
+    time: "5小时前",
+    avatar: "data:image/png;base64,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",
+    badge: { text: "职场达人", variant: "blue" },
+    followed: true,
+    content: "分享一个最近做的设计复盘：好的设计不是华丽的视觉，而是让用户感觉不到设计的存在。简洁、克制、目标明确——这是我这五年最深的体会。",
+    file: { name: "2026设计师能力模型.pdf", size: "2.3MB · 已下载1.5k次" },
+    stats: { like: 1200, comment: 234, liked: true },
+  },
+  {
+    id: 3,
+    name: "陈默",
+    company: "鹏程科技",
+    title: "技术专家 · T11",
+    time: "昨天 21:30",
+    avatar: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAIAAAC2BqGFAAAGIklEQVR4nO3c/08aZxzA8efgOITji19rRURURIShNhpxUrXVbW22bukal25Nk/5t/aU/dVmyLl2/pLUTO1ooVqubiiAiFhEErUCVU47F0hC6Uu3a+dHUz+sn7zyeB9/Cc3f8AHXj9jBB+48mhOgbagFmOsrcXr/goJ/DUYGhgWBoIBgaCIYGgqGBYGggGBoIhgaCoYFgaCAYGgiGBoKhgWBoIBgaCIYGgqGBYGggGBoIhgaCoYFgaCAYGgiGBoKhgWBoIBgaCIYGgqGBYGggGBoIhgaCoYFgaCAYGgiGBoKhgWBoIBgaCIYGgqGBYGggGBoIhgaCoYFgaCAYGgiGBvwGmo8Rjqz8fvdB9mexWGwyNJpNhqVQeMrt6e/t/tfBk3/PTE7N/HD+G6FQmN3zYn3d4RoPR6Iimtbr6ttajNHY6m+37uUeIhQILv94IRpbdY4+O/tFX3ana2yClUoMel0ikXSMjofDK4QQTU11xwkzwzBvz557khRFyVhpq9nYUFdbcKLISuzmnfuv9wiFxysr+qwWkUh08KEJIaqqyi9P9xBCEsnkzdtDddqadx3p8we0mhqfP6Cr1xJCOG7r7v2Rthbj6Z7PUynOZndOu70V5aVVx4991d+757zpdPrOfVuzQXeyqyPN888mp4ds9jMDfbs8yUwmE1tdGxq2y1iWpoUFJ8rt5DjO9qfT6/Mb9DpyqJYOns9QAooQquBvQ8uRkmKl2dg0MzuX3RNYDFZUlOnqtTRNs6z01MkudXXV+08XWAyWl5U063UMw0iKiiwdbZubqbW19V0eQlFUWWmJyaifX1jcc/xMhqT5NEUV/nMO4BUdXFq+eu06RVFSicRk0MtYaTyeePuwWa9Pr6tnWamYYVaisfKy0pcbG0qFPHdAUZGYEJJKpZZC4avXrmd3qlVVA6eshJDlcCS3kxBi6WiLJ5JKpSJ/CqVCnkgmc+vSu7BSaTgSJYQUnCi3UygUatSq7JvvcC0du+A4zh94Pje/kN0Ui5me7k6WlT4PhnLHxOOJSDSmVMgLvqMrj1Xkr9GEEKlEEgwt5w7IZDJrL9ZZVrq5mdr9ycTjCVYqyV8l8mV3rscTI3anoUm357/tcF11eOcXGhu0Vy4NXrk0+NPgd4vB0GYqVVNdFVqOeH3+7e10PJF8+Ni1Z6N8mprq5cjK1IyH47iNjc3HT8aKisQlxcpdHpLJZKKx1b+m3fVaze6DK+Sybkv7A5s9mXxJDskruqDAYjD3rjx3dmDW4+vp7sxuMgyj1VTPenxmk6G/r9vhGrM7RhmRSK+rNxoao7HV/Hc0IeTCt2cLTiES0Wf6ex2usdHxSYFAoFGrTvd0F5w9f32Ty2QdJ1pKS4r3nKhYqTAbm0YeOd91gv1PqBu3h/ELBvcbfsEgHLwzBLJfa/T7WA5HJqfcA307F1U8z4/YnYHnS0VicWd7a41aRQhxuMZnvT6FnO3pthS/eSX3/w7yKb+in01OPXI+5Xk+u+mZ8wuFwosXzvVaLXbHaPb0tRKNDp7/2mxqdjwZ279BPvHQSoW8z9qV29Tr6qxdHTRNFyvlDLPz2UI4stJQVyveuURRxxNJnuen3Z4hm50Q8sfDx1Nuz4cNcuRC12rUr+7X38BtbQ3Z7CdaTK9+3haLxa8XOFq4vZ026HUZnr/34GF6e7v51ecPHzAIOSCH6GS49mL9zr3hZr2uVqPeudwW0RzHZX/FbW2JRDunE7OpeTG49Jmx6WMGOdKhk8mXI3Znr9WSPYMRQo5VlHvm/KlUam5+QcayFEXxPO9wjXW2tzpc4+lCi8D7DEKO4FVHvom/Z6Kx1V9u3MpuXr74vaqqcjEY+vnXW1KJpNe6c1fpGptQq443NzWmuC3X04nO9tYPGOSg4J0hBLwzPHpr9CcPQwPB0EAwNBAMDQRDA8HQQDA0EAwNBEMDwdBAMDQQDA0EQwPB0EAwNBAMDQRDA8HQQDA0EAwNBEMDwdBAMDQQDA0EQwPB0EAwNBAMDQRDA8HQQDA0EAwNBEMDwdBAMDQQDA0EQwPB0EAwNBAMDQRDA8HQQDA0EAwNBEMDwdBAMDQQDA34nUpurx9qOnJk/QOKaZXY3i2aJQAAAABJRU5ErkJggg==",
+    badge: { text: "技术大牛", variant: "green" },
+    followed: false,
+    content: "AI Coding 已经不再是辅助工具，而是新一代研发范式。团队从今年 Q1 开始全员上手，效率提升约 40%。最关键的不是模型多强，而是把工程化做到位。",
+    poll: [
+      { label: "已经全面采用", percent: 62 },
+      { label: "部分场景使用", percent: 28 },
+      { label: "还在观望", percent: 10 },
+    ],
+    stats: { like: 856, comment: 192, liked: false },
+  },
+];
+
+const TABS = ["推荐", "关注", "同事圈", "行业头条", "招聘"];
+
+/* ---------- 组件 ---------- */
+function StatusBar() {
+  return (
+    <div className="flex h-11 items-center justify-between bg-white px-5 pt-3.5">
+      <span className="text-[16px] font-semibold text-foreground">9:41</span>
+      <div className="flex items-center gap-1.5 text-foreground">
+        <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="6" width="3" height="6" rx="1" fill="currentColor"/><rect x="5" y="4" width="3" height="8" rx="1" fill="currentColor"/><rect x="10" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2C4 2 1 4 0 6l2 2c1-2 3-3 6-3s5 1 6 3l2-2c-1-2-4-4-8-4zm0 5c-2 0-4 1-5 2l2 2c1-1 2-2 3-2s2 1 3 2l2-2c-1-1-3-2-5-2z" fill="currentColor"/></svg>
+        <div className="h-3 w-[26px] rounded-[3px] border border-current p-[1px]"><div className="h-full w-full rounded-[1px] bg-current"/></div>
+      </div>
+    </div>
+  );
+}
+
+function TopNav() {
+  return (
+    <div className="flex h-12 items-center gap-2.5 bg-white px-4">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary">
+        <span className="text-base font-bold text-primary-foreground">脉</span>
+      </div>
+      <div className="flex h-9 flex-1 items-center gap-2 rounded-full bg-secondary px-3">
+        <Icon.Search className="h-4 w-4 text-muted-foreground"/>
+        <span className="text-[13px] text-muted-foreground">搜索人、公司、岗位</span>
+      </div>
+      <button className="relative flex h-9 w-9 items-center justify-center text-foreground">
+        <Icon.Bell className="h-[22px] w-[22px]"/>
+        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive ring-2 ring-white"/>
+      </button>
+    </div>
+  );
+}
+
+function Tabs({ active, onChange }) {
+  return (
+    <div className="flex h-11 items-center justify-between bg-white px-6">
+      {TABS.map((t)=>(
+        <TabsTrigger key={t} active={active===t} onClick={()=>onChange(t)}>{t}</TabsTrigger>
+      ))}
+    </div>
+  );
+}
+
+function PostHeader({ post, onToggleFollow }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <Avatar src={post.avatar} fallback={post.name[0]} className="h-11 w-11"/>
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[15px] font-semibold text-foreground">{post.name}</span>
+          {post.badge && <Badge variant={post.badge.variant}>{post.badge.text}</Badge>}
+        </div>
+        <span className="text-xs text-muted-foreground">{post.company} · {post.title} · {post.time}</span>
+      </div>
+      {post.followed ? (
+        <Button variant="secondary" onClick={()=>onToggleFollow(post.id)}>已关注</Button>
+      ) : (
+        <Button variant="outline" onClick={()=>onToggleFollow(post.id)}>+ 关注</Button>
+      )}
+    </div>
+  );
+}
+
+function PostActions({ stats, onLike }) {
+  return (
+    <div className="flex items-center justify-between pt-1">
+      <button onClick={onLike} className={cn("flex items-center gap-1.5 text-[13px] transition-colors", stats.liked ? "text-destructive" : "text-muted-foreground")}>
+        {stats.liked ? <Icon.LikeFill className="h-[18px] w-[18px]"/> : <Icon.Like className="h-[18px] w-[18px]"/>}
+        <span>{stats.like >= 1000 ? (stats.like/1000).toFixed(1)+"k" : stats.like}</span>
+      </button>
+      <button className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <Icon.Comment className="h-[18px] w-[18px]"/>
+        <span>{stats.comment}</span>
+      </button>
+      <button className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <Icon.Share className="h-[18px] w-[18px]"/>
+        <span>分享</span>
+      </button>
+      <button className="flex items-center text-muted-foreground">
+        <Icon.More className="h-[18px] w-[18px]"/>
+      </button>
+    </div>
+  );
+}
+
+function PollBlock({ poll }) {
+  return (
+    <div className="space-y-2 rounded-lg bg-muted p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">投票</span>
+        <span>你的团队 AI Coding 进展如何？</span>
+      </div>
+      {poll.map((p,i)=>(
+        <div key={i} className="relative h-8 overflow-hidden rounded-md bg-white">
+          <div className="absolute inset-y-0 left-0 bg-primary/15" style={{ width: p.percent+"%" }}/>
+          <div className="relative flex h-full items-center justify-between px-3 text-xs">
+            <span className="text-foreground">{p.label}</span>
+            <span className="font-medium text-primary">{p.percent}%</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PostCard({ post, onToggleFollow, onLike }) {
+  return (
+    <Card className="flex flex-col gap-2.5 px-4 py-3.5">
+      <PostHeader post={post} onToggleFollow={onToggleFollow}/>
+      <p className="text-[15px] leading-[22px] text-foreground">{post.content}</p>
+      {post.image && (
+        <img src={post.image} className="h-44 w-full rounded-lg object-cover" alt=""/>
+      )}
+      {post.file && (
+        <div className="flex items-center gap-2 rounded-lg bg-muted p-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">PDF</div>
+          <div className="flex flex-1 flex-col">
+            <span className="text-[13px] font-semibold text-foreground">{post.file.name}</span>
+            <span className="text-[11px] text-muted-foreground">{post.file.size}</span>
+          </div>
+          <Button size="sm" variant="outline">下载</Button>
+        </div>
+      )}
+      {post.poll && <PollBlock poll={post.poll}/>}
+      {post.topic && (
+        <div className="flex items-center gap-1.5 rounded-md bg-muted px-3 py-2">
+          <Icon.Star className="h-3.5 w-3.5 text-accent-foreground"/>
+          <span className="text-xs text-[#4E5969]">{post.topic}</span>
+        </div>
+      )}
+      <PostActions stats={post.stats} onLike={()=>onLike(post.id)}/>
+    </Card>
+  );
+}
+
+function BottomTab({ active, onChange }) {
+  const items = [
+    { key: "home", label: "首页", icon: Icon.Home, outline: Icon.HomeOutline },
+    { key: "network", label: "人脉", icon: Icon.Network, outline: Icon.Network },
+    { key: "plus", label: "", icon: Icon.Plus, isPlus: true },
+    { key: "msg", label: "消息", icon: Icon.Msg, outline: Icon.Msg, dot: true },
+    { key: "me", label: "我的", icon: Icon.User, outline: Icon.User },
+  ];
+  return (
+    <div className="absolute inset-x-0 bottom-0 flex h-20 items-start justify-between border-t border-border bg-white px-4 pb-5 pt-2">
+      {items.map((it)=>{
+        if (it.isPlus) {
+          return (
+            <button key={it.key} className="flex w-14 items-center justify-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary shadow-md shadow-primary/30 active:scale-95 transition-transform">
+                <it.icon className="h-[22px] w-[22px] text-primary-foreground"/>
+              </div>
+            </button>
+          );
+        }
+        const isActive = active === it.key;
+        const I = isActive ? it.icon : (it.outline || it.icon);
+        return (
+          <button key={it.key} onClick={()=>onChange(it.key)} className="flex w-14 flex-col items-center gap-0.5">
+            <div className="relative">
+              <I className={cn("h-6 w-6", isActive ? "text-primary" : "text-muted-foreground")}/>
+              {it.dot && <span className="absolute -right-1 -top-0.5 h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-white"/>}
+            </div>
+            <span className={cn("text-[10px]", isActive ? "text-primary" : "text-muted-foreground")}>{it.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- 主页面 ---------- */
+function App() {
+  const [tab, setTab] = useState("推荐");
+  const [activeTab, setActiveTab] = useState("home");
+  const [posts, setPosts] = useState(POSTS);
+
+  const toggleFollow = (id) => {
+    setPosts((s)=>s.map(p=>p.id===id?{...p, followed: !p.followed}:p));
+  };
+  const toggleLike = (id) => {
+    setPosts((s)=>s.map(p=>{
+      if (p.id !== id) return p;
+      const liked = !p.stats.liked;
+      return { ...p, stats: { ...p.stats, liked, like: p.stats.like + (liked?1:-1) } };
+    }));
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center p-4 sm:p-8">
+      <div className="phone-shell relative w-[375px] overflow-hidden rounded-[40px] border-[10px] border-slate-900 bg-slate-100" style={{height: 812}}>
+        {/* 屏幕区域 */}
+        <div className="relative flex h-full flex-col overflow-y-auto no-scrollbar bg-secondary">
+          <StatusBar/>
+          <TopNav/>
+          <Tabs active={tab} onChange={setTab}/>
+          <Separator/>
+
+          {posts.map((p, idx)=>(
+            <React.Fragment key={p.id}>
+              <PostCard post={p} onToggleFollow={toggleFollow} onLike={toggleLike}/>
+              {idx < posts.length - 1 && <Separator/>}
+            </React.Fragment>
+          ))}
+
+          {/* 底部占位避免被底部 tab 遮挡 */}
+          <div className="h-24"/>
+        </div>
+
+        {/* 底部 tab 固定 */}
+        <BottomTab active={activeTab} onChange={setActiveTab}/>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
