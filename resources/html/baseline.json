@@ -1,34 +1,50 @@
 {
-  "_comment": "Corpus-level mean baseline for HTMLTest. This gates the per-corpus SSIM / pixel-diff / RGB-delta MEANS (not per-case pixels, since baselines are Chromium-rendered at run time and are not deterministic per case). A corpus with null means is report-only until seeded. Seed / update ONLY via a trusted run: HTML_EVAL_UPDATE_BASELINE=1 test/run_html_eval.sh. Do not hand-edit the means; you may hand-edit per-corpus tolerance.",
-  "updatedAt": null,
+  "_comment": "Corpus-level mean baseline for HTMLTest. Update only via a trusted run: HTML_EVAL_UPDATE_BASELINE=1 test/run_html_eval.sh. Do not hand-edit means.",
+  "updatedAt": "2026-07-24T08:30:05.822Z",
   "corpora": {
     "html-cases": {
-      "ssimMean": null,
-      "pdMean": null,
-      "rgbMean": null,
-      "cases": 0,
-      "tolerance": { "ssim": 0.02, "pd": 0.02, "rgb": 2.0 }
+      "ssimMean": 0.8705,
+      "pdMean": 0.0143,
+      "rgbMean": 2.73,
+      "cases": 187,
+      "tolerance": {
+        "ssim": 0.02,
+        "pd": 0.02,
+        "rgb": 2
+      }
     },
     "html-cli": {
-      "ssimMean": null,
-      "pdMean": null,
-      "rgbMean": null,
-      "cases": 0,
-      "tolerance": { "ssim": 0.02, "pd": 0.02, "rgb": 2.0 }
+      "ssimMean": 0.9118,
+      "pdMean": 0.0091,
+      "rgbMean": 1.7,
+      "cases": 276,
+      "tolerance": {
+        "ssim": 0.02,
+        "pd": 0.02,
+        "rgb": 2
+      }
     },
     "html-websites": {
-      "ssimMean": null,
-      "pdMean": null,
-      "rgbMean": null,
-      "cases": 0,
-      "tolerance": { "ssim": 0.05, "pd": 0.05, "rgb": 5.0 }
+      "ssimMean": 0.8492,
+      "pdMean": 0.028,
+      "rgbMean": 4.36,
+      "cases": 26,
+      "tolerance": {
+        "ssim": 0.05,
+        "pd": 0.05,
+        "rgb": 5
+      }
     },
     "html-generated": {
-      "ssimMean": null,
-      "pdMean": null,
-      "rgbMean": null,
-      "cases": 0,
-      "tolerance": { "ssim": 0.05, "pd": 0.05, "rgb": 5.0 }
+      "ssimMean": 0.8297,
+      "pdMean": 0.0215,
+      "rgbMean": 4.3,
+      "cases": 162,
+      "tolerance": {
+        "ssim": 0.05,
+        "pd": 0.05,
+        "rgb": 5
+      }
     }
   }
 }
