@@ -293,7 +293,7 @@ SplitView {
                 }
 
                 ToolTip.visible: hovered
-                ToolTip.text: qsTr("Reset View")
+                ToolTip.text: qsTr("Reset Zoom")
                 ToolTip.delay: 500
             }
         }

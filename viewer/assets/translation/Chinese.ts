@@ -188,8 +188,8 @@
     </message>
     <message>
         <location filename="../qml/MainForm.qml" line="296"/>
-        <source>Reset View</source>
-        <translation>重置视图</translation>
+        <source>Reset Zoom</source>
+        <translation>重置缩放</translation>
     </message>
     <message>
         <location filename="../qml/MainForm.qml" line="803"/>
