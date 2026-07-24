@@ -48,11 +48,13 @@ corpus_dir() {
   esac
 }
 
-ALL_CORPORA="cases cli websites generated"
+# Single source of truth for the corpus set; the error hint derives from it.
+DEFAULT_CORPORA=(cases cli websites generated)
+ALL_CORPORA="${DEFAULT_CORPORA[*]}"
 if [ "$#" -gt 0 ]; then
   CORPORA=("$@")
 else
-  CORPORA=(cases cli websites generated)
+  CORPORA=("${DEFAULT_CORPORA[@]}")
 fi
 
 # --- prerequisites ---------------------------------------------------------
