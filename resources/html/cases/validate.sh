@@ -9,7 +9,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CASES="$ROOT/resources/html/cases"
-PAGX="${1:-$ROOT/build/pagx}"
+PAGX="${1:-$ROOT/cmake-build-debug/pagx}"
 MANIFEST="$CASES/manifest.csv"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
