@@ -161,6 +161,7 @@ Item {
                         root.command("toggle-edit-panel");
                     }
                 }
+                MenuSeparator {}
                 Action {
                     text: qsTr("Zoom In")
                     enabled: root.hasPAGFile
