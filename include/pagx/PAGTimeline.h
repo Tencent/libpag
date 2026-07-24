@@ -21,9 +21,14 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include "pagx/nodes/Timeline.h"
 
 namespace pagx {
+
+struct RuntimeBinding;
+class PAGScene;
+class PAGXDocument;
 
 /**
  * PAGTimeline is the abstract base for runtime playback drivers. A PAGAnimation plays a single
@@ -75,6 +80,29 @@ class PAGTimeline {
     apply(mix);
     return changed;
   }
+
+ protected:
+  PAGTimeline(RuntimeBinding* binding, PAGXDocument* contextDoc, std::weak_ptr<PAGScene> owner)
+      : owner(std::move(owner)), binding(binding), contextDoc(contextDoc) {
+  }
+
+  // Resolves the binding this timeline should write through. A non-null binding is a fixed
+  // composition binding co-owned with that composition. A null binding marks a top-level timeline:
+  // the owning scene's current root binding is resolved lazily here, so the timeline keeps working
+  // after the scene rebuilds its runtime tree (which frees and replaces that binding) instead of
+  // dereferencing a dangling pointer. Returns nullptr once the owning scene is gone.
+  RuntimeBinding* effectiveBinding() const;
+
+  // Owning scene. binding / contextDoc point into content this scene keeps alive, so subclasses
+  // bail out of advance()/apply() once the scene is gone to avoid dereferencing freed memory.
+  std::weak_ptr<PAGScene> owner;
+  // Runtime binding the channel writers should target. Null marks a top-level timeline resolved
+  // lazily via effectiveBinding(); non-null is a fixed composition binding.
+  RuntimeBinding* binding = nullptr;
+  // Document used to resolve channel target IDs. Top-level timelines use the scene's primary
+  // document; timelines spawned by external composition layers use the layer's externalDoc so
+  // internal IDs of the external file stay self-contained.
+  PAGXDocument* contextDoc = nullptr;
 };
 
 }  // namespace pagx
