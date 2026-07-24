@@ -150,5 +150,5 @@ node tools/html-snapshot/eval/summary.js --out tools/html-snapshot/eval/out \
 `verify` + 告警断言，不经浏览器）。它**不接入** `HTMLTest`，仅供需要时手动运行：
 
 ```bash
-resources/html/cases/validate.sh    # 默认使用 build/pagx，可传入自定义 pagx 路径
+resources/html/cases/validate.sh    # 默认使用 cmake-build-debug/pagx，可传入自定义 pagx 路径
 ```
