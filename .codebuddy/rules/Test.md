@@ -39,7 +39,9 @@ cmake --build cmake-build-debug --target PAGFullTest
 `corpus/generated`），以及浏览器正确渲染所必需的本地图片和字体；PNG 由 Git LFS 管理。
 `HTMLTest` 目标对它们统一做浏览器保真度
 评测：`snapshot.js`(Chromium) → `pagx import` → `pagx render` → 与 Chromium 基准图比对，
-只出报告（`report.md`/`index.html`），不做通过/失败门禁。
+出报告（`report.md`/`index.html`）。**逐例不设门禁**，但对每套语料的**平均 SSIM / 像素差 /
+RGB 偏差**做回归门禁：与仓库内 `resources/html/baseline.json` 比对，均值退化超容忍值则
+`HTMLTest` 失败。
 
 ```bash
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
@@ -51,6 +53,10 @@ cmake --build cmake-build-debug --target HTMLTest   # 依赖并先构建 pagx
 - 前置条件：已构建 `pagx`、Node.js（脚本会自动 `npm install`/`npm run build`，默认
   Playwright 引擎还会自动安装 Chromium）；
   评测 `websites`/`generated` 需要联网（拉 CDN CSS/字体/图片）。
+- **基准门禁**：`baseline.json` 存的是**语料级均值**（非逐例像素，逐例基准图由 Chromium
+  运行时现场渲染、不确定）。**NEVER** 手改其中的均值。保真度有意提升或首次 seed 时，用
+  `HTML_EVAL_UPDATE_BASELINE=1 cmake --build cmake-build-debug --target HTMLTest` 重新生成
+  （仅全部语料成功时才写入），并把 `baseline.json` 变更一并提交。
 - 用法与指标详见 [resources/html/README.md](../../resources/html/README.md)。
 
 ## 使用本地 tgfx 源码调试

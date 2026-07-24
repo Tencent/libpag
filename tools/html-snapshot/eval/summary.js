@@ -19,13 +19,23 @@ const fs = require('fs');
 const path = require('path');
 
 function parseArgs(argv) {
-  const opts = { outDir: path.join(__dirname, 'out'), title: 'HTML eval summary', labels: [] };
+  const opts = {
+    outDir: path.join(__dirname, 'out'),
+    title: 'HTML eval summary',
+    labels: [],
+    baseline: '',
+    updateBaseline: false,
+  };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--out') opts.outDir = argv[++i];
     else if (a === '--title') opts.title = argv[++i];
+    else if (a === '--baseline') opts.baseline = argv[++i];
+    else if (a === '--update-baseline') opts.updateBaseline = true;
     else if (a === '-h' || a === '--help') {
-      console.log('Usage: node summary.js [--out <dir>] [--title <t>] <label> [<label> ...]');
+      console.log(
+        'Usage: node summary.js [--out <dir>] [--title <t>] [--baseline <file>] [--update-baseline] <label> [<label> ...]'
+      );
       process.exit(0);
     } else opts.labels.push(a);
   }
@@ -175,6 +185,108 @@ function renderHtml(summaries, overall, title, entries) {
 `;
 }
 
+// --- corpus-level mean baseline gate ---------------------------------------
+//
+// Browser fidelity is a corpus-level mean metric, so the gate compares this
+// run's per-corpus means against a committed baseline instead of doing any
+// per-case pixel comparison (baselines are Chromium-rendered at run time and
+// therefore not deterministic per case). A corpus regresses when its SSIM mean
+// drops, or its pixel-diff / RGB-delta mean rises, beyond the tolerance.
+
+// Default tolerances per corpus. websites/generated pull CDN CSS/fonts/images
+// at eval time, so they are inherently noisier and get looser bounds.
+const DEFAULT_TOLERANCE = { ssim: 0.02, pd: 0.02, rgb: 2.0 };
+const LOOSE_TOLERANCE = { ssim: 0.05, pd: 0.05, rgb: 5.0 };
+const CORPUS_TOLERANCE = {
+  'html-cases': DEFAULT_TOLERANCE,
+  'html-cli': DEFAULT_TOLERANCE,
+  'html-websites': LOOSE_TOLERANCE,
+  'html-generated': LOOSE_TOLERANCE,
+};
+
+function loadBaseline(file) {
+  if (!file || !fs.existsSync(file)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    console.error(`summary: failed to parse baseline ${file}: ${e.message}`);
+    return null;
+  }
+}
+
+function toleranceFor(baseline, label) {
+  const perCorpus = baseline && baseline.corpora && baseline.corpora[label];
+  if (perCorpus && perCorpus.tolerance) return perCorpus.tolerance;
+  return CORPUS_TOLERANCE[label] || DEFAULT_TOLERANCE;
+}
+
+// Returns { ok, checks: [...] } comparing a corpus summary against its baseline
+// entry. A missing baseline entry is report-only (ok=true, checks=[]).
+function gateCorpus(summary, baseline) {
+  const entry = baseline && baseline.corpora && baseline.corpora[summary.label];
+  if (!entry) return { ok: true, checks: [], skipped: true };
+  const tol = toleranceFor(baseline, summary.label);
+  const checks = [];
+  const cmp = (metric, cur, base, dir, t) => {
+    if (!Number.isFinite(base)) return;
+    const limit = dir === 'higher' ? base - t : base + t;
+    const pass = dir === 'higher' ? cur >= limit : cur <= limit;
+    checks.push({ metric, cur, base, limit, dir, pass });
+  };
+  cmp('ssimMean', summary.ssimMean, num(entry.ssimMean), 'higher', tol.ssim);
+  cmp('pdMean', summary.pdMean, num(entry.pdMean), 'lower', tol.pd);
+  cmp('rgbMean', summary.rgbMean, num(entry.rgbMean), 'lower', tol.rgb);
+  return { ok: checks.every((c) => c.pass), checks, skipped: false };
+}
+
+function printGate(results) {
+  console.log('=== HTML eval baseline gate (corpus-level means) ===');
+  let anyGated = false;
+  for (const { summary, gate } of results) {
+    if (gate.skipped) {
+      console.log(`  ${summary.label}: (no baseline entry — report-only)`);
+      continue;
+    }
+    anyGated = true;
+    const status = gate.ok ? 'PASS' : 'FAIL';
+    console.log(`  ${summary.label}: ${status}`);
+    for (const c of gate.checks) {
+      const arrow = c.dir === 'higher' ? '>=' : '<=';
+      const mark = c.pass ? 'ok ' : 'BAD';
+      console.log(
+        `      [${mark}] ${c.metric} ${f(c.cur)} (need ${arrow} ${f(c.limit)}, base ${f(c.base)})`
+      );
+    }
+  }
+  if (!anyGated) console.log('  (no corpus had a baseline entry; nothing gated)');
+  console.log('');
+}
+
+function writeBaseline(file, summaries) {
+  const prev = loadBaseline(file) || {};
+  const corpora = {};
+  for (const s of summaries) {
+    const prevEntry = (prev.corpora && prev.corpora[s.label]) || {};
+    corpora[s.label] = {
+      ssimMean: Number.isFinite(s.ssimMean) ? Number(s.ssimMean.toFixed(4)) : null,
+      pdMean: Number.isFinite(s.pdMean) ? Number(s.pdMean.toFixed(4)) : null,
+      rgbMean: Number.isFinite(s.rgbMean) ? Number(s.rgbMean.toFixed(2)) : null,
+      cases: s.cases,
+      // Preserve any hand-tuned per-corpus tolerance override.
+      ...(prevEntry.tolerance ? { tolerance: prevEntry.tolerance } : {}),
+    };
+  }
+  const out = {
+    _comment:
+      'Corpus-level mean baseline for HTMLTest. Update only via a trusted run: ' +
+      'HTML_EVAL_UPDATE_BASELINE=1 test/run_html_eval.sh. Do not hand-edit means.',
+    updatedAt: new Date().toISOString(),
+    corpora,
+  };
+  fs.writeFileSync(file, JSON.stringify(out, null, 2) + '\n', 'utf8');
+  console.log(`summary: wrote baseline ${file}`);
+}
+
 function main() {
   const opts = parseArgs(process.argv);
   if (!opts.labels.length) {
@@ -207,6 +319,43 @@ function main() {
   const outHtml = path.join(opts.outDir, 'summary.html');
   fs.writeFileSync(outHtml, renderHtml(summaries, overall, opts.title, entries), 'utf8');
   console.log(`summary: wrote ${outHtml}`);
+  console.log('');
+
+  // Explicit baseline update: never happens as a side effect of a normal run.
+  if (opts.updateBaseline) {
+    if (!opts.baseline) {
+      console.error('summary: --update-baseline requires --baseline <file>');
+      process.exit(2);
+    }
+    writeBaseline(opts.baseline, summaries);
+    return;
+  }
+
+  // No baseline path given: stay report-only (preserves prior behaviour).
+  if (!opts.baseline) return;
+
+  const baseline = loadBaseline(opts.baseline);
+  if (!baseline) {
+    console.error(
+      `summary: baseline ${opts.baseline} missing or unreadable — run once with ` +
+        'HTML_EVAL_UPDATE_BASELINE=1 to seed it. Skipping gate.'
+    );
+    return;
+  }
+  const results = summaries.map((s) => ({ summary: s, gate: gateCorpus(s, baseline) }));
+  printGate(results);
+  const failed = results.filter((r) => !r.gate.ok);
+  if (failed.length) {
+    console.error(
+      `summary: baseline gate FAILED for: ${failed.map((r) => r.summary.label).join(', ')}`
+    );
+    console.error(
+      'summary: if this change is an intended fidelity update, re-baseline via ' +
+        'HTML_EVAL_UPDATE_BASELINE=1 test/run_html_eval.sh'
+    );
+    process.exit(1);
+  }
+  console.log('summary: baseline gate PASSED');
 }
 
 main();

@@ -7,9 +7,11 @@
 # resources/html/, and emits a per-corpus report. This is the entry point
 # behind the CMake `HTMLTest` target.
 #
-# It is report-only: it never fails on low SSIM. Browser fidelity is a
-# corpus-level mean metric, not a hard pass/fail gate, so inspect the
-# generated report.md / index.html by hand.
+# Per case it is report-only: it never fails on a single low SSIM. Browser
+# fidelity is a corpus-level mean metric, so the only pass/fail gate is on the
+# per-corpus means (SSIM / pixel-diff / RGB-delta) compared against the
+# committed baseline resources/html/baseline.json. A corpus with no baseline
+# entry stays report-only. Inspect report.md / index.html by hand for detail.
 #
 # Prerequisites:
 #   - a built `pagx` binary (default: <repo>/cmake-build-debug/pagx, or $PAGX_BIN)
@@ -24,6 +26,8 @@
 #   PAGX_BIN=/path/to/pagx test/run_html_eval.sh
 #   EVAL_EXTRA_ARGS="--only bilibili" test/run_html_eval.sh websites
 #   CONCURRENCY=8 BROWSER_ENGINE=puppeteer test/run_html_eval.sh
+#   HTML_EVAL_UPDATE_BASELINE=1 test/run_html_eval.sh   # re-seed the baseline
+#   HTML_BASELINE=/path/to/baseline.json test/run_html_eval.sh
 #
 set -u
 set -o pipefail
@@ -36,6 +40,11 @@ EVAL_EXTRA_ARGS="${EVAL_EXTRA_ARGS:-}"
 # Cases run in parallel; a headless engine handles the browser work.
 CONCURRENCY="${CONCURRENCY:-16}"
 BROWSER_ENGINE="${BROWSER_ENGINE:-playwright}"
+# Corpus-level mean baseline gate. HTML_BASELINE points at the committed
+# baseline; set HTML_EVAL_UPDATE_BASELINE=1 to re-seed it from this run instead
+# of gating against it.
+HTML_BASELINE="${HTML_BASELINE:-$ROOT/resources/html/baseline.json}"
+HTML_EVAL_UPDATE_BASELINE="${HTML_EVAL_UPDATE_BASELINE:-0}"
 
 # corpus name  ->  relative dir under resources/html
 corpus_dir() {
@@ -183,14 +192,27 @@ else
 fi
 
 # Aggregate every corpus that ran into one cross-corpus summary: print the
-# rolled-up table to the console and write out/summary.html.
+# rolled-up table to the console, write out/summary.html, and gate the
+# per-corpus means against the committed baseline (or re-seed it on request).
 if [ "${#LABELS[@]}" -gt 0 ]; then
-  if node "$SNAPSHOT_DIR/eval/summary.js" --out "$OUT_ROOT" "${LABELS[@]}"; then
+  declare -a SUMMARY_ARGS=(--out "$OUT_ROOT" --baseline "$HTML_BASELINE")
+  if [ "$HTML_EVAL_UPDATE_BASELINE" != "0" ]; then
+    SUMMARY_ARGS+=(--update-baseline)
+    echo "run_html_eval: re-seeding baseline from this run -> $HTML_BASELINE" >&2
+  fi
+  # A partial run (some corpora failed) must never rewrite the baseline: the
+  # new file would drop the missing corpora's entries.
+  if [ "$HTML_EVAL_UPDATE_BASELINE" != "0" ] && [ "${#FAILED_CORPORA[@]}" -gt 0 ]; then
+    echo "run_html_eval: refusing to update baseline; corpora failed this run: ${FAILED_CORPORA[*]}" >&2
+    RUN_STATUS=1
+  elif node "$SNAPSHOT_DIR/eval/summary.js" "${SUMMARY_ARGS[@]}" "${LABELS[@]}"; then
     echo ""
     echo "Open the summary:      open $OUT_ROOT/summary.html"
     echo "Open a corpus viewer:  open ${REPORTS[0]}/index.html"
   else
-    echo "run_html_eval: failed to generate cross-corpus summary" >&2
+    # summary.js exits non-zero on a baseline-gate regression as well as on a
+    # genuine summary failure; both must fail the overall run.
+    echo "run_html_eval: cross-corpus summary/baseline gate failed" >&2
     RUN_STATUS=1
   fi
 else
