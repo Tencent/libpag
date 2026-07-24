@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>展望</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .arrow-bullet {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- 极细网格线装饰 -->
+    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(rgba(17,17,17,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,0.06) 1px, transparent 1px); background-size: 80px 80px;"></div>
+
+    <!-- 页眉线 -->
+    <div class="absolute top-0 left-0 w-full h-[2px]" style="background: rgba(17,17,17,0.2);"></div>
+
+    <!-- zone-5: 装饰区-左上 几何圆环 -->
+    <div class="absolute pointer-events-none" style="top:30px; left:60px; width:160px; height:160px;">
+      <div style="width:120px; height:120px; border:1px solid #111111; border-radius:50%; opacity:0.1; position:absolute; top:0; left:0;"></div>
+      <div style="width:80px; height:80px; border:1px solid #111111; border-radius:50%; opacity:0.08; position:absolute; top:40px; left:40px;"></div>
+      <div style="width:40px; height:40px; border:1px solid #111111; border-radius:50%; opacity:0.06; position:absolute; top:80px; left:80px;"></div>
+    </div>
+
+    <!-- zone-6: 装饰区-右下 几何圆环 -->
+    <div class="absolute pointer-events-none" style="top:540px; left:1060px; width:220px; height:160px;">
+      <div style="width:140px; height:140px; border:1px solid #111111; border-radius:50%; opacity:0.1; position:absolute; bottom:0; right:0;"></div>
+      <div style="width:80px; height:80px; border:1px solid #111111; border-radius:50%; opacity:0.08; position:absolute; bottom:40px; right:40px;"></div>
+      <div style="width:40px; height:40px; border:1px solid #111111; border-radius:50%; opacity:0.06; position:absolute; bottom:80px; right:80px;"></div>
+    </div>
+
+    <!-- zone-1: 主标题区 -->
+    <div class="absolute" style="top:180px; left:240px; width:800px; height:100px;">
+      <h1 class="text-[96px] font-semibold text-center" style="letter-spacing: -0.025em; line-height: 1;">展望</h1>
+    </div>
+
+    <!-- zone-2: 副标题区 -->
+    <div class="absolute" style="top:290px; left:340px; width:600px; height:50px;">
+      <p class="text-[24px] font-medium text-center" style="color:rgba(17,17,17,0.6); letter-spacing: -0.01em;">从工具辅助到智能协同</p>
+    </div>
+
+    <!-- zone-3: 愿景列表 -->
+    <div class="absolute" style="top:380px; left:190px; width:900px; height:200px;">
+      <div class="space-y-4">
+        <div class="flex items-center gap-4">
+          <svg class="arrow-bullet" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[16px] leading-[1.625]">随着AI技术与设计工具的深度融合，设计行业正在经历从工具辅助到智能协同的根本性转变</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <svg class="arrow-bullet" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[16px] leading-[1.625]">Ardot的资产化思维和MCP协议实践，代表了一种全新的产设研协作范式</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <svg class="arrow-bullet" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[16px] leading-[1.625]">未来竞争焦点：谁的AI更懂设计、谁的生态更完整、谁的流转更顺畅</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <svg class="arrow-bullet" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[16px] leading-[1.625]">Ardot凭借腾讯的技术积累和产品视野，有望成为国产AI设计工具的重要引领者</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-4: 核心亮点 -->
+    <div class="absolute" style="top:600px; left:240px; width:800px; height:50px;">
+      <div class="text-center py-3" style="border-top: 1px solid rgba(17,17,17,0.2); border-bottom: 1px solid rgba(17,17,17,0.2);">
+        <p class="text-[18px] font-medium" style="letter-spacing: -0.01em;">谁的AI更懂设计，谁就将定义下一代设计工具</p>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-0 left-0 w-full flex justify-between items-center px-[60px]" style="height:30px;">
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">腾讯Ardot设计平台 - 分析与竞品分析报告</span>
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">15</span>
+    </div>
+  </div>
+</body>
+</html>

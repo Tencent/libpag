@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 3 - 五层架构总览</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+.slide { width: 1280px; height: 720px; overflow: hidden; position: relative; background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%); }
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- 背景水印 -->
+  <div class="absolute top-[100px] left-[50px] text-[350px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="font-family:'Noto Sans SC',sans-serif;">五层</div>
+
+  <!-- 页眉 -->
+  <div class="absolute top-[32px] right-[48px] z-50">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[48px] left-[64px] z-20">
+    <h1 class="text-[36px] font-[400] text-[#FFFFFF] tracking-[0.02em]">五层架构总览</h1>
+    <p class="text-[16px] font-[300] text-[#FFFFFF]/60 mt-[8px] tracking-[0.05em]">从内到外的人格体系设计</p>
+  </div>
+
+  <!-- 五层堆叠 -->
+  <!-- 第5层 -->
+  <div class="absolute top-[150px] left-[200px] w-[880px] h-[80px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[8px] flex items-center px-[32px] z-20">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 w-[80px]">第 5 层</span>
+    <span class="text-[18px] font-[400] text-[#FFFFFF] mx-[16px]">主动行为层</span>
+    <span class="text-[12px] font-[400] text-[#FFFFFF]/30 uppercase tracking-[0.05em] mx-[16px]">Heartbeat</span>
+    <div class="flex-1"></div>
+    <span class="text-[14px] font-[300] text-[#FFFFFF]/60">它会主动做什么</span>
+  </div>
+
+  <!-- 第4层 -->
+  <div class="absolute top-[240px] left-[200px] w-[880px] h-[80px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[8px] flex items-center px-[32px] z-20">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 w-[80px]">第 4 层</span>
+    <span class="text-[18px] font-[400] text-[#FFFFFF] mx-[16px]">能力扩展层</span>
+    <span class="text-[12px] font-[400] text-[#FFFFFF]/30 uppercase tracking-[0.05em] mx-[16px]">Skills</span>
+    <div class="flex-1"></div>
+    <span class="text-[14px] font-[300] text-[#FFFFFF]/60">它能做什么</span>
+  </div>
+
+  <!-- 第3层 -->
+  <div class="absolute top-[330px] left-[200px] w-[880px] h-[80px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[8px] flex items-center px-[32px] z-20">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 w-[80px]">第 3 层</span>
+    <span class="text-[18px] font-[400] text-[#FFFFFF] mx-[16px]">工作流程层</span>
+    <span class="text-[12px] font-[400] text-[#FFFFFF]/30 uppercase tracking-[0.05em] mx-[16px]">Agents</span>
+    <div class="flex-1"></div>
+    <span class="text-[14px] font-[300] text-[#FFFFFF]/60">它怎么干活</span>
+  </div>
+
+  <!-- 第2层 -->
+  <div class="absolute top-[420px] left-[200px] w-[880px] h-[80px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[8px] flex items-center px-[32px] z-20">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 w-[80px]">第 2 层</span>
+    <span class="text-[18px] font-[400] text-[#FFFFFF] mx-[16px]">关系认知层</span>
+    <span class="text-[12px] font-[400] text-[#FFFFFF]/30 uppercase tracking-[0.05em] mx-[16px]">User + Memory</span>
+    <div class="flex-1"></div>
+    <span class="text-[14px] font-[300] text-[#FFFFFF]/60">它了解谁、记住了什么</span>
+  </div>
+
+  <!-- 第1层 -->
+  <div class="absolute top-[510px] left-[200px] w-[880px] h-[80px] border-[1px] border-[#82D0A4]/40 rounded-[8px] flex items-center px-[32px] z-20" style="background: rgba(130,208,164,0.05);">
+    <span class="text-[14px] font-[400] text-[#82D0A4] w-[80px]">第 1 层</span>
+    <span class="text-[18px] font-[400] text-[#FFFFFF] mx-[16px]">灵魂内核层</span>
+    <span class="text-[12px] font-[400] text-[#FFFFFF]/30 uppercase tracking-[0.05em] mx-[16px]">Soul + Identity</span>
+    <div class="flex-1"></div>
+    <span class="text-[14px] font-[300] text-[#FFFFFF]/60">它是谁</span>
+  </div>
+
+  <!-- 左侧数字标注 -->
+  <div class="absolute top-[150px] left-[120px] w-[60px] h-[440px] flex flex-col justify-between z-10">
+    <div class="w-[1px] h-[100%] bg-[#FFFFFF]/10 absolute left-[30px]"></div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">架构</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

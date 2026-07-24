@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 7 - 技术架构与资产化思维差异化</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.bg-noise {
+  background-color: #DFDDDA;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+</style>
+</head>
+<body>
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden m-auto">
+  <!-- Page Title -->
+  <div class="absolute top-[50px] left-[48px]">
+    <h1 class="text-[40px] font-semibold tracking-[-0.01em] leading-[1.2]">技术架构与 "资产化思维" 差异化</h1>
+  </div>
+
+  <!-- Horizontal Divider -->
+  <div class="absolute left-[48px] right-[48px] top-[130px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- Comparison Table -->
+  <div class="absolute top-[148px] left-[48px] w-[1184px]">
+    <table class="w-full border-collapse text-left">
+      <thead>
+        <tr class="border-b border-[#111111]/25">
+          <th class="py-[12px] px-[16px] text-[13px] font-semibold uppercase tracking-wider opacity-70 w-[22%]">维度</th>
+          <th class="py-[12px] px-[16px] text-[13px] font-semibold uppercase tracking-wider opacity-70 w-[39%]">传统 AI 设计工具</th>
+          <th class="py-[12px] px-[16px] text-[13px] font-semibold uppercase tracking-wider opacity-70 w-[39%]">Ardot</th>
+        </tr>
+      </thead>
+      <tbody class="text-[14px]">
+        <tr class="border-b border-[#111111]/10">
+          <td class="py-[11px] px-[16px] font-medium">输出类型</td>
+          <td class="py-[11px] px-[16px] opacity-65">静态图片</td>
+          <td class="py-[11px] px-[16px] font-medium">可编辑结构化设计资产</td>
+        </tr>
+        <tr class="border-b border-[#111111]/10">
+          <td class="py-[11px] px-[16px] font-medium">图层结构</td>
+          <td class="py-[11px] px-[16px] opacity-65">无 / 扁平化</td>
+          <td class="py-[11px] px-[16px] font-medium">保留完整图层与组件属性</td>
+        </tr>
+        <tr class="border-b border-[#111111]/10">
+          <td class="py-[11px] px-[16px] font-medium">团队协作</td>
+          <td class="py-[11px] px-[16px] opacity-65">有限</td>
+          <td class="py-[11px] px-[16px] font-medium">企业级权限 + 行为追溯</td>
+        </tr>
+        <tr>
+          <td class="py-[11px] px-[16px] font-medium">开发交付</td>
+          <td class="py-[11px] px-[16px] opacity-65">需手动标注切图</td>
+          <td class="py-[11px] px-[16px] font-medium">MCP 一键转代码</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Tech Stack Row -->
+  <div class="absolute bottom-[48px] left-[48px] right-[48px] flex gap-[20px]">
+    <div class="flex-1 border border-[#111111]/15 p-[18px] rounded-[4px]">
+      <div class="flex items-center gap-[8px] mb-[8px]">
+        <i class="ph ph-cube text-[18px]"></i>
+        <span class="text-[13px] font-semibold">混元大模型</span>
+      </div>
+      <p class="text-[12px]/[1.5] opacity-60">自然语言理解与生成能力</p>
+    </div>
+    <div class="flex-1 border border-[#111111]/15 p-[18px] rounded-[4px]">
+      <div class="flex items-center gap-[8px] mb-[8px]">
+        <i class="ph ph-eye text-[18px]"></i>
+        <span class="text-[13px] font-semibold">优图视觉算法</span>
+      </div>
+      <p class="text-[12px]/[1.5] opacity-60">图像识别、分层与转换引擎</p>
+    </div>
+    <div class="flex-1 border border-[#111111]/15 p-[18px] rounded-[4px]">
+      <div class="flex items-center gap-[8px] mb-[8px]">
+        <i class="ph ph-code-block text-[18px]"></i>
+        <span class="text-[13px] font-semibold">WorkBuddy / CodeBuddy</span>
+      </div>
+      <p class="text-[12px]/[1.5] opacity-60">开发工具链无缝衔接架构</p>
+    </div>
+    <div class="flex-1 border border-[#111111]/15 p-[18px] rounded-[4px]">
+      <div class="flex items-center gap-[8px] mb-[8px]">
+        <i class="ph ph-link text-[18px]"></i>
+        <span class="text-[13px] font-semibold">MCP 协议</span>
+      </div>
+      <p class="text-[12px]/[1.5] opacity-60">设计与代码的无缝连接桥梁</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

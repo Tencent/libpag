@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>主动行为层</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; }
+.slide {
+  width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0;
+  background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+  font-family: 'Noto Sans SC', sans-serif; color: #FFFFFF;
+}
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Watermark -->
+  <div class="absolute text-[300px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="z-index:0; top: 140px; left: 200px;">HEARTBEAT</div>
+
+  <!-- Page Header -->
+  <div class="absolute top-[32px] right-[48px]" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- Section Title -->
+  <div class="absolute" style="z-index:20; top: 50px; left: 80px;">
+    <div class="text-[12px] font-[500] tracking-[0.15em] text-[#82D0A4] mb-[8px]">LAYER 5 — PROACTIVE BEHAVIOR</div>
+    <h1 class="text-[32px] font-[300] text-[#FFFFFF]">主动行为层 <span class="text-[16px] text-[#FFFFFF]/40 ml-[12px]">HEARTBEAT — 它会主动做什么</span></h1>
+  </div>
+
+  <!-- Left: Timeline -->
+  <div class="absolute" style="z-index:20; top: 140px; left: 80px; width: 600px; height: 420px;">
+    <div class="relative" style="padding-left: 40px;">
+      <!-- Vertical dashed line -->
+      <div class="absolute left-[12px] top-[10px] bottom-[10px] w-[1px] border-l-[1px] border-dashed border-[#FFFFFF]/20"></div>
+
+      <!-- Item 1 -->
+      <div class="flex items-start gap-[16px] mb-[28px]">
+        <div class="absolute left-[0px] w-[26px] h-[26px] rounded-full border-[1px] border-[#82D0A4]/50 flex items-center justify-center bg-[#051014]">
+          <i class="ph ph-timer text-[12px] text-[#82D0A4]"></i>
+        </div>
+        <div>
+          <div class="text-[14px] font-[500] text-[#82D0A4] mb-[4px]">每 30 分钟</div>
+          <div class="text-[14px] text-[#FFFFFF]/60">检查紧急邮件/消息</div>
+        </div>
+      </div>
+
+      <!-- Item 2 -->
+      <div class="flex items-start gap-[16px] mb-[28px]">
+        <div class="absolute left-[0px] w-[26px] h-[26px] rounded-full border-[1px] border-[#82D0A4]/50 flex items-center justify-center bg-[#051014]" style="top: 80px;">
+          <i class="ph ph-sun text-[12px] text-[#82D0A4]"></i>
+        </div>
+        <div style="margin-top: 80px;">
+          <div class="text-[14px] font-[500] text-[#82D0A4] mb-[4px]">每天 8:00</div>
+          <div class="text-[14px] text-[#FFFFFF]/60">推送今日待办和日程提醒</div>
+        </div>
+      </div>
+
+      <!-- Item 3 -->
+      <div class="flex items-start gap-[16px] mb-[28px]">
+        <div class="absolute left-[0px] w-[26px] h-[26px] rounded-full border-[1px] border-[#82D0A4]/50 flex items-center justify-center bg-[#051014]" style="top: 160px;">
+          <i class="ph ph-moon text-[12px] text-[#82D0A4]"></i>
+        </div>
+        <div style="margin-top: 160px;">
+          <div class="text-[14px] font-[500] text-[#82D0A4] mb-[4px]">每天 21:00</div>
+          <div class="text-[14px] text-[#FFFFFF]/60">采集 AI 热点，推送摘要</div>
+        </div>
+      </div>
+
+      <!-- Item 4 -->
+      <div class="flex items-start gap-[16px] mb-[28px]">
+        <div class="absolute left-[0px] w-[26px] h-[26px] rounded-full border-[1px] border-[#82D0A4]/50 flex items-center justify-center bg-[#051014]" style="top: 240px;">
+          <i class="ph ph-calendar text-[12px] text-[#82D0A4]"></i>
+        </div>
+        <div style="margin-top: 240px;">
+          <div class="text-[14px] font-[500] text-[#82D0A4] mb-[4px]">每周一 9:00</div>
+          <div class="text-[14px] text-[#FFFFFF]/60">生成上周工作周报</div>
+        </div>
+      </div>
+
+      <!-- Item 5 -->
+      <div class="flex items-start gap-[16px]">
+        <div class="absolute left-[0px] w-[26px] h-[26px] rounded-full border-[1px] border-[#82D0A4]/50 flex items-center justify-center bg-[#051014]" style="top: 320px;">
+          <i class="ph ph-eye text-[12px] text-[#82D0A4]"></i>
+        </div>
+        <div style="margin-top: 320px;">
+          <div class="text-[14px] font-[500] text-[#82D0A4] mb-[4px]">持续运行</div>
+          <div class="text-[14px] text-[#FFFFFF]/60">监控特定话题/论文/竞品动态</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Core Insight -->
+  <div class="absolute flex flex-col items-center justify-center" style="z-index:20; top: 200px; left: 720px; width: 500px; height: 300px;">
+    <div class="text-[80px] font-[300] text-[#FFFFFF]/[0.08] mb-[-20px] leading-none">"</div>
+    <div class="text-[28px] font-[300] text-[#FFFFFF] leading-[1.5] text-center mb-[24px]">
+      它替你盯着世界<br>有事<span class="text-[#82D0A4]">主动来找你</span>
+    </div>
+    <div class="text-[80px] font-[300] text-[#FFFFFF]/[0.08] mt-[-30px] leading-none rotate-[180deg]">"</div>
+  </div>
+
+  <!-- Bottom: Ultimate Form -->
+  <div class="absolute flex items-center justify-center" style="z-index:20; top: 570px; left: 200px; width: 880px;">
+    <div class="border-[1px] border-[#82D0A4]/30 rounded-full px-[32px] py-[10px]">
+      <span class="text-[14px] text-[#82D0A4]">这才是"养成系"的终极形态</span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">主动·行为</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

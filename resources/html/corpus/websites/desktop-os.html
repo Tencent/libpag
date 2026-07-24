@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AuroraOS Nova</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.js"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* AuroraOS 桌面壁纸 - Nova 风格渐变 */
+  .desktop-bg {
+    background:
+      radial-gradient(ellipse at 20% 20%, rgba(255, 145, 86, 0.55), transparent 55%),
+      radial-gradient(ellipse at 85% 15%, rgba(255, 90, 160, 0.45), transparent 55%),
+      radial-gradient(ellipse at 70% 80%, rgba(99, 102, 241, 0.55), transparent 55%),
+      radial-gradient(ellipse at 15% 85%, rgba(56, 189, 248, 0.45), transparent 55%),
+      linear-gradient(135deg, #1e1b4b 0%, #312e81 35%, #4c1d95 70%, #831843 100%);
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+  }
+  .glass-dark {
+    background: rgba(28, 28, 30, 0.62);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .glass-window {
+    background: rgba(40, 40, 45, 0.78);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .dock-icon {
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .dock-icon:hover {
+    transform: translateY(-10px) scale(1.15);
+  }
+  .dock-icon:hover + .dock-tooltip,
+  .dock-icon-wrap:hover .dock-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  .dock-tooltip {
+    opacity: 0;
+    transition: all 0.15s ease;
+    pointer-events: none;
+  }
+  .traffic-light {
+    width: 12px; height: 12px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: filter 0.15s ease;
+  }
+  .traffic-light:hover svg { opacity: 1; }
+  .traffic-light svg { opacity: 0; transition: opacity 0.15s ease; }
+  .scrollbar-thin::-webkit-scrollbar { width: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  /* Dock 反射 */
+  .dock-reflection {
+    background: linear-gradient(to bottom, rgba(255,255,255,0.06) 0%, transparent 100%);
+  }
+  /* 桌面图标选中态 */
+  .desktop-icon:hover .icon-glow {
+    background: rgba(255,255,255,0.18);
+  }
+  /* 启动动画 */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in-up { animation: fadeInUp 0.6s ease both; }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ---------- 顶部菜单栏 ---------- */
+function MenuBar({ activeApp, time }) {
+  const menus = ["文件", "编辑", "显示", "前往", "窗口", "帮助"];
+  return (
+    <div className="glass-dark fixed top-0 left-0 right-0 h-7 px-4 flex items-center justify-between text-white text-[13px] z-50 select-none">
+      <div className="flex items-center gap-4">
+        {/* Aurora Logo */}
+        <svg viewBox="0 0 384 512" className="w-3.5 h-3.5 fill-white">
+          <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+        </svg>
+        <span className="font-semibold">{activeApp}</span>
+        {menus.map(m => (
+          <span key={m} className="cursor-default hover:bg-white/15 px-2 py-0.5 rounded">{m}</span>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        {/* Status icons */}
+        <i data-lucide="bluetooth" className="w-3.5 h-3.5"></i>
+        <i data-lucide="wifi" className="w-3.5 h-3.5"></i>
+        <i data-lucide="battery-full" className="w-4 h-4"></i>
+        <i data-lucide="search" className="w-3.5 h-3.5"></i>
+        <i data-lucide="layout-grid" className="w-3.5 h-3.5"></i>
+        <span className="font-medium tracking-tight">{time.date}</span>
+        <span className="font-medium tracking-tight">{time.time}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 红绿灯按钮 ---------- */
+function TrafficLights({ onClose, onMin, onMax }) {
+  return (
+    <div className="flex items-center gap-2 group">
+      <button onClick={onClose} className="traffic-light bg-[#FF5F57]">
+        <svg width="6" height="6" viewBox="0 0 6 6"><path d="M1 1 L5 5 M5 1 L1 5" stroke="#4d0000" strokeWidth="1" strokeLinecap="round"/></svg>
+      </button>
+      <button onClick={onMin} className="traffic-light bg-[#FEBC2E]">
+        <svg width="6" height="2" viewBox="0 0 6 2"><path d="M0.5 1 L5.5 1" stroke="#5d3700" strokeWidth="1.2" strokeLinecap="round"/></svg>
+      </button>
+      <button onClick={onMax} className="traffic-light bg-[#28C840]">
+        <svg width="6" height="6" viewBox="0 0 6 6"><path d="M1.5 1 L5 1 L5 4.5 Z M4.5 5 L1 5 L1 1.5 Z" fill="#0a4a0a"/></svg>
+      </button>
+    </div>
+  );
+}
+
+/* ---------- 通用窗口外壳 ---------- */
+function Window({ title, children, defaultPos, size = "lg", onClose, zIndex, onFocus, sidebar }) {
+  const [pos, setPos] = useState(defaultPos);
+  const [dragging, setDragging] = useState(false);
+  const offset = useRef({ x: 0, y: 0 });
+
+  const onMouseDown = (e) => {
+    onFocus && onFocus();
+    setDragging(true);
+    offset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+  };
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e) => {
+      setPos({ x: e.clientX - offset.current.x, y: Math.max(28, e.clientY - offset.current.y) });
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [dragging]);
+
+  const sizeClass = {
+    sm: "w-[520px] h-[380px]",
+    md: "w-[720px] h-[480px]",
+    lg: "w-[920px] h-[600px]",
+  }[size];
+
+  return (
+    <div
+      className={`glass-window absolute rounded-xl shadow-2xl overflow-hidden flex flex-col ${sizeClass} fade-in-up`}
+      style={{ left: pos.x, top: pos.y, zIndex }}
+      onMouseDown={onFocus}
+    >
+      {/* TitleBar */}
+      <div
+        className="h-10 flex items-center px-4 border-b border-white/10 cursor-grab active:cursor-grabbing select-none"
+        onMouseDown={onMouseDown}
+      >
+        <TrafficLights onClose={onClose} />
+        <div className="flex-1 text-center text-white/90 text-[13px] font-medium -ml-12">{title}</div>
+      </div>
+      {/* Body */}
+      <div className="flex-1 flex overflow-hidden">
+        {sidebar && <div className="w-52 bg-black/20 border-r border-white/10 overflow-y-auto scrollbar-thin">{sidebar}</div>}
+        <div className="flex-1 overflow-y-auto scrollbar-thin">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Finder 应用 ---------- */
+function FinderApp(props) {
+  const sidebarItems = [
+    { group: "个人收藏", items: [
+      { name: "隔空投送", icon: "send" },
+      { name: "最近使用", icon: "clock" },
+      { name: "应用程序", icon: "layout-grid" },
+      { name: "桌面", icon: "monitor" },
+      { name: "文稿", icon: "file-text" },
+      { name: "下载", icon: "download" },
+    ]},
+    { group: "SkyDrive", items: [
+      { name: "SkyDrive云盘", icon: "cloud" },
+      { name: "已共享", icon: "users" },
+    ]},
+    { group: "位置", items: [
+      { name: "Aurora HD", icon: "hard-drive" },
+      { name: "网络", icon: "globe" },
+    ]},
+    { group: "标签", items: [
+      { name: "红色", color: "bg-red-500" },
+      { name: "橙色", color: "bg-orange-500" },
+      { name: "黄色", color: "bg-yellow-500" },
+      { name: "绿色", color: "bg-green-500" },
+      { name: "蓝色", color: "bg-blue-500" },
+    ]},
+  ];
+
+  const files = [
+    { name: "项目文档", type: "folder", size: "—", date: "今天 09:24" },
+    { name: "设计稿.sketch", type: "file", size: "12.4 MB", date: "今天 08:10" },
+    { name: "屏幕快照.png", type: "image", size: "2.1 MB", date: "昨天 22:45" },
+    { name: "源代码", type: "folder", size: "—", date: "昨天 18:32" },
+    { name: "README.md", type: "file", size: "4 KB", date: "5月 12日" },
+    { name: "package.json", type: "file", size: "1 KB", date: "5月 12日" },
+    { name: "音乐合集", type: "folder", size: "—", date: "5月 10日" },
+    { name: "演讲.key", type: "file", size: "28.7 MB", date: "5月 8日" },
+    { name: "财务报表.xlsx", type: "file", size: "856 KB", date: "5月 5日" },
+    { name: "视频素材", type: "folder", size: "—", date: "5月 3日" },
+  ];
+
+  const sidebar = (
+    <div className="py-3 text-white/85 text-[13px]">
+      {sidebarItems.map((g, gi) => (
+        <div key={gi} className="mb-3">
+          <div className="px-4 py-1 text-[11px] uppercase tracking-wider text-white/45 font-semibold">{g.group}</div>
+          {g.items.map((it, i) => (
+            <div key={i} className={`mx-2 px-2 py-[5px] rounded-md flex items-center gap-2 cursor-default hover:bg-white/10 ${gi===0&&i===3?"bg-white/15":""}`}>
+              {it.icon ? <i data-lucide={it.icon} className="w-4 h-4 text-blue-400"></i> : <span className={`w-2.5 h-2.5 rounded-full ${it.color}`}></span>}
+              <span>{it.name}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
+  const iconFor = (type) => {
+    if (type === "folder") return { icon: "folder", color: "text-sky-400" };
+    if (type === "image") return { icon: "image", color: "text-pink-400" };
+    return { icon: "file", color: "text-white/80" };
+  };
+
+  return (
+    <Window {...props} title="桌面" sidebar={sidebar}>
+      {/* Toolbar */}
+      <div className="px-4 py-2 border-b border-white/10 flex items-center gap-3 text-white/80">
+        <div className="flex gap-1.5">
+          <button className="p-1 rounded hover:bg-white/10"><i data-lucide="chevron-left" className="w-4 h-4"></i></button>
+          <button className="p-1 rounded hover:bg-white/10"><i data-lucide="chevron-right" className="w-4 h-4"></i></button>
+        </div>
+        <div className="flex bg-black/30 rounded-md p-0.5">
+          {["list", "grid-3x3", "columns-3", "gallery-thumbnails"].map((ic, i) => (
+            <button key={ic} className={`px-2 py-1 rounded ${i===1?"bg-white/15":""}`}><i data-lucide={ic} className="w-3.5 h-3.5"></i></button>
+          ))}
+        </div>
+        <div className="flex-1"></div>
+        <button className="p-1 rounded hover:bg-white/10"><i data-lucide="share" className="w-4 h-4"></i></button>
+        <button className="p-1 rounded hover:bg-white/10"><i data-lucide="tag" className="w-4 h-4"></i></button>
+        <div className="relative">
+          <i data-lucide="search" className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-white/50"></i>
+          <input className="bg-black/30 rounded-md text-[12px] pl-7 pr-3 py-1 w-44 outline-none placeholder-white/40" placeholder="搜索"/>
+        </div>
+      </div>
+      {/* Grid */}
+      <div className="p-6 grid grid-cols-5 gap-5">
+        {files.map((f, i) => {
+          const { icon, color } = iconFor(f.type);
+          return (
+            <div key={i} className="flex flex-col items-center gap-1.5 cursor-default group">
+              <div className="w-16 h-16 rounded-lg flex items-center justify-center group-hover:bg-white/10">
+                <i data-lucide={icon} className={`w-12 h-12 ${color}`} style={{strokeWidth: 1.2}}></i>
+              </div>
+              <div className="text-white text-[12px] text-center leading-tight max-w-[100px] truncate group-hover:bg-blue-500/80 px-1 rounded">{f.name}</div>
+            </div>
+          );
+        })}
+      </div>
+    </Window>
+  );
+}
+
+/* ---------- Voyager 应用 ---------- */
+function VoyagerApp(props) {
+  return (
+    <Window {...props} title="Voyager" size="lg">
+      {/* URL bar */}
+      <div className="h-12 flex items-center gap-2 px-4 border-b border-white/10">
+        <button className="p-1 rounded hover:bg-white/10 text-white/60"><i data-lucide="chevron-left" className="w-4 h-4"></i></button>
+        <button className="p-1 rounded hover:bg-white/10 text-white/40"><i data-lucide="chevron-right" className="w-4 h-4"></i></button>
+        <button className="p-1 rounded hover:bg-white/10 text-white/60"><i data-lucide="layout-grid" className="w-4 h-4"></i></button>
+        <div className="flex-1 mx-2 bg-black/30 rounded-md px-3 py-1 flex items-center gap-2 text-white/80 text-[12.5px]">
+          <i data-lucide="lock" className="w-3 h-3 text-white/50"></i>
+          <span>apple.com</span>
+        </div>
+        <button className="p-1 rounded hover:bg-white/10 text-white/60"><i data-lucide="share" className="w-4 h-4"></i></button>
+        <button className="p-1 rounded hover:bg-white/10 text-white/60"><i data-lucide="plus" className="w-4 h-4"></i></button>
+        <button className="p-1 rounded hover:bg-white/10 text-white/60"><i data-lucide="copy" className="w-4 h-4"></i></button>
+      </div>
+      {/* 起始页 */}
+      <div className="p-8">
+        <h2 className="text-white text-2xl font-semibold mb-1">收藏</h2>
+        <p className="text-white/50 text-sm mb-6">9 个网站</p>
+        <div className="grid grid-cols-6 gap-5 mb-10">
+          {[
+            { name: "Aurora", color: "from-gray-700 to-gray-900", letter: "" },
+            { name: "SkyDrive", color: "from-sky-400 to-blue-600", letter: "☁" },
+            { name: "GitHub", color: "from-gray-800 to-black", letter: "G" },
+            { name: "VidStream", color: "from-red-500 to-red-700", letter: "▶" },
+            { name: "Chirp", color: "from-sky-400 to-sky-600", letter: "𝕏" },
+            { name: "DesignLab", color: "from-purple-500 to-pink-500", letter: "F" },
+            { name: "NoteHub", color: "from-gray-100 to-gray-300", letter: "N", dark: true },
+            { name: "Tunify", color: "from-green-400 to-green-600", letter: "♫" },
+            { name: "Gmail", color: "from-red-400 to-amber-500", letter: "M" },
+            { name: "Slack", color: "from-purple-600 to-fuchsia-600", letter: "#" },
+            { name: "Linear", color: "from-indigo-500 to-violet-600", letter: "L" },
+            { name: "Vercel", color: "from-zinc-700 to-black", letter: "▲" },
+          ].map(s => (
+            <div key={s.name} className="flex flex-col items-center gap-2 cursor-pointer">
+              <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center text-2xl font-bold ${s.dark?"text-black":"text-white"} shadow-lg hover:scale-105 transition`}>
+                {s.letter}
+              </div>
+              <span className="text-white/85 text-[12px]">{s.name}</span>
+            </div>
+          ))}
+        </div>
+        <h3 className="text-white text-lg font-semibold mb-3">隐私报告</h3>
+        <div className="bg-black/30 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-blue-500/30 flex items-center justify-center">
+            <i data-lucide="shield-check" className="w-6 h-6 text-blue-300"></i>
+          </div>
+          <div className="flex-1">
+            <div className="text-white font-medium">过去 7 天，Voyager 已阻止 <span className="text-blue-400">42</span> 个跟踪器</div>
+            <div className="text-white/50 text-sm">您的 IP 地址未对已知跟踪器隐藏</div>
+          </div>
+          <i data-lucide="chevron-right" className="w-5 h-5 text-white/50"></i>
+        </div>
+      </div>
+    </Window>
+  );
+}
+
+/* ---------- 备忘录应用 ---------- */
+function NotesApp(props) {
+  const notes = [
+    { title: "AuroraOS 设计灵感", date: "10:15", preview: "毛玻璃效果、流畅动画、半透明..." },
+    { title: "周会记录", date: "昨天", preview: "本周完成需求评审，下周启动..." },
+    { title: "购物清单", date: "周三", preview: "牛奶、面包、鸡蛋、水果..." },
+    { title: "读书笔记《设计的逻辑》", date: "5/10", preview: "好的设计是看不见的，它服务于..." },
+    { title: "旅行计划", date: "5/8", preview: "上海 → 杭州 → 苏州，五日行程..." },
+  ];
+  const [active, setActive] = useState(0);
+
+  const sidebar = (
+    <div className="py-2">
+      <div className="px-3 py-2 text-white/45 text-[11px] uppercase tracking-wider font-semibold">SkyDrive</div>
+      {notes.map((n, i) => (
+        <div key={i} onClick={() => setActive(i)}
+          className={`mx-2 my-0.5 px-3 py-2 rounded-md cursor-default ${active===i?"bg-amber-500/30":"hover:bg-white/5"}`}>
+          <div className="text-white text-[13px] font-semibold truncate">{n.title}</div>
+          <div className="text-white/60 text-[11px] mt-0.5"><span className="text-white/85">{n.date}</span> {n.preview}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <Window {...props} title="备忘录" sidebar={sidebar} size="lg">
+      <div className="px-10 py-8 text-white">
+        <div className="text-white/50 text-xs mb-2">2026年5月15日 上午10:15</div>
+        <h1 className="text-2xl font-bold mb-4">{notes[active].title}</h1>
+        <div className="space-y-3 text-[14px] leading-relaxed text-white/90">
+          <p>AuroraOS Nova 的设计语言充分体现了苹果对细节的极致追求：</p>
+          <ul className="list-disc pl-6 space-y-1.5 text-white/85">
+            <li>毛玻璃材质（Material）随背景动态调整</li>
+            <li>窗口阴影柔和而真实，强化层级感</li>
+            <li>Glyph Symbols 图标系统统一视觉语言</li>
+            <li>Dock 图标采用拟物 + 扁平的混合风格</li>
+            <li>动效遵循 spring 物理模型，自然舒适</li>
+          </ul>
+          <p>真正优秀的产品，不需要解释。</p>
+          <div className="mt-6 p-4 rounded-lg bg-amber-400/10 border-l-4 border-amber-400">
+            <div className="text-amber-200 font-semibold text-sm mb-1">💡 灵感</div>
+            <div className="text-white/80 text-sm">少即是多。Less, but better. — L. Verona</div>
+          </div>
+        </div>
+      </div>
+    </Window>
+  );
+}
+
+/* ---------- 控制中心 ---------- */
+function ControlCenter({ open, onClose }) {
+  if (!open) return null;
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose}></div>
+      <div className="glass-dark fixed top-9 right-3 w-80 rounded-2xl p-3 z-50 text-white shadow-2xl fade-in-up">
+        <div className="grid grid-cols-2 gap-2">
+          {/* 网络组 */}
+          <div className="col-span-2 bg-white/10 rounded-xl p-3 grid grid-cols-3 gap-2">
+            {[
+              { icon: "wifi", label: "Wi-Fi", sub: "MyHome", on: true },
+              { icon: "bluetooth", label: "蓝牙", sub: "开启", on: true },
+              { icon: "plane", label: "AirDrop", sub: "联系人", on: false },
+            ].map(b => (
+              <button key={b.label} className="flex flex-col items-start gap-1 p-2 rounded-lg hover:bg-white/10">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${b.on?"bg-blue-500":"bg-white/20"}`}>
+                  <i data-lucide={b.icon} className="w-4 h-4"></i>
+                </div>
+                <div className="text-[12px] font-semibold">{b.label}</div>
+                <div className="text-[10px] text-white/60">{b.sub}</div>
+              </button>
+            ))}
+          </div>
+          {/* 专注 / 舞台调度 */}
+          <button className="bg-white/10 rounded-xl p-3 flex items-center gap-2 hover:bg-white/15">
+            <i data-lucide="moon" className="w-4 h-4"></i>
+            <span className="text-[13px] font-medium">专注模式</span>
+          </button>
+          <button className="bg-white/10 rounded-xl p-3 flex items-center gap-2 hover:bg-white/15">
+            <i data-lucide="layout-panel-left" className="w-4 h-4"></i>
+            <span className="text-[13px] font-medium">舞台调度</span>
+          </button>
+          {/* 屏幕镜像 */}
+          <button className="col-span-2 bg-white/10 rounded-xl p-3 flex items-center gap-2 hover:bg-white/15">
+            <i data-lucide="monitor-smartphone" className="w-4 h-4"></i>
+            <span className="text-[13px] font-medium">屏幕镜像</span>
+          </button>
+          {/* 显示亮度 */}
+          <div className="col-span-2 bg-white/10 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <i data-lucide="sun" className="w-4 h-4"></i>
+              <span className="text-[12px] font-semibold">显示器</span>
+            </div>
+            <div className="bg-white/10 rounded-full h-7 overflow-hidden">
+              <div className="bg-white h-full flex items-center justify-end px-2" style={{width: "75%"}}>
+                <i data-lucide="sun" className="w-3 h-3 text-black"></i>
+              </div>
+            </div>
+          </div>
+          {/* 声音 */}
+          <div className="col-span-2 bg-white/10 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <i data-lucide="volume-2" className="w-4 h-4"></i>
+              <span className="text-[12px] font-semibold">声音</span>
+            </div>
+            <div className="bg-white/10 rounded-full h-7 overflow-hidden">
+              <div className="bg-white h-full flex items-center justify-end px-2" style={{width: "55%"}}>
+                <i data-lucide="volume-2" className="w-3 h-3 text-black"></i>
+              </div>
+            </div>
+          </div>
+          {/* 音乐 */}
+          <div className="col-span-2 bg-white/10 rounded-xl p-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-md bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                <i data-lucide="music" className="w-5 h-5"></i>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold truncate">起风了</div>
+                <div className="text-[11px] text-white/60 truncate">买辣椒也用券</div>
+              </div>
+              <button className="p-1.5 rounded hover:bg-white/10"><i data-lucide="skip-back" className="w-4 h-4"></i></button>
+              <button className="p-1.5 rounded hover:bg-white/10"><i data-lucide="play" className="w-4 h-4"></i></button>
+              <button className="p-1.5 rounded hover:bg-white/10"><i data-lucide="skip-forward" className="w-4 h-4"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- 桌面图标 ---------- */
+function DesktopIcons() {
+  const items = [
+    { name: "Aurora HD", icon: "hard-drive", color: "text-white" },
+    { name: "项目", icon: "folder", color: "text-sky-300" },
+    { name: "屏幕快照.png", icon: "image", color: "text-pink-300" },
+  ];
+  return (
+    <div className="absolute top-12 right-6 flex flex-col gap-5 z-10">
+      {items.map((it, i) => (
+        <div key={i} className="desktop-icon flex flex-col items-center gap-1 cursor-default w-20">
+          <div className="icon-glow w-14 h-14 rounded-lg flex items-center justify-center transition">
+            <i data-lucide={it.icon} className={`w-12 h-12 ${it.color} drop-shadow-lg`} style={{strokeWidth: 1.2}}></i>
+          </div>
+          <span className="text-white text-[11px] text-center leading-tight px-1 rounded" style={{textShadow: "0 1px 3px rgba(0,0,0,0.7)"}}>{it.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Dock ---------- */
+function Dock({ onOpen, runningApps }) {
+  const apps = [
+    { id: "finder", name: "访达", grad: "from-sky-400 via-blue-500 to-indigo-600", icon: "smile" },
+    { id: "launchpad", name: "启动台", grad: "from-zinc-200 to-zinc-400", icon: "layout-grid", dark: true },
+    { id: "safari", name: "Voyager 浏览器", grad: "from-blue-400 via-cyan-500 to-blue-600", icon: "compass" },
+    { id: "messages", name: "信息", grad: "from-green-400 to-green-600", icon: "message-circle" },
+    { id: "mail", name: "邮件", grad: "from-sky-400 to-blue-600", icon: "mail" },
+    { id: "maps", name: "地图", grad: "from-emerald-300 via-green-400 to-teal-500", icon: "map" },
+    { id: "photos", name: "照片", grad: "from-yellow-300 via-pink-400 to-purple-500", icon: "image" },
+    { id: "facetime", name: "FaceTime", grad: "from-green-400 to-emerald-600", icon: "video" },
+    { id: "calendar", name: "日历", grad: "from-white to-zinc-100", icon: "calendar", dark: true },
+    { id: "notes", name: "备忘录", grad: "from-yellow-200 via-amber-300 to-yellow-500", icon: "notebook-pen", dark: true },
+    { id: "music", name: "音乐", grad: "from-pink-400 via-red-400 to-rose-500", icon: "music" },
+    { id: "appstore", name: "App Store", grad: "from-sky-400 to-blue-600", icon: "shopping-bag" },
+    { id: "settings", name: "系统设置", grad: "from-zinc-400 to-zinc-700", icon: "settings" },
+    { id: "terminal", name: "终端", grad: "from-zinc-700 to-black", icon: "square-terminal" },
+    { id: "trash", name: "废纸篓", grad: "from-zinc-300 to-zinc-500", icon: "trash-2", dark: true, divider: true },
+  ];
+  return (
+    <div className="fixed bottom-2 left-1/2 -translate-x-1/2 z-40">
+      <div className="glass rounded-2xl px-2 py-2 flex items-end gap-1 shadow-2xl">
+        {apps.map((a, i) => (
+          <React.Fragment key={a.id}>
+            {a.divider && <div className="w-px h-12 bg-white/25 mx-1 self-center"></div>}
+            <div className="dock-icon-wrap relative flex flex-col items-center">
+              <div className="dock-tooltip absolute -top-9 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[12px] px-2 py-1 rounded-md whitespace-nowrap">
+                {a.name}
+              </div>
+              <button
+                onClick={() => onOpen(a.id)}
+                className={`dock-icon w-14 h-14 rounded-xl bg-gradient-to-br ${a.grad} flex items-center justify-center shadow-lg ${a.dark?"text-zinc-700":"text-white"}`}
+              >
+                <i data-lucide={a.icon} className="w-8 h-8" style={{strokeWidth: 1.6}}></i>
+              </button>
+              <div className={`w-1 h-1 rounded-full mt-0.5 ${runningApps.includes(a.id)?"bg-white/80":"bg-transparent"}`}></div>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 主应用 ---------- */
+function App() {
+  const [windows, setWindows] = useState([
+    { id: "finder-1", app: "finder", z: 10, pos: { x: 80, y: 60 } },
+    { id: "safari-1", app: "safari", z: 11, pos: { x: 220, y: 110 } },
+    { id: "notes-1", app: "notes", z: 12, pos: { x: 360, y: 160 } },
+  ]);
+  const [topZ, setTopZ] = useState(12);
+  const [showCC, setShowCC] = useState(false);
+  const [time, setTime] = useState({ date: "", time: "" });
+
+  useEffect(() => {
+    const update = () => {
+      const d = new Date();
+      const days = ["周日","周一","周二","周三","周四","周五","周六"];
+      setTime({
+        date: `${days[d.getDay()]} ${d.getMonth()+1}月${d.getDate()}日`,
+        time: d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
+      });
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Lucide 图标渲染
+  useEffect(() => {
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  const focusWin = (id) => {
+    const nz = topZ + 1;
+    setTopZ(nz);
+    setWindows(ws => ws.map(w => w.id === id ? { ...w, z: nz } : w));
+  };
+  const closeWin = (id) => setWindows(ws => ws.filter(w => w.id !== id));
+  const openApp = (app) => {
+    if (app === "trash") return;
+    // 已存在则聚焦
+    const existed = windows.find(w => w.app === app);
+    if (existed) { focusWin(existed.id); return; }
+    const nz = topZ + 1;
+    setTopZ(nz);
+    const id = `${app}-${Date.now()}`;
+    setWindows(ws => [...ws, { id, app, z: nz, pos: { x: 100 + ws.length*40, y: 80 + ws.length*30 } }]);
+  };
+
+  const activeApp = windows.length ? (
+    { finder: "访达", safari: "Voyager", notes: "备忘录" }[windows.reduce((a,b)=>a.z>b.z?a:b).app] || "访达"
+  ) : "访达";
+
+  const runningApps = [...new Set(windows.map(w => w.app))];
+
+  return (
+    <div className="desktop-bg w-full h-full relative overflow-hidden">
+      <MenuBar activeApp={activeApp} time={time} />
+
+      {/* 控制中心触发器（菜单栏右侧已展示图标，这里加个透明热区） */}
+      <div className="fixed top-0 right-0 w-32 h-7 z-50 cursor-default" onClick={() => setShowCC(v => !v)}></div>
+      <ControlCenter open={showCC} onClose={() => setShowCC(false)} />
+
+      <DesktopIcons />
+
+      {/* 窗口 */}
+      {windows.map(w => {
+        const common = {
+          key: w.id,
+          defaultPos: w.pos,
+          zIndex: w.z,
+          onClose: () => closeWin(w.id),
+          onFocus: () => focusWin(w.id),
+        };
+        if (w.app === "finder") return <FinderApp {...common} />;
+        if (w.app === "safari") return <VoyagerApp {...common} />;
+        if (w.app === "notes") return <NotesApp {...common} />;
+        return null;
+      })}
+
+      <Dock onOpen={openApp} runningApps={runningApps} />
+
+      {/* 右下角 hint */}
+      <div className="fixed bottom-3 right-4 text-white/50 text-[11px] z-30 select-none">
+        提示：点击 Dock 打开应用 · 拖动标题栏移动窗口 · 点击右上角图标打开控制中心
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

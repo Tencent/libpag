@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ardot SWOT分析</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .arrow-icon { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">14 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">Ardot SWOT分析</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 左上：S优势 -->
+  <div class="absolute top-[180px] left-[80px] w-[530px] h-[220px]">
+    <div class="flex items-center gap-[10px] mb-[12px]">
+      <i class="ph ph-trend-up text-[24px]"></i>
+      <h3 class="text-[20px] font-[600]">S 优势 Strengths</h3>
+    </div>
+    <div class="flex flex-col gap-[8px]">
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">腾讯技术积累深厚，混元大模型加持</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">资产化思维创新，输出结构化设计资产</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">MCP协议前瞻性布局，设计到代码零损耗</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">与CodeBuddy深度协同，产设研一体化</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 竖中线 -->
+  <div class="absolute top-[180px] left-[640px] w-[1px] h-[470px] bg-[#111111]/20"></div>
+
+  <!-- 右上：W劣势 -->
+  <div class="absolute top-[180px] left-[670px] w-[530px] h-[220px]">
+    <div class="flex items-center gap-[10px] mb-[12px]">
+      <i class="ph ph-trend-down text-[24px]"></i>
+      <h3 class="text-[20px] font-[600]">W 劣势 Weaknesses</h3>
+    </div>
+    <div class="flex flex-col gap-[8px]">
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">插件生态处于初期，与Figma差距明显</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">Windows桌面版和小程序待上线</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">品牌知名度待提升，市场教育成本高</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">设计系统成熟度追赶Figma需时间</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 横中线 -->
+  <div class="absolute top-[420px] left-[80px] w-[1120px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 左下：O机会 -->
+  <div class="absolute top-[440px] left-[80px] w-[530px] h-[220px]">
+    <div class="flex items-center gap-[10px] mb-[12px]">
+      <i class="ph ph-door-open text-[24px]"></i>
+      <h3 class="text-[20px] font-[600]">O 机会 Opportunities</h3>
+    </div>
+    <div class="flex flex-col gap-[8px]">
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">国产替代政策趋势，数据安全需求增长</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">AI设计工具浪潮，市场快速扩张</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">企业数字化转型加速，产设研一体化需求增长</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">腾讯生态协同优势（微信/企业微信/腾讯会议）</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右下：T威胁 -->
+  <div class="absolute top-[440px] left-[670px] w-[530px] h-[220px]">
+    <div class="flex items-center gap-[10px] mb-[12px]">
+      <i class="ph ph-warning text-[24px]"></i>
+      <h3 class="text-[20px] font-[600]">T 威胁 Threats</h3>
+    </div>
+    <div class="flex flex-col gap-[8px]">
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">Figma生态壁垒深厚，用户迁移成本高</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">竞品快速迭代跟进，功能差距缩小</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">AI设计市场教育周期长，用户习惯培养慢</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[22px]">国产工具之间同质化竞争加剧</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

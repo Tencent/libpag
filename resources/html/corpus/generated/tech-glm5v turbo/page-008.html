@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 8 - 全球UI/UX设计工具市场规模</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.bg-noise {
+  background-color: #DFDDDA;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+</style>
+</head>
+<body>
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden m-auto">
+  <!-- Page Title -->
+  <div class="absolute top-[50px] left-[48px]">
+    <h1 class="text-[44px] font-semibold tracking-[-0.01em] leading-[1.2]">全球 UI/UX 设计工具市场规模</h1>
+  </div>
+
+  <!-- Horizontal Divider -->
+  <div class="absolute left-[48px] right-[48px] top-[130px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- ECharts Chart Container -->
+  <div id="marketChart" class="absolute top-[165px] left-[48px] w-[730px] h-[450px]"></div>
+
+  <!-- Right Stats Panel -->
+  <div class="absolute top-[170px] left-[805px] w-[400px] space-y-[24px]">
+    <!-- Stat 1 -->
+    <div class="border-b border-[#111111]/12 pb-[18px]">
+      <p class="text-[11px] uppercase tracking-widest opacity-50 mb-[4px]">2025 市场规模</p>
+      <p class="text-[42px] font-semibold leading-[1] tracking-tight">21.4<span class="text-[20px] ml-[4px] opacity-60">亿美元</span></p>
+    </div>
+
+    <!-- Stat 2 -->
+    <div class="border-b border-[#111111]/12 pb-[18px]">
+      <p class="text-[11px] uppercase tracking-widest opacity-50 mb-[4px]">2035 预测规模</p>
+      <p class="text-[42px] font-semibold leading-[1] tracking-tight">159.9<span class="text-[20px] ml-[4px] opacity-60">亿美元</span></p>
+    </div>
+
+    <!-- Stat 3 -->
+    <div class="border-b border-[#111111]/12 pb-[18px]">
+      <p class="text-[11px] uppercase tracking-widest opacity-50 mb-[4px]">复合年增长率 CAGR</p>
+      <p class="text-[42px] font-semibold leading-[1] tracking-tight">22.25<span class="text-[20px] ml-[4px] opacity-60">%</span></p>
+    </div>
+
+    <!-- Stat 4 -->
+    <div class="pb-[4px]">
+      <p class="text-[11px] uppercase tracking-widest opacity-50 mb-[4px]">云部署占比</p>
+      <div class="flex items-end gap-[12px]">
+        <p class="text-[36px] font-semibold leading-[1]">61%</p>
+        <div class="flex-1 h-[10px] bg-[#111111]/10 rounded-full mt-[10px] overflow-hidden">
+          <div class="h-full w-[61%] bg-[#111111] rounded-full"></div>
+        </div>
+      </div>
+      <p class="text-[11px] mt-[4px] opacity-50">本地部署 39% | 数据来源：Business Research Insights</p>
+    </div>
+  </div>
+
+  <!-- ECharts Script -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script>
+    var chart = echarts.init(document.getElementById('marketChart'));
+    var option = {
+      backgroundColor: 'transparent',
+      grid: { top: 50, bottom: 50, left: 90, right: 30 },
+      xAxis: {
+        type: 'category',
+        data: ['2025', '2026 (E)', '2035 (E)'],
+        axisLine: { lineStyle: { color: 'rgba(17,17,17,0.2)' } },
+        axisTick: { show: false },
+        axisLabel: { fontSize: 14, color: '#111111', fontFamily: 'Plus Jakarta Sans' }
+      },
+      yAxis: {
+        type: 'value',
+        name: '亿美元',
+        nameTextStyle: { fontSize: 12, color: '#111111', fontFamily: 'Plus Jakarta Sans' },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { fontSize: 12, color: '#111111', fontFamily: 'Plus Jakarta Sans' },
+        splitLine: { lineStyle: { color: 'rgba(17,17,17,0.08)', type: 'solid' } }
+      },
+      series: [{
+        type: 'bar',
+        data: [21.4, 26.2, 159.9],
+        barWidth: 56,
+        itemStyle: {
+          color: '#111111',
+          borderRadius: [5, 5, 0, 0]
+        },
+        label: {
+          show: true,
+          position: 'top',
+          fontSize: 15,
+          color: '#111111',
+          fontWeight: 600,
+          fontFamily: 'Plus Jakarta Sans',
+          formatter: '{c}亿'
+        }
+      }],
+      textStyle: { fontFamily: 'Plus Jakarta Sans' }
+    };
+    chart.setOption(option);
+  </script>
+</div>
+</body>
+</html>

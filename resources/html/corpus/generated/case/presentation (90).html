@@ -1,0 +1,3067 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPT Presentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/style.css">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f5f5f5; padding: 40px 20px; min-height: 100vh; overflow-x: auto; }
+    .slide-wrapper {
+      --available-width: min(1280px, calc(100vw - 40px));
+      --slide-scale: calc(var(--available-width) / 1280);
+      position: relative; width: var(--available-width); height: calc(720px * var(--slide-scale));
+      margin: 0 auto 40px auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden;
+    }
+    .slide-wrapper:last-child { margin-bottom: 0; }
+    .slide-number { position: absolute; top: -30px; left: 0; background: #7C3AED; color: white; padding: 4px 12px; border-radius: 4px 4px 0 0; font-size: 12px; font-weight: 600; z-index: 10; }
+    .slide { width: 1280px; height: 720px; background: white; position: relative; overflow: hidden; transform-origin: top left; transform: scale(var(--slide-scale)); }
+    @media print { body { background: white; padding: 0; margin: 0; } .slide-wrapper { page-break-after: always; page-break-inside: avoid; box-shadow: none; margin: 0; border-radius: 0; width: 100%; height: 100vh; overflow: hidden; } .slide-wrapper:last-child { page-break-after: auto; } .slide-number { display: none; } .slide { width: 100%; height: 100%; transform: none; } }
+    .slide-page-1 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-1 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-1 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-1 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-1 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-1 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-1 .slide .ff-sans, .slide-page-1 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-1 .slide .ff-geometric, .slide-page-1 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-1 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-1 .slide .ff-condensed, .slide-page-1 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-1 .slide .ff-serif, .slide-page-1 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-1 .slide .ff-editorial, .slide-page-1 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-1 .slide .ff-mono, .slide-page-1 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-1 .slide .ff-cjk-emphasis, .slide-page-1 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-1 .slide .image-frame, .slide-page-1 .slide .image-placeholder:has(img), .slide-page-1 .slide .bound-media-fallback, .slide-page-1 .slide .bound-media-fallback *, .slide-page-1 .slide [class*="hexagon"]:has(img), .slide-page-1 .slide [class*="polygon"]:has(img), .slide-page-1 .slide [class*="clip"]:has(img), .slide-page-1 .slide [class*="mask"]:has(img), .slide-page-1 .slide [style*="clip-path"]:has(img), .slide-page-1 .slide [style*="polygon"]:has(img), .slide-page-1 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-2 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-2 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-2 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-2 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-2 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-2 .slide .ff-sans, .slide-page-2 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-2 .slide .ff-geometric, .slide-page-2 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-2 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-2 .slide .ff-condensed, .slide-page-2 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-2 .slide .ff-serif, .slide-page-2 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-2 .slide .ff-editorial, .slide-page-2 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-2 .slide .ff-mono, .slide-page-2 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-2 .slide .ff-cjk-emphasis, .slide-page-2 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-2 .slide .image-frame, .slide-page-2 .slide .image-placeholder:has(img), .slide-page-2 .slide .bound-media-fallback, .slide-page-2 .slide .bound-media-fallback *, .slide-page-2 .slide [class*="hexagon"]:has(img), .slide-page-2 .slide [class*="polygon"]:has(img), .slide-page-2 .slide [class*="clip"]:has(img), .slide-page-2 .slide [class*="mask"]:has(img), .slide-page-2 .slide [style*="clip-path"]:has(img), .slide-page-2 .slide [style*="polygon"]:has(img), .slide-page-2 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-3 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-3 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-3 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-3 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-3 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-3 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-3 .slide .ff-sans, .slide-page-3 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-3 .slide .ff-geometric, .slide-page-3 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-3 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-3 .slide .ff-condensed, .slide-page-3 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-3 .slide .ff-serif, .slide-page-3 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-3 .slide .ff-editorial, .slide-page-3 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-3 .slide .ff-mono, .slide-page-3 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-3 .slide .ff-cjk-emphasis, .slide-page-3 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-3 .slide .image-frame, .slide-page-3 .slide .image-placeholder:has(img), .slide-page-3 .slide .bound-media-fallback, .slide-page-3 .slide .bound-media-fallback *, .slide-page-3 .slide [class*="hexagon"]:has(img), .slide-page-3 .slide [class*="polygon"]:has(img), .slide-page-3 .slide [class*="clip"]:has(img), .slide-page-3 .slide [class*="mask"]:has(img), .slide-page-3 .slide [style*="clip-path"]:has(img), .slide-page-3 .slide [style*="polygon"]:has(img), .slide-page-3 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-4 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-4 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-4 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-4 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-4 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-4 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-4 .slide .ff-sans, .slide-page-4 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-4 .slide .ff-geometric, .slide-page-4 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-4 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-4 .slide .ff-condensed, .slide-page-4 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-4 .slide .ff-serif, .slide-page-4 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-4 .slide .ff-editorial, .slide-page-4 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-4 .slide .ff-mono, .slide-page-4 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-4 .slide .ff-cjk-emphasis, .slide-page-4 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-4 .slide .image-frame, .slide-page-4 .slide .image-placeholder:has(img), .slide-page-4 .slide .bound-media-fallback, .slide-page-4 .slide .bound-media-fallback *, .slide-page-4 .slide [class*="hexagon"]:has(img), .slide-page-4 .slide [class*="polygon"]:has(img), .slide-page-4 .slide [class*="clip"]:has(img), .slide-page-4 .slide [class*="mask"]:has(img), .slide-page-4 .slide [style*="clip-path"]:has(img), .slide-page-4 .slide [style*="polygon"]:has(img), .slide-page-4 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-5 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-5 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-5 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-5 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-5 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-5 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-5 .slide .ff-sans, .slide-page-5 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-5 .slide .ff-geometric, .slide-page-5 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-5 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-5 .slide .ff-condensed, .slide-page-5 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-5 .slide .ff-serif, .slide-page-5 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-5 .slide .ff-editorial, .slide-page-5 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-5 .slide .ff-mono, .slide-page-5 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-5 .slide .ff-cjk-emphasis, .slide-page-5 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-5 .slide .image-frame, .slide-page-5 .slide .image-placeholder:has(img), .slide-page-5 .slide .bound-media-fallback, .slide-page-5 .slide .bound-media-fallback *, .slide-page-5 .slide [class*="hexagon"]:has(img), .slide-page-5 .slide [class*="polygon"]:has(img), .slide-page-5 .slide [class*="clip"]:has(img), .slide-page-5 .slide [class*="mask"]:has(img), .slide-page-5 .slide [style*="clip-path"]:has(img), .slide-page-5 .slide [style*="polygon"]:has(img), .slide-page-5 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-6 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-6 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-6 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-6 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-6 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-6 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-6 .slide .ff-sans, .slide-page-6 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-6 .slide .ff-geometric, .slide-page-6 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-6 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-6 .slide .ff-condensed, .slide-page-6 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-6 .slide .ff-serif, .slide-page-6 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-6 .slide .ff-editorial, .slide-page-6 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-6 .slide .ff-mono, .slide-page-6 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-6 .slide .ff-cjk-emphasis, .slide-page-6 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-6 .slide .image-frame, .slide-page-6 .slide .image-placeholder:has(img), .slide-page-6 .slide .bound-media-fallback, .slide-page-6 .slide .bound-media-fallback *, .slide-page-6 .slide [class*="hexagon"]:has(img), .slide-page-6 .slide [class*="polygon"]:has(img), .slide-page-6 .slide [class*="clip"]:has(img), .slide-page-6 .slide [class*="mask"]:has(img), .slide-page-6 .slide [style*="clip-path"]:has(img), .slide-page-6 .slide [style*="polygon"]:has(img), .slide-page-6 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-7 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-7 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-7 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-7 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-7 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-7 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-7 .slide .ff-sans, .slide-page-7 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-7 .slide .ff-geometric, .slide-page-7 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-7 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-7 .slide .ff-condensed, .slide-page-7 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-7 .slide .ff-serif, .slide-page-7 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-7 .slide .ff-editorial, .slide-page-7 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-7 .slide .ff-mono, .slide-page-7 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-7 .slide .ff-cjk-emphasis, .slide-page-7 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-7 .slide .image-frame, .slide-page-7 .slide .image-placeholder:has(img), .slide-page-7 .slide .bound-media-fallback, .slide-page-7 .slide .bound-media-fallback *, .slide-page-7 .slide [class*="hexagon"]:has(img), .slide-page-7 .slide [class*="polygon"]:has(img), .slide-page-7 .slide [class*="clip"]:has(img), .slide-page-7 .slide [class*="mask"]:has(img), .slide-page-7 .slide [style*="clip-path"]:has(img), .slide-page-7 .slide [style*="polygon"]:has(img), .slide-page-7 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-8 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-8 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-8 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-8 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-8 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-8 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-8 .slide .ff-sans, .slide-page-8 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-8 .slide .ff-geometric, .slide-page-8 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-8 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-8 .slide .ff-condensed, .slide-page-8 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-8 .slide .ff-serif, .slide-page-8 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-8 .slide .ff-editorial, .slide-page-8 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-8 .slide .ff-mono, .slide-page-8 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-8 .slide .ff-cjk-emphasis, .slide-page-8 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-8 .slide .image-frame, .slide-page-8 .slide .image-placeholder:has(img), .slide-page-8 .slide .bound-media-fallback, .slide-page-8 .slide .bound-media-fallback *, .slide-page-8 .slide [class*="hexagon"]:has(img), .slide-page-8 .slide [class*="polygon"]:has(img), .slide-page-8 .slide [class*="clip"]:has(img), .slide-page-8 .slide [class*="mask"]:has(img), .slide-page-8 .slide [style*="clip-path"]:has(img), .slide-page-8 .slide [style*="polygon"]:has(img), .slide-page-8 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-9 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-9 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-9 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-9 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-9 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-9 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-9 .slide .ff-sans, .slide-page-9 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-9 .slide .ff-geometric, .slide-page-9 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-9 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-9 .slide .ff-condensed, .slide-page-9 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-9 .slide .ff-serif, .slide-page-9 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-9 .slide .ff-editorial, .slide-page-9 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-9 .slide .ff-mono, .slide-page-9 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-9 .slide .ff-cjk-emphasis, .slide-page-9 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-9 .slide .image-frame, .slide-page-9 .slide .image-placeholder:has(img), .slide-page-9 .slide .bound-media-fallback, .slide-page-9 .slide .bound-media-fallback *, .slide-page-9 .slide [class*="hexagon"]:has(img), .slide-page-9 .slide [class*="polygon"]:has(img), .slide-page-9 .slide [class*="clip"]:has(img), .slide-page-9 .slide [class*="mask"]:has(img), .slide-page-9 .slide [style*="clip-path"]:has(img), .slide-page-9 .slide [style*="polygon"]:has(img), .slide-page-9 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-10 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-10 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-10 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-10 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-10 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-10 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-10 .slide .ff-sans, .slide-page-10 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-10 .slide .ff-geometric, .slide-page-10 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-10 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-10 .slide .ff-condensed, .slide-page-10 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-10 .slide .ff-serif, .slide-page-10 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-10 .slide .ff-editorial, .slide-page-10 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-10 .slide .ff-mono, .slide-page-10 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-10 .slide .ff-cjk-emphasis, .slide-page-10 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-10 .slide .image-frame, .slide-page-10 .slide .image-placeholder:has(img), .slide-page-10 .slide .bound-media-fallback, .slide-page-10 .slide .bound-media-fallback *, .slide-page-10 .slide [class*="hexagon"]:has(img), .slide-page-10 .slide [class*="polygon"]:has(img), .slide-page-10 .slide [class*="clip"]:has(img), .slide-page-10 .slide [class*="mask"]:has(img), .slide-page-10 .slide [style*="clip-path"]:has(img), .slide-page-10 .slide [style*="polygon"]:has(img), .slide-page-10 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-11 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-11 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-11 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-11 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-11 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-11 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-11 .slide .ff-sans, .slide-page-11 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-11 .slide .ff-geometric, .slide-page-11 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-11 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-11 .slide .ff-condensed, .slide-page-11 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-11 .slide .ff-serif, .slide-page-11 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-11 .slide .ff-editorial, .slide-page-11 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-11 .slide .ff-mono, .slide-page-11 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-11 .slide .ff-cjk-emphasis, .slide-page-11 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-11 .slide .image-frame, .slide-page-11 .slide .image-placeholder:has(img), .slide-page-11 .slide .bound-media-fallback, .slide-page-11 .slide .bound-media-fallback *, .slide-page-11 .slide [class*="hexagon"]:has(img), .slide-page-11 .slide [class*="polygon"]:has(img), .slide-page-11 .slide [class*="clip"]:has(img), .slide-page-11 .slide [class*="mask"]:has(img), .slide-page-11 .slide [style*="clip-path"]:has(img), .slide-page-11 .slide [style*="polygon"]:has(img), .slide-page-11 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-12 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-12 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-12 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-12 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-12 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-12 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-12 .slide .ff-sans, .slide-page-12 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-12 .slide .ff-geometric, .slide-page-12 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-12 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-12 .slide .ff-condensed, .slide-page-12 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-12 .slide .ff-serif, .slide-page-12 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-12 .slide .ff-editorial, .slide-page-12 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-12 .slide .ff-mono, .slide-page-12 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-12 .slide .ff-cjk-emphasis, .slide-page-12 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-12 .slide .image-frame, .slide-page-12 .slide .image-placeholder:has(img), .slide-page-12 .slide .bound-media-fallback, .slide-page-12 .slide .bound-media-fallback *, .slide-page-12 .slide [class*="hexagon"]:has(img), .slide-page-12 .slide [class*="polygon"]:has(img), .slide-page-12 .slide [class*="clip"]:has(img), .slide-page-12 .slide [class*="mask"]:has(img), .slide-page-12 .slide [style*="clip-path"]:has(img), .slide-page-12 .slide [style*="polygon"]:has(img), .slide-page-12 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-13 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-13 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-13 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-13 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-13 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-13 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-13 .slide .ff-sans, .slide-page-13 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-13 .slide .ff-geometric, .slide-page-13 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-13 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-13 .slide .ff-condensed, .slide-page-13 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-13 .slide .ff-serif, .slide-page-13 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-13 .slide .ff-editorial, .slide-page-13 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-13 .slide .ff-mono, .slide-page-13 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-13 .slide .ff-cjk-emphasis, .slide-page-13 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-13 .slide .image-frame, .slide-page-13 .slide .image-placeholder:has(img), .slide-page-13 .slide .bound-media-fallback, .slide-page-13 .slide .bound-media-fallback *, .slide-page-13 .slide [class*="hexagon"]:has(img), .slide-page-13 .slide [class*="polygon"]:has(img), .slide-page-13 .slide [class*="clip"]:has(img), .slide-page-13 .slide [class*="mask"]:has(img), .slide-page-13 .slide [style*="clip-path"]:has(img), .slide-page-13 .slide [style*="polygon"]:has(img), .slide-page-13 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-14 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-14 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-14 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-14 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-14 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-14 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-14 .slide .ff-sans, .slide-page-14 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-14 .slide .ff-geometric, .slide-page-14 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-14 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-14 .slide .ff-condensed, .slide-page-14 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-14 .slide .ff-serif, .slide-page-14 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-14 .slide .ff-editorial, .slide-page-14 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-14 .slide .ff-mono, .slide-page-14 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-14 .slide .ff-cjk-emphasis, .slide-page-14 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-14 .slide .image-frame, .slide-page-14 .slide .image-placeholder:has(img), .slide-page-14 .slide .bound-media-fallback, .slide-page-14 .slide .bound-media-fallback *, .slide-page-14 .slide [class*="hexagon"]:has(img), .slide-page-14 .slide [class*="polygon"]:has(img), .slide-page-14 .slide [class*="clip"]:has(img), .slide-page-14 .slide [class*="mask"]:has(img), .slide-page-14 .slide [style*="clip-path"]:has(img), .slide-page-14 .slide [style*="polygon"]:has(img), .slide-page-14 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-15 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-15 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-15 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-15 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-15 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-15 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-15 .slide .ff-sans, .slide-page-15 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-15 .slide .ff-geometric, .slide-page-15 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-15 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-15 .slide .ff-condensed, .slide-page-15 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-15 .slide .ff-serif, .slide-page-15 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-15 .slide .ff-editorial, .slide-page-15 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-15 .slide .ff-mono, .slide-page-15 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-15 .slide .ff-cjk-emphasis, .slide-page-15 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-15 .slide .image-frame, .slide-page-15 .slide .image-placeholder:has(img), .slide-page-15 .slide .bound-media-fallback, .slide-page-15 .slide .bound-media-fallback *, .slide-page-15 .slide [class*="hexagon"]:has(img), .slide-page-15 .slide [class*="polygon"]:has(img), .slide-page-15 .slide [class*="clip"]:has(img), .slide-page-15 .slide [class*="mask"]:has(img), .slide-page-15 .slide [style*="clip-path"]:has(img), .slide-page-15 .slide [style*="polygon"]:has(img), .slide-page-15 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-16 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-16 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-16 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-16 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-16 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-16 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-16 .slide .ff-sans, .slide-page-16 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-16 .slide .ff-geometric, .slide-page-16 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-16 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-16 .slide .ff-condensed, .slide-page-16 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-16 .slide .ff-serif, .slide-page-16 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-16 .slide .ff-editorial, .slide-page-16 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-16 .slide .ff-mono, .slide-page-16 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-16 .slide .ff-cjk-emphasis, .slide-page-16 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-16 .slide .image-frame, .slide-page-16 .slide .image-placeholder:has(img), .slide-page-16 .slide .bound-media-fallback, .slide-page-16 .slide .bound-media-fallback *, .slide-page-16 .slide [class*="hexagon"]:has(img), .slide-page-16 .slide [class*="polygon"]:has(img), .slide-page-16 .slide [class*="clip"]:has(img), .slide-page-16 .slide [class*="mask"]:has(img), .slide-page-16 .slide [style*="clip-path"]:has(img), .slide-page-16 .slide [style*="polygon"]:has(img), .slide-page-16 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-17 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-17 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-17 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-17 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-17 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-17 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-17 .slide .ff-sans, .slide-page-17 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-17 .slide .ff-geometric, .slide-page-17 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-17 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-17 .slide .ff-condensed, .slide-page-17 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-17 .slide .ff-serif, .slide-page-17 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-17 .slide .ff-editorial, .slide-page-17 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-17 .slide .ff-mono, .slide-page-17 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-17 .slide .ff-cjk-emphasis, .slide-page-17 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-17 .slide .image-frame, .slide-page-17 .slide .image-placeholder:has(img), .slide-page-17 .slide .bound-media-fallback, .slide-page-17 .slide .bound-media-fallback *, .slide-page-17 .slide [class*="hexagon"]:has(img), .slide-page-17 .slide [class*="polygon"]:has(img), .slide-page-17 .slide [class*="clip"]:has(img), .slide-page-17 .slide [class*="mask"]:has(img), .slide-page-17 .slide [style*="clip-path"]:has(img), .slide-page-17 .slide [style*="polygon"]:has(img), .slide-page-17 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+.slide-page-18 .slide {
+background: #F4F2EE;
+}
+
+.slide-page-18 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-18 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-18 .slide .hairline {
+border-color: #333333;
+}
+
+.slide-page-18 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-18 .slide {
+font-family: var(--font-neutral-sans);
+}
+
+.slide-page-18 .slide .ff-sans, .slide-page-18 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-18 .slide .ff-geometric, .slide-page-18 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-18 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-18 .slide .ff-condensed, .slide-page-18 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-18 .slide .ff-serif, .slide-page-18 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-18 .slide .ff-editorial, .slide-page-18 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-18 .slide .ff-mono, .slide-page-18 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-18 .slide .ff-cjk-emphasis, .slide-page-18 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-18 .slide .image-frame, .slide-page-18 .slide .image-placeholder:has(img), .slide-page-18 .slide .bound-media-fallback, .slide-page-18 .slide .bound-media-fallback *, .slide-page-18 .slide [class*="hexagon"]:has(img), .slide-page-18 .slide [class*="polygon"]:has(img), .slide-page-18 .slide [class*="clip"]:has(img), .slide-page-18 .slide [class*="mask"]:has(img), .slide-page-18 .slide [style*="clip-path"]:has(img), .slide-page-18 .slide [style*="polygon"]:has(img), .slide-page-18 .slide [style*="mask-image"]:has(img) {
+clip-path: none !important;
+    -webkit-clip-path: none !important;
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+}
+  </style>
+</head>
+<body>
+
+    <div class="slide-wrapper slide-page-1">
+      <div class="slide-number">1</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333] flex flex-col box-border" style="background:#F4F2EE;">
+    
+    <!-- Header: Editorial Style -->
+    <header class="h-[60px] border-b-[1px] border-[#333333] flex justify-between items-center px-[32px]">
+      <div class="flex items-center gap-[12px]">
+        <i class="ph ph-cube text-[18px]"></i>
+        <span class="text-[12px] uppercase tracking-[0.1em] font-[400]">Competitive Analysis Report</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-[0.1em] font-[400]">Confidential</span>
+    </header>
+
+    <!-- Main Content: Hero Layout -->
+    <main class="flex-1 flex flex-col">
+      <!-- Title Section: High Impact -->
+      <div class="flex-1 flex flex-col justify-center px-[60px] py-[40px] gap-[48px]">
+        
+        <!-- Main Title: Large, Light, Sophisticated -->
+        <div class="max-w-[1000px]">
+          <h1 class="text-[72px] leading-[1.1] font-[300] tracking-tight text-[#333333]">
+            腾讯 ima 知识库产品<br/>
+            <span class="text-[#333333]/90">全球竞品分析报告</span>
+          </h1>
+        </div>
+
+        <!-- Subtitle/Points: Modular Pill Style -->
+        <div class="flex flex-wrap gap-[20px] items-center">
+          <div class="flex items-center gap-[12px] px-[24px] py-[12px] rounded-[9999px] border-[1px] border-[#333333] bg-transparent">
+            <i class="ph ph-brain text-[20px]"></i>
+            <span class="text-[18px] font-[300] tracking-wide">核心体验变革</span>
+          </div>
+          <div class="flex items-center gap-[12px] px-[24px] py-[12px] rounded-[9999px] border-[1px] border-[#333333] bg-transparent">
+            <i class="ph ph-target text-[20px]"></i>
+            <span class="text-[18px] font-[300] tracking-wide">范式翻转：Karpathy 的 L…</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Grid-based Meta Info -->
+    <footer class="h-[60px] border-t-[1px] border-[#333333] flex justify-between items-center px-[32px]">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-[9999px] border-[1px] border-[#333333] flex items-center justify-center text-[12px] font-[400]">
+          01
+        </div>
+        <span class="text-[12px] uppercase tracking-[0.05em] font-[400]">Strategic Intelligence</span>
+      </div>
+      
+      <div class="flex items-center gap-[32px]">
+        <div class="flex items-center gap-[8px]">
+          <i class="ph ph-globe text-[14px]"></i>
+          <span class="text-[12px] uppercase tracking-[0.05em] font-[400]">Global Market View</span>
+        </div>
+        <span class="text-[12px] uppercase tracking-[0.05em] font-[400]">2024 Edition</span>
+      </div>
+    </footer>
+
+    <!-- Decorative Hairline Elements (Bento Accents) -->
+    <div class="absolute top-[60px] right-[0px] w-[1px] h-[calc(100%-120px)] bg-[#333333]/20"></div>
+    <div class="absolute bottom-[60px] left-[60px] w-[120px] h-[1px] bg-[#333333]"></div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-2">
+      <div class="slide-number">2</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333] flex flex-col box-border" style="background:#F4F2EE;">
+    
+    <!-- Header: Editorial Style -->
+    <header class="h-[60px] border-b-[1px] border-[#333333] flex justify-between items-center px-[32px]">
+      <span class="text-[12px] uppercase tracking-[0.1em] font-[400]">Knowledge Management Evolution</span>
+      <span class="text-[12px] uppercase tracking-[0.1em] font-[400]">Contents</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col">
+      <!-- Title Section: High Tension Typography -->
+      <div class="h-[160px] border-b-[1px] border-[#333333] flex items-center px-[48px]">
+        <h1 class="text-[64px] font-[300] uppercase tracking-tight leading-none">
+          目录 <span class="text-[24px] align-middle ml-4 font-[400] opacity-50">/ INDEX</span>
+        </h1>
+      </div>
+
+      <!-- Catalog Grid: Bento-inspired layout -->
+      <div class="flex-1 grid grid-cols-1 px-[48px] py-[40px] gap-[24px]">
+        <!-- Item 01 -->
+        <div class="flex items-start gap-[32px] group">
+          <div class="w-[120px] py-[8px] px-[16px] rounded-[9999px] border-[1px] border-[#333333] text-[14px] uppercase text-center font-[300] shrink-0">
+            Chapter 01
+          </div>
+          <div class="flex-1 border-b-[0.5px] border-[#333333]/40 pb-[24px]">
+            <div class="flex items-center gap-[12px] mb-[8px]">
+              <i class="ph ph-brain text-[24px]"></i>
+              <h2 class="text-[24px] font-[300] tracking-wide">核心体验变革</h2>
+            </div>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70 max-w-[900px]">
+              系统阐述用户在使用AI知识库过程中能感受到的三大核心体验升级，涵盖智能自动化处理、多维度知识关联以及个性化内容呈现等关键维度，展现AI技术对知识管理体验的根本性重塑。
+            </p>
+          </div>
+        </div>
+
+        <!-- Item 02 -->
+        <div class="flex items-start gap-[32px] group">
+          <div class="w-[120px] py-[8px] px-[16px] rounded-[9999px] border-[1px] border-[#333333] text-[14px] uppercase text-center font-[300] shrink-0">
+            Chapter 02
+          </div>
+          <div class="flex-1 border-b-[0.5px] border-[#333333]/40 pb-[24px]">
+            <div class="flex items-center gap-[12px] mb-[8px]">
+              <i class="ph ph-cube text-[24px]"></i>
+              <h2 class="text-[24px] font-[300] tracking-wide">范式翻转：Karpathy 的 LLM Wiki</h2>
+            </div>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70 max-w-[900px]">
+              深入解析AI主动编译维护机制，以Karpathy LLM Wiki为标杆案例，展示AI如何替代人工完成知识整理工作，实现知识库的自动化构建与持续更新。
+            </p>
+          </div>
+        </div>
+
+        <!-- Item 03 -->
+        <div class="flex items-start gap-[32px] group">
+          <div class="w-[120px] py-[8px] px-[16px] rounded-[9999px] border-[1px] border-[#333333] text-[14px] uppercase text-center font-[300] shrink-0">
+            Chapter 03
+          </div>
+          <div class="flex-1 border-b-[0.5px] border-[#333333]/40 pb-[24px]">
+            <div class="flex items-center gap-[12px] mb-[8px]">
+              <i class="ph ph-arrows-clockwise text-[24px]"></i>
+              <h2 class="text-[24px] font-[300] tracking-wide">知识库会"生长"</h2>
+            </div>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70 max-w-[900px]">
+              剖析用户认知与行为模式的根本性转变，传统人工整理知识的方式正在被AI驱动的无感化知识管理取代，用户只需专注内容输入，系统自动完成分类、关联与优化。
+            </p>
+          </div>
+        </div>
+
+        <!-- Item 04 -->
+        <div class="flex items-start gap-[32px] group">
+          <div class="w-[120px] py-[8px] px-[16px] rounded-[9999px] border-[1px] border-[#333333] text-[14px] uppercase text-center font-[300] shrink-0">
+            Chapter 04
+          </div>
+          <div class="flex-1 border-b-[0.5px] border-[#333333]/40 pb-[24px]">
+            <div class="flex items-center gap-[12px] mb-[8px]">
+              <i class="ph ph-chart-line-up text-[24px]"></i>
+              <h2 class="text-[24px] font-[300] tracking-wide">Monthly Health Report</h2>
+            </div>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70 max-w-[900px]">
+              基于AI主动编译维护机制，展示知识库自动化运维的具体实践形态，通过定期健康报告形式呈现知识库生长状态与维护效果，体现智能化知识管理的持续运营价值。
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Editorial Style -->
+    <footer class="h-[60px] border-t-[1px] border-[#333333] flex justify-between items-center px-[32px]">
+      <div class="flex items-center gap-[16px]">
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] border-[#333333] flex items-center justify-center text-[12px] font-[400]">
+          2
+        </div>
+        <span class="text-[12px] uppercase tracking-[0.05em]">AI Knowledge Base Strategy</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-[0.05em] opacity-60">Confidential & Proprietary</span>
+    </footer>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-3">
+      <div class="slide-number">3</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333] flex flex-col box-border" style="background:#F4F2EE;">
+    
+    <!-- Header -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col">
+      <!-- Title Area -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center justify-center relative">
+        <h1 class="text-[48px] font-[300] uppercase tracking-[0.025em] text-center">核心体验变革</h1>
+        <!-- Decorative element for "Paradigm Shift" -->
+        <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px]">
+          <span class="text-[12px] uppercase tracking-widest opacity-50">Evolution</span>
+          <div class="w-[40px] h-[1px] bg-[#333333]"></div>
+        </div>
+      </div>
+
+      <!-- Body Area: Comparison Layout -->
+      <div class="flex-1 grid grid-cols-2 relative">
+        
+        <!-- Left Column: Traditional (The "Before") -->
+        <div class="p-[48px] flex flex-col justify-center gap-[32px] border-r-[1px] hairline">
+          <div class="flex items-center gap-[12px] mb-[-16px]">
+            <div class="px-[12px] py-[4px] rounded-[9999px] border-[1px] hairline text-[12px] uppercase tracking-wider">Traditional</div>
+            <span class="text-[14px] opacity-50 uppercase">Static Archive</span>
+          </div>
+          
+          <div class="flex flex-col gap-[24px]">
+            <div class="flex items-start gap-[16px]">
+              <i class="ph ph-stack text-[24px] mt-1"></i>
+              <div>
+                <h3 class="text-[20px] font-[300] mb-[8px]">传统档案柜模式</h3>
+                <p class="text-[15px] leading-[1.625] opacity-70">
+                  依赖人工分类、手动打标签与层级维护。知识被碎片化地存储在静态文件夹中，随着规模增长，检索成本呈指数级上升。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: LLM Wiki (The "After") -->
+        <div class="p-[48px] flex flex-col justify-center gap-[32px] bg-[#FFFFFF]/30">
+          <div class="flex items-center gap-[12px] mb-[-16px]">
+            <div class="px-[12px] py-[4px] rounded-[9999px] border-[1px] hairline bg-[#333333] text-white text-[12px] uppercase tracking-wider">LLM Wiki</div>
+            <span class="text-[14px] opacity-50 uppercase">Living System</span>
+          </div>
+
+          <div class="flex flex-col gap-[24px]">
+            <div class="flex items-start gap-[16px]">
+              <i class="ph ph-brain text-[24px] mt-1"></i>
+              <div>
+                <h3 class="text-[20px] font-[300] mb-[8px]">活体知识系统</h3>
+                <p class="text-[15px] leading-[1.625] opacity-70">
+                  用户仅需执行“往 raw/ 扔素材”这一步，AI 自动完成索引、关联与编译。知识从“存储”转变为“生长”，实现全自动维护。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center Transition Element (The "Mechanism") -->
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-[12px]">
+          <div class="w-[80px] h-[80px] rounded-full border-[1px] hairline bg-[#F4F2EE] flex items-center justify-center shadow-sm">
+            <i class="ph ph-arrows-clockwise text-[32px]"></i>
+          </div>
+          <div class="px-[16px] py-[6px] rounded-[9999px] border-[1px] hairline text-[11px] uppercase tracking-widest font-semibold">
+            AI 主动编译
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Authority Band -->
+      <div class="h-[120px] border-t-[1px] hairline px-[48px] py-[32px] flex items-center justify-between gap-[40px]">
+        <div class="flex-1 flex items-center gap-[24px]">
+          <div class="w-[1px] h-[40px] bg-[#333333]"></div>
+          <div class="flex flex-col gap-[4px]">
+            <span class="text-[12px] uppercase tracking-widest opacity-50">Industry Impact / Andrej Karpathy (2026)</span>
+            <p class="text-[15px] leading-[1.6] font-[300]">
+              该方法由前 OpenAI 核心成员提出，相关内容获得 <span class="font-bold">252K</span> 次浏览和 <span class="font-bold">4.1万</span> 次收藏，定义了新一代知识管理范式。
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-[12px]">
+          <div class="px-[20px] py-[10px] rounded-[9999px] border-[1px] hairline text-[12px] uppercase tracking-wider">
+            Paradigm Shift
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE]">
+      <div class="flex items-center gap-[16px]">
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          3
+        </div>
+        <span class="text-[12px] uppercase tracking-wider opacity-70">Chapter 1: Core Experience</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-wider opacity-70">LLM Wiki System Analysis</span>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-4">
+      <div class="slide-number">4</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center justify-center px-[40px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.025em] text-center leading-tight">
+          范式翻转：Karpathy 的 LLM Wiki
+        </h1>
+      </div>
+
+      <!-- Comparison Grid: Bento Box Style -->
+      <div class="flex-1 grid grid-cols-2 gap-0">
+        
+        <!-- Left Column: Before (Traditional) -->
+        <div class="border-r-[1px] hairline p-[48px] flex flex-col justify-center relative">
+          <!-- Label -->
+          <div class="absolute top-[32px] left-[48px]">
+            <div class="px-[16px] py-[6px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-widest opacity-60">
+              Before: Traditional
+            </div>
+          </div>
+          
+          <div class="mt-[24px]">
+            <h2 class="text-[28px] font-[300] uppercase mb-[32px] tracking-tight">
+              传统痛点：整理累而非记录难
+            </h2>
+            <p class="text-[18px] leading-[1.7] opacity-80 font-[400]">
+              传统知识管理最大的痛点不是"记录难"，而是"整理累"。用户必须人工完成<span class="text-[#333333] font-bold">收集、阅读、理解、分类、打标签、建链接、定期回顾</span>这 7 个步骤，每一步都需要消耗人类的时间和认知投入。
+            </p>
+            
+            <!-- Visual Step Counter -->
+            <div class="mt-[40px] flex gap-[8px] flex-wrap">
+              <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">1</div>
+              <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">2</div>
+              <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">3</div>
+              <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">4</div>
+              <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">5</div>
+              <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">6</div>
+              <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">7</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: After (AI-Driven) -->
+        <div class="p-[48px] flex flex-col justify-center relative bg-white/30">
+          <!-- Label -->
+          <div class="absolute top-[32px] left-[48px]">
+            <div class="px-[16px] py-[6px] rounded-full border-[1px] hairline bg-[#333333] text-white text-[12px] uppercase tracking-widest">
+              After: LLM Wiki
+            </div>
+          </div>
+
+          <div class="mt-[24px]">
+            <h2 class="text-[28px] font-[300] uppercase mb-[32px] tracking-tight">
+              范式翻转：从 7 步到 1 步
+            </h2>
+            <p class="text-[18px] leading-[1.7] opacity-80 font-[400]">
+              Karpathy 提出的 LLM Wiki 彻底翻转了这个关系。用户只需执行<span class="text-[#333333] font-bold">"往 raw/ 扔素材"</span>这 1 步操作，AI 将自动完成后续所有索引与关联，替代人工完成知识整理工作。
+            </p>
+
+            <!-- Visual Step Counter -->
+            <div class="mt-[40px] flex items-center gap-[16px]">
+              <div class="w-[48px] h-[48px] rounded-full border-[2px] hairline bg-[#333333] text-white flex items-center justify-center text-[18px] font-bold">
+                1
+              </div>
+              <div class="h-[1px] w-[60px] bg-[#333333] opacity-30"></div>
+              <span class="text-[14px] uppercase tracking-widest opacity-60">AI Automation</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Position Locked as per Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          4
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Knowledge Paradigm Shift</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 2</span>
+    </footer>
+
+    <!-- Side Decoration: Inherited from Anchor -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-50 rotate-90 origin-center">Evolution</span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-5">
+      <div class="slide-number">5</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[160px] border-b-[1px] hairline flex items-center justify-center px-[64px]">
+        <h1 class="text-[48px] font-[300] uppercase tracking-[0.05em] text-center leading-tight">
+          知识库会"生长"
+        </h1>
+      </div>
+
+      <!-- Content Grid: Asymmetric Split / Bento Style -->
+      <div class="flex-1 grid grid-cols-12 gap-0">
+        <!-- Left Column: Primary Narrative (7/12) -->
+        <div class="col-span-7 p-[64px] flex flex-col justify-center gap-[48px] border-r-[1px] hairline">
+          
+          <!-- Block 1 -->
+          <div class="flex flex-col gap-[20px]">
+            <div class="flex items-center gap-[12px]">
+              <div class="w-[8px] h-[8px] rounded-full bg-[#333333]"></div>
+              <span class="text-[14px] uppercase tracking-widest opacity-60">Structural Synthesis</span>
+            </div>
+            <p class="text-[22px] leading-[1.6] font-[300] text-[#333333]">
+              AI将碎片素材编译为结构化维基，按主题归类并建立交叉引用，用户随手存储即可获得井井有条的整理结果。
+            </p>
+          </div>
+
+          <!-- Block 2 -->
+          <div class="flex flex-col gap-[20px]">
+            <div class="flex items-center gap-[12px]">
+              <div class="w-[8px] h-[8px] rounded-full bg-[#333333]"></div>
+              <span class="text-[14px] uppercase tracking-widest opacity-60">Active Connection</span>
+            </div>
+            <p class="text-[22px] leading-[1.6] font-[300] text-[#333333]">
+              AI主动发现跨文档关联，将两年前文章与今日记录建立联系。每次提问后的答案自动整合回知识库，实现知识越用越丰富。
+            </p>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Visual/Callout (5/12) -->
+        <div class="col-span-5 p-[64px] flex flex-col justify-center">
+          <div class="relative p-[40px] border-[1px] hairline rounded-[2px] bg-white/30">
+            <div class="flex flex-col gap-[24px]">
+              <div class="flex items-center gap-[12px] mb-[8px]">
+                <i class="ph ph-brain text-[24px]"></i>
+                <span class="text-[12px] uppercase tracking-widest font-semibold">Growth Logic</span>
+              </div>
+              <p class="text-[18px] leading-[1.8] italic font-[300] opacity-80">
+                "我只是随手存了些东西，打开一看居然已经形成了一个完整的知识体系。"
+              </p>
+              <div class="mt-[12px] flex flex-col gap-[12px]">
+                <div class="px-[16px] py-[8px] rounded-full border-[0.5px] hairline text-[12px] uppercase text-center tracking-wider">
+                  Continuous Value Addition
+                </div>
+                <div class="px-[16px] py-[8px] rounded-full border-[0.5px] hairline text-[12px] uppercase text-center tracking-wider">
+                  Personal Knowledge Asset
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Position Locked as per Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          5
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 3</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Knowledge Paradigm Shift</span>
+    </footer>
+
+    <!-- Decorative Element: Right Side Vertical Label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-40 rotate-90 origin-right">Evolution</span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-6">
+      <div class="slide-number">6</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Fixed position from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per Content Page rules -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center px-[48px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.025em] leading-none">
+          Monthly Health Report
+        </h1>
+      </div>
+
+      <!-- Bento Grid Layout -->
+      <div class="flex-1 grid grid-cols-12 gap-0">
+        
+        <!-- Left: Textual Insights (5 columns) -->
+        <div class="col-span-5 border-r-[1px] hairline p-[48px] flex flex-col justify-center gap-[40px]">
+          <div class="flex flex-col gap-[12px]">
+            <div class="flex items-center gap-[8px]">
+              <i class="ph ph-trend-up text-[18px]"></i>
+              <span class="text-[14px] uppercase tracking-widest opacity-60">Insight 01</span>
+            </div>
+            <h3 class="text-[24px] font-[300] uppercase">知识覆盖度持续提升</h3>
+            <p class="text-[15px] leading-[1.625] opacity-80">
+              本月知识覆盖度达87%，较上月提升5个百分点，显示知识库内容完整度保持稳健增长态势，核心领域知识收录日趋完善，为业务决策提供更全面的信息支撑。
+            </p>
+          </div>
+
+          <div class="flex flex-col gap-[12px]">
+            <div class="flex items-center gap-[8px]">
+              <i class="ph ph-warning-circle text-[18px]"></i>
+              <span class="text-[14px] uppercase tracking-widest opacity-60">Insight 02</span>
+            </div>
+            <h3 class="text-[24px] font-[300] uppercase">异常内容智能识别</h3>
+            <p class="text-[15px] leading-[1.625] opacity-80">
+              AI自动扫描发现3处矛盾信息需人工复核，同时检测到12条内容已过时（最早可追溯至2024年6月），系统通过主动标记潜在问题，确保知识库信息的准确性与时效性。
+            </p>
+          </div>
+        </div>
+
+        <!-- Right: KPI Hero Area (7 columns) -->
+        <div class="col-span-7 p-[48px] flex flex-col justify-center gap-[32px]">
+          <!-- KPI Cards Row -->
+          <div class="grid grid-cols-3 gap-[20px]">
+            <!-- Coverage Card -->
+            <div class="flex flex-col items-center justify-center p-[24px] border-[1px] hairline rounded-[8px] bg-white/30">
+              <span class="text-[12px] uppercase tracking-widest opacity-60 mb-[12px]">Coverage</span>
+              <div class="flex items-baseline gap-[4px]">
+                <span class="text-[42px] font-[300]">87</span>
+                <span class="text-[16px] font-[300]">%</span>
+              </div>
+              <div class="mt-[8px] px-[12px] py-[4px] rounded-full border-[0.5px] hairline text-[11px] uppercase">
+                +5% vs last month
+              </div>
+            </div>
+            <!-- Conflicts Card -->
+            <div class="flex flex-col items-center justify-center p-[24px] border-[1px] hairline rounded-[8px] bg-white/30">
+              <span class="text-[12px] uppercase tracking-widest opacity-60 mb-[12px]">Conflicts</span>
+              <div class="flex items-baseline gap-[4px]">
+                <span class="text-[42px] font-[300]">3</span>
+                <span class="text-[16px] font-[300]">pts</span>
+              </div>
+              <div class="mt-[8px] px-[12px] py-[4px] rounded-full border-[0.5px] hairline text-[11px] uppercase">
+                Needs Review
+              </div>
+            </div>
+            <!-- Outdated Card -->
+            <div class="flex flex-col items-center justify-center p-[24px] border-[1px] hairline rounded-[8px] bg-white/30">
+              <span class="text-[12px] uppercase tracking-widest opacity-60 mb-[12px]">Outdated</span>
+              <div class="flex items-baseline gap-[4px]">
+                <span class="text-[42px] font-[300]">12</span>
+                <span class="text-[16px] font-[300]">items</span>
+              </div>
+              <div class="mt-[8px] px-[12px] py-[4px] rounded-full border-[0.5px] hairline text-[11px] uppercase">
+                Since 2024-06
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart Area -->
+          <div class="border-[1px] hairline rounded-[8px] p-[20px] bg-white/20">
+            <div id="chart_p6_1" style="width:100%; height: 200px; min-height: 180px; max-height: 220px;"></div>
+          </div>
+
+          <!-- System Status Footer -->
+          <div class="flex justify-end items-center gap-[12px]">
+            <div class="w-2 h-2 rounded-full bg-[#333333] animate-pulse"></div>
+            <span class="text-[12px] uppercase tracking-widest opacity-60">System Scan Status: OK</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Fixed position from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE]">
+      <div class="flex items-center gap-[16px]">
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          6
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Knowledge Health Report</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 4</span>
+    </footer>
+
+    <!-- Decorative Element -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-30 rotate-90 origin-center">Monitoring</span>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-7">
+      <div class="slide-number">7</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="relative h-[660px] flex flex-col">
+      
+      <!-- Title Area: Max 48px as per rules -->
+      <div class="h-[140px] flex items-center justify-center border-b-[1px] hairline">
+        <h1 class="text-[48px] font-[300] uppercase tracking-[0.05em] text-center">知识生长可视化</h1>
+      </div>
+
+      <!-- Process Flow Area -->
+      <div class="flex-1 flex flex-col items-center justify-center px-[80px] pb-[80px] gap-0">
+        
+        <!-- Step 1: AI Auto-Organize -->
+        <div class="w-full max-w-[800px] flex items-stretch group">
+          <div class="w-[240px] flex-shrink-0 px-[24px] py-[16px] rounded-full border-[1px] hairline text-[14px] uppercase text-center font-[300] flex items-center justify-center bg-white">
+            AI 自动整理
+          </div>
+          <div class="flex-1 border-y-[1px] border-l-[1px] hairline p-[32px] flex items-center gap-[24px]">
+            <i class="ph ph-brain text-[32px] opacity-60"></i>
+            <div class="flex flex-col">
+              <span class="text-[20px] font-[300] mb-[4px]">从手动分类到自动归集</span>
+              <p class="text-[16px] leading-[1.6] opacity-70">ima的核心体验应从"你来整理知识"变为"AI帮你整理知识"——用户只管塞，AI自动组织成知识图谱，彻底转变使用范式。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connector Arrow 1 -->
+        <div class="py-[24px] flex flex-col items-center">
+          <div class="w-[1px] h-[32px] bg-[#333333]"></div>
+          <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-[#333333]"></div>
+        </div>
+
+        <!-- Step 2: Active Discovery (Implicit from Semantic Intent) -->
+        <div class="w-full max-w-[800px] flex items-stretch opacity-60">
+          <div class="w-[240px] flex-shrink-0 px-[24px] py-[16px] rounded-full border-[1px] hairline text-[14px] uppercase text-center font-[300] flex items-center justify-center bg-white">
+            主动发现关联
+          </div>
+          <div class="flex-1 border-y-[1px] border-l-[1px] hairline p-[32px] flex items-center gap-[24px]">
+            <i class="ph ph-share-network text-[32px] opacity-60"></i>
+            <div class="flex flex-col">
+              <span class="text-[20px] font-[300] mb-[4px]">智能挖掘潜在连接</span>
+              <p class="text-[16px] leading-[1.6] opacity-70">在知识输入过程中，AI实时扫描库内相关内容，主动推送关联节点，将碎片信息织成知识网络。</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connector Arrow 2 -->
+        <div class="py-[24px] flex flex-col items-center">
+          <div class="w-[1px] h-[32px] bg-[#333333]"></div>
+          <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-[#333333]"></div>
+        </div>
+
+        <!-- Step 3: Knowledge Health Check -->
+        <div class="w-full max-w-[800px] flex items-stretch">
+          <div class="w-[240px] flex-shrink-0 px-[24px] py-[16px] rounded-full border-[1px] hairline text-[14px] uppercase text-center font-[300] flex items-center justify-center bg-white">
+            知识体检与可视化
+          </div>
+          <div class="flex-1 border-y-[1px] border-l-[1px] hairline p-[32px] flex items-center gap-[24px]">
+            <i class="ph ph-chart-line-up text-[32px] opacity-60"></i>
+            <div class="flex flex-col">
+              <span class="text-[20px] font-[300] mb-[4px]">可视化成长轨迹</span>
+              <p class="text-[16px] leading-[1.6] opacity-70">推出月度"知识体检"功能，直观看到成长轨迹、内容矛盾点和认知盲区，建立持续性的质量管理反馈闭环。</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Position Locked as per Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          7
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Knowledge Growth Visualization</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 5</span>
+    </footer>
+
+    <!-- Side Decoration: Inherited from Continuity Anchor -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-50 rotate-90 origin-center whitespace-nowrap">Evolution</span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-8">
+      <div class="slide-number">8</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[160px] flex items-center justify-center px-[64px] text-center">
+        <h1 class="text-[42px] font-[300] leading-[1.2] tracking-tight">
+          核心趋势：突破纯文字边界，<br/>走向<span class="italic">"全感官"</span>体验
+        </h1>
+      </div>
+
+      <!-- Bento Grid Content: 2-column layout based on JSON body items -->
+      <div class="flex-1 px-[64px] pb-[80px] grid grid-cols-2 gap-[32px]">
+        
+        <!-- Card 1: 代表产品革新 -->
+        <div class="border-[1px] hairline p-[40px] flex flex-col gap-[24px] bg-white/30">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[1px] bg-[#333333]"></div>
+            <span class="text-[14px] uppercase tracking-[0.2em] font-[400]">代表产品革新</span>
+          </div>
+          <p class="text-[18px] leading-[1.7] font-[400] opacity-90">
+            Google NotebookLM、百度 GenFlow 与 ima 正在重新定义知识管理，将碎片化信息转化为结构化洞察，打破传统文档的线性限制。
+          </p>
+        </div>
+
+        <!-- Card 2: 多模态深度融合 -->
+        <div class="border-[1px] hairline p-[40px] flex flex-col gap-[24px] bg-white/30">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[1px] bg-[#333333]"></div>
+            <span class="text-[14px] uppercase tracking-[0.2em] font-[400]">多模态深度融合</span>
+          </div>
+          <p class="text-[18px] leading-[1.7] font-[400] opacity-90">
+            实现文本、音频、图像与数据的深度融合，构建起立体化的知识处理与呈现体系，显著提升信息理解的维度与处理效率，形成完整的感官化知识体验闭环。
+          </p>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Position Lock inherited from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px] font-[400]">
+          8
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-60">Chapter 6</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-60">Editorial Layout System</span>
+    </footer>
+
+    <!-- Decorative Element: Right side vertical label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] rotate-90 origin-right">
+      <span class="text-[12px] uppercase tracking-widest opacity-40">Sensory Experience</span>
+      <div class="w-[40px] h-[1px] bg-[#333333] opacity-30"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-9">
+      <div class="slide-number">9</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[160px] flex items-center justify-center px-[64px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.05em] text-center leading-tight">
+          评估维度与排序逻辑
+        </h1>
+      </div>
+
+      <!-- Bento Grid Content: 2-column layout based on JSON body items -->
+      <div class="flex-1 grid grid-cols-2 gap-0 px-[64px] pb-[80px]">
+        
+        <!-- Card 1: 核心竞品选取 -->
+        <div class="border-[1px] hairline p-[40px] flex flex-col gap-[24px] relative">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[1px] bg-[#333333]"></div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Dimension 01</span>
+          </div>
+          <h2 class="text-[28px] font-[300] uppercase tracking-tight">
+            核心竞品选取
+          </h2>
+          <p class="text-[16px] leading-[1.7] opacity-80 font-[400]">
+            本章节在全球范围内筛选知识管理领域具有代表性的核心竞品作为分析对象，确保评估样本具备行业典型性与全球视野，为后续对比分析奠定坚实基础。
+          </p>
+          <!-- Decorative Pill -->
+          <div class="mt-8 self-start px-[16px] py-[6px] rounded-full border-[0.5px] hairline text-[12px] uppercase tracking-wider opacity-60">
+            Global Benchmarking
+          </div>
+        </div>
+
+        <!-- Card 2: 三维评估体系 -->
+        <div class="border-[1px] hairline p-[40px] flex flex-col gap-[24px] relative">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[1px] bg-[#333333]"></div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Dimension 02</span>
+          </div>
+          <h2 class="text-[28px] font-[300] uppercase tracking-tight">
+            三维评估体系
+          </h2>
+          <p class="text-[16px] leading-[1.7] opacity-80 font-[400]">
+            建立三维综合评估体系，通过多维度指标对知识管理产品进行系统性评价，构建科学、全面的分析框架，以客观衡量各竞品的市场表现与产品能力。
+          </p>
+          <!-- Decorative Pill -->
+          <div class="mt-8 self-start px-[16px] py-[6px] rounded-full border-[0.5px] hairline text-[12px] uppercase tracking-wider opacity-60">
+            Analytical Framework
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Fixed Position Lock from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px] font-[400]">
+          9
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Methodology</span>
+      </div>
+      <div class="text-[12px] uppercase tracking-widest opacity-70">
+        Chapter 7
+      </div>
+    </footer>
+
+    <!-- Right Side Decorative Element (Inherited from Anchor) -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-40 rotate-90 origin-center whitespace-nowrap">
+        Evaluation Logic
+      </span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-10">
+      <div class="slide-number">10</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Product Roadmap 2026</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center justify-center px-[40px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.05em] text-center">
+          2026年关键产品更新
+        </h1>
+      </div>
+
+      <!-- Bento Grid Content: 3-column hierarchy as per semantic intent -->
+      <div class="flex-1 grid grid-cols-3 border-b-[1px] hairline">
+        
+        <!-- Column 1: Platform Foundation -->
+        <div class="p-[48px] flex flex-col gap-[32px] border-r-[1px] hairline">
+          <div class="flex items-center gap-[12px] mb-[-16px]">
+            <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-globe text-[16px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Foundation</span>
+          </div>
+          
+          <div class="flex flex-col gap-[24px]">
+            <h2 class="text-[24px] font-[300] uppercase leading-tight">
+              平台基础与<br/>全球生态
+            </h2>
+            <p class="text-[16px] leading-[1.625] text-[#333333]/80 font-[400]">
+              Notion由Notion Labs开发运营，作为全球领先的工作空间平台，截至2025年已积累超过1亿全球用户，构建起庞大的全球协作生态。
+            </p>
+          </div>
+          
+          <div class="mt-8">
+            <div class="px-[20px] py-[10px] rounded-full border-[1px] hairline text-[12px] uppercase text-center tracking-wider">
+              100M+ Global Users
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2: Technical Architecture (Derived from semantic intent) -->
+        <div class="p-[48px] flex flex-col gap-[32px] border-r-[1px] hairline bg-[#F0EEE8]">
+          <div class="flex items-center gap-[12px] mb-[-16px]">
+            <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-cpu text-[16px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Architecture</span>
+          </div>
+          
+          <div class="flex flex-col gap-[24px]">
+            <h2 class="text-[24px] font-[300] uppercase leading-tight">
+              技术底层与<br/>模型支持
+            </h2>
+            <p class="text-[16px] leading-[1.625] text-[#333333]/80 font-[400]">
+              通过多模态模型集成与分布式架构升级，确保AI Agent在处理海量私有知识库时的低延迟响应与高精准度检索。
+            </p>
+          </div>
+          
+          <div class="mt-8">
+            <div class="px-[20px] py-[10px] rounded-full border-[1px] hairline text-[12px] uppercase text-center tracking-wider">
+              Multi-modal LLM Core
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 3: 2026 Innovation -->
+        <div class="p-[48px] flex flex-col gap-[32px]">
+          <div class="flex items-center gap-[12px] mb-[-16px]">
+            <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-lightbulb text-[16px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Innovation</span>
+          </div>
+          
+          <div class="flex flex-col gap-[24px]">
+            <h2 class="text-[24px] font-[300] uppercase leading-tight">
+              2026年<br/>核心功能创新
+            </h2>
+            <p class="text-[16px] leading-[1.625] text-[#333333]/80 font-[400]">
+              Notion于2026年2月推出Custom Agents功能，支持用户自定义AI Agent以自主执行多步骤复杂任务，实现从工具到助理的跃迁。
+            </p>
+          </div>
+          
+          <div class="mt-8">
+            <div class="px-[20px] py-[10px] rounded-full border-[1px] hairline text-[12px] uppercase text-center tracking-wider">
+              Custom Agents v1.0
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Fixed Position Lock from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          10
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 8 / Product Evolution</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Notion Labs Strategic Update</span>
+    </footer>
+
+    <!-- Decorative Element: Inherited from Continuity Anchor -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-30 rotate-90 origin-center">Evolution</span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-11">
+      <div class="slide-number">11</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center justify-center">
+        <h1 class="text-[48px] font-[300] uppercase tracking-[0.025em] text-center">AI 功能生态对比</h1>
+      </div>
+
+      <!-- Comparison Grid: Bento Box Style -->
+      <div class="flex-1 grid grid-cols-2 gap-0">
+        
+        <!-- Left Column: Notion Custom Agents -->
+        <div class="border-r-[1px] hairline p-[48px] flex flex-col gap-[40px]">
+          <div class="flex items-center gap-[12px] mb-[-20px]">
+            <div class="px-[16px] py-[6px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-widest">
+              Notion Ecosystem
+            </div>
+            <i class="ph ph-brain text-[24px]"></i>
+          </div>
+          
+          <div class="flex flex-col gap-[32px]">
+            <div class="flex flex-col gap-[12px]">
+              <h3 class="text-[24px] font-[300] uppercase tracking-tight">Notion Custom Agents</h3>
+              <p class="text-[16px] leading-[1.625] opacity-80">
+                Notion Labs于2026年2月推出核心功能更新，支持用户创建自定义AI智能体，能够自主执行多步骤复杂任务，实现从被动AI问答到主动任务执行的跨越。
+              </p>
+            </div>
+            
+            <div class="p-[24px] border-[1px] hairline rounded-[8px] bg-white/30">
+              <div class="text-[14px] font-[400] uppercase mb-[16px] opacity-60">Core Capability</div>
+              <div class="text-[18px] leading-[1.6] font-[300]">
+                标志着知识工作台从工具属性向智能体协作平台的范式转变，使复杂的多步骤任务编排过程可视化、可配置、可管理。
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: NotebookLM Comparison -->
+        <div class="p-[48px] flex flex-col gap-[40px]">
+          <div class="flex items-center gap-[12px] mb-[-20px]">
+            <div class="px-[16px] py-[6px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-widest">
+              NotebookLM Matrix
+            </div>
+            <i class="ph ph-stack text-[24px]"></i>
+          </div>
+
+          <div class="flex flex-col gap-[20px]">
+            <!-- Feature Mapping Items -->
+            <div class="flex items-center gap-[20px] p-[20px] border-[1px] hairline rounded-[8px] transition-all">
+              <div class="w-[120px] text-[12px] uppercase opacity-50 text-right">Deep Research</div>
+              <div class="w-[1px] h-[24px] bg-[#333333]"></div>
+              <div class="text-[16px] font-[300]">深度研究能力对标</div>
+            </div>
+            
+            <div class="flex items-center gap-[20px] p-[20px] border-[1px] hairline rounded-[8px]">
+              <div class="w-[120px] text-[12px] uppercase opacity-50 text-right">Data Tables</div>
+              <div class="w-[1px] h-[24px] bg-[#333333]"></div>
+              <div class="text-[16px] font-[300]">结构化数据处理对标</div>
+            </div>
+
+            <div class="flex items-center gap-[20px] p-[20px] border-[1px] hairline rounded-[8px]">
+              <div class="w-[120px] text-[12px] uppercase opacity-50 text-right">Cinematic Video</div>
+              <div class="w-[1px] h-[24px] bg-[#333333]"></div>
+              <div class="text-[16px] font-[300]">多模态内容生成对标</div>
+            </div>
+
+            <div class="mt-[20px] p-[24px] border-[1px] hairline rounded-[8px] bg-[#333333] text-white">
+              <div class="text-[14px] uppercase mb-[8px] opacity-70">Strategic Insight</div>
+              <div class="text-[16px] leading-[1.6] font-[300]">
+                建立清晰的生态位对标认知，突出Notion从被动问答到主动执行的范式跨越。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Fixed Position Lock from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          11
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 9</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">AI Ecosystem Comparison</span>
+    </footer>
+
+    <!-- Side Decoration: Inherited from Anchor -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-50 rotate-90 origin-center">Evolution</span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-12">
+      <div class="slide-number">12</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center justify-center">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.05em] text-center">
+          ima优势：本地化壁垒
+        </h1>
+      </div>
+
+      <!-- Comparison Grid: Bento Box Style -->
+      <div class="flex-1 grid grid-cols-2">
+        
+        <!-- Left Column: Notion (Global) -->
+        <div class="flex flex-col border-r-[1px] hairline">
+          <!-- Section Header -->
+          <div class="px-[48px] py-[32px] border-b-[1px] hairline flex items-center gap-[12px]">
+            <div class="px-[12px] py-[4px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider">Global Giant</div>
+            <span class="text-[24px] font-[300] uppercase">Notion</span>
+          </div>
+          
+          <!-- Content Blocks -->
+          <div class="p-[48px] flex flex-col gap-[40px]">
+            <!-- Block 1 -->
+            <div class="flex flex-col gap-[12px]">
+              <h3 class="text-[16px] font-[400] uppercase tracking-wider opacity-60">Notion全球市场地位</h3>
+              <p class="text-[18px] leading-[1.625] font-[300]">
+                Notion Labs拥有超1亿全球用户（2025年数据），核心定位为All-in-one工作空间，深度集成笔记、数据库、项目管理、Wiki与AI功能，构建完整的生产力工具生态体系。
+              </p>
+            </div>
+            <!-- Block 2 -->
+            <div class="flex flex-col gap-[12px]">
+              <h3 class="text-[16px] font-[400] uppercase tracking-wider opacity-60">Notion Custom Agents</h3>
+              <p class="text-[18px] leading-[1.625] font-[300]">
+                Notion于2026年2月推出Custom Agents功能，支持用户自定义AI Agent以自主执行多步骤复杂任务，实现从被动记录工具向主动智能执行体的能力跃迁。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: ima (Local) -->
+        <div class="flex flex-col bg-[#EBE9E4]">
+          <!-- Section Header -->
+          <div class="px-[48px] py-[32px] border-b-[1px] hairline flex items-center gap-[12px]">
+            <div class="px-[12px] py-[4px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider">Local Edge</div>
+            <span class="text-[24px] font-[300] uppercase">ima</span>
+          </div>
+
+          <!-- Content Blocks -->
+          <div class="p-[48px] flex flex-col justify-center h-full pb-[80px]">
+            <div class="flex flex-col gap-[24px]">
+              <h3 class="text-[16px] font-[400] uppercase tracking-wider opacity-60">ima深度本地化优势</h3>
+              <div class="flex flex-col gap-[20px]">
+                <div class="flex items-start gap-[16px]">
+                  <div class="mt-1 w-[8px] h-[8px] rounded-full bg-[#333333] shrink-0"></div>
+                  <p class="text-[20px] leading-[1.6] font-[300]">
+                    访问速度快、中文支持深度优化
+                  </p>
+                </div>
+                <div class="flex items-start gap-[16px]">
+                  <div class="mt-1 w-[8px] h-[8px] rounded-full bg-[#333333] shrink-0"></div>
+                  <p class="text-[20px] leading-[1.6] font-[300]">
+                    深度集成微信生态，贴合本土协同习惯
+                  </p>
+                </div>
+                <div class="flex items-start gap-[16px]">
+                  <div class="mt-1 w-[8px] h-[8px] rounded-full bg-[#333333] shrink-0"></div>
+                  <p class="text-[20px] leading-[1.6] font-[300]">
+                    构建难以复制的本土市场壁垒
+                  </p>
+                </div>
+              </div>
+              <div class="mt-[32px] px-[24px] py-[16px] rounded-full border-[1px] hairline text-[14px] uppercase text-center tracking-widest">
+                Localized Competitive Advantage
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Fixed Position Lock from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          12
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Local Adaptation Strategy</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">ima Analysis Report</span>
+    </footer>
+
+    <!-- Decorative Element: Right Side Vertical Label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-40 rotate-90 origin-center whitespace-nowrap">
+        Competitive Matrix
+      </span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-13">
+      <div class="slide-number">13</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Core Capability System</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center justify-center">
+        <h1 class="text-[48px] font-[300] uppercase tracking-[0.05em] text-[#333333]">核心能力体系</h1>
+      </div>
+
+      <!-- 2x2 Matrix Layout: Bento Box Style -->
+      <div class="flex-1 grid grid-cols-2 grid-rows-2">
+        
+        <!-- Top Left: Ecosystem Scale -->
+        <div class="border-r-[1px] border-b-[1px] hairline p-[40px] flex flex-col justify-center gap-[24px]">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-users text-[16px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Ecosystem Scale</span>
+          </div>
+          <div class="flex flex-col gap-[12px]">
+            <h3 class="text-[24px] font-[300] leading-tight">国内最大企业级AI应用生态底座</h3>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70">
+              积累8亿用户、2000万+企业组织，其中30万家付费企业客户深度使用AI功能，构成国内最大的企业级AI应用生态底座，形成强大的网络效应与数据壁垒。
+            </p>
+          </div>
+        </div>
+
+        <!-- Top Right: Technical Architecture -->
+        <div class="border-b-[1px] hairline p-[40px] flex flex-col justify-center gap-[24px]">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-cpu text-[16px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Technical Architecture</span>
+          </div>
+          <div class="flex flex-col gap-[12px]">
+            <h3 class="text-[24px] font-[300] leading-tight">AI-Fusion多模型融合架构</h3>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70">
+              采用AI-Fusion引擎融合50+全球主流大模型，底层Agent Runtime支持LLM Independent架构，确保模型中立性与技术自主性。
+            </p>
+          </div>
+        </div>
+
+        <!-- Bottom Left: Platform Upgrade (Based on Semantic Intent) -->
+        <div class="border-r-[1px] hairline p-[40px] flex flex-col justify-center gap-[24px]">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-stack text-[16px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Platform Upgrade</span>
+          </div>
+          <div class="flex flex-col gap-[12px]">
+            <h3 class="text-[24px] font-[300] leading-tight">Agent OS 全球首个</h3>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70">
+              构建面向AI原生时代的操作系统，实现从单一模型调用到复杂任务编排的跨越，定义企业级AI Agent的运行标准。
+            </p>
+          </div>
+        </div>
+
+        <!-- Bottom Right: Tech Ecosystem (Based on Semantic Intent) -->
+        <div class="p-[40px] flex flex-col justify-center gap-[24px]">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-share-network text-[16px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300]">Tech Ecosystem</span>
+          </div>
+          <div class="flex flex-col gap-[12px]">
+            <h3 class="text-[24px] font-[300] leading-tight">P-A-L 闭环能力</h3>
+            <p class="text-[15px] leading-[1.6] text-[#333333]/70">
+              通过 Platform-Agent-Layer 闭环体系，快速覆盖20+核心业务场景，实现技术能力到商业价值的极速转化。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Fixed Position Lock from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          13
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Core Capability System</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 11</span>
+    </footer>
+
+    <!-- Decorative Element: Right Side Vertical Label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-40 rotate-90 origin-center whitespace-nowrap">Capability Matrix</span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-14">
+      <div class="slide-number">14</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center px-[48px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.025em] leading-tight">
+          3.4 Google NotebookLM — AI 研究工具引领者
+        </h1>
+      </div>
+
+      <!-- Bento Grid Content: Vertical Flow Logic -->
+      <div class="flex-1 px-[48px] py-[40px] grid grid-cols-1 gap-[32px] max-w-[1100px] mx-auto w-full">
+        
+        <!-- Card 1: Technical Foundation -->
+        <div class="group relative border-[1px] hairline p-[32px] flex items-start gap-[32px] bg-white/30">
+          <div class="flex-shrink-0 w-[80px] h-[80px] rounded-full border-[1px] hairline flex items-center justify-center">
+            <i class="ph ph-cpu text-[32px]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center gap-[12px] mb-[16px]">
+              <span class="px-[16px] py-[4px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider font-[300]">
+                Technical Base
+              </span>
+              <h2 class="text-[24px] font-[300] uppercase tracking-wide">技术底座：Gemini 3 (Flash)</h2>
+            </div>
+            <p class="text-[16px] leading-[1.625] opacity-80 max-w-[800px]">
+              NotebookLM由Google（Alphabet）出品，底层技术依托Gemini 3 (Flash)模型，为AI研究工具提供强大的多模态处理能力支撑。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 2: Ecosystem Loop -->
+        <div class="group relative border-[1px] hairline p-[32px] flex items-start gap-[32px] bg-white/30">
+          <div class="flex-shrink-0 w-[80px] h-[80px] rounded-full border-[1px] hairline flex items-center justify-center">
+            <i class="ph ph-share-network text-[32px]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center gap-[12px] mb-[16px]">
+              <span class="px-[16px] py-[4px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider font-[300]">
+                Ecosystem
+              </span>
+              <h2 class="text-[24px] font-[300] uppercase tracking-wide">生态闭环：Gemini 深度集成</h2>
+            </div>
+            <p class="text-[16px] leading-[1.625] opacity-80 max-w-[800px]">
+              已完成与Gemini深度集成，实现笔记本与Gemini双向打通，聊天记录可直接作为研究来源引用，标志着NotebookLM正式融入Google AI生态。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Position Lock Inherited -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px] font-[400]">
+          14
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">NotebookLM Analysis</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[12px] uppercase tracking-widest opacity-50">Chapter 12</span>
+      </div>
+    </footer>
+
+    <!-- Decorative Element: Right Side Vertical Label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex flex-col items-center gap-[12px] opacity-40">
+      <span class="text-[12px] uppercase tracking-[0.3em] rotate-90 origin-center whitespace-nowrap">
+        Architecture
+      </span>
+      <div class="w-[1px] h-[100px] bg-[#333333]"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-15">
+      <div class="slide-number">15</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Gemini Ecosystem Integration</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[160px] flex items-center justify-center px-[64px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.05em] text-center leading-tight">
+          Gemini 生态深度集成：要点 1
+        </h1>
+      </div>
+
+      <!-- Bento Grid Content: 3-column cards as per semantic intent -->
+      <div class="flex-1 px-[48px] pb-[80px] grid grid-cols-3 gap-0 border-t-[1px] hairline">
+        
+        <!-- Card 1 -->
+        <div class="border-r-[1px] hairline p-[40px] flex flex-col gap-[24px]">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-8 h-8 rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-stack text-[16px]"></i>
+            </div>
+            <span class="text-[12px] uppercase tracking-widest opacity-60">Capability 01</span>
+          </div>
+          <h2 class="text-[24px] font-[300] leading-tight">
+            100万Token<br/>超大上下文窗口
+          </h2>
+          <p class="text-[15px] leading-[1.625] opacity-80">
+            上线100万Token超大上下文窗口，支持保存聊天会话与自定义研究目标，实现跨多篇长文关联分析，单次可处理约1500页文档内容，奠定长文档研究基础能力。
+          </p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="border-r-[1px] hairline p-[40px] flex flex-col gap-[24px]">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-8 h-8 rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-brain text-[16px]"></i>
+            </div>
+            <span class="text-[12px] uppercase tracking-widest opacity-60">Capability 02</span>
+          </div>
+          <h2 class="text-[24px] font-[300] leading-tight">
+            Deep Research<br/>深度研究功能
+          </h2>
+          <p class="text-[15px] leading-[1.625] opacity-80">
+            推出Deep Research深度研究功能，新增Word、Sheets及OCR图片作为来源类型，产品从被动文档助手升级为主动自主研究Agent。
+          </p>
+        </div>
+
+        <!-- Card 3: Empty/Placeholder for 3-column balance as per semantic intent, but content only has 2 items -->
+        <div class="p-[40px] flex flex-col justify-center items-center text-center gap-[16px] opacity-40">
+          <div class="w-12 h-12 rounded-full border-[1px] border-dashed hairline flex items-center justify-center">
+            <i class="ph ph-circle text-[12px]"></i>
+          </div>
+          <span class="text-[12px] uppercase tracking-widest">Further Integration</span>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Position Lock inherited from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          15
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 13</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Gemini Ecosystem Analysis</span>
+    </footer>
+
+    <!-- Decorative Element: Right side vertical label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-40 rotate-90 origin-center whitespace-nowrap">
+        Integration Phase
+      </span>
+      <div class="w-[1px] h-[60px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-16">
+      <div class="slide-number">16</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Gemini Ecosystem Integration</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[160px] flex items-center justify-center px-[64px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.05em] text-center leading-tight">
+          Gemini 生态深度集成：要点 2
+        </h1>
+      </div>
+
+      <!-- Bento Grid Content: 2-column layout based on JSON body items -->
+      <div class="flex-1 px-[64px] pb-[80px] grid grid-cols-2 gap-[32px] max-w-[1100px] mx-auto w-full">
+        
+        <!-- Card 1: Slide Editing -->
+        <div class="border-[1px] hairline p-[40px] flex flex-col gap-[24px] relative bg-white/30">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[40px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-stack text-[20px]"></i>
+            </div>
+            <h2 class="text-[24px] font-[300] uppercase tracking-wide">
+              幻灯片逐页Prompt编辑与PPT…
+            </h2>
+          </div>
+          <p class="text-[16px] leading-[1.7] opacity-80 font-[400]">
+            推出幻灯片逐页Prompt编辑功能，支持直接生成并导出PPTX格式文件，彻底解决AI生成演示文稿后无法二次编辑修改的用户痛点，实现与主流办公套件无缝衔接。
+          </p>
+          <!-- Decorative Pill -->
+          <div class="mt-8 pt-[20px]">
+            <span class="px-[16px] py-[6px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-widest opacity-60">
+              Workflow Optimization
+            </span>
+          </div>
+        </div>
+
+        <!-- Card 2: NotebookLM Integration -->
+        <div class="border-[1px] hairline p-[40px] flex flex-col gap-[24px] relative bg-white/30">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[40px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-brain text-[20px]"></i>
+            </div>
+            <h2 class="text-[24px] font-[300] uppercase tracking-wide">
+              NotebookLM与Gemini…
+            </h2>
+          </div>
+          <p class="text-[16px] leading-[1.7] opacity-80 font-[400]">
+            完成与Gemini深度集成，实现笔记本与Gemini双向打通，聊天记录可直接作为研究来源引用，标志着NotebookLM正式融入Google AI生态，形成全链路闭环。
+          </p>
+          <!-- Decorative Pill -->
+          <div class="mt-8 pt-[20px]">
+            <span class="px-[16px] py-[6px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-widest opacity-60">
+              Ecosystem Synergy
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Fixed Position Lock from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE] z-20">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px] font-[400]">
+          16
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 14</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Gemini Integration Analysis</span>
+    </footer>
+
+    <!-- Right Side Decorative Element from Anchor -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-40 rotate-90 origin-center">Integration</span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-17">
+      <div class="slide-number">17</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex flex-col h-full">
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[160px] border-b-[1px] hairline flex items-center justify-center px-[64px]">
+        <h1 class="text-[42px] font-[300] uppercase tracking-[0.05em] text-center leading-tight">
+          关键结论：五大用户体验新范式
+        </h1>
+      </div>
+
+      <!-- Body Area: Bento-style split for key takeaways -->
+      <div class="flex-1 grid grid-cols-2 gap-0">
+        <!-- Takeaway 1 -->
+        <div class="p-[64px] flex flex-col justify-center gap-[32px] border-r-[1px] hairline">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[1px] bg-[#333333]"></div>
+            <span class="text-[14px] uppercase tracking-widest font-[400]">Core Methodology</span>
+          </div>
+          <div class="flex flex-col gap-[24px]">
+            <h2 class="text-[28px] font-[300] leading-tight">
+              核心方法论：AI主动编译维护
+            </h2>
+            <p class="text-[18px] leading-[1.7] opacity-80 font-[400]">
+              基于Karpathy LLM Wiki等标杆产品分析，AI主动编译维护已成为知识管理的核心方法论。
+            </p>
+          </div>
+          <div class="mt-4">
+            <div class="px-[20px] py-[8px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider inline-block">
+              Automation Governance
+            </div>
+          </div>
+        </div>
+
+        <!-- Takeaway 2 -->
+        <div class="p-[64px] flex flex-col justify-center gap-[32px]">
+          <div class="flex items-center gap-[12px]">
+            <div class="w-[40px] h-[1px] bg-[#333333]"></div>
+            <span class="text-[14px] uppercase tracking-widest font-[400]">Future Trends</span>
+          </div>
+          <div class="flex flex-col gap-[24px]">
+            <h2 class="text-[28px] font-[300] leading-tight">
+              2025-2026五大确定性趋势
+            </h2>
+            <p class="text-[18px] leading-[1.7] opacity-80 font-[400]">
+              AI主动编译维护实现知识自动化治理、多模态知识融合打破数据形态边界、AI记忆与超个性化重塑人机交互体验等。
+            </p>
+          </div>
+          <div class="mt-4">
+            <div class="px-[20px] py-[8px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider inline-block">
+              Paradigm Shift 2026
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer: Fixed Position Lock from Continuity Anchor -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE]">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px] font-[400]">
+          17
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 15</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Key Takeaways</span>
+    </footer>
+
+    <!-- Decorative Element: Right side vertical label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] pointer-events-none">
+      <span class="text-[12px] uppercase tracking-widest opacity-40 rotate-90 origin-right whitespace-nowrap">
+        Strategic Conclusion
+      </span>
+      <div class="w-[1px] h-[100px] bg-[#333333] opacity-20"></div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-18">
+      <div class="slide-number">18</div>
+      <div class="slide bg-[#F4F2EE] text-[#333333]" style="background:#F4F2EE;">
+    
+    <!-- Header: Inherited from Continuity Anchor -->
+    <header class="h-[60px] border-b-[1px] hairline flex justify-end items-center px-[32px] z-20">
+      <span class="text-[12px] leading-[16px] uppercase tracking-[0.05em] opacity-70">Knowledge Paradigm Shift</span>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="relative h-[660px] flex flex-col">
+      
+      <!-- Title Area: Max 48px as per rules, maintaining editorial tension -->
+      <div class="h-[140px] border-b-[1px] hairline flex items-center justify-center">
+        <h1 class="text-[48px] font-[300] uppercase tracking-[0.05em] text-[#333333]">总结与展望</h1>
+      </div>
+
+      <!-- Bento Grid Content: 2-column layout for the 2 body items -->
+      <div class="flex-1 grid grid-cols-2 gap-0">
+        
+        <!-- Item 1: Paradigm Shift -->
+        <div class="border-r-[1px] hairline p-[64px] flex flex-col justify-center gap-[32px]">
+          <div class="flex items-center gap-[16px]">
+            <div class="w-[48px] h-[48px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-brain text-[24px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300] opacity-60">Paradigm Shift</span>
+          </div>
+          
+          <div class="flex flex-col gap-[20px]">
+            <h2 class="text-[28px] font-[300] leading-tight">范式翻转：Karpathy 的 L…</h2>
+            <p class="text-[16px] leading-[1.625] text-[#333333]/80 font-[400]">
+              深入解析AI主动编译维护机制，以Karpathy LLM Wiki为代表案例，展示AI如何替代人工完成知识整理工作，实现知识库的自动化构建与持续更新。
+            </p>
+          </div>
+          
+          <div class="mt-4">
+            <div class="inline-block px-[20px] py-[8px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider">
+              Automation
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 2: Action Plan -->
+        <div class="p-[64px] flex flex-col justify-center gap-[32px]">
+          <div class="flex items-center gap-[16px]">
+            <div class="w-[48px] h-[48px] rounded-full border-[1px] hairline flex items-center justify-center">
+              <i class="ph ph-target text-[24px]"></i>
+            </div>
+            <span class="text-[14px] uppercase tracking-widest font-[300] opacity-60">Action Plan</span>
+          </div>
+          
+          <div class="flex flex-col gap-[20px]">
+            <h2 class="text-[28px] font-[300] leading-tight">后续行动建议</h2>
+            <p class="text-[16px] leading-[1.625] text-[#333333]/80 font-[400]">
+              建议用户专注核心内容输入，依托AI系统实现知识库的自动化构建与持续更新，充分利用智能自动化处理、多维度知识关联及个性化内容呈现能力。
+            </p>
+          </div>
+          
+          <div class="mt-4">
+            <div class="inline-block px-[20px] py-[8px] rounded-full border-[1px] hairline text-[12px] uppercase tracking-wider">
+              Implementation
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer: Position Lock Inherited -->
+    <footer class="absolute bottom-0 left-0 w-full h-[60px] border-t-[1px] hairline flex justify-between items-center px-[32px] bg-[#F4F2EE]">
+      <div class="flex items-center gap-[16px]">
+        <!-- Circle Page Number -->
+        <div class="w-[32px] h-[32px] rounded-full border-[1px] hairline flex items-center justify-center text-[12px]">
+          18
+        </div>
+        <span class="text-[12px] uppercase tracking-widest opacity-70">Chapter 16</span>
+      </div>
+      <span class="text-[12px] uppercase tracking-widest opacity-70">Summary & Outlook</span>
+    </footer>
+
+    <!-- Decorative Element: Right Side Vertical Label -->
+    <div class="absolute right-[48px] top-1/2 -translate-y-1/2 flex items-center gap-[12px] rotate-90 origin-right">
+      <span class="text-[12px] uppercase tracking-widest opacity-40">Final Synthesis</span>
+      <div class="w-[40px] h-[1px] bg-[#333333] opacity-30"></div>
+    </div>
+
+  </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // Initialize ECharts with the provided minimal theme and data
+    var chart_p6_1 = echarts.init(document.getElementById('chart_p6_1'));
+    
+    const option = {
+      
+
+    chart_p6_1.setOption(option);
+  
+
+});
+</script>
+</body>
+</html>

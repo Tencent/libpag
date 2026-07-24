@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>不是功能，是产品哲学</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+*, *::before, *::after { animation: none !important; transition: none !important; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body>
+<div class="slide" style="width:1280px;height:720px;overflow:hidden;position:relative;background:linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);">
+  <!-- Watermark -->
+  <div class="absolute z-0 text-[450px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="left:50%;top:50%;transform:translate(-50%,-50%);">IMA</div>
+  <!-- Dashed decorative circles -->
+  <div class="absolute z-5 border-[1px] border-dashed border-[#FFFFFF]/[0.06] rounded-full" style="width:480px;height:480px;left:400px;top:120px;"></div>
+  <div class="absolute z-5 border-[1px] border-dashed border-[#FFFFFF]/[0.04] rounded-full" style="width:560px;height:560px;left:360px;top:80px;"></div>
+  <!-- Main Content: Center statement -->
+  <div class="absolute z-20 flex flex-col items-center justify-center" style="left:0;top:0;width:1280px;height:720px;">
+    <!-- Subtitle -->
+    <div class="text-[14px] font-[300] text-[#FFFFFF]/30 tracking-[0.2em] uppercase mb-[40px]">Philosophy</div>
+    <!-- Giant parentheses title -->
+    <div class="flex items-center gap-[16px]">
+      <span class="text-[100px] font-[300] text-[#FFFFFF]/60 leading-none">(</span>
+      <div class="flex flex-col items-center">
+        <h1 class="text-[64px] font-[300] text-[#FFFFFF] leading-[1.2] tracking-[0.03em]">不是功能</h1>
+        <h1 class="text-[64px] font-[300] text-[#FFFFFF] leading-[1.2] tracking-[0.03em] mt-[4px]">是产品哲学</h1>
+      </div>
+      <span class="text-[100px] font-[300] text-[#FFFFFF]/60 leading-none">)</span>
+    </div>
+    <!-- Core statement -->
+    <div class="mt-[40px] text-[18px] font-[300] text-[#FFFFFF]/50 tracking-[0.05em]">从「人使用工具」变成「人养育伙伴」</div>
+  </div>
+  <!-- Footer -->
+  <div class="absolute z-50 flex flex-col items-center justify-center" style="bottom:48px;left:0;right:0;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/70">ima</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/30 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

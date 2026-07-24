@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>五层架构总览</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+*, *::before, *::after { animation: none !important; transition: none !important; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body>
+<div class="slide" style="width:1280px;height:720px;overflow:hidden;position:relative;background:linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);">
+  <!-- Watermark -->
+  <div class="absolute z-0 text-[400px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="left:50%;top:50%;transform:translate(-50%,-50%);">STACK</div>
+  <!-- Header -->
+  <div class="absolute z-20" style="top:40px;left:120px;width:1040px;">
+    <div class="text-[14px] font-[300] text-[#FFFFFF]/40 tracking-[0.15em] uppercase mb-[8px]">Five-Layer Architecture</div>
+    <h2 class="text-[36px] font-[300] text-[#FFFFFF] leading-tight">五层架构总览</h2>
+    <div class="w-[48px] h-[1px] bg-[#FFFFFF]/20 mt-[16px]"></div>
+  </div>
+  <!-- Pyramid Layers -->
+  <!-- Layer 5 -->
+  <div class="absolute z-20 flex items-center" style="top:150px;left:440px;width:400px;height:68px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;">
+    <div class="flex items-center pl-[20px] w-full">
+      <i class="ph ph-heartbeat text-[22px] text-[#82D0A4] mr-[16px]"></i>
+      <div>
+        <div class="text-[16px] font-[400] text-[#FFFFFF]">第5层：主动行为层</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40 mt-[2px]">它会主动做什么 / Heartbeat + Cron</div>
+      </div>
+    </div>
+  </div>
+  <!-- Layer 4 -->
+  <div class="absolute z-20 flex items-center" style="top:240px;left:380px;width:520px;height:68px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;">
+    <div class="flex items-center pl-[20px] w-full">
+      <i class="ph ph-plugs-connected text-[22px] text-[#82D0A4] mr-[16px]"></i>
+      <div>
+        <div class="text-[16px] font-[400] text-[#FFFFFF]">第4层：能力扩展层</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40 mt-[2px]">它能做什么 / Skills</div>
+      </div>
+    </div>
+  </div>
+  <!-- Layer 3 -->
+  <div class="absolute z-20 flex items-center" style="top:330px;left:320px;width:640px;height:68px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;">
+    <div class="flex items-center pl-[20px] w-full">
+      <i class="ph ph-flow-arrow text-[22px] text-[#82D0A4] mr-[16px]"></i>
+      <div>
+        <div class="text-[16px] font-[400] text-[#FFFFFF]">第3层：工作流程层</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40 mt-[2px]">它怎么干活 / Agents</div>
+      </div>
+    </div>
+  </div>
+  <!-- Layer 2 -->
+  <div class="absolute z-20 flex items-center" style="top:420px;left:260px;width:760px;height:68px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;">
+    <div class="flex items-center pl-[20px] w-full">
+      <i class="ph ph-users text-[22px] text-[#82D0A4] mr-[16px]"></i>
+      <div>
+        <div class="text-[16px] font-[400] text-[#FFFFFF]">第2层：关系认知层</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40 mt-[2px]">它了解谁、记住了什么 / User + Memory</div>
+      </div>
+    </div>
+  </div>
+  <!-- Layer 1 -->
+  <div class="absolute z-20 flex items-center" style="top:510px;left:200px;width:880px;height:68px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;background:rgba(130,208,164,0.05);">
+    <div class="flex items-center pl-[20px] w-full">
+      <i class="ph ph-identification-card text-[22px] text-[#82D0A4] mr-[16px]"></i>
+      <div>
+        <div class="text-[16px] font-[500] text-[#FFFFFF]">第1层：灵魂内核层</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40 mt-[2px]">它是谁 / Soul + Identity</div>
+      </div>
+    </div>
+  </div>
+  <!-- Side labels -->
+  <div class="absolute z-10 text-[12px] font-[300] text-[#FFFFFF]/20 tracking-[0.1em] uppercase" style="top:170px;right:140px;">Outer</div>
+  <div class="absolute z-10 text-[12px] font-[300] text-[#FFFFFF]/20 tracking-[0.1em] uppercase" style="top:535px;right:140px;">Inner / Core</div>
+  <!-- Vertical arrow -->
+  <div class="absolute z-10" style="left:150px;top:170px;width:1px;height:400px;background:linear-gradient(to bottom, rgba(255,255,255,0.02), rgba(130,208,164,0.15), rgba(255,255,255,0.02));"></div>
+  <!-- Footer -->
+  <div class="absolute z-50 flex flex-col items-center justify-center" style="bottom:48px;left:0;right:0;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/70">ima</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/30 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

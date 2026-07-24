@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>谢谢观看</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .gradient-dark { background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%); }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide gradient-dark">
+  <!-- 主内容 -->
+  <div class="absolute inset-0 flex flex-col items-center justify-center px-[48px]">
+    <div class="mb-[24px]">
+      <i class="ph ph-hand-wave text-[#2563EB] text-[48px]"></i>
+    </div>
+    <h1 class="text-[64px] font-[900] italic leading-[1.15] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+      谢谢观看
+    </h1>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[24px]"></div>
+    <div class="text-[20px] text-[#F5F5DC]/60 mt-[24px]">
+      数据驱动洞察，趋势引领决策
+    </div>
+
+    <!-- 数据来源 -->
+    <div class="mt-[48px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] px-[32px] py-[16px]">
+      <div class="text-[14px] text-[#F5F5DC]/40 mb-[8px]">数据来源</div>
+      <div class="text-[14px] text-[#F5F5DC]/60 leading-[1.8] text-center">
+        2026年中国宠物行业白皮书（派读宠物）<br>
+        艾媒咨询 (iiMedia Research)<br>
+        毕马威中国《2025年中国宠物行业市场报告》<br>
+        中商产业研究院 / 天猫双11数据
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#F5F5DC]/30">中国宠物经济趋势洞察</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HUD · MK-IV RAILGUN</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          hud: {
+            bg: '#020a18',
+            bg2: '#031124',
+            cyan: '#22d3ee',
+            cyan2: '#67e8f9',
+            blue: '#3b82f6',
+            orange: '#ff9500',
+            orange2: '#ffb43a',
+            red: '#ff3b3b',
+            green: '#22c55e',
+            yellow: '#eab308',
+          }
+        },
+        fontFamily: {
+          mono: ['"Share Tech Mono"','"VT323"','ui-monospace','SFMono-Regular','Menlo','Consolas','monospace'],
+          display: ['"Orbitron"','"Share Tech Mono"','sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; background: #020a18; color: #e0f2fe; }
+  body {
+    font-family: 'Share Tech Mono', ui-monospace, monospace;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  .display { font-family: 'Orbitron', 'Share Tech Mono', sans-serif; letter-spacing: 0.06em; }
+
+  /* HUD 背景：暗蓝色 + 网格 */
+  .hud-bg {
+    background:
+      radial-gradient(ellipse at center, rgba(34,211,238,0.05) 0%, transparent 60%),
+      linear-gradient(180deg, #02101f 0%, #010816 100%);
+    position: relative;
+  }
+  .hud-bg::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(34,211,238,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,211,238,0.06) 1px, transparent 1px);
+    background-size: 36px 36px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, #000 35%, transparent 95%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 95%);
+  }
+  /* 顶部底部蓝色条 */
+  .hud-bg::after {
+    content: '';
+    position: absolute; inset: 0;
+    box-shadow:
+      inset 0 4px 0 0 #1e40af,
+      inset 0 -4px 0 0 #1e40af;
+    pointer-events: none;
+  }
+
+  /* 角落括号 */
+  .corner {
+    position: absolute; width: 32px; height: 32px;
+    border-color: #22d3ee; border-style: solid; border-width: 0;
+  }
+  .corner.tl { top: 18px; left: 18px; border-top-width: 2px; border-left-width: 2px; }
+  .corner.tr { top: 18px; right: 18px; border-top-width: 2px; border-right-width: 2px; }
+  .corner.bl { bottom: 18px; left: 18px; border-bottom-width: 2px; border-left-width: 2px; }
+  .corner.br { bottom: 18px; right: 18px; border-bottom-width: 2px; border-right-width: 2px; }
+
+  /* 闪烁文字 */
+  .blink { animation: blink 1.4s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  /* 旋转 */
+  .spin-slow { animation: spin 18s linear infinite; }
+  .spin-rev { animation: spin 26s linear infinite reverse; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 中心橙色发光 */
+  .glow-orange {
+    filter: drop-shadow(0 0 14px rgba(255,149,0,0.6))
+            drop-shadow(0 0 30px rgba(255,149,0,0.35));
+  }
+  .glow-cyan {
+    filter: drop-shadow(0 0 6px rgba(34,211,238,0.7));
+  }
+  .glow-text-cyan {
+    text-shadow: 0 0 6px rgba(34,211,238,0.55), 0 0 14px rgba(34,211,238,0.25);
+  }
+  .glow-text-orange {
+    text-shadow: 0 0 6px rgba(255,149,0,0.6), 0 0 16px rgba(255,149,0,0.35);
+  }
+
+  /* 雷达扫描动画 */
+  .radar-sweep { transform-origin: 50% 50%; animation: spin 4s linear infinite; }
+
+  /* 弹药条满格闪烁 */
+  .ammo-pulse { animation: ammoPulse 1.6s ease-in-out infinite; }
+  @keyframes ammoPulse {
+    0%,100% { filter: drop-shadow(0 0 2px rgba(255,149,0,0.5)); }
+    50%     { filter: drop-shadow(0 0 6px rgba(255,149,0,0.95)); }
+  }
+
+  /* 扫描线 */
+  .scanline {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 2px, transparent 4px);
+    pointer-events: none; mix-blend-mode: overlay;
+  }
+
+  /* 边缘小刻度 */
+  .tick { stroke: #22d3ee; stroke-width: 1; opacity: 0.55; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
+
+// ============= 顶部 HUD 文本 =============
+function TopBar() {
+  return (
+    <div className="absolute top-3 left-0 right-0 px-12 flex items-center justify-center pointer-events-none z-20">
+      <div className="display text-[15px] font-bold text-cyan-100 tracking-[0.18em] glow-text-cyan whitespace-nowrap">
+        <span className="text-hud-cyan">MISSION OBJECTIVES:</span>
+        <span className="ml-5">[ ] INFILTRATE BASE</span>
+        <span className="ml-5">[ ] HACK TERMINAL</span>
+        <span className="ml-5 text-hud-orange glow-text-orange">[x] SECURE PERIMETER</span>
+      </div>
+    </div>
+  );
+}
+
+// ============= 左上系统状态 =============
+function SystemStatus() {
+  const [pwr, setPwr] = useState(88);
+  useEffect(() => {
+    const t = setInterval(() => setPwr(p => 86 + Math.floor(Math.random() * 5)), 1500);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="absolute top-12 left-8 z-20 text-[14px] text-hud-cyan glow-text-cyan leading-[1.55] tracking-wider">
+      <div>PWR:    <span className="text-cyan-200">{pwr}%</span></div>
+      <div>RADAR:  <span className="text-cyan-200 blink">ACT</span></div>
+      <div>SHIELD: <span className="text-cyan-200">OK</span></div>
+    </div>
+  );
+}
+
+// ============= 右上 3 LED =============
+function TopRightLeds() {
+  return (
+    <div className="absolute top-12 right-12 z-20 flex gap-1.5">
+      {[0,1,2].map(i => (
+        <div key={i}
+          className="w-3 h-3 border border-hud-orange"
+          style={{
+            background: i === 2 ? 'transparent' : 'rgba(255,149,0,0.85)',
+            boxShadow: i === 2 ? 'none' : '0 0 8px rgba(255,149,0,0.85)',
+            animation: `blink ${1.2 + i * 0.3}s steps(2) infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ============= 中心 HUD（瞄准 + 圆环 + 弧形条） =============
+function CenterHUD() {
+  const cx = 300, cy = 300;
+  // 主圆环
+  const ringR = 175;
+  // 内部瞄准三角
+  const triSize = 75;
+
+  // 顶部弧形刻度（圆环外圈装饰）
+  const ticks = [];
+  for (let i = 0; i < 60; i++) {
+    const a = -90 + i * 6; // 顶部环
+    if (a < -150 || a > -30) {
+      const r1 = 200, r2 = i % 5 === 0 ? 212 : 207;
+      const rad = (a * Math.PI) / 180;
+      ticks.push({ x1: cx + r1 * Math.cos(rad), y1: cy + r1 * Math.sin(rad),
+                   x2: cx + r2 * Math.cos(rad), y2: cy + r2 * Math.sin(rad) });
+    }
+  }
+
+  // 左侧弧形条 (绿→黄→红，从下到上 100%)，弧角范围
+  const leftArc = useMemo(() => {
+    const segs = [];
+    const start = 130, end = 230, count = 38; // 角度（顺时针，左半）
+    for (let i = 0; i < count; i++) {
+      const t = i / (count - 1); // 0..1
+      const a = start + (end - start) * t;
+      // 颜色：底部红 -> 中黄 -> 顶绿（图中顶绿底红）
+      let color;
+      if (t < 0.4) color = `hsl(${0 + t * 25}, 100%, 55%)`;        // 红→橙
+      else if (t < 0.7) color = `hsl(${50 + (t - 0.4) * 30}, 100%, 55%)`; // 黄→黄绿
+      else color = `hsl(${110 + (t - 0.7) * 40}, 90%, 50%)`;       // 绿
+      segs.push({ a, color });
+    }
+    return segs;
+  }, []);
+
+  // 右侧弧形条（蓝色渐变）
+  const rightArc = useMemo(() => {
+    const segs = [];
+    const start = -50, end = 50, count = 38;
+    for (let i = 0; i < count; i++) {
+      const t = i / (count - 1);
+      const a = start + (end - start) * t;
+      // 60% 满，下方 40% 暗
+      const filled = i >= count * 0.4;
+      const lightness = filled ? 55 : 22;
+      const sat = filled ? 95 : 40;
+      const hue = 200 - t * 25; // 蓝
+      segs.push({ a, color: `hsl(${hue}, ${sat}%, ${lightness}%)`, filled });
+    }
+    return segs;
+  }, []);
+
+  // 弧形条段绘制工具
+  const arcSeg = (a, innerR, outerR, color, key) => {
+    const rad = (a * Math.PI) / 180;
+    const cosA = Math.cos(rad), sinA = Math.sin(rad);
+    const x1 = cx + innerR * cosA, y1 = cy + innerR * sinA;
+    const x2 = cx + outerR * cosA, y2 = cy + outerR * sinA;
+    return <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="3.5" strokeLinecap="butt"/>;
+  };
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <svg viewBox="0 0 600 600" width="640" height="640" className="overflow-visible">
+        <defs>
+          <radialGradient id="orangeGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ff9500" stopOpacity="0.55"/>
+            <stop offset="60%" stopColor="#ff9500" stopOpacity="0.15"/>
+            <stop offset="100%" stopColor="#ff9500" stopOpacity="0"/>
+          </radialGradient>
+          <linearGradient id="triGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffb43a"/>
+            <stop offset="100%" stopColor="#ff8400"/>
+          </linearGradient>
+          <filter id="cyanBlur" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.2"/>
+          </filter>
+        </defs>
+
+        {/* 最外层装饰圆（虚线） */}
+        <circle cx={cx} cy={cy} r="225" fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="2 8" opacity="0.45" className="spin-slow" style={{transformOrigin:'300px 300px'}}/>
+        {/* 顶部弧形刻度 */}
+        <g className="spin-rev" style={{transformOrigin:'300px 300px'}}>
+          {ticks.map((t, i) => (
+            <line key={i} {...t} stroke="#22d3ee" strokeWidth="1.2" opacity={i % 5 === 0 ? 0.95 : 0.5}/>
+          ))}
+        </g>
+
+        {/* 主圆环 */}
+        <circle cx={cx} cy={cy} r={ringR} fill="none" stroke="#22d3ee" strokeWidth="2.5" filter="url(#cyanBlur)"/>
+        <circle cx={cx} cy={cy} r={ringR} fill="none" stroke="#67e8f9" strokeWidth="1.5"/>
+        {/* 内圈虚线 */}
+        <circle cx={cx} cy={cy} r={ringR - 14} fill="none" stroke="#22d3ee" strokeWidth="1" strokeDasharray="3 4" opacity="0.6"/>
+
+        {/* 中心橙色发光底 */}
+        <circle cx={cx} cy={cy} r={130} fill="url(#orangeGlow)"/>
+
+        {/* 中心瞄准三角形 */}
+        <g className="glow-orange">
+          <polygon
+            points={`${cx - triSize * 0.86},${cy - triSize} ${cx + triSize * 1.05},${cy} ${cx - triSize * 0.86},${cy + triSize}`}
+            fill="none" stroke="url(#triGrad)" strokeWidth="6" strokeLinejoin="round"
+          />
+          <polygon
+            points={`${cx - triSize * 0.86},${cy - triSize} ${cx + triSize * 1.05},${cy} ${cx - triSize * 0.86},${cy + triSize}`}
+            fill="rgba(255,149,0,0.18)"
+          />
+        </g>
+
+        {/* 中心瞄准十字 */}
+        <g stroke="#ffffff" strokeWidth="1.4" opacity="0.95">
+          <line x1={cx - 14} y1={cy} x2={cx - 4} y2={cy}/>
+          <line x1={cx + 4} y1={cy} x2={cx + 14} y2={cy}/>
+          <line x1={cx} y1={cy - 14} x2={cx} y2={cy - 4}/>
+          <line x1={cx} y1={cy + 4} x2={cx} y2={cy + 14}/>
+          <circle cx={cx} cy={cy} r="2.5" fill="#ffffff"/>
+        </g>
+
+        {/* 左侧弧形彩色条 */}
+        <g>
+          {leftArc.map((s, i) => arcSeg(s.a, 195, 230, s.color, "L" + i))}
+        </g>
+        {/* 右侧蓝色弧条 */}
+        <g>
+          {rightArc.map((s, i) => arcSeg(s.a, 195, 230, s.color, "R" + i))}
+        </g>
+
+        {/* 圆环上的小三角指示器（参考图中的小标记） */}
+        <g fill="#22d3ee" opacity="0.9">
+          <polygon points={`${cx},${cy - ringR - 8} ${cx - 5},${cy - ringR - 1} ${cx + 5},${cy - ringR - 1}`}/>
+          <polygon points={`${cx},${cy + ringR + 8} ${cx - 5},${cy + ringR + 1} ${cx + 5},${cy + ringR + 1}`}/>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+// ============= 左侧/右侧百分比文字 =============
+function SideLabels() {
+  return (
+    <>
+      <div className="absolute left-[8%] top-1/2 -translate-y-1/2 z-20 text-right">
+        <div className="display text-[42px] font-bold text-white leading-none">100%</div>
+        <div className="text-[13px] text-hud-cyan glow-text-cyan tracking-[0.18em] mt-2">STRUCTURAL INTEGRITY</div>
+      </div>
+      <div className="absolute right-[8%] top-1/2 -translate-y-1/2 z-20">
+        <div className="display text-[42px] font-bold text-white leading-none">60%</div>
+        <div className="text-[13px] text-hud-cyan glow-text-cyan tracking-[0.18em] mt-2">PLASMA RESERVES</div>
+      </div>
+    </>
+  );
+}
+
+// ============= 左下雷达 =============
+function Radar() {
+  return (
+    <div className="absolute bottom-12 left-12 z-20">
+      <svg width="150" height="150" viewBox="0 0 150 150">
+        <defs>
+          <radialGradient id="radarBg" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.95"/>
+            <stop offset="70%" stopColor="#16a34a" stopOpacity="0.7"/>
+            <stop offset="100%" stopColor="#14532d" stopOpacity="0.85"/>
+          </radialGradient>
+          <linearGradient id="sweepGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#bbf7d0" stopOpacity="0"/>
+            <stop offset="100%" stopColor="#bbf7d0" stopOpacity="0.55"/>
+          </linearGradient>
+        </defs>
+        {/* 圆形雷达 */}
+        <circle cx="75" cy="75" r="60" fill="url(#radarBg)" stroke="#86efac" strokeWidth="1.5"/>
+        {/* 同心圆 */}
+        <circle cx="75" cy="75" r="42" fill="none" stroke="#86efac" strokeWidth="0.8" opacity="0.6"/>
+        <circle cx="75" cy="75" r="22" fill="none" stroke="#86efac" strokeWidth="0.8" opacity="0.6"/>
+        {/* 十字 */}
+        <line x1="15" y1="75" x2="135" y2="75" stroke="#86efac" strokeWidth="0.8" opacity="0.55"/>
+        <line x1="75" y1="15" x2="75" y2="135" stroke="#86efac" strokeWidth="0.8" opacity="0.55"/>
+        {/* 扫描扇形 */}
+        <g className="radar-sweep" style={{ transformOrigin: '75px 75px' }}>
+          <path d="M 75 75 L 135 75 A 60 60 0 0 0 117 32 Z" fill="url(#sweepGrad)" opacity="0.7"/>
+        </g>
+        {/* 中心点 */}
+        <circle cx="75" cy="75" r="2.5" fill="#ffffff"/>
+        {/* 红色目标 */}
+        <circle cx="100" cy="58" r="3" fill="#ff3b3b">
+          <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="42" cy="88" r="3" fill="#ff3b3b">
+          <animate attributeName="opacity" values="0.4;1;0.4" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    </div>
+  );
+}
+
+// ============= 武器牌 =============
+function WeaponBadge() {
+  return (
+    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-20">
+      <svg viewBox="0 0 540 90" width="520" height="86">
+        <defs>
+          <linearGradient id="badgeFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0b1e35" stopOpacity="0.95"/>
+            <stop offset="100%" stopColor="#021124" stopOpacity="0.95"/>
+          </linearGradient>
+        </defs>
+        {/* 异形边框 */}
+        <path
+          d="M 30 10 L 80 10 L 100 30 L 440 30 L 460 10 L 510 10 L 530 30 L 530 60 L 510 80 L 460 80 L 440 60 L 100 60 L 80 80 L 30 80 L 10 60 L 10 30 Z"
+          fill="url(#badgeFill)"
+          stroke="#22d3ee"
+          strokeWidth="2"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="display text-[26px] font-extrabold text-white tracking-[0.18em]">MK-IV RAILGUN</div>
+        <div className="text-[14px] text-hud-orange glow-text-orange tracking-[0.25em] mt-0.5">[ BURST MODE ]</div>
+      </div>
+    </div>
+  );
+}
+
+// ============= 右下弹药格 =============
+function AmmoGrid() {
+  // 16 格 5x4-ish，参考图: 顶行5满 + 中行5满 + 第三行 2 满 + 3 暗
+  const filled = [
+    1,1,1,1,1,
+    1,1,1,1,1,
+    1,1,0.4,0.2,0,
+  ];
+  return (
+    <div className="absolute bottom-14 right-14 z-20">
+      <div className="grid grid-cols-5 gap-1.5">
+        {filled.map((f, i) => {
+          const opacity = f;
+          const isFull = f === 1;
+          return (
+            <svg key={i} width="20" height="22" viewBox="0 0 20 22" className={isFull ? "ammo-pulse" : ""} style={{ opacity: opacity || 0.18 }}>
+              <path
+                d="M 10 1 L 17 6 L 17 16 L 10 21 L 3 16 L 3 6 Z"
+                fill="#ff9500"
+                stroke="#ffb43a"
+                strokeWidth="0.8"
+              />
+              <circle cx="10" cy="9" r="2" fill="#fff8e1" opacity="0.85"/>
+            </svg>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============= 应用 =============
+function App() {
+  return (
+    <div className="w-screen h-screen hud-bg relative select-none">
+      {/* 角落括号 */}
+      <span className="corner tl"/><span className="corner tr"/>
+      <span className="corner bl"/><span className="corner br"/>
+
+      <TopBar />
+      <SystemStatus />
+      <TopRightLeds />
+
+      <CenterHUD />
+      <SideLabels />
+
+      <Radar />
+      <WeaponBadge />
+      <AmmoGrid />
+
+      {/* 全屏扫描线 */}
+      <div className="scanline"/>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>

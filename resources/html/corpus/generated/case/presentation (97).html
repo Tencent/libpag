@@ -1,0 +1,4806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPT Presentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web/style/css/vendors/phosphor-icons.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.1.1/src/css/player.min.css">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f5f5f5; padding: 40px 20px; min-height: 100vh; overflow-x: auto; }
+    .slide-wrapper {
+      --available-width: min(1280px, calc(100vw - 40px));
+      --slide-scale: calc(var(--available-width) / 1280);
+      position: relative; width: var(--available-width); height: calc(720px * var(--slide-scale));
+      margin: 0 auto 40px auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden;
+    }
+    .slide-wrapper:last-child { margin-bottom: 0; }
+    .slide-number { position: absolute; top: -30px; left: 0; background: #7C3AED; color: white; padding: 4px 12px; border-radius: 4px 4px 0 0; font-size: 12px; font-weight: 600; z-index: 10; }
+    .slide { width: 1280px; height: 720px; background: white; position: relative; overflow: hidden; transform-origin: top left; transform: scale(var(--slide-scale)); }
+    @media print { body { background: white; padding: 0; margin: 0; } .slide-wrapper { page-break-after: always; page-break-inside: avoid; box-shadow: none; margin: 0; border-radius: 0; width: 100%; height: 100vh; overflow: hidden; } .slide-wrapper:last-child { page-break-after: auto; } .slide-number { display: none; } .slide { width: 100%; height: 100%; transform: none; } }
+    .slide-page-1 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-1 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-1 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-1 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-1 .slide .gradient-dark {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-1 .slide .vertical-text {
+writing-mode: vertical-rl; 
+      text-orientation: mixed;
+}
+
+.slide-page-1 .slide .italic-skew {
+font-style: italic; 
+      transform: skewX(-5deg);
+}
+
+.slide-page-1 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-1 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-1 .slide .ff-sans, .slide-page-1 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-1 .slide .ff-geometric, .slide-page-1 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-1 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-1 .slide .ff-condensed, .slide-page-1 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-1 .slide .ff-serif, .slide-page-1 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-1 .slide .ff-editorial, .slide-page-1 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-1 .slide .ff-mono, .slide-page-1 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-1 .slide .ff-cjk-emphasis, .slide-page-1 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-1 .slide.text-\[\#F5F5DC\], .slide-page-1 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-1 .slide.absolute, .slide-page-1 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-1 .slide.top-\[0px\], .slide-page-1 .slide .top-\[0px\] {
+top: 0px !important;
+}
+
+.slide-page-1 .slide.left-\[0px\], .slide-page-1 .slide .left-\[0px\] {
+left: 0px !important;
+}
+
+.slide-page-1 .slide.right-\[0px\], .slide-page-1 .slide .right-\[0px\] {
+right: 0px !important;
+}
+
+.slide-page-1 .slide.h-\[72px\], .slide-page-1 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-1 .slide.flex, .slide-page-1 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-1 .slide.items-center, .slide-page-1 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-1 .slide.justify-between, .slide-page-1 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-1 .slide.px-\[60px\], .slide-page-1 .slide .px-\[60px\] {
+padding-left: 60px !important;
+padding-right: 60px !important;
+}
+
+.slide-page-1 .slide.pt-\[8px\], .slide-page-1 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-1 .slide.gap-\[12px\], .slide-page-1 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-1 .slide.text-\[\#2563EB\], .slide-page-1 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-1 .slide.text-\[24px\], .slide-page-1 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-1 .slide.text-\[14px\], .slide-page-1 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-1 .slide.text-\[\#FFFFFF\]\/40, .slide-page-1 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-1 .slide.tracking-\[0\.15em\], .slide-page-1 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-1 .slide.uppercase, .slide-page-1 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-1 .slide.gap-\[24px\], .slide-page-1 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-1 .slide.text-\[11px\], .slide-page-1 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-1 .slide.tracking-\[0\.1em\], .slide-page-1 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-1 .slide.text-\[\#FFFFFF\]\/35, .slide-page-1 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-1 .slide.text-\[13px\], .slide-page-1 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-1 .slide.text-\[\#FFFFFF\]\/50, .slide-page-1 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-1 .slide.left-\[60px\], .slide-page-1 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-1 .slide.top-\[180px\], .slide-page-1 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-1 .slide.h-\[300px\], .slide-page-1 .slide .h-\[300px\] {
+height: 300px !important;
+}
+
+.slide-page-1 .slide.text-\[12px\], .slide-page-1 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-1 .slide.tracking-\[0\.3em\], .slide-page-1 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-1 .slide.text-\[\#FFFFFF\]\/20, .slide-page-1 .slide .text-\[\#FFFFFF\]\/20 {
+color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.slide-page-1 .slide.top-\[240px\], .slide-page-1 .slide .top-\[240px\] {
+top: 240px !important;
+}
+
+.slide-page-1 .slide.max-w-\[960px\], .slide-page-1 .slide .max-w-\[960px\] {
+max-width: 960px !important;
+}
+
+.slide-page-1 .slide.mb-\[32px\], .slide-page-1 .slide .mb-\[32px\] {
+margin-bottom: 32px !important;
+}
+
+.slide-page-1 .slide.rounded-\[9999px\], .slide-page-1 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+
+.slide-page-1 .slide.border-\[2px\], .slide-page-1 .slide .border-\[2px\] {
+border-width: 2px !important;
+border-style: solid !important;
+}
+
+.slide-page-1 .slide.border-\[\#2563EB\], .slide-page-1 .slide .border-\[\#2563EB\] {
+border-color: #2563EB !important;
+}
+
+.slide-page-1 .slide.px-\[16px\], .slide-page-1 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-1 .slide.py-\[6px\], .slide-page-1 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-1 .slide.text-\[20px\], .slide-page-1 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-1 .slide.text-\[80px\], .slide-page-1 .slide .text-\[80px\] {
+font-size: 80px !important;
+}
+
+.slide-page-1 .slide.leading-\[1\.12\], .slide-page-1 .slide .leading-\[1\.12\] {
+line-height: 1.12 !important;
+}
+
+.slide-page-1 .slide.w-\[96px\], .slide-page-1 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-1 .slide.h-\[4px\], .slide-page-1 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-1 .slide.bg-\[\#2563EB\], .slide-page-1 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-1 .slide.mt-\[32px\], .slide-page-1 .slide .mt-\[32px\] {
+margin-top: 32px !important;
+}
+
+.slide-page-1 .slide.bottom-\[40px\], .slide-page-1 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-1 .slide.right-\[60px\], .slide-page-1 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-1 .slide.items-end, .slide-page-1 .slide .items-end {
+align-items: flex-end !important;
+}
+
+.slide-page-1 .slide.grid, .slide-page-1 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-1 .slide.grid-cols-3, .slide-page-1 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-1 .slide.gap-\[4px\], .slide-page-1 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-1 .slide.w-\[16px\], .slide-page-1 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-1 .slide.h-\[16px\], .slide-page-1 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-1 .slide.bg-\[\#2563EB\]\/20, .slide-page-1 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-1 .slide.bg-\[\#2563EB\]\/40, .slide-page-1 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+.slide-page-2 .slide {
+background: #F5F0E8;
+}
+
+.slide-page-2 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-2 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-2 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background-color: #F5F0E8;
+}
+
+.slide-page-2 .slide .italic-heading {
+font-style: italic; transform: skewX(-5deg);
+}
+
+.slide-page-2 .slide .vertical-text {
+writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+.slide-page-2 .slide .star-decor {
+color: #2563EB; font-weight: 700;
+}
+
+.slide-page-2 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-2 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-2 .slide .ff-sans, .slide-page-2 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-2 .slide .ff-geometric, .slide-page-2 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-2 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-2 .slide .ff-condensed, .slide-page-2 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-2 .slide .ff-serif, .slide-page-2 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-2 .slide .ff-editorial, .slide-page-2 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-2 .slide .ff-mono, .slide-page-2 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-2 .slide .ff-cjk-emphasis, .slide-page-2 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-2 .slide.absolute, .slide-page-2 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-2 .slide.top-\[0px\], .slide-page-2 .slide .top-\[0px\] {
+top: 0px !important;
+}
+
+.slide-page-2 .slide.left-\[0px\], .slide-page-2 .slide .left-\[0px\] {
+left: 0px !important;
+}
+
+.slide-page-2 .slide.right-\[0px\], .slide-page-2 .slide .right-\[0px\] {
+right: 0px !important;
+}
+
+.slide-page-2 .slide.h-\[72px\], .slide-page-2 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-2 .slide.flex, .slide-page-2 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-2 .slide.items-center, .slide-page-2 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-2 .slide.justify-between, .slide-page-2 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-2 .slide.px-\[48px\], .slide-page-2 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-2 .slide.pt-\[8px\], .slide-page-2 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-2 .slide.gap-\[12px\], .slide-page-2 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-2 .slide.text-\[24px\], .slide-page-2 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-2 .slide.text-\[16px\], .slide-page-2 .slide .text-\[16px\] {
+font-size: 16px !important;
+}
+
+.slide-page-2 .slide.text-\[\#111827\], .slide-page-2 .slide .text-\[\#111827\] {
+color: #111827 !important;
+}
+
+.slide-page-2 .slide.text-\[14px\], .slide-page-2 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-2 .slide.text-\[\#6B7280\], .slide-page-2 .slide .text-\[\#6B7280\] {
+color: #6B7280 !important;
+}
+
+.slide-page-2 .slide.top-\[112px\], .slide-page-2 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-2 .slide.left-\[48px\], .slide-page-2 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-2 .slide.text-\[60px\], .slide-page-2 .slide .text-\[60px\] {
+font-size: 60px !important;
+}
+
+.slide-page-2 .slide.leading-\[1\.25\], .slide-page-2 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-2 .slide.w-\[96px\], .slide-page-2 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-2 .slide.h-\[4px\], .slide-page-2 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-2 .slide.bg-\[\#2563EB\], .slide-page-2 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-2 .slide.mt-\[16px\], .slide-page-2 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-2 .slide.top-\[240px\], .slide-page-2 .slide .top-\[240px\] {
+top: 240px !important;
+}
+
+.slide-page-2 .slide.right-\[48px\], .slide-page-2 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-2 .slide.grid, .slide-page-2 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-2 .slide.grid-cols-2, .slide-page-2 .slide .grid-cols-2 {
+grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.slide-page-2 .slide.gap-x-\[40px\], .slide-page-2 .slide .gap-x-\[40px\] {
+column-gap: 40px !important;
+}
+
+.slide-page-2 .slide.gap-y-\[32px\], .slide-page-2 .slide .gap-y-\[32px\] {
+row-gap: 32px !important;
+}
+
+.slide-page-2 .slide.items-start, .slide-page-2 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-2 .slide.gap-\[20px\], .slide-page-2 .slide .gap-\[20px\] {
+gap: 20px !important;
+}
+
+.slide-page-2 .slide.p-\[32px\], .slide-page-2 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-2 .slide.border-\[1px\], .slide-page-2 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-2 .slide.border-\[\#D1D5DB\], .slide-page-2 .slide .border-\[\#D1D5DB\] {
+border-color: #D1D5DB !important;
+}
+
+.slide-page-2 .slide.rounded-\[4px\], .slide-page-2 .slide .rounded-\[4px\] {
+border-radius: 4px !important;
+}
+
+.slide-page-2 .slide.relative, .slide-page-2 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-2 .slide.overflow-hidden, .slide-page-2 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-2 .slide.flex-col, .slide-page-2 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-2 .slide.text-\[36px\], .slide-page-2 .slide .text-\[36px\] {
+font-size: 36px !important;
+}
+
+.slide-page-2 .slide.text-\[\#2563EB\], .slide-page-2 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-2 .slide.mb-\[12px\], .slide-page-2 .slide .mb-\[12px\] {
+margin-bottom: 12px !important;
+}
+
+.slide-page-2 .slide.text-\[20px\], .slide-page-2 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-2 .slide.text-\[\#4B5563\], .slide-page-2 .slide .text-\[\#4B5563\] {
+color: #4B5563 !important;
+}
+
+.slide-page-2 .slide.leading-\[1\.6\], .slide-page-2 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-2 .slide.top-\[32px\], .slide-page-2 .slide .top-\[32px\] {
+top: 32px !important;
+}
+
+.slide-page-2 .slide.right-\[32px\], .slide-page-2 .slide .right-\[32px\] {
+right: 32px !important;
+}
+
+.slide-page-2 .slide.text-\[12px\], .slide-page-2 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-2 .slide.tracking-\[0\.3em\], .slide-page-2 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-2 .slide.text-\[\#6B7280\]\/40, .slide-page-2 .slide .text-\[\#6B7280\]\/40 {
+color: rgba(107, 114, 128, 0.4) !important;
+}
+
+.slide-page-2 .slide.uppercase, .slide-page-2 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-2 .slide.bottom-\[32px\], .slide-page-2 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-2 .slide.grid-cols-3, .slide-page-2 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-2 .slide.gap-\[4px\], .slide-page-2 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-2 .slide.w-\[16px\], .slide-page-2 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-2 .slide.h-\[16px\], .slide-page-2 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-2 .slide.bg-\[\#2563EB\]\/20, .slide-page-2 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-2 .slide.bg-\[\#2563EB\]\/40, .slide-page-2 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+.slide-page-3 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-3 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-3 .slide {
+margin: 0; padding: 0; background-color: #000;
+}
+
+.slide-page-3 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-3 .slide .italic-heading {
+font-style: italic; transform: skewX(-5deg);
+}
+
+.slide-page-3 .slide .vertical-text {
+writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+.slide-page-3 .slide .star-decor {
+color: #2563EB; font-weight: 700;
+}
+
+.slide-page-3 .slide .capsule-nav {
+border-radius: 9999px; border: 2px solid #2563EB;
+}
+
+.slide-page-3 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-3 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-3 .slide .ff-sans, .slide-page-3 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-3 .slide .ff-geometric, .slide-page-3 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-3 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-3 .slide .ff-condensed, .slide-page-3 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-3 .slide .ff-serif, .slide-page-3 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-3 .slide .ff-editorial, .slide-page-3 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-3 .slide .ff-mono, .slide-page-3 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-3 .slide .ff-cjk-emphasis, .slide-page-3 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-3 .slide.absolute, .slide-page-3 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-3 .slide.h-\[72px\], .slide-page-3 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-3 .slide.flex, .slide-page-3 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-3 .slide.items-center, .slide-page-3 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-3 .slide.justify-between, .slide-page-3 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-3 .slide.px-\[48px\], .slide-page-3 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-3 .slide.pt-\[8px\], .slide-page-3 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-3 .slide.gap-\[12px\], .slide-page-3 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-3 .slide.text-\[\#2563EB\], .slide-page-3 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-3 .slide.text-\[24px\], .slide-page-3 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-3 .slide.text-\[14px\], .slide-page-3 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-3 .slide.text-\[\#FFFFFF\]\/40, .slide-page-3 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-3 .slide.tracking-\[0\.15em\], .slide-page-3 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-3 .slide.gap-\[24px\], .slide-page-3 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-3 .slide.text-\[11px\], .slide-page-3 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-3 .slide.tracking-\[0\.1em\], .slide-page-3 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-3 .slide.text-\[\#FFFFFF\]\/35, .slide-page-3 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-3 .slide.uppercase, .slide-page-3 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-3 .slide.text-\[13px\], .slide-page-3 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-3 .slide.text-\[\#FFFFFF\]\/50, .slide-page-3 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-3 .slide.top-\[112px\], .slide-page-3 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-3 .slide.left-\[48px\], .slide-page-3 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-3 .slide.text-\[48px\], .slide-page-3 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-3 .slide.leading-\[1\.25\], .slide-page-3 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-3 .slide.text-\[\#F5F5DC\], .slide-page-3 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-3 .slide.w-\[96px\], .slide-page-3 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-3 .slide.h-\[4px\], .slide-page-3 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-3 .slide.bg-\[\#2563EB\], .slide-page-3 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-3 .slide.mt-\[16px\], .slide-page-3 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-3 .slide.top-\[220px\], .slide-page-3 .slide .top-\[220px\] {
+top: 220px !important;
+}
+
+.slide-page-3 .slide.right-\[48px\], .slide-page-3 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-3 .slide.bottom-\[80px\], .slide-page-3 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-3 .slide.flex-col, .slide-page-3 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-3 .slide.bg-\[\#FFFFFF\]\/5, .slide-page-3 .slide .bg-\[\#FFFFFF\]\/5 {
+background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.slide-page-3 .slide.border-\[1px\], .slide-page-3 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-3 .slide.border-\[\#FFFFFF\]\/10, .slide-page-3 .slide .border-\[\#FFFFFF\]\/10 {
+border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.slide-page-3 .slide.relative, .slide-page-3 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-3 .slide.overflow-hidden, .slide-page-3 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-3 .slide.h-full, .slide-page-3 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-3 .slide.text-\[20px\], .slide-page-3 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-3 .slide.text-\[\#FFFFFF\], .slide-page-3 .slide .text-\[\#FFFFFF\] {
+color: #FFFFFF !important;
+}
+
+.slide-page-3 .slide.text-\[15px\], .slide-page-3 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-3 .slide.leading-\[1\.7\], .slide-page-3 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-3 .slide.text-\[\#FFFFFF\]\/60, .slide-page-3 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-3 .slide.justify-center, .slide-page-3 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-3 .slide.border-t, .slide-page-3 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-3 .slide.items-start, .slide-page-3 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-3 .slide.bottom-\[32px\], .slide-page-3 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-3 .slide.text-\[\#FFFFFF\]\/30, .slide-page-3 .slide .text-\[\#FFFFFF\]\/30 {
+color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.slide-page-3 .slide.grid, .slide-page-3 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-3 .slide.grid-cols-3, .slide-page-3 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-3 .slide.gap-\[4px\], .slide-page-3 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-3 .slide.w-\[16px\], .slide-page-3 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-3 .slide.h-\[16px\], .slide-page-3 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-3 .slide.bg-\[\#2563EB\]\/20, .slide-page-3 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-3 .slide.bg-\[\#2563EB\]\/40, .slide-page-3 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+.slide-page-3 .slide.text-\[12px\], .slide-page-3 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-3 .slide.tracking-\[0\.3em\], .slide-page-3 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-3 .slide.text-\[\#FFFFFF\]\/10, .slide-page-3 .slide .text-\[\#FFFFFF\]\/10 {
+color: rgba(255, 255, 255, 0.1) !important;
+}
+.slide-page-4 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-4 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-4 .slide {
+margin: 0; padding: 0; background: #000;
+}
+
+.slide-page-4 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-4 .slide .italic-heading {
+font-style: italic; transform: skewX(-5deg);
+}
+
+.slide-page-4 .slide .vertical-text {
+writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+.slide-page-4 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-4 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-4 .slide .ff-sans, .slide-page-4 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-4 .slide .ff-geometric, .slide-page-4 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-4 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-4 .slide .ff-condensed, .slide-page-4 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-4 .slide .ff-serif, .slide-page-4 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-4 .slide .ff-editorial, .slide-page-4 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-4 .slide .ff-mono, .slide-page-4 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-4 .slide .ff-cjk-emphasis, .slide-page-4 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-4 .slide.absolute, .slide-page-4 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-4 .slide.h-\[72px\], .slide-page-4 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-4 .slide.flex, .slide-page-4 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-4 .slide.items-center, .slide-page-4 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-4 .slide.justify-between, .slide-page-4 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-4 .slide.px-\[48px\], .slide-page-4 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-4 .slide.pt-\[8px\], .slide-page-4 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-4 .slide.gap-\[12px\], .slide-page-4 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-4 .slide.text-\[\#2563EB\], .slide-page-4 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-4 .slide.text-\[24px\], .slide-page-4 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-4 .slide.text-\[14px\], .slide-page-4 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-4 .slide.text-\[\#FFFFFF\]\/40, .slide-page-4 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-4 .slide.tracking-\[0\.15em\], .slide-page-4 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-4 .slide.gap-\[24px\], .slide-page-4 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-4 .slide.text-\[11px\], .slide-page-4 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-4 .slide.tracking-\[0\.1em\], .slide-page-4 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-4 .slide.text-\[\#FFFFFF\]\/35, .slide-page-4 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-4 .slide.uppercase, .slide-page-4 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-4 .slide.text-\[13px\], .slide-page-4 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-4 .slide.text-\[\#FFFFFF\]\/50, .slide-page-4 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-4 .slide.top-\[112px\], .slide-page-4 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-4 .slide.left-\[48px\], .slide-page-4 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-4 .slide.text-\[48px\], .slide-page-4 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-4 .slide.leading-\[1\.25\], .slide-page-4 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-4 .slide.text-\[\#F5F5DC\], .slide-page-4 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-4 .slide.w-\[96px\], .slide-page-4 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-4 .slide.h-\[4px\], .slide-page-4 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-4 .slide.bg-\[\#2563EB\], .slide-page-4 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-4 .slide.mt-\[16px\], .slide-page-4 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-4 .slide.top-\[220px\], .slide-page-4 .slide .top-\[220px\] {
+top: 220px !important;
+}
+
+.slide-page-4 .slide.right-\[48px\], .slide-page-4 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-4 .slide.flex-col, .slide-page-4 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-4 .slide.justify-center, .slide-page-4 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-4 .slide.bg-\[\#FFFFFF\]\/5, .slide-page-4 .slide .bg-\[\#FFFFFF\]\/5 {
+background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.slide-page-4 .slide.border-\[1px\], .slide-page-4 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-4 .slide.border-\[\#FFFFFF\]\/10, .slide-page-4 .slide .border-\[\#FFFFFF\]\/10 {
+border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.slide-page-4 .slide.relative, .slide-page-4 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-4 .slide.overflow-hidden, .slide-page-4 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-4 .slide.h-full, .slide-page-4 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-4 .slide.text-\[18px\], .slide-page-4 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-4 .slide.text-\[\#FFFFFF\], .slide-page-4 .slide .text-\[\#FFFFFF\] {
+color: #FFFFFF !important;
+}
+
+.slide-page-4 .slide.leading-\[1\.7\], .slide-page-4 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-4 .slide.text-\[\#FFFFFF\]\/60, .slide-page-4 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-4 .slide.bottom-\[32px\], .slide-page-4 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-4 .slide.text-\[\#FFFFFF\]\/30, .slide-page-4 .slide .text-\[\#FFFFFF\]\/30 {
+color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.slide-page-4 .slide.grid, .slide-page-4 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-4 .slide.grid-cols-3, .slide-page-4 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-4 .slide.gap-\[4px\], .slide-page-4 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-4 .slide.w-\[16px\], .slide-page-4 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-4 .slide.h-\[16px\], .slide-page-4 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-4 .slide.bg-\[\#2563EB\]\/20, .slide-page-4 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-4 .slide.bg-\[\#2563EB\]\/40, .slide-page-4 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+.slide-page-4 .slide.text-\[12px\], .slide-page-4 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-4 .slide.tracking-\[0\.3em\], .slide-page-4 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-4 .slide.text-\[\#FFFFFF\]\/10, .slide-page-4 .slide .text-\[\#FFFFFF\]\/10 {
+color: rgba(255, 255, 255, 0.1) !important;
+}
+.slide-page-5 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-5 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-5 .slide {
+margin: 0; padding: 0; background: #000;
+}
+
+.slide-page-5 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-5 .slide .italic-heading {
+font-style: italic; transform: skewX(-5deg);
+}
+
+.slide-page-5 .slide .vertical-text {
+writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+.slide-page-5 .slide .star-decor {
+color: #2563EB; font-weight: 700;
+}
+
+.slide-page-5 .slide .capsule-nav {
+border-radius: 9999px; border: 2px solid #2563EB;
+}
+
+.slide-page-5 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-5 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-5 .slide .ff-sans, .slide-page-5 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-5 .slide .ff-geometric, .slide-page-5 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-5 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-5 .slide .ff-condensed, .slide-page-5 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-5 .slide .ff-serif, .slide-page-5 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-5 .slide .ff-editorial, .slide-page-5 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-5 .slide .ff-mono, .slide-page-5 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-5 .slide .ff-cjk-emphasis, .slide-page-5 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-5 .slide.absolute, .slide-page-5 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-5 .slide.h-\[72px\], .slide-page-5 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-5 .slide.flex, .slide-page-5 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-5 .slide.items-center, .slide-page-5 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-5 .slide.justify-between, .slide-page-5 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-5 .slide.px-\[48px\], .slide-page-5 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-5 .slide.pt-\[8px\], .slide-page-5 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-5 .slide.gap-\[12px\], .slide-page-5 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-5 .slide.text-\[\#2563EB\], .slide-page-5 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-5 .slide.text-\[24px\], .slide-page-5 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-5 .slide.text-\[14px\], .slide-page-5 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-5 .slide.text-\[\#FFFFFF\]\/40, .slide-page-5 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-5 .slide.tracking-\[0\.15em\], .slide-page-5 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-5 .slide.gap-\[24px\], .slide-page-5 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-5 .slide.text-\[11px\], .slide-page-5 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-5 .slide.tracking-\[0\.1em\], .slide-page-5 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-5 .slide.text-\[\#FFFFFF\]\/35, .slide-page-5 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-5 .slide.uppercase, .slide-page-5 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-5 .slide.text-\[13px\], .slide-page-5 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-5 .slide.text-\[\#FFFFFF\]\/50, .slide-page-5 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-5 .slide.top-\[112px\], .slide-page-5 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-5 .slide.left-\[48px\], .slide-page-5 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-5 .slide.text-\[48px\], .slide-page-5 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-5 .slide.leading-\[1\.25\], .slide-page-5 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-5 .slide.text-\[\#F5F5DC\], .slide-page-5 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-5 .slide.w-\[96px\], .slide-page-5 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-5 .slide.h-\[4px\], .slide-page-5 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-5 .slide.bg-\[\#2563EB\], .slide-page-5 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-5 .slide.mt-\[16px\], .slide-page-5 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-5 .slide.top-\[220px\], .slide-page-5 .slide .top-\[220px\] {
+top: 220px !important;
+}
+
+.slide-page-5 .slide.right-\[48px\], .slide-page-5 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-5 .slide.flex-col, .slide-page-5 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-5 .slide.justify-center, .slide-page-5 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-5 .slide.bg-\[\#FFFFFF\]\/5, .slide-page-5 .slide .bg-\[\#FFFFFF\]\/5 {
+background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.slide-page-5 .slide.border-\[1px\], .slide-page-5 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-5 .slide.border-\[\#FFFFFF\]\/10, .slide-page-5 .slide .border-\[\#FFFFFF\]\/10 {
+border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.slide-page-5 .slide.relative, .slide-page-5 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-5 .slide.overflow-hidden, .slide-page-5 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-5 .slide.h-full, .slide-page-5 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-5 .slide.items-start, .slide-page-5 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-5 .slide.text-\[18px\], .slide-page-5 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-5 .slide.text-\[\#FFFFFF\], .slide-page-5 .slide .text-\[\#FFFFFF\] {
+color: #FFFFFF !important;
+}
+
+.slide-page-5 .slide.leading-\[1\.6\], .slide-page-5 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-5 .slide.text-\[\#FFFFFF\]\/60, .slide-page-5 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-5 .slide.bottom-\[32px\], .slide-page-5 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-5 .slide.text-\[\#FFFFFF\]\/30, .slide-page-5 .slide .text-\[\#FFFFFF\]\/30 {
+color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.slide-page-5 .slide.grid, .slide-page-5 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-5 .slide.grid-cols-3, .slide-page-5 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-5 .slide.gap-\[4px\], .slide-page-5 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-5 .slide.w-\[16px\], .slide-page-5 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-5 .slide.h-\[16px\], .slide-page-5 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-5 .slide.bg-\[\#2563EB\]\/20, .slide-page-5 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-5 .slide.bg-\[\#2563EB\]\/40, .slide-page-5 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+.slide-page-5 .slide.text-\[12px\], .slide-page-5 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-5 .slide.tracking-\[0\.3em\], .slide-page-5 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-5 .slide.text-\[\#FFFFFF\]\/10, .slide-page-5 .slide .text-\[\#FFFFFF\]\/10 {
+color: rgba(255, 255, 255, 0.1) !important;
+}
+.slide-page-6 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-6 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-6 .slide {
+margin: 0; padding: 0; background: #000;
+}
+
+.slide-page-6 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-6 .slide .italic-heading {
+font-style: italic; transform: skewX(-5deg);
+}
+
+.slide-page-6 .slide .vertical-text {
+writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+.slide-page-6 .slide .star-decor {
+color: #2563EB; font-weight: 700;
+}
+
+.slide-page-6 .slide .capsule-nav {
+border-radius: 9999px; border: 2px solid #2563EB;
+}
+
+.slide-page-6 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-6 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-6 .slide .ff-sans, .slide-page-6 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-6 .slide .ff-geometric, .slide-page-6 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-6 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-6 .slide .ff-condensed, .slide-page-6 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-6 .slide .ff-serif, .slide-page-6 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-6 .slide .ff-editorial, .slide-page-6 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-6 .slide .ff-mono, .slide-page-6 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-6 .slide .ff-cjk-emphasis, .slide-page-6 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-6 .slide.absolute, .slide-page-6 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-6 .slide.h-\[72px\], .slide-page-6 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-6 .slide.flex, .slide-page-6 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-6 .slide.items-center, .slide-page-6 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-6 .slide.justify-between, .slide-page-6 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-6 .slide.px-\[48px\], .slide-page-6 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-6 .slide.pt-\[8px\], .slide-page-6 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-6 .slide.gap-\[12px\], .slide-page-6 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-6 .slide.text-\[\#2563EB\], .slide-page-6 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-6 .slide.text-\[24px\], .slide-page-6 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-6 .slide.text-\[14px\], .slide-page-6 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-6 .slide.text-\[\#FFFFFF\]\/40, .slide-page-6 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-6 .slide.tracking-\[0\.15em\], .slide-page-6 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-6 .slide.gap-\[24px\], .slide-page-6 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-6 .slide.text-\[11px\], .slide-page-6 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-6 .slide.tracking-\[0\.1em\], .slide-page-6 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-6 .slide.text-\[\#FFFFFF\]\/35, .slide-page-6 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-6 .slide.uppercase, .slide-page-6 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-6 .slide.text-\[13px\], .slide-page-6 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-6 .slide.text-\[\#FFFFFF\]\/50, .slide-page-6 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-6 .slide.h-full, .slide-page-6 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-6 .slide.bg-\[\#2563EB\], .slide-page-6 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-6 .slide.top-\[112px\], .slide-page-6 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-6 .slide.left-\[48px\], .slide-page-6 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-6 .slide.text-\[48px\], .slide-page-6 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-6 .slide.leading-\[1\.25\], .slide-page-6 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-6 .slide.text-\[\#F5F5DC\], .slide-page-6 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-6 .slide.w-\[96px\], .slide-page-6 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-6 .slide.h-\[4px\], .slide-page-6 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-6 .slide.mt-\[16px\], .slide-page-6 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-6 .slide.top-\[220px\], .slide-page-6 .slide .top-\[220px\] {
+top: 220px !important;
+}
+
+.slide-page-6 .slide.right-\[48px\], .slide-page-6 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-6 .slide.flex-col, .slide-page-6 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-6 .slide.justify-center, .slide-page-6 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-6 .slide.p-\[32px\], .slide-page-6 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-6 .slide.bg-\[\#FFFFFF\]\/5, .slide-page-6 .slide .bg-\[\#FFFFFF\]\/5 {
+background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.slide-page-6 .slide.border-\[1px\], .slide-page-6 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-6 .slide.border-\[\#FFFFFF\]\/10, .slide-page-6 .slide .border-\[\#FFFFFF\]\/10 {
+border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.slide-page-6 .slide.relative, .slide-page-6 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-6 .slide.overflow-hidden, .slide-page-6 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-6 .slide.text-\[64px\], .slide-page-6 .slide .text-\[64px\] {
+font-size: 64px !important;
+}
+
+.slide-page-6 .slide.tracking-\[0\.2em\], .slide-page-6 .slide .tracking-\[0\.2em\] {
+letter-spacing: 0.2em !important;
+}
+
+.slide-page-6 .slide.text-\[72px\], .slide-page-6 .slide .text-\[72px\] {
+font-size: 72px !important;
+}
+
+.slide-page-6 .slide.text-\[20px\], .slide-page-6 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-6 .slide.text-\[\#FFFFFF\]\/60, .slide-page-6 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-6 .slide.text-\[15px\], .slide-page-6 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-6 .slide.leading-\[1\.7\], .slide-page-6 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-6 .slide.text-\[12px\], .slide-page-6 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-6 .slide.grid, .slide-page-6 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-6 .slide.grid-cols-1, .slide-page-6 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-6 .slide.p-\[24px\], .slide-page-6 .slide .p-\[24px\] {
+padding: 24px !important;
+}
+
+.slide-page-6 .slide.border-l-\[4px\], .slide-page-6 .slide .border-l-\[4px\] {
+border-left-width: 4px !important;
+border-left-style: solid !important;
+}
+
+.slide-page-6 .slide.border-\[\#2563EB\], .slide-page-6 .slide .border-\[\#2563EB\] {
+border-color: #2563EB !important;
+}
+
+.slide-page-6 .slide.border-r-\[1px\], .slide-page-6 .slide .border-r-\[1px\] {
+border-right-width: 1px !important;
+border-right-style: solid !important;
+}
+
+.slide-page-6 .slide.rounded-full, .slide-page-6 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-6 .slide.bg-\[\#2563EB\]\/20, .slide-page-6 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-6 .slide.flex-1, .slide-page-6 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-6 .slide.leading-\[1\.6\], .slide-page-6 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-6 .slide.tracking-\[0\.3em\], .slide-page-6 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-6 .slide.text-\[\#FFFFFF\]\/20, .slide-page-6 .slide .text-\[\#FFFFFF\]\/20 {
+color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.slide-page-6 .slide.bottom-\[32px\], .slide-page-6 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-6 .slide.grid-cols-3, .slide-page-6 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-6 .slide.gap-\[4px\], .slide-page-6 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-6 .slide.w-\[16px\], .slide-page-6 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-6 .slide.h-\[16px\], .slide-page-6 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-6 .slide.bg-\[\#2563EB\]\/40, .slide-page-6 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+.slide-page-7 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-7 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-7 .slide {
+margin: 0; padding: 0; background: #000;
+}
+
+.slide-page-7 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-7 .slide .italic-heading {
+font-style: italic;
+      transform: skewX(-5deg);
+}
+
+.slide-page-7 .slide .vertical-text {
+writing-mode: vertical-rl;
+      text-orientation: mixed;
+}
+
+.slide-page-7 .slide .star-decor {
+color: #2563EB;
+      font-weight: 700;
+}
+
+.slide-page-7 .slide .capsule-nav {
+border-radius: 9999px;
+      border: 2px solid #2563EB;
+}
+
+.slide-page-7 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-7 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-7 .slide .ff-sans, .slide-page-7 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-7 .slide .ff-geometric, .slide-page-7 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-7 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-7 .slide .ff-condensed, .slide-page-7 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-7 .slide .ff-serif, .slide-page-7 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-7 .slide .ff-editorial, .slide-page-7 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-7 .slide .ff-mono, .slide-page-7 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-7 .slide .ff-cjk-emphasis, .slide-page-7 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-7 .slide.absolute, .slide-page-7 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-7 .slide.h-\[72px\], .slide-page-7 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-7 .slide.flex, .slide-page-7 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-7 .slide.items-center, .slide-page-7 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-7 .slide.justify-between, .slide-page-7 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-7 .slide.px-\[48px\], .slide-page-7 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-7 .slide.pt-\[8px\], .slide-page-7 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-7 .slide.gap-\[12px\], .slide-page-7 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-7 .slide.text-\[\#2563EB\], .slide-page-7 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-7 .slide.text-\[24px\], .slide-page-7 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-7 .slide.text-\[14px\], .slide-page-7 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-7 .slide.text-\[\#FFFFFF\]\/40, .slide-page-7 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-7 .slide.tracking-\[0\.15em\], .slide-page-7 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-7 .slide.gap-\[24px\], .slide-page-7 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-7 .slide.text-\[11px\], .slide-page-7 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-7 .slide.tracking-\[0\.1em\], .slide-page-7 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-7 .slide.text-\[\#FFFFFF\]\/35, .slide-page-7 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-7 .slide.uppercase, .slide-page-7 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-7 .slide.text-\[13px\], .slide-page-7 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-7 .slide.text-\[\#FFFFFF\]\/50, .slide-page-7 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-7 .slide.h-full, .slide-page-7 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-7 .slide.bg-\[\#2563EB\], .slide-page-7 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-7 .slide.top-\[112px\], .slide-page-7 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-7 .slide.left-\[48px\], .slide-page-7 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-7 .slide.text-\[48px\], .slide-page-7 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-7 .slide.leading-\[1\.25\], .slide-page-7 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-7 .slide.text-\[\#F5F5DC\], .slide-page-7 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-7 .slide.w-\[96px\], .slide-page-7 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-7 .slide.h-\[4px\], .slide-page-7 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-7 .slide.mt-\[16px\], .slide-page-7 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-7 .slide.top-\[240px\], .slide-page-7 .slide .top-\[240px\] {
+top: 240px !important;
+}
+
+.slide-page-7 .slide.right-\[48px\], .slide-page-7 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-7 .slide.flex-col, .slide-page-7 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-7 .slide.p-\[32px\], .slide-page-7 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-7 .slide.bg-\[\#FFFFFF\]\/5, .slide-page-7 .slide .bg-\[\#FFFFFF\]\/5 {
+background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.slide-page-7 .slide.border-\[1px\], .slide-page-7 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-7 .slide.border-\[\#FFFFFF\]\/10, .slide-page-7 .slide .border-\[\#FFFFFF\]\/10 {
+border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.slide-page-7 .slide.relative, .slide-page-7 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-7 .slide.overflow-hidden, .slide-page-7 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-7 .slide.text-\[20px\], .slide-page-7 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-7 .slide.text-\[12px\], .slide-page-7 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-7 .slide.text-\[22px\], .slide-page-7 .slide .text-\[22px\] {
+font-size: 22px !important;
+}
+
+.slide-page-7 .slide.text-\[\#FFFFFF\], .slide-page-7 .slide .text-\[\#FFFFFF\] {
+color: #FFFFFF !important;
+}
+
+.slide-page-7 .slide.text-\[15px\], .slide-page-7 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-7 .slide.text-\[\#FFFFFF\]\/60, .slide-page-7 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-7 .slide.leading-\[1\.7\], .slide-page-7 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-7 .slide.tracking-\[0\.3em\], .slide-page-7 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-7 .slide.text-\[\#FFFFFF\]\/20, .slide-page-7 .slide .text-\[\#FFFFFF\]\/20 {
+color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.slide-page-7 .slide.bottom-\[32px\], .slide-page-7 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-7 .slide.grid, .slide-page-7 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-7 .slide.grid-cols-3, .slide-page-7 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-7 .slide.gap-\[4px\], .slide-page-7 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-7 .slide.w-\[16px\], .slide-page-7 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-7 .slide.h-\[16px\], .slide-page-7 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-7 .slide.bg-\[\#2563EB\]\/20, .slide-page-7 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-7 .slide.bg-\[\#2563EB\]\/40, .slide-page-7 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+.slide-page-8 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-8 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-8 .slide {
+margin: 0; padding: 0; background: #000;
+}
+
+.slide-page-8 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-8 .slide .italic-heading {
+font-style: italic; transform: skewX(-5deg);
+}
+
+.slide-page-8 .slide .vertical-text {
+writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+.slide-page-8 .slide .star-decor {
+color: #2563EB; font-weight: 700;
+}
+
+.slide-page-8 .slide .capsule-nav {
+border-radius: 9999px; border: 2px solid #2563EB;
+}
+
+.slide-page-8 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-8 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-8 .slide .ff-sans, .slide-page-8 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-8 .slide .ff-geometric, .slide-page-8 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-8 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-8 .slide .ff-condensed, .slide-page-8 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-8 .slide .ff-serif, .slide-page-8 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-8 .slide .ff-editorial, .slide-page-8 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-8 .slide .ff-mono, .slide-page-8 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-8 .slide .ff-cjk-emphasis, .slide-page-8 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-8 .slide.absolute, .slide-page-8 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-8 .slide.h-\[72px\], .slide-page-8 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-8 .slide.flex, .slide-page-8 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-8 .slide.items-center, .slide-page-8 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-8 .slide.justify-between, .slide-page-8 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-8 .slide.px-\[48px\], .slide-page-8 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-8 .slide.pt-\[8px\], .slide-page-8 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-8 .slide.gap-\[12px\], .slide-page-8 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-8 .slide.text-\[\#2563EB\], .slide-page-8 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-8 .slide.text-\[24px\], .slide-page-8 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-8 .slide.text-\[14px\], .slide-page-8 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-8 .slide.text-\[\#FFFFFF\]\/40, .slide-page-8 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-8 .slide.tracking-\[0\.15em\], .slide-page-8 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-8 .slide.gap-\[24px\], .slide-page-8 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-8 .slide.text-\[11px\], .slide-page-8 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-8 .slide.tracking-\[0\.1em\], .slide-page-8 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-8 .slide.text-\[\#FFFFFF\]\/35, .slide-page-8 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-8 .slide.uppercase, .slide-page-8 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-8 .slide.text-\[13px\], .slide-page-8 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-8 .slide.text-\[\#FFFFFF\]\/50, .slide-page-8 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-8 .slide.h-full, .slide-page-8 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-8 .slide.bg-\[\#2563EB\], .slide-page-8 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-8 .slide.top-\[112px\], .slide-page-8 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-8 .slide.left-\[48px\], .slide-page-8 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-8 .slide.text-\[48px\], .slide-page-8 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-8 .slide.leading-\[1\.25\], .slide-page-8 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-8 .slide.text-\[\#F5F5DC\], .slide-page-8 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-8 .slide.w-\[96px\], .slide-page-8 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-8 .slide.h-\[4px\], .slide-page-8 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-8 .slide.mt-\[16px\], .slide-page-8 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-8 .slide.top-\[230px\], .slide-page-8 .slide .top-\[230px\] {
+top: 230px !important;
+}
+
+.slide-page-8 .slide.right-\[48px\], .slide-page-8 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-8 .slide.grid, .slide-page-8 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-8 .slide.grid-cols-3, .slide-page-8 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-8 .slide.flex-col, .slide-page-8 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-8 .slide.p-\[32px\], .slide-page-8 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-8 .slide.border, .slide-page-8 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-8 .slide.relative, .slide-page-8 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-8 .slide.overflow-hidden, .slide-page-8 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-8 .slide.text-\[20px\], .slide-page-8 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-8 .slide.text-\[12px\], .slide-page-8 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-8 .slide.text-\[15px\], .slide-page-8 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-8 .slide.leading-\[1\.7\], .slide-page-8 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-8 .slide.tracking-\[0\.3em\], .slide-page-8 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-8 .slide.bottom-\[32px\], .slide-page-8 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-8 .slide.gap-\[4px\], .slide-page-8 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-8 .slide.w-\[16px\], .slide-page-8 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-8 .slide.h-\[16px\], .slide-page-8 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-8 .slide.bg-\[\#2563EB\]\/20, .slide-page-8 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-8 .slide.bg-\[\#2563EB\]\/40, .slide-page-8 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+.slide-page-9 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-9 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-9 .slide {
+margin: 0; padding: 0; background: #000;
+}
+
+.slide-page-9 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-9 .slide .italic-heading {
+font-style: italic;
+      transform: skewX(-5deg);
+}
+
+.slide-page-9 .slide .vertical-text {
+writing-mode: vertical-rl;
+      text-orientation: mixed;
+}
+
+.slide-page-9 .slide .star-decor {
+color: #2563EB;
+      font-weight: 700;
+}
+
+.slide-page-9 .slide .capsule-nav {
+border-radius: 9999px;
+      border: 2px solid #2563EB;
+}
+
+.slide-page-9 .slide /* Layout Overflow Guard: readable_content_bottom_y <= 680 */ .main-content-area {
+position: absolute;
+      top: 220px;
+      left: 48px;
+      right: 48px;
+      height: 420px; /* Fixed height to prevent overflow */
+      display: flex;
+      gap: 32px;
+      box-sizing: border-box;
+      z-index: 10;
+}
+
+.slide-page-9 .slide .card-glass {
+background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+}
+
+.slide-page-9 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-9 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-9 .slide .ff-sans, .slide-page-9 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-9 .slide .ff-geometric, .slide-page-9 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-9 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-9 .slide .ff-condensed, .slide-page-9 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-9 .slide .ff-serif, .slide-page-9 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-9 .slide .ff-editorial, .slide-page-9 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-9 .slide .ff-mono, .slide-page-9 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-9 .slide .ff-cjk-emphasis, .slide-page-9 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-9 .slide.absolute, .slide-page-9 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-9 .slide.h-full, .slide-page-9 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-9 .slide.bg-\[\#2563EB\], .slide-page-9 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-9 .slide.w-\[300px\], .slide-page-9 .slide .w-\[300px\] {
+width: 300px !important;
+}
+
+.slide-page-9 .slide.h-\[300px\], .slide-page-9 .slide .h-\[300px\] {
+height: 300px !important;
+}
+
+.slide-page-9 .slide.bg-\[\#2563EB\]\/10, .slide-page-9 .slide .bg-\[\#2563EB\]\/10 {
+background-color: rgba(37, 99, 235, 0.1) !important;
+}
+
+.slide-page-9 .slide.rounded-full, .slide-page-9 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-9 .slide.w-\[400px\], .slide-page-9 .slide .w-\[400px\] {
+width: 400px !important;
+}
+
+.slide-page-9 .slide.h-\[400px\], .slide-page-9 .slide .h-\[400px\] {
+height: 400px !important;
+}
+
+.slide-page-9 .slide.bg-\[\#1E40AF\]\/10, .slide-page-9 .slide .bg-\[\#1E40AF\]\/10 {
+background-color: rgba(30, 64, 175, 0.1) !important;
+}
+
+.slide-page-9 .slide.h-\[72px\], .slide-page-9 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-9 .slide.flex, .slide-page-9 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-9 .slide.items-center, .slide-page-9 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-9 .slide.justify-between, .slide-page-9 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-9 .slide.px-\[48px\], .slide-page-9 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-9 .slide.pt-\[8px\], .slide-page-9 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-9 .slide.gap-\[12px\], .slide-page-9 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-9 .slide.text-\[\#2563EB\], .slide-page-9 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-9 .slide.text-\[24px\], .slide-page-9 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-9 .slide.text-\[14px\], .slide-page-9 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-9 .slide.text-\[\#FFFFFF\]\/40, .slide-page-9 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-9 .slide.tracking-\[0\.15em\], .slide-page-9 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-9 .slide.uppercase, .slide-page-9 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-9 .slide.gap-\[24px\], .slide-page-9 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-9 .slide.text-\[11px\], .slide-page-9 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-9 .slide.tracking-\[0\.1em\], .slide-page-9 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-9 .slide.text-\[\#FFFFFF\]\/35, .slide-page-9 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-9 .slide.text-\[13px\], .slide-page-9 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-9 .slide.text-\[\#FFFFFF\]\/50, .slide-page-9 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-9 .slide.top-\[112px\], .slide-page-9 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-9 .slide.left-\[48px\], .slide-page-9 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-9 .slide.text-\[18px\], .slide-page-9 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-9 .slide.text-\[\#FFFFFF\]\/60, .slide-page-9 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-9 .slide.text-\[48px\], .slide-page-9 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-9 .slide.leading-\[1\.2\], .slide-page-9 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-9 .slide.text-\[\#F5F5DC\], .slide-page-9 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-9 .slide.w-\[96px\], .slide-page-9 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-9 .slide.h-\[4px\], .slide-page-9 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-9 .slide.mt-\[16px\], .slide-page-9 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-9 .slide.flex-1, .slide-page-9 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-9 .slide.p-\[32px\], .slide-page-9 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-9 .slide.flex-col, .slide-page-9 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-9 .slide.relative, .slide-page-9 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-9 .slide.overflow-hidden, .slide-page-9 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-9 .slide.justify-center, .slide-page-9 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-9 .slide.text-\[20px\], .slide-page-9 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-9 .slide.text-\[32px\], .slide-page-9 .slide .text-\[32px\] {
+font-size: 32px !important;
+}
+
+.slide-page-9 .slide.text-\[15px\], .slide-page-9 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-9 .slide.leading-\[1\.7\], .slide-page-9 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-9 .slide.border-t, .slide-page-9 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-9 .slide.border-\[\#FFFFFF\]\/10, .slide-page-9 .slide .border-\[\#FFFFFF\]\/10 {
+border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.slide-page-9 .slide.text-\[12px\], .slide-page-9 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-9 .slide.bottom-\[32px\], .slide-page-9 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-9 .slide.right-\[48px\], .slide-page-9 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-9 .slide.grid, .slide-page-9 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-9 .slide.grid-cols-3, .slide-page-9 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-9 .slide.gap-\[4px\], .slide-page-9 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-9 .slide.w-\[16px\], .slide-page-9 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-9 .slide.h-\[16px\], .slide-page-9 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-9 .slide.bg-\[\#2563EB\]\/20, .slide-page-9 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-9 .slide.bg-\[\#2563EB\]\/40, .slide-page-9 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+.slide-page-9 .slide.right-\[24px\], .slide-page-9 .slide .right-\[24px\] {
+right: 24px !important;
+}
+
+.slide-page-9 .slide.tracking-\[0\.3em\], .slide-page-9 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-9 .slide.text-\[\#FFFFFF\]\/20, .slide-page-9 .slide .text-\[\#FFFFFF\]\/20 {
+color: rgba(255, 255, 255, 0.2) !important;
+}
+.slide-page-10 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-10 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-10 .slide {
+margin: 0; padding: 0; background: #000;
+}
+
+.slide-page-10 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+      color: #F5F5DC;
+}
+
+.slide-page-10 .slide .italic-heading {
+font-style: italic; transform: skewX(-5deg);
+}
+
+.slide-page-10 .slide .vertical-text {
+writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+.slide-page-10 .slide .star-decor {
+color: #2563EB; font-weight: 700;
+}
+
+.slide-page-10 .slide .capsule-nav {
+border-radius: 9999px; border: 2px solid #2563EB;
+}
+
+.slide-page-10 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-10 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-10 .slide .ff-sans, .slide-page-10 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-10 .slide .ff-geometric, .slide-page-10 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-10 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-10 .slide .ff-condensed, .slide-page-10 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-10 .slide .ff-serif, .slide-page-10 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-10 .slide .ff-editorial, .slide-page-10 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-10 .slide .ff-mono, .slide-page-10 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-10 .slide .ff-cjk-emphasis, .slide-page-10 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-10 .slide.absolute, .slide-page-10 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-10 .slide.h-\[72px\], .slide-page-10 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-10 .slide.flex, .slide-page-10 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-10 .slide.items-center, .slide-page-10 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-10 .slide.justify-between, .slide-page-10 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-10 .slide.px-\[48px\], .slide-page-10 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-10 .slide.pt-\[8px\], .slide-page-10 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-10 .slide.gap-\[12px\], .slide-page-10 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-10 .slide.text-\[\#2563EB\], .slide-page-10 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-10 .slide.text-\[24px\], .slide-page-10 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-10 .slide.text-\[14px\], .slide-page-10 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-10 .slide.text-\[\#FFFFFF\]\/40, .slide-page-10 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-10 .slide.tracking-\[0\.15em\], .slide-page-10 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-10 .slide.uppercase, .slide-page-10 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-10 .slide.gap-\[24px\], .slide-page-10 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-10 .slide.text-\[11px\], .slide-page-10 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-10 .slide.tracking-\[0\.1em\], .slide-page-10 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-10 .slide.text-\[\#FFFFFF\]\/35, .slide-page-10 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-10 .slide.text-\[13px\], .slide-page-10 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-10 .slide.text-\[\#FFFFFF\]\/50, .slide-page-10 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-10 .slide.h-full, .slide-page-10 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-10 .slide.bg-\[\#2563EB\], .slide-page-10 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-10 .slide.top-\[112px\], .slide-page-10 .slide .top-\[112px\] {
+top: 112px !important;
+}
+
+.slide-page-10 .slide.left-\[48px\], .slide-page-10 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-10 .slide.text-\[48px\], .slide-page-10 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-10 .slide.leading-\[1\.25\], .slide-page-10 .slide .leading-\[1\.25\] {
+line-height: 1.25 !important;
+}
+
+.slide-page-10 .slide.text-\[\#F5F5DC\], .slide-page-10 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-10 .slide.w-\[96px\], .slide-page-10 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-10 .slide.h-\[4px\], .slide-page-10 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-10 .slide.mt-\[16px\], .slide-page-10 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-10 .slide.top-\[220px\], .slide-page-10 .slide .top-\[220px\] {
+top: 220px !important;
+}
+
+.slide-page-10 .slide.right-\[48px\], .slide-page-10 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-10 .slide.grid, .slide-page-10 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-10 .slide.grid-cols-3, .slide-page-10 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-10 .slide.flex-col, .slide-page-10 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-10 .slide.p-\[32px\], .slide-page-10 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-10 .slide.bg-\[\#FFFFFF\]\/5, .slide-page-10 .slide .bg-\[\#FFFFFF\]\/5 {
+background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.slide-page-10 .slide.border-\[1px\], .slide-page-10 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-10 .slide.border-\[\#FFFFFF\]\/10, .slide-page-10 .slide .border-\[\#FFFFFF\]\/10 {
+border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.slide-page-10 .slide.relative, .slide-page-10 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-10 .slide.overflow-hidden, .slide-page-10 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-10 .slide.text-\[20px\], .slide-page-10 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-10 .slide.text-\[22px\], .slide-page-10 .slide .text-\[22px\] {
+font-size: 22px !important;
+}
+
+.slide-page-10 .slide.text-\[\#FFFFFF\], .slide-page-10 .slide .text-\[\#FFFFFF\] {
+color: #FFFFFF !important;
+}
+
+.slide-page-10 .slide.text-\[15px\], .slide-page-10 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-10 .slide.leading-\[1\.7\], .slide-page-10 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-10 .slide.text-\[\#FFFFFF\]\/60, .slide-page-10 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-10 .slide.h-\[420px\], .slide-page-10 .slide .h-\[420px\] {
+height: 420px !important;
+}
+
+.slide-page-10 .slide.text-\[12px\], .slide-page-10 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-10 .slide.tracking-\[0\.3em\], .slide-page-10 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-10 .slide.text-\[\#FFFFFF\]\/20, .slide-page-10 .slide .text-\[\#FFFFFF\]\/20 {
+color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.slide-page-10 .slide.bottom-\[32px\], .slide-page-10 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-10 .slide.gap-\[4px\], .slide-page-10 .slide .gap-\[4px\] {
+gap: 4px !important;
+}
+
+.slide-page-10 .slide.w-\[16px\], .slide-page-10 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-10 .slide.h-\[16px\], .slide-page-10 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-10 .slide.bg-\[\#2563EB\]\/20, .slide-page-10 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-10 .slide.bg-\[\#2563EB\]\/40, .slide-page-10 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+.slide-page-11 .slide {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-11 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-11 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-11 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+      display: flex;
+      flex-direction: column;
+}
+
+.slide-page-11 .slide .gradient-dark {
+background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);
+}
+
+.slide-page-11 .slide .italic-heading {
+font-style: italic;
+      transform: skewX(-5deg);
+}
+
+.slide-page-11 .slide .vertical-text {
+writing-mode: vertical-rl;
+      text-orientation: mixed;
+}
+
+.slide-page-11 .slide .capsule-nav {
+border-radius: 9999px;
+      border: 2px solid #2563EB;
+}
+
+.slide-page-11 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-11 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-11 .slide .ff-sans, .slide-page-11 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-11 .slide .ff-geometric, .slide-page-11 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-11 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-11 .slide .ff-condensed, .slide-page-11 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-11 .slide .ff-serif, .slide-page-11 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-11 .slide .ff-editorial, .slide-page-11 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-11 .slide .ff-mono, .slide-page-11 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-11 .slide .ff-cjk-emphasis, .slide-page-11 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-11 .slide.text-\[\#F5F5DC\], .slide-page-11 .slide .text-\[\#F5F5DC\] {
+color: #F5F5DC !important;
+}
+
+.slide-page-11 .slide.shrink-0, .slide-page-11 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-11 .slide.h-\[72px\], .slide-page-11 .slide .h-\[72px\] {
+height: 72px !important;
+}
+
+.slide-page-11 .slide.flex, .slide-page-11 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-11 .slide.items-center, .slide-page-11 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-11 .slide.justify-between, .slide-page-11 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-11 .slide.px-\[48px\], .slide-page-11 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-11 .slide.pt-\[8px\], .slide-page-11 .slide .pt-\[8px\] {
+padding-top: 8px !important;
+}
+
+.slide-page-11 .slide.gap-\[12px\], .slide-page-11 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-11 .slide.text-\[\#2563EB\], .slide-page-11 .slide .text-\[\#2563EB\] {
+color: #2563EB !important;
+}
+
+.slide-page-11 .slide.text-\[24px\], .slide-page-11 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-11 .slide.text-\[14px\], .slide-page-11 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-11 .slide.text-\[\#FFFFFF\]\/40, .slide-page-11 .slide .text-\[\#FFFFFF\]\/40 {
+color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.slide-page-11 .slide.tracking-\[0\.15em\], .slide-page-11 .slide .tracking-\[0\.15em\] {
+letter-spacing: 0.15em !important;
+}
+
+.slide-page-11 .slide.uppercase, .slide-page-11 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-11 .slide.gap-\[24px\], .slide-page-11 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-11 .slide.text-\[11px\], .slide-page-11 .slide .text-\[11px\] {
+font-size: 11px !important;
+}
+
+.slide-page-11 .slide.tracking-\[0\.1em\], .slide-page-11 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-11 .slide.text-\[\#FFFFFF\]\/35, .slide-page-11 .slide .text-\[\#FFFFFF\]\/35 {
+color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.slide-page-11 .slide.text-\[13px\], .slide-page-11 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-11 .slide.text-\[\#FFFFFF\]\/50, .slide-page-11 .slide .text-\[\#FFFFFF\]\/50 {
+color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.slide-page-11 .slide.flex-1, .slide-page-11 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-11 .slide.flex-col, .slide-page-11 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-11 .slide.justify-center, .slide-page-11 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-11 .slide.relative, .slide-page-11 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-11 .slide.absolute, .slide-page-11 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-11 .slide.text-\[12px\], .slide-page-11 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-11 .slide.tracking-\[0\.3em\], .slide-page-11 .slide .tracking-\[0\.3em\] {
+letter-spacing: 0.3em !important;
+}
+
+.slide-page-11 .slide.text-\[\#FFFFFF\]\/20, .slide-page-11 .slide .text-\[\#FFFFFF\]\/20 {
+color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.slide-page-11 .slide.text-\[56px\], .slide-page-11 .slide .text-\[56px\] {
+font-size: 56px !important;
+}
+
+.slide-page-11 .slide.leading-\[1\.2\], .slide-page-11 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-11 .slide.w-\[96px\], .slide-page-11 .slide .w-\[96px\] {
+width: 96px !important;
+}
+
+.slide-page-11 .slide.h-\[4px\], .slide-page-11 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-11 .slide.bg-\[\#2563EB\], .slide-page-11 .slide .bg-\[\#2563EB\] {
+background-color: #2563EB !important;
+}
+
+.slide-page-11 .slide.grid, .slide-page-11 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-11 .slide.grid-cols-3, .slide-page-11 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-11 .slide.border, .slide-page-11 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-11 .slide.h-full, .slide-page-11 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-11 .slide.bg-\[\#2563EB\]\/20, .slide-page-11 .slide .bg-\[\#2563EB\]\/20 {
+background-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+.slide-page-11 .slide.text-\[\#FFFFFF\]\/60, .slide-page-11 .slide .text-\[\#FFFFFF\]\/60 {
+color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.slide-page-11 .slide.text-\[16px\], .slide-page-11 .slide .text-\[16px\] {
+font-size: 16px !important;
+}
+
+.slide-page-11 .slide.w-full, .slide-page-11 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-11 .slide.h-\[80px\], .slide-page-11 .slide .h-\[80px\] {
+height: 80px !important;
+}
+
+.slide-page-11 .slide.bg-\[\#2563EB\]\/40, .slide-page-11 .slide .bg-\[\#2563EB\]\/40 {
+background-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+.slide-page-11 .slide.bg-\[\#2563EB\]\/10, .slide-page-11 .slide .bg-\[\#2563EB\]\/10 {
+background-color: rgba(37, 99, 235, 0.1) !important;
+}
+
+.slide-page-11 .slide.rounded-full, .slide-page-11 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-11 .slide.bg-\[\#1E40AF\]\/10, .slide-page-11 .slide .bg-\[\#1E40AF\]\/10 {
+background-color: rgba(30, 64, 175, 0.1) !important;
+}
+  </style>
+</head>
+<body>
+
+    <div class="slide-wrapper slide-page-1">
+      <div class="slide-number">1</div>
+      <div class="slide gradient-dark text-[#F5F5DC]" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header Band -->
+    <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[60px] pt-[8px]">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em] uppercase">Industry Insight Report</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Global Pet Economy</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">2025</span>
+      </div>
+    </div>
+
+    <!-- Vertical Decoration Text -->
+    <div class="absolute left-[60px] top-[180px] h-[300px] flex items-center">
+      <div class="vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/20 uppercase font-[400]">
+        Trend Analysis & Market Forecast
+      </div>
+    </div>
+
+    <!-- Main Title Area -->
+    <div class="absolute top-[240px] left-[60px] max-w-[960px]">
+      <!-- Pre-title tag -->
+      <div class="flex items-center gap-[12px] mb-[32px]">
+        <div class="rounded-[9999px] border-[2px] border-[#2563EB] px-[16px] py-[6px] text-[12px] tracking-[0.15em] text-[#2563EB] font-[500]">
+          TREND REPORT
+        </div>
+        <span class="text-[#2563EB] text-[20px] font-[700]">*</span>
+      </div>
+
+      <!-- Main Title -->
+      <div class="italic-skew">
+        <h1 class="text-[80px] font-[900] leading-[1.12] text-[#F5F5DC] text-wrap-balance word-break-keep-all">
+          2025全球宠物<br>经济趋势洞察
+        </h1>
+      </div>
+      
+      <!-- Title Underline Decoration -->
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[32px]"></div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[40px] left-[60px] right-[60px] flex items-end justify-between">
+      <div class="flex items-center gap-[12px]">
+        <i class="ph ph-brain text-[#2563EB] text-[24px]"></i>
+        <span class="text-[14px] text-[#FFFFFF]/40 font-[400]">深度分析报告 · 战略洞察版</span>
+      </div>
+
+      <!-- Checkerboard Decoration -->
+      <div class="grid grid-cols-3 gap-[4px]">
+        <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+        <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+        <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+        <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+        <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+        <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-2">
+      <div class="slide-number">2</div>
+      <div class="slide" style="background:#F5F0E8;">
+    <!-- Header -->
+    <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+      <div class="flex items-center gap-[12px]">
+        <span class="star-decor text-[24px]">*</span>
+        <span class="text-[16px] font-[500] text-[#111827]">报告目录</span>
+      </div>
+      <span class="text-[14px] text-[#6B7280]">第 02 页</span>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[112px] left-[48px]">
+      <div class="italic-heading">
+        <h1 class="text-[60px] font-[900] italic leading-[1.25] text-[#111827]" style="transform: skewX(-5deg);">
+          目录
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content: 2x2 Grid -->
+    <div class="absolute top-[240px] left-[48px] right-[48px] grid grid-cols-2 gap-x-[40px] gap-y-[32px]">
+      <!-- Item 01 -->
+      <div class="flex items-start gap-[20px] p-[32px] bg-white border-[1px] border-[#D1D5DB] rounded-[4px] relative overflow-hidden">
+        <div class="flex flex-col">
+          <span class="text-[36px] font-[900] italic text-[#2563EB] leading-none mb-[12px]">01</span>
+          <div class="text-[20px] font-[700] text-[#111827] mb-[12px] leading-tight">全球市场：抗衰退板块的增长动能</div>
+          <div class="text-[14px] text-[#4B5563] leading-[1.6] font-[400]">
+            解析2025年全球宠物产业3,200-3,500亿美元市场规模，剖析6.8%-7.2%年复合增长率背后的抗衰退特性，探讨“宠物人性化”趋势下单宠年均消费增长。
+          </div>
+        </div>
+        <span class="star-decor text-[20px] absolute top-[32px] right-[32px]">*</span>
+      </div>
+
+      <!-- Item 02 -->
+      <div class="flex items-start gap-[20px] p-[32px] bg-white border-[1px] border-[#D1D5DB] rounded-[4px] relative overflow-hidden">
+        <div class="flex flex-col">
+          <span class="text-[36px] font-[900] italic text-[#2563EB] leading-none mb-[12px]">02</span>
+          <div class="text-[20px] font-[700] text-[#111827] mb-[12px] leading-tight">区域分化：三大市场的差异化路径</div>
+          <div class="text-[14px] text-[#4B5563] leading-[1.6] font-[400]">
+            对比北美市场服务化与医疗化转型（宠物医疗占比首超食品达32%）、欧洲可持续法规倒逼下的绿色转型（昆虫蛋白市场增至15亿欧元）。
+          </div>
+        </div>
+        <span class="star-decor text-[20px] absolute top-[32px] right-[32px]">*</span>
+      </div>
+
+      <!-- Item 03 -->
+      <div class="flex items-start gap-[20px] p-[32px] bg-white border-[1px] border-[#D1D5DB] rounded-[4px] relative overflow-hidden">
+        <div class="flex flex-col">
+          <span class="text-[36px] font-[900] italic text-[#2563EB] leading-none mb-[12px]">03</span>
+          <div class="text-[20px] font-[700] text-[#111827] mb-[12px] leading-tight">食品科技：替代蛋白与个性化营养</div>
+          <div class="text-[14px] text-[#4B5563] leading-[1.6] font-[400]">
+            探讨欧盟《宠物食品可持续性法案》驱动下的替代蛋白创新，以及基因检测技术赋能的个性化营养方案，分析精准健康管理的产业升级路径。
+          </div>
+        </div>
+        <span class="star-decor text-[20px] absolute top-[32px] right-[32px]">*</span>
+      </div>
+
+      <!-- Item 04 -->
+      <div class="flex items-start gap-[20px] p-[32px] bg-white border-[1px] border-[#D1D5DB] rounded-[4px] relative overflow-hidden">
+        <div class="flex flex-col">
+          <span class="text-[36px] font-[900] italic text-[#2563EB] leading-none mb-[12px]">04</span>
+          <div class="text-[20px] font-[700] text-[#111827] mb-[12px] leading-tight">智能生态：AI硬件与数字孪生</div>
+          <div class="text-[14px] text-[#4B5563] leading-[1.6] font-[400]">
+            前瞻AI硬件与数字孪生技术对宠物照护生态的变革性影响，探讨智能监测、数据驱动决策等数字化创新如何重构人宠互动模式与产业服务边界。
+          </div>
+        </div>
+        <span class="star-decor text-[20px] absolute top-[32px] right-[32px]">*</span>
+      </div>
+    </div>
+
+    <!-- Decorative Vertical Text -->
+    <div class="absolute top-[112px] right-[48px] vertical-text text-[12px] tracking-[0.3em] text-[#6B7280]/40 uppercase font-[500]">
+      Pet Economy Report 2025
+    </div>
+
+    <!-- Footer -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+      <i class="ph ph-cube text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-[#6B7280]">共30页深度分析</span>
+    </div>
+
+    <!-- Checkerboard Decoration -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-3">
+      <div class="slide-number">3</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">全球市场分析 / GLOBAL MARKET</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Pet Economy Trend Report</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 03</span>
+      </div>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          全球市场：3500亿美元背后的抗衰退逻辑
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[220px] left-[48px] right-[48px] bottom-[80px] z-10" 
+         style="height: 420px; display: grid; grid-template-columns: 540px 1fr; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Insight Cards -->
+      <div class="flex flex-col gap-6">
+        <!-- Card 1 -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-6 rounded-sm relative overflow-hidden group">
+          <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB]"></div>
+          <div class="flex items-center gap-3 mb-3">
+            <span class="star-decor text-[20px]">*</span>
+            <h3 class="text-[20px] font-[700] text-[#FFFFFF]">市场规模突破3,280亿美元，增速强劲</h3>
+          </div>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60">
+            2025年全球宠物产业规模预计达3,280亿美元（Grand View Research预测），2020-2025年复合增长率维持6.8%-7.2%，显著高于全球GDP增速。
+          </p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-6 rounded-sm relative overflow-hidden">
+          <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB]"></div>
+          <div class="flex items-center gap-3 mb-3">
+            <span class="star-decor text-[20px]">*</span>
+            <h3 class="text-[20px] font-[700] text-[#FFFFFF]">单宠消费增至1,580美元，非基础需求升级</h3>
+          </div>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60">
+            单宠年均消费从2020年的1,200美元增至2025年的1,580美元，五年增幅达31.7%，显示出宠物消费的刚性与升级趋势。
+          </p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-6 rounded-sm relative overflow-hidden">
+          <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB]"></div>
+          <div class="flex items-center gap-3 mb-3">
+            <span class="star-decor text-[20px]">*</span>
+            <h3 class="text-[20px] font-[700] text-[#FFFFFF]">新兴市场贡献60%增量，亚太份额跃升</h3>
+          </div>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60">
+            新兴市场贡献全球增量的60%，亚太地区成为核心增长引擎，2025年规模预计突破800亿美元，全球份额从18%跃升至25%。
+          </p>
+        </div>
+      </div>
+
+      <!-- Right: Chart Area -->
+      <div class="flex flex-col justify-center bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-8 rounded-sm relative">
+        <div class="absolute top-4 right-4">
+          <div class="capsule-nav px-3 py-1 text-[11px] tracking-[0.1em] text-[#2563EB] font-semibold">DATA VISUALIZATION</div>
+        </div>
+        <div id="chart_p3_1" style="width:100%; height: 200px; min-height: 180px; max-height: 220px;"></div>
+        <div class="mt-6 pt-6 border-t border-[#FFFFFF]/10">
+          <div class="flex items-start gap-3">
+            <i class="fa-solid fa-circle-info text-[#2563EB] mt-1"></i>
+            <p class="text-[14px] text-[#FFFFFF]/50 leading-relaxed">
+              <strong class="text-[#FFFFFF]">核心洞察：</strong> 亚太地区增长率(12.3%)远超北美(3.5%)与欧洲(4.1%)，成为全球宠物经济抗衰退的战略支撑点。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="fa-solid fa-paw text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/30">全球宠物产业深度分析报告</span>
+    </div>
+
+    <!-- Right Bottom Decoration -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+
+    <!-- Side Decoration -->
+    <div class="absolute right-0 top-1/2 -translate-y-1/2 vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/10 uppercase font-semibold">
+      Market Resilience Analysis 2025
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-4">
+      <div class="slide-number">4</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header Band -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">市场分析 / MARKET ANALYSIS</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Pet Economy Report 2025</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 04</span>
+      </div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          区域分化：三大市场的差异化增长路径
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[220px] left-[48px] right-[48px] z-10" style="height: 420px; display: grid; grid-template-columns: 600px 1fr; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Chart Section -->
+      <div class="flex flex-col justify-center bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-sm p-6 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB]"></div>
+        <div id="chart_p4_1" style="width:100%; height: 200px; min-height: 180px; max-height: 220px;"></div>
+      </div>
+
+      <!-- Right: Insights Section -->
+      <div class="flex flex-col gap-5 justify-center">
+        <!-- Card 1: North America -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-5 relative group">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-[#2563EB] font-bold">*</span>
+            <h3 class="text-[18px] font-[700] text-[#FFFFFF]">北美：医疗化与服务化主导</h3>
+          </div>
+          <p class="text-[14px] leading-[1.7] text-[#FFFFFF]/60">
+            美国宠物市场2025年将达1,460亿美元，其中宠物医疗（含保险）占比首次超过食品，达32% vs 30%。
+          </p>
+        </div>
+
+        <!-- Card 2: Europe -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-5 relative group">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-[#2563EB] font-bold">*</span>
+            <h3 class="text-[18px] font-[700] text-[#FFFFFF]">欧洲：可持续法规倒逼产业转型</h3>
+          </div>
+          <p class="text-[14px] leading-[1.7] text-[#FFFFFF]/60">
+            欧盟2025年实施《宠物食品可持续性法案》，强制要求包装可回收率≥70%并实施碳足迹标签强制化。
+          </p>
+        </div>
+
+        <!-- Card 3: Asia Pacific -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-5 relative group">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-[#2563EB] font-bold">*</span>
+            <h3 class="text-[18px] font-[700] text-[#FFFFFF]">亚太：数字化与情感消费升级</h3>
+          </div>
+          <p class="text-[14px] leading-[1.7] text-[#FFFFFF]/60">
+            中国它经济2025年规模预计达3,200亿人民币，Z世代贡献消费增量的58%；日本银发族推动适老化服务增长40%。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Band (Position Locked) -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="fa-solid fa-paw text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/30">区域市场差异化增长路径分析报告</span>
+    </div>
+
+    <!-- Right Bottom Decoration -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+
+    <!-- Vertical Decor -->
+    <div class="absolute right-0 top-1/2 -translate-y-1/2 vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/10 uppercase pr-4">
+      Global Market Divergence 2025
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-5">
+      <div class="slide-number">5</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header Band -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">FOOD TECHNOLOGY</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Pet Economy Research Report</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 05</span>
+      </div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          食品科技：从昆虫蛋白到基因定制的营养革命
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[220px] left-[48px] right-[48px] z-10" style="height: 420px; display: grid; grid-template-columns: 600px 1fr; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Chart Section -->
+      <div class="flex flex-col justify-center bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-lg p-6 relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB]"></div>
+        <div id="chart_p5_1" style="width:100%; height: 200px; min-height: 180px; max-height: 220px;"></div>
+      </div>
+
+      <!-- Right: Insights Section -->
+      <div class="flex flex-col gap-5 justify-center">
+        <!-- Card 1 -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-5 rounded-lg relative group">
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex items-center gap-2">
+              <span class="star-decor text-[18px]">*</span>
+              <h3 class="text-[18px] font-[700] text-[#FFFFFF]">昆虫蛋白：规模化生产突破</h3>
+            </div>
+            <span class="text-[#2563EB] font-[700] text-[24px]">50%↓</span>
+          </div>
+          <p class="text-[14px] leading-[1.6] text-[#FFFFFF]/60">
+            生产成本已降至$2.1/kg，在欧盟《宠物食品可持续性法案》强制要求包装可回收率≥70%与碳足迹标签化的监管压力下，规模化效应显著。
+          </p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-5 rounded-lg relative group">
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex items-center gap-2">
+              <span class="star-decor text-[18px]">*</span>
+              <h3 class="text-[18px] font-[700] text-[#FFFFFF]">个性化营养：基因驱动精准饲喂</h3>
+            </div>
+            <span class="text-[#2563EB] font-[700] text-[24px]">12%</span>
+          </div>
+          <p class="text-[14px] leading-[1.6] text-[#FFFFFF]/60">
+            鲜粮订阅模式市场渗透率达12%，伴随基因检测成本下探至消费级可承受区间，精准营养方案成为高端市场核心竞争力。
+          </p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 p-5 rounded-lg relative group">
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex items-center gap-2">
+              <span class="star-decor text-[18px]">*</span>
+              <h3 class="text-[18px] font-[700] text-[#FFFFFF]">功能性零食：医疗级健康管理</h3>
+            </div>
+            <span class="text-[#2563EB] font-[700] text-[24px]">25%↑</span>
+          </div>
+          <p class="text-[14px] leading-[1.6] text-[#FFFFFF]/60">
+            细分市场增速高达25%，针对焦虑缓解、关节养护等特定需求快速扩张，Mars Petcare已战略投资8亿美元扩建专注该领域。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="fa-solid fa-paw text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/30">食品科技趋势深度分析报告</span>
+    </div>
+
+    <!-- Right Bottom Decoration -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+
+    <!-- Vertical Decor -->
+    <div class="absolute right-0 top-1/2 -translate-y-1/2 vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/10 uppercase pr-4">
+      Nutritional Revolution 2025
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-6">
+      <div class="slide-number">6</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header Band -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">智能生态 / AI Hardware</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">AI Hardware Penetration Report</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 06</span>
+      </div>
+    </div>
+
+    <!-- Left Edge Accent -->
+    <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB] z-30"></div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          智能生态：AI硬件渗透率突破22%
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[220px] left-[48px] right-[48px] z-10" style="height: 420px; display: grid; grid-template-columns: 320px 1fr; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Highlight Data Card -->
+      <div class="flex flex-col justify-center p-[32px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-sm relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4 opacity-20">
+          <i class="ph ph-cpu text-[64px] text-[#2563EB]"></i>
+        </div>
+        <div class="text-[#2563EB] text-[14px] font-[600] tracking-[0.2em] mb-4 uppercase">Market Penetration</div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-[72px] font-[900] text-white leading-none">22%</span>
+          <span class="text-[20px] font-[500] text-[#FFFFFF]/60 italic">Breakthrough</span>
+        </div>
+        <div class="mt-6 text-[15px] leading-[1.7] text-[#FFFFFF]/60">
+          AI硬件已从单一功能设备演进为全场景感知终端，渗透率的快速提升标志着宠物医疗进入“实时监测”时代。
+        </div>
+        <div class="mt-8 flex items-center gap-2">
+          <span class="star-decor text-[20px]">*</span>
+          <span class="text-[12px] tracking-[0.1em] text-[#FFFFFF]/40 uppercase">Core Metric 2025</span>
+        </div>
+      </div>
+
+      <!-- Right: Detail Cards Grid -->
+      <div class="grid grid-cols-1 gap-6" style="height: 100%;">
+        <!-- Card 1 -->
+        <div class="flex gap-6 p-[24px] bg-[#FFFFFF]/5 border-l-[4px] border-[#2563EB] border-y-[1px] border-r-[1px] border-[#FFFFFF]/10">
+          <div class="flex-shrink-0 w-12 h-12 rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+            <i class="ph ph-circle text-[24px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="text-[20px] font-[700] text-white mb-2">健康监测硬件规模化部署</div>
+            <div class="text-[15px] leading-[1.6] text-[#FFFFFF]/60">
+              智能健康监测设备全球年出货量已达4,200万台，针对老年宠物（7岁以上占比持续攀升）的慢性病管理需求，实时追踪心率变异率、呼吸频率及活动量异常。
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="flex gap-6 p-[24px] bg-[#FFFFFF]/5 border-l-[4px] border-[#2563EB] border-y-[1px] border-r-[1px] border-[#FFFFFF]/10">
+          <div class="flex-shrink-0 w-12 h-12 rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+            <i class="ph ph-brain text-[24px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="text-[20px] font-[700] text-white mb-2">AI诊断精度逼近专业兽医</div>
+            <div class="text-[15px] leading-[1.6] text-[#FFFFFF]/60">
+              基于卷积神经网络与百万级病例训练的皮肤病识别系统准确率已达94%，诊断水平接近执业兽医初级能力，可在30秒内完成湿疹、真菌感染等常见病症筛查。
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="flex gap-6 p-[24px] bg-[#FFFFFF]/5 border-l-[4px] border-[#2563EB] border-y-[1px] border-r-[1px] border-[#FFFFFF]/10">
+          <div class="flex-shrink-0 w-12 h-12 rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+            <i class="ph ph-share-network text-[24px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="text-[20px] font-[700] text-white mb-2">IoT数字孪生降低医疗冗余</div>
+            <div class="text-[15px] leading-[1.6] text-[#FFFFFF]/60">
+              智能喂食器、饮水监测与可穿戴设备形成IoT闭环，构建宠物个体健康数字孪生体，通过多维度数据联动分析提前14天预警肾脏、心脏等潜在健康风险。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decorative Vertical Text -->
+    <div class="absolute right-[48px] top-[112px] vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/20 uppercase font-semibold">
+      Intelligent Ecosystem Analysis
+    </div>
+
+    <!-- Footer Band (Position Locked) -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="fa-solid fa-paw text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/40">AI 硬件渗透率深度分析报告</span>
+    </div>
+
+    <!-- Right Bottom Checkerboard -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-7">
+      <div class="slide-number">7</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header Band -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">医疗重构 / 支付体系</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Insurance Tech Analysis</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 07</span>
+      </div>
+    </div>
+
+    <!-- Left Edge Accent -->
+    <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB]"></div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          医疗重构：保险科技降本增效重构支付体系
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[240px] left-[48px] right-[48px] z-10" 
+         style="height: 380px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; box-sizing: border-box;">
+      
+      <!-- Card 1: AI理赔 -->
+      <div class="flex flex-col h-full p-[32px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4 opacity-20">
+          <i class="ph ph-brain text-[48px] text-[#2563EB]"></i>
+        </div>
+        <div class="flex items-center gap-2 mb-6">
+          <span class="star-decor text-[20px]">*</span>
+          <div class="capsule-nav px-3 py-1 text-[12px] tracking-[0.1em] text-[#2563EB] font-semibold">
+            AI理赔与保险科技
+          </div>
+        </div>
+        <div class="text-[22px] font-[700] text-[#FFFFFF] mb-4 leading-tight">
+          智能理赔系统<br/>周期压缩至 2 小时
+        </div>
+        <div class="text-[15px] text-[#FFFFFF]/60 leading-[1.7] font-normal">
+          美国市场渗透率持续提升，通过自动化风控与实时核赔技术重构宠物医疗支付效率，显著降低保险机构运营成本并提升用户体验。
+        </div>
+      </div>
+
+      <!-- Card 2: 远程医疗 -->
+      <div class="flex flex-col h-full p-[32px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4 opacity-20">
+          <i class="ph ph-globe text-[48px] text-[#2563EB]"></i>
+        </div>
+        <div class="flex items-center gap-2 mb-6">
+          <span class="star-decor text-[20px]">*</span>
+          <div class="capsule-nav px-3 py-1 text-[12px] tracking-[0.1em] text-[#2563EB] font-semibold">
+            远程医疗常态化
+          </div>
+        </div>
+        <div class="text-[22px] font-[700] text-[#FFFFFF] mb-4 leading-tight">
+          35% 初级咨询<br/>通过视频问诊完成
+        </div>
+        <div class="text-[15px] text-[#FFFFFF]/60 leading-[1.7] font-normal">
+          突破地域限制实现医疗资源普惠化，成为北美预防性医疗体系的关键基础设施，有效缓解线下医院接诊压力并降低宠物主时间成本。
+        </div>
+      </div>
+
+      <!-- Card 3: 精准医疗 -->
+      <div class="flex flex-col h-full p-[32px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4 opacity-20">
+          <i class="ph ph-cpu text-[48px] text-[#2563EB]"></i>
+        </div>
+        <div class="flex items-center gap-2 mb-6">
+          <span class="star-decor text-[20px]">*</span>
+          <div class="capsule-nav px-3 py-1 text-[12px] tracking-[0.1em] text-[#2563EB] font-semibold">
+            精准医疗与基因检测
+          </div>
+        </div>
+        <div class="text-[22px] font-[700] text-[#FFFFFF] mb-4 leading-tight">
+          覆盖 350 种<br/>品种遗传病筛查
+        </div>
+        <div class="text-[15px] text-[#FFFFFF]/60 leading-[1.7] font-normal">
+          推动医疗模式从被动治疗向主动预防转型，支撑高端医疗服务升级，为个性化治疗方案提供分子级别的数据基础。
+        </div>
+      </div>
+    </div>
+
+    <!-- Decorative Vertical Text -->
+    <div class="absolute right-[48px] top-[112px] vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/20 uppercase font-normal">
+      Medical Reconstruction & InsurTech 2025
+    </div>
+
+    <!-- Footer Band (Position Locked) -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="ph ph-shield-check text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/40">第 5 章：医疗支付体系重构分析</span>
+    </div>
+
+    <!-- Right Bottom Checkerboard -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-8">
+      <div class="slide-number">8</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header Band -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">情感经济分析</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Pet Economy Report</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 08</span>
+      </div>
+    </div>
+
+    <!-- Left Accent Line -->
+    <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB] z-10"></div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          情感经济：殡葬与心理健康服务爆发增长
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[230px] left-[48px] right-[48px] z-10" style="height: 410px; display: grid; grid-template-columns: 1fr; gap: 24px; box-sizing: border-box;">
+      
+      <!-- Insight Cards Grid -->
+      <div class="grid grid-cols-3 gap-6 h-full">
+        
+        <!-- Card 1 -->
+        <div class="flex flex-col p-[32px] bg-white/5 border border-white/10 relative overflow-hidden" style="height: 350px;">
+          <div class="absolute top-0 right-0 p-4 opacity-20">
+            <i class="ph ph-globe text-[48px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex items-center gap-2 mb-6">
+            <span class="text-[#2563EB] text-[20px] font-bold">*</span>
+            <div class="capsule-nav px-3 py-1 text-[12px] text-[#2563EB] font-semibold">全球视野</div>
+          </div>
+          <div class="text-[24px] font-bold text-white leading-tight mb-4">
+            全球宠物殡葬市场<br/>突破 <span class="text-[#2563EB]">45 亿美元</span>
+          </div>
+          <div class="text-[15px] text-white/60 leading-[1.7] font-normal">
+            涵盖火化、土葬、骨灰钻石、宠物墓地及纪念品定制等全链条服务，形成完整的宠物生命终点产业生态。
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="flex flex-col p-[32px] bg-white/5 border border-white/10 relative overflow-hidden" style="height: 350px;">
+          <div class="absolute top-0 right-0 p-4 opacity-20">
+            <i class="ph ph-trend-up text-[48px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex items-center gap-2 mb-6">
+            <span class="text-[#2563EB] text-[20px] font-bold">*</span>
+            <div class="capsule-nav px-3 py-1 text-[12px] text-[#2563EB] font-semibold">中国增速</div>
+          </div>
+          <div class="text-[24px] font-bold text-white leading-tight mb-4">
+            中国市场增速<br/>高达 <span class="text-[#2563EB]">60%</span>
+          </div>
+          <div class="text-[15px] text-white/60 leading-[1.7] font-normal">
+            源于宠物保有量激增带来的善终需求，以及 Z 世代宠主追求“体面告别”的情感诉求驱动，远超全球平均水平。
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="flex flex-col p-[32px] bg-white/5 border border-white/10 relative overflow-hidden" style="height: 350px;">
+          <div class="absolute top-0 right-0 p-4 opacity-20">
+            <i class="ph ph-target text-[48px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex items-center gap-2 mb-6">
+            <span class="text-[#2563EB] text-[20px] font-bold">*</span>
+            <div class="capsule-nav px-3 py-1 text-[12px] text-[#2563EB] font-semibold">商业溢价</div>
+          </div>
+          <div class="text-[24px] font-bold text-white leading-tight mb-4">
+            宠物友好空间带动<br/>客单价提升 <span class="text-[#2563EB]">20-30%</span>
+          </div>
+          <div class="text-[15px] text-white/60 leading-[1.7] font-normal">
+            酒店、餐厅、商场等通过改造硬件设施与提供专属服务，将情感连接转化为实际的商业客单价增长。
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Vertical Decor Text -->
+    <div class="absolute right-[48px] top-[112px] h-full flex items-center z-10">
+      <div class="vertical-text text-[12px] tracking-[0.3em] text-white/20 uppercase font-semibold">
+        Emotional Economy Analysis 2025
+      </div>
+    </div>
+
+    <!-- Footer Band (Position Locked) -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="fa-solid fa-paw text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-white/40">宠物经济趋势深度分析报告</span>
+    </div>
+
+    <!-- Checkerboard Decor -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-9">
+      <div class="slide-number">9</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Background Decoration -->
+    <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB] z-0"></div>
+    <div class="absolute right-0 top-0 w-[300px] h-[300px] bg-[#2563EB]/10 rounded-full blur-[100px]"></div>
+    <div class="absolute left-0 bottom-0 w-[400px] h-[400px] bg-[#1E40AF]/10 rounded-full blur-[120px]"></div>
+
+    <!-- Header Band -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em] uppercase">ESG Strategy & Sustainability</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35">PET ECONOMY REPORT</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 09</span>
+      </div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="star-decor text-[18px]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/60 tracking-[0.1em]">CHAPTER 07 / 产业升级</span>
+      </div>
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.2] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          ESG转型：零塑包装与碳中和成为高端标配
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content-area">
+      <!-- Column 1: Bio-based Packaging -->
+      <div class="flex-1 card-glass rounded-2xl p-[32px] flex flex-col relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4 opacity-20">
+          <i class="ph ph-cube text-[48px] text-[#2563EB]"></i>
+        </div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white font-bold text-sm">01</div>
+          <h3 class="text-[20px] font-[700] text-white tracking-tight">生物基包装成本优化</h3>
+        </div>
+        <div class="flex-1">
+          <div class="text-[32px] font-[700] text-[#2563EB] mb-4 leading-none">-40%</div>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60">
+            生物基材料规模化生产推动宠物食品包装成本较传统塑料下降40%，显著降低企业ESG转型门槛，使可持续包装从“奢侈品”变为“标准件”。
+          </p>
+        </div>
+        <div class="mt-6 pt-4 border-t border-[#FFFFFF]/10">
+          <span class="text-[12px] text-[#FFFFFF]/40 tracking-wider uppercase">Cost Efficiency / 成本效能</span>
+        </div>
+      </div>
+
+      <!-- Column 2: Carbon Neutrality -->
+      <div class="flex-1 card-glass rounded-2xl p-[32px] flex flex-col relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4 opacity-20">
+          <i class="ph ph-shield-check text-[48px] text-[#2563EB]"></i>
+        </div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white font-bold text-sm">02</div>
+          <h3 class="text-[20px] font-[700] text-white tracking-tight">碳中和认证与溯源</h3>
+        </div>
+        <div class="flex-1">
+          <div class="text-[32px] font-[700] text-[#2563EB] mb-4 leading-none">12%</div>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60">
+            碳中和认证猫粮已占据高端宠物食品市场12%的份额，通过区块链溯源体系构建信任背书，成为ESG合规的核心产品形态。
+          </p>
+        </div>
+        <div class="mt-6 pt-4 border-t border-[#FFFFFF]/10">
+          <span class="text-[12px] text-[#FFFFFF]/40 tracking-wider uppercase">Market Share / 市场份额</span>
+        </div>
+      </div>
+
+      <!-- Column 3: Plant-based Diet -->
+      <div class="flex-1 card-glass rounded-2xl p-[32px] flex flex-col relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-4 opacity-20">
+          <i class="ph ph-leaf text-[48px] text-[#2563EB]"></i>
+        </div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white font-bold text-sm">03</div>
+          <h3 class="text-[20px] font-[700] text-white tracking-tight">植物基饮食减排潜力</h3>
+        </div>
+        <div class="flex-1">
+          <div class="text-[32px] font-[700] text-[#2563EB] mb-4 leading-none">-75%</div>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60">
+            科学研究证实，采用植物基配方的宠物饮食可减少高达75%的碳足迹，成为实现产业碳中和目标的最有效路径。
+          </p>
+        </div>
+        <div class="mt-6 pt-4 border-t border-[#FFFFFF]/10">
+          <span class="text-[12px] text-[#FFFFFF]/40 tracking-wider uppercase">Carbon Footprint / 碳足迹</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Band (Position Locked) -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="ph ph-leaf text-[#2563EB] text-[24px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/40">可持续发展战略分析报告</span>
+    </div>
+
+    <!-- Right Bottom Decoration -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+
+    <!-- Side Decoration Text -->
+    <div class="absolute right-[24px] top-1/2 -translate-y-1/2 vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/20 uppercase font-semibold">
+      Sustainable Future / ESG Transformation
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-10">
+      <div class="slide-number">10</div>
+      <div class="slide" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header Band: Fixed Position -->
+    <div class="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-20">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em] uppercase">Risk Analysis / 风险预警</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Pet Economy Report</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">PAGE 10</span>
+      </div>
+    </div>
+
+    <!-- Left Edge Accent Line -->
+    <div class="absolute top-0 left-0 w-1 h-full bg-[#2563EB]"></div>
+
+    <!-- Title Band: Fixed Position -->
+    <div class="absolute top-[112px] left-[48px] z-10">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          风险预警：原料波动与监管趋严加速整合
+        </h1>
+      </div>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    </div>
+
+    <!-- Main Content Area: Fixed Height & Position -->
+    <div class="absolute top-[220px] left-[48px] right-[48px] z-10" 
+         style="height: 420px; display: flex; flex-direction: column; justify-content: flex-start; gap: 24px; box-sizing: border-box;">
+      
+      <!-- Content Grid: 3 Insight Cards -->
+      <div class="grid grid-cols-3 gap-[24px] h-full">
+        
+        <!-- Card 1 -->
+        <div class="flex flex-col h-full p-[32px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 relative overflow-hidden">
+          <div class="absolute top-0 right-0 p-4 opacity-20">
+            <i class="ph ph-trend-up text-[48px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex items-center gap-2 mb-6">
+            <span class="star-decor text-[20px]">*</span>
+            <div class="capsule-nav px-3 py-1 text-[11px] tracking-[0.1em] text-[#2563EB] font-semibold uppercase">Cost Pressure</div>
+          </div>
+          <h3 class="text-[22px] font-[700] text-[#FFFFFF] mb-4 leading-tight">原料成本压力<br/>倒逼行业并购</h3>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60 font-normal">
+            禽肉鱼类作为宠物食品核心蛋白来源，市场价格上行15-20%直接压缩中小企业利润空间，倒逼行业通过并购重组实现规模效应。
+          </p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="flex flex-col h-full p-[32px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 relative overflow-hidden">
+          <div class="absolute top-0 right-0 p-4 opacity-20">
+            <i class="ph ph-shield-check text-[48px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex items-center gap-2 mb-6">
+            <span class="star-decor text-[20px]">*</span>
+            <div class="capsule-nav px-3 py-1 text-[11px] tracking-[0.1em] text-[#2563EB] font-semibold uppercase">Regulation</div>
+          </div>
+          <h3 class="text-[22px] font-[700] text-[#FFFFFF] mb-4 leading-tight">欧盟数据法案<br/>重塑平台规则</h3>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60 font-normal">
+            欧盟《数据法案》正式生效，强制要求宠物智能设备产生的健康数据、行为数据具备可移植性，明确禁止平台利用数据优势实施垄断行为。
+          </p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="flex flex-col h-full p-[32px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 relative overflow-hidden">
+          <div class="absolute top-0 right-0 p-4 opacity-20">
+            <i class="ph ph-globe text-[48px] text-[#2563EB]"></i>
+          </div>
+          <div class="flex items-center gap-2 mb-6">
+            <span class="star-decor text-[20px]">*</span>
+            <div class="capsule-nav px-3 py-1 text-[11px] tracking-[0.1em] text-[#2563EB] font-semibold uppercase">Import Standard</div>
+          </div>
+          <h3 class="text-[22px] font-[700] text-[#FFFFFF] mb-4 leading-tight">中国进口标准<br/>提升 30%</h3>
+          <p class="text-[15px] leading-[1.7] text-[#FFFFFF]/60 font-normal">
+            中国海关总署将进口宠物食品检验检疫标准提升30%，针对真菌毒素、重金属残留实施更严格的限量检测与溯源要求。
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Decorative Vertical Text -->
+    <div class="absolute right-[48px] top-[112px] h-[420px] flex items-center z-0">
+      <div class="vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/20 uppercase font-semibold">
+        Strategic Risk Assessment 2025
+      </div>
+    </div>
+
+    <!-- Footer Band: Fixed Position Lock -->
+    <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px] z-20">
+      <i class="ph ph-circle text-[#2563EB] text-[12px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/40 font-normal">Chapter 08 / 行业风险预警分析</span>
+    </div>
+
+    <!-- Right Bottom Checkerboard Decoration -->
+    <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px] z-20">
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+      <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-11">
+      <div class="slide-number">11</div>
+      <div class="slide gradient-dark text-[#F5F5DC]" style="background:linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%);">
+    <!-- Header -->
+    <header class="shrink-0 h-[72px] flex items-center justify-between px-[48px] pt-[8px] z-10">
+      <div class="flex items-center gap-[12px]">
+        <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+        <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em] uppercase">Future Outlook / 2025-2030</span>
+      </div>
+      <div class="flex items-center gap-[24px]">
+        <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35 uppercase">Strategic Vision Report</span>
+        <span class="text-[13px] font-[600] text-[#FFFFFF]/50">FINAL PAGE</span>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-[48px] flex flex-col justify-center relative">
+      <!-- Vertical Decor Text -->
+      <div class="absolute left-0 top-1/2 -translate-y-1/2 vertical-text text-[12px] tracking-[0.3em] text-[#FFFFFF]/20 uppercase">
+        Technology & Humanity Convergence
+      </div>
+
+      <!-- Title Section -->
+      <div class="mb-12 relative z-10">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="capsule-nav px-4 py-1 text-[12px] tracking-[0.15em] text-[#2563EB] font-semibold">
+            未来展望
+          </div>
+        </div>
+        <h1 class="italic-heading text-[56px] font-[900] leading-[1.2] text-[#F5F5DC]">
+          科技与人文交汇的万亿赛道
+        </h1>
+        <div class="w-[96px] h-[4px] bg-[#2563EB] mt-6"></div>
+      </div>
+
+      <!-- Points Grid -->
+      <div class="grid grid-cols-3 gap-6 relative z-10">
+        <!-- Point 1 -->
+        <div class="bg-white/5 border border-white/10 p-8 flex flex-col h-full">
+          <div class="flex items-center justify-between mb-6">
+            <div class="w-12 h-12 rounded-lg bg-[#2563EB]/20 flex items-center justify-center text-[#2563EB]">
+              <i class="ph ph-users text-3xl"></i>
+            </div>
+            <span class="text-[#2563EB] font-bold text-xl">*</span>
+          </div>
+          <h3 class="text-2xl font-bold mb-4 text-white">情感经济深化</h3>
+          <p class="text-[#FFFFFF]/60 leading-relaxed text-[16px]">
+            从简单的“拥有”产品，转化为对“家庭成员”般的情感依赖与陪伴需求，驱动高客单价的服务升级。
+          </p>
+        </div>
+
+        <!-- Point 2 -->
+        <div class="bg-white/5 border border-white/10 p-8 flex flex-col h-full">
+          <div class="flex items-center justify-between mb-6">
+            <div class="w-12 h-12 rounded-lg bg-[#2563EB]/20 flex items-center justify-center text-[#2563EB]">
+              <i class="ph ph-brain text-3xl"></i>
+            </div>
+            <span class="text-[#2563EB] font-bold text-xl">*</span>
+          </div>
+          <h3 class="text-2xl font-bold mb-4 text-white">AI+IoT重构</h3>
+          <p class="text-[#FFFFFF]/60 leading-relaxed text-[16px]">
+            通过全时空感知与智能分析，实现从“被动治疗”到“主动预防”的健康管理范式革命。
+          </p>
+        </div>
+
+        <!-- Point 3 -->
+        <div class="bg-white/5 border border-white/10 p-8 flex flex-col h-full">
+          <div class="flex items-center justify-between mb-6">
+            <div class="w-12 h-12 rounded-lg bg-[#2563EB]/20 flex items-center justify-center text-[#2563EB]">
+              <i class="ph ph-globe text-3xl"></i>
+            </div>
+            <span class="text-[#2563EB] font-bold text-xl">*</span>
+          </div>
+          <h3 class="text-2xl font-bold mb-4 text-white">可持续发展</h3>
+          <p class="text-[#FFFFFF]/60 leading-relaxed text-[16px]">
+            环保材料与循环经济将从企业的“可选项”转化为行业准入的“硬门槛”，定义新竞争标准。
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="absolute bottom-0 w-full h-[80px] px-[48px] flex items-center justify-between z-10">
+      <div class="flex items-center gap-3">
+        <i class="ph ph-circle text-[#2563EB] text-xl"></i>
+        <span class="text-[14px] text-[#FFFFFF]/40">© 2025 Strategic Intelligence Group. All Rights Reserved.</span>
+      </div>
+      
+      <!-- Checkerboard Decor -->
+      <div class="grid grid-cols-3 gap-1">
+        <div class="w-4 h-4 bg-[#2563EB]/20"></div>
+        <div class="w-4 h-4 bg-[#2563EB]/40"></div>
+        <div class="w-4 h-4 bg-[#2563EB]/20"></div>
+        <div class="w-4 h-4 bg-[#2563EB]/40"></div>
+        <div class="w-4 h-4 bg-[#2563EB]/20"></div>
+        <div class="w-4 h-4 bg-[#2563EB]/40"></div>
+      </div>
+    </footer>
+
+    <!-- Background Decorative Elements -->
+    <div class="absolute -bottom-20 -left-20 w-96 h-96 bg-[#2563EB]/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/4 -right-20 w-64 h-64 bg-[#1E40AF]/10 rounded-full blur-3xl pointer-events-none"></div>
+  </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    var chart_p3_1 = echarts.init(document.getElementById('chart_p3_1'));
+    chart_p3_1.setOption(Object.assign({
+      "animation": false,
+      "backgroundColor": "transparent",
+      "color": ["#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"],
+      "textStyle": { "color": "#cbd5e1", "fontFamily": "Noto Sans SC, system-ui, sans-serif" },
+      "title": { "textStyle": { "color": "#f1f5f9" }, "subtextStyle": { "color": "#94a3b8" } },
+      "legend": { "textStyle": { "color": "#cbd5e1" } },
+      "tooltip": { "trigger": "axis", "backgroundColor": "#1e293b", "borderColor": "#334155", "textStyle": { "color": "#f1f5f9" } },
+      "grid": { "top": 60, "right": 20, "bottom": 40, "left": 60, "containLabel": true },
+      "xAxis": { 
+        "axisLine": { "lineStyle": { "color": "#475569" } }, 
+        "axisTick": { "lineStyle": { "color": "#475569" } }, 
+        "axisLabel": { "color": "#94a3b8" }, 
+        "splitLine": { "show": false } 
+      },
+      "yAxis": { 
+        "axisLine": { "show": false }, 
+        "axisTick": { "show": false }, 
+        "axisLabel": { "color": "#94a3b8" }, 
+        "splitLine": { "lineStyle": { "color": "rgba(255,255,255,0.1)" } } 
+      }
+    }, {
+      title: { 
+        text: '2024-2025年全球宠物市场区域增长率对比', 
+        left: 'center', 
+        top: 2, 
+        textStyle: { color: '#f1f5f9', fontSize: 14, fontWeight: 700 } 
+      },
+      grid: { top: 50, right: 20, bottom: 30, left: 50, containLabel: true },
+      xAxis: { 
+        type: 'category', 
+        data: ["北美", "欧洲", "亚太", "拉美"] 
+      },
+      yAxis: { 
+        type: 'value', 
+        name: '增长率 (%)', 
+        nameTextStyle: { color: '#94a3b8', fontSize: 12 } 
+      },
+      series: [{
+        name: '同比增长率(%)',
+        type: 'bar',
+        barWidth: '40%',
+        data: [3.5, 4.1, 12.3, 9.8],
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#2E5C8A' },
+            { offset: 1, color: '#5B8DB8' }
+          ])
+        },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#FFFFFF',
+          formatter: '{c}%',
+          fontSize: 12
+        }
+      }]
+    }));
+  
+
+
+    var chart_p4_1 = echarts.init(document.getElementById('chart_p4_1'));
+    chart_p4_1.setOption(Object.assign({
+      "animation": false,
+      "backgroundColor": "transparent",
+      "color": ["#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"],
+      "textStyle": { "color": "#cbd5e1", "fontFamily": "Noto Sans SC, system-ui, sans-serif" },
+      "title": { "textStyle": { "color": "#f1f5f9" }, "subtextStyle": { "color": "#94a3b8" } },
+      "legend": { "textStyle": { "color": "#cbd5e1" } },
+      "tooltip": { "trigger": "axis", "backgroundColor": "#1e293b", "borderColor": "#334155", "textStyle": { "color": "#f1f5f9" } },
+      "grid": { "top": 60, "right": 20, "bottom": 40, "left": 60, "containLabel": true },
+      "xAxis": { 
+        "axisLine": { "lineStyle": { "color": "#475569" } }, 
+        "axisTick": { "lineStyle": { "color": "#475569" } }, 
+        "axisLabel": { "color": "#94a3b8", "fontSize": 10 }, 
+        "splitLine": { "show": false } 
+      },
+      "yAxis": { 
+        "axisLine": { "show": false }, 
+        "axisTick": { "show": false }, 
+        "axisLabel": { "color": "#94a3b8" }, 
+        "splitLine": { "lineStyle": { "color": "rgba(245, 245, 220, 0.1)" } } 
+      }
+    }, {
+      title: { 
+        text: '区域分化：核心指标趋势可视化', 
+        left: 'center', 
+        top: 2, 
+        textStyle: { color: '#f1f5f9', fontSize: 14, fontWeight: 'bold' } 
+      },
+      grid: { top: 50, right: 20, bottom: 40, left: 60, containLabel: true },
+      xAxis: { 
+        type: 'category', 
+        data: ['保险渗透', '昆虫蛋白', 'Z世代贡献', '医疗占比', '回收率要求'],
+        axisLabel: { interval: 0 }
+      },
+      yAxis: { type: 'value', name: '数值/百分比' },
+      series: [{
+        data: [4.5, 15, 58, 32, 70],
+        type: 'bar',
+        barWidth: '40%',
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#3B82F6' },
+            { offset: 1, color: '#1E40AF' }
+          ])
+        },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#F5F5DC',
+          formatter: '{c}%'
+        }
+      }]
+    }));
+  
+
+
+    var chart_p5_1 = echarts.init(document.getElementById('chart_p5_1'));
+    chart_p5_1.setOption(Object.assign({
+      "animation": false,
+      "backgroundColor": "transparent",
+      "color": ["#60a5fa", "#3b82f6", "#2563eb", "#1d4ed8"],
+      "textStyle": { "color": "#cbd5e1", "fontFamily": "Noto Sans SC, system-ui, sans-serif" },
+      "title": { "textStyle": { "color": "#f1f5f9" }, "subtextStyle": { "color": "#94a3b8" } },
+      "legend": { "show": false },
+      "tooltip": { "trigger": "axis", "backgroundColor": "#1e293b", "borderColor": "#334155", "textStyle": { "color": "#f1f5f9" } },
+      "grid": { "top": 60, "right": 20, "bottom": 40, "left": 60, "containLabel": true },
+      "xAxis": { 
+        "axisLine": { "lineStyle": { "color": "#475569" } }, 
+        "axisTick": { "lineStyle": { "color": "#475569" } }, 
+        "axisLabel": { "color": "#94a3b8", "fontSize": 11, "interval": 0, "rotate": 15 }, 
+        "splitLine": { "show": false } 
+      },
+      "yAxis": { 
+        "axisLine": { "show": false }, 
+        "axisTick": { "show": false }, 
+        "axisLabel": { "color": "#94a3b8" }, 
+        "splitLine": { "lineStyle": { "color": "rgba(245, 245, 220, 0.1)" } } 
+      }
+    }, {
+      title: { 
+        text: '核心数据可视化：食品科技关键指标', 
+        left: 'center', 
+        top: 2, 
+        textStyle: { color: '#f1f5f9', fontSize: 14, fontWeight: 'bold' } 
+      },
+      xAxis: { 
+        type: 'category', 
+        data: ['成本下降', '订阅渗透率', '零食增速', '可回收率', '24年规模', '25年规模', '非基础占比'] 
+      },
+      yAxis: { type: 'value' },
+      series: [{
+        data: [50, 12, 25, 70, 6.8, 15, 35],
+        type: 'bar',
+        barWidth: '40%',
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#3B82F6' },
+            { offset: 1, color: '#1E40AF' }
+          ])
+        },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#F5F5DC',
+          fontSize: 12
+        }
+      }]
+    }));
+  
+
+});
+</script>
+</body>
+</html>

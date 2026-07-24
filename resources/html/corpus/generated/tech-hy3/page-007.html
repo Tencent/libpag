@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>技术架构与差异化优势</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid -->
+    <div class="absolute left-[50%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-cpu text-[20px]"></i>
+      <span class="text-[14px]/[20px]">技术架构 · Ardot</span>
+    </div>
+
+    <!-- Page Title -->
+    <div class="absolute top-[60px] left-[80px] z-[10]">
+      <h1 class="text-[56px] font-[600] leading-[1.2] tracking-[-0.01em]">技术架构与差异化优势</h1>
+      <div class="w-[80px] h-[2px] bg-[#111111] mt-[12px]"></div>
+    </div>
+
+    <!-- Core Concept Banner -->
+    <div class="absolute top-[180px] left-[80px] right-[80px] z-[10]">
+      <div class="border-[1px] border-[#111111]/30 rounded-[8px] px-[28px] py-[18px]">
+        <p class="text-[16px]/[24px] leading-[1.6] text-center font-[500]">核心技术差异化：<span class="font-[600]">"资产化思维"</span>——不是"生成图片"，而是"生成资产"</p>
+        <p class="text-[13px]/[20px] leading-[1.6] text-[#111111]/60 text-center mt-[8px]">Ardot输出物是结构化设计资产，可编辑、可复用、可交付，天然适配团队级设计资产管理体系</p>
+      </div>
+    </div>
+
+    <!-- Left: 底层技术 -->
+    <div class="absolute top-[340px] left-[80px] w-[520px] z-[10]">
+      <h3 class="text-[18px] font-[600] mb-[16px] flex items-center gap-[10px]"><i class="ph ph-cpu text-[18px]"></i>底层技术</h3>
+      <div class="space-y-[12px]">
+        <div class="flex items-start gap-[10px]">
+          <i class="ph ph-arrow-up-right text-[16px] mt-[3px] shrink-0"></i>
+          <p class="text-[14px]/[22px] leading-[1.6]"><span class="font-[600]">腾讯混元大模型</span>：提供自然语言理解与生成能力</p>
+        </div>
+        <div class="flex items-start gap-[10px]">
+          <i class="ph ph-arrow-up-right text-[16px] mt-[3px] shrink-0"></i>
+          <p class="text-[14px]/[22px] leading-[1.6]"><span class="font-[600]">优图视觉算法</span>：支撑图像识别、分层与转换</p>
+        </div>
+        <div class="flex items-start gap-[10px]">
+          <i class="ph ph-arrow-up-right text-[16px] mt-[3px] shrink-0"></i>
+          <p class="text-[14px]/[22px] leading-[1.6]"><span class="font-[600]">WorkBuddy/CodeBuddy架构</span>：确保与开发工具链无缝衔接</p>
+        </div>
+        <div class="flex items-start gap-[10px]">
+          <i class="ph ph-arrow-up-right text-[16px] mt-[3px] shrink-0"></i>
+          <p class="text-[14px]/[22px] leading-[1.6]"><span class="font-[600]">MCP协议</span>：实现设计与代码的无缝连接</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: 核心差异化对比 -->
+    <div class="absolute top-[340px] left-[680px] w-[520px] z-[10]">
+      <h3 class="text-[18px] font-[600] mb-[16px] flex items-center gap-[10px]"><i class="ph ph-compare text-[18px]"></i>核心差异化优势</h3>
+      <div class="space-y-[14px]">
+        <div class="flex justify-between items-center border-b-[1px] border-[#111111]/15 pb-[10px]">
+          <span class="text-[14px]/[22px] w-[140px] text-[#111111]/60">输出类型</span>
+          <span class="text-[13px]/[20px] w-[150px] text-[#111111]/50]">静态图片</span>
+          <i class="ph ph-arrow-right text-[14px]"></i>
+          <span class="text-[13px]/[20px] w-[150px] font-[500]">可编辑结构化设计资产</span>
+        </div>
+        <div class="flex justify-between items-center border-b-[1px] border-[#111111]/15 pb-[10px]">
+          <span class="text-[14px]/[22px] w-[140px] text-[#111111]/60">图层结构</span>
+          <span class="text-[13px]/[20px] w-[150px] text-[#111111]/50]">无/扁平化</span>
+          <i class="ph ph-arrow-right text-[14px]"></i>
+          <span class="text-[13px]/[20px] w-[150px] font-[500]">完整图层与组件属性</span>
+        </div>
+        <div class="flex justify-between items-center border-b-[1px] border-[#111111]/15 pb-[10px]">
+          <span class="text-[14px]/[22px] w-[140px] text-[#111111]/60">团队协作</span>
+          <span class="text-[13px]/[20px] w-[150px] text-[#111111]/50]">有限</span>
+          <i class="ph ph-arrow-right text-[14px]"></i>
+          <span class="text-[13px]/[20px] w-[150px] font-[500]">企业级权限+追溯</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[14px]/[22px] w-[140px] text-[#111111]/60">开发交付</span>
+          <span class="text-[13px]/[20px] w-[150px] text-[#111111]/50]">手动标注切图</span>
+          <i class="ph ph-arrow-right text-[14px]"></i>
+          <span class="text-[13px]/[20px] w-[150px] font-[500]">MCP一键转代码</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom border -->
+    <div class="absolute bottom-[40px] left-[80px] right-[80px] h-[1px] bg-[#111111]/20 z-[10]"></div>
+  </div>
+</body>
+</html>

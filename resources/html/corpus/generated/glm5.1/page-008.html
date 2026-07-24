@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>新兴赛道</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide bg-[#F5F0E8]">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="star-decor text-[24px]">*</span>
+      <span class="text-[16px] font-[500] text-[#111827]">新兴赛道</span>
+    </div>
+    <span class="text-[14px] text-[#6B7280]">第 08 页</span>
+  </div>
+
+  <!-- 标题 -->
+  <div class="pt-[88px] px-[48px]">
+    <div class="flex items-end gap-[32px]">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#111827]" style="transform: skewX(-5deg);">
+          智能与跨界双轮驱动
+        </h1>
+      </div>
+      <div class="text-[16px] text-[#4B5563] pb-[8px]">数十家上市公司跨界入局</div>
+    </div>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="flex px-[48px] mt-[24px] gap-[32px]">
+    <!-- 图表 -->
+    <div class="flex-1">
+      <div id="chart-growth" style="width: 700px; height: 380px;"></div>
+    </div>
+    <!-- 要点 -->
+    <div class="w-[400px] flex flex-col justify-center gap-[16px]">
+      <div class="flex items-start gap-[12px] bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <i class="ph ph-lightning text-[#2563EB] text-[24px] mt-[2px]"></i>
+        <div>
+          <div class="text-[16px] font-[700] text-[#111827]">AI+宠物健康</div>
+          <div class="text-[13px] text-[#4B5563] mt-[4px] leading-[1.6]">智能穿戴+1560%，智能玩具+1470%，伴宠机器人+210%，最具爆发力赛道</div>
+        </div>
+      </div>
+      <div class="flex items-start gap-[12px] bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <i class="ph ph-shield-check text-[#2563EB] text-[24px] mt-[2px]"></i>
+        <div>
+          <div class="text-[16px] font-[700] text-[#111827]">宠物保险</div>
+          <div class="text-[13px] text-[#4B5563] mt-[4px] leading-[1.6]">保费增长51.3%，半年服务111万宠主，累计服务超711万宠主</div>
+        </div>
+      </div>
+      <div class="flex items-start gap-[12px] bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <i class="ph ph-buildings text-[#2563EB] text-[24px] mt-[2px]"></i>
+        <div>
+          <div class="text-[16px] font-[700] text-[#111827]">跨界入局</div>
+          <div class="text-[13px] text-[#4B5563] mt-[4px] leading-[1.6]">72个典型跨界品牌，横跨11个行业。双汇、三只松鼠、伊利等数十家上市公司加速入局</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#6B7280]">数据来源：天猫双11 / 众安在线中报 / 2025天猫宠物经济跨界观察</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+
+<script>
+  var chart = echarts.init(document.getElementById('chart-growth'));
+  chart.setOption({
+    animation: false,
+    grid: { left: 100, right: 60, top: 20, bottom: 30 },
+    xAxis: {
+      type: 'value',
+      axisLabel: { color: '#6B7280', fontSize: 12, formatter: '{value}%' },
+      splitLine: { lineStyle: { color: '#E5E7EB' } },
+      axisLine: { show: false }
+    },
+    yAxis: {
+      type: 'category',
+      data: ['宠物服饰', '宠物保险', '伴宠机器人', '智能玩具', '智能穿戴'],
+      axisLabel: { color: '#111827', fontSize: 14, fontWeight: 500 },
+      axisLine: { lineStyle: { color: '#D1D5DB' } }
+    },
+    series: [{
+      type: 'bar',
+      barWidth: 28,
+      data: [
+        { value: 42, itemStyle: { color: '#93C5FD' } },
+        { value: 51.3, itemStyle: { color: '#60A5FA' } },
+        { value: 210, itemStyle: { color: '#3B82F6' } },
+        { value: 1470, itemStyle: { color: '#2563EB' } },
+        { value: 1560, itemStyle: { color: '#1E40AF' } }
+      ],
+      label: {
+        show: true,
+        position: 'right',
+        color: '#111827',
+        fontSize: 13,
+        fontWeight: 600,
+        formatter: '{c}%'
+      }
+    }]
+  });
+</script>
+</body>
+</html>

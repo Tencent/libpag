@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>技术架构与差异化</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .geometric-ring {
+      border: 1px solid #111111;
+      border-radius: 50%;
+      position: absolute;
+    }
+    .grid-line {
+      position: absolute;
+      background: rgba(17,17,17,0.06);
+    }
+    .tech-card {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(17,17,17,0.2);
+      border-radius: 6px;
+      padding: 8px 16px;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- Grid lines -->
+    <div class="grid-line" style="top:0; left:640px; width:1px; height:720px;"></div>
+    <div class="grid-line" style="top:100px; left:0; width:1280px; height:1px;"></div>
+
+    <!-- Geometric ring decorations -->
+    <div class="geometric-ring" style="top:-50px; right:100px; width:140px; height:140px;"></div>
+    <div class="geometric-ring" style="bottom:50px; left:40px; width:80px; height:80px;"></div>
+
+    <!-- Header (zone-1) -->
+    <div style="position:absolute; top:30px; left:60px; width:1160px; height:60px;">
+      <p style="font-size:14px; font-weight:400; opacity:0.5; margin:0 0 4px 0;">07</p>
+      <h1 style="font-size:56px; font-weight:600; letter-spacing:-0.025em; margin:0; line-height:1.1;">技术架构与差异化</h1>
+    </div>
+
+    <!-- Tech architecture description (zone-2) -->
+    <div style="position:absolute; top:100px; left:60px; width:1160px; height:140px;">
+      <p style="font-size:20px; font-weight:500; opacity:0.6; margin:0 0 16px 0;">资产化思维 vs 图片化输出</p>
+      <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <div class="tech-card">
+          <i class="ph ph-cpu" style="font-size:20px;"></i>
+          <span style="font-size:16px; font-weight:400;">腾讯混元大模型</span>
+          <span style="font-size:14px; font-weight:400; opacity:0.5;">自然语言理解与生成</span>
+        </div>
+        <div class="tech-card">
+          <i class="ph ph-eye" style="font-size:20px;"></i>
+          <span style="font-size:16px; font-weight:400;">优图视觉算法</span>
+          <span style="font-size:14px; font-weight:400; opacity:0.5;">图像识别、分层与转换</span>
+        </div>
+        <div class="tech-card">
+          <i class="ph ph-link" style="font-size:20px;"></i>
+          <span style="font-size:16px; font-weight:400;">MCP协议</span>
+          <span style="font-size:14px; font-weight:400; opacity:0.5;">设计与代码无缝连接</span>
+        </div>
+        <div class="tech-card">
+          <i class="ph ph-cube" style="font-size:20px;"></i>
+          <span style="font-size:16px; font-weight:400;">WorkBuddy/CodeBuddy</span>
+          <span style="font-size:14px; font-weight:400; opacity:0.5;">开发工具链无缝衔接</span>
+        </div>
+      </div>
+      <div style="margin-top:14px; display:flex; align-items:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="margin-right:8px; flex-shrink:0;">
+          <path d="M7 7l10 10M17 7v10H7"/>
+        </svg>
+        <p style="font-size:16px; font-weight:500; margin:0;">核心差异化：资产化思维 — 不是生成图片，而是生成资产</p>
+      </div>
+    </div>
+
+    <!-- Chart area (zone-3) -->
+    <div style="position:absolute; top:260px; left:60px; width:1160px; height:380px;">
+      <div id="comparison-chart" style="width:1160px; height:380px;"></div>
+    </div>
+
+    <!-- Highlight bar (zone-4) -->
+    <div style="position:absolute; top:660px; left:60px; width:1160px; height:30px; display:flex; align-items:center; border-top:1px solid rgba(17,17,17,0.2); padding-top:4px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="margin-right:8px; flex-shrink:0;">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <p style="font-size:14px; font-weight:500; margin:0;">不是生成图片，而是生成资产</p>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute; bottom:16px; left:60px; right:60px; display:flex; justify-content:space-between;">
+      <p style="font-size:14px; font-weight:400; opacity:0.4; margin:0;">腾讯Ardot设计平台 - 分析与竞品分析报告</p>
+      <p style="font-size:14px; font-weight:400; opacity:0.4; margin:0;">07</p>
+    </div>
+  </div>
+
+  <script>
+    var chart = echarts.init(document.getElementById('comparison-chart'));
+    var option = {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        backgroundColor: '#111111',
+        borderColor: '#111111',
+        textStyle: { color: '#DFDDDA', fontFamily: 'Plus Jakarta Sans', fontSize: 13 }
+      },
+      legend: {
+        data: ['传统AI工具', 'Ardot'],
+        top: 10,
+        right: 40,
+        textStyle: { fontFamily: 'Plus Jakarta Sans', fontSize: 14, color: '#111111' },
+        itemWidth: 16,
+        itemHeight: 10,
+        itemGap: 24
+      },
+      grid: {
+        left: 80,
+        right: 40,
+        top: 50,
+        bottom: 50
+      },
+      xAxis: {
+        type: 'category',
+        data: ['输出类型\n(静态 vs 结构化)', '图层结构\n(扁平 vs 完整)', '团队协作\n(有限 vs 企业级)', '开发交付\n(手动 vs MCP)'],
+        axisLine: { lineStyle: { color: 'rgba(17,17,17,0.2)' } },
+        axisTick: { show: false },
+        axisLabel: {
+          fontFamily: 'Plus Jakarta Sans',
+          fontSize: 13,
+          color: '#111111',
+          interval: 0,
+          lineHeight: 18
+        }
+      },
+      yAxis: {
+        type: 'value',
+        max: 6,
+        min: 0,
+        splitNumber: 3,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { lineStyle: { color: 'rgba(17,17,17,0.08)', type: 'dashed' } },
+        axisLabel: {
+          fontFamily: 'Plus Jakarta Sans',
+          fontSize: 12,
+          color: 'rgba(17,17,17,0.5)'
+        }
+      },
+      series: [
+        {
+          name: '传统AI工具',
+          type: 'bar',
+          barWidth: 48,
+          barGap: '30%',
+          data: [1, 1, 2, 1],
+          itemStyle: {
+            color: '#E5E5E5',
+            borderRadius: [4, 4, 0, 0]
+          },
+          label: {
+            show: true,
+            position: 'top',
+            fontFamily: 'Plus Jakarta Sans',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#111111'
+          }
+        },
+        {
+          name: 'Ardot',
+          type: 'bar',
+          barWidth: 48,
+          data: [5, 5, 5, 5],
+          itemStyle: {
+            color: '#111111',
+            borderRadius: [4, 4, 0, 0]
+          },
+          label: {
+            show: true,
+            position: 'top',
+            fontFamily: 'Plus Jakarta Sans',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#111111'
+          }
+        }
+      ]
+    };
+    chart.setOption(option);
+  </script>
+</body>
+</html>

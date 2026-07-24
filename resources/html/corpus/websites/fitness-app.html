@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fitness App</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          'app-bg': '#000000',
+          'card-bg': '#1c1c1e',
+          'card-bg2': '#161618',
+          'accent-green': '#c6ff3d',
+          'accent-pink': '#ff2d6f',
+          'accent-cyan': '#00d4ff',
+          'accent-red': '#ff3b30',
+          'muted': '#8e8e93',
+        },
+        fontFamily: {
+          sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'Inter', 'system-ui', 'sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { background: #0a0a0a; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, system-ui, sans-serif; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .ecg-line { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: draw 3s ease-out infinite; }
+  @keyframes draw { 
+    0% { stroke-dashoffset: 1000; }
+    60% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: 0; opacity: 0.9; }
+  }
+  .pulse-dot { animation: pulseDot 1.2s ease-in-out infinite; }
+  @keyframes pulseDot {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+  .ring-spin { animation: ringDraw 1.6s ease-out forwards; }
+</style>
+</head>
+<body class="bg-[#0a0a0a] min-h-screen flex items-center justify-center py-6">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState } = React;
+
+// ============== Icons (inline SVG, lucide-style) ==============
+const Icon = ({ d, className = "w-4 h-4", stroke = "currentColor", fill = "none", strokeWidth = 2, viewBox = "0 0 24 24" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox={viewBox} fill={fill} stroke={stroke}
+       strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+    {d}
+  </svg>
+);
+
+const HeartIcon = (p) => <Icon className={p.className} stroke={p.stroke} fill={p.fill || "none"} d={
+  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+}/>;
+const FootprintIcon = (p) => <Icon className={p.className} stroke={p.stroke} d={<><path d="M4 16s-2-3-2-6c0-2 1-4 3-4s3 2 3 4-1 4-2 6"/><circle cx="6" cy="20" r="1.5"/><path d="M16 14s2-3 2-6c0-2-1-4-3-4s-3 2-3 4 1 4 2 6"/><circle cx="14" cy="18" r="1.5"/></>}/>;
+const MoonIcon = (p) => <Icon className={p.className} stroke={p.stroke} d={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>}/>;
+const ChartIcon = (p) => <Icon className={p.className} stroke={p.stroke} d={<><path d="M3 3v18h18"/><rect x="7" y="12" width="2.5" height="6"/><rect x="12" y="8" width="2.5" height="10"/><rect x="17" y="14" width="2.5" height="4"/></>}/>;
+const ActivityIcon = (p) => <Icon className={p.className} stroke={p.stroke} d={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>}/>;
+const HomeIcon = (p) => <Icon className={p.className} stroke={p.stroke} d={<><path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></>}/>;
+const UserIcon = (p) => <Icon className={p.className} stroke={p.stroke} d={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>}/>;
+const PlusIcon = (p) => <Icon className={p.className} stroke={p.stroke} strokeWidth={3} d={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}/>;
+const ChevronRight = (p) => <Icon className={p.className} stroke={p.stroke} d={<polyline points="9 18 15 12 9 6"/>}/>;
+
+// ============== Activity Rings (Apple-Watch style) ==============
+function ActivityRings() {
+  const cx = 110, cy = 110;
+  const rings = [
+    { r: 90, color: '#ff2d6f', pct: 0.62, bg: 'rgba(255,45,111,0.15)' }, // 活动 红
+    { r: 72, color: '#c6ff3d', pct: 0.66, bg: 'rgba(198,255,61,0.15)' }, // 锻炼 绿
+    { r: 54, color: '#00d4ff', pct: 0.83, bg: 'rgba(0,212,255,0.15)' },  // 站立 蓝
+  ];
+  return (
+    <div className="relative flex items-center justify-center">
+      <svg width="220" height="220" viewBox="0 0 220 220" className="-rotate-90">
+        {rings.map((ring, i) => {
+          const C = 2 * Math.PI * ring.r;
+          return (
+            <g key={i}>
+              <circle cx={cx} cy={cy} r={ring.r} fill="none" stroke={ring.bg} strokeWidth="14" />
+              <circle cx={cx} cy={cy} r={ring.r} fill="none" stroke={ring.color}
+                strokeWidth="14" strokeLinecap="round"
+                strokeDasharray={`${C * ring.pct} ${C}`}
+              />
+            </g>
+          );
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="text-[11px] tracking-[0.2em] text-white/60 font-medium">KCAL</div>
+        <div className="text-4xl font-bold text-white mt-1">487</div>
+        <div className="text-[11px] text-white/50 mt-1">目标 580</div>
+      </div>
+    </div>
+  );
+}
+
+// ============== ECG line (heart rate) ==============
+function EcgLine() {
+  // a stylized ECG path
+  const pts = "0,30 30,30 38,30 42,12 48,48 52,30 70,30 100,30 108,30 112,8 118,52 124,30 150,30 180,30 188,30 192,12 198,48 202,30 230,30 260,30 268,30 272,8 278,52 284,30 320,30";
+  return (
+    <svg viewBox="0 0 320 60" className="w-full h-16" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="ecg-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#ff3b30" stopOpacity="0.2"/>
+          <stop offset="50%" stopColor="#ff3b30" stopOpacity="1"/>
+          <stop offset="100%" stopColor="#ff3b30" stopOpacity="0.2"/>
+        </linearGradient>
+      </defs>
+      <polyline points={pts} fill="none" stroke="url(#ecg-grad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ecg-line"/>
+    </svg>
+  );
+}
+
+// ============== Step Bars ==============
+function StepBars() {
+  const data = [40, 65, 50, 80, 35, 90, 70];
+  return (
+    <div className="flex items-end gap-1 h-10">
+      {data.map((h, i) => (
+        <div key={i} className="flex-1 rounded-sm bg-accent-green/80" style={{ height: `${h}%`, minHeight: '6px' }} />
+      ))}
+    </div>
+  );
+}
+
+// ============== Sleep Bars ==============
+function SleepBars() {
+  const data = [
+    [50, '#1f6feb'],
+    [70, '#3b82f6'],
+    [85, '#60a5fa'],
+    [60, '#3b82f6'],
+    [40, '#1e40af'],
+    [55, '#3b82f6'],
+    [75, '#60a5fa'],
+  ];
+  return (
+    <div className="flex items-end gap-1 h-10">
+      {data.map(([h, c], i) => (
+        <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, background: c, minHeight: '6px' }} />
+      ))}
+    </div>
+  );
+}
+
+// ============== Run Route Card ==============
+function RouteSvg() {
+  return (
+    <svg viewBox="0 0 100 80" className="w-full h-full">
+      <path d="M20,60 C10,40 30,20 50,30 C70,38 80,55 65,65 C50,72 25,72 20,60 Z"
+            fill="none" stroke="#c6ff3d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="20" cy="60" r="2.5" fill="#c6ff3d"/>
+    </svg>
+  );
+}
+
+// ============== Recommendation Card ==============
+function RecCard({ tag, tagColor, time, title, sub, gradient }) {
+  return (
+    <div className="relative flex-1 min-w-[150px] rounded-2xl overflow-hidden h-56 cursor-pointer group">
+      <div className="absolute inset-0" style={{ background: gradient }}/>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"/>
+      <div className="absolute top-3 left-3 flex items-center gap-2">
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${tagColor}`}>{tag}</span>
+        <span className="text-[10px] text-white/90">· {time}</span>
+      </div>
+      <div className="absolute bottom-3 left-3 right-3">
+        <div className="text-white text-base font-bold">{title}</div>
+        <div className="text-white/70 text-[11px] mt-0.5">{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+// ============== Bottom Tab ==============
+function BottomTab() {
+  const [active, setActive] = useState(0);
+  const tabs = [
+    { icon: HomeIcon, label: '今日' },
+    { icon: ActivityIcon, label: '训练' },
+    { icon: null, label: '' },
+    { icon: ChartIcon, label: '数据' },
+    { icon: UserIcon, label: '我的' },
+  ];
+  return (
+    <div className="relative px-4 pt-3 pb-6 bg-black border-t border-white/5">
+      <div className="flex items-center justify-between">
+        {tabs.map((T, i) => {
+          if (i === 2) {
+            return (
+              <button key={i} className="w-12 h-12 rounded-full bg-accent-green flex items-center justify-center -mt-6 shadow-lg shadow-accent-green/30 active:scale-95 transition">
+                <PlusIcon className="w-6 h-6" stroke="#000"/>
+              </button>
+            );
+          }
+          const I = T.icon;
+          const isActive = active === i;
+          return (
+            <button key={i} onClick={() => setActive(i)} className="flex flex-col items-center gap-1 flex-1">
+              <I className="w-5 h-5" stroke={isActive ? '#c6ff3d' : '#6b6b70'}/>
+              <span className={`text-[10px] ${isActive ? 'text-accent-green' : 'text-white/40'}`}>{T.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============== Main App ==============
+function App() {
+  return (
+    <div className="w-[390px] rounded-[44px] overflow-hidden bg-black shadow-2xl shadow-black/60 border border-white/10 relative">
+      {/* Status bar */}
+      <div className="flex items-center justify-between px-7 pt-3 pb-1 text-white text-[13px] font-semibold">
+        <span>9:41</span>
+        <div className="flex items-center gap-1.5">
+          <div className="flex items-end gap-0.5">
+            <span className="w-1 h-1 rounded-full bg-white"/>
+            <span className="w-1 h-1.5 rounded-full bg-white"/>
+            <span className="w-1 h-2 rounded-full bg-white"/>
+            <span className="w-1 h-2.5 rounded-full bg-white"/>
+            <span className="w-1 h-3 rounded-full bg-white/40"/>
+          </div>
+          <span className="text-[11px]">WiFi</span>
+          <div className="ml-1 flex items-center gap-0.5">
+            <div className="w-6 h-2.5 border border-white/80 rounded-sm relative">
+              <div className="absolute inset-0.5 bg-white rounded-[1px]"/>
+            </div>
+            <span className="text-[11px]">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-h-[820px] overflow-y-auto scrollbar-hide pb-2">
+        {/* Top header */}
+        <div className="px-5 pt-3 flex items-center justify-between">
+          <div className="text-white/60 text-[13px]">星期三 · 5 月 13 日</div>
+          <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white text-xs font-semibold">JH</div>
+        </div>
+
+        <div className="px-5 mt-2">
+          <h1 className="text-white text-[28px] font-bold tracking-tight">早上好，Junzhi</h1>
+          <p className="text-white/50 text-[13px] mt-1">今天是连续运动的第 12 天</p>
+        </div>
+
+        {/* Activity rings card */}
+        <div className="mx-5 mt-5 rounded-3xl bg-card-bg p-5">
+          <div className="flex items-center gap-5 text-[12px]">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-accent-pink"/>
+              <span className="text-white/70">活动</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-accent-green"/>
+              <span className="text-white/70">锻炼</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-accent-cyan"/>
+              <span className="text-white/70">站立</span>
+            </div>
+          </div>
+          <div className="flex items-baseline gap-6 mt-2">
+            <div>
+              <span className="text-white text-2xl font-bold">487</span>
+              <span className="text-white/40 text-[12px] ml-1">/ 580</span>
+            </div>
+            <div>
+              <span className="text-white text-2xl font-bold">40</span>
+              <span className="text-white/40 text-[12px] ml-1">/ 60 分钟</span>
+            </div>
+            <div>
+              <span className="text-white text-2xl font-bold">10</span>
+              <span className="text-white/40 text-[12px] ml-1">/ 12 小时</span>
+            </div>
+          </div>
+
+          <div className="flex justify-center mt-3">
+            <ActivityRings/>
+          </div>
+        </div>
+
+        {/* Heart rate card */}
+        <div className="mx-5 mt-4 rounded-3xl bg-card-bg p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HeartIcon className="w-4 h-4" stroke="#ff3b30" fill="#ff3b30"/>
+              <span className="text-white text-sm font-medium">心率</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-red pulse-dot"/>
+              <span className="text-accent-red text-[11px] font-medium">实时</span>
+            </div>
+          </div>
+          <div className="flex items-baseline gap-1 mt-3">
+            <span className="text-white text-4xl font-bold">72</span>
+            <span className="text-white/50 text-xs ml-1">BPM</span>
+          </div>
+          <div className="mt-2">
+            <EcgLine/>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-white/40 mt-1">
+            <span>静息区间 · 60–80 bpm</span>
+            <span>日均 78</span>
+          </div>
+        </div>
+
+        {/* Two grid cards: sleep & steps */}
+        <div className="mx-5 mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-3xl bg-card-bg p-4">
+            <div className="flex items-center gap-2">
+              <MoonIcon className="w-4 h-4" stroke="#60a5fa"/>
+              <span className="text-white text-xs">昨晚睡眠</span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-white text-2xl font-bold">7</span>
+              <span className="text-white/50 text-[11px]">小时</span>
+              <span className="text-white text-2xl font-bold ml-1">32</span>
+              <span className="text-white/50 text-[11px]">分</span>
+            </div>
+            <div className="mt-3"><SleepBars/></div>
+            <div className="text-[10px] text-white/40 mt-2">深睡 32% · 优于昨日</div>
+          </div>
+
+          <div className="rounded-3xl bg-card-bg p-4">
+            <div className="flex items-center gap-2">
+              <FootprintIcon className="w-4 h-4" stroke="#c6ff3d"/>
+              <span className="text-white text-xs">今日步数</span>
+            </div>
+            <div className="mt-3">
+              <span className="text-white text-2xl font-bold">8,432</span>
+            </div>
+            <div className="mt-3"><StepBars/></div>
+            <div className="text-[10px] text-white/40 mt-2">目标 10,000 · 完成 84%</div>
+          </div>
+        </div>
+
+        {/* Run card */}
+        <div className="mx-5 mt-4 rounded-3xl bg-card-bg p-4">
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-2xl bg-black/40 flex items-center justify-center p-2">
+              <RouteSvg/>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-white text-sm font-semibold">晨跑</span>
+                <span className="text-white/40 text-[11px]">今早 06:42</span>
+              </div>
+              <div className="flex items-baseline gap-5 mt-3">
+                <div>
+                  <div className="text-white text-lg font-bold">5.6</div>
+                  <div className="text-white/40 text-[10px]">公里</div>
+                </div>
+                <div>
+                  <div className="text-white text-lg font-bold">5'42"</div>
+                  <div className="text-white/40 text-[10px]">配速</div>
+                </div>
+                <div>
+                  <div className="text-white text-lg font-bold">32:14</div>
+                  <div className="text-white/40 text-[10px]">用时</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recommendations */}
+        <div className="px-5 mt-6 flex items-center justify-between">
+          <h2 className="text-white text-base font-bold">今日推荐</h2>
+          <button className="text-accent-green text-[12px] font-medium flex items-center gap-0.5">
+            全部 <ChevronRight className="w-3.5 h-3.5" stroke="#c6ff3d"/>
+          </button>
+        </div>
+
+        <div className="px-5 mt-3 flex gap-3 pb-6">
+          <RecCard
+            tag="中级 · 30 分钟"
+            tagColor="bg-accent-green text-black"
+            time=""
+            title="5K 燃脂跑"
+            sub="约消耗 380 千卡"
+            gradient="linear-gradient(135deg,#1f2937 0%,#3b3f5c 50%,#a16207 100%)"
+          />
+          <RecCard
+            tag="初级 · 15 分钟"
+            tagColor="bg-white/90 text-black"
+            time=""
+            title="晨间瑜伽"
+            sub="舒展拉伸 · 入门"
+            gradient="linear-gradient(135deg,#3f5d4a 0%,#6b8e6b 50%,#cbd5b5 100%)"
+          />
+        </div>
+      </div>
+
+      <BottomTab/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

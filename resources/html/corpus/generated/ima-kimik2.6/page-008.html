@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 8 - 第 5 层：主动行为层</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+.slide { width: 1280px; height: 720px; overflow: hidden; position: relative; background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%); }
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- 页眉 -->
+  <div class="absolute top-[32px] right-[48px] z-50">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[48px] left-[64px] z-20">
+    <div class="flex items-center gap-[12px]">
+      <span class="text-[14px] font-[400] text-[#82D0A4]">第 5 层</span>
+      <h1 class="text-[36px] font-[400] text-[#FFFFFF] tracking-[0.02em]">主动行为层</h1>
+    </div>
+    <p class="text-[16px] font-[300] text-[#FFFFFF]/60 mt-[8px] tracking-[0.05em]">Heartbeat / Cron · 它会主动做什么</p>
+  </div>
+
+  <!-- 引言 -->
+  <div class="absolute top-[140px] left-[64px] right-[64px] z-20">
+    <p class="text-[14px] font-[400] text-[#FFFFFF]/70 leading-[1.8]">让 AI 从被动响应变为主动出击。这才是养成系的终极形态：AI 不再是你问它答，而是它替你盯着世界，有事主动来找你。</p>
+  </div>
+
+  <!-- 时间轴 -->
+  <div class="absolute top-[210px] left-[64px] right-[64px] z-20">
+    <!-- 轴线 -->
+    <div class="absolute top-[40px] left-[0px] right-[0px] h-[1px] bg-[#FFFFFF]/10"></div>
+
+    <div class="flex items-start justify-between relative">
+      <!-- 每30分钟 -->
+      <div class="w-[220px] text-center">
+        <div class="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[1px] border-dashed border-[#FFFFFF]/20 mx-auto mb-[16px] bg-[#051014]">
+          <i class="ph ph-clock text-[28px] text-[#82D0A4]"></i>
+        </div>
+        <div class="text-[14px] font-[400] text-[#82D0A4] mb-[8px]">每 30 分钟</div>
+        <div class="mx-[8px] p-[12px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70">检查紧急邮件/消息</p>
+        </div>
+      </div>
+
+      <!-- 每天8:00 -->
+      <div class="w-[220px] text-center">
+        <div class="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[1px] border-dashed border-[#FFFFFF]/20 mx-auto mb-[16px] bg-[#051014]">
+          <i class="ph ph-bell text-[28px] text-[#82D0A4]"></i>
+        </div>
+        <div class="text-[14px] font-[400] text-[#82D0A4] mb-[8px]">每天早上 8:00</div>
+        <div class="mx-[8px] p-[12px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70">推送今日待办和日程提醒</p>
+        </div>
+      </div>
+
+      <!-- 每天21:00 -->
+      <div class="w-[220px] text-center">
+        <div class="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[1px] border-dashed border-[#FFFFFF]/20 mx-auto mb-[16px] bg-[#051014]">
+          <i class="ph ph-newspaper text-[28px] text-[#82D0A4]"></i>
+        </div>
+        <div class="text-[14px] font-[400] text-[#82D0A4] mb-[8px]">每天晚上 21:00</div>
+        <div class="mx-[8px] p-[12px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70">采集今日 AI 热点，推送摘要</p>
+        </div>
+      </div>
+
+      <!-- 每周一 -->
+      <div class="w-[220px] text-center">
+        <div class="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[1px] border-dashed border-[#FFFFFF]/20 mx-auto mb-[16px] bg-[#051014]">
+          <i class="ph ph-chart-bar text-[28px] text-[#82D0A4]"></i>
+        </div>
+        <div class="text-[14px] font-[400] text-[#82D0A4] mb-[8px]">每周一 9:00</div>
+        <div class="mx-[8px] p-[12px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70">生成上周工作周报</p>
+        </div>
+      </div>
+
+      <!-- 持续运行 -->
+      <div class="w-[220px] text-center">
+        <div class="flex items-center justify-center w-[80px] h-[80px] rounded-full border-[1px] border-dashed border-[#FFFFFF]/20 mx-auto mb-[16px] bg-[#051014]">
+          <i class="ph ph-eye text-[28px] text-[#82D0A4]"></i>
+        </div>
+        <div class="text-[14px] font-[400] text-[#82D0A4] mb-[8px]">持续运行</div>
+        <div class="mx-[8px] p-[12px] border-[1px] border-dashed border-[#FFFFFF]/15 rounded-[8px]">
+          <p class="text-[13px] font-[400] text-[#FFFFFF]/70">监控特定话题/论文/竞品动态</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部高亮 -->
+  <div class="absolute top-[520px] left-[64px] right-[64px] z-20">
+    <div class="p-[24px] border-[1px] border-[#82D0A4]/30 rounded-[12px] text-center" style="background: rgba(130,208,164,0.05);">
+      <p class="text-[18px] font-[300] text-[#FFFFFF] tracking-[0.02em]">终极形态：AI 替你盯着世界，有事主动来找你</p>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">主动</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720, initial-scale=1.0">
+<title>核心功能：专业设计与企业级协作</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .geo-circle {
+    border: 1px solid #111111;
+    border-radius: 50%;
+  }
+  .bullet-arrow {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+  .feature-block {
+    padding: 14px 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(17,17,17,0.08);
+  }
+</style>
+</head>
+<body class="bg-noise">
+<div class="relative w-[1280px] h-[720px] overflow-hidden">
+
+  <!-- Decorative elements -->
+  <div class="absolute geo-circle" style="top: -80px; left: 1100px; width: 240px; height: 240px; opacity: 0.1;"></div>
+
+  <!-- Hairline Grid Lines -->
+  <div class="absolute" style="top: 110px; left: 48px; width: 1184px; height: 1px; background: rgba(17,17,17,0.15);"></div>
+
+  <!-- Header Zone -->
+  <div class="absolute" style="top: 40px; left: 48px; width: 1184px; height: 60px;">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="ph-duotone ph-vector-three" style="font-size: 28px; color: #111111;"></i>
+        <h1 class="font-semibold" style="font-size: 56px; letter-spacing: -0.01em; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif;">核心功能：专业设计与企业级协作</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-[2px]" style="background: #111111; opacity: 0.3;"></div>
+        <span style="font-size: 12px; color: #111111; opacity: 0.4;">05</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Body Zone -->
+  <div class="absolute" style="top: 130px; left: 48px; width: 560px; height: 520px;">
+    <div class="flex flex-col gap-4 h-full">
+      <!-- Section label -->
+      <div class="flex items-center gap-2 pb-1" style="border-bottom: 2px solid #111111; width: fit-content;">
+        <i class="ph ph-vector-three" style="font-size: 16px; color: #111111;"></i>
+        <span class="font-semibold" style="font-size: 13px; color: #111111; letter-spacing: 0.05em; text-transform: uppercase;">Professional Design</span>
+      </div>
+
+      <!-- 矢量编辑特性 -->
+      <div class="feature-block" style="background: rgba(17,17,17,0.04);">
+        <div class="flex items-center gap-2 mb-2">
+          <div style="width: 28px; height: 28px; background: rgba(17,17,17,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-vector-three" style="font-size: 15px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 15px; color: #111111;">矢量编辑特性</span>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">W3C标准的斜切、3D旋转</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">增强形状工具</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 动态布局系统 -->
+      <div class="feature-block" style="background: rgba(17,17,17,0.04);">
+        <div class="flex items-center gap-2 mb-2">
+          <div style="width: 28px; height: 28px; background: rgba(17,17,17,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-grid-four" style="font-size: 15px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 15px; color: #111111;">动态布局系统</span>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">Grid布局、百分比定位</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">真实比例锁定</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 设计系统 -->
+      <div class="feature-block" style="background: rgba(17,17,17,0.04);">
+        <div class="flex items-center gap-2 mb-2">
+          <div style="width: 28px; height: 28px; background: rgba(17,17,17,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-puzzle-piece" style="font-size: 15px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 15px; color: #111111;">设计系统</span>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">组件、颜色、文本样式全局同步</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">自由组合，一键复用</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 变量系统 -->
+      <div class="feature-block" style="background: rgba(17,17,17,0.04);">
+        <div class="flex items-center gap-2 mb-2">
+          <div style="width: 28px; height: 28px; background: rgba(17,17,17,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-swap" style="font-size: 15px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 15px; color: #111111;">变量系统</span>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">颜色、数值、字符串等设计令牌</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">支持多主题自动切换</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="absolute" style="top: 130px; left: 624px; width: 1px; height: 520px; background: rgba(17,17,17,0.2);"></div>
+
+  <!-- Right Body Zone -->
+  <div class="absolute" style="top: 130px; left: 648px; width: 584px; height: 520px;">
+    <div class="flex flex-col gap-4 h-full">
+      <!-- Section label -->
+      <div class="flex items-center gap-2 pb-1" style="border-bottom: 2px solid #111111; width: fit-content;">
+        <i class="ph ph-shield-check" style="font-size: 16px; color: #111111;"></i>
+        <span class="font-semibold" style="font-size: 13px; color: #111111; letter-spacing: 0.05em; text-transform: uppercase;">Enterprise Collaboration</span>
+      </div>
+
+      <!-- 智能权限中心 -->
+      <div class="feature-block" style="background: rgba(17,17,17,0.04);">
+        <div class="flex items-center gap-2 mb-2">
+          <div style="width: 28px; height: 28px; background: rgba(17,17,17,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-shield-check" style="font-size: 15px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 15px; color: #111111;">智能权限中心</span>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">超管精细分配权限</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">关键资源更安全</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 行为追溯与协同 -->
+      <div class="feature-block" style="background: rgba(17,17,17,0.04);">
+        <div class="flex items-center gap-2 mb-2">
+          <div style="width: 28px; height: 28px; background: rgba(17,17,17,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-eye" style="font-size: 15px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 15px; color: #111111;">行为追溯与协同</span>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">操作日志全记录</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 1px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.75; line-height: 1.5;">多人在线实时评论、标注反馈和版本比对</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collaboration flow visual -->
+      <div style="margin-top: 12px;">
+        <div style="background: rgba(17,17,17,0.04); border: 1px solid rgba(17,17,17,0.08); border-radius: 6px; padding: 20px;">
+          <div class="flex items-center justify-between" style="gap: 8px;">
+            <div style="text-align: center; flex: 1;">
+              <div style="width: 44px; height: 44px; background: rgba(17,17,17,0.08); border-radius: 50%; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center;">
+                <i class="ph ph-pencil-simple-line" style="font-size: 20px; color: #111111;"></i>
+              </div>
+              <span style="font-size: 11px; color: #111111; opacity: 0.6;">设计</span>
+            </div>
+            <div style="flex: 0 0 24px; text-align: center;">
+              <i class="ph ph-arrow-right" style="font-size: 14px; color: #111111; opacity: 0.3;"></i>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="width: 44px; height: 44px; background: rgba(17,17,17,0.08); border-radius: 50%; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center;">
+                <i class="ph ph-chat-text" style="font-size: 20px; color: #111111;"></i>
+              </div>
+              <span style="font-size: 11px; color: #111111; opacity: 0.6;">评论</span>
+            </div>
+            <div style="flex: 0 0 24px; text-align: center;">
+              <i class="ph ph-arrow-right" style="font-size: 14px; color: #111111; opacity: 0.3;"></i>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="width: 44px; height: 44px; background: rgba(17,17,17,0.08); border-radius: 50%; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center;">
+                <i class="ph ph-git-branch" style="font-size: 20px; color: #111111;"></i>
+              </div>
+              <span style="font-size: 11px; color: #111111; opacity: 0.6;">版本</span>
+            </div>
+            <div style="flex: 0 0 24px; text-align: center;">
+              <i class="ph ph-arrow-right" style="font-size: 14px; color: #111111; opacity: 0.3;"></i>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="width: 44px; height: 44px; background: rgba(17,17,17,0.08); border-radius: 50%; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center;">
+                <i class="ph ph-export" style="font-size: 20px; color: #111111;"></i>
+              </div>
+              <span style="font-size: 11px; color: #111111; opacity: 0.6;">交付</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key insight -->
+      <div style="background: rgba(17,17,17,0.06); padding: 14px 18px; border-left: 2px solid #111111; border-radius: 0 4px 4px 0; margin-top: 8px;">
+        <p style="font-size: 13px; line-height: 1.6; color: #111111; opacity: 0.8;">
+          Ardot在专业设计能力与企业级协作层面形成了完整闭环，从矢量编辑到权限管理，覆盖设计团队的全部工作场景。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page Number -->
+  <div class="absolute" style="bottom: 20px; right: 48px;">
+    <span style="color: #111111; opacity: 0.4; font-size: 12px;">05</span>
+  </div>
+
+</div>
+</body>
+</html>

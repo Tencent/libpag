@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>第5层：主动行为 — 它会主动做什么</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+*, *::before, *::after { animation: none !important; transition: none !important; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body>
+<div class="slide" style="width:1280px;height:720px;overflow:hidden;position:relative;background:linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);">
+  <!-- Watermark -->
+  <div class="absolute z-0 text-[350px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="left:50%;top:55%;transform:translate(-50%,-50%);">PULSE</div>
+  <!-- Header -->
+  <div class="absolute z-20" style="top:40px;left:120px;width:1040px;">
+    <div class="text-[14px] font-[300] text-[#FFFFFF]/40 tracking-[0.15em] uppercase mb-[8px]">Layer 5: Heartbeat / Cron</div>
+    <h2 class="text-[36px] font-[300] text-[#FFFFFF] leading-tight">第5层：主动行为 — 它会主动做什么</h2>
+    <div class="w-[48px] h-[1px] bg-[#FFFFFF]/20 mt-[16px]"></div>
+  </div>
+  <!-- Timeline Items -->
+  <!-- Item 1 -->
+  <div class="absolute z-20 flex items-center" style="top:160px;left:200px;width:880px;height:56px;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div class="flex items-center justify-center w-[80px] flex-shrink-0">
+      <i class="ph ph-envelope-simple text-[20px] text-[#82D0A4]"></i>
+    </div>
+    <div class="text-[15px] font-[400] text-[#FFFFFF]/80 w-[160px] flex-shrink-0">每 30 分钟</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">检查紧急邮件和消息</div>
+  </div>
+  <!-- Item 2 -->
+  <div class="absolute z-20 flex items-center" style="top:220px;left:200px;width:880px;height:56px;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div class="flex items-center justify-center w-[80px] flex-shrink-0">
+      <i class="ph ph-calendar-check text-[20px] text-[#82D0A4]"></i>
+    </div>
+    <div class="text-[15px] font-[400] text-[#FFFFFF]/80 w-[160px] flex-shrink-0">每天 08:00</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">推送今日待办和日程提醒</div>
+  </div>
+  <!-- Item 3 -->
+  <div class="absolute z-20 flex items-center" style="top:280px;left:200px;width:880px;height:56px;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div class="flex items-center justify-center w-[80px] flex-shrink-0">
+      <i class="ph ph-newspaper text-[20px] text-[#82D0A4]"></i>
+    </div>
+    <div class="text-[15px] font-[400] text-[#FFFFFF]/80 w-[160px] flex-shrink-0">每天 21:00</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">采集今日 AI 热点，推送摘要</div>
+  </div>
+  <!-- Item 4 -->
+  <div class="absolute z-20 flex items-center" style="top:340px;left:200px;width:880px;height:56px;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <div class="flex items-center justify-center w-[80px] flex-shrink-0">
+      <i class="ph ph-chart-bar text-[20px] text-[#82D0A4]"></i>
+    </div>
+    <div class="text-[15px] font-[400] text-[#FFFFFF]/80 w-[160px] flex-shrink-0">每周一 09:00</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">生成上周工作周报</div>
+  </div>
+  <!-- Item 5 -->
+  <div class="absolute z-20 flex items-center" style="top:400px;left:200px;width:880px;height:56px;">
+    <div class="flex items-center justify-center w-[80px] flex-shrink-0">
+      <i class="ph ph-eye text-[20px] text-[#82D0A4]"></i>
+    </div>
+    <div class="text-[15px] font-[400] text-[#FFFFFF]/80 w-[160px] flex-shrink-0">持续运行</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">监控特定话题、论文、竞品动态</div>
+  </div>
+  <!-- Vertical dashed line -->
+  <div class="absolute z-10" style="left:240px;top:180px;width:0;height:280px;border-left:1px dashed rgba(255,255,255,0.1);"></div>
+  <!-- Conclusion -->
+  <div class="absolute z-20" style="top:510px;left:200px;width:880px;">
+    <div class="border-l-[2px] border-[#82D0A4]/50 pl-[20px]">
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/30 tracking-[0.08em] uppercase mb-[6px]">Ultimate Form</div>
+      <p class="text-[16px] font-[300] text-[#FFFFFF]/60 leading-[1.6]">AI 不再是你问它答，而是<span class="text-[#82D0A4]">替你盯着世界</span>，有事主动来找你。</p>
+    </div>
+  </div>
+  <!-- Footer -->
+  <div class="absolute z-50 flex flex-col items-center justify-center" style="bottom:48px;left:0;right:0;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/70">ima</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/30 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

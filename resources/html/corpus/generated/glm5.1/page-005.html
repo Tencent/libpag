@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>消费结构</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .gradient-dark { background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%); }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide gradient-dark">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+      <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">消费结构</span>
+    </div>
+    <div class="flex items-center gap-[24px]">
+      <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35">中国宠物经济趋势洞察</span>
+      <span class="text-[13px] font-[600] text-[#FFFFFF]/50">05</span>
+    </div>
+  </div>
+
+  <!-- 标题 -->
+  <div class="pt-[88px] px-[48px]">
+    <div class="flex items-end gap-[32px]">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          食品为王，医疗承压
+        </h1>
+      </div>
+      <div class="text-[16px] text-[#F5F5DC]/50 pb-[8px]">食品占比53.7%稳居半壁江山</div>
+    </div>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="flex px-[48px] mt-[24px] gap-[40px]">
+    <!-- 饼图 -->
+    <div class="flex-1">
+      <div id="chart-structure" style="width: 560px; height: 400px;"></div>
+    </div>
+    <!-- 卡片 -->
+    <div class="w-[500px] flex flex-col justify-center gap-[16px]">
+      <div class="flex items-center gap-[16px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] p-[16px]">
+        <i class="ph ph-bowl-food text-[#2563EB] text-[28px]"></i>
+        <div class="flex-1">
+          <div class="text-[16px] font-[700] text-[#F5F5DC]">食品 53.7%</div>
+          <div class="text-[13px] text-[#F5F5DC]/50">主粮、零食、营养品小幅上升</div>
+        </div>
+        <div class="text-[32px] font-[700] text-[#2563EB]">53.7</div>
+      </div>
+      <div class="flex items-center gap-[16px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] p-[16px]">
+        <i class="ph ph-heartbeat text-[#1E40AF] text-[28px]"></i>
+        <div class="flex-1">
+          <div class="text-[16px] font-[700] text-[#F5F5DC]">医疗 27.6%</div>
+          <div class="text-[13px] text-[#F5F5DC]/50">体检上升，药品诊疗下降</div>
+        </div>
+        <div class="text-[32px] font-[700] text-[#1E40AF]">27.6</div>
+      </div>
+      <div class="flex items-center gap-[16px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] p-[16px]">
+        <i class="ph ph-package text-[#3B82F6] text-[28px]"></i>
+        <div class="flex-1">
+          <div class="text-[16px] font-[700] text-[#F5F5DC]">用品 12.2%</div>
+          <div class="text-[13px] text-[#F5F5DC]/50">智能用品爆发式增长</div>
+        </div>
+        <div class="text-[32px] font-[700] text-[#3B82F6]">12.2</div>
+      </div>
+      <div class="flex items-center gap-[16px] bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] p-[16px]">
+        <i class="ph ph-hand-heart text-[#60A5FA] text-[28px]"></i>
+        <div class="flex-1">
+          <div class="text-[16px] font-[700] text-[#F5F5DC]">服务 6.5%</div>
+          <div class="text-[13px] text-[#F5F5DC]/50">洗美为主，寄养出现分流</div>
+        </div>
+        <div class="text-[32px] font-[700] text-[#60A5FA]">6.5</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#F5F5DC]/30">数据来源：2026年中国宠物行业白皮书</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+
+<script>
+  var chart = echarts.init(document.getElementById('chart-structure'));
+  chart.setOption({
+    animation: false,
+    series: [{
+      type: 'pie',
+      radius: ['45%', '72%'],
+      center: ['50%', '50%'],
+      data: [
+        { value: 53.7, name: '食品', itemStyle: { color: '#2563EB' } },
+        { value: 27.6, name: '医疗', itemStyle: { color: '#1E40AF' } },
+        { value: 12.2, name: '用品', itemStyle: { color: '#3B82F6' } },
+        { value: 6.5, name: '服务', itemStyle: { color: '#60A5FA' } }
+      ],
+      label: {
+        color: '#F5F5DC',
+        fontSize: 14,
+        formatter: '{b}\n{d}%'
+      },
+      labelLine: { lineStyle: { color: 'rgba(245,245,220,0.3)' } },
+      emphasis: { disabled: true }
+    }]
+  });
+</script>
+</body>
+</html>
