@@ -81,8 +81,8 @@
           "yuv"
         ],
         "arguments": [
-          "-DCMAKE_C_FLAGS=\"-w -march=armv8-a\"",
-          "-DCMAKE_CXX_FLAGS=\"-w -march=armv8-a\""
+          "-DCMAKE_C_FLAGS=\"-w\"",
+          "-DCMAKE_CXX_FLAGS=\"-w\""
         ],
         "platforms": [
           "android"

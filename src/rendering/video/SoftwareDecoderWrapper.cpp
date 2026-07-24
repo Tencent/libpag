@@ -24,7 +24,6 @@
 #include <atomic>
 #include "base/utils/Log.h"
 #include "libyuv/convert_argb.h"
-#include "tgfx/core/ColorSpace.h"
 #include "tgfx/platform/HardwareBuffer.h"
 #endif
 
@@ -70,6 +69,11 @@ static std::shared_ptr<tgfx::ImageBuffer> MakeHardwareBufferFrame(const YUVBuffe
   if (!tgfx::HardwareBufferAvailable()) {
     return nullptr;
   }
+  for (int i = 0; i < I420_PLANE_COUNT; i++) {
+    if (frame->data[i] == nullptr || frame->lineSize[i] <= 0) {
+      return nullptr;
+    }
+  }
   auto hardwareBuffer = tgfx::HardwareBufferAllocate(videoFormat.width, videoFormat.height, false);
   if (hardwareBuffer == nullptr) {
     return nullptr;
@@ -89,7 +93,7 @@ static std::shared_ptr<tgfx::ImageBuffer> MakeHardwareBufferFrame(const YUVBuffe
     tgfx::HardwareBufferRelease(hardwareBuffer);
     return nullptr;
   }
-  auto imageBuffer = tgfx::ImageBuffer::MakeFrom(hardwareBuffer, tgfx::ColorSpace::SRGB());
+  auto imageBuffer = tgfx::ImageBuffer::MakeFrom(hardwareBuffer);
   tgfx::HardwareBufferRelease(hardwareBuffer);
   return imageBuffer;
 }
