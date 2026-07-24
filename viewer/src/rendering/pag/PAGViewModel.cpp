@@ -264,6 +264,8 @@ bool PAGViewModel::loadFile(const QString& filePath) {
 
   reportPAGFileInfo(pagFile, byteData->length());
 
+  resetView();
+
   return true;
 }
 

@@ -99,7 +99,7 @@ IContentRenderer::RenderMetrics PAGXRenderer::flush() {
   metrics.currentFrame = computeProfileFrame(state);
 
   if (state.contentWidth > 0 && state.contentHeight > 0) {
-    applyFitTransform(state, tgfxSurface->width(), tgfxSurface->height());
+    applyDisplayTransform(state, tgfxSurface->width(), tgfxSurface->height());
   }
 
   auto renderStart = tgfx::Clock::Now();
@@ -237,17 +237,26 @@ int64_t PAGXRenderer::computeProfileFrame(const PAGXViewModel::RenderState& stat
   return frame;
 }
 
-void PAGXRenderer::applyFitTransform(PAGXViewModel::RenderState& state, int surfaceWidth,
-                                     int surfaceHeight) {
+void PAGXRenderer::applyDisplayTransform(PAGXViewModel::RenderState& state, int surfaceWidth,
+                                         int surfaceHeight) {
   float scaleX = static_cast<float>(surfaceWidth) / static_cast<float>(state.contentWidth);
   float scaleY = static_cast<float>(surfaceHeight) / static_cast<float>(state.contentHeight);
-  float scale = std::min(scaleX, scaleY);
-  float offsetX =
-      (static_cast<float>(surfaceWidth) - static_cast<float>(state.contentWidth) * scale) * 0.5f;
-  float offsetY =
-      (static_cast<float>(surfaceHeight) - static_cast<float>(state.contentHeight) * scale) * 0.5f;
-  state.scene->getDisplayOptions()->setZoomScale(scale);
-  state.scene->getDisplayOptions()->setContentOffset(offsetX, offsetY);
+  float contentScale = std::min(scaleX, scaleY);
+  float contentOffsetX =
+      (static_cast<float>(surfaceWidth) - static_cast<float>(state.contentWidth) * contentScale) *
+      0.5f;
+  float contentOffsetY =
+      (static_cast<float>(surfaceHeight) - static_cast<float>(state.contentHeight) * contentScale) *
+      0.5f;
+
+  // Combine fit-to-screen transform with user zoom/pan from gesture interaction.
+  float finalScale = contentScale * static_cast<float>(state.viewTransform.zoomScale);
+  float finalOffsetX = contentOffsetX * static_cast<float>(state.viewTransform.zoomScale) +
+                       static_cast<float>(state.viewTransform.offsetX);
+  float finalOffsetY = contentOffsetY * static_cast<float>(state.viewTransform.zoomScale) +
+                       static_cast<float>(state.viewTransform.offsetY);
+  state.scene->getDisplayOptions()->setZoomScale(finalScale);
+  state.scene->getDisplayOptions()->setContentOffset(finalOffsetX, finalOffsetY);
 }
 
 }  // namespace pag

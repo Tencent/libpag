@@ -52,6 +52,9 @@ class ContentView : public QQuickItem {
   /// itemChange(ItemSceneChange) when the item loses its window, but those fire too
   /// late for a Loader component switch where RenderThread needs the window context.
   Q_INVOKABLE void prepareForRemoval();
+  Q_INVOKABLE void zoomAt(double factor, double x, double y);
+  Q_INVOKABLE void panBy(double deltaX, double deltaY);
+  Q_INVOKABLE void resetView();
 
   /**
    * Updates the QSG texture node with the current drawable's texture.

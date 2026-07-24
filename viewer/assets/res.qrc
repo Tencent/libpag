@@ -29,6 +29,7 @@
         <!-- svg -->
         <file>images/close-dark.svg</file>
         <file>images/restore-dark.svg</file>
+        <file>images/reset-view.svg</file>
         <file>images/maximize-dark.svg</file>
         <file>images/minimize-dark.svg</file>
 

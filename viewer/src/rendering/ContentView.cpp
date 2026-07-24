@@ -67,6 +67,20 @@ void ContentView::prepareForRemoval() {
   releaseDrawable();
 }
 
+void ContentView::zoomAt(double factor, double x, double y) {
+  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
+  getViewModel()->zoomAt(factor, x * pixelRatio, y * pixelRatio);
+}
+
+void ContentView::panBy(double deltaX, double deltaY) {
+  auto pixelRatio = window() == nullptr ? 1.0 : window()->devicePixelRatio();
+  getViewModel()->panBy(deltaX * pixelRatio, deltaY * pixelRatio);
+}
+
+void ContentView::resetView() {
+  getViewModel()->resetView();
+}
+
 void ContentView::sizeChangedDelayHandle() {
   resizeTimer->stop();
   if (sizeChanged) {
