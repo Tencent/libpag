@@ -1,0 +1,134 @@
+/*
+ * Tencent is pleased to support the open source community by making libpag available.
+ * Copyright (C) 2026 Tencent. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ */
+
+/* Preview-only chrome around the shared PAGXPlayer component. Canvas / toolbar / playback bar
+ * styles ship with pagx-player itself (see pagx-player/src/styles.ts) so this file only owns
+ * the base layout and the preview-specific overlays. */
+
+html, body {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: #1a1a2e;
+    color: #fff;
+}
+
+#container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Editor-open layout (canvas / toolbar / playback bar reflow next to the panel) is handled
+   entirely inside the pagx-player root wrapper - see pagx-player/src/styles.ts's
+   .pagx-player-root.with-editor rule. #container just provides the sizing frame. */
+
+/* Status pill styles live in pagx-player (see pagx-player/src/styles.ts) so both playground and
+   preview render identical status chrome; the preview only owns the elements that don't belong
+   to the component. */
+
+/* Refresh banner shown when the tab regains focus after the file changed in the background.
+   More prominent than .status so users returning to the tab immediately notice the update. */
+.refresh-banner {
+    position: absolute;
+    left: 50%;
+    top: 24px;
+    transform: translateX(-50%);
+    padding: 10px 20px;
+    background: rgba(76, 124, 243, 0.92);
+    color: #fff;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+    z-index: 250;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+}
+
+.refresh-banner.hidden {
+    opacity: 0;
+}
+
+/* Persistent advisory shown only in drop sessions. Amber, distinct from the blue refresh
+   banner so users don't confuse "your file just changed" with "your file can't change".
+   Positioned in the top-right so it stays out of the drop-overlay's centered target. */
+.drop-hint {
+    position: absolute;
+    right: 24px;
+    top: 20px;
+    max-width: 360px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px 10px 14px;
+    background: rgba(51, 39, 20, 0.95);
+    color: #f7d992;
+    border: 1px solid rgba(247, 217, 146, 0.35);
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    z-index: 200;
+}
+
+.drop-hint.hidden {
+    display: none;
+}
+
+.drop-hint code {
+    padding: 0 4px;
+    background: rgba(247, 217, 146, 0.14);
+    border-radius: 3px;
+    font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+}
+
+.drop-hint-close {
+    flex-shrink: 0;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    background: transparent;
+    color: inherit;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.drop-hint-close:hover {
+    opacity: 1;
+}
+
+/* Drag overlay for dropping .pagx files. Kept subtle so it doesn't blow up on stray drags but
+   clearly signals the drop zone once a file is over the window. */
+.drop-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(26, 26, 46, 0.7);
+    border: 3px dashed rgba(255, 255, 255, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 500;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 300;
+}
+
+.drop-overlay.active {
+    opacity: 1;
+}

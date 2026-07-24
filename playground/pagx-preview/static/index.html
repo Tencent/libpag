@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!--
+  ~ Tencent is pleased to support the open source community by making libpag available.
+  ~ Copyright (C) 2026 Tencent. All rights reserved.
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>PAGX Preview</title>
+    <link rel="stylesheet" href="/static/index.css"/>
+</head>
+<body>
+<!-- #container is the mount point handed to PAGXPlayer: it's responsible for creating the
+     <canvas>, the top-right toolbar, the bottom playback bar, and the status pill inside this
+     element. The preview-only overlays (refresh banner / drop hint / drop overlay) stay as
+     siblings so they layer on top of the player without going through the component. -->
+<div id="container">
+    <div id="refresh-banner" class="refresh-banner hidden">File updated, refreshing...</div>
+    <!-- Persistent hint shown when the session was created from a browser drop event. Dropped
+         files are held in memory only because the browser never gives web pages an absolute
+         filesystem path, so we can't watch them for live-reload. The hint tells the user how to
+         get a watched session instead. -->
+    <div id="drop-hint" class="drop-hint hidden">
+        <span>Live reload isn't available for dropped files. Run <code>pagx-preview &lt;file&gt;</code> in a terminal for a watched preview.</span>
+        <button id="drop-hint-close" class="drop-hint-close" aria-label="Dismiss">&times;</button>
+    </div>
+    <div id="drop-overlay" class="drop-overlay">Drop .pagx file to preview</div>
+</div>
+<script type="module" src="/static/index.js"></script>
+</body>
+</html>
