@@ -82,8 +82,8 @@ The following attributes are available on any element and are not repeated in in
 
 ```xml
 <Layer data-name="Background Layer" data-figma-id="12:34" data-exported-by="PAGExporter">
-  <Rectangle width="100" height="100"/>
-  <Fill color="#FF0000"/>
+    <Rectangle width="100" height="100"/>
+    <Fill color="#FF0000"/>
 </Layer>
 ```
 
@@ -233,7 +233,7 @@ External resources are referenced via relative paths or data URIs, applicable to
 <Image source="photo.png"/>
 <Image source="assets/icons/logo.png"/>
 
-<!-- Data URI embedding -->
+        <!-- Data URI embedding -->
 <Image source="data:image/png;base64,iVBORw0KGgo..."/>
 ```
 
@@ -269,6 +269,7 @@ PAGX uses a standard 2D Cartesian coordinate system:
 |-----------|------|---------|-------------|
 | `width` | float | (required) | Canvas width |
 | `height` | float | (required) | Canvas height |
+| `viewModel` | idref | — | ViewModel reference `"@id"` |
 
 **Canvas Clipping**: The canvas defined by `width` and `height` acts as the rendering boundary. Any content extending beyond the canvas area is clipped and not rendered.
 
@@ -411,10 +412,10 @@ Diamond gradients radiate from the center toward the four corners.
 
 - **Stop Interpolation**: Linear interpolation between adjacent color stops
 - **Stop Boundaries**:
-  - Stops with `offset < 0` are treated as `offset = 0`
-  - Stops with `offset > 1` are treated as `offset = 1`
-  - If there is no stop at `offset = 0`, the first stop's color is used to fill
-  - If there is no stop at `offset = 1`, the last stop's color is used to fill
+    - Stops with `offset < 0` are treated as `offset = 0`
+    - Stops with `offset > 1` are treated as `offset = 1`
+    - If there is no stop at `offset = 0`, the first stop's color is used to fill
+    - If there is no stop at `offset = 1`, the last stop's color is used to fill
 
 ##### ImagePattern
 
@@ -485,10 +486,18 @@ Compositions are used for content reuse (similar to After Effects pre-comps).
 |-----------|------|---------|-------------|
 | `width` | float | (required) | Composition width |
 | `height` | float | (required) | Composition height |
+| `viewModel` | idref | — | ViewModel reference `"@id"` |
+
+**Child Elements**:
+
+| Element | Category | Description |
+|---------|----------|-------------|
+| `<Animations>` | animations | Container wrapping `<Animation>` (keyframe timelines) and `<StateMachine>` (state machines) that drive properties on layers within this Composition |
+| `<DataBind>` | dataBinds | Bindings connecting ViewModel properties to render node channels |
 
 #### 3.3.5 Font
 
-Font defines embedded font resources containing subsetted glyph data (vector outlines or bitmaps). Embedding glyph data makes PAGX files fully self-contained, ensuring consistent rendering across platforms. Font nodes can also reference external font files via the optional `file` attribute, serving as font source declarations for `pagx embed` to discover and register before text layout.
+Font defines embedded font resources containing subsetted glyph data (vector outlines or bitmaps). Embedding glyph data makes PAGX files fully self-contained, ensuring consistent rendering across platforms.
 
 ```xml
 <!-- Embedded vector font -->
@@ -502,15 +511,12 @@ Font defines embedded font resources containing subsetted glyph data (vector out
   <Glyph advance="136" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
   <Glyph advance="136" image="emoji/heart.png" offset="0,-5"/>
 </Font>
-
-<!-- External font file reference (before embed) -->
-<Font id="Noto" file="./fonts/NotoSansSC-Regular.otf" unitsPerEm="1000"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `file` | string | - | External font file path. When set, the Font node references an external TTF/OTF file. Relative paths resolve against the PAGX file's directory. `pagx embed` discovers Font nodes with `file`, loads the fonts, and registers them for text shaping. After embed, `file` is preserved for source traceability while embedded glyph data lives in separate Font nodes. |
 | `unitsPerEm` | int | 1000 | Font design space units. Rendering scale = `fontSize / unitsPerEm` |
+| `file` | string | — | External font file path. When set, the Font node references an external TTF/OTF file. Relative paths resolve against the PAGX file's directory. `pagx embed` discovers Font nodes with `file`, loads the fonts, and registers them for text shaping. After embed, `file` is preserved for source traceability while embedded glyph data lives in separate Font nodes. |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
 
@@ -927,16 +933,17 @@ Layer background is primarily used for:
 
 #### Child Elements
 
-Layer child elements are automatically categorized into four collections by type:
+Layer child elements are automatically categorized into five collections by type:
 
 | Child Element Type | Category | Description |
 |-------------------|----------|-------------|
 | VectorElement | contents | Geometry elements, modifiers, painters (participate in accumulation processing) |
-| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle |
-| LayerFilter | filters | BlurFilter, DropShadowFilter, and other filters |
+| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle |
+| LayerFilter | filters | BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter, NoiseFilter |
+| `<Timelines>` | timelines | Container of `<Animation ref="@id" playing="..."/>` and `<StateMachine ref="@id"/>` entries that drive animations or state machines on the referenced Composition |
 | Layer | children | Nested child layers |
 
-**Recommended Order**: Although child element order does not affect parsing results, it is recommended to write them in the order: VectorElement → LayerStyle → LayerFilter → child Layer, for improved readability.
+**Recommended Order**: Although child element order does not affect parsing results, it is recommended to write them in the order: VectorElement → LayerStyle → LayerFilter → Timeline → child Layer, for improved readability.
 
 #### Layer Attributes
 
@@ -959,6 +966,9 @@ Layer child elements are automatically categorized into four collections by type
 | `mask` | idref | - | Mask layer reference "@id" |
 | `maskType` | MaskType | alpha | Mask type |
 | `composition` | idref | - | Composition reference "@id" |
+| `vmContext` | string | "" | ViewModel binding context path for resolving DataBind sources |
+| `import` | string | - | External file path to import (see §7) |
+| `importFormat` | string | - | Force import format (see §7) |
 
 **Layout and constraint attributes**: `width`, `height`, `layout`, `gap`, `padding`, `alignment`, `arrangement`, `flex`, `includeInLayout`, `left`, `right`, `top`, `bottom`, `centerX`, `centerY` — see §4 for definitions, defaults, and usage.
 
@@ -1058,6 +1068,21 @@ Draws an inner shadow **above** the layer, appearing inside the layer content. C
 3. Fill the shadow region with `color`
 4. Intersect with opaque layer content, keeping only shadow inside content
 
+#### 5.3.4 NoiseStyle
+
+Overlays procedural Perlin noise above the layer content. Three noise modes are available: Mono (single color), Duo (two complementary colors), and Multi (preserving original noise RGB with enhanced contrast).
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | NoiseMode | mono | Noise mode |
+| `size` | float | 4 | Noise grain size. Larger values produce coarser grains. Must be positive |
+| `density` | float | 0.5 | Noise density in [0, 1]. Controls the proportion of visible noise pixels |
+| `seed` | float | 0 | Random seed for the noise pattern |
+| `color` | Color | #000000 | Noise color for Mono mode |
+| `firstColor` | Color | #000000 | First noise color for Duo mode |
+| `secondColor` | Color | #FFFFFF | Second noise color for Duo mode |
+| `opacity` | float | 0.15 | Overall noise opacity for Multi mode, in [0, 1] |
+
 ### 5.4 Layer Filters
 
 Layer filters are the final stage of layer rendering. All previously rendered results (including layer styles) accumulated in order serve as filter input. Filters are applied in chain fashion according to document order, with each filter's output becoming the next filter's input.
@@ -1137,6 +1162,10 @@ Transforms colors using a 4×5 color matrix.
 | A' |   | m[15] m[16] m[17] m[18] m[19] |   | A |
                                             | 1 |
 ```
+
+#### 5.4.6 NoiseFilter
+
+Overlays procedural Perlin noise on the layer. Accepts the same noise parameters as NoiseStyle (§5.3.4).
 
 ### 5.5 Clipping and Masking
 
@@ -2174,8 +2203,8 @@ The `pagx resolve` command processes all import directives in a PAGX file:
    size, sets `width` and `height` from the source dimensions (e.g., SVG `viewBox`
    or `width`/`height` attributes)
 5. Inserts a comment in the Layer's children indicating the original source:
-   - Inline SVG: `<!-- Resolved from: inline svg -->`
-   - External file: `<!-- Resolved from: assets/logo.svg -->`
+    - Inline SVG: `<!-- Resolved from: inline svg -->`
+    - External file: `<!-- Resolved from: assets/logo.svg -->`
 
 After resolution, the file contains only native PAGX nodes — no `<svg>` elements or
 `import` attributes remain.
@@ -2189,6 +2218,571 @@ Tools that process PAGX files handle unresolved import directives as follows:
 
 ---
 
+## 8. Animation System
+
+PAGX animation system consists of two parts: keyframe-based Animations and input-driven StateMachines. Animations are named timelines composed of objects, channels, and keyframes; StateMachines are state graphs composed of states, transitions, and conditions. Both are declared in the `<Animations>` container and referenced by `<Timelines>` entries on Layers (`<Animation ref="@id"/>` or `<StateMachine ref="@id"/>` drivers) to drive property changes on nodes inside the referenced composition at runtime.
+
+### 8.1 Animation
+
+#### 8.1.1 Animation Overview
+
+`<Animation>` defines a named timeline. It is declared inside an `<Animations>` container (either at the document level or inside a Composition) and identified by `id`, which must be unique within the owning scope. Animations are activated in one of two ways:
+
+- **Top-level scope** — an `<Animations>` container placed directly under the Document or Composition applies its animations to nodes in the same scope without needing `<Timelines>`. This is the simpler pattern when a scope owns its animations.
+- **Layer-driven scope** — a Layer references an external Composition via `composition="@id"` and attaches a `<Timelines>` child element to mount a specific Animation or StateMachine on that instance. This is how animations are bound to nested Compositions.
+
+The `ref` attribute on `<Animation ref="@id"/>` (or `<StateMachine ref="@id"/>`) inside `<Timelines>` selects the timeline to mount.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `id` | string | (required) | Unique identifier, referenced from Layer `<Timelines>` |
+| `duration` | Frame | 0 | Total animation length in frames |
+| `frameRate` | float | 60 | Frame rate (frames per second) |
+| `loop` | LoopMode | once | Behavior after reaching the end |
+
+**LoopMode** controls how an Animation repeats after reaching its end:
+
+| Mode | Description |
+|------|-------------|
+| `once` | Plays once and stops at the final frame |
+| `loop` | Restarts from the beginning each time it reaches the end |
+| `pingPong` | Plays forward to the end, then backward to the start, and repeats |
+
+**Child Elements**:
+
+| Element | Description |
+|---------|-------------|
+| `<Object>` | An animation object grouping channels that target a single node |
+
+**Example**: a complete animation definition.
+
+```xml
+<Animations>
+  <Animation id="fadePulse" duration="60" frameRate="60" loop="loop">
+    <Object target="statusDot">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="0.35" interpolation="linear"/>
+        <Key time="30" value="1" interpolation="linear"/>
+        <Key time="60" value="0.35" interpolation="linear"/>
+      </Channel>
+    </Object>
+  </Animation>
+</Animations>
+```
+
+#### 8.1.2 Object
+
+`<Object>` groups the animated channels that target a single node. Each object binds to one target node (identified by `target`) and carries a set of `<Channel>` elements whose keyframes drive that node over time.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `target` | string | (required) | The id of the target node, e.g. `"titleLayer"` |
+
+**Child Elements**:
+
+| Element | Description |
+|---------|-------------|
+| `<Channel>` | A typed channel with keyframes driving a single property on the target node |
+
+**Example**: a typical Object with Channel and Key definitions.
+
+```xml
+<Object target="slidingBar">
+  <Channel name="x" type="float">
+    <Key time="0" value="20" interpolation="bezier"/>
+    <Key time="60" value="360" interpolation="bezier"/>
+    <Key time="120" value="20"/>
+  </Channel>
+</Object>
+```
+
+#### 8.1.3 Channel (`<Channel>`)
+
+`<Channel>` defines a property that changes over time on a target node. Each channel carries a `name` (the property to drive, e.g. `"x"`, `"y"`, `"alpha"`, `"visible"`, `"size.width"`, `"position.x"`, or painter channels such as `"color"` on a `Fill` / `Stroke` node) and a list of keyframes stored as `<Key>` child elements.
+
+The `type` attribute specifies the value type this channel carries. The schema enumerates the canonical forms below; the importer additionally accepts these aliases for backward compatibility: `number` (→ `float`), `enum` (→ `int`), `text` (→ `string`), `imageRef` (→ `image`).
+
+| `type` value | Description |
+|--------------|-------------|
+| `float` | Numeric scalar (opacity, scale, rotation, etc.) |
+| `bool` | Boolean toggle |
+| `int` | Integer value |
+| `string` | Text value |
+| `image` | Image resource reference |
+| `color` | Color value (RGBA) |
+| `matrix` | 2D transform matrix |
+
+If `type` is omitted, it is inferred from the first `<Key>` value (color → bool → image → int → float → string).
+
+```xml
+<Channel name="alpha" type="float">
+  <Key time="0" value="0" interpolation="linear"/>
+  <Key time="30" value="1" interpolation="linear"/>
+</Channel>
+```
+
+#### 8.1.4 Keyframes (Key)
+
+A keyframe holds a property value at a specific time, together with how it transitions to the next keyframe and optional bezier control handles. Supported value types are `float`, `bool`, `int`, `string`, `image`, `color`, and `matrix`.
+
+**Frame**: `Frame` is a frame index. `ZeroFrame = 0` is the first frame of any animation.
+
+**KeyframeInterpolationType** determines how a keyframe's value transitions to the next:
+
+| Type | Description |
+|------|-------------|
+| `None` | No interpolation; holds value until the next keyframe (same as Hold) |
+| `Linear` | Linear interpolation between this keyframe and the next |
+| `Bezier` | Cubic bezier easing using `bezierOut` and the next keyframe's `bezierIn` handles |
+| `Hold` | Holds value until the next keyframe, then jumps |
+
+**Key attributes**:
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `time` | Frame | `0` | The frame position of this keyframe |
+| `value` | determined by Channel `type` | type default | The property value at this frame |
+| `interpolation` | KeyframeInterpolationType | `Linear` | How the value transitions to the next keyframe |
+| `bezierIn` | string | — | Cubic bezier ease-in control point, format `"x,y"`; only used in `Bezier` mode |
+| `bezierOut` | string | — | Cubic bezier ease-out control point, format `"x,y"`; only used in `Bezier` mode |
+
+**ImageRef**: A special value for image-typed properties. It references an image resource by id, allowing keyframes to show different images at different times.
+
+**Example**: keyframes with various interpolation modes.
+
+```xml
+<Channel name="alpha" type="float">
+  <Key time="0" value="0" interpolation="bezier" bezierOut="0.2,0,0.4,1"/>
+  <Key time="30" value="1" interpolation="linear"/>
+  <Key time="60" value="0" interpolation="hold"/>
+</Channel>
+```
+
+### 8.2 State Machine
+
+#### 8.2.1 State Machine Overview
+
+PAGX state machines provide an alternative to keyframe-based animation for scenarios where the timeline behavior depends on external inputs at runtime. Instead of pre-scripting every transition via keyframes, a state machine defines states (each bound to an Animation or empty), transitions conditioned on input values, and crossfade parameters for smooth switching.
+
+`<StateMachine>` defines the state graph. It is declared inside an `<Animations>` container and identified by `id`, and referenced from a Layer's `<Timelines>` via `<StateMachine ref="@id"/>`. It declares **inputs** (named ports that host code feeds values into) and **regions** (parallel state charts). Each region owns its own states and transitions and advances independently — based on the orthogonal-region concept from UML state machines, this avoids combinatorial state explosion when modeling independent behavioral dimensions. See the code examples in §8.2.5–8.2.6. A playable state machine sample is not yet available (see the note below).
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `id` | string | (required) | Unique identifier, referenced from Layer `<Timelines>` |
+
+**Child Elements**:
+
+| Element | Description |
+|---------|-------------|
+| `<Inputs>` | Container for input port declarations (§8.2.2) |
+| `<StateRegion>` | A parallel orthogonal state region (§8.2.3); may appear multiple times |
+
+#### 8.2.2 Input (`<Input>`)
+
+`<Input>` declares a named input port on the state machine. Inputs are shared by all regions and referenced by `<Condition>` elements in transitions. Host code feeds runtime values into these ports to trigger state changes.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | string | (required) | Input name, referenced by `<Condition>`. Unique within the owning StateMachine |
+| `type` | StateMachineInputType | (required) | The value kind of this input |
+
+**StateMachineInputType**:
+
+| Type | Description |
+|------|-------------|
+| `bool` | Persistent boolean. Used with `equal` / `notEqual` conditions |
+| `number` | Persistent numeric. Used with `equal` / `notEqual` / `lessThan` / `lessThanOrEqual` / `greaterThan` / `greaterThanOrEqual` |
+| `trigger` | One-shot event. Fired by host code, consumed at most once per region per advance, then cleared |
+
+Type-specific attributes:
+
+| Attribute | Applicable Types | Default | Description |
+|-----------|-----------------|---------|-------------|
+| `default` | bool, number | `false` / `0` | Initial value; interpreted as boolean for `bool` type, numeric for `number` type |
+
+**Example**: declaring three inputs of different types.
+
+```xml
+<StateMachine id="playerControl">
+  <Inputs>
+    <Input name="isPlaying" type="bool" default="false"/>
+    <Input name="speed" type="number" default="1.0"/>
+    <Input name="tap" type="trigger"/>
+  </Inputs>
+</StateMachine>
+```
+
+#### 8.2.3 StateRegion (`<StateRegion>`)
+
+`<StateRegion>` is one orthogonal region of a StateMachine. It owns an independent set of states, transitions, and its own initial state. All regions advance in parallel.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | string | — | Region name, unique within the owning StateMachine |
+| `initialState` | string | (required) | The name of the state this region enters on start |
+
+**Child Elements**:
+
+| Element | Description |
+|---------|-------------|
+| `<States>` | Container for the region's states (§8.2.4) |
+| `<Transitions>` | Container for the region's transitions (§8.2.5) |
+
+#### 8.2.4 State
+
+`<State>` represents a single state within a `StateRegion`. A state binds to an Animation via the `animation` attribute, or omits it to act as an empty control-flow state.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | string | (required) | State name, unique within the owning StateRegion. Referenced by `from`/`to` in transitions |
+| `animation` | idref | — | The id of the Animation to play while active, prefixed with `@`. Omit for an empty control-flow state |
+
+**Example**: an idle state that plays an animation, and an empty waiting state.
+
+```xml
+<State name="idle" animation="@animIdle"/>
+
+<State name="waiting"/>
+```
+
+#### 8.2.5 Transition
+
+`<Transition>` describes a directed edge between two states, with conditions that gate it and crossfade parameters for switching. All conditions must hold (AND) for the transition to trigger.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `from` | string | (required) | Source state name, or `"any"` to match any state in the region |
+| `to` | string | (required) | Destination state name |
+| `duration` | Frame | 0 | Crossfade duration in frames; 0 means an immediate cut |
+| `frameRate` | float | 60 | Frame rate for converting `duration` to crossfade time |
+| `interpolation` | KeyframeInterpolationType | `linear` | Crossfade weight interpolation curve |
+| `bezierOut` | string | — | Bezier ease-out handle, format `"x,y"` (only when `interpolation="bezier"`) |
+| `bezierIn` | string | — | Bezier ease-in handle, format `"x,y"` (only when `interpolation="bezier"`) |
+| `earlyExit` | bool | false | If `true`, this transition may interrupt an in-progress crossfade |
+| `pauseOnExit` | bool | false | If `true`, the source state's animation freezes when the transition begins; otherwise it keeps advancing while fading out |
+
+**Child Elements**:
+
+| Element | Description |
+|---------|-------------|
+| `<Condition>` | A condition gating this transition (§8.2.6); an empty list means always allowed |
+
+#### 8.2.6 Condition (`<Condition>`)
+
+`<Condition>` tests an input value against a reference value using a comparison operator.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `input` | string | (required) | The name of the input to test |
+| `op` | TransitionConditionOp | `equal` | Comparison operator (must be compatible with the input's type) |
+| `value` | string | — | Reference value. For `bool` inputs: `"true"` or `"false"`. For `number` inputs: a numeric string (e.g. `"0.5"`). Omitted for `trigger` inputs |
+
+**TransitionConditionOp** and compatible input types:
+
+| Operator | Compatible Types | Description |
+|----------|-----------------|-------------|
+| `equal` | bool, number | Input equals reference value |
+| `notEqual` | bool, number | Input does not equal reference value |
+| `lessThan` | number | Input is less than reference value |
+| `lessThanOrEqual` | number | Input is less than or equal to reference value |
+| `greaterThan` | number | Input is greater than reference value |
+| `greaterThanOrEqual` | number | Input is greater than or equal to reference value |
+| `trigger` | trigger | Input has been fired and not yet consumed in this region |
+
+**Example**: transitions with crossfade and conditions.
+
+```xml
+<Transition from="idle" to="hovered" duration="12" frameRate="60"
+            interpolation="bezier" bezierOut="0.2,0" bezierIn="0.4,1"
+            earlyExit="true">
+  <Condition input="isHovered" op="equal" value="true"/>
+</Transition>
+
+<Transition from="any" to="error">
+  <Condition input="errorTrigger" op="trigger"/>
+</Transition>
+```
+
+> **Note**: A playable state machine sample is not yet available. The playground currently cannot inject input values to advance state machines, so state transitions cannot be triggered in that environment. Once host-side input injection is supported, a complete `state_machine.pagx` sample covering states, transitions, conditions, and all input types will be added.
+
+### 8.3 Layer Timeline References
+
+Using the `composition` attribute, a Layer can import an external PAGX file as a Composition into the current document. A Layer referencing a Composition may declare a `<Timelines>` child element to attach animations or state machines. Each entry selects the timeline kind through the element name:
+
+| Element | Description |
+|---------|-------------|
+| `<Animation ref="@id"/>` | Attaches a keyframe-driven Animation timeline |
+| `<StateMachine ref="@id"/>` | Attaches a state-driven StateMachine timeline |
+
+#### 8.3.1 AnimationTimeline
+
+**Driver attributes** (on `<Animation>` inside `<Timelines>`):
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `ref` | idref | (required) | The id of the referenced Animation, prefixed with `@` |
+| `playing` | bool | true | Initial playing state; set to `false` to start paused |
+
+```xml
+<Resources>
+  <Composition id="badgeComp" width="120" height="40">
+    <Layer id="statusDot" width="16" height="16">
+      <Ellipse width="16" height="16"/>
+      <Fill color="#14B8A6"/>
+    </Layer>
+  </Composition>
+
+  <Animations>
+    <Animation id="pulse" duration="60" frameRate="60" loop="loop">
+      <Object target="statusDot">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0.4" interpolation="linear"/>
+          <Key time="30" value="1" interpolation="linear"/>
+          <Key time="60" value="0.4" interpolation="linear"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</Resources>
+
+<Layer composition="@badgeComp">
+  <Timelines>
+    <Animation ref="@pulse" playing="true"/>
+  </Timelines>
+</Layer>
+```
+
+#### 8.3.2 StateMachineTimeline
+
+**Driver attributes** (on `<StateMachine>` inside `<Timelines>`):
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `ref` | idref | (required) | The id of the referenced StateMachine, prefixed with `@` |
+
+Unlike an AnimationTimeline, a StateMachineTimeline has no `playing` attribute: the owning Layer enters the state machine's initial states on load, and the state machine advances in response to input changes driven by host code.
+
+```xml
+<Layer composition="@controlComp">
+  <Timelines>
+    <StateMachine ref="@hoverControl"/>
+  </Timelines>
+</Layer>
+```
+
+The referenced `<StateMachine>` is defined in the `<Animations>` container; see §8.2 for its structure. A playable state machine sample is not yet available (see the note at the end of §8.2).
+
+### 8.4 Relationship with Data Binding
+
+If a property is both data-bound (via `DataBind`) and animated, the bound value takes precedence over the animation. You can use this intentionally for state-driven overrides, such as disabling an animated badge through a boolean ViewModel property.
+
+Animations apply on top of layout results. Layout attributes (`width`, `height`, `layout`, `gap`, `padding`, `arrangement`, `alignment`, etc.) are resolved before rendering and cannot be animated. To change a visible size dynamically, animate a specific node's channel such as `Rectangle.size.width` rather than a layout attribute on `Layer`.
+
+### 8.5 Example
+
+The following example demonstrates combining keyframes, channels, and multiple target objects:
+
+> [Sample](samples/animation.pagx)
+
+---
+
+## 9. ViewModel & Data Binding
+
+The ViewModel system lets you drive the UI with data: a ViewModel defines a schema of typed properties, and DataBind connects those properties to node channels. When a ViewModel property value changes, all bound targets are updated automatically.
+
+### 9.1 Overview
+
+A ViewModel is a schema that defines properties with names, types, defaults, and optional constraints. It is typically attached to a Document or Composition (a Document is itself a Composition). Code creates instances from this schema and assigns values. DataBind connects ViewModel properties to node channels using a path syntax (`"$vm.propertyName"`).
+
+Each Layer may set a `vmContext` path to resolve relative DataBind source references within its subtree.
+
+### 9.2 ViewModel
+
+`<ViewModel>` defines a ViewModel schema. It is identified by `id` and can be referenced by Compositions or other ViewModels (a `<Property>` of type `viewModel`). A `<ViewModel>` is declared in `<Resources>` and is attached to a Document or Composition via the `viewModel` attribute. Each container can reference at most one `<ViewModel>`. Multiple `<DataBind>` and `<DataConverter>` elements may appear under the same container.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `id` | string | (required) | Unique identifier |
+
+**Child Elements**:
+
+| Element | Description |
+|---------|-------------|
+| `<Property>` | A property declaration in declaration order |
+
+**Example**: The following snippet shows how to define ViewModel properties.
+
+```xml
+<ViewModel id="deviceVM">
+  <Property name="accent" type="color" default="#14B8A6"/>
+  <Property name="online" type="boolean" default="true"/>
+  <Property name="panelOpacity" type="number" default="0.96" min="0" max="1"/>
+  <Property name="utilization" type="number" default="0.68" min="0" max="1"
+            dataConverter="@usageToWidth"/>
+  <Property name="temperature" type="number" default="24" min="16" max="32"
+            dataConverter="@temperatureToWidth"/>
+</ViewModel>
+```
+
+### 9.3 Property
+
+`<Property>` defines a single property within a ViewModel schema. Its `type` attribute determines which additional attributes are applicable.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | string | (required) | Property name, e.g. `"speed"`, `"title"` |
+| `type` | ViewModelPropertyType | (required) | Value type of this property |
+
+**ViewModelPropertyType** values (both PascalCase such as `Number` and lowercase such as `number` are accepted; the exporter always writes PascalCase):
+
+| `type` value | Description |
+|--------------|-------------|
+| `number` | Numeric value with optional min/max constraints |
+| `string` | Text value |
+| `boolean` | Boolean value |
+| `color` | Color value (RGBA) |
+| `image` | Image resource reference |
+| `viewModel` | Nested ViewModel instance (references another ViewModel schema via `viewModelRef`) |
+| `enum` | Enumerated value with a predefined list of string options |
+| `trigger` | Ephemeral trigger (does not support `default`) |
+
+Type-specific attributes:
+
+| Attribute | Applicable Types | Default | Description |
+|-----------|-----------------|---------|-------------|
+| `default` | number, string, boolean, color, image, enum | see below | Default value; the interpretation depends on `type` (number → float, string → text, boolean → `true`/`false`, color → color literal, image → `@id` reference, enum → option index (starting from 0)) |
+| `min` | number | — | Minimum allowed value |
+| `max` | number | — | Maximum allowed value |
+| `viewModelRef` | viewModel | — | Target ViewModel schema for nested ViewModel properties (must be an `@id` reference) |
+| `options` | enum | "" | Allowed string values (comma-separated); each maps to its 0-based index. Literal `,` and `\\` inside an option value must be escaped as `\\,` and `\\\\` |
+| `dataConverter` | any | — | Optional `@id` reference to a `<DataConverter>` resource that transforms values before they are applied through a DataBind |
+
+An optional `<DataConverter>` resource can be defined separately and referenced from a `<Property>` via the `dataConverter="@id"` attribute to transform values before they are applied through a DataBind.
+
+### 9.4 DataBind
+
+`<DataBind>` connects a ViewModel property to a channel on a target node. The target should be the concrete node that owns the channel. For example, bind color to a `Fill` node's `color` channel, not to its parent `Layer`.
+
+Each Composition has its own independent binding scope, and only nodes belonging to the same Composition as the DataBind declaration will take effect.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `source` | string | (required) | ViewModel source path, e.g. `"$vm.utilization"`, `"$vm.accent"` |
+| `target` | string | (required) | Target node id, e.g. `"@usageFill"`, `"@accentFill"` |
+| `channel` | string | (required) | Target channel name, e.g. `"alpha"`, `"visible"`, `"size.width"`, `"color"` |
+| `direction` | DataBindDirection | ToTarget | Binding direction |
+
+Use `$vm` as the root of portable binding paths. Do not use a ViewModel schema id as the source root, such as `$playerVM.title`; the `id` identifies the schema resource, while `$vm` identifies the ViewModel instance in use.
+
+**Example: bind status, opacity, width, and color**
+
+The following snippet shows the `$vm` path syntax, the `rangeMapper` converter, and common target-channel combinations.
+
+```xml
+<Resources>
+  <DataConverter id="usageToWidth" type="rangeMapper">
+    <Param name="inputMin" value="0"/>
+    <Param name="inputMax" value="1"/>
+    <Param name="outputMin" value="0"/>
+    <Param name="outputMax" value="288"/>
+  </DataConverter>
+
+  <ViewModel id="deviceVM">
+    <Property name="accent" type="color" default="#14B8A6"/>
+    <Property name="online" type="boolean" default="true"/>
+    <Property name="panelOpacity" type="number" default="0.96" min="0" max="1"/>
+    <Property name="utilization" type="number" default="0.68" min="0" max="1"
+              dataConverter="@usageToWidth"/>
+  </ViewModel>
+</Resources>
+
+<Layer id="deviceCard" width="344" height="336">
+  <Rectangle width="344" height="336" roundness="28"/>
+  <Fill color="#111827"/>
+</Layer>
+
+<Layer id="onlineBadge" width="78" height="26">
+  <Rectangle width="78" height="26" roundness="13"/>
+  <Fill id="badgeFill" color="#14B8A6"/>
+</Layer>
+
+<Layer width="288" height="18">
+  <Rectangle id="usageFill" width="196" height="18" roundness="9"/>
+  <Fill id="usageFillColor" color="#14B8A6"/>
+</Layer>
+
+<DataBind source="$vm.panelOpacity" target="@deviceCard" channel="alpha"/>
+<DataBind source="$vm.online" target="@onlineBadge" channel="visible"/>
+<DataBind source="$vm.utilization" target="@usageFill" channel="size.width"/>
+<DataBind source="$vm.accent" target="@badgeFill" channel="color"/>
+<DataBind source="$vm.accent" target="@usageFillColor" channel="color"/>
+```
+
+### 9.5 DataBindDirection
+
+**DataBindDirection** controls the direction in which data flows:
+
+| Direction | Description |
+|-----------|-------------|
+| `ToTarget` | ViewModel value applied to target node (one-way). Default direction |
+| `ToSource` | Target node value written back to ViewModel |
+| `TwoWay` | Bidirectional: ViewModel drives target, and target changes sync back |
+| `Once` | Applied once on initialization, never updated afterward |
+
+`ToTarget` is the most common pattern. Multiple `ToTarget` bindings sharing one ViewModel property is safe since no write-back occurs. Unless intentional, avoid binding and animating the same channel.
+
+### 9.6 DataConverter
+
+`<DataConverter>` transforms ViewModel property values before they are applied to target nodes. It is declared as a resource with its own `id`, and referenced from a `<Property>` via the `dataConverter="@id"` attribute. Each converter specifies a type and a set of `<Param>` parameters.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `id` | string | (required) | Unique identifier |
+| `type` | string | (required) | Converter type, e.g. `"secondsToFrames"`, `"priceFormat"` |
+
+**Child Elements**:
+
+| Element | Description |
+|---------|-------------|
+| `<Param name="..." value="..."/>` | A key-value parameter; interpretation is converter-specific |
+
+Built-in converters:
+
+| Converter | Input | Output | Parameters |
+|-----------|-------|--------|------------|
+| `secondsToFrames` | number seconds | number frames | `frameRate` (default `30`) |
+| `priceFormat` | number | string | `prefix`, `suffix`, `decimals` |
+| `rangeMapper` | number | number | `inputMin`, `inputMax`, `outputMin`, `outputMax` |
+| `degsToRads` | number degrees | number radians | — |
+
+**Example**: The following snippet shows using `rangeMapper` to map a temperature value to a visible width.
+
+```xml
+<DataConverter id="temperatureToWidth" type="rangeMapper">
+  <Param name="inputMin" value="16"/>
+  <Param name="inputMax" value="32"/>
+  <Param name="outputMin" value="0"/>
+  <Param name="outputMax" value="288"/>
+</DataConverter>
+<ViewModel id="deviceVM">
+  <Property name="temperature" type="number" default="24" min="16" max="32"
+            dataConverter="@temperatureToWidth"/>
+</ViewModel>
+<DataBind source="$vm.temperature" target="@temperatureFill" channel="size.width"/>
+```
+
+### 9.7 Relationship with Animation
+
+When a channel is driven by both a DataBind and an animation, if they fall on the same frame, the animation value is overridden; simultaneous modification should be avoided. Animations apply on top of layout results and cannot modify layout attributes (`width`, `height`, `layout`, `gap`, `padding`, etc.), as those are discarded once layout is complete.
+
+### 9.8 Example
+
+The following example demonstrates ViewModel property definitions, a `rangeMapper` converter, and data bindings for status, opacity, visible width, and color channels.
+
+> [Sample](samples/viewmodel.pagx)
+
+---
+
 ## Appendix A. Node Hierarchy
 
 This appendix describes node categorization and nesting rules.
@@ -2197,13 +2791,16 @@ This appendix describes node categorization and nesting rules.
 
 | Category | Nodes | Description |
 |----------|-------|-------------|
-| **Structure** | `pagx`, `Resources` | `pagx`: document entry point (children: `<Layer>`, `<Resources>` only). `Resources`: holds reusable definitions (Image, PathData, Composition, Font, etc.) |
-| **Content Containers** | `Layer` | Accepts VectorElements, child Layers, styles, and filters. |
+| **Structure** | `pagx`, `Resources` | `pagx`: document entry point (children: `<Layer>`, `<Resources>` only). `Resources`: holds reusable definitions (Image, PathData, Composition, Font, Animation, ViewModel, etc.) |
+| **Content Containers** | `Layer` | Accepts VectorElements, child Layers, styles, filters, and Timeline entries. |
 | **Element Containers** | `Group`, `TextBox` | Accept VectorElements only. |
 | **Resource Types** | `Image`, `PathData`, `Composition`, `Font`, `Glyph` | Reusable assets stored in `<Resources>`. |
+| **Animation** | `Animation`, `Object`, `Channel` | Named timelines driving animated properties via keyframes. `Channel` contains `Key` keyframes. |
+| **State Machine** | `StateMachine`, `Input`, `StateRegion`, `State`, `Transition`, `Condition` | State-driven behavior: input-conditioned transitions between states, each bound to an Animation or empty. Defined in `<Animations>`, driven via `<StateMachine ref="@id"/>` in Layer `<Timelines>`. |
+| **ViewModel** | `ViewModel`, `Property`, `DataBind`, `DataConverter` | ViewModel schema and data binding definitions. |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
-| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle` | Visual effects applied to Layer content. |
-| **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter` | Post-processing effects applied to composited Layer. |
+| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `NoiseStyle` | Visual effects applied to Layer content. |
+| **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter`, `NoiseFilter` | Post-processing effects applied to composited Layer. |
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable geometry (shapes and text). Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` | Transform or combine geometry and text. |
 | **Painters** | `Fill`, `Stroke` | Apply color/gradient to geometry. Must be inside Layer/Group. |
@@ -2211,42 +2808,49 @@ This appendix describes node categorization and nesting rules.
 
 ### A.2 Document Containment
 
-The root element `<pagx>` **only accepts `<Layer>` and `<Resources>` as direct children**. Geometry elements, painters, and other elements must be nested inside a `<Layer>`.
+`<pagx>` accepts `<Layer>`, `<Resources>`, `<Animations>`, and `<DataBind>` as direct children. Geometry elements, painters, and other elements must be nested inside a `<Layer>`.
 
 ```
 pagx (required attributes: width, height)
-├── Layer*                      ← Direct children MUST be Layer
+├── Layer*                      ← Top-level layers
 │   ├── VectorElement* (see A.3)
 │   ├── <svg>* (import directive, see §7)
-│   ├── DropShadowStyle*
-│   ├── InnerShadowStyle*
-│   ├── BackgroundBlurStyle*
-│   ├── BlurFilter*
-│   ├── DropShadowFilter*
-│   ├── InnerShadowFilter*
-│   ├── BlendFilter*
-│   ├── ColorMatrixFilter*
+│   ├── Timelines? → Animation* (ref="@id", playing) or StateMachine* (ref="@id")
+│   ├── LayerStyle* (DropShadow / InnerShadow / BackgroundBlur / Noise)
+│   ├── LayerFilter* (Blur / DropShadow / InnerShadow / Blend / ColorMatrix / Noise)
 │   └── Layer* (child layers, recursive)
 │
-└── Resources (optional, reusable definitions)
-    ├── Image
-    ├── PathData
-    ├── SolidColor
-    ├── LinearGradient → ColorStop*
-    ├── RadialGradient → ColorStop*
-    ├── ConicGradient → ColorStop*
-    ├── DiamondGradient → ColorStop*
-    ├── ImagePattern
-    ├── Font → Glyph*
-    └── Composition → Layer*    ← Composition root children also MUST be Layer
+├── Resources (optional, reusable definitions)
+│   ├── Image
+│   ├── PathData
+│   ├── SolidColor / LinearGradient / RadialGradient / ConicGradient / DiamondGradient / ImagePattern
+│   │   └── ColorStop*
+│   ├── Font → Glyph*
+│   ├── ViewModel → Property*
+│   ├── DataConverter → Param*
+│   └── Composition                    ← Reusable composition template
+│       ├── Layer*                      ← Contains only Layers
+│       │   └── (same as root Layer)
+│       ├── Animations?
+│       └── DataBind*
+│
+├── Animations?
+│   ├── Animation*
+│   │   └── Object* → Channel* → Key*
+│   └── StateMachine*
+│       ├── Input*
+│       └── StateRegion*
+│           ├── State* (animation="@id")
+│           └── Transition* → Condition*
+└── DataBind*
 ```
 
 **Key rules**:
-- `<pagx>` direct children: **only `<Layer>` and `<Resources>`**
+- `<pagx>` direct children: `<Layer>`, `<Resources>`, `<Animations>`, `<DataBind>`
+- `<Composition>` is a template defined in Resources; its body contains `<Layer>`, `<Animations>`, `<DataBind>`; at runtime it instantiates as a PAGLayer
 - VectorElements (Rectangle, Ellipse, Path, Text, etc.) **must be inside `<Layer>` or `<Group>`**
 - Painters (Fill, Stroke) **must be inside `<Layer>` or `<Group>`**
-- `<Group>` or geometry as direct child of `<pagx>` causes a parse error
-- `<Composition>` root children follow the same rule: only `<Layer>` allowed
+- `<Group>` or geometry as direct child of `<pagx>` or `<Composition>` causes a parse error
 
 ### A.3 VectorElement Containment
 
@@ -2292,6 +2896,8 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 | **LayoutMode** | `none`, `horizontal`, `vertical` |
 | **Alignment** | `start`, `center`, `end`, `stretch` |
 | **Arrangement** | `start`, `center`, `end`, `spaceBetween`, `spaceEvenly`, `spaceAround` |
+| **NoiseMode** | `mono`, `duo`, `multi` |
+| **LoopMode** | `once`, `loop`, `pingPong` |
 
 ### Painter Related
 
@@ -2325,6 +2931,30 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 | **WritingMode** | `horizontal`, `vertical` |
 | **RepeaterOrder** | `belowOriginal`, `aboveOriginal` |
 | **Overflow** | `visible`, `hidden` |
+
+### Animation Related
+
+| Enum | Values |
+|------|--------|
+| **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold` |
+| **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix` |
+| **TimelineType** | `animation`, `stateMachine` |
+
+### State Machine Related
+
+| Enum | Values |
+|------|--------|
+| **StateMachineInputType** | `bool`, `number`, `trigger` |
+| **TransitionConditionOp** | `equal`, `notEqual`, `lessThan`, `lessThanOrEqual`, `greaterThan`, `greaterThanOrEqual`, `trigger` |
+
+> Note: `image` in `ChannelValueType` also accepts the synonym `imageRef` (exports always write `image`). The runtime also uses a `pagImage` value type for decoded `PAGImage` objects, but it exists only in memory and is never serialized to XML; therefore it is not a legal value for the `type` attribute.
+
+### ViewModel Related
+
+| Enum | Values |
+|------|--------|
+| **ViewModelPropertyType** | `number`, `string`, `boolean`, `color`, `image`, `viewModel`, `enum`, `trigger` (both PascalCase and lowercase accepted; exporter writes PascalCase) |
+| **DataBindDirection** | `ToTarget`, `ToSource`, `TwoWay`, `Once` (case-sensitive) |
 
 ---
 
@@ -2365,4 +2995,150 @@ An infographic / presentation slide introducing PAGX capabilities — center tit
 An illustrated alien planet scene with an astronaut, exotic flora, alien creatures, and atmospheric effects. Demonstrates complex scene composition with layered backgrounds, hand-drawn Path artwork, procedurally generated grass fields via long Path data, and rich gradient lighting.
 
 > [Sample](samples/space_explorer.pagx)
+
+---
+
+## Appendix D. Channel Reference
+
+The following lists all node channels that can be driven via `<Channel>` (animation) or `<DataBind>` (data binding). Markers marked ^Layout^ require a layout pass after being modified.
+
+### D.1 Layer
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `alpha` | number | Opacity |
+| `visible` | boolean | Visibility toggle |
+| `blendMode` | enum | Blend mode |
+| `x` ^Layout^ | float | Top-left X position |
+| `y` ^Layout^ | float | Top-left Y position |
+
+### D.2 Geometry Nodes (Rectangle / Ellipse / Polystar / Path)
+
+| Channel | Value Type | Nodes | Description |
+|---------|------------|-------|-------------|
+| `position.x` ^Layout^ | float | Rectangle, Ellipse, Polystar | Geometry X position |
+| `position.y` ^Layout^ | float | Rectangle, Ellipse, Polystar | Geometry Y position |
+| `size.width` ^Layout^ | float | Rectangle, Ellipse, Polystar | Visual width |
+| `size.height` ^Layout^ | float | Rectangle, Ellipse, Polystar | Visual height |
+| `roundness` | float | Rectangle | Corner radius |
+| `pointCount` ^Layout^ | float | Polystar | Point/corner count |
+| `type` ^Layout^ | enum | Polystar | Polygon/star type (`star` / `polygon`) |
+| `outerRadius` ^Layout^ | float | Polystar | Outer radius |
+| `innerRadius` ^Layout^ | float | Polystar | Inner radius |
+| `rotation` ^Layout^ | float | Polystar | Rotation angle |
+| `outerRoundness` | float | Polystar | Outer roundness |
+| `innerRoundness` | float | Polystar | Inner roundness |
+
+> Path's `position.x/y` can only be modified through document editing; animation is not supported.
+
+### D.3 Text / TextBox
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `x` ^Layout^ | float | Text anchor X (Text-specific, not `position.x`) |
+| `y` ^Layout^ | float | Text anchor Y (Text-specific, not `position.y`) |
+
+> `fontSize`, `letterSpacing` and other text properties can only be modified through document editing; animation is not supported.
+
+### D.4 Painters (Fill / Stroke)
+
+| Channel | Value Type | Nodes | Description |
+|---------|------------|-------|-------------|
+| `color` | color | Fill, Stroke | Painter color (solid color only) |
+| `alpha` | number | Fill, Stroke | Opacity |
+| `width` | number | Stroke | Stroke width |
+| `miterLimit` | number | Stroke | Miter limit |
+| `dashOffset` | number | Stroke | Dash offset |
+
+### D.5 Group / TextBox (Transform Properties)
+
+Group and TextBox share the following transform channels for applying animated transforms to their contents:
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `anchor.x` | float | Anchor X |
+| `anchor.y` | float | Anchor Y |
+| `position.x` ^Layout^ | float | Position X |
+| `position.y` ^Layout^ | float | Position Y |
+| `rotation` | float | Rotation angle |
+| `scale.x` | float | Scale X |
+| `scale.y` | float | Scale Y |
+| `skew` | float | Skew angle |
+| `skewAxis` | float | Skew axis angle |
+| `alpha` | number | Group opacity |
+
+### D.6 Modifiers
+
+| Channel | Value Type | Nodes | Description |
+|---------|------------|-------|-------------|
+| `start` | float | TrimPath, RangeSelector | Start position |
+| `end` | float | TrimPath, RangeSelector | End position |
+| `offset` | float | TrimPath, RangeSelector, Repeater | Offset |
+| `radius` | float | RoundCorner | Corner radius |
+| `copies` | float | Repeater | Copy count |
+
+**Repeater transforms**:
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `anchor.x`, `anchor.y` | float | Anchor |
+| `position.x`, `position.y` | float | Position offset |
+| `rotation` | float | Rotation |
+| `scale.x`, `scale.y` | float | Scale |
+| `startAlpha` | number | First copy opacity |
+| `endAlpha` | number | Last copy opacity |
+
+**TextModifier properties**:
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `anchor.x`, `anchor.y` | float | Anchor |
+| `position.x`, `position.y` | float | Position |
+| `rotation` | float | Rotation |
+| `scale.x`, `scale.y` | float | Scale |
+| `skew`, `skewAxis` | float | Skew |
+| `alpha` | number | Opacity |
+| `fillColor` | color | Fill color override |
+| `strokeColor` | color | Stroke color override |
+| `strokeWidth` | float | Stroke width override |
+
+**RangeSelector easing**:
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `easeIn` | float | Ease in amount |
+| `easeOut` | float | Ease out amount |
+| `weight` | float | Weight |
+
+### D.7 Color Sources
+
+| Channel | Value Type | Nodes | Description |
+|---------|------------|-------|-------------|
+| `color` | color | SolidColor, ColorStop | Color value |
+| `offset` | float | ColorStop | Gradient stop position |
+| `startPoint.x`, `startPoint.y` | float | LinearGradient | Start point |
+| `endPoint.x`, `endPoint.y` | float | LinearGradient | End point |
+| `center.x`, `center.y` | float | RadialGradient, ConicGradient, DiamondGradient | Center |
+| `radius` | float | RadialGradient, DiamondGradient | Radius |
+| `startAngle` | float | ConicGradient | Start angle |
+| `endAngle` | float | ConicGradient | End angle |
+
+### D.8 Layer Styles (DropShadow / InnerShadow / BackgroundBlur)
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `offsetX`, `offsetY` | float | Shadow offset (DropShadow, InnerShadow) |
+| `blurX`, `blurY` | float | Blur radius |
+| `color` | color | Shadow / overlay color |
+| `showBehindLayer` | boolean | Show behind layer (DropShadowStyle) |
+
+### D.9 Filters (Blur / DropShadow / InnerShadow / Blend)
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `blurX`, `blurY` | float | Blur radius (BlurFilter) |
+| `offsetX`, `offsetY` | float | Shadow offset (DropShadowFilter, InnerShadowFilter) |
+| `blurX`, `blurY` | float | Shadow blur (DropShadowFilter, InnerShadowFilter) |
+| `color` | color | Shadow / blend color (DropShadowFilter, InnerShadowFilter, BlendFilter) |
+| `shadowOnly` | boolean | Show shadow only (DropShadowFilter, InnerShadowFilter) |
 
