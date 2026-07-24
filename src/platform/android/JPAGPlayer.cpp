@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGPlayer.h"
+#include <mutex>
 #include "JNIHelper.h"
 #include "JPAGLayerHandle.h"
 #include "JPAGSurface.h"
@@ -28,11 +29,13 @@
 
 namespace pag {
 static jfieldID PAGPlayer_nativeContext;
-}
+static std::mutex PAGPlayer_contextLocker = {};
+}  // namespace pag
 
 using namespace pag;
 
 std::shared_ptr<PAGPlayer> getPAGPlayer(JNIEnv* env, jobject thiz) {
+  std::lock_guard<std::mutex> autoLock(PAGPlayer_contextLocker);
   auto jPlayer = reinterpret_cast<JPAGPlayer*>(env->GetLongField(thiz, PAGPlayer_nativeContext));
   if (jPlayer == nullptr) {
     return nullptr;
@@ -40,12 +43,24 @@ std::shared_ptr<PAGPlayer> getPAGPlayer(JNIEnv* env, jobject thiz) {
   return jPlayer->get();
 }
 
-void setPAGPlayer(JNIEnv* env, jobject thiz, JPAGPlayer* player) {
-  auto old = reinterpret_cast<JPAGPlayer*>(env->GetLongField(thiz, PAGPlayer_nativeContext));
-  if (old != nullptr) {
-    delete old;
+void clearPAGPlayer(JNIEnv* env, jobject thiz) {
+  JPAGPlayer* old = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(PAGPlayer_contextLocker);
+    old = reinterpret_cast<JPAGPlayer*>(env->GetLongField(thiz, PAGPlayer_nativeContext));
+    env->SetLongField(thiz, PAGPlayer_nativeContext, 0);
   }
-  env->SetLongField(thiz, PAGPlayer_nativeContext, (jlong)player);
+  delete old;
+}
+
+void setPAGPlayer(JNIEnv* env, jobject thiz, JPAGPlayer* player) {
+  JPAGPlayer* old = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(PAGPlayer_contextLocker);
+    old = reinterpret_cast<JPAGPlayer*>(env->GetLongField(thiz, PAGPlayer_nativeContext));
+    env->SetLongField(thiz, PAGPlayer_nativeContext, (jlong)player);
+  }
+  delete old;
 }
 
 extern "C" {
@@ -60,14 +75,11 @@ PAG_API void Java_org_libpag_PAGPlayer_nativeSetup(JNIEnv* env, jobject thiz) {
 }
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeRelease(JNIEnv* env, jobject thiz) {
-  auto jPlayer = reinterpret_cast<JPAGPlayer*>(env->GetLongField(thiz, PAGPlayer_nativeContext));
-  if (jPlayer != nullptr) {
-    jPlayer->clear();
-  }
+  clearPAGPlayer(env, thiz);
 }
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeFinalize(JNIEnv* env, jobject thiz) {
-  setPAGPlayer(env, thiz, nullptr);
+  clearPAGPlayer(env, thiz);
 }
 
 PAG_API jobject Java_org_libpag_PAGPlayer_getComposition(JNIEnv* env, jobject thiz) {
