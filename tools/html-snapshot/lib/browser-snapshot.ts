@@ -155,6 +155,18 @@ function normalizeBackgroundClip(value) {
   return value.trim().toLowerCase() === 'text' ? 'text' : '';
 }
 
+// PAGX's mask-image supports the same value forms as background-image: a
+// gradient function, an SVG `data:image/svg+xml,...` URI (rebuilt into a
+// contour/alpha mask layer), or a raster `url(...)` (PNG/JPEG/WebP) turned into
+// an image-backed alpha/luminance mask layer. All three share background-image's
+// URL handling, so reuse it verbatim: a local `file://` mask url is rewritten to
+// the plain absolute path the importer + tgfx load directly (an un-normalized
+// `file://` url reaches `ImageCodec::MakeFrom` as-is and fails to decode, which
+// silently drops the mask), while `data:` / `http(s)` urls pass through untouched.
+function normalizeMaskImage(value) {
+  return normalizeBackgroundImage(value);
+}
+
 // PAGX rebuilds `clip-path` into a contour mask layer, either from a `url(#id)`
 // reference to a <clipPath> def (Chromium reports it verbatim as `url("#id")`) or
 // from a CSS basic shape — `polygon()`, `path()`, `circle()`, `ellipse()`,
@@ -166,6 +178,369 @@ function normalizeClipPath(value) {
   if (!value) return '';
   const trimmed = value.trim();
   return /^(url|polygon|path|circle|ellipse|inset)\(/i.test(trimmed) ? trimmed : '';
+}
+
+// Format a number for SVG geometry: round to sub-pixel precision and drop a
+// trailing `.0` so `10` stays `10` (not `10px` — SVG coordinates are unitless
+// user units) and `12.5` stays `12.5`.
+function pagxClipNum(n) {
+  if (!isFinite(n)) return '0';
+  const r = Math.round(n * 1000) / 1000;
+  return String(r);
+}
+
+// Split `str` on top-level occurrences of `sep` (a single char), ignoring any
+// separators nested inside parentheses (so `calc(100% - 10px)` and function
+// arguments survive intact). Used to break a `polygon()` vertex list on commas
+// and an argument on whitespace.
+function pagxClipSplitTop(str, sep) {
+  const out = [];
+  let depth = 0;
+  let cur = '';
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (sep === ' ' ? /\s/.test(c) : c === sep)) {
+      if (cur.trim() !== '') out.push(cur.trim());
+      cur = '';
+      continue;
+    }
+    cur += c;
+  }
+  if (cur.trim() !== '') out.push(cur.trim());
+  return out;
+}
+
+// Evaluate a CSS <length-percentage> (optionally wrapped in `calc()`, possibly
+// nested, with `+ - * /`) to pixels. `%` resolves against `basis`; unitless and
+// `px` values pass through. Unknown units / functions (min/max/clamp/var) yield
+// 0 for the offending term rather than throwing, so a partially-understood value
+// degrades instead of dropping the whole clip. This is a small recursive-descent
+// evaluator (expr → term → factor) matching CSS calc precedence.
+function pagxEvalLengthPx(token, basis) {
+  const s = String(token == null ? '' : token).trim();
+  if (s === '') return 0;
+  let i = 0;
+  function skip() { while (i < s.length && /\s/.test(s[i])) i++; }
+  function parseFactor() {
+    skip();
+    if (s[i] === '(') {
+      i++;
+      const v = parseExpr();
+      skip();
+      if (s[i] === ')') i++;
+      return v;
+    }
+    if (s.slice(i, i + 5).toLowerCase() === 'calc(') {
+      i += 5;
+      const v = parseExpr();
+      skip();
+      if (s[i] === ')') i++;
+      return v;
+    }
+    const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(px|%)?/i.exec(s.slice(i));
+    if (!m) { i = s.length; return 0; }
+    i += m[0].length;
+    let val = parseFloat(m[1]);
+    if (m[2] === '%') val = basis * val / 100;
+    return val;
+  }
+  function parseTerm() {
+    let v = parseFactor();
+    skip();
+    while (s[i] === '*' || s[i] === '/') {
+      const op = s[i++];
+      const r = parseFactor();
+      v = op === '*' ? v * r : (r !== 0 ? v / r : 0);
+      skip();
+    }
+    return v;
+  }
+  function parseExpr() {
+    let v = parseTerm();
+    skip();
+    while (s[i] === '+' || s[i] === '-') {
+      const op = s[i++];
+      const r = parseTerm();
+      v = op === '+' ? v + r : v - r;
+      skip();
+    }
+    return v;
+  }
+  return parseExpr();
+}
+
+// Parse a `clip-path` value into `{ shape, args, box }` where `shape` is one of
+// inset/circle/ellipse/polygon/path, `args` is the raw text inside the shape
+// function, and `box` is the resolved <geometry-box> keyword (defaults to
+// `border-box`, CSS's default reference box for HTML). Returns null for `none`,
+// `url(...)` (handled by the normalizer), and unrecognised values.
+function pagxParseClipShape(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '' || s.toLowerCase() === 'none') return null;
+  if (/^url\(/i.test(s)) return null;
+  const m = /(inset|circle|ellipse|polygon|path)\s*\(/i.exec(s);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  let depth = 1;
+  let j = start;
+  for (; j < s.length; j++) {
+    if (s[j] === '(') depth++;
+    else if (s[j] === ')') { depth--; if (depth === 0) break; }
+  }
+  const args = s.slice(start, j);
+  const outside = (s.slice(0, m.index) + ' ' + s.slice(j + 1)).toLowerCase();
+  const boxKeywords = [
+    'border-box', 'padding-box', 'content-box', 'margin-box',
+    'fill-box', 'stroke-box', 'view-box',
+  ];
+  let box = 'border-box';
+  for (const kw of boxKeywords) {
+    if (new RegExp('(^|\\s)' + kw + '(\\s|$)').test(outside)) { box = kw; break; }
+  }
+  return { shape: m[1].toLowerCase(), args, box };
+}
+
+// Resolve the clip-path reference box to a pixel rect `{ x, y, w, h }` in the
+// element's own border-box coordinate space (origin at the border-box top-left,
+// matching the `width`/`height` the snapshot emits and the `viewBox` the C++
+// importer frames the mask in). `fill-box` / `stroke-box` / `view-box` (SVG-only)
+// fall back to border-box for HTML boxes.
+function pagxClipRefRect(box, width, height, computed) {
+  const bt = borderWidthOf(computed, 'top');
+  const br = borderWidthOf(computed, 'right');
+  const bb = borderWidthOf(computed, 'bottom');
+  const bl = borderWidthOf(computed, 'left');
+  if (box === 'padding-box') {
+    return { x: bl, y: bt, w: width - bl - br, h: height - bt - bb };
+  }
+  if (box === 'content-box') {
+    const p = readPadding(computed);
+    return {
+      x: bl + p.left, y: bt + p.top,
+      w: width - bl - br - p.left - p.right,
+      h: height - bt - bb - p.top - p.bottom,
+    };
+  }
+  if (box === 'margin-box') {
+    const mgn = readMargin(computed);
+    return {
+      x: -mgn.left, y: -mgn.top,
+      w: width + mgn.left + mgn.right,
+      h: height + mgn.top + mgn.bottom,
+    };
+  }
+  return { x: 0, y: 0, w: width, h: height };
+}
+
+// Resolve an `at <position>` list (CSS <position>, 1-2 tokens handled) into an
+// absolute center point inside `rect`. Keywords map to edges/center; percentages
+// resolve against the rect axis; lengths are px offsets from the top-left.
+function pagxClipPosition(tokens, rect) {
+  function axis(tok, base, origin, isX) {
+    const t = String(tok || '').toLowerCase();
+    if (t === 'center' || t === '') return origin + base / 2;
+    if (isX && t === 'left') return origin;
+    if (isX && t === 'right') return origin + base;
+    if (!isX && t === 'top') return origin;
+    if (!isX && t === 'bottom') return origin + base;
+    return origin + pagxEvalLengthPx(tok, base);
+  }
+  let xTok = 'center';
+  let yTok = 'center';
+  if (tokens.length === 1) {
+    const t = tokens[0].toLowerCase();
+    if (t === 'top' || t === 'bottom') { yTok = t; } else { xTok = tokens[0]; }
+  } else if (tokens.length >= 2) {
+    // Vertical keyword may lead (e.g. `top right`); otherwise first token is X.
+    const a = tokens[0].toLowerCase();
+    const b = tokens[1].toLowerCase();
+    if (a === 'top' || a === 'bottom' || b === 'left' || b === 'right') {
+      yTok = tokens[0]; xTok = tokens[1];
+    } else {
+      xTok = tokens[0]; yTok = tokens[1];
+    }
+  }
+  return {
+    cx: axis(xTok, rect.w, rect.x, true),
+    cy: axis(yTok, rect.h, rect.y, false),
+  };
+}
+
+// Resolve a circle/ellipse shape radius token against a per-axis basis, honouring
+// the `closest-side` / `farthest-side` keywords (measured from the center `c`
+// within `[origin, origin+base]`). `null` basisDiagonal signals the ellipse
+// per-axis case; circle passes the diagonal basis for `%`.
+function pagxClipRadius(tok, base, origin, c, basisForPercent) {
+  const t = String(tok || '').toLowerCase().trim();
+  if (t === '' || t === 'closest-side') return Math.max(0, Math.min(c - origin, origin + base - c));
+  if (t === 'farthest-side') return Math.max(c - origin, origin + base - c);
+  return pagxEvalLengthPx(tok, basisForPercent == null ? base : basisForPercent);
+}
+
+// Convert a parsed clip-path shape to the INNER markup of a `<clipPath>` (the
+// child shape element(s)), with all coordinates resolved into `rect`'s pixel
+// space. Returns '' for shapes that cannot be represented. The C++ importer
+// serializes exactly these children into a white-filled `<svg>` and reads their
+// coverage as a contour mask, so no fill/stroke needs to be set here.
+function pagxClipShapeToInner(parsed, rect) {
+  const shape = parsed.shape;
+  const args = parsed.args;
+  if (shape === 'polygon') {
+    let segs = pagxClipSplitTop(args, ',');
+    if (segs.length && /^(nonzero|evenodd)$/i.test(segs[0])) {
+      const rule = segs.shift().toLowerCase();
+      const pts = segs.map((seg) => {
+        const xy = pagxClipSplitTop(seg, ' ');
+        return pagxClipNum(rect.x + pagxEvalLengthPx(xy[0], rect.w)) + ',' +
+               pagxClipNum(rect.y + pagxEvalLengthPx(xy[1], rect.h));
+      });
+      if (pts.length < 3) return '';
+      return '<polygon points="' + pts.join(' ') + '" clip-rule="' + rule +
+             '" fill-rule="' + rule + '"/>';
+    }
+    const pts = segs.map((seg) => {
+      const xy = pagxClipSplitTop(seg, ' ');
+      return pagxClipNum(rect.x + pagxEvalLengthPx(xy[0], rect.w)) + ',' +
+             pagxClipNum(rect.y + pagxEvalLengthPx(xy[1], rect.h));
+    });
+    if (pts.length < 3) return '';
+    return '<polygon points="' + pts.join(' ') + '"/>';
+  }
+  if (shape === 'inset') {
+    const tokens = pagxClipSplitTop(args, ' ');
+    const insets = [];
+    let radius = null;
+    for (let k = 0; k < tokens.length; k++) {
+      if (tokens[k].toLowerCase() === 'round') {
+        // Remaining tokens are border-radius; take the first horizontal radius
+        // (optionally before a `/`) as a uniform rx/ry approximation.
+        const rest = tokens.slice(k + 1).join(' ');
+        const firstH = pagxClipSplitTop(rest.split('/')[0], ' ')[0];
+        if (firstH != null) radius = firstH;
+        break;
+      }
+      insets.push(tokens[k]);
+    }
+    let t; let r; let b; let l;
+    if (insets.length === 1) { t = b = insets[0]; r = l = insets[0]; }
+    else if (insets.length === 2) { t = b = insets[0]; r = l = insets[1]; }
+    else if (insets.length === 3) { t = insets[0]; r = l = insets[1]; b = insets[2]; }
+    else if (insets.length >= 4) { t = insets[0]; r = insets[1]; b = insets[2]; l = insets[3]; }
+    else { t = r = b = l = '0'; }
+    const top = pagxEvalLengthPx(t, rect.h);
+    const right = pagxEvalLengthPx(r, rect.w);
+    const bottom = pagxEvalLengthPx(b, rect.h);
+    const left = pagxEvalLengthPx(l, rect.w);
+    const w = Math.max(0, rect.w - left - right);
+    const h = Math.max(0, rect.h - top - bottom);
+    if (w <= 0 || h <= 0) return '';
+    let attrs = 'x="' + pagxClipNum(rect.x + left) + '" y="' + pagxClipNum(rect.y + top) +
+                '" width="' + pagxClipNum(w) + '" height="' + pagxClipNum(h) + '"';
+    if (radius != null) {
+      const rad = pagxEvalLengthPx(radius, Math.min(rect.w, rect.h));
+      if (rad > 0) attrs += ' rx="' + pagxClipNum(rad) + '" ry="' + pagxClipNum(rad) + '"';
+    }
+    return '<rect ' + attrs + '/>';
+  }
+  if (shape === 'circle' || shape === 'ellipse') {
+    const parts = pagxClipSplitTop(args, ' ');
+    const atIdx = parts.findIndex((p) => p.toLowerCase() === 'at');
+    const radiusTokens = atIdx >= 0 ? parts.slice(0, atIdx) : parts.slice();
+    const posTokens = atIdx >= 0 ? parts.slice(atIdx + 1) : [];
+    const center = pagxClipPosition(posTokens, rect);
+    if (shape === 'circle') {
+      const diag = Math.sqrt(rect.w * rect.w + rect.h * rect.h) / Math.SQRT2;
+      const rTok = radiusTokens.length ? radiusTokens[0] : 'closest-side';
+      // For `closest-side`/`farthest-side` on a circle, use the min/max over all
+      // four side distances (not a single axis).
+      let r;
+      const lc = String(rTok).toLowerCase();
+      if (lc === 'closest-side' || lc === '') {
+        r = Math.min(center.cx - rect.x, rect.x + rect.w - center.cx,
+                     center.cy - rect.y, rect.y + rect.h - center.cy);
+      } else if (lc === 'farthest-side') {
+        r = Math.max(center.cx - rect.x, rect.x + rect.w - center.cx,
+                     center.cy - rect.y, rect.y + rect.h - center.cy);
+      } else {
+        r = pagxEvalLengthPx(rTok, diag);
+      }
+      r = Math.max(0, r);
+      if (r <= 0) return '';
+      return '<circle cx="' + pagxClipNum(center.cx) + '" cy="' + pagxClipNum(center.cy) +
+             '" r="' + pagxClipNum(r) + '"/>';
+    }
+    const rxTok = radiusTokens.length >= 1 ? radiusTokens[0] : 'closest-side';
+    const ryTok = radiusTokens.length >= 2 ? radiusTokens[1] : rxTok;
+    const rx = Math.max(0, pagxClipRadius(rxTok, rect.w, rect.x, center.cx, rect.w));
+    const ry = Math.max(0, pagxClipRadius(ryTok, rect.h, rect.y, center.cy, rect.h));
+    if (rx <= 0 || ry <= 0) return '';
+    return '<ellipse cx="' + pagxClipNum(center.cx) + '" cy="' + pagxClipNum(center.cy) +
+           '" rx="' + pagxClipNum(rx) + '" ry="' + pagxClipNum(ry) + '"/>';
+  }
+  if (shape === 'path') {
+    // path( [<fill-rule>,]? "<path data>" ). The data is in the reference box's
+    // pixel space, so only a translate onto the box origin is needed.
+    let rule = '';
+    let data = args.trim();
+    const ruleMatch = /^(nonzero|evenodd)\s*,/i.exec(data);
+    if (ruleMatch) {
+      rule = ruleMatch[1].toLowerCase();
+      data = data.slice(ruleMatch[0].length).trim();
+    }
+    const q = /^(['"])([\s\S]*)\1$/.exec(data);
+    if (!q) return '';
+    const d = q[2];
+    const ruleAttr = rule ? ' clip-rule="' + rule + '" fill-rule="' + rule + '"' : '';
+    const inner = '<path d="' + d.replace(/"/g, "'") + '"' + ruleAttr + '/>';
+    if (rect.x !== 0 || rect.y !== 0) {
+      return '<g transform="translate(' + pagxClipNum(rect.x) + ',' + pagxClipNum(rect.y) +
+             ')">' + inner + '</g>';
+    }
+    return inner;
+  }
+  return '';
+}
+
+// Convert a geometric `clip-path` value into the INNER markup of a `<clipPath>`
+// def, resolved into the element's border-box pixel space. Returns '' for `none`,
+// `url(...)`, and shapes that cannot be represented. Pure (no DOM side effects)
+// so it is unit-testable with a mock `computed`; the registration + id lives in
+// `appendGeometricClipPath`.
+function pagxClipPathInnerMarkup(raw, width, height, computed) {
+  const parsed = pagxParseClipShape(raw);
+  if (!parsed) return '';
+  const rect = pagxClipRefRect(parsed.box, width, height, computed);
+  if (!(rect.w > 0) || !(rect.h > 0)) return '';
+  return pagxClipShapeToInner(parsed, rect);
+}
+
+// Emit a geometric `clip-path` (inset/circle/ellipse/polygon/path) as a rewritten
+// `clip-path: url(#pagxClipN)` declaration, registering the synthesized
+// `<clipPath clipPathUnits="userSpaceOnUse">` in `window.__pagxClipDefs` for
+// `snapshotMain` to flush into a single hidden `<svg>` in the output body. The
+// importer's `collectSharedDefs` then indexes it and rebuilds a contour mask —
+// the same path a hand-authored `url(#id)` clip-path already takes. `url(...)`
+// values are handled by the STYLE_SCHEMA copy (via `normalizeClipPath`) and are
+// left untouched here; identical geometry is de-duplicated across elements.
+function appendGeometricClipPath(parts, computed, width, height) {
+  const raw = (computed.getPropertyValue('clip-path') || '').trim();
+  if (!raw || /^url\(/i.test(raw)) return;
+  const inner = pagxClipPathInnerMarkup(raw, width, height, computed);
+  if (!inner) return;
+  if (typeof window === 'undefined') return;
+  if (!window.__pagxClipDefs) window.__pagxClipDefs = [];
+  if (!window.__pagxClipDefMap) window.__pagxClipDefMap = {};
+  let id = window.__pagxClipDefMap[inner];
+  if (!id) {
+    id = 'pagxClip' + window.__pagxClipDefs.length;
+    window.__pagxClipDefMap[inner] = id;
+    window.__pagxClipDefs.push(
+      '<clipPath id="' + id + '" clipPathUnits="userSpaceOnUse">' + inner + '</clipPath>',
+    );
+  }
+  parts.push('clip-path: url(#' + id + ')');
 }
 
 // PAGX models only `WritingMode::Horizontal` and `WritingMode::Vertical`.
@@ -263,11 +638,63 @@ function nonZero(rect) {
 // Centralised visibility check. CSS `display: contents` is intentionally NOT
 // considered hidden here — it generates no box of its own but its children
 // still render, and the snapshot walker handles the pass-through separately.
-function isVisible(computed) {
+//
+// `opacity: 0` and `visibility: hidden` are treated as hidden EXCEPT when the
+// element is animated by the capture pass (animation-capture.ts marks such
+// elements with a `pagxAnim*` `animation-name`). An element legitimately reads
+// opacity=0 / visibility=hidden at the animation's starting phase; dropping it
+// here would erase the very subject of the animation (e.g. a
+// `0% { opacity: 0 } 100% { opacity: 1 }` fade-in dot), taking its keyframes
+// with it. This is the common shape of JS-driven entrances — GSAP's
+// `autoAlpha: 0`, for instance, sets BOTH `opacity: 0` and `visibility: hidden`
+// on every element waiting to fly in, so the capture-reset frame (timeline at
+// t=0) reports the not-yet-entered text as `visibility: hidden`.
+function isVisible(computed, el) {
   if (computed.display === 'none') return false;
-  if (computed.visibility === 'hidden') return false;
-  if (parseFloat(computed.opacity) === 0) return false;
+  if (computed.visibility === 'hidden' && !hasPagxAnimation(computed) &&
+      !hasHiddenAnimatedAncestor(el)) return false;
+  if (parseFloat(computed.opacity) === 0 && !hasPagxAnimation(computed)) return false;
   return true;
+}
+
+// True when `el`'s computed `visibility: hidden` is inherited from an ancestor
+// that carries a pagxAnimation (a captured reveal), rather than being the
+// element's own resting state. `visibility` is an *inherited* property, so an
+// element whose base state is `visibility: hidden` — but which a class toggle
+// later reveals, and whose reveal the capture pass baked into a `pagxAnim*`
+// animation on that element (e.g. a skill panel that fades in from
+// `opacity:0; visibility:hidden`) — propagates `hidden` to every descendant.
+// The animated ancestor itself survives `isVisible` via `hasPagxAnimation`, and
+// browser-snapshot never emits `visibility` at all, so at playback the whole
+// subtree is visible. Without this, the ancestor's non-animated descendants
+// (e.g. the panel's `display:grid` icon container and every perk inside it)
+// read `visibility: hidden` at snapshot time and would be dropped — silently
+// erasing the entire subtree even though its leaves were captured with their
+// own reveal animations. Walk up until the first ancestor whose own visibility
+// is not hidden: if any hidden ancestor along that contiguous chain is
+// pagx-animated, the element's hidden is an inherited reveal state, so keep it.
+function hasHiddenAnimatedAncestor(el) {
+  if (!el || !el.parentElement) return false;
+  let p = el.parentElement;
+  while (p && p !== document.body) {
+    const cs = getComputedStyle(p);
+    // The contiguous inherited-hidden chain ends here — anything above set its
+    // own visibility, so `el`'s hidden did not originate from an animated
+    // reveal ancestor.
+    if (cs.visibility !== 'hidden') return false;
+    if (hasPagxAnimation(cs)) return true;
+    p = p.parentElement;
+  }
+  return false;
+}
+
+// True when the element carries a canonical `pagxAnim*` animation injected by
+// animation-capture.ts. The capture pass owns the keyframes, so any zero-valued
+// channel on the element (opacity, transform out-of-frame) is part of the
+// animation's starting phase rather than a static-hidden state.
+function hasPagxAnimation(computed) {
+  const name = (computed.getPropertyValue('animation-name') || '').split(',')[0].trim();
+  return !!name && name !== 'none' && name.indexOf('pagxAnim') === 0;
 }
 
 // Read a single CSSOM declaration as a number, defaulting to 0 when the
@@ -278,6 +705,21 @@ function isVisible(computed) {
 // across this file stop carrying their own copy.
 function readNum(computed, prop) {
   return parseFloat(computed.getPropertyValue(prop)) || 0;
+}
+
+// True when a flex-item text leaf carries its own `pagxAnim*` reveal whose
+// starting phase hides the glyph (base `opacity` < 1) — the per-character
+// decode/typewriter shape where each char fades in on its own keyframes.
+// Such a leaf must NOT take renderTextLeaf's bare pure-inline `<span>` flex
+// path: that path forwards only text-scope declarations and drops the
+// box-scope `opacity`, so the importer folds the reveal into a static colour
+// alpha and freezes the glyph fully visible from t=0 (loose value text in a
+// `<div class="spec"><b>CLASS</b>/ ROGUE BLADE</div>` flex row popped in
+// immediately while the `<b>` label, emitted as an absolute char box,
+// correctly stayed hidden until typed). When this fires, renderTextLeaf emits
+// a sized flex-item box that keeps the opacity reveal on the outer Layer.
+function flexCharCarriesReveal(computed) {
+  return hasPagxAnimation(computed) && readNum(computed, 'opacity') < 1;
 }
 
 // Read a 4-sided CSS box (`padding-*`, `margin-*`, `border-*-width`, …) into
@@ -551,7 +993,7 @@ function applyTextTransform(text, computed) {
 function classify(el, computed) {
   const tag = el.tagName.toLowerCase();
   if (DROP_TAGS.has(tag)) return null;
-  if (!isVisible(computed)) return null;
+  if (!isVisible(computed, el)) return null;
   if (tag === 'svg') return 'svg';
   if (tag === 'img') return 'img';
   if (tag === 'canvas') {
@@ -620,6 +1062,55 @@ function appendBoxShadow(parts, computed) {
   if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
 }
 
+// Emit the `animation-*` longhands for an element animated by the capture pass
+// (animation-capture.ts). Only `pagxAnim*` names are forwarded: those are the
+// canonical animations whose `@keyframes` the capture pass injected into the
+// `<style id="__pagx_anim_keyframes">` block (which snapshotMain copies into
+// the output <style>). Any other animation-name refers to a `@keyframes` that
+// only existed in the page's original stylesheet — which the snapshot rebuilds
+// from scratch and therefore does not carry — so emitting it would dangle.
+// The longhands are read straight from computed style; the importer folds them
+// back together (spec/html_subset.md §13).
+function appendAnimation(parts, computed) {
+  const name = (computed.getPropertyValue('animation-name') || '').split(',')[0].trim();
+  if (!name || name === 'none' || name.indexOf('pagxAnim') !== 0) return;
+  parts.push(`animation-name: ${name}`);
+  const longhands = [
+    'animation-duration',
+    'animation-timing-function',
+    'animation-iteration-count',
+    'animation-direction',
+    'animation-delay',
+    // Forward `animation-fill-mode` so the importer can hold the 0%-keyframe
+    // state during the delay (and the 100% state after the active window when
+    // `forwards`/`both`) instead of falling back to the inline base style.
+    // The capture pass writes `backwards` into the canonical shorthand so this
+    // longhand resolves to a non-default value; without it, every finite
+    // animation would visually collapse onto its post-active state at t=0.
+    'animation-fill-mode',
+  ];
+  for (const prop of longhands) {
+    const v = (computed.getPropertyValue(prop) || '').trim();
+    if (v) parts.push(`${prop}: ${v}`);
+  }
+  // Forward `transform-origin` for animated elements. The importer pivots an
+  // animated `transform` channel around this origin (`T(o)·M·T(-o)`), and the
+  // captured keyframe matrices are the origin-independent CSS values, so the
+  // origin must survive into the subset. The generic transform emission above
+  // only writes `transform-origin` alongside a non-`none` static `transform`
+  // (readBoxTransform returns null for `none`); an element whose *keyframes*
+  // drive the transform has its static transform pinned to `none` by the
+  // capture pass, which would otherwise drop the origin and force the importer
+  // to fall back to the box centre — visibly shifting any scaled / rotated
+  // keyframe whose CSS origin is off-centre. Skipped when a transform-origin
+  // was already emitted (static-transform path) to avoid a duplicate property.
+  const hasOrigin = parts.some((p) => p.indexOf('transform-origin:') === 0);
+  if (!hasOrigin) {
+    const origin = (computed.getPropertyValue('transform-origin') || '').trim();
+    if (origin) parts.push(`transform-origin: ${origin}`);
+  }
+}
+
 // Coalesce the two `-webkit-text-stroke` longhands Chromium's computed style
 // exposes (`-webkit-text-stroke-width` / `-webkit-text-stroke-color`) into the
 // single shorthand the HTML exporter emits and the importer parses. The
@@ -641,6 +1132,83 @@ function resolveTextStroke(computed) {
 function appendTextStroke(parts, computed) {
   const value = resolveTextStroke(computed);
   if (value) parts.push(`-webkit-text-stroke: ${value}`);
+}
+
+// Translate CSS `text-shadow` (a text glow like `0 0 12px rgba(...)`) into an
+// equivalent `filter: drop-shadow(...)` chain so it survives into PAGX. The
+// importer has no `text-shadow` property, but it lowers `filter: drop-shadow()`
+// onto a DropShadowFilter (HTMLLayerBuilder / HTMLAnimationBuilder). For an
+// element that paints no box, `filter: drop-shadow` glows only the rendered
+// glyphs — visually identical to `text-shadow`. The caller (buildStyle) gates
+// this on `!hasBoxVisualsForInline(computed)` so a solid panel is never haloed,
+// and only invokes it inside the `opts.text` branch (elements that render text
+// directly), which avoids double-glowing when the inherited `text-shadow`
+// re-appears on both a container and its text leaves.
+//
+// Computed `text-shadow` is `<color> <offX> <offY> [<blur>]` per shadow, comma
+// separated (no `inset`, no spread). Each maps to `drop-shadow(offX offY blur
+// color)`; a missing blur defaults to `0px`. The chain is merged into any
+// `filter` already emitted (a second inline `filter:` would clobber the first).
+function appendTextShadow(parts, computed) {
+  const raw = computed.getPropertyValue('text-shadow').trim();
+  if (!raw || raw === 'none') return;
+  // Top-level comma split that keeps `rgb(...)` / `hsl(...)` colour commas
+  // intact (they nest inside parens).
+  const items = [];
+  let depth = 0;
+  let seg = '';
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) {
+      items.push(seg);
+      seg = '';
+    } else {
+      seg += ch;
+    }
+  }
+  if (seg) items.push(seg);
+  const chain = [];
+  for (const item of items) {
+    const spec = item.trim();
+    if (!spec) continue;
+    // Whitespace tokeniser that keeps function args (`rgb(...)`) intact.
+    const tokens = [];
+    let d = 0;
+    let cur = '';
+    for (let i = 0; i < spec.length; i++) {
+      const c = spec[i];
+      if (c === '(') d++;
+      else if (c === ')') d = Math.max(0, d - 1);
+      if (d === 0 && /\s/.test(c)) {
+        if (cur) {
+          tokens.push(cur);
+          cur = '';
+        }
+      } else {
+        cur += c;
+      }
+    }
+    if (cur) tokens.push(cur);
+    const lengths = [];
+    const colors = [];
+    for (const t of tokens) {
+      if (/^-?[\d.]+(px)?$/.test(t)) lengths.push(t);
+      else colors.push(t);
+    }
+    if (lengths.length < 2) continue; // need at least offX / offY
+    const offX = lengths[0];
+    const offY = lengths[1];
+    const blur = lengths.length >= 3 ? lengths[2] : '0px';
+    const color = colors.length ? colors.join(' ') : 'rgb(0, 0, 0)';
+    chain.push(`drop-shadow(${offX} ${offY} ${blur} ${color})`);
+  }
+  if (!chain.length) return;
+  const glow = chain.join(' ');
+  const idx = parts.findIndex((p) => p.indexOf('filter:') === 0);
+  if (idx >= 0) parts[idx] = `${parts[idx]} ${glow}`;
+  else parts.push(`filter: ${glow}`);
 }
 
 // Forward `background-size` / `background-repeat` / `background-position` when the element
@@ -807,6 +1375,11 @@ function buildStyle(left, top, width, height, computed, opts) {
     for (const entry of STYLE_SCHEMA_BOX) {
       appendStyleProp(parts, computed, entry);
     }
+    // Geometric clip-path (inset/circle/ellipse/polygon/path) is not a plain
+    // property copy — it needs the element's box size to resolve %/calc, so it
+    // is synthesized into a `<clipPath>` def and rewritten to `url(#id)` here.
+    // (The STYLE_SCHEMA loop above already forwarded any `url(...)` clip-path.)
+    appendGeometricClipPath(parts, computed, width, height);
     // Border / shadow are emitted between the box-scope and text-scope blocks
     // so the resulting declaration order matches the historical hand-written
     // layout. See appendBorder / appendBoxShadow for the per-helper
@@ -824,6 +1397,18 @@ function buildStyle(left, top, width, height, computed, opts) {
       appendStyleProp(parts, computed, entry, ctx);
     }
     appendTextStroke(parts, computed);
+    // Text glow: forward `text-shadow` as a `filter: drop-shadow(...)` chain so
+    // the glow survives import (the importer lowers a drop-shadow filter onto a
+    // DropShadowFilter but has no `text-shadow`). `filter` glows the element's
+    // whole painted content, so only skip when THIS style call also paints a
+    // box (`opts.box` with a background/border/shadow) — a whole-element glow
+    // would then halo the box. A text-only span (`opts.box` false, the common
+    // case: a text leaf inside a separately-painted wrapper) always glows just
+    // its glyphs, matching CSS text-shadow, even when the inherited `computed`
+    // carries the wrapper's background.
+    if (!(opts.box && hasBoxVisualsForInline(computed))) {
+      appendTextShadow(parts, computed);
+    }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
     // currentColor stroke/fill picks up the right tint.
@@ -846,6 +1431,12 @@ function buildStyle(left, top, width, height, computed, opts) {
       parts.push(`transform-origin: ${opts.transform.transformOrigin}`);
     }
   }
+
+  // Forward a canonical `pagxAnim*` animation (set by animation-capture.ts) so
+  // the importer can map it onto a PAGX animation. Emitted for every element
+  // kind so animated containers, text leaves and replaced elements all carry
+  // their declaration.
+  appendAnimation(parts, computed);
 
   return parts.join('; ');
 }
@@ -1252,8 +1843,17 @@ function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
 // thumbnails authored with `object-fit: cover` (CMS hero images, avatar
 // crops, …) would render with the wrong aspect ratio against the live
 // browser baseline.
-function imageInnerStyle(rect, flexItem, objectFit) {
-  const base = flexItem
+function imageInnerStyle(rect, flexItem, objectFit, forceExplicitSize) {
+  // Under flex mode the wrapper is not absolutely positioned, so a raster image
+  // fills the wrapper via flow sizing (`width/height: 100%`). A *vector* source
+  // (`.svg`) is different: `pagx resolve` inlines the SVG as vector paths and
+  // must scale them to a concrete target read off this layer's width/height. A
+  // percentage size is NaN at resolve time (layout has not run), so the SVG
+  // falls back to its own intrinsic size (e.g. a potrace `width="477pt"` = 636
+  // px) and overflows the flex-sized box, rendering as a clipped corner. Emit
+  // the browser-measured pixel size so resolve gets a real target — this is
+  // also more faithful, since it is exactly the size the page painted the icon.
+  const base = (flexItem && !forceExplicitSize)
     ? `width: 100%; height: 100%`
     : `position: absolute; left: 0px; top: 0px; ` +
       `width: ${px(rect.width)}; height: ${px(rect.height)}`;
@@ -1261,6 +1861,17 @@ function imageInnerStyle(rect, flexItem, objectFit) {
     return `${base}; object-fit: ${objectFit}`;
   }
   return base;
+}
+
+// True when an <img> source is an SVG (by extension or `data:` MIME). SVG
+// sources are inlined as resolvable vector paths downstream, so their host
+// layer needs an explicit pixel size (see imageInnerStyle); raster sources do
+// not. Query strings / fragments after the extension are tolerated.
+function isSvgSource(src) {
+  const s = (src || '').trim().toLowerCase();
+  if (!s) return false;
+  if (s.indexOf('data:image/svg+xml') === 0) return true;
+  return /\.svg(?:[?#]|$)/.test(s);
 }
 
 // Walk an SVG subtree and freeze the CSS-resolved paint state onto each
@@ -1357,6 +1968,24 @@ function freezeSvg(svgEl, rect) {
     // opacity here; the walk below also skips freezing it back as an attribute. Only the
     // root is affected — CSS `opacity` does not inherit, so descendants keep theirs.
     clone.style.removeProperty('opacity');
+    // `animation` is wrapper-owned for the same reason: `renderSvg`'s wrapper `<div>`
+    // already carries the SVG's `pagxAnim*` animation and its `transform-origin`
+    // (buildStyle → appendAnimation), and that is the box the importer pivots the
+    // animated transform around. Leaving the identical `animation` on the root `<svg>`
+    // makes the runtime play it a SECOND time on the inner layer — doubling every
+    // scale/translate/opacity/filter step (e.g. a glitch glyph's `scale(2)` becomes
+    // ~4× and floods the frame as a solid block, with the drop-shadow copies smeared
+    // into offset colour bars). Strip the root's own animation so the transform lives
+    // on exactly one element. Descendant shape animations (buildForInlineSvgShape)
+    // target inner nodes, not the root, so they are untouched.
+    clone.style.removeProperty('animation');
+    clone.style.removeProperty('animation-name');
+    clone.style.removeProperty('animation-duration');
+    clone.style.removeProperty('animation-timing-function');
+    clone.style.removeProperty('animation-iteration-count');
+    clone.style.removeProperty('animation-direction');
+    clone.style.removeProperty('animation-delay');
+    clone.style.removeProperty('animation-fill-mode');
   }
   // A directly-authored `opacity` attribute on the root <svg> is the same wrapper-owned
   // value in attribute form; drop it so the walk's freeze pass treats the root as having
@@ -1994,7 +2623,7 @@ function flexItemChildren(el) {
     const tag = c.tagName.toLowerCase();
     if (DROP_TAGS.has(tag)) continue;
     const cs = getComputedStyle(c);
-    if (!isVisible(cs)) continue;
+    if (!isVisible(cs, c)) continue;
     if (cs.display === 'contents') return null;
     const pos = cs.position;
     if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return null;
@@ -2298,7 +2927,7 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
   const alt = escapeHtml(el.getAttribute('alt') || '');
   const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
+  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit, isSvgSource(src));
   const dataAttrs = forwardDataAttrs(el);
   const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs} style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
@@ -2573,7 +3202,18 @@ function isInlineRunChild(el) {
   const tag = el.tagName.toLowerCase();
   if (!INLINE_RUN_TAGS.has(tag)) return false;
   const cs = getComputedStyle(el);
-  if (!isVisible(cs)) return false;
+  if (!isVisible(cs, el)) return false;
+  // An inline run carrying its own `pagxAnim*` animation (e.g. a per-character
+  // decode-typewriter where each `<span class="ch">` fades/decodes in on its own
+  // opacity/color keyframes) must NOT be collapsed into a static text leaf: the
+  // inline-run emit path forwards only text-scope declarations and folds the
+  // child's `opacity` into its `color` alpha at the static base value, silently
+  // dropping the animation (a t=0 `opacity:0` char is frozen fully transparent
+  // and never reveals). Bail so the element takes the absolute-positioned
+  // container path instead, which preserves each animated child as its own
+  // Layer that plays the reveal — matching how a multi-line / overlay-bearing
+  // sibling run is already handled.
+  if (hasPagxAnimation(cs)) return false;
   const display = cs.display;
   if (display !== 'inline' && display !== 'inline-block') return false;
   if (cs.position !== 'static') return false;
@@ -2956,6 +3596,27 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   // metrics differ from Chromium's by a sub-pixel — the measured wrapper
   // rect already matches Chromium's natural line width.
   if (opts.flexItem) {
+    // A flex-item text leaf that carries its own `pagxAnim*` reveal AND whose
+    // base opacity is < 1 (a per-character decode/typewriter where each glyph
+    // fades in on its own opacity keyframes) must be emitted as a sized
+    // flex-item BOX that keeps that box-level `opacity` + animation — NOT the
+    // bare pure-inline `<span>` below. The pure-inline path forwards only
+    // text-scope declarations (color/font/letter-spacing/…) and drops the
+    // box-scope `opacity`, so the importer folds the reveal into a static
+    // colour alpha and freezes the glyph at its resting (fully-visible) state:
+    // the loose value text in a `<div class="spec"><b>CLASS</b>/ ROGUE BLADE</div>`
+    // flex row then pops in from t=0 while the `<b>` label (which takes the
+    // absolute-positioned char-box path) correctly stays hidden until typed.
+    // The box mirrors that char-box path — `opacity`/animation on the outer
+    // Layer, colour flash on the inner text span — so the reveal plays and the
+    // flex row still measures the item's width for layout.
+    if (flexCharCarriesReveal(computed)) {
+      const textNode = firstTextNodeChild(el);
+      const revealSpans = textNode
+        ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+        : [];
+      return `<div style="${boxStyle}">${revealSpans.join('')}${overlays}</div>`;
+    }
     const baseTextStyle = buildStyle(0, 0, 0, 0, computed, {
       box: false, text: true, positioned: false,
     });
@@ -3482,8 +4143,22 @@ function render(el, parentRect, opts, precomputed) {
 // is what makes the two renders comparable.
 function prepareBodyForSnapshot() {
   const body = document.body;
+  // Reset the geometric clip-path def registry so a re-run (this function is the
+  // registered `takeSnapshot` and may be evaluated more than once per page) does
+  // not accumulate defs from a previous pass. `appendGeometricClipPath` fills it
+  // during the tree walk; it is flushed into a hidden `<svg>` in the output below.
+  window.__pagxClipDefs = [];
+  window.__pagxClipDefMap = {};
   body.style.margin = '0';
   body.style.padding = '0';
+  // Make <body> a containing block before any measurement runs. The output
+  // <style> block pins `body{position:relative}` so that the emitted
+  // `position: absolute` children resolve against the body's box; mirror that on
+  // the LIVE document here so the source page (where <body> is `position: static`
+  // by default) resolves `right`/`bottom` anchors of absolute children against
+  // the body rather than the initial containing block, keeping the live
+  // measurements and the emitted subset on one origin.
+  body.style.position = 'relative';
   const docEl = document.documentElement;
   if (docEl && docEl.style) {
     docEl.style.margin = '0';
@@ -3505,6 +4180,43 @@ function prepareBodyForSnapshot() {
   if (typeof window.scrollTo === 'function') {
     try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
   }
+  // Cancel every running CSS animation so the snapshot measures the element
+  // in its base (un-animated) state. Without this, `direction: reverse` and
+  // any other non-zero starting phase would shift the element away from its
+  // CSS-declared position by the time `getBoundingClientRect()` runs — and
+  // the same offset would also surface through `getComputedStyle(.).transform`,
+  // so both the `top/left` and the static `transform: matrix(...)` written
+  // into the subset would carry the animation offset twice (once baked into
+  // the rect, once forwarded as a static transform). The PAGX importer then
+  // adds the keyframe channel on top, tripling the offset. CSS animations
+  // surface as WAAPI `Animation` objects via `getAnimations()`; calling
+  // `cancel()` on each removes the effect from computed style without
+  // touching the stylesheet rules, so longhand reads (`animation-name`,
+  // `-direction`, `-duration`, …) still resolve correctly when the snapshot
+  // walker emits them.
+  //
+  // The canonical `pagxAnim*` animations the capture layer just installed are
+  // cancelled too: the shorthand was written into the element's *inline*
+  // `style.animation` (animation-capture.ts), and `cancel()` only stops the
+  // running WAAPI effect — it does not erase the inline declaration, so
+  // `getComputedStyle(.).animation-name/-direction/-duration/…` still resolve
+  // to the captured longhand when `appendAnimation()` later serialises the
+  // element. Skipping them here was the source of a "double-write" bug:
+  // `direction: reverse` keeps the element pinned at its 100% keyframe (e.g.
+  // `translateY(120px)` + `opacity: 0`), so `getBoundingClientRect()` and
+  // `getComputedStyle().transform` both reported the offset position and the
+  // subset emitted the same translation twice (once as `top`, once as
+  // `transform: matrix(...)`).
+  try {
+    if (typeof document.getAnimations === 'function') {
+      const all = document.getAnimations();
+      for (let i = 0; i < all.length; i++) {
+        try {
+          all[i].cancel();
+        } catch (_) { /* ignore per-anim failure */ }
+      }
+    }
+  } catch (_) { /* ignore */ }
   // Force layout flush.
   void body.offsetHeight;
 }
@@ -3531,6 +4243,28 @@ function measureCanvas() {
   prepareBodyForSnapshot();
   const body = document.body;
   const bodyRect = body.getBoundingClientRect();
+  // `prepareBodyForSnapshot` forces an inline `position: relative` on the live
+  // <body> so that `right`/`bottom`-anchored absolute children resolve against
+  // the body (not the initial containing block) during the emission walk. But
+  // that role change also makes every body-anchored `position: absolute` child
+  // part of the body's scrollable overflow, so `scrollWidth`/`scrollHeight`
+  // would grow to include any such child that overflows the body's own box —
+  // e.g. a bottom-pinned nav bar whose inner content is wider than the bar,
+  // which inflates the canvas past the body (weibo: 390x780 -> 422x796).
+  //
+  // The canvas must match the eval baseline's screenshot clip, and baseline.js
+  // measures `body.scrollWidth/scrollHeight` WITHOUT injecting any position (it
+  // only zeroes margin/padding), i.e. against the body's *authored* position.
+  // Mirror that here: drop the injected inline `relative` for the scroll read so
+  // the body falls back to its authored containing-block role (`static` unless
+  // the page's own CSS set it otherwise). In-flow content that overflows the
+  // declared size (fixed-size mocks, fluid feeds) still grows the canvas, while
+  // an absolute child whose containing block is the initial containing block —
+  // not the body — no longer does. The injected `relative` is restored right
+  // afterward so the tree walk keeps its body-anchored geometry.
+  const savedPosition = body.style.position;
+  body.style.position = '';
+  void body.offsetHeight;
   const width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
   // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
   // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
@@ -3540,6 +4274,8 @@ function measureCanvas() {
     MAX_CAPTURE_HEIGHT_PX,
     Math.max(body.scrollHeight, Math.round(bodyRect.height)),
   );
+  body.style.position = savedPosition;
+  void body.offsetHeight;
   return { width, height };
 }
 
@@ -3632,11 +4368,36 @@ function snapshotMain(opts) {
   // Element selectors inside a single `<style>` block are inside the
   // subset (`spec/html_subset.md` §3.3); the pagx importer parses them,
   // applies the (no-op) declarations, and drops the `<style>` element.
-  const styleBlock =
+  let styleBlock =
     'div,span,img,svg,body{box-sizing:border-box}' +
     'html{min-height:100vh;display:flex;justify-content:center;' +
     'align-items:flex-start;padding:32px 0}' +
     'body{margin:0;padding:0;position:relative;flex-shrink:0}';
+
+  // animation-capture.ts (run before this snapshot) stashes the canonical
+  // `@keyframes` it synthesised in a dedicated <style id="__pagx_anim_keyframes">.
+  // Fold them into the single output <style> so the importer's
+  // StyleSheetCollectorPass picks them up alongside the `animation-*` longhands
+  // that appendAnimation() forwarded onto each element. The block is appended
+  // (not prepended) so element selectors above keep their precedence.
+  const animKeyframes = document.getElementById('__pagx_anim_keyframes');
+  if (animKeyframes && animKeyframes.textContent) {
+    styleBlock += animKeyframes.textContent.trim();
+  }
+
+  // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
+  // hidden `<svg>` at the top of <body>. `display:none` keeps it out of the
+  // browser preview render, but the pagx importer's `collectSharedDefs` still
+  // indexes every id under a `<defs>` from the parsed DOM, so the `url(#pagxClipN)`
+  // rewrites resolve into contour masks. Coordinates are in userSpaceOnUse
+  // border-box pixels, which is also how a browser applies the url() clip.
+  const clipDefs = (window.__pagxClipDefs && window.__pagxClipDefs.length)
+    ? window.__pagxClipDefs : [];
+  const clipDefsSvg = clipDefs.length
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" ' +
+      'style="display:none" aria-hidden="true"><defs>' + clipDefs.join('') +
+      '</defs></svg>\n'
+    : '';
 
   return {
     html:
@@ -3647,7 +4408,7 @@ function snapshotMain(opts) {
     <style>${styleBlock}</style>
   </head>
   <body style="${bodyStyle.join('; ')}">
-${parts.join('')}
+${clipDefsSvg}${parts.join('')}
   </body>
 </html>
 `,
@@ -3736,7 +4497,7 @@ const STYLE_SCHEMA = [
   // group must survive the snapshot. mask-image defaults to none and is dropped;
   // the descriptors are forwarded only when the element actually carries a mask,
   // gated by appendMaskFitting below (they are noise on unmasked boxes).
-  { prop: 'mask-image',       scope: 'box',  defaults: ['none'] },
+  { prop: 'mask-image',       scope: 'box',  defaults: ['none'], normalize: normalizeMaskImage },
   // clip-path: url(#id) references a hidden clipPath def the snapshot keeps as an
   // inline svg; the importer resolves the def into a contour mask layer (the
   // inverse of HTMLWriter::writeClipDef). CSS basic shapes (polygon/path/circle/
@@ -3776,8 +4537,19 @@ const HELPER_FNS = [
   normalizeOverflow,
   normalizeBorderRadius,
   normalizeBackgroundImage,
+  normalizeMaskImage,
   normalizeBackgroundClip,
   normalizeClipPath,
+  pagxClipNum,
+  pagxClipSplitTop,
+  pagxEvalLengthPx,
+  pagxParseClipShape,
+  pagxClipRefRect,
+  pagxClipPosition,
+  pagxClipRadius,
+  pagxClipShapeToInner,
+  pagxClipPathInnerMarkup,
+  appendGeometricClipPath,
   normalizeWritingMode,
   roundPx,
   px,
@@ -3787,6 +4559,8 @@ const HELPER_FNS = [
   withNowrap,
   paddingShorthand,
   nonZero,
+  hasPagxAnimation,
+  hasHiddenAnimatedAncestor,
   isVisible,
   readNum,
   readBox,
@@ -3812,8 +4586,10 @@ const HELPER_FNS = [
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
+  appendAnimation,
   resolveTextStroke,
   appendTextStroke,
+  appendTextShadow,
   appendBackgroundImageFitting,
   appendMaskFitting,
   buildStyle,
@@ -3830,6 +4606,7 @@ const HELPER_FNS = [
   isCssBorderTrianglePattern,
   renderBorderTriangle,
   imageInnerStyle,
+  isSvgSource,
   freezeSvg,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
@@ -3842,6 +4619,7 @@ const HELPER_FNS = [
   resolveInlineTextValue,
   isInlineRunChild,
   isInlineTextLeafCandidate,
+  flexCharCarriesReveal,
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
@@ -4010,6 +4788,13 @@ async function inlineExternalImages(cachedMap) {
     const rawSrc = (img.getAttribute('src') || '').trim();
     const rawSrcset = (img.getAttribute('srcset') || '').trim();
     if (!rawSrc && !rawSrcset) continue;
+    // Skip images an earlier pass already inlined (a `data:` URI or local path
+    // stamped on `data-snapshot-src`). This function may run more than once on
+    // a JS-driven page — components can mount fresh <img>s after the first pass
+    // (e.g. once the animation-capture virtual clock advances) — so this guard
+    // keeps the repeat pass from needlessly re-fetching every already-inlined
+    // image and only lets the newly mounted ones fall through.
+    if ((img.getAttribute('data-snapshot-src') || '').trim()) continue;
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
     if (!src) continue;
     if (src.startsWith('data:')) continue;
@@ -4217,6 +5002,20 @@ async function materializeDecorativePseudoElements() {
     'box-sizing',
     'color', 'font-family', 'font-size', 'font-weight', 'font-style',
     'line-height', 'letter-spacing', 'text-align',
+    // Animation longhands are forwarded so an *animated* decorative pseudo
+    // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
+    // -> scaleX(1)`) keeps its motion on the synthetic node. The animation is
+    // declared against the pseudo selector, which the synthetic `<div>` does
+    // not match, so without copying these the div would freeze at whatever
+    // phase the capture-pause init script left the pseudo in (t=0 = the 0%
+    // keyframe, typically `opacity: 0` / `scaleX(0)`) and then be dropped by
+    // the walker's `isVisible` (opacity 0, no `pagxAnim*`) or collapse to a
+    // zero-size box (`scaleX(0)`). `animation-play-state` is intentionally
+    // omitted: the global capture-pause rule owns it and the sampler drives
+    // `currentTime` directly.
+    'animation-name', 'animation-duration', 'animation-timing-function',
+    'animation-delay', 'animation-iteration-count', 'animation-direction',
+    'animation-fill-mode',
   ];
 
   // Defaults emitted by Chromium for properties that don't change anything.
@@ -4247,6 +5046,10 @@ async function materializeDecorativePseudoElements() {
     ['transform', 'none'],
     ['z-index', 'auto'],
     ['box-sizing', 'content-box'],
+    ['animation-name', 'none'], ['animation-duration', '0s'],
+    ['animation-timing-function', 'ease'], ['animation-delay', '0s'],
+    ['animation-iteration-count', '1'], ['animation-direction', 'normal'],
+    ['animation-fill-mode', 'none'],
   ]);
 
   // A pseudo's `content` value reaches us with quotes preserved
@@ -4307,6 +5110,46 @@ async function materializeDecorativePseudoElements() {
     return parts.join('; ');
   }
 
+  // Return the pseudo's *resting* (un-animated) computed style so the copied
+  // box reflects the state the walker will measure after `takeSnapshot`
+  // cancels every animation — not the frozen 0%-keyframe phase the
+  // capture-pause init script leaves running pseudos in. When the pipeline
+  // freezes the page at t=0, an entrance-animated pseudo (e.g. `animation:
+  // nbLine ... { 0% { opacity: 0; transform: scaleX(0) } }`) reads as
+  // invisible / zero-scaled; baking that in would bury the box's real
+  // geometry and paint colour under transient keyframe values. Cancelling the
+  // pseudo's own WAAPI animation reverts its computed style to the base rule
+  // (the animatable channels fall back to their static / initial values)
+  // while leaving `animation-*` longhands intact for the forwarding copy, so
+  // the synthetic div lands with correct resting geometry AND the animation
+  // that the capture pass then re-samples into a `pagxAnim*`. The pseudo is
+  // never serialised itself (the walker only sees DOM nodes), so cancelling
+  // its animation on the live page has no output-visible side effect. Falls
+  // back to the original style object if `getAnimations` is unavailable or
+  // throws (older engines) — the frozen state is still better than dropping
+  // the box entirely.
+  function restingPseudoStyle(el, pseudo, cs) {
+    const animName = (cs.getPropertyValue('animation-name') || '').trim();
+    if (!animName || animName === 'none') return cs;
+    try {
+      if (typeof el.getAnimations !== 'function') return cs;
+      const anims = el.getAnimations({ subtree: true });
+      let cancelledAny = false;
+      for (let a = 0; a < anims.length; a++) {
+        const eff = anims[a].effect;
+        if (eff && eff.target === el && eff.pseudoElement === pseudo) {
+          try { anims[a].cancel(); cancelledAny = true; } catch (_) { /* ignore */ }
+        }
+      }
+      if (!cancelledAny) return cs;
+      // Flush style/layout so the fresh read reflects the cancelled state.
+      void el.offsetHeight;
+      return getComputedStyle(el, pseudo);
+    } catch (_) {
+      return cs;
+    }
+  }
+
   // `<svg>` subtrees are an opaque resolver target downstream — leaving
   // pseudo-elements declared on inline SVG markup alone matches how the
   // snapshot already passes the SVG through verbatim.
@@ -4361,7 +5204,11 @@ async function materializeDecorativePseudoElements() {
 
       const div = document.createElement('div');
       div.setAttribute('data-snapshot-pseudo', slot.pseudo);
-      const style = emitInlineStyle(slot.cs);
+      // Read the pseudo's resting style (cancelling its own animation) so an
+      // entrance-animated pseudo isn't baked at its invisible 0% keyframe; the
+      // forwarded `animation-*` longhands (see COPY_PROPS) keep the motion.
+      const restingCs = restingPseudoStyle(el, slot.pseudo, slot.cs);
+      const style = emitInlineStyle(restingCs);
       if (style) div.setAttribute('style', style);
       // `::before` is painted before the host's children, `::after` after.
       // Mirror that order in the DOM so the natural document order matches.
@@ -4401,6 +5248,10 @@ export {
   bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
+  flexCharCarriesReveal,
+  pagxEvalLengthPx,
+  pagxParseClipShape,
+  pagxClipPathInnerMarkup,
   dashedBorderSideSvg,
   forwardDataAttrs,
   normalizeBackgroundImage,

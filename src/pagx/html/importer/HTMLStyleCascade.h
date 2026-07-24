@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
 
 namespace pagx {
 
@@ -78,6 +79,12 @@ class HTMLStyleCascade {
    *  layout, visuals, transform). */
   HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
 
+  /** Returns the `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name.
+   *  Populated by `collectStyles`; consumed by the animation builder (see §13). */
+  const std::unordered_map<std::string, html::CssKeyframesRule>& keyframes() const {
+    return _keyframes;
+  }
+
  private:
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
   void mergeClassRules(const std::string& classAttribute, PropertyMap& out);
@@ -123,6 +130,10 @@ class HTMLStyleCascade {
   // cleared first; switching to `weak_ptr<DOMNode>` would express the constraint at the cost of
   // a hash-table indirection.
   std::unordered_map<const DOMNode*, PropertyMap> _resolvedCache = {};
+
+  // `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name. The last
+  // definition of a given name wins, matching CSS cascade order.
+  std::unordered_map<std::string, html::CssKeyframesRule> _keyframes = {};
 };
 
 }  // namespace pagx

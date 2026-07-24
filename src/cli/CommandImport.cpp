@@ -201,7 +201,7 @@ struct SnapshotResult {
 // subset). snapshot.js routes its `wrote ...` progress line and any browser errors to
 // stderr, which `popen` leaves connected to the parent's stderr — so the user still sees
 // progress and diagnostics while we get a clean HTML payload back on stdout.
-static SnapshotResult RunHTMLSnapshot(const std::string& inputPath) {
+static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool captureAnimations) {
   SnapshotResult result;
   auto bin = ResolveSnapshotBin();
   if (bin.empty()) {
@@ -215,6 +215,11 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath) {
   command += " ";
   command += ShellQuote(inputPath);
   command += " -o -";
+  // Opt into animation capture; snapshot.js is static-by-default, so the flag is
+  // only appended when the caller asked for it.
+  if (captureAnimations) {
+    command += " --capture-animations";
+  }
 
   FILE* pipe = popen(command.c_str(), "r");
   if (pipe == nullptr) {
@@ -321,7 +326,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
       // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
       // subset HTML) straight to the importer. No temp file touches the disk; the HTML
       // lives in this string for the duration of the call.
-      auto snap = RunHTMLSnapshot(filePath);
+      auto snap = RunHTMLSnapshot(filePath, formatOptions.captureAnimations);
       if (!snap.error.empty()) {
         result.error = snap.error;
         return result;
@@ -405,6 +410,9 @@ static void PrintUsage() {
       << "  --format <format>              Force input format (svg, html)\n"
       << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
       << "                                 <svg>) instead of expanding them into native nodes\n"
+      << "  --capture-animations           HTML/URL only: capture the page's animations (CSS\n"
+      << "                                 @keyframes, Web Animations, GSAP, anime.js) into the\n"
+      << "                                 output so they replay in PAGX. Default: a static frame\n"
       << "  --images <mode>                How image resources are stored: 'external' (default;\n"
       << "                                 write image files next to the output PAGX and keep the\n"
       << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
@@ -422,6 +430,7 @@ static void PrintUsage() {
       << "  pagx import --input layout.html                   # HTML to layout.pagx\n"
       << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
       << "  pagx import --input page.html --no-resolve        # keep import directives\n"
+      << "  pagx import --input page.html --capture-animations # replay page animations in PAGX\n"
       << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
 }
 
@@ -437,6 +446,8 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->format = argv[++i];
     } else if (arg == "--no-resolve") {
       options->resolve = false;
+    } else if (arg == "--capture-animations") {
+      options->formatOptions.captureAnimations = true;
     } else if (arg == "--images" && i + 1 < argc) {
       std::string mode = argv[++i];
       if (!ParseImageStorageMode(mode, &options->imageStorage)) {
@@ -504,9 +515,21 @@ int RunImport(int argc, char* argv[]) {
     // inline `<svg>` as directive content, so no base directory prefix is needed here.
     auto resolveStats = ResolveDocument(result.document.get(), "", options.formatOptions);
     if (resolveStats.errorCount > 0) {
-      std::cerr << "pagx import: error: failed to resolve " << resolveStats.errorCount
-                << " import directive(s)\n";
-      return 1;
+      // A directive that cannot be resolved must not abort the whole conversion. This happens for
+      // an external SVG `<img>` whose source the snapshot pass could not inline into a
+      // `data:`/local reference — e.g. a site-absolute `/icon.svg` path from a URL import, a 404 /
+      // cross-origin fetch, or an image that mounted only after the inline pass (common on
+      // JS-rendered pages, where the animation-capture virtual clock defers DOM mounts). Such a
+      // source ends up as a bare `import` directive that resolve then tries to read as a local
+      // file and fails. Treat this like the non-fatal handling of an unresolvable raster `<img>`
+      // (preserved as an empty image slot): one missing external asset must not discard an
+      // otherwise-complete document. Drop the leftover directive so the Layer becomes a plain
+      // (empty) box and the output stays fully flattened — `pagx render` rejects any document that
+      // still carries an unresolved directive.
+      int dropped = DropUnresolvedDirectives(result.document.get());
+      std::cerr << "pagx import: warning: failed to resolve " << resolveStats.errorCount
+                << " import directive(s); dropped " << dropped
+                << " unresolvable reference(s) from the output\n";
     }
   }
 

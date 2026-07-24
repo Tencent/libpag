@@ -545,6 +545,77 @@ bool ParseCSSHSLColor(const std::string& value, Color& out) {
   return true;
 }
 
+bool ParseCSSColorFunction(const std::string& value, Color& out) {
+  std::string trimmed = TrimAsciiWS(value);
+  if (trimmed.empty()) return false;
+  if (!StartsWithIgnoreCase(trimmed, "color", 5)) return false;
+  size_t open = trimmed.find('(', 5);
+  if (open == std::string::npos) return false;
+  size_t close = trimmed.rfind(')');
+  if (close == std::string::npos || close <= open) return false;
+  std::string inner = trimmed.substr(open + 1, close - open - 1);
+  const char* ptr = inner.c_str();
+  const char* end = ptr + inner.size();
+  while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r')) {
+    ++ptr;
+  }
+  // CSS Color 4 reserves the leading ident as the color space ("srgb", "srgb-linear",
+  // "display-p3", "rec2020", "a98-rgb", "prophoto-rgb", "xyz", "xyz-d50", "xyz-d65").
+  // Hyphens are valid ident chars; ConsumeUnit() only accepts letters/%/_ so it would
+  // truncate "srgb-linear" to "srgb". Walk the ident manually instead.
+  std::string space;
+  while (ptr < end &&
+         (std::isalpha(static_cast<unsigned char>(*ptr)) ||
+          std::isdigit(static_cast<unsigned char>(*ptr)) || *ptr == '-' || *ptr == '_')) {
+    space.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(*ptr))));
+    ++ptr;
+  }
+  if (space.empty()) return false;
+  // The pipeline currently only renders sRGB. Other spaces are technically lossy if folded
+  // into sRGB without a real color transform, so we refuse them and let the caller emit a
+  // targeted diagnostic instead of silently picking the wrong primaries.
+  if (space != "srgb") return false;
+
+  auto consumeChannel = [&](float& outValue) -> bool {
+    float v = 0;
+    if (!ConsumeNumber(ptr, end, v)) return false;
+    std::string unit = ConsumeUnit(ptr, end);
+    // CSS Color 4: a percentage is mapped to the 0..1 channel range; unitless values are
+    // already on 0..1. Anything else (deg/em/...) is invalid here.
+    if (!unit.empty() && unit != "%") return false;
+    if (unit == "%") v /= 100.0f;
+    outValue = v;
+    return true;
+  };
+
+  float r = 0, g = 0, b = 0, a = 1.0f;
+  if (!consumeChannel(r)) return false;
+  if (!consumeChannel(g)) return false;
+  if (!consumeChannel(b)) return false;
+  while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r')) {
+    ++ptr;
+  }
+  if (ptr < end && *ptr == '/') {
+    ++ptr;
+    float av = 0;
+    if (!ConsumeNumber(ptr, end, av)) return false;
+    std::string aUnit = ConsumeUnit(ptr, end);
+    if (!aUnit.empty() && aUnit != "%") return false;
+    if (aUnit == "%") av /= 100.0f;
+    a = av;
+  }
+  while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r')) {
+    ++ptr;
+  }
+  if (ptr != end) return false;
+  out.red = std::clamp(r, 0.0f, 1.0f);
+  out.green = std::clamp(g, 0.0f, 1.0f);
+  out.blue = std::clamp(b, 0.0f, 1.0f);
+  out.alpha = std::clamp(a, 0.0f, 1.0f);
+  out.colorSpace = ColorSpace::SRGB;
+  return true;
+}
+
 std::vector<float> ParseFloatList(const std::string& str) {
   std::vector<float> result = {};
   result.reserve(8);

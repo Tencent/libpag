@@ -1,0 +1,881 @@
+'use strict';
+
+const {
+  PAGX_ANIM_PREFIX,
+  PAGX_ANIM_STYLE_ID,
+  pagxExtractTranslate,
+  pagxPickProp,
+  pagxNormalizeProps,
+  pagxFillOffsets,
+  pagxOffsetFromKeyText,
+  pagxParseTimeMs,
+  pagxWhichVary,
+  pagxReduceKeyframes,
+  pagxBisectStepBoundary,
+  pagxParseColorChannels,
+  pagxParseFilterChannels,
+  pagxParseTranslateXY,
+  pagxStopScalarSeries,
+  pagxRdpKeep,
+  pagxDecimateStops,
+  pagxNormalizeTiming,
+  pagxBoxShadowToFilter,
+  pagxResolveWaapiEasing,
+  pagxBuildCanonicalAnimation,
+  pagxTransitionDescriptorFromBags,
+  pagxOverlayDisturbsFlow,
+  pagxTextSegments,
+  pagxGlobalSampleCount,
+  pagxClipNormalizeD,
+  buildAnimationCapturePayload,
+  capturePagxAnimationsOnPage,
+  PAGX_TRANSITION_INIT_SCRIPT,
+} = require('../dist/lib/animation-capture');
+
+describe('pagxExtractTranslate', () => {
+  test('returns null for none / empty', () => {
+    expect(pagxExtractTranslate('none')).toBeNull();
+    expect(pagxExtractTranslate('')).toBeNull();
+  });
+
+  test('normalises translateX / translateY to translate(x, y)', () => {
+    expect(pagxExtractTranslate('translateX(40px)')).toBe('translate(40px, 0px)');
+    expect(pagxExtractTranslate('translateY(20px)')).toBe('translate(0px, 20px)');
+  });
+
+  test('passes through a two-arg translate', () => {
+    expect(pagxExtractTranslate('translate(10px, 5px)')).toBe('translate(10px, 5px)');
+  });
+
+  test('decomposes a pure-translation 2D matrix', () => {
+    expect(pagxExtractTranslate('matrix(1, 0, 0, 1, 12, 34)')).toBe('translate(12px, 34px)');
+  });
+
+  test('keeps the translate component of a matrix carrying rotation/scale', () => {
+    expect(pagxExtractTranslate('matrix(2, 0, 0, 2, 12, 34)')).toBe('translate(12px, 34px)');
+    expect(pagxExtractTranslate('matrix(0, 1, -1, 0, 5, 6)')).toBe('translate(5px, 6px)');
+  });
+
+  test('keeps the translate component of a matrix3d carrying scale', () => {
+    expect(
+      pagxExtractTranslate('matrix3d(2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 7, 8, 0, 1)'),
+    ).toBe('translate(7px, 8px)');
+  });
+
+  test('drops rotate / scale (no translate component)', () => {
+    expect(pagxExtractTranslate('rotate(45deg)')).toBeNull();
+    expect(pagxExtractTranslate('scale(1.5)')).toBeNull();
+  });
+
+  test('keeps only the translate part of a compound transform', () => {
+    expect(pagxExtractTranslate('translate(8px, 9px) rotate(45deg)')).toBe('translate(8px, 9px)');
+  });
+
+  test('resolves percent translate against the box dimensions', () => {
+    expect(pagxExtractTranslate('translate(-50%, 0px)', { width: 200, height: 80 }))
+      .toBe('translate(-100px, 0px)');
+    expect(pagxExtractTranslate('translateY(25%)', { width: 100, height: 80 }))
+      .toBe('translate(0px, 20px)');
+  });
+
+  test('forwards percent translate verbatim when no box is provided', () => {
+    expect(pagxExtractTranslate('translate(-50%, 0px)')).toBe('translate(-50%, 0px)');
+  });
+});
+
+describe('pagxPickProp', () => {
+  test('prefers kebab, falls back to camel', () => {
+    expect(pagxPickProp({ 'background-color': 'red' }, 'background-color', 'backgroundColor'))
+      .toBe('red');
+    expect(pagxPickProp({ backgroundColor: 'blue' }, 'background-color', 'backgroundColor'))
+      .toBe('blue');
+  });
+
+  test('returns null when neither key is present or non-empty', () => {
+    expect(pagxPickProp({}, 'opacity', 'opacity')).toBeNull();
+    expect(pagxPickProp({ opacity: '' }, 'opacity', 'opacity')).toBeNull();
+  });
+});
+
+describe('pagxNormalizeProps', () => {
+  test('keeps the runtime-playable subset only', () => {
+    const out = pagxNormalizeProps({
+      opacity: '0.5',
+      transform: 'translateX(5px)',
+      color: 'rgb(1, 2, 3)',
+      backgroundColor: 'rgb(4, 5, 6)',
+      width: '100px',
+    });
+    expect(out).toEqual({
+      opacity: '0.5',
+      transform: 'translate(5px, 0px)',
+      color: 'rgb(1, 2, 3)',
+      'background-color': 'rgb(4, 5, 6)',
+    });
+  });
+
+  test('drops a non-translate transform but keeps other channels', () => {
+    const out = pagxNormalizeProps({ opacity: '1', transform: 'rotate(10deg)' });
+    expect(out).toEqual({ opacity: '1' });
+  });
+
+  test('folds a box-shadow glow into the filter channel as drop-shadow', () => {
+    const out = pagxNormalizeProps({
+      opacity: '1',
+      boxShadow: 'rgb(40, 224, 208) 0px 0px 6px 0px, rgb(40, 224, 208) 0px 0px 12px 0px',
+    });
+    expect(out).toEqual({
+      opacity: '1',
+      filter: 'drop-shadow(0px 0px 6px rgb(40, 224, 208)) drop-shadow(0px 0px 12px rgb(40, 224, 208))',
+    });
+  });
+
+  test('appends the box-shadow drop-shadow after an existing filter', () => {
+    const out = pagxNormalizeProps({
+      filter: 'blur(2px)',
+      boxShadow: 'rgb(0, 0, 0) 1px 2px 3px 0px',
+    });
+    expect(out.filter).toBe('blur(2px) drop-shadow(1px 2px 3px rgb(0, 0, 0))');
+  });
+});
+
+describe('pagxBoxShadowToFilter', () => {
+  test('returns null for none / empty', () => {
+    expect(pagxBoxShadowToFilter('none')).toBeNull();
+    expect(pagxBoxShadowToFilter('')).toBeNull();
+    expect(pagxBoxShadowToFilter(null)).toBeNull();
+  });
+
+  test('converts a single outer shadow, dropping the spread', () => {
+    expect(pagxBoxShadowToFilter('rgb(40, 224, 208) 0px 0px 12px 0px'))
+      .toBe('drop-shadow(0px 0px 12px rgb(40, 224, 208))');
+  });
+
+  test('converts a multi-layer glow into a drop-shadow chain', () => {
+    expect(pagxBoxShadowToFilter(
+      'rgb(40, 224, 208) 0px 0px 6px 0px, rgb(40, 224, 208) 0px 0px 12px 0px',
+    )).toBe('drop-shadow(0px 0px 6px rgb(40, 224, 208)) drop-shadow(0px 0px 12px rgb(40, 224, 208))');
+  });
+
+  test('skips inset shadows (no drop-shadow analogue)', () => {
+    expect(pagxBoxShadowToFilter('rgb(0, 0, 0) 0px 0px 4px 0px inset')).toBeNull();
+    expect(pagxBoxShadowToFilter(
+      'rgb(0, 0, 0) 0px 0px 4px 0px inset, rgb(1, 2, 3) 0px 0px 8px 0px',
+    )).toBe('drop-shadow(0px 0px 8px rgb(1, 2, 3))');
+  });
+
+  test('defaults blur to 0px when only offsets are present', () => {
+    expect(pagxBoxShadowToFilter('rgb(9, 9, 9) 2px 3px')).toBe('drop-shadow(2px 3px 0px rgb(9, 9, 9))');
+  });
+});
+
+describe('pagxFillOffsets', () => {
+  test('spaces missing offsets evenly across the range', () => {
+    const norm = [
+      { offset: null, props: {} },
+      { offset: null, props: {} },
+      { offset: null, props: {} },
+    ];
+    pagxFillOffsets(norm);
+    expect(norm.map((k) => k.offset)).toEqual([0, 0.5, 1]);
+  });
+
+  test('a single missing offset becomes 0', () => {
+    const norm = [{ offset: null, props: {} }];
+    pagxFillOffsets(norm);
+    expect(norm[0].offset).toBe(0);
+  });
+});
+
+describe('pagxOffsetFromKeyText', () => {
+  test('maps from / to / percentages', () => {
+    expect(pagxOffsetFromKeyText('from')).toBe(0);
+    expect(pagxOffsetFromKeyText('to')).toBe(1);
+    expect(pagxOffsetFromKeyText('50%')).toBe(0.5);
+  });
+
+  test('returns null for unparsable text', () => {
+    expect(pagxOffsetFromKeyText('middle')).toBeNull();
+  });
+});
+
+describe('pagxParseTimeMs', () => {
+  test('parses s and ms', () => {
+    expect(pagxParseTimeMs('2s')).toBe(2000);
+    expect(pagxParseTimeMs('500ms')).toBe(500);
+  });
+
+  test('returns 0 for unitless / empty', () => {
+    expect(pagxParseTimeMs('5')).toBe(0);
+    expect(pagxParseTimeMs('')).toBe(0);
+  });
+});
+
+describe('pagxWhichVary', () => {
+  test('returns only the properties that change across samples', () => {
+    const samples = [
+      { opacity: '0', transform: 'translate(0px, 0px)', color: 'red', 'background-color': 'blue' },
+      { opacity: '1', transform: 'translate(0px, 0px)', color: 'red', 'background-color': 'blue' },
+    ];
+    expect(pagxWhichVary(samples)).toEqual(['opacity']);
+  });
+});
+
+describe('pagxReduceKeyframes', () => {
+  test('drops interior stops identical to both neighbours', () => {
+    const norm = [
+      { offset: 0, props: { opacity: '0' } },
+      { offset: 0.5, props: { opacity: '0' } },
+      { offset: 1, props: { opacity: '1' } },
+    ];
+    const out = pagxReduceKeyframes(norm);
+    expect(out.map((k) => k.offset)).toEqual([0, 0.5, 1]);
+  });
+
+  test('keeps a varying interior stop', () => {
+    const norm = [
+      { offset: 0, props: { opacity: '0' } },
+      { offset: 0.5, props: { opacity: '0.5' } },
+      { offset: 1, props: { opacity: '1' } },
+    ];
+    expect(pagxReduceKeyframes(norm)).toHaveLength(3);
+  });
+
+  test('a flat middle run collapses', () => {
+    const norm = [
+      { offset: 0, props: { opacity: '0' } },
+      { offset: 0.33, props: { opacity: '0' } },
+      { offset: 0.66, props: { opacity: '0' } },
+      { offset: 1, props: { opacity: '1' } },
+    ];
+    const out = pagxReduceKeyframes(norm);
+    // first kept, the two identical interior collapse to one (the boundary), last kept.
+    expect(out.length).toBeLessThan(4);
+    expect(out[0].offset).toBe(0);
+    expect(out[out.length - 1].offset).toBe(1);
+  });
+});
+
+describe('pagxBisectStepBoundary', () => {
+  // A synthetic piecewise-constant value that jumps from "old" to "new" at 0.4.
+  const probeIsNew = (frac) => frac >= 0.4;
+
+  test('locates a mid-interval step boundary to sub-sample precision', () => {
+    // Coarse grid straddles the true 0.4 jump (old @0.3, new @0.5); the plain
+    // step-end path would place the jump at 0.5 and lag a render at 0.42.
+    const b = pagxBisectStepBoundary(0.3, 0.5, probeIsNew, 12);
+    expect(b).toBeGreaterThanOrEqual(0.4);
+    expect(b).toBeLessThan(0.41);
+  });
+
+  test('returns a value strictly inside the bracket', () => {
+    const b = pagxBisectStepBoundary(0.3, 0.5, probeIsNew);
+    expect(b).toBeGreaterThan(0.3);
+    expect(b).toBeLessThanOrEqual(0.5);
+  });
+
+  test('boundary at the high edge stays at the high edge', () => {
+    // Value only turns new at the very end: bisection converges to hi.
+    const b = pagxBisectStepBoundary(0.3, 0.5, (f) => f >= 0.5, 10);
+    expect(b).toBeCloseTo(0.5, 2);
+  });
+});
+
+describe('pagxParseColorChannels', () => {
+  test('parses rgb and rgba', () => {
+    expect(pagxParseColorChannels('rgb(255, 0, 128)')).toEqual([255, 0, 128, 1]);
+    expect(pagxParseColorChannels('rgba(10, 20, 30, 0.5)')).toEqual([10, 20, 30, 0.5]);
+  });
+  test('returns null for non-rgb values', () => {
+    expect(pagxParseColorChannels('red')).toBeNull();
+    expect(pagxParseColorChannels('#fff')).toBeNull();
+    expect(pagxParseColorChannels('')).toBeNull();
+  });
+});
+
+describe('pagxParseFilterChannels', () => {
+  test('none / empty yields no shadows', () => {
+    expect(pagxParseFilterChannels('none')).toEqual({ shadows: [], fblur: 0 });
+    expect(pagxParseFilterChannels('')).toEqual({ shadows: [], fblur: 0 });
+  });
+  test('parses a color-first drop-shadow (computed serialization)', () => {
+    const f = pagxParseFilterChannels('drop-shadow(rgb(40, 224, 208) 0px 0px 16px)');
+    expect(f.shadows).toHaveLength(1);
+    const sh = f.shadows[0];
+    expect(sh.fdx).toBe(0);
+    expect(sh.fdy).toBe(0);
+    expect(sh.fdb).toBe(16);
+    expect([sh.fdr, sh.fdg, sh.fdbl]).toEqual([40, 224, 208]);
+    expect(sh.fda).toBe(1);
+  });
+  test('keeps every drop-shadow in author order (chromatic aberration stack)', () => {
+    // Offset-only glitch idiom: two blur-0 ghosts, orange right + magenta left. The
+    // importer lowers each onto its own DropShadowFilter slot, so both are kept.
+    const f = pagxParseFilterChannels(
+      'drop-shadow(rgba(240, 160, 0, 0.55) 42px 0px 0px) ' +
+      'drop-shadow(rgba(255, 0, 90, 0.4) -26px 0px 0px) brightness(1.3)');
+    expect(f.shadows).toHaveLength(2);
+    expect(f.shadows[0].fdx).toBe(42);
+    expect(f.shadows[0].fda).toBeCloseTo(0.55, 5);
+    expect([f.shadows[0].fdr, f.shadows[0].fdg, f.shadows[0].fdbl]).toEqual([240, 160, 0]);
+    expect(f.shadows[1].fdx).toBe(-26);
+    expect(f.shadows[1].fda).toBeCloseTo(0.4, 5);
+    expect([f.shadows[1].fdr, f.shadows[1].fdg, f.shadows[1].fdbl]).toEqual([255, 0, 90]);
+  });
+  test('captures a blur() radius and ignores unsupported functions', () => {
+    const f = pagxParseFilterChannels('blur(5px) brightness(1.2)');
+    expect(f.fblur).toBe(5);
+    expect(f.shadows).toEqual([]);
+  });
+});
+
+describe('pagxParseTranslateXY', () => {
+  test('parses x and y px', () => {
+    expect(pagxParseTranslateXY('translate(12px, -4px)')).toEqual([12, -4]);
+  });
+  test('defaults missing y to 0', () => {
+    expect(pagxParseTranslateXY('translate(8px)')).toEqual([8, 0]);
+  });
+  test('returns null when no x parses', () => {
+    expect(pagxParseTranslateXY('none')).toBeNull();
+    expect(pagxParseTranslateXY('')).toBeNull();
+  });
+});
+
+describe('pagxStopScalarSeries', () => {
+  test('decomposes tracked props into per-channel scalar series', () => {
+    const stops = [
+      { offset: 0, props: { opacity: '0', transform: 'translate(0px, 0px)' } },
+      { offset: 1, props: { opacity: '1', transform: 'translate(40px, 10px)' } },
+    ];
+    const series = pagxStopScalarSeries(stops);
+    expect(series.opacity).toEqual([0, 1]);
+    // transform decomposes into the six affine components; a pure translate
+    // folds to [1,0,0,1,tx,ty], so m4/m5 carry the translation.
+    expect(series.m4).toEqual([0, 40]);
+    expect(series.m5).toEqual([0, 10]);
+  });
+  test('decomposes a filter drop-shadow into per-slot scalar glow channels', () => {
+    const stops = [
+      { offset: 0, props: { filter: 'none' } },
+      { offset: 0.5, props: { filter: 'drop-shadow(rgb(40, 224, 208) 0px 0px 16px)' } },
+      { offset: 1, props: { filter: 'none' } },
+    ];
+    const series = pagxStopScalarSeries(stops);
+    // Slot 0 channels; absent (`none`) stops read a transparent 0 so the ramp is seen.
+    expect(series.fd0b).toEqual([0, 16, 0]);
+    expect(series.fd0a).toEqual([0, 1, 0]);
+    expect(series.fd0g).toEqual([0, 224, 0]);
+  });
+  test('tracks a second drop-shadow slot so a secondary ghost keeps its frames', () => {
+    // Only the SECOND shadow moves (24px -> 40px); the first is constant. A single
+    // collapsed signature could miss frame 1, dropping the slot-1 keyframe.
+    const stops = [
+      { offset: 0, props: { filter: 'drop-shadow(rgb(255,0,0) 0px 0px 8px) drop-shadow(rgb(0,0,255) 24px 0px 0px)' } },
+      { offset: 0.5, props: { filter: 'drop-shadow(rgb(255,0,0) 0px 0px 8px) drop-shadow(rgb(0,0,255) 40px 0px 0px)' } },
+      { offset: 1, props: { filter: 'drop-shadow(rgb(255,0,0) 0px 0px 8px)' } },
+    ];
+    const series = pagxStopScalarSeries(stops);
+    expect(series.fd0b).toEqual([8, 8, 8]);
+    expect(series.fd1x).toEqual([24, 40, 0]);
+    expect(series.fd1a).toEqual([1, 1, 0]);
+  });
+});
+
+describe('pagxRdpKeep', () => {
+  test('collapses a perfectly linear ramp to its endpoints', () => {
+    const offsets = [0, 0.25, 0.5, 0.75, 1];
+    const values = [0, 25, 50, 75, 100];
+    const keep = pagxRdpKeep(offsets, values, 0.02);
+    expect(keep).toEqual([true, false, false, false, true]);
+  });
+
+  test('keeps the apex of a sharply curved series', () => {
+    // A spike at the middle deviates far from the 0→0 chord.
+    const offsets = [0, 0.5, 1];
+    const values = [0, 100, 0];
+    const keep = pagxRdpKeep(offsets, values, 0.02);
+    expect(keep).toEqual([true, true, true]);
+  });
+
+  test('a flat channel keeps only endpoints', () => {
+    const offsets = [0, 0.5, 1];
+    const values = [7, 7, 7];
+    expect(pagxRdpKeep(offsets, values, 0.02)).toEqual([true, false, true]);
+  });
+
+  test('absEps keeps a small spike that relative eps alone drops on a wide-range channel', () => {
+    // A 2px spike at index 2 shares a channel that also travels 260px: the
+    // spike is only ~0.8% of the range, below a 2% relative eps.
+    const offsets = [0, 0.25, 0.5, 0.75, 1];
+    const values = [0, 0, 2, 0, 260];
+    const relOnly = pagxRdpKeep(offsets, values, 0.02, 0);
+    const withFloor = pagxRdpKeep(offsets, values, 0.02, 0.5);
+    expect(relOnly[2]).toBe(false);
+    expect(withFloor[2]).toBe(true);
+  });
+});
+
+describe('pagxDecimateStops', () => {
+  test('collapses a linear opacity ramp to two keyframes', () => {
+    const stops = [];
+    for (let i = 0; i <= 10; i++) {
+      stops.push({ offset: i / 10, props: { opacity: String(i / 10) } });
+    }
+    const out = pagxDecimateStops(stops);
+    expect(out.map((s) => s.offset)).toEqual([0, 1]);
+  });
+
+  test('keeps interior points of an eased (non-linear) curve', () => {
+    // ease-out-ish: fast then slow → bows away from the chord.
+    const stops = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      stops.push({ offset: t, props: { opacity: String(Math.sqrt(t)) } });
+    }
+    const out = pagxDecimateStops(stops);
+    expect(out.length).toBeGreaterThan(2);
+    expect(out.length).toBeLessThan(stops.length);
+    expect(out[0].offset).toBe(0);
+    expect(out[out.length - 1].offset).toBe(1);
+  });
+
+  test('unions keep-points across independent channels', () => {
+    // opacity is linear (collapses) but x has a mid-curve kink → that index survives.
+    const stops = [
+      { offset: 0, props: { opacity: '0', transform: 'translate(0px, 0px)' } },
+      { offset: 0.5, props: { opacity: '0.5', transform: 'translate(80px, 0px)' } },
+      { offset: 1, props: { opacity: '1', transform: 'translate(100px, 0px)' } },
+    ];
+    const out = pagxDecimateStops(stops);
+    expect(out.map((s) => s.offset)).toContain(0.5);
+  });
+
+  test('returns input unchanged for <= 2 stops', () => {
+    const stops = [
+      { offset: 0, props: { opacity: '0' } },
+      { offset: 1, props: { opacity: '1' } },
+    ];
+    expect(pagxDecimateStops(stops)).toHaveLength(2);
+  });
+
+  test('keeps a small translate shake sharing the channel with a large slide', () => {
+    // Baseline at x=0, a brief ±2px shake in the middle, then a 260px slide —
+    // the pattern an energy bar shows: each increment shakes the bar while it
+    // later slides off-screen. The pixel floor keeps the shake extrema that the
+    // relative eps alone would erase against the 260px travel.
+    const stops = [];
+    for (let i = 0; i < 5; i++) {
+      stops.push({ offset: i / 20, props: { transform: 'translate(0px, 0px)' } });
+    }
+    stops.push({ offset: 5 / 20, props: { transform: 'translate(2px, 0px)' } });
+    stops.push({ offset: 6 / 20, props: { transform: 'translate(-2px, 0px)' } });
+    stops.push({ offset: 7 / 20, props: { transform: 'translate(0px, 0px)' } });
+    for (let i = 8; i < 15; i++) {
+      stops.push({ offset: i / 20, props: { transform: 'translate(0px, 0px)' } });
+    }
+    for (let i = 15; i <= 20; i++) {
+      stops.push({ offset: i / 20, props: { transform: 'translate(260px, 0px)' } });
+    }
+    const out = pagxDecimateStops(stops);
+    const xs = out.map((s) => parseFloat(s.props.transform.match(/-?[\d.]+/)[0]));
+    expect(xs).toContain(2);
+    expect(xs).toContain(-2);
+    // …and the big slide endpoint is still present.
+    expect(xs).toContain(260);
+  });
+});
+
+describe('pagxNormalizeTiming', () => {
+  test('defaults empty to linear, passes others through', () => {
+    expect(pagxNormalizeTiming('')).toBe('linear');
+    expect(pagxNormalizeTiming('ease-in-out')).toBe('ease-in-out');
+  });
+});
+
+describe('pagxOverlayDisturbsFlow', () => {
+  const originalGetComputedStyle = global.getComputedStyle;
+  afterEach(() => {
+    global.getComputedStyle = originalGetComputedStyle;
+  });
+
+  // Build a mock element that is `el` with the given computed `position`, sitting
+  // among `siblings` (raw childNode objects) inside a parent. getComputedStyle is
+  // stubbed to report the element's position; the helper only reads `position`.
+  function withEl(position, siblings) {
+    const el = { nodeType: 1 };
+    el.parentElement = { childNodes: [el, ...siblings] };
+    global.getComputedStyle = (node) => (node === el ? { position } : { position: 'static' });
+    return el;
+  }
+  const elementSibling = () => ({ nodeType: 1 });
+  const textSibling = (v) => ({ nodeType: 3, nodeValue: v });
+
+  test('in-flow element with an element sibling is unsafe (typewriter char)', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', [elementSibling()]))).toBe(true);
+  });
+
+  test('blockified flex-item char with siblings is still unsafe', () => {
+    // A per-character span that is a flex item computes display:block, but it
+    // still shares its parent's formatting context — clones would add tracks.
+    expect(pagxOverlayDisturbsFlow(withEl('relative', [elementSibling(), textSibling(' ')]))).toBe(true);
+  });
+
+  test('in-flow element with a non-whitespace text sibling is unsafe', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', [textSibling('COMBO ')]))).toBe(true);
+  });
+
+  test('in-flow element with only whitespace text siblings is safe', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', [textSibling('\n  ')]))).toBe(false);
+  });
+
+  test('sole in-flow child (standalone counter) is safe', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('static', []))).toBe(false);
+  });
+
+  test('out-of-flow element keeps the overlay path even with siblings', () => {
+    expect(pagxOverlayDisturbsFlow(withEl('absolute', [elementSibling()]))).toBe(false);
+    expect(pagxOverlayDisturbsFlow(withEl('fixed', [elementSibling()]))).toBe(false);
+  });
+});
+
+describe('pagxTextSegments', () => {
+  test('groups a scripted counter into one segment per value', () => {
+    // combo counter: empty until each value pops in for a few samples.
+    const texts = ['', '', '+1', '+1', '', '+2', '+2', '+2', '', '+3'];
+    const segs = pagxTextSegments(texts);
+    expect(segs).toEqual([
+      { text: '+1', startIdx: 2, endIdx: 3 },
+      { text: '+2', startIdx: 5, endIdx: 7 },
+      { text: '+3', startIdx: 9, endIdx: 9 },
+    ]);
+  });
+
+  test('skips empty samples and starts no segment for them', () => {
+    expect(pagxTextSegments(['', '', ''])).toEqual([]);
+  });
+
+  test('a recurring value in non-adjacent runs yields separate segments', () => {
+    const segs = pagxTextSegments(['GO', 'GO', '', 'GO']);
+    expect(segs).toEqual([
+      { text: 'GO', startIdx: 0, endIdx: 1 },
+      { text: 'GO', startIdx: 3, endIdx: 3 },
+    ]);
+  });
+
+  test('a single stable value is one segment spanning the window', () => {
+    expect(pagxTextSegments(['3', '3', '3'])).toEqual([
+      { text: '3', startIdx: 0, endIdx: 2 },
+    ]);
+  });
+});
+
+describe('pagxResolveWaapiEasing', () => {
+  // The function calls `getComputedStyle` in the page; in jest's node env we
+  // stub it so the CSS-name branch is exercised end-to-end.
+  const originalGetComputedStyle = global.getComputedStyle;
+  afterEach(() => {
+    global.getComputedStyle = originalGetComputedStyle;
+  });
+
+  test('CSSAnimation: reads animation-timing-function from computed style', () => {
+    global.getComputedStyle = () => ({
+      animationName: 'runEase',
+      animationTimingFunction: 'ease-in-out',
+    });
+    const anim = { animationName: 'runEase' };
+    const effect = { getTiming: () => ({ easing: 'linear' }) };
+    const ct = { easing: 'linear' };
+    const target = {};
+    expect(pagxResolveWaapiEasing(anim, effect, ct, target)).toBe('ease-in-out');
+  });
+
+  test('CSSAnimation: picks the timing matching the animation-name index', () => {
+    global.getComputedStyle = () => ({
+      animationName: 'foo, runEase, bar',
+      animationTimingFunction: 'linear, cubic-bezier(0.42, 0, 0.58, 1), ease-out',
+    });
+    const anim = { animationName: 'runEase' };
+    const out = pagxResolveWaapiEasing(anim, {}, {}, {});
+    expect(out).toBe('cubic-bezier(0.42, 0, 0.58, 1)');
+  });
+
+  test('WAAPI animation (no animationName): uses effect-level easing', () => {
+    global.getComputedStyle = () => ({ animationName: '', animationTimingFunction: 'linear' });
+    const anim = {};
+    const effect = { getTiming: () => ({ easing: 'cubic-bezier(0.1, 0.2, 0.3, 0.4)' }) };
+    const ct = { easing: 'linear' };
+    expect(pagxResolveWaapiEasing(anim, effect, ct, {})).toBe('cubic-bezier(0.1, 0.2, 0.3, 0.4)');
+  });
+
+  test('falls back to ct.easing when effect-level easing is empty', () => {
+    const anim = {};
+    const effect = { getTiming: () => ({ easing: '' }) };
+    const ct = { easing: 'ease-in' };
+    expect(pagxResolveWaapiEasing(anim, effect, ct, {})).toBe('ease-in');
+  });
+
+  test('returns linear on any thrown lookup', () => {
+    const anim = {};
+    const effect = { getTiming: () => { throw new Error('boom'); } };
+    const ct = {};
+    expect(pagxResolveWaapiEasing(anim, effect, ct, {})).toBe('linear');
+  });
+});
+
+describe('pagxBuildCanonicalAnimation', () => {
+  const cap = {
+    keyframes: [
+      { offset: 0, props: { opacity: '0', transform: 'translate(0px, 0px)' } },
+      { offset: 1, props: { opacity: '1', transform: 'translate(40px, 0px)' } },
+    ],
+    durationMs: 2000,
+    delayMs: 0,
+    iterations: Infinity,
+    direction: 'normal',
+    timing: 'linear',
+  };
+
+  test('emits @keyframes + animation shorthand for an infinite animation', () => {
+    const out = pagxBuildCanonicalAnimation(cap, 0, PAGX_ANIM_PREFIX);
+    expect(out.name).toBe('pagxAnim0');
+    expect(out.keyframesCss).toContain('@keyframes pagxAnim0');
+    expect(out.keyframesCss).toContain('0% { opacity: 0; transform: translate(0px, 0px); }');
+    expect(out.keyframesCss).toContain('100% { opacity: 1; transform: translate(40px, 0px); }');
+    expect(out.animationShorthand).toBe('pagxAnim0 2s linear 0s infinite normal both');
+  });
+
+  test('finite iteration count is preserved verbatim', () => {
+    const finite = Object.assign({}, cap, { iterations: 3 });
+    const out = pagxBuildCanonicalAnimation(finite, 1, PAGX_ANIM_PREFIX);
+    expect(out.animationShorthand).toBe('pagxAnim1 2s linear 0s 3 normal both');
+  });
+
+  test('returns null when no subset declarations survive', () => {
+    const empty = Object.assign({}, cap, {
+      keyframes: [{ offset: 0, props: { width: '10px' } }],
+    });
+    expect(pagxBuildCanonicalAnimation(empty, 0, PAGX_ANIM_PREFIX)).toBeNull();
+  });
+
+  test('rounds offsets to one decimal percent', () => {
+    const odd = Object.assign({}, cap, {
+      keyframes: [
+        { offset: 0, props: { opacity: '0' } },
+        { offset: 1 / 3, props: { opacity: '0.5' } },
+        { offset: 1, props: { opacity: '1' } },
+      ],
+    });
+    const out = pagxBuildCanonicalAnimation(odd, 0, PAGX_ANIM_PREFIX);
+    expect(out.keyframesCss).toContain('33.3% {');
+  });
+
+  test('emits filter keyframes (glow / halo)', () => {
+    const glow = Object.assign({}, cap, {
+      keyframes: [
+        { offset: 0, props: { filter: 'none' } },
+        { offset: 0.32, props: { filter: 'drop-shadow(rgb(40, 224, 208) 0px 0px 16px)' } },
+        { offset: 1, props: { filter: 'none' } },
+      ],
+    });
+    const out = pagxBuildCanonicalAnimation(glow, 0, PAGX_ANIM_PREFIX);
+    expect(out.keyframesCss).toContain('filter: none');
+    expect(out.keyframesCss).toContain('filter: drop-shadow(rgb(40, 224, 208) 0px 0px 16px)');
+  });
+});
+
+describe('pagxTransitionDescriptorFromBags', () => {
+  test('builds a 2-stop descriptor for an opacity transition', () => {
+    const out = pagxTransitionDescriptorFromBags(
+      { opacity: '0' }, { opacity: '1' }, null, 600, 0, 'ease',
+    );
+    expect(out).not.toBeNull();
+    expect(out.durationMs).toBe(600);
+    expect(out.timing).toBe('ease');
+    expect(out.iterations).toBe(1);
+    expect(out.keyframes).toEqual([
+      { offset: 0, props: { opacity: '0' } },
+      { offset: 1, props: { opacity: '1' } },
+    ]);
+  });
+
+  test('treats a one-sided transform as translate(0px, 0px) on the missing side', () => {
+    const out = pagxTransitionDescriptorFromBags(
+      { transform: 'none' }, { transform: 'translate(40px, 0px)' }, null, 300, 0, 'linear',
+    );
+    expect(out.keyframes[0].props.transform).toBe('translate(0px, 0px)');
+    expect(out.keyframes[1].props.transform).toBe('translate(40px, 0px)');
+  });
+
+  test('merges multiple changing channels into one descriptor', () => {
+    const out = pagxTransitionDescriptorFromBags(
+      { opacity: '0', transform: 'translate(0px, 20px)' },
+      { opacity: '1', transform: 'translate(0px, 0px)' },
+      null, 500, 100, 'ease-out',
+    );
+    expect(out.delayMs).toBe(100);
+    expect(out.keyframes[0].props).toEqual({ opacity: '0', transform: 'translate(0px, 20px)' });
+    expect(out.keyframes[1].props).toEqual({ opacity: '1', transform: 'translate(0px, 0px)' });
+  });
+
+  test('returns null when no tracked channel changes', () => {
+    expect(pagxTransitionDescriptorFromBags(
+      { opacity: '1' }, { opacity: '1' }, null, 300, 0, 'linear',
+    )).toBeNull();
+  });
+
+  test('returns null for a non-positive duration', () => {
+    expect(pagxTransitionDescriptorFromBags(
+      { opacity: '0' }, { opacity: '1' }, null, 0, 0, 'linear',
+    )).toBeNull();
+  });
+
+  test('drops a channel defined on only one side (non-transform)', () => {
+    // `color` present only in `to` cannot describe a tween (no start value).
+    const out = pagxTransitionDescriptorFromBags(
+      { opacity: '0' }, { opacity: '1', color: 'rgb(255, 0, 0)' }, null, 300, 0, 'linear',
+    );
+    expect(out.keyframes[0].props).toEqual({ opacity: '0' });
+    expect(out.keyframes[1].props).toEqual({ opacity: '1' });
+  });
+});
+
+describe('PAGX_TRANSITION_INIT_SCRIPT', () => {
+  test('is a self-contained IIFE that installs the transitionrun recorder', () => {
+    expect(typeof PAGX_TRANSITION_INIT_SCRIPT).toBe('string');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('function pagxTransitionInstall');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('pagxTransitionInstall();');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('transitionrun');
+    // bundles its two helper dependencies
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('function pagxSplitTopLevelCommas');
+    expect(PAGX_TRANSITION_INIT_SCRIPT).toContain('function pagxParseTimeMs');
+  });
+});
+
+describe('pagxGlobalSampleCount', () => {
+  test('keeps at least the base count for a short timeline', () => {
+    // 500ms @ 40ms → 14 wanted, floored back up to the base 24.
+    expect(pagxGlobalSampleCount(500, 24)).toBe(24);
+    // 1s @ 40ms → 26 (just above the floor); step stays ~40ms.
+    expect(pagxGlobalSampleCount(1000, 24)).toBe(26);
+  });
+
+  test('scales up for a long timeline so the step stays near stepMs', () => {
+    // 28.9s @ 40ms → ~724 samples: the fixed 24 would resolve only ~1.25s,
+    // collapsing a 45ms staggered entrance into one step.
+    const n = pagxGlobalSampleCount(28900, 24);
+    expect(n).toBe(724);
+    // resulting temporal resolution is ~40ms, not ~1.25s
+    expect(28900 / (n - 1)).toBeCloseTo(40, 0);
+  });
+
+  test('caps at maxCount for a pathologically long timeline', () => {
+    expect(pagxGlobalSampleCount(10 * 60 * 1000, 24)).toBe(900);
+    expect(pagxGlobalSampleCount(1e9, 24, 40, 900)).toBe(900);
+  });
+
+  test('honours custom stepMs / maxCount and falls back on a non-positive duration', () => {
+    expect(pagxGlobalSampleCount(2000, 24, 20)).toBe(101);
+    expect(pagxGlobalSampleCount(0, 24)).toBe(24);
+    expect(pagxGlobalSampleCount(-5, 24)).toBe(24);
+    expect(pagxGlobalSampleCount(Infinity, 24)).toBe(24);
+  });
+});
+
+describe('pagxClipNormalizeD', () => {
+  // The function reads border/padding/margin off getComputedStyle; default them all to 0px so the
+  // reference box is the plain border-box.
+  const origGetComputedStyle = global.getComputedStyle;
+  beforeAll(() => {
+    global.getComputedStyle = () => ({
+      borderLeftWidth: '0px', borderTopWidth: '0px', borderRightWidth: '0px', borderBottomWidth: '0px',
+      paddingLeft: '0px', paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px',
+      marginLeft: '0px', marginTop: '0px', marginRight: '0px', marginBottom: '0px',
+    });
+  });
+  afterAll(() => { global.getComputedStyle = origGetComputedStyle; });
+
+  // Emulate an element under a `transform: scale(s)` ancestor (e.g. the poster wrapper): the layout
+  // border box (offsetWidth/offsetHeight) stays in CSS pixels while getBoundingClientRect() reports
+  // the scaled, rendered box.
+  const scaledEl = (layoutW, layoutH, scale) => ({
+    offsetWidth: layoutW,
+    offsetHeight: layoutH,
+    getBoundingClientRect: () => ({ width: layoutW * scale, height: layoutH * scale, left: 0, top: 0 }),
+  });
+
+  test('emits geometry in the untransformed layout box, not the scaled rect', () => {
+    const el = scaledEl(1920, 383, 0.5);
+    // Fully-open inset → the full-size layout border box (1920×383), NOT the halved rect (960×191.5).
+    expect(pagxClipNormalizeD('inset(0px 0px 0px 0px)', el))
+      .toBe('M 0 0 L 1920 0 L 1920 383 L 0 383 Z');
+    // wipe start: right inset 100% collapses width to 0 at the left edge, in layout pixels.
+    expect(pagxClipNormalizeD('inset(0px 100% 0px 0px)', el))
+      .toBe('M 0 0 L 0 0 L 0 383 L 0 383 Z');
+    // wipe start from the right: left inset 100% collapses width to 0 at the right (x = 1920).
+    expect(pagxClipNormalizeD('inset(0px 0px 0px 100%)', el))
+      .toBe('M 1920 0 L 1920 0 L 1920 383 L 1920 383 Z');
+  });
+
+  test('falls back to getBoundingClientRect for elements without an offset box (e.g. SVG)', () => {
+    const el = { getBoundingClientRect: () => ({ width: 200, height: 100, left: 0, top: 0 }) };
+    expect(pagxClipNormalizeD('inset(0px 0px 0px 0px)', el))
+      .toBe('M 0 0 L 200 0 L 200 100 L 0 100 Z');
+  });
+
+  test('returns empty for none / url() references', () => {
+    const el = scaledEl(100, 100, 0.5);
+    expect(pagxClipNormalizeD('none', el)).toBe('');
+    expect(pagxClipNormalizeD('url(#clip)', el)).toBe('');
+  });
+});
+
+describe('buildAnimationCapturePayload', () => {
+  test('produces a self-contained IIFE that calls pagxAnimMain with inlined opts', () => {
+    const payload = buildAnimationCapturePayload({ sampleCount: 6, maxElements: 100 });
+    expect(payload.startsWith('(() => {')).toBe(true);
+    expect(payload).toContain('function pagxAnimMain');
+    expect(payload).toContain('function pagxExtractTranslate');
+    expect(payload).toContain('function pagxCollectTransitions');
+    expect(payload).toContain('function pagxGlobalSampleCount');
+    expect(payload).toContain(`"prefix":"${PAGX_ANIM_PREFIX}"`);
+    expect(payload).toContain(`"styleId":"${PAGX_ANIM_STYLE_ID}"`);
+    expect(payload).toContain('"sampleCount":6');
+    expect(payload).toContain('"maxElements":100');
+  });
+});
+
+describe('capturePagxAnimationsOnPage', () => {
+  test('evaluates the payload and logs when animations are captured', async () => {
+    const logs = [];
+    const page = {
+      evaluate: async () => ({ count: 2, names: ['pagxAnim0', 'pagxAnim1'] }),
+    };
+    const out = await capturePagxAnimationsOnPage(page, { logger: (m) => logs.push(m) });
+    expect(out).toEqual({ count: 2, names: ['pagxAnim0', 'pagxAnim1'] });
+    expect(logs.join('\n')).toMatch(/captured 2 animation\(s\): pagxAnim0, pagxAnim1/);
+  });
+
+  test('passes a string payload to page.evaluate', async () => {
+    let received = null;
+    const page = {
+      evaluate: async (arg) => {
+        received = arg;
+        return { count: 0, names: [] };
+      },
+    };
+    await capturePagxAnimationsOnPage(page);
+    expect(typeof received).toBe('string');
+    expect(received).toContain('pagxAnimMain');
+  });
+
+  test('degrades to a zero result and logs on evaluate failure', async () => {
+    const logs = [];
+    const page = {
+      evaluate: async () => { throw new Error('boom'); },
+    };
+    const out = await capturePagxAnimationsOnPage(page, { logger: (m) => logs.push(m) });
+    expect(out).toEqual({ count: 0, names: [] });
+    expect(logs.join('\n')).toMatch(/animation capture failed: boom/);
+  });
+});

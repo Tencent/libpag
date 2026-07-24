@@ -376,9 +376,14 @@ void HTMLStyleCascade::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode
     return;
   }
   std::vector<std::string> droppedAtRules;
-  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules);
+  std::vector<CssKeyframesRule> keyframesRules;
+  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules, keyframesRules);
   for (auto& at : droppedAtRules) {
     _diagnostics.warn("html: at-rule '" + at + "' not supported in <style>; dropped");
+  }
+  // Keep `@keyframes` so the animation builder can map them onto PAGX animations (see §13).
+  for (auto& kf : keyframesRules) {
+    _keyframes[kf.name] = std::move(kf);
   }
   for (auto& rule : rules) {
     if (rule.declarations.empty()) continue;

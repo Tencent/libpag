@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -1362,6 +1363,167 @@ CLI_TEST(PAGXCliTest, Import_SvgOptions) {
 CLI_TEST(PAGXCliTest, Import_UnexpectedArgument) {
   auto ret = CallRun(pagx::cli::RunImport, {"import", "somefile.svg"});
   EXPECT_NE(ret, 0);
+}
+
+//==============================================================================
+// Import — ImportString / ImportFile library entry points and RunImport options
+//==============================================================================
+
+// ImportString infers `svg` from the root element tag and produces a document.
+CLI_TEST(PAGXCliTest, ImportString_SvgInferredFromContent) {
+  auto result = pagx::cli::ImportString(
+      "<svg width=\"10\" height=\"10\"><rect width=\"10\" height=\"10\" fill=\"#F00\"/></svg>", "",
+      {});
+  EXPECT_TRUE(result.error.empty());
+  ASSERT_NE(result.document, nullptr);
+}
+
+// ImportString infers `html` from an <html>/<body> root and produces a document.
+CLI_TEST(PAGXCliTest, ImportString_HtmlInferredFromContent) {
+  auto result = pagx::cli::ImportString(
+      "<html><body style=\"width:20px;height:20px\"><div "
+      "style=\"width:20px;height:20px;background:#00F\"></div></body></html>",
+      "", {});
+  EXPECT_TRUE(result.error.empty());
+  ASSERT_NE(result.document, nullptr);
+}
+
+// A forced format overrides the content-tag inference.
+CLI_TEST(PAGXCliTest, ImportString_ForcedFormat) {
+  auto result = pagx::cli::ImportString(
+      "<svg width=\"10\" height=\"10\"><circle cx=\"5\" cy=\"5\" r=\"4\"/></svg>", "svg", {});
+  EXPECT_TRUE(result.error.empty());
+  ASSERT_NE(result.document, nullptr);
+}
+
+// An unrecognised format yields an error and no document.
+CLI_TEST(PAGXCliTest, ImportString_UnsupportedFormat) {
+  auto result = pagx::cli::ImportString("<foo/>", "", {});
+  EXPECT_FALSE(result.error.empty());
+  EXPECT_EQ(result.document, nullptr);
+}
+
+// Content with no element tag falls back to an empty inferred format → unsupported.
+CLI_TEST(PAGXCliTest, ImportString_NoTagUnsupported) {
+  auto result = pagx::cli::ImportString("just some text", "", {});
+  EXPECT_FALSE(result.error.empty());
+}
+
+// Malformed SVG content fails to parse and reports an error.
+CLI_TEST(PAGXCliTest, ImportString_FailedParse) {
+  auto result = pagx::cli::ImportString("<svg", "svg", {});
+  EXPECT_FALSE(result.error.empty());
+  EXPECT_EQ(result.document, nullptr);
+}
+
+// ImportFile with an explicit SVG file resolves and produces a document (exercises the file path
+// and the extension-based format inference).
+CLI_TEST(PAGXCliTest, ImportFile_SvgExtensionInferred) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "ImportFileSvg_Basic.svg");
+  auto result = pagx::cli::ImportFile(svgPath, "", {});
+  EXPECT_TRUE(result.error.empty());
+  ASSERT_NE(result.document, nullptr);
+}
+
+// `htm` / `xhtml` extensions normalise to `html`. With the snapshot pre-pass disabled the file is
+// imported directly, so a flat inline-styled document round-trips without invoking Node.
+CLI_TEST(PAGXCliTest, ImportFile_HtmExtensionNormalizedNoSnapshot) {
+  auto htmPath = TempDir() + "/ImportFile_Alias.htm";
+  {
+    std::ofstream out(htmPath);
+    out << "<html><body style=\"width:20px;height:20px\"><div "
+           "style=\"width:20px;height:20px;background:#0F0\"></div></body></html>";
+  }
+  const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
+  std::string saved = previous ? previous : "";
+  setenv("PAGX_HTML_SNAPSHOT", "0", 1);
+  auto result = pagx::cli::ImportFile(htmPath, "", {});
+  if (previous) {
+    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
+  } else {
+    unsetenv("PAGX_HTML_SNAPSHOT");
+  }
+  EXPECT_TRUE(result.error.empty());
+  ASSERT_NE(result.document, nullptr);
+}
+
+// A URL input while the snapshot pre-pass is disabled is rejected: the importers cannot fetch
+// http(s) themselves.
+CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
+  const char* previous = std::getenv("PAGX_HTML_SNAPSHOT");
+  std::string saved = previous ? previous : "";
+  setenv("PAGX_HTML_SNAPSHOT", "off", 1);
+  auto result = pagx::cli::ImportFile("https://example.com/demo", "", {});
+  if (previous) {
+    setenv("PAGX_HTML_SNAPSHOT", saved.c_str(), 1);
+  } else {
+    unsetenv("PAGX_HTML_SNAPSHOT");
+  }
+  EXPECT_FALSE(result.error.empty());
+  EXPECT_EQ(result.document, nullptr);
+}
+
+// RunImport with a URL input but no --output is rejected during option parsing.
+CLI_TEST(PAGXCliTest, Import_UrlRequiresOutput) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", "https://example.com/demo"});
+  EXPECT_NE(ret, 0);
+}
+
+// RunImport with --no-resolve keeps the SVG import path but skips directive resolution; the output
+// PAGX is still written.
+CLI_TEST(PAGXCliTest, Import_NoResolve) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "ImportNoResolve.svg");
+  auto outputPath = TempDir() + "/ImportNoResolve.pagx";
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--input", svgPath, "--output", outputPath, "--no-resolve"});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+// RunImport with --verbose prints warnings (if any) and still succeeds.
+CLI_TEST(PAGXCliTest, Import_Verbose) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "ImportVerbose.svg");
+  auto outputPath = TempDir() + "/ImportVerbose.pagx";
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--input", svgPath, "--output", outputPath, "--verbose"});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+// RunImport with --images external (the default, spelled explicitly) succeeds.
+CLI_TEST(PAGXCliTest, Import_ImagesExternal) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "ImportImagesExternal.svg");
+  auto outputPath = TempDir() + "/ImportImagesExternal.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath,
+                                            "--images", "external"});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+// RunImport with --images embed inlines images (none here, but exercises the option + storage pass).
+CLI_TEST(PAGXCliTest, Import_ImagesEmbed) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "ImportImagesEmbed.svg");
+  auto outputPath = TempDir() + "/ImportImagesEmbed.pagx";
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--input", svgPath, "--output", outputPath, "--images", "embed"});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
+}
+
+// An invalid --images value is rejected during option parsing.
+CLI_TEST(PAGXCliTest, Import_ImagesInvalid) {
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", "test.svg", "--images", "bogus"});
+  EXPECT_NE(ret, 0);
+}
+
+// --image-base-dir overrides the directory used to resolve relative image paths.
+CLI_TEST(PAGXCliTest, Import_ImageBaseDir) {
+  auto svgPath = ExportToSVG("render_basic.pagx", "ImportImageBaseDir.svg");
+  auto outputPath = TempDir() + "/ImportImageBaseDir.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", svgPath, "--output", outputPath,
+                                            "--image-base-dir", TempDir()});
+  EXPECT_EQ(ret, 0);
+  EXPECT_TRUE(std::filesystem::exists(outputPath));
 }
 
 CLI_TEST(PAGXCliTest, Export_Help) {

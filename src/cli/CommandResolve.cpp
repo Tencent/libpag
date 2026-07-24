@@ -134,8 +134,14 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     return false;  // Nothing to resolve.
   }
 
-  // Check for conflicting contents or children.
-  if (!layer->contents.empty() || !layer->children.empty()) {
+  // Check for conflicting contents or children. An attached mask (e.g. a contour mask synthesised
+  // from an animated CSS clip-path, or an alpha/luminance mask-image) lives as an invisible,
+  // layout-excluded child in `layer->children` alongside `layer->mask`; that does not conflict with
+  // expanding the inline <svg> into `layer->contents`, so permit resolve when the layer's only
+  // "extra" content is its own mask layer (the masked inline SVG then resolves normally).
+  bool onlyMaskChild = layer->contents.empty() && layer->mask != nullptr &&
+                       layer->children.size() == 1 && layer->children.front() == layer->mask;
+  if ((!layer->contents.empty() || !layer->children.empty()) && !onlyMaskChild) {
     std::string desc =
         hasImportSource ? ("import=\"" + layer->importDirective.source + "\"") : "inline <svg>";
     std::cerr << "pagx resolve: warning: Layer";
@@ -151,7 +157,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   std::string resolvedFromDesc;
 
   if (hasImportSource) {
-    auto filePath = baseDir + layer->importDirective.source;
+    auto filePath = JoinPath(baseDir, layer->importDirective.source);
     result = ImportFile(filePath, layer->importDirective.format, formatOptions, layer->width,
                         layer->height);
     resolvedFromDesc = layer->importDirective.source;
@@ -366,6 +372,40 @@ ResolveStats ResolveDocument(PAGXDocument* doc, const std::string& baseDir,
     DeduplicateNodeIds(doc);
   }
   return stats;
+}
+
+//--------------------------------------------------------------------------------------------------
+// Dropping unresolvable directives
+//--------------------------------------------------------------------------------------------------
+
+static void DropUnresolvedInLayers(const std::vector<Layer*>& layers, int& droppedCount) {
+  for (auto* layer : layers) {
+    if (!layer->importDirective.source.empty() || !layer->importDirective.content.empty()) {
+      // The directive could not be expanded (e.g. an unreachable external SVG). Clear it so the
+      // Layer is a plain, directive-free box instead of a dangling reference that `pagx render`
+      // would reject. The Layer's own attributes (size/position/id/data-*) are preserved.
+      layer->importDirective.source.clear();
+      layer->importDirective.content.clear();
+      layer->importDirective.format.clear();
+      droppedCount++;
+    }
+    DropUnresolvedInLayers(layer->children, droppedCount);
+  }
+}
+
+int DropUnresolvedDirectives(PAGXDocument* doc) {
+  if (doc == nullptr) {
+    return 0;
+  }
+  int droppedCount = 0;
+  DropUnresolvedInLayers(doc->layers, droppedCount);
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      DropUnresolvedInLayers(comp->layers, droppedCount);
+    }
+  }
+  return droppedCount;
 }
 
 //--------------------------------------------------------------------------------------------------

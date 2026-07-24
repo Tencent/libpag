@@ -184,6 +184,32 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, fl
   if (lower.compare(0, 15, "conic-gradient(") == 0) {
     return _valueParser.parseConicGradient(trimmed);
   }
+  // CSS `repeating-*-gradient(...)` forms. PAGX has no tile/repeat axis on its gradient
+  // nodes, so we cannot reproduce the tiled effect natively. Falling back to the non-repeating
+  // variant preserves the dominant color and direction (e.g. a teal scanline overlay collapses
+  // into a single teal-to-transparent stripe instead of being dropped to opaque black). The
+  // caller still emits a "background-image not supported" diagnostic via a separate code path
+  // for cases where even this degraded version fails to parse.
+  static constexpr size_t kRepeatingPrefixLen = 10;  // length of "repeating-"
+  auto warnDowngrade = [&](ColorSource* color) -> ColorSource* {
+    if (color != nullptr) {
+      _diagnostics.warn("html: " + lower.substr(0, lower.find('(')) +
+                        " is not supported as a repeating pattern; "
+                        "rendered as a single non-repeating gradient instead");
+    }
+    return color;
+  };
+  if (lower.compare(0, 26, "repeating-linear-gradient(") == 0) {
+    return warnDowngrade(_valueParser.parseLinearGradient(trimmed.substr(kRepeatingPrefixLen),
+                                                          boxWidth, boxHeight, /*repeating=*/true));
+  }
+  if (lower.compare(0, 26, "repeating-radial-gradient(") == 0) {
+    return warnDowngrade(_valueParser.parseRadialGradient(trimmed.substr(kRepeatingPrefixLen),
+                                                          boxWidth, boxHeight, /*repeating=*/true));
+  }
+  if (lower.compare(0, 25, "repeating-conic-gradient(") == 0) {
+    return warnDowngrade(_valueParser.parseConicGradient(trimmed.substr(kRepeatingPrefixLen)));
+  }
   return nullptr;
 }
 
@@ -467,6 +493,13 @@ void HTMLLayerBuilder::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& bo
       drop->blurX = sigma;
       drop->blurY = sigma;
       drop->color = s.color;
+      // A CSS outer `box-shadow` is always clipped to *outside* the element's border box, so it is
+      // never visible under the box itself — even when the box has a translucent (or absent)
+      // background. PAGX's default `showBehindLayer=true` instead paints the shadow behind the whole
+      // layer, so with a translucent fill the shadow bleeds through and washes the box in the shadow
+      // colour. Setting `showBehindLayer=false` makes the layer knock the shadow out of its own
+      // coverage, matching the CSS clip and leaving only the exterior glow.
+      drop->showBehindLayer = false;
       layer->styles.push_back(drop);
     }
   }
@@ -568,6 +601,10 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
             layer->filters.push_back(f);
           }
         }
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
+        auto cm = _document->makeNode<ColorMatrixFilter>();
+        cm->matrix = step.matrix;
+        layer->filters.push_back(cm);
       } else {
         _diagnostics.warn("html: filter '" + step.raw + "' not supported");
       }

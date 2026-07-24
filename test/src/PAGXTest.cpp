@@ -446,6 +446,45 @@ PAGX_TEST(PAGXTest, PAGXDocumentXMLExport) {
 }
 
 /**
+ * Test case: a LayerFilter carrying an id must serialize that id so animations can target the
+ * filter node. Regression for the exporter dropping filter ids, which left every animated
+ * DropShadowFilter / BlurFilter target dangling (the animation bound to nothing and never played).
+ */
+PAGX_TEST(PAGXTest, LayerFilterIdSerialization) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->id = "seg";
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = 60;
+  rect->size.height = 30;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solidColor = doc->makeNode<pagx::SolidColor>();
+  solidColor->color = {0.16f, 0.88f, 0.82f, 1.0f};
+  fill->color = solidColor;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto shadow = doc->makeNode<pagx::DropShadowFilter>();
+  shadow->id = "seg_glow";
+  layer->filters.push_back(shadow);
+  doc->layers.push_back(layer);
+
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("id=\"seg_glow\""), std::string::npos);
+
+  // The id must survive a round-trip so the node stays addressable by animation targets.
+  auto doc2 = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc2 != nullptr);
+  EXPECT_TRUE(doc2->errors.empty());
+  ASSERT_EQ(doc2->layers.size(), 1u);
+  ASSERT_EQ(doc2->layers[0]->filters.size(), 1u);
+  EXPECT_EQ(doc2->layers[0]->filters[0]->id, "seg_glow");
+}
+
+/**
  * Test case: PAGXDocument XML round-trip (create -> export -> parse)
  */
 PAGX_TEST(PAGXTest, PAGXDocumentRoundTrip) {
@@ -10493,6 +10532,112 @@ PAGX_TEST(PAGXTest, NotifyChangeResetsTimelinesInNestedContainer) {
   scene->advanceAndApply(500'000);
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/ResetTimelinesInNestedContainer_after"));
+}
+
+/**
+ * Test case: an animated contour-mask Path driven by per-point float channels (the runtime lowering
+ * for an animated CSS `clip-path`). The mask starts as a full 100x100 rectangle and its two
+ * right-edge points sweep their x coordinate from 100 to 0, collapsing the rectangle to a zero-area
+ * sliver. The masked content must therefore be fully visible at t=0 and almost entirely clipped at
+ * the end — verifying that PathRuntimeTarget rebuilds the tgfx path geometry from the point
+ * channels each frame.
+ */
+PAGX_TEST(PAGXTest, AnimatedClipPathPointChannelsMorphContourMask) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+
+  auto* content = doc->makeNode<pagx::Layer>("content");
+  content->width = 100;
+  content->height = 100;
+  {
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->size.width = 100;
+    rect->size.height = 100;
+    auto* fill = doc->makeNode<pagx::Fill>();
+    auto* color = doc->makeNode<pagx::SolidColor>();
+    color->color = {1.0f, 0.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+    fill->color = color;
+    content->contents.push_back(rect);
+    content->contents.push_back(fill);
+  }
+
+  // Contour mask: a full-box rectangle path whose right edge animates inward.
+  auto* maskLayer = doc->makeNode<pagx::Layer>("mask");
+  maskLayer->visible = false;
+  maskLayer->includeInLayout = false;
+  auto* pathData = doc->makeNode<pagx::PathData>();
+  pathData->moveTo(0, 0);
+  pathData->lineTo(100, 0);
+  pathData->lineTo(100, 100);
+  pathData->lineTo(0, 100);
+  pathData->close();
+  auto* maskPath = doc->makeNode<pagx::Path>("clipPath");
+  maskPath->data = pathData;
+  auto* maskFill = doc->makeNode<pagx::Fill>();
+  auto* maskColor = doc->makeNode<pagx::SolidColor>();
+  maskColor->color = {1.0f, 1.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  maskFill->color = maskColor;
+  maskLayer->contents.push_back(maskPath);
+  maskLayer->contents.push_back(maskFill);
+  content->mask = maskLayer;
+  content->maskType = pagx::MaskType::Contour;
+  content->children.push_back(maskLayer);
+  doc->layers.push_back(content);
+
+  auto* anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Once;
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "clipPath";
+  for (const char* name : {"point1.x", "point2.x"}) {
+    auto* ch = doc->makeNode<pagx::TypedChannel<float>>();
+    ch->name = name;
+    ch->keyframes.push_back({0, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+    ch->keyframes.push_back({60, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+    object->channels.push_back(ch);
+  }
+  anim->objects.push_back(object);
+  doc->animations.push_back(anim);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(100, 100);
+  ASSERT_TRUE(surface != nullptr);
+
+  const size_t rowBytes = 100 * 4;
+  std::vector<uint8_t> pixels(rowBytes * 100);
+  auto countVisible = [&]() -> int {
+    int n = 0;
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+      if (pixels[i + 3] > 0) n++;
+    }
+    return n;
+  };
+
+  auto driveTo = [&](int64_t timeUs) {
+    for (const auto& id : scene->getAnimationIds()) {
+      auto animation = scene->getAnimation(id);
+      if (animation != nullptr) {
+        animation->setCurrentTime(timeUs);
+        animation->apply(1.0f);
+      }
+    }
+  };
+
+  driveTo(0);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), rowBytes));
+  int visibleStart = countVisible();
+
+  driveTo(1'000'000);
+  ASSERT_TRUE(scene->draw(surface));
+  ASSERT_TRUE(surface->readPixels(pixels.data(), rowBytes));
+  int visibleEnd = countVisible();
+
+  // Full rectangle at t=0 covers essentially the whole 100x100 box; the collapsed sliver at the end
+  // clips nearly all of it away.
+  EXPECT_GT(visibleStart, 9000);
+  EXPECT_LT(visibleEnd, visibleStart / 4);
 }
 
 /**

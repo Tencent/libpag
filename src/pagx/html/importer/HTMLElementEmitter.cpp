@@ -22,7 +22,9 @@
 // handled by `HTMLTextFragmentBuilder` and reached through `_textFragmentBuilder`.
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
+#include <unordered_map>
 #include "base/utils/MathUtil.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/html/importer/HTMLDetail.h"
@@ -32,11 +34,16 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Rectangle.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
+#include "pagx/xml/XMLDOM.h"
+#include "renderer/ToTGFX.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace pagx {
 
@@ -522,7 +529,9 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   // `<img>`'s too so image-carried custom data (e.g. `data-id`) is not lost to the fold.
   _layerBuilder->forwardDataAttributes(layer, img);
 
-  _idAllocator->assign(layer, element);
+  // Use assignElementId (not a bare _idAllocator->assign) so an `animation` style on the folded
+  // element is still recorded for later PAGX animation emission.
+  assignElementId(layer, element);
   return true;
 }
 
@@ -536,7 +545,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     _layerBuilder->applyLayerAttributes(layer, element, box);
     layer->importDirective.source = resolveImageSource(src);
     layer->importDirective.format = "svg";
-    _idAllocator->assign(layer, element);
+    assignElementId(layer, element);
     return layer;
   }
 
@@ -568,7 +577,7 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
   fill->color = pattern;
   layer->contents.push_back(fill);
-  _idAllocator->assign(layer, element);
+  assignElementId(layer, element);
   return layer;
 }
 
@@ -604,10 +613,86 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
     _svgEmitter->stripRootOpacity(element);
   }
 
+  // Record animated shape descendants before serialisation so any minted `id` is baked into the
+  // import directive and the SVG importer can derive matching Fill / Stroke painter ids.
+  collectInlineSvgShapeAnimations(element);
+
   layer->importDirective.content = _svgEmitter->serialize(element);
   layer->importDirective.format = "svg";
-  _idAllocator->assign(layer, element);
+  assignElementId(layer, element);
   return layer;
+}
+
+void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node) {
+  if (node == nullptr) {
+    return;
+  }
+  for (auto child = node->getFirstChild(); child; child = child->getNextSibling()) {
+    if (child->type != DOMNodeType::Element) {
+      continue;
+    }
+    const std::string* styleAttr = child->findAttribute("style");
+    if (styleAttr != nullptr) {
+      std::unordered_map<std::string, std::string> style;
+      ParseStyleString(*styleAttr, style);
+      if (style.count("animation") > 0 || style.count("animation-name") > 0) {
+        // A stable id must survive serialisation so the SVG importer can key the derived painter
+        // ids off it. Reuse an authored id; otherwise mint a fresh non-colliding one.
+        std::string id;
+        const std::string* idAttr = child->findAttribute("id");
+        if (idAttr != nullptr && !idAttr->empty()) {
+          id = *idAttr;
+        } else {
+          id = _idAllocator->generateUnique("svgshape");
+          bool replaced = false;
+          for (auto& attr : child->attributes) {
+            if (attr.name == "id") {
+              attr.value = id;
+              replaced = true;
+              break;
+            }
+          }
+          if (!replaced) {
+            child->attributes.push_back(DOMAttribute{std::string("id"), id});
+          }
+        }
+
+        // `stroke-dashoffset` keyframes are captured in author space (normalised by `pathLength`);
+        // resolve the real-to-author length ratio here where the geometry `d` is available, matching
+        // the static dash scaling the SVG importer applies (SVGParserContext::computePathTotalLength).
+        float dashScale = 1.0f;
+        const std::string* pathLen = child->findAttribute("pathLength");
+        const std::string* dAttr = child->findAttribute("d");
+        if (pathLen != nullptr && dAttr != nullptr && child->name == "path") {
+          float authorLength = std::strtof(pathLen->c_str(), nullptr);
+          if (authorLength > 0.0f) {
+            tgfx::Path path = ToTGFX(PathDataFromSVGString(*dAttr));
+            if (!path.isEmpty()) {
+              auto measure = tgfx::PathMeasure::MakeFrom(path);
+              if (measure != nullptr) {
+                float total = 0.0f;
+                do {
+                  total += measure->getLength();
+                } while (measure->nextContour());
+                if (total > 0.0f) {
+                  dashScale = total / authorLength;
+                }
+              }
+            }
+          }
+        }
+
+        PendingSvgShapeAnimation pending;
+        pending.style = std::move(style);
+        pending.shapeTargetId = id;
+        pending.fillTargetId = id + "__fill";
+        pending.strokeTargetId = id + "__stroke";
+        pending.dashScale = dashScale;
+        _pendingSvgShapeAnimations.push_back(std::move(pending));
+      }
+    }
+    collectInlineSvgShapeAnimations(child);
+  }
 }
 
 std::string HTMLParserContext::serializeSvg(const std::shared_ptr<DOMNode>& svgNode) {
@@ -633,7 +718,15 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
     std::string url = ExtractCssUrl(box.maskImage);
     svgContent = DecodeSvgDataUri(url);
     if (svgContent.empty()) {
-      warn("html: mask-image is not a decodable data:image/svg+xml URI; ignored");
+      // Not an SVG data URI. A raster `mask-image` (PNG / JPEG / WebP via a file path, `http(s)`
+      // URL, or `data:image/<raster>` URI) is masked through an image-backed layer instead of the
+      // SVG geometry path below. Fall back to warning and dropping only when that also fails.
+      if (applyRasterImageMask(layer, box, url)) {
+        return;
+      }
+      warn(
+          "html: mask-image is not a decodable data:image/svg+xml URI or loadable raster image; "
+          "ignored");
       return;
     }
     maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
@@ -734,6 +827,50 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   // child satisfies both: it is walked by LayerBuilder but neither drawn (maskOwner is set) nor
   // laid out (includeInLayout is false).
   layer->children.push_back(maskLayer);
+}
+
+bool HTMLParserContext::applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box,
+                                             const std::string& url) {
+  if (url.empty()) return false;
+  auto* imageNode = registerImageResource(resolveImageSource(url));
+  if (imageNode == nullptr) return false;
+  // The mask is scaled / positioned relative to its intrinsic pixel box (the CSS `mask-size` /
+  // `mask-position` model), so the native dimensions must be decodable up front. A zero size means
+  // the bytes could not be read — let the caller warn and drop rather than emit a degenerate mask.
+  auto nativeSize = decodeImageNativeSize(imageNode);
+  if (nativeSize.first <= 0 || nativeSize.second <= 0) return false;
+  float intrinsicW = static_cast<float>(nativeSize.first);
+  float intrinsicH = static_cast<float>(nativeSize.second);
+
+  // Build the mask layer as a native-sized rectangle filled with the image, anchored at the origin
+  // — the same coordinate convention the SVG-mask path relies on. `ScaleMode::Stretch` paints the
+  // image across the full rectangle box; since the rectangle is the image's native size the paint
+  // is 1:1, and `applyMaskSizeAndPosition` below then scales / offsets the whole layer to match CSS.
+  auto* maskLayer = _document->makeNode<Layer>();
+  auto* rect = _document->makeNode<Rectangle>();
+  rect->size = {intrinsicW, intrinsicH};
+  maskLayer->contents.push_back(rect);
+  auto* fill = _document->makeNode<Fill>();
+  auto* pattern = _document->makeNode<ImagePattern>();
+  pattern->image = imageNode;
+  pattern->scaleMode = ScaleMode::Stretch;
+  fill->color = pattern;
+  maskLayer->contents.push_back(fill);
+
+  maskLayer->visible = false;
+  maskLayer->includeInLayout = false;
+  applyMaskSizeAndPosition(maskLayer, box, intrinsicW, intrinsicH);
+  // A stable id keeps the `mask="@id"` reference intact across a PAGX export / re-import round-trip.
+  if (maskLayer->id.empty()) {
+    maskLayer->id = _idAllocator->generateUnique("mask");
+  }
+
+  layer->mask = maskLayer;
+  // A raster `mask-image` defaults to `mask-mode: match-source`, which for an image source reads its
+  // alpha channel; `mask-mode: luminance` opts into the luma-keyed form instead.
+  layer->maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+  layer->children.push_back(maskLayer);
+  return true;
 }
 
 float HTMLParserContext::resolveMaskPositionAxis(const std::string& token, float boxAxis,

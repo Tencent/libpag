@@ -28,6 +28,7 @@
 #include <vector>
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/importer/HTMLAnimationBuilder.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -118,6 +119,20 @@ class HTMLParserContext {
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                           const HTMLInheritedStyle& inherited);
 
+  // Walks an inline `<svg>` subtree (before it is serialised into the layer's import directive) and
+  // records every shape descendant carrying an inline `style="animation:…"`. Each such shape is
+  // given a stable DOM `id` (minted when absent) so the SVG importer can derive its Fill / Stroke
+  // painter ids from it, and a `PendingSvgShapeAnimation` is queued targeting those derived ids.
+  // `stroke-dashoffset` scaling (real path length / author `pathLength`) is resolved here where the
+  // geometry `d` is available, mirroring the static dash scaling in the SVG importer.
+  void collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node);
+
+  // Reserves the element's `id` on the allocator, then records the element when it carries an
+  // `animation` declaration so the post-tree-build animation pass can emit a PAGX animation
+  // bound to this layer. All `<img>`, inline `<svg>`, and container conversion paths funnel
+  // their final outer Layer through this helper to ensure animation capture is exhaustive.
+  void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
+
   // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
   // `clip-path` (contour) — the latter from a `url(#id)` <clipPath> reference or a CSS basic
   // shape (`polygon()` / `path()` / `circle()` / `ellipse()` / `inset()`) synthesised into
@@ -129,6 +144,15 @@ class HTMLParserContext {
   // neither a mask nor a clip-path reference. `box` supplies the masked layer's resolved size used
   // to frame a contour clip-path SVG.
   void applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box);
+
+  // Rebuilds an alpha / luminance mask layer from a raster `mask-image: url(...)` (a PNG / JPEG /
+  // WebP referenced by file path, `http(s)` URL, or `data:image/<raster>` URI) and attaches it to
+  // `layer`. The image is loaded into an `ImagePattern` fill on a Rectangle sized to the image's
+  // native pixels, then `mask-size` / `mask-position` scale and offset it onto the masked box (via
+  // `applyMaskSizeAndPosition`), mirroring the SVG-mask path. Returns false when `url` is empty or
+  // the image cannot be loaded / decoded, so the caller can fall back to warning and dropping the
+  // mask. The complement of the SVG data-URI branch handled directly in `applyMaskOrClip`.
+  bool applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box, const std::string& url);
 
   // Applies the CSS `mask-size` / `mask-position` transform onto a rebuilt alpha/luminance mask
   // layer (the inverse of the size/position emission in `HTMLWriter::writeMaskCSS`). The mask SVG
@@ -162,6 +186,27 @@ class HTMLParserContext {
   // import directive content.
   std::string serializeSvg(const std::shared_ptr<DOMNode>& svgNode);
 
+  // Post-tree cleanup: drops `BackgroundBlurStyle` (CSS `backdrop-filter: blur`) from any layer
+  // that sits under an ancestor (or is itself) whose opacity is animated below 1. PAGX renders an
+  // `opacity < 1` group into an isolated offscreen surface, so a descendant backdrop-filter samples
+  // that empty/self surface instead of the page behind and tints the box with its own colour.
+  // Chromium samples the real backdrop, so the blur is invisible when nothing sits behind the box;
+  // dropping it matches the baseline far better than the tint artifact. Runs after the animation
+  // pass so the fading layers are known. Static `opacity < 1` is handled separately by the
+  // box-shadow fallback path in the HTML writer.
+  void suppressBackdropBlurUnderOpacityFade();
+
+  // Post-tree animation coalescing: `HTMLAnimationBuilder` emits one `Animation` per animated
+  // element (each driving a single element's channels), so a page that animates many siblings
+  // (a staggered grid, a list of cards) produces a long run of separate `<Animation>` blocks.
+  // The runtime plays every top-level animation, so this is only a structural verbosity — but a
+  // single timeline is easier to read, edit, and drive. Merge animations that share the same
+  // `duration` / `frameRate` / `loop` into one `Animation` (their objects concatenated). Grouping
+  // by that triple keeps it general: animations with different lengths or loop behaviour (some
+  // `once`, some infinite) stay in separate `Animation` nodes so they are never forced onto a
+  // mismatched shared timeline. Runs after both animation build passes.
+  void coalesceAnimations();
+
   // Diagnostics ------------------------------------------------------------------------
   // Short forwarders to `_diagnostics`; kept for the very common warn / hardError call
   // sites where the unique_ptr-deref boilerplate would dominate the surrounding code.
@@ -183,6 +228,30 @@ class HTMLParserContext {
   // Owns the CSS rule tables, the resolved-style cache, the inheritance walk, and the
   // box-attribute parser. Borrows `_diagnostics` and `_valueParser`.
   std::unique_ptr<HTMLStyleCascade> _styleCascade = nullptr;
+
+  // Maps the `@keyframes` + `animation` subset onto PAGX animations. Borrows `_diagnostics`,
+  // `_valueParser` and `_idAllocator`; document handle + keyframes registry bound in parseDOM.
+  std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
+
+  // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
+  // Recorded during `assignElementId` and processed after the whole tree is built (so background
+  // fills used by `color` channels already exist).
+  std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
+
+  // Inline-SVG shape descendants (`<path>`, `<rect>`, …) that declare a CSS animation. The wrapping
+  // `<svg>` is serialised into a single import directive that is expanded (resolved) only after the
+  // layer tree is built, so these shapes have no PAGX painter node yet. `convertInlineSvg` assigns
+  // each such shape a stable DOM `id`; the SVG importer later derives its Fill / Stroke ids from it
+  // (`<id>__fill` / `<id>__stroke`). The animation is built after the tree exists, targeting those
+  // derived painter ids by string (the nodes materialise during resolve, before export).
+  struct PendingSvgShapeAnimation {
+    std::unordered_map<std::string, std::string> style = {};
+    std::string shapeTargetId = {};
+    std::string fillTargetId = {};
+    std::string strokeTargetId = {};
+    float dashScale = 1.0f;
+  };
+  std::vector<PendingSvgShapeAnimation> _pendingSvgShapeAnimations = {};
 
   // Builds and mutates `Layer` instances from `HTMLBoxAttributes`. Borrows `_diagnostics`,
   // `_valueParser` and `_idAllocator`; document handle is bound after `PAGXDocument::Make`.

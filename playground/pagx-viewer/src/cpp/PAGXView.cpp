@@ -110,6 +110,7 @@ void PAGXView::loadPAGX(const val& pagxData) {
 void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
   scene = nullptr;
+  timelines.clear();
   defaultTimeline = nullptr;
   defaultAnimation = nullptr;
   lastRecording = nullptr;
@@ -152,6 +153,17 @@ void PAGXView::buildLayers() {
   defaultAnimation = nullptr;
   if (defaultTimeline != nullptr && defaultTimeline->type() == TimelineType::Animation) {
     defaultAnimation = std::static_pointer_cast<PAGAnimation>(defaultTimeline);
+  }
+  // Collect every top-level animation other than the default one. A PAGX document (notably an
+  // HTML-imported one) may declare several independent animations (e.g. one per animated element);
+  // the default animation is driven with play/loop gating below, while these extras are advanced
+  // alongside it so all animated elements play instead of only the first.
+  timelines.clear();
+  for (const auto& id : scene->getAnimationIds()) {
+    auto animation = scene->getAnimation(id);
+    if (animation != nullptr && animation != defaultAnimation) {
+      timelines.push_back(std::move(animation));
+    }
   }
   playing = true;
   lastAnimationTimeMs = -1.0;
@@ -205,6 +217,15 @@ void PAGXView::advanceTimelines(double frameStartMs) {
     } else if (defaultTimeline != nullptr) {
       // Non-animation timelines (state machines) have no seekable duration to gate; drive as-is.
       defaultTimeline->advanceAndApply(deltaUs);
+    }
+    // Drive the remaining top-level animations alongside the default so multi-animation documents
+    // (e.g. HTML imports) play every animated element. These follow the same play gate but are not
+    // subject to the single-pass loop gating above, which only governs the default animation's
+    // progress-bar semantics.
+    for (const auto& timeline : timelines) {
+      if (timeline != nullptr) {
+        timeline->advanceAndApply(deltaUs);
+      }
     }
     // Drive the scene inside the playing gate so pausing freezes the whole picture: this advances
     // the auto-playing nested compositions, which would otherwise keep animating (and keep
@@ -286,7 +307,7 @@ void PAGXView::applySceneDisplayOptions() {
     return;
   }
   auto options = scene->getDisplayOptions();
-  options->setRenderMode(PAGRenderMode::Tiled);
+  options->setRenderMode(PAGRenderMode::Partial);
   options->setTileUpdateMode(PAGTileUpdateMode::Smooth);
   options->setMaxTileCount(512);
   options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);

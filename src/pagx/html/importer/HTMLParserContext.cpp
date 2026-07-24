@@ -22,6 +22,9 @@
 #include <utility>
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Text.h"
@@ -47,6 +50,47 @@ HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Opti
   return result;
 }
 
+// True when an `alpha` channel ever drops below 1 (a fade-in from 0 or a fade-out toward 0). Such
+// an animation drives the layer's group opacity below 1 at some point, isolating it into an
+// offscreen surface that breaks descendant backdrop-filter sampling.
+bool AlphaChannelDipsBelowOne(const Channel* channel) {
+  if (channel == nullptr || channel->name != "alpha" ||
+      channel->valueType() != ChannelValueType::Float) {
+    return false;
+  }
+  const auto* typed = static_cast<const TypedChannel<float>*>(channel);
+  for (const auto& kf : typed->keyframes) {
+    if (kf.value < 1.0f - 1e-3f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Recursively strips `BackgroundBlurStyle` from `layer` and its descendants once `ancestorFades`
+// (or the layer's own id) marks the subtree as living under an animated-opacity group. Returns the
+// number of styles removed.
+size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::string>& fadingIds,
+                                  bool ancestorFades) {
+  if (layer == nullptr) {
+    return 0;
+  }
+  const bool fades = ancestorFades || (!layer->id.empty() && fadingIds.count(layer->id) > 0);
+  size_t removed = 0;
+  if (fades && !layer->styles.empty()) {
+    auto& styles = layer->styles;
+    auto it = std::remove_if(styles.begin(), styles.end(), [](const LayerStyle* ls) {
+      return ls != nullptr && ls->nodeType() == NodeType::BackgroundBlurStyle;
+    });
+    removed += static_cast<size_t>(std::distance(it, styles.end()));
+    styles.erase(it, styles.end());
+  }
+  for (auto* child : layer->children) {
+    removed += StripBackdropBlurUnderFade(child, fadingIds, fades);
+  }
+  return removed;
+}
+
 }  // namespace
 
 //==================================================================================================
@@ -65,6 +109,8 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _imageResources = std::make_unique<HTMLImageResources>(*_idAllocator);
   _svgEmitter = std::make_unique<HTMLInlineSvgEmitter>();
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
+  _animationBuilder =
+      std::make_unique<HTMLAnimationBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
   _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
@@ -181,6 +227,8 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _imageResources->bindDocument(_document.get());
   _layerBuilder->bindDocument(_document.get());
   _textFragmentBuilder->bindDocument(_document.get());
+  _animationBuilder->bindDocument(_document.get());
+  _animationBuilder->setKeyframes(&_styleCascade->keyframes());
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -209,8 +257,107 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
+  // Build PAGX animations for every recorded animated element now that the full layer tree
+  // (including background fills consumed by `color` channels) exists. See spec §13.
+  for (auto& entry : _pendingAnimations) {
+    const auto& style = _styleCascade->getResolvedStyle(entry.first);
+    _animationBuilder->buildForElement(style, entry.second);
+  }
+  // Inline-SVG shape animations (`fill` / `stroke` / `stroke-dashoffset` on `<path>` etc.). Their
+  // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
+  // the derived painter ids by string; the nodes materialise (with those ids) before export.
+  for (auto& shape : _pendingSvgShapeAnimations) {
+    _animationBuilder->buildForInlineSvgShape(shape.style, shape.shapeTargetId, shape.fillTargetId,
+                                              shape.strokeTargetId, shape.dashScale);
+  }
+  coalesceAnimations();
+  suppressBackdropBlurUnderOpacityFade();
   flushFontFallbacksToDocument();
   return _document;
+}
+
+void HTMLParserContext::coalesceAnimations() {
+  if (!_document || _document->animations.size() < 2) {
+    return;
+  }
+  // First animation of each (duration, frameRate, loop) group becomes the group leader and keeps
+  // its id; later animations in the same group have their objects appended to the leader and are
+  // dropped from the list. Leaders are scanned linearly because a page has only a handful of
+  // distinct timings even when it animates hundreds of elements. Order is preserved so the
+  // resulting `<Animations>` block still follows document order.
+  std::vector<Node*> coalesced;
+  coalesced.reserve(_document->animations.size());
+  // Parallel list of the Animation* leaders held in `coalesced`, used to match subsequent
+  // animations by timing. Non-animation timelines (e.g. state machines) are passed through
+  // untouched and never participate in coalescing.
+  std::vector<Animation*> leaders;
+  for (auto* node : _document->animations) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() != NodeType::Animation) {
+      coalesced.push_back(node);
+      continue;
+    }
+    auto* anim = static_cast<Animation*>(node);
+    Animation* group = nullptr;
+    for (auto* leader : leaders) {
+      if (leader->duration == anim->duration && leader->loop == anim->loop &&
+          std::fabs(leader->frameRate - anim->frameRate) < 1e-6f) {
+        group = leader;
+        break;
+      }
+    }
+    if (group == nullptr) {
+      coalesced.push_back(anim);
+      leaders.push_back(anim);
+      continue;
+    }
+    for (auto* obj : anim->objects) {
+      group->objects.push_back(obj);
+    }
+    anim->objects.clear();
+  }
+  _document->animations = std::move(coalesced);
+}
+
+void HTMLParserContext::suppressBackdropBlurUnderOpacityFade() {
+  if (!_document) {
+    return;
+  }
+  // Gather the ids of every layer whose opacity is animated below 1 at some point in the timeline.
+  std::unordered_set<std::string> fadingIds;
+  for (const auto* node : _document->animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) {
+      continue;
+    }
+    const auto* anim = static_cast<const Animation*>(node);
+    for (const auto* obj : anim->objects) {
+      if (obj == nullptr || obj->target.empty()) {
+        continue;
+      }
+      for (const auto* ch : obj->channels) {
+        if (AlphaChannelDipsBelowOne(ch)) {
+          fadingIds.insert(obj->target);
+          break;
+        }
+      }
+    }
+  }
+  if (fadingIds.empty()) {
+    return;
+  }
+  size_t removed = 0;
+  for (auto* root : _document->layers) {
+    removed += StripBackdropBlurUnderFade(root, fadingIds, /*ancestorFades=*/false);
+  }
+  if (removed > 0) {
+    warn("html: dropped " + std::to_string(removed) +
+         " backdrop-filter blur(s) under an animated-opacity group; PAGX isolates such groups into "
+         "an offscreen surface and cannot sample the page behind them, which would tint the box "
+         "with its own colour instead of blurring the backdrop "
+         "(subset:backdrop-blur-dropped-under-opacity-fade)");
+  }
 }
 
 void HTMLParserContext::recordFontFallbacks(const std::vector<std::string>& chain) {
@@ -275,6 +422,22 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 }
 
 //==================================================================================================
+// ID assignment with animation registration hook.
+//==================================================================================================
+
+void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
+  _idAllocator->assign(layer, element);
+  // Record elements that declare an animation so PAGX animations can be emitted once the whole
+  // tree is built. Cheap lookup: the resolved style is cached by the cascade.
+  if (layer != nullptr && element != nullptr) {
+    const auto& style = _styleCascade->getResolvedStyle(element);
+    if (style.count("animation") > 0 || style.count("animation-name") > 0) {
+      _pendingAnimations.emplace_back(element, layer);
+    }
+  }
+}
+
+//==================================================================================================
 // Body / element conversion
 //==================================================================================================
 
@@ -334,7 +497,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     }
     child = child->getNextSibling();
   }
-  _idAllocator->assign(wrapper, body);
+  assignElementId(wrapper, body);
   return wrapper;
 }
 
@@ -493,7 +656,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // after children are attached so the mask layer is appended last; it shares `layer`'s local
   // coordinate origin (the mask SVG geometry is in the masked element's own 0..W/0..H space).
   applyMaskOrClip(layer, box);
-  _idAllocator->assign(wrapper, element);
+  assignElementId(wrapper, element);
   return wrapper;
 }
 

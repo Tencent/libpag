@@ -127,6 +127,7 @@ Options:
 | `--cookie <name=value>` | — | Cookie scoped to the URL (URL inputs only; repeatable) |
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
 | `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
+| `--capture-animations` | _disabled_ | Capture the page's animations (CSS `@keyframes`, Web Animations, GSAP, anime.js) into the subset as `@keyframes` + `animation` so the importer can replay the motion; otherwise a single static frame is emitted |
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
 | `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |
@@ -269,6 +270,7 @@ Options:
 | `--no-resolve` | Stop after `pagx import` |
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
+| `--capture-animations` | Forwarded to `snapshot.js`: capture the page's animations into the subset so the `.pagx` replays the motion (default: a single static frame) |
 | `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
 | `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx font embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
@@ -523,9 +525,23 @@ Babel-compiled at runtime.
 
 ## Limitations
 
-- Animations, hover states, and other dynamic effects are captured in whatever
-  state the page is in when the snapshot is taken. Use `--wait-ms` or
-  `--selector` to land on the desired frame.
+- Animation capture is **off by default** — the snapshot emits a single static
+  frame. Pass `--capture-animations` (`snapshot.js` / `html2pagx` /
+  `pagx import`), set `captureAnimations: true` on the `runSnapshot` /
+  `runHtmlToPagx` APIs, or send `captureAnimations: true` in the HTTP service's
+  options to opt in. When enabled, animations are normalised into the canonical
+  `@keyframes` + `animation` subset (`spec/html_subset.md` §13) so the importer
+  can replay them. The capture pass (`lib/animation-capture.ts`) reads running
+  animations from CSS `@keyframes`, the Web Animations API, GSAP, and anime.js,
+  and rewrites them as `@keyframes pagxAnim<N>` rules plus an inline `animation`
+  shorthand. Only runtime-playable channels survive: `opacity` (→ `alpha`),
+  `transform: translate[X|Y]` (→ `x`/`y`), and `color` / `background-color`
+  (→ a fill's `SolidColor.color`). Other animated properties (`rotate`,
+  `scale`, `width`/`height`, `filter`, `box-shadow`, …) are dropped, and the
+  element holds whatever value it had when the snapshot was taken — use
+  `--wait-ms` or `--selector` to land on the desired frame for those.
+- Hover states and other dynamic effects that are not expressed as animations
+  are captured in whatever state the page is in when the snapshot is taken.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
 - `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,

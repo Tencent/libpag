@@ -32,14 +32,19 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLTransformContext.h"
 #include "pagx/html/importer/HTMLTransformPassUtils.h"
 #include "pagx/html/importer/HTMLTransformPasses.h"
+#include "pagx/html/importer/HTMLValueParser.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
@@ -198,15 +203,48 @@ inline pagx::Color SolidFillColorOf(pagx::Layer* layer) {
   return solid->color;
 }
 
+// Counts `BackgroundBlurStyle` nodes across `layer` and its whole subtree. Used to assert the
+// backdrop-filter suppression pass without depending on the exact wrapper-layer nesting.
+inline size_t CountBackgroundBlurStyles(pagx::Layer* layer) {
+  if (!layer) return 0;
+  size_t count = 0;
+  for (auto* s : layer->styles) {
+    if (As<pagx::BackgroundBlurStyle>(s)) count++;
+  }
+  for (auto* c : layer->children) count += CountBackgroundBlurStyles(c);
+  return count;
+}
+
+// Returns the first Channel named `name` across all AnimationObjects of `anim`, or nullptr.
+inline pagx::Channel* FindChannel(pagx::Animation* anim, const std::string& name) {
+  if (!anim) return nullptr;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch && ch->name == name) return ch;
+    }
+  }
+  return nullptr;
+}
+
+// Returns the AnimationObject whose `target` matches `targetId`, or nullptr.
+inline pagx::AnimationObject* FindObjectByTarget(pagx::Animation* anim,
+                                                 const std::string& targetId) {
+  if (!anim) return nullptr;
+  for (auto* obj : anim->objects) {
+    if (obj && obj->target == targetId) return obj;
+  }
+  return nullptr;
+}
+
 // HTMLSubsetTransformer helpers -----------------------------------------------------------
 
-std::shared_ptr<pagx::DOMNode> ParseHtml(const std::string& html) {
+inline std::shared_ptr<pagx::DOMNode> ParseHtml(const std::string& html) {
   auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(html.data()), html.size());
   if (!dom) return nullptr;
   return dom->getRootNode();
 }
 
-pagx::HTMLSubsetTransformer::Result RunTransform(
+inline pagx::HTMLSubsetTransformer::Result RunTransform(
     const std::string& html, std::shared_ptr<pagx::DOMNode>* outRoot,
     const pagx::HTMLSubsetTransformer::Options& opts = {}) {
   auto root = ParseHtml(html);
@@ -221,33 +259,34 @@ pagx::HTMLSubsetTransformer::Result RunTransform(
 }
 
 // Returns the first <body> child whose tag matches `tag`.
-std::shared_ptr<pagx::DOMNode> FirstBodyChild(const std::shared_ptr<pagx::DOMNode>& root,
-                                              const std::string& tag = "") {
+inline std::shared_ptr<pagx::DOMNode> FirstBodyChild(const std::shared_ptr<pagx::DOMNode>& root,
+                                                     const std::string& tag = "") {
   if (!root) return nullptr;
   auto body = root->getFirstChild("body");
   if (!body) return nullptr;
   return body->getFirstChild(tag);
 }
 
-std::string AttrValue(const std::shared_ptr<pagx::DOMNode>& node, const std::string& name) {
+inline std::string AttrValue(const std::shared_ptr<pagx::DOMNode>& node, const std::string& name) {
   if (!node) return {};
   const auto* val = node->findAttribute(name);
   return val ? *val : std::string();
 }
 
-bool HasDiagnostic(const pagx::HTMLSubsetTransformer::Result& result, const std::string& code) {
+inline bool HasDiagnostic(const pagx::HTMLSubsetTransformer::Result& result,
+                          const std::string& code) {
   for (const auto& d : result.diagnostics) {
     if (d.code == code) return true;
   }
   return false;
 }
 
-bool StyleContains(const std::shared_ptr<pagx::DOMNode>& node, const std::string& needle) {
+inline bool StyleContains(const std::shared_ptr<pagx::DOMNode>& node, const std::string& needle) {
   return AttrValue(node, "style").find(needle) != std::string::npos;
 }
 
 // Counts the number of element children directly under `parent`.
-size_t CountElementChildren(const std::shared_ptr<pagx::DOMNode>& parent) {
+inline size_t CountElementChildren(const std::shared_ptr<pagx::DOMNode>& parent) {
   size_t n = 0;
   if (!parent) return 0;
   for (auto c = parent->firstChild; c; c = c->nextSibling) {
@@ -715,6 +754,9 @@ PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
   EXPECT_FLOAT_EQ(drop->blurX, 4.0f);
   EXPECT_FLOAT_EQ(drop->blurY, 4.0f);
   EXPECT_TRUE(ColorNear(drop->color, HexColor(0x000000, 0.2f), 0.02f));
+  // A CSS outer box-shadow is clipped to outside the border box, so it must not paint behind the
+  // (possibly translucent) layer — otherwise the shadow bleeds through and tints the box.
+  EXPECT_FALSE(drop->showBehindLayer);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, InsetBoxShadowProducesInnerShadowStyle) {
@@ -995,6 +1037,110 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradient) {
   EXPECT_EQ(rg->colorStops.size(), 2u);
 }
 
+// CSS Color 4 `color()` functional notation. Chrome's getComputedStyle frequently emits this
+// form even when the source is plain rgba(); previously every channel value fell through to
+// opaque black, which broke HUD-style designs that relied on the captured alpha.
+PAG_TEST(PAGXHTMLImporterTest, ColorFunctionSrgbWithAlphaRecognized) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:color(srgb 0.156863 0.878431 0.815686 / 0.6)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("unrecognised color"), std::string::npos);
+  }
+  auto* div = doc->layers.front()->children.front();
+  pagx::Color expected;
+  expected.red = 0.156863f;
+  expected.green = 0.878431f;
+  expected.blue = 0.815686f;
+  expected.alpha = 0.6f;
+  expected.colorSpace = pagx::ColorSpace::SRGB;
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), expected));
+}
+
+// `color(srgb r g b)` without alpha must default to opaque, matching CSS Color 4 semantics.
+PAG_TEST(PAGXHTMLImporterTest, ColorFunctionSrgbWithoutAlphaIsOpaque) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:color(srgb 1 0 0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0xFF0000)));
+}
+
+// A color() space that PAGX cannot map to its pipeline (neither sRGB nor DisplayP3) is
+// downgraded with a dedicated diagnostic instead of the generic "unrecognised color value"
+// message so users can tell which feature is missing.
+PAG_TEST(PAGXHTMLImporterTest, ColorFunctionNonSrgbWarnsAndFallsBack) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-color:color(rec2020 0.5 0.2 0.9)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("color()") != std::string::npos && msg.find("non-sRGB") != std::string::npos) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x000000)));
+}
+
+// `radial-gradient(closest-side, ...)` used to be misparsed: the leading size keyword fell
+// through to `parseColor`, producing both a bogus diagnostic and an opaque-black first stop.
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientWithSizeKeyword) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:radial-gradient(closest-side, #FFFFFF 0%, #000000 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("unrecognised color value 'closest-side'"), std::string::npos);
+  }
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  ASSERT_EQ(rg->colorStops.size(), 2u);
+  EXPECT_TRUE(ColorNear(rg->colorStops.front()->color, HexColor(0xFFFFFF)));
+  EXPECT_TRUE(ColorNear(rg->colorStops.back()->color, HexColor(0x000000)));
+}
+
+// CSS `repeating-linear-gradient(...)` cannot be expressed natively in PAGX, but instead of
+// dropping it to a black background we render the non-repeating variant so the dominant color
+// survives and emit a diagnostic explaining the degradation.
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientDegradesToSingleGradient) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:repeating-linear-gradient(90deg, #FF0000 0px, #FF0000 4px, #0000FF 4px, #0000FF 8px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("repeating-linear-gradient") != std::string::npos &&
+        msg.find("non-repeating") != std::string::npos) {
+      warned = true;
+    }
+  }
+  EXPECT_TRUE(warned);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  EXPECT_GE(lg->colorStops.size(), 2u);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RadialGradientSizeAndPositionDescriptor) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:200px">
@@ -1191,6 +1337,72 @@ PAG_TEST(PAGXHTMLImporterTest, BackdropFilterMapsToBackgroundBlurStyle) {
     }
   }
   EXPECT_TRUE(foundBlur);
+}
+
+// A `backdrop-filter: blur` under an ancestor whose opacity is animated below 1 is dropped: PAGX
+// isolates the fading group into an offscreen surface, so the child backdrop-filter would sample
+// that surface (its own tint) instead of the page behind. See
+// HTMLParserContext::suppressBackdropBlurUnderOpacityFade.
+PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedUnderAnimatedOpacityAncestor) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes leave { 0% { opacity: 1; } 100% { opacity: 0; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="group" style="position:absolute;left:0;top:0;width:100px;height:100px;
+                             animation:leave 2s linear">
+        <div style="position:absolute;left:0;top:0;width:50px;height:50px;
+                    background-color:#FFFFFF88;backdrop-filter:blur(6px)"></div>
+      </div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 0u);
+}
+
+// The element that itself animates its opacity also isolates into an offscreen surface, so its own
+// backdrop-filter blur is dropped as well.
+PAG_TEST(PAGXHTMLImporterTest, BackdropBlurDroppedWhenElementAnimatesOwnOpacity) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes appear { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div style="position:absolute;left:0;top:0;width:50px;height:50px;
+                  background-color:#FFFFFF88;backdrop-filter:blur(6px);
+                  animation:appear 2s linear"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 0u);
+}
+
+// Without any opacity animation on the element or an ancestor, the backdrop-filter blur stays: a
+// statically fully-opaque group is not isolated, so PAGX samples the real backdrop correctly.
+PAG_TEST(PAGXHTMLImporterTest, BackdropBlurKeptWithoutOpacityAnimation) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes slide { 0% { transform: translateX(0px); } 100% { transform: translateX(20px); } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="group" style="position:absolute;left:0;top:0;width:100px;height:100px;
+                             animation:slide 2s linear">
+        <div style="position:absolute;left:0;top:0;width:50px;height:50px;
+                    background-color:#FFFFFF88;backdrop-filter:blur(6px)"></div>
+      </div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountBackgroundBlurStyles(doc->layers.front()), 1u);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenMapsToClipToBounds) {
@@ -2062,6 +2274,288 @@ PAG_TEST(PAGXHTMLInlineSvgEmitterTest, FormatColorForAttributeEmitsAlphaHex) {
   translucent.colorSpace = pagx::ColorSpace::SRGB;
   // 0.5 * 255 rounds to 128 (0x80).
   EXPECT_EQ(pagx::HTMLInlineSvgEmitter::formatColorForAttribute(translucent), "#0000FF80");
+}
+
+//==================================================================================================
+// HTMLInlineSvgEmitter — reconstructForeignObjectPaints
+//
+// The HTML exporter has no plain-SVG spelling for a conic-gradient stroke, so it emits a
+// `<defs><mask>` holding white stroke shapes plus a sibling `<foreignObject mask="url(#…)">`
+// whose `<div>` carries the paint as a CSS `background`. The downstream SVG importer does not
+// understand `<foreignObject>`, so `reconstructForeignObjectPaints` rewrites that pattern back
+// into native stroked shapes recoloured to a concrete paint. These tests drive the emitter
+// directly to cover the reconstruction, the paint-sampling helpers, and the fallback branches.
+//==================================================================================================
+
+namespace {
+
+// Parses `svg` into a DOM tree and returns the root `<svg>` element (skipping any surrounding
+// wrapper), or nullptr when parsing fails or no `<svg>` is present.
+std::shared_ptr<pagx::DOMNode> ParseSvgRoot(const std::string& svg) {
+  auto dom = pagx::XMLDOM::Make(reinterpret_cast<const uint8_t*>(svg.data()), svg.size());
+  if (!dom) return nullptr;
+  auto root = dom->getRootNode();
+  if (!root) return nullptr;
+  if (pagx::html::ToLower(root->name) == "svg") return root;
+  return root->getFirstChild("svg");
+}
+
+// Runs `collectSharedDefs` + `reconstructForeignObjectPaints` on `svg` and returns the serialised
+// result, so tests can assert on the rewritten SVG text.
+std::string ReconstructForeignObjects(const std::string& svg) {
+  auto svgRoot = ParseSvgRoot(svg);
+  if (!svgRoot) return {};
+  pagx::HTMLInlineSvgEmitter emitter;
+  emitter.collectSharedDefs(svgRoot);
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  pagx::HTMLDiagnosticSink sink(/*strict=*/false);
+  float canvasWidth = 100;
+  float canvasHeight = 100;
+  pagx::HTMLValueParser parser(sink, canvasWidth, canvasHeight);
+  parser.bindDocument(doc.get());
+  emitter.reconstructForeignObjectPaints(svgRoot, parser);
+  return emitter.serialize(svgRoot);
+}
+
+}  // namespace
+
+// A masked `<foreignObject>` whose `<div>` carries a solid colour background is rewritten into the
+// mask's single stroke shape, recoloured with that solid colour; the foreignObject and mask
+// indirection is dropped. A single shape without a transform is spliced in directly (no wrapping
+// `<g>`).
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectSolidMaskBecomesStrokedShape) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask0" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask0)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#FF8800"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  // The foreignObject is gone; a native stroked circle carrying the sampled colour remains.
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  EXPECT_NE(out.find("stroke=\"#FF8800\""), std::string::npos);
+}
+
+// A masked `<foreignObject>` carrying a `transform` wraps the recoloured mask shapes in a `<g>`
+// that re-applies the transform, and multiple mask shapes are all recoloured.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectMaskWithTransformWrapsInGroup) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask1" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+          <rect x="4" y="4" width="10" height="10" fill="none" stroke="white" stroke-width="2"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" transform="rotate(30 20 20)" mask="url(#cmask1)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#123456"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<g"), std::string::npos);
+  EXPECT_NE(out.find("transform=\"rotate(30 20 20)\""), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  EXPECT_NE(out.find("<rect"), std::string::npos);
+  // Both shapes are recoloured to the sampled solid colour.
+  auto first = out.find("stroke=\"#123456\"");
+  ASSERT_NE(first, std::string::npos);
+  EXPECT_NE(out.find("stroke=\"#123456\"", first + 1), std::string::npos);
+}
+
+// A masked `<foreignObject>` whose `<div>` background is a `conic-gradient(...)` samples the sweep
+// to a representative hue and recolours the mask stroke shape with it.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectConicGradientMaskSampled) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask2" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <path d="M4 4 L36 4 L36 36 Z" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask2)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:conic-gradient(from 0deg at -100px -100px, #FF0000 0deg, #00FF00 360deg)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<path"), std::string::npos);
+  // A concrete hex colour (not the CSS gradient token) is now on the stroke.
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("conic-gradient"), std::string::npos);
+}
+
+// A linear-gradient div background is sampled at its midpoint.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectLinearGradientMaskSampled) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask3" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask3)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:linear-gradient(90deg, #000000, #FFFFFF)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  // Midpoint of black→white is a mid-grey; assert a concrete stroke colour was written.
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("linear-gradient"), std::string::npos);
+}
+
+// A radial-gradient div background is sampled at its midpoint.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectRadialGradientMaskSampled) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask4" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask4)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:radial-gradient(circle, #FF0000, #0000FF)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("radial-gradient"), std::string::npos);
+}
+
+// A `<foreignObject>` with no `mask` attribute represents a plain painted box; it is rewritten into
+// a solid-filled `<rect>` covering the same box (carrying x/y/width/height and the sampled fill).
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectWithoutMaskBecomesFilledRect) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="5" y="6" width="20" height="30" transform="translate(1 2)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#00AA00"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<rect"), std::string::npos);
+  EXPECT_NE(out.find("fill=\"#00AA00\""), std::string::npos);
+  EXPECT_NE(out.find("x=\"5\""), std::string::npos);
+  EXPECT_NE(out.find("y=\"6\""), std::string::npos);
+  EXPECT_NE(out.find("width=\"20\""), std::string::npos);
+  EXPECT_NE(out.find("height=\"30\""), std::string::npos);
+  EXPECT_NE(out.find("transform=\"translate(1 2)\""), std::string::npos);
+}
+
+// A `<foreignObject>` whose `<div>` background is a `url(...)` image reference is left untouched:
+// the reconstruction returns nullptr and the node is preserved for the existing image path.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectImageBackgroundLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="0" y="0" width="40" height="40">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:url(tex.png)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  // The unrecognised image background leaves the foreignObject in place.
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// A `<foreignObject>` whose child `<div>` carries no `style` (thus no background paint) is left
+// untouched — there is nothing to recover.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectNoBackgroundLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="0" y="0" width="40" height="40">
+        <div xmlns="http://www.w3.org/1999/xhtml"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// A `<foreignObject>` with no element child is left untouched (nothing to reconstruct).
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectWithoutDivChildLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <foreignObject x="0" y="0" width="40" height="40"></foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// A masked `<foreignObject>` whose referenced `<mask>` holds no element shapes yields no
+// reconstructable geometry, so the node is left untouched.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectEmptyMaskLeftUntouched) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask5" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40"></mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask5)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#FF0000"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_NE(out.find("foreignObject"), std::string::npos);
+}
+
+// The reconstruction descends into nested groups: a `<foreignObject>` buried under a `<g>` is
+// rewritten in place while its enclosing group survives.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectNestedUnderGroupReconstructed) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <g id="wrap">
+        <foreignObject x="2" y="2" width="20" height="20">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:#010203"/>
+        </foreignObject>
+      </g>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("id=\"wrap\""), std::string::npos);
+  EXPECT_NE(out.find("<rect"), std::string::npos);
+  EXPECT_NE(out.find("fill=\"#010203\""), std::string::npos);
+}
+
+// A conic gradient whose centre coincides with the box centre (CSS default `at 50% 50%`, i.e. no
+// `at` clause) has an undefined sweep angle at the sample point, so the paint falls back to the
+// average of all stop colours rather than a single interpolated hue.
+PAG_TEST(PAGXHTMLInlineSvgEmitterTest, ForeignObjectConicCentredUsesAverageStops) {
+  auto out = ReconstructForeignObjects(R"SVG(
+    <svg width="40" height="40" viewBox="0 0 40 40">
+      <defs>
+        <mask id="cmask6" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="white" stroke-width="4"/>
+        </mask>
+      </defs>
+      <foreignObject x="0" y="0" width="40" height="40" mask="url(#cmask6)">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;background:conic-gradient(#000000 0deg, #FFFFFF 360deg)"/>
+      </foreignObject>
+    </svg>
+  )SVG");
+  ASSERT_FALSE(out.empty());
+  EXPECT_EQ(out.find("foreignObject"), std::string::npos);
+  EXPECT_NE(out.find("<circle"), std::string::npos);
+  // Average of black and white is a mid-grey (#7F7F7F / #808080); assert a concrete hex was set.
+  EXPECT_NE(out.find("stroke=\"#"), std::string::npos);
+  EXPECT_EQ(out.find("conic-gradient"), std::string::npos);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, StyleClassRulesApply) {
@@ -4433,6 +4927,8 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundUrlRecoversImagePattern) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedFilterWarns) {
+  // Standard CSS colour/geometry filter functions (blur, drop-shadow, grayscale, hue-rotate, ...)
+  // are all modelled; an unrecognized filter function is the genuinely unsupported case and warns.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -5052,6 +5548,58 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientWithExplicitPxOffsetPerStop) {
   ASSERT_EQ(lg->colorStops.size(), 2u);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientPxStopOffsetsNormalisedAgainstRadius) {
+  // A px stop offset is an absolute distance along the gradient ray, so it must be divided by the
+  // gradient's px radius to land in PAGX's [0,1] color-stop space. On a large box the `1.4px` /
+  // `1.6px` halftone dots would otherwise store 1.4 / 1.6 (both past the 1.0 edge) and flood the
+  // whole box with the first color instead of painting a tiny dot.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:1920px;height:1080px">
+      <div style="width:1920px;height:1080px;
+                  background-image:radial-gradient(rgba(255,138,0,0.16) 1.4px, rgba(0,0,0,0) 1.6px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  ASSERT_EQ(rg->colorStops.size(), 2u);
+  // radius = 0.5 (default) * 1920 box width = 960px, so 1.4px -> 0.001458, 1.6px -> 0.001667.
+  EXPECT_TRUE(NearlyEqual(rg->colorStops[0]->offset, 1.4f / 960.0f, 1e-4f));
+  EXPECT_TRUE(NearlyEqual(rg->colorStops[1]->offset, 1.6f / 960.0f, 1e-4f));
+  EXPECT_LT(rg->colorStops.back()->offset, 1.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientPxStopsNormalisedAndReset) {
+  // A repeating-*-gradient downgraded to a single gradient must still normalise its px stops into
+  // [0,1] (against the known box) and reset to the first color past the pattern, so a subtle 10px
+  // stripe overlay renders as one period at true scale instead of flooding the box with the last
+  // color.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;
+                  background-image:repeating-linear-gradient(90deg, #F00 0px, #00F 10px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_GE(lg->colorStops.size(), 3u);
+  // Every stop stays within [0,1] (no raw 10px offset leaking through).
+  for (const auto* stop : lg->colorStops) {
+    EXPECT_GE(stop->offset, 0.0f);
+    EXPECT_LE(stop->offset, 1.0f);
+  }
+  // The declared period ends at 10px / 100px line = 0.1, then the tile resets to the first color and
+  // the last stop holds that first color out to the 1.0 edge.
+  EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.1f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(lg->colorStops.back()->offset, 1.0f, 0.01f));
+  EXPECT_TRUE(ColorNear(lg->colorStops.back()->color, lg->colorStops.front()->color));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, DuplicateHeadIsMergedBySubsetTransformer) {
   // The transformer must merge multiple <head> elements into one. Both <title>s should survive
   // (the importer uses the first one for data-title).
@@ -5085,6 +5633,709 @@ PAG_TEST(PAGXHTMLImporterTest, DuplicateBodyIsMergedBySubsetTransformer) {
   EXPECT_FLOAT_EQ(doc->width, 50.0f);
   EXPECT_FLOAT_EQ(doc->height, 50.0f);
   EXPECT_EQ(doc->layers.front()->children.size(), 2u);
+}
+
+//==================================================================================================
+// Animation: @keyframes + animation -> PAGX <Animations> (spec/html_subset.md §13)
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationOpacityProducesAlphaChannel) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:fade 2s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_FLOAT_EQ(anim->frameRate, 60.0f);
+  // 2s at 60fps = 120 frames, no delay.
+  EXPECT_EQ(anim->duration, 120);
+  auto* obj = FindObjectByTarget(anim, "card");
+  ASSERT_NE(obj, nullptr);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "alpha"));
+  ASSERT_NE(ch, nullptr);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes.front().time, 0);
+  EXPECT_FLOAT_EQ(ch->keyframes.front().value, 0.0f);
+  EXPECT_EQ(ch->keyframes.back().time, 120);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value, 1.0f);
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Linear);
+}
+
+// The builder emits one Animation per animated element; a post-pass then coalesces animations that
+// share the same duration / frameRate / loop into a single Animation (objects concatenated) so a
+// staggered grid of siblings does not produce a long run of near-identical <Animation> blocks. The
+// merge is timing-aware: elements with a different duration or loop mode stay in their own
+// Animation so they are never forced onto a mismatched shared timeline.
+PAG_TEST(PAGXHTMLImporterTest, AnimationsWithMatchingTimingAreCoalesced) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="a" style="width:20px;height:20px;background-color:#000;
+                         animation:fade 2s linear infinite"></div>
+      <div id="b" style="width:20px;height:20px;background-color:#000;
+                         animation:fade 2s linear infinite"></div>
+      <div id="c" style="width:20px;height:20px;background-color:#000;
+                         animation:fade 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  // `a` and `b` share (duration 120, 60fps, Loop) and merge into one Animation; `c` runs 1s so it
+  // has a different duration and stays in its own Animation.
+  ASSERT_EQ(doc->animations.size(), 2u);
+
+  auto* merged = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(merged->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(merged->duration, 120);
+  EXPECT_NE(FindObjectByTarget(merged, "a"), nullptr);
+  EXPECT_NE(FindObjectByTarget(merged, "b"), nullptr);
+  EXPECT_EQ(FindObjectByTarget(merged, "c"), nullptr);
+
+  auto* separate = static_cast<pagx::Animation*>(doc->animations.back());
+  EXPECT_EQ(separate->duration, 60);
+  EXPECT_NE(FindObjectByTarget(separate, "c"), nullptr);
+  EXPECT_EQ(FindObjectByTarget(separate, "a"), nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes slide {
+        0%   { transform: translate(0px, 0px); }
+        100% { transform: translate(40px, 20px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="box" style="width:50px;height:50px;background-color:#000;
+                           animation:slide 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Once);
+  EXPECT_EQ(anim->duration, 60);
+  auto* xCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "x"));
+  auto* yCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "y"));
+  ASSERT_NE(xCh, nullptr);
+  ASSERT_NE(yCh, nullptr);
+  // animation-fill-mode: forwards keeps the last value; no trailing baseline keyframe is inserted.
+  ASSERT_EQ(xCh->keyframes.size(), 2u);
+  ASSERT_EQ(yCh->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(xCh->keyframes.back().value, 40.0f);
+  EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 20.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes recolor {
+        0%   { background-color: #FF0000; }
+        100% { background-color: #0000FF; }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="swatch" style="width:50px;height:50px;background-color:#FF0000;
+                              animation:recolor 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* ch = dynamic_cast<pagx::TypedChannel<pagx::Color>*>(FindChannel(anim, "color"));
+  ASSERT_NE(ch, nullptr);
+  // forwards fill-mode keeps the last value; no trailing baseline keyframe is inserted.
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_TRUE(ColorNear(ch->keyframes.front().value, HexColor(0xFF0000)));
+  EXPECT_TRUE(ColorNear(ch->keyframes.back().value, HexColor(0x0000FF)));
+}
+
+// An animated `clip-path` (emitted by the capture pipeline as a canonical `path("d")` per keyframe)
+// lowers onto a contour mask whose Path geometry morphs through per-point float channels. The
+// reveal below wipes a rectangle open on the x axis, so the two right-edge points animate their x
+// coordinate from 0 to 50 while the y coordinates (and the two left-edge points) stay constant and
+// emit no channel. The masked layer gains a Contour mask whose Path is the animation target.
+PAG_TEST(PAGXHTMLImporterTest, AnimationClipPathProducesPointChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes reveal {
+        0%   { clip-path: path("M 0 0 L 0 0 L 0 50 L 0 50 Z"); }
+        100% { clip-path: path("M 0 0 L 50 0 L 50 50 L 0 50 Z"); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:reveal 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->duration, 60);
+
+  // point1.x and point2.x sweep 0 -> 50; the other coordinates are constant and are not emitted.
+  auto* p1x = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "point1.x"));
+  auto* p2x = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "point2.x"));
+  ASSERT_NE(p1x, nullptr);
+  ASSERT_NE(p2x, nullptr);
+  EXPECT_FLOAT_EQ(p1x->keyframes.front().value, 0.0f);
+  EXPECT_FLOAT_EQ(p1x->keyframes.back().value, 50.0f);
+  EXPECT_FLOAT_EQ(p2x->keyframes.back().value, 50.0f);
+  EXPECT_EQ(FindChannel(anim, "point0.x"), nullptr);
+  EXPECT_EQ(FindChannel(anim, "point1.y"), nullptr);
+
+  // The masked layer carries a Contour mask whose Path geometry is the point channels' target.
+  auto* card = doc->layers.front()->children.front();
+  ASSERT_NE(card->mask, nullptr);
+  EXPECT_EQ(card->maskType, pagx::MaskType::Contour);
+  EXPECT_FALSE(card->mask->visible);
+  EXPECT_FALSE(card->mask->includeInLayout);
+  auto* maskPath = FindElementOfType<pagx::Path>(card->mask);
+  ASSERT_NE(maskPath, nullptr);
+  ASSERT_NE(maskPath->data, nullptr);
+  EXPECT_EQ(maskPath->data->countPoints(), 4u);
+  auto* obj = FindObjectByTarget(anim, maskPath->id);
+  ASSERT_NE(obj, nullptr);
+}
+
+// A `filter: drop-shadow(...)` glow authored in @keyframes (with `none` at rest) lowers onto the
+// runtime's animatable DropShadowFilter channels: blurX/blurY ramp with the glow radius and the
+// color channel ramps its alpha in/out. The filter node is minted on the layer (no static filter)
+// and an AnimationObject targets it.
+PAG_TEST(PAGXHTMLImporterTest, AnimationFilterDropShadowGlowMapsToDropShadowChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes glow {
+        0%   { filter: none; }
+        50%  { filter: drop-shadow(rgba(40, 224, 208, 1) 0px 0px 16px); }
+        100% { filter: none; }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="g" style="width:50px;height:50px;background-color:#000;
+                         animation:glow 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+
+  // The layer gained a DropShadowFilter to drive.
+  auto* div = doc->layers.front()->children.front();
+  pagx::DropShadowFilter* drop = nullptr;
+  for (auto* f : div->filters) {
+    if (auto* d = As<pagx::DropShadowFilter>(f)) {
+      drop = d;
+      break;
+    }
+  }
+  ASSERT_NE(drop, nullptr);
+  ASSERT_FALSE(drop->id.empty());
+
+  // The blur channel ramps up to the authored glow radius (~16px) and back.
+  auto* blurCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "blurX"));
+  ASSERT_NE(blurCh, nullptr);
+  float maxBlur = 0.0f;
+  for (const auto& k : blurCh->keyframes) {
+    if (k.value > maxBlur) maxBlur = k.value;
+  }
+  EXPECT_NEAR(maxBlur, 16.0f, 0.5f);
+
+  // The color channel ramps its alpha from 0 (glow off) up to 1 (glow on) and back.
+  auto* colorCh = dynamic_cast<pagx::TypedChannel<pagx::Color>*>(FindChannel(anim, "color"));
+  ASSERT_NE(colorCh, nullptr);
+  float maxAlpha = 0.0f;
+  float minAlpha = 1.0f;
+  for (const auto& k : colorCh->keyframes) {
+    if (k.value.alpha > maxAlpha) maxAlpha = k.value.alpha;
+    if (k.value.alpha < minAlpha) minAlpha = k.value.alpha;
+  }
+  EXPECT_NEAR(maxAlpha, 1.0f, 0.01f);
+  EXPECT_NEAR(minAlpha, 0.0f, 0.01f);
+
+  // The drop-shadow channels target the minted filter node, not the layer.
+  auto* obj = FindObjectByTarget(anim, drop->id);
+  ASSERT_NE(obj, nullptr);
+}
+
+// A `filter` chain with several drop-shadows (a glitch "chromatic aberration" stack)
+// lowers onto ONE animated DropShadowFilter per shadow slot, so every ghost survives
+// instead of collapsing to a single representative. Slot k tracks the k-th drop-shadow
+// of each keyframe (author order); a keyframe with fewer shadows leaves the extra slot
+// transparent (alpha ramps to 0) so its ghost fades out rather than snapping.
+PAG_TEST(PAGXHTMLImporterTest, AnimationFilterMultipleDropShadowsMapToSeparateSlots) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes ca {
+        0%   { filter: none; }
+        50%  { filter: drop-shadow(rgba(240,160,0,0.55) 42px 0px 0px)
+                       drop-shadow(rgba(255,0,90,0.4) -26px 0px 0px); }
+        100% { filter: drop-shadow(rgba(240,160,0,0.55) -40px 0px 0px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="g" style="width:50px;height:50px;background-color:#000;
+                         animation:ca 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+
+  // Two DropShadowFilter nodes minted on the layer, one per concurrent shadow.
+  auto* div = doc->layers.front()->children.front();
+  std::vector<pagx::DropShadowFilter*> drops;
+  for (auto* f : div->filters) {
+    if (auto* d = As<pagx::DropShadowFilter>(f)) drops.push_back(d);
+  }
+  ASSERT_EQ(drops.size(), 2u);
+
+  // offsetX travel + minimum color alpha for a given slot's AnimationObject.
+  auto slotStats = [&](pagx::DropShadowFilter* d, float& oxMin, float& oxMax, float& aMin) {
+    oxMin = 1e9f;
+    oxMax = -1e9f;
+    aMin = 1.0f;
+    auto* obj = FindObjectByTarget(anim, d->id);
+    EXPECT_NE(obj, nullptr);
+    if (!obj) return;
+    for (auto* ch : obj->channels) {
+      if (ch->name == "offsetX") {
+        auto* fc = dynamic_cast<pagx::TypedChannel<float>*>(ch);
+        for (const auto& k : fc->keyframes) {
+          if (k.value < oxMin) oxMin = k.value;
+          if (k.value > oxMax) oxMax = k.value;
+        }
+      } else if (ch->name == "color") {
+        auto* cc = dynamic_cast<pagx::TypedChannel<pagx::Color>*>(ch);
+        for (const auto& k : cc->keyframes) {
+          if (k.value.alpha < aMin) aMin = k.value.alpha;
+        }
+      }
+    }
+  };
+
+  // Slot 0 (author-first orange): reaches +42 at 50% and -40 at 100%.
+  float ox0Min, ox0Max, a0Min;
+  slotStats(drops[0], ox0Min, ox0Max, a0Min);
+  EXPECT_NEAR(ox0Max, 42.0f, 0.5f);
+  EXPECT_NEAR(ox0Min, -40.0f, 0.5f);
+
+  // Slot 1 (magenta): reaches -26 at 50%, and is transparent (alpha 0) on the 0% /
+  // 100% keyframes that have fewer than two shadows.
+  float ox1Min, ox1Max, a1Min;
+  slotStats(drops[1], ox1Min, ox1Max, a1Min);
+  EXPECT_NEAR(ox1Min, -26.0f, 0.5f);
+  EXPECT_NEAR(a1Min, 0.0f, 0.01f);
+}
+
+// A `filter: blur(...)` animation lowers onto a BlurFilter's blurX/blurY channels.
+PAG_TEST(PAGXHTMLImporterTest, AnimationFilterBlurMapsToBlurChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes soften {
+        0%   { filter: blur(0px); }
+        100% { filter: blur(8px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="b" style="width:50px;height:50px;background-color:#000;
+                         animation:soften 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* blurCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "blurX"));
+  ASSERT_NE(blurCh, nullptr);
+  float maxBlur = 0.0f;
+  for (const auto& k : blurCh->keyframes) {
+    if (k.value > maxBlur) maxBlur = k.value;
+  }
+  EXPECT_NEAR(maxBlur, 8.0f, 0.01f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationAlternateDirectionIsPingPong) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear infinite alternate"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Animation*>(doc->animations.front())->loop, pagx::LoopMode::PingPong);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationDelayShiftsKeyframeTimes) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 0.5s forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  // delay (0.5s = 30 frames) + duration (1s = 60 frames).
+  EXPECT_EQ(anim->duration, 90);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "alpha"));
+  ASSERT_NE(ch, nullptr);
+  // forwards fill-mode keeps the last value past the active end (no trailing baseline). The pre-
+  // active region between t=0 and the delayed first keyframe is filled with the layer's baseline
+  // value, so the channel emits 3 keyframes: baseline at frame 0 + the two authored stops.
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  EXPECT_EQ(ch->keyframes.front().time, 0);
+  EXPECT_EQ(ch->keyframes[1].time, 30);
+  EXPECT_EQ(ch->keyframes.back().time, 90);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s cubic-bezier(0.42, 0, 0.58, 1) forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  // forwards fill-mode keeps the last value; no trailing baseline keyframe is inserted.
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Bezier);
+  EXPECT_NEAR(ch->keyframes.front().bezierOut.x, 0.42f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().bezierIn.x, 0.58f, kEps);
+}
+
+// CSS reverses the timing-function alongside the keyframes for `direction: reverse`. With the
+// keyframes already mirrored by the builder, the resolved easing must be reversed too — applying
+// `B'(t) = 1 - B(1 - t)` to the cubic-bezier control points (e.g. ease-in -> ease-out) so the
+// browser and the runtime sample the same shape.
+PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsCubicBezier) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s ease-in infinite reverse"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  // ease-in is (0.42, 0, 1, 1); reversed it must become ease-out (0, 0, 0.58, 1).
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Bezier);
+  EXPECT_NEAR(ch->keyframes.front().bezierOut.x, 0.0f, kEps);
+  EXPECT_NEAR(ch->keyframes.front().bezierOut.y, 0.0f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().bezierIn.x, 0.58f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().bezierIn.y, 1.0f, kEps);
+}
+
+// CSS `steps(n, jump-end)` reversed becomes `steps(n, jump-start)`: the discontinuity moves to
+// the opposite end of the segment. After ExpandSteps fans the timing function out into hold
+// keyframes, jump-start places the first jump at fraction 1/n (rather than 0/n for jump-end), so
+// the very first sub-keyframe carries a non-zero output value.
+PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsStepsJump) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s steps(4, jump-end) infinite reverse"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  // 4 steps + the trailing endpoint = 5 hold keyframes.
+  ASSERT_EQ(ch->keyframes.size(), 5u);
+  // Reversed keyframes go 1 -> 0; combined with jump-start (effective after reversal), the first
+  // hold lands on 1 - 1/4 = 0.75, and the last hold reaches 0.0.
+  EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Hold);
+  EXPECT_NEAR(ch->keyframes.front().value, 0.75f, kEps);
+  EXPECT_NEAR(ch->keyframes.back().value, 0.0f, kEps);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationRotateProducesMatrixChannel) {
+  // `rotate` (like scale / skew) is a non-translation transform, so it routes through the full
+  // affine `matrix` channel rather than x/y. No unsupported-property warning is expected.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:spin 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
+  }
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
+  ASSERT_NE(mCh, nullptr);
+  ASSERT_EQ(mCh->keyframes.size(), 2u);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationScaleProducesMatrixChannel) {
+  // `transform: scale(...)` is animatable through the `matrix` channel. The pivot is baked from
+  // the element's box centre so the keyframe matrices mirror the static applyBoxTransform path.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes pulse {
+        0%   { transform: scale(1); }
+        100% { transform: scale(2); }
+      }
+    </style></head>
+    <body style="width:200px;height:200px">
+      <div id="box" style="width:50px;height:50px;background-color:#000;transform-origin:50% 50%;
+                           animation:pulse 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
+  }
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
+  ASSERT_NE(mCh, nullptr);
+  // No x/y channels: a non-translation transform routes entirely through the matrix channel.
+  EXPECT_EQ(FindChannel(anim, "x"), nullptr);
+  EXPECT_EQ(FindChannel(anim, "y"), nullptr);
+  ASSERT_EQ(mCh->keyframes.size(), 2u);
+  // 0% scale(1) about a (25, 25) pivot is the identity.
+  const auto& first = mCh->keyframes.front().value;
+  EXPECT_FLOAT_EQ(first.a, 1.0f);
+  EXPECT_FLOAT_EQ(first.d, 1.0f);
+  // 100% scale(2) about (25, 25): a == d == 2, tx == ty == -25 (T(c) * S(2) * T(-c)).
+  const auto& last = mCh->keyframes.back().value;
+  EXPECT_FLOAT_EQ(last.a, 2.0f);
+  EXPECT_FLOAT_EQ(last.d, 2.0f);
+  EXPECT_FLOAT_EQ(last.tx, -25.0f);
+  EXPECT_FLOAT_EQ(last.ty, -25.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixWithScaleProducesMatrixChannel) {
+  // A `matrix(...)` that combines a scale with a translation (the common shape `getComputedStyle`
+  // reports for GSAP-style animations) is now carried verbatim through the `matrix` channel — the
+  // scale is preserved rather than dropped.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes flyin {
+        0%   { transform: matrix(2, 0, 0, 2, 10, 200); }
+        100% { transform: matrix(1, 0, 0, 1, 30, 0); }
+      }
+    </style></head>
+    <body style="width:200px;height:300px">
+      <div id="box" style="width:50px;height:50px;background-color:#000;
+                           animation:flyin 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
+  }
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
+  ASSERT_NE(mCh, nullptr);
+  EXPECT_EQ(FindChannel(anim, "x"), nullptr);
+  EXPECT_EQ(FindChannel(anim, "y"), nullptr);
+  ASSERT_EQ(mCh->keyframes.size(), 2u);
+  // The 0% matrix scales by 2 — preserved, not dropped.
+  EXPECT_FLOAT_EQ(mCh->keyframes.front().value.a, 2.0f);
+  EXPECT_FLOAT_EQ(mCh->keyframes.front().value.d, 2.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupported3DTransformWarnsAndDrops) {
+  // 3D transforms (matrix3d / rotate3d / perspective) have no 2D affine representation, so they
+  // warn and drop, emitting no animation when no other channel survives.
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spin3d {
+        0%   { transform: rotate3d(0, 1, 0, 0deg); }
+        100% { transform: rotate3d(0, 1, 0, 180deg); }
+      }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:spin3d 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-unsupported-property") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  EXPECT_TRUE(doc->animations.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationUnknownKeyframesWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:missing 1s linear"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-unknown-keyframes") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  EXPECT_TRUE(doc->animations.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationFiniteCountWarns) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         animation:fade 1s linear 3"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  bool warned = false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find("subset:animation-finite-count") != std::string::npos) warned = true;
+  }
+  EXPECT_TRUE(warned);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Animation*>(doc->animations.front())->loop, pagx::LoopMode::Once);
+}
+
+// The default pipeline (autoNormalize = true) must preserve the `@keyframes` block and the
+// `animation` shorthand through the subset transformer so the builder still emits an animation.
+PAG_TEST(PAGXHTMLImporterTest, AnimationSurvivesDefaultNormalization) {
+  auto doc = ParseFromString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:fade 2s linear infinite"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* ch = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  ASSERT_NE(ch, nullptr);
+  EXPECT_EQ(ch->keyframes.size(), 2u);
+}
+
+// A round-trip through the exporter must serialise the <Animations> block; importing the
+// emitted XML back reproduces the same channel.
+PAG_TEST(PAGXHTMLImporterTest, AnimationExportsToXML) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="card" style="width:50px;height:50px;background-color:#000;
+                            animation:fade 2s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("Animation"), std::string::npos);
+  EXPECT_NE(xml.find("alpha"), std::string::npos);
 }
 
 //==================================================================================================
@@ -7596,6 +8847,72 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
 }
 
+// A raster `mask-image: url(...)` (a PNG here, referenced via a `data:image/png` URI) is rebuilt
+// into an image-backed alpha mask layer rather than dropped: the mask layer holds a Rectangle sized
+// to the image's native pixels filled by an ImagePattern of that image, attached invisibly and
+// excluded from layout — the same shape as the SVG-mask path but with a raster source.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageRasterUrlRebuildsImageMaskLayer) {
+  // 1x1 PNG so the intrinsic mask box is trivially known; `mask-size:2px 2px` then scales it 2x.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;mask-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');mask-mode:alpha;mask-size:2px 2px;mask-repeat:no-repeat">
+        <div style="width:100px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+  EXPECT_FALSE(masked->mask->visible);
+  EXPECT_FALSE(masked->mask->includeInLayout);
+  // Geometry is the image's native 1x1 box; mask-size:2px scales the whole layer by 2 on each axis.
+  auto* rect = FindElementOfType<pagx::Rectangle>(masked->mask);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_TRUE(NearlyEqual(rect->size.width, 1.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rect->size.height, 1.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 2.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 2.0f, 0.001f));
+  auto* fill = FindElementOfType<pagx::Fill>(masked->mask);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  ASSERT_NE(pattern->image, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+// `mask-mode: luminance` on a raster mask opts into the luminance-keyed mask type (the alpha-keyed
+// `match-source` default is exercised by the test above).
+PAG_TEST(PAGXHTMLImporterTest, MaskImageRasterUrlLuminanceModeSetsLuminanceType) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;mask-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');mask-mode:luminance;mask-size:cover;mask-repeat:no-repeat">
+        <div style="width:100px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Luminance);
+}
+
+// A `mask-image: url(...)` that is neither a decodable SVG data URI nor a loadable raster image is
+// dropped with a diagnostic, leaving the element unmasked (an undecodable data:image/png here).
+PAG_TEST(PAGXHTMLImporterTest, MaskImageUndecodableUrlIsDroppedWithDiagnostic) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;mask-image:url('data:image/png;base64,notarealimage');mask-mode:alpha;mask-repeat:no-repeat">
+        <div style="width:100px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  EXPECT_EQ(masked->mask, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "loadable raster image"));
+}
+
 // A `mask-size` larger than the mask SVG's intrinsic size scales the rebuilt mask layer by the
 // per-axis ratio so the mask geometry covers the element CSS rendered it across, rather than
 // staying pinned at the smaller intrinsic size in the top-left corner. The ratios differ per axis
@@ -7970,11 +9287,12 @@ PAG_TEST(PAGXHTMLImporterTest, ClipPathObjectBoundingBoxScalesToBox) {
   auto* masked = doc->layers.front()->children.back();
   ASSERT_NE(masked->mask, nullptr);
   EXPECT_EQ(masked->maskType, pagx::MaskType::Contour);
-  // The unit-square (0..1) clip geometry is mapped onto the 200x200 box, so the mask carries a
-  // `scale(200, 200)` transform. Without the objectBoundingBox handling the geometry would stay in
-  // 0..1 pixel space and collapse to a ~1px region at the origin (no scale emitted).
+  // The unit-square (0..1) clip geometry is mapped onto the 200x200 box, so the mask layer carries
+  // a `scale(200, 200)` transform, serialised as the layer matrix `200,0,0,200,0,0`. Without the
+  // objectBoundingBox handling the geometry would stay in 0..1 pixel space and collapse to a ~1px
+  // region at the origin (an identity matrix, no attribute emitted).
   std::string xml = pagx::PAGXExporter::ToXML(*doc);
-  EXPECT_NE(xml.find("scale=\"200,200\""), std::string::npos);
+  EXPECT_NE(xml.find("matrix=\"200,0,0,200,0,0\""), std::string::npos);
 }
 
 // The rebuilt mask layer carries a generated id so the `mask="@id"` reference survives a PAGX
@@ -8398,11 +9716,12 @@ PAG_TEST(PAGXHTMLImporterTest, DisplayP3ColorWithAlphaParsed) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, UnsupportedColorFunctionFallsBackToBlack) {
-  // A color() function in a colour space the parser does not model (`srgb`, `lab`, ...) is not
-  // silently mis-decoded: it warns and falls back to opaque black.
+  // A color() function in a colour space the parser does not model (`xyz`, `a98-rgb`, ...) is not
+  // silently mis-decoded: it warns and falls back to opaque black. `srgb` and `display-p3` are
+  // modelled and covered by their own tests.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:40px;height:40px">
-      <div style="width:40px;height:40px;background-color:color(srgb 1 0 0)"></div>
+      <div style="width:40px;height:40px;background-color:color(xyz 0.5 0.4 0.3)"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
