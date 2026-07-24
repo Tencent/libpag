@@ -51,6 +51,11 @@
         "dir": "third_party/libxml2"
       },
       {
+        "url": "https://chromium.googlesource.com/libyuv/libyuv",
+        "commit": "644251f252a84bf8ce91ff0aca86a9b16b069ab8",
+        "dir": "third_party/libyuv"
+      },
+      {
         "url": "https://github.com/google/woff2.git",
         "commit": "1c69169e9e1811dccd6c54c532fedda300233968",
         "dir": "third_party/woff2"

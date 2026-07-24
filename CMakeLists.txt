@@ -525,6 +525,11 @@ elseif (ANDROID)
         list(APPEND PAG_INCLUDES vendor/ffavc/include)
     endif ()
 
+    # libyuv provides SIMD-accelerated I420 to RGBA conversion used by SoftwareDecoderWrapper on
+    # Android to bypass glTexSubImage2D uploads. See issue #3540.
+    list(APPEND PAG_STATIC_VENDORS libyuv)
+    list(APPEND PAG_INCLUDES third_party/libyuv/include)
+
     # optimizes the output size
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/android/libpag/export.def")
     list(APPEND PAG_COMPILE_OPTIONS -ffunction-sections -fdata-sections -Os -fno-exceptions -fno-rtti)
