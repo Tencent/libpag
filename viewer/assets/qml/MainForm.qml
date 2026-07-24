@@ -280,7 +280,11 @@ SplitView {
                 height: 32
                 hoverEnabled: true
                 padding: 7
-                onClicked: contentView.resetView()
+                onClicked: {
+                    if (contentView) {
+                        contentView.resetView();
+                    }
+                }
 
                 background: Rectangle {
                     radius: 8
