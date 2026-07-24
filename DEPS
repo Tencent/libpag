@@ -34,6 +34,11 @@
         "url": "https://github.com/lz4/lz4.git",
         "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
         "dir": "third_party/lz4"
+      },
+      {
+        "url": "https://chromium.googlesource.com/libyuv/libyuv",
+        "commit": "644251f252a84bf8ce91ff0aca86a9b16b069ab8",
+        "dir": "third_party/libyuv"
       }
     ]
   },
