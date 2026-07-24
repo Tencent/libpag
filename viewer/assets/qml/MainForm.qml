@@ -84,6 +84,7 @@ SplitView {
 
     PAGRectangle {
         id: centerItem
+        clip: true
         SplitView.minimumWidth: minPlayerWidth
         SplitView.fillWidth: true
         color: "#000000"
@@ -163,10 +164,137 @@ SplitView {
             anchors.rightMargin: resizeHandleSize
             anchors.bottom: parent.bottom
             anchors.bottomMargin: controlFormHeight + 9
-            onClicked: {
-                if (contentView) {
+            acceptedButtons: Qt.LeftButton
+            cursorShape: pressed && dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+            property real pressX: 0
+            property real pressY: 0
+            property real lastX: 0
+            property real lastY: 0
+            property bool dragging: false
+
+            onPressed: function (mouse) {
+                pressX = mouse.x;
+                pressY = mouse.y;
+                lastX = mouse.x;
+                lastY = mouse.y;
+                dragging = false;
+            }
+            onPositionChanged: function (mouse) {
+                if (!contentView || !pressed) {
+                    return;
+                }
+                if (!dragging) {
+                    var distance = Math.hypot(mouse.x - pressX, mouse.y - pressY);
+                    if (distance < 4) {
+                        return;
+                    }
+                    dragging = true;
+                    contentView.panBy(mouse.x - pressX, mouse.y - pressY);
+                } else {
+                    contentView.panBy(mouse.x - lastX, mouse.y - lastY);
+                }
+                lastX = mouse.x;
+                lastY = mouse.y;
+            }
+            onReleased: function (mouse) {
+                if (!dragging && contentView) {
                     contentView.viewModel.isPlaying = !contentView.viewModel.isPlaying;
                 }
+                dragging = false;
+            }
+            onCanceled: dragging = false
+            onWheel: function (wheel) {
+                if (!contentView) {
+                    return;
+                }
+                if (pinchHandler.active) {
+                    wheel.accepted = true;
+                    return;
+                }
+                var pixelDeltaX = wheel.pixelDelta.x !== 0 ? wheel.pixelDelta.x : wheel.angleDelta.x / 4;
+                var pixelDeltaY = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.angleDelta.y / 4;
+                if (wheel.modifiers & Qt.ControlModifier || wheel.modifiers & Qt.MetaModifier) {
+                    var anchor = mouseArea.mapToItem(contentView, wheel.x, wheel.y);
+                    var rawDelta = wheel.pixelDelta.y !== 0 ? wheel.pixelDelta.y : wheel.angleDelta.y;
+                    var ratio = wheel.pixelDelta.y !== 0 ? 240 : 600;
+                    contentView.zoomAt(Math.exp(rawDelta / ratio), anchor.x, anchor.y);
+                } else if (wheel.modifiers & Qt.ShiftModifier) {
+                    contentView.panBy(pixelDeltaY, 0);
+                } else {
+                    contentView.panBy(pixelDeltaX, pixelDeltaY);
+                }
+                wheel.accepted = true;
+            }
+        }
+        // macOS trackpad pinch-to-zoom (two-finger pinch gesture).
+        PinchHandler {
+            id: pinchHandler
+            target: null
+            acceptedDevices: PointerDevice.TouchPad | PointerDevice.TouchScreen
+
+            property real lastScale: 1.0
+
+            onScaleChanged: {
+                if (!active || !contentView) {
+                    return;
+                }
+                var factor = scale / pinchHandler.lastScale;
+                pinchHandler.lastScale = scale;
+                if (factor > 0 && isFinite(factor) && factor !== 1) {
+                    contentView.zoomAt(factor, centroid.position.x, centroid.position.y);
+                }
+            }
+            onActiveChanged: {
+                pinchHandler.lastScale = scale;
+            }
+        }
+        Row {
+            id: viewControls
+            z: 4
+            visible: hasPAGFile && contentView
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.bottom: controlForm.top
+            anchors.bottomMargin: 16
+            spacing: 8
+
+            Rectangle {
+                id: zoomScaleBadge
+                width: zoomScaleText.implicitWidth + 24
+                height: 32
+                radius: 8
+                color: "#99000000"
+
+                Text {
+                    id: zoomScaleText
+                    anchors.centerIn: parent
+                    color: "#cccccc"
+                    font.pixelSize: 12
+                    text: contentView ? Math.round(contentView.viewModel.zoomScale * 100) + "%" : ""
+                }
+            }
+
+            Button {
+                id: resetViewButton
+                width: 32
+                height: 32
+                hoverEnabled: true
+                padding: 7
+                onClicked: contentView.resetView()
+
+                background: Rectangle {
+                    radius: 8
+                    color: resetViewButton.pressed ? "#cc000000" : resetViewButton.hovered ? "#b3000000" : "#99000000"
+                }
+
+                contentItem: Image {
+                    source: "qrc:/images/reset-view.svg"
+                    fillMode: Image.PreserveAspectFit
+                }
+
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Reset View")
+                ToolTip.delay: 500
             }
         }
         DropArea {

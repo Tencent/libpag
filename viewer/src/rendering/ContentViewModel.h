@@ -23,6 +23,7 @@
 #include <QSizeF>
 #include <QString>
 #include <memory>
+#include <mutex>
 
 namespace pag {
 
@@ -58,6 +59,7 @@ class ContentViewModel : public QObject {
                  editableImageLayerCountChanged)
   Q_PROPERTY(bool showVideoFrames READ getShowVideoFrames WRITE setShowVideoFrames)
   Q_PROPERTY(ContentType contentType READ getContentType CONSTANT)
+  Q_PROPERTY(double zoomScale READ zoomScale NOTIFY zoomScaleChanged)
 
   explicit ContentViewModel(QObject* parent = nullptr) : QObject(parent) {
   }
@@ -89,6 +91,18 @@ class ContentViewModel : public QObject {
   Q_INVOKABLE virtual void nextFrame() = 0;
   Q_INVOKABLE virtual void previousFrame() = 0;
 
+  struct ViewTransform {
+    double zoomScale = 1.0;
+    double offsetX = 0.0;
+    double offsetY = 0.0;
+  };
+
+  double zoomScale() const;
+  ViewTransform getViewTransform() const;
+  void zoomAt(double factor, double anchorX, double anchorY);
+  void panBy(double deltaX, double deltaY);
+  void resetView();
+
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void hasAnimationChanged(bool hasAnimation);
   Q_SIGNAL void progressChanged(double progress);
@@ -101,6 +115,17 @@ class ContentViewModel : public QObject {
   Q_SIGNAL void preferredSizeChanged();
   Q_SIGNAL void requestFlush();
   Q_SIGNAL void contentSizeChanged();
+  Q_SIGNAL void zoomScaleChanged(double value);
+
+ protected:
+  virtual void onViewTransformChanged() {
+  }
+
+ private:
+  void notifyViewTransformChanged(double zoomScale);
+
+  mutable std::mutex viewTransformMutex = {};
+  ViewTransform viewTransform = {};
 };
 
 }  // namespace pag

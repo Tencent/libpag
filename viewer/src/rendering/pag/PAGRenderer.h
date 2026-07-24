@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "platform/qt/GPUDrawable.h"
 #include "rendering/IContentRenderer.h"
 #include "rendering/pag/PAGViewModel.h"
 
@@ -34,9 +35,13 @@ class PAGRenderer : public IContentRenderer {
   RenderMetrics flush() override;
   void updateSize() override;
   bool isReady() const override;
+  void setDrawable(GPUDrawable* drawable) override;
 
  private:
+  void applyDisplayTransform();
+
   PAGViewModel* viewModel = nullptr;
+  GPUDrawable* drawable = nullptr;
 };
 
 }  // namespace pag

@@ -161,6 +161,30 @@ Item {
                         root.command("toggle-edit-panel");
                     }
                 }
+                Action {
+                    text: qsTr("Zoom In")
+                    enabled: root.hasPAGFile
+                    shortcut: "Ctrl+="
+                    onTriggered: {
+                        root.command("zoom-in");
+                    }
+                }
+                Action {
+                    text: qsTr("Zoom Out")
+                    enabled: root.hasPAGFile
+                    shortcut: "Ctrl+-"
+                    onTriggered: {
+                        root.command("zoom-out");
+                    }
+                }
+                Action {
+                    text: qsTr("Reset Zoom")
+                    enabled: root.hasPAGFile
+                    shortcut: "Ctrl+0"
+                    onTriggered: {
+                        root.command("reset-zoom");
+                    }
+                }
             }
 
             PAGMenu {
@@ -378,6 +402,31 @@ Item {
                     shortcut: "L"
                     onTriggered: {
                         root.command("toggle-edit-panel");
+                    }
+                }
+                Platform.MenuSeparator {}
+                Platform.MenuItem {
+                    text: qsTr("Zoom In")
+                    enabled: root.hasPAGFile
+                    shortcut: "Meta+="
+                    onTriggered: {
+                        root.command("zoom-in");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Zoom Out")
+                    enabled: root.hasPAGFile
+                    shortcut: "Meta+-"
+                    onTriggered: {
+                        root.command("zoom-out");
+                    }
+                }
+                Platform.MenuItem {
+                    text: qsTr("Reset Zoom")
+                    enabled: root.hasPAGFile
+                    shortcut: "Meta+0"
+                    onTriggered: {
+                        root.command("reset-zoom");
                     }
                 }
             }

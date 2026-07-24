@@ -150,6 +150,10 @@ void PAGXViewModel::markNeedsRender() {
   needsRender = true;
 }
 
+void PAGXViewModel::onViewTransformChanged() {
+  markNeedsRender();
+}
+
 void PAGXViewModel::updateProgressFromRender(double newProgress, uint64_t generation) {
   QMetaObject::invokeMethod(this, "applyProgressFromRender", Qt::QueuedConnection,
                             Q_ARG(double, newProgress),
@@ -192,7 +196,8 @@ PAGXViewModel::RenderState PAGXViewModel::getRenderState() {
           isPlaying_.load(),
           progress,
           pendingSeek.exchange(false),
-          playbackGeneration.load()};
+          playbackGeneration.load(),
+          getViewTransform()};
 }
 
 bool PAGXViewModel::hasContent() {
@@ -297,6 +302,8 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   // will be called from onRenderCompleted() after the first render finishes.
   // This avoids race conditions between ListView updates and texture presentation.
   pendingXmlContent = xmlString;
+
+  resetView();
 
   return true;
 }
