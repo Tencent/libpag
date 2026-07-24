@@ -27,6 +27,7 @@
 #include <vector>
 #include "pagx/FontConfig.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/VerifyUtils.h"
 #include "tgfx/core/Typeface.h"
@@ -46,24 +47,88 @@ static inline bool FontFamilyMatch(const std::string& requested, const std::stri
   return true;
 }
 
+static inline bool FontStyleMatch(const std::string& requested, const std::string& actual) {
+  if (requested.empty()) {
+    return true;
+  }
+  if (requested.size() != actual.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < requested.size(); i++) {
+    if (std::tolower(static_cast<unsigned char>(requested[i])) !=
+        std::tolower(static_cast<unsigned char>(actual[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
- * Resolves a system font by family and style with fallback. First attempts an exact match with the
- * given style. If the result's fontFamily does not match the requested family (case-insensitive),
- * or the style is not found, falls back to the family's default style.
+ * Resolves a system font by family and style with fallback. First attempts MakeFromName for an
+ * exact match. If MakeFromName is unavailable (e.g. FreeType backend on macOS), falls back to
+ * SystemFonts::FindFont to locate the font file path and loads via MakeFromPath.
  */
 static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::string& family,
                                                                     const std::string& style) {
   auto typeface = tgfx::Typeface::MakeFromName(family, style);
-  if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily())) {
+  if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
+      FontStyleMatch(style, typeface->fontStyle())) {
     return typeface;
   }
   if (!style.empty()) {
     typeface = tgfx::Typeface::MakeFromName(family, "");
-    if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily())) {
+    if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
+        FontStyleMatch(style, typeface->fontStyle())) {
       return typeface;
     }
   }
+  // Fallback: locate the font file via platform APIs and load by path.
+  auto location = pagx::SystemFonts::FindFont(family, style);
+  if (!location.path.empty()) {
+    return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
+  }
+  if (!style.empty()) {
+    location = pagx::SystemFonts::FindFont(family, "");
+    if (!location.path.empty()) {
+      return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
+    }
+  }
   return nullptr;
+}
+
+inline size_t FindLastPathSeparator(const std::string& path) {
+  auto slash = path.rfind('/');
+  auto backslash = path.rfind('\\');
+  if (slash == std::string::npos) return backslash;
+  if (backslash == std::string::npos) return slash;
+  return std::max(slash, backslash);
+}
+
+/**
+ * Resolves a fallback font specifier to a Typeface. Accepts either a font file path (containing
+ * a path separator or ending with a known font extension) or a font name in "family[,style]" format.
+ */
+inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string& specifier) {
+  bool isFilePath =
+      specifier.find('/') != std::string::npos || specifier.find('\\') != std::string::npos;
+  if (!isFilePath) {
+    auto dot = specifier.rfind('.');
+    if (dot != std::string::npos) {
+      auto ext = specifier.substr(dot);
+      for (auto& ch : ext) {
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+      }
+      isFilePath =
+          ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" || ext == ".woff2";
+    }
+  }
+  if (isFilePath) {
+    return tgfx::Typeface::MakeFromPath(specifier);
+  }
+  auto commaPos = specifier.find(',');
+  auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
+  auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
+  return ResolveSystemTypeface(family, style);
 }
 
 /**
@@ -98,7 +163,7 @@ inline std::string ReplaceExtension(const std::string& path, const std::string& 
  * Extracts the directory part of a path (including trailing slash), or returns "./" if none.
  */
 inline std::string GetDirectory(const std::string& path) {
-  auto slash = path.rfind('/');
+  auto slash = FindLastPathSeparator(path);
   if (slash != std::string::npos) {
     return path.substr(0, slash + 1);
   }
@@ -109,7 +174,7 @@ inline std::string GetDirectory(const std::string& path) {
  * Extracts the base name from a path (filename without directory and extension).
  */
 inline std::string GetBaseName(const std::string& path) {
-  auto slash = path.rfind('/');
+  auto slash = FindLastPathSeparator(path);
   auto base = (slash != std::string::npos) ? path.substr(slash + 1) : path;
   auto dot = base.rfind('.');
   if (dot != std::string::npos) {

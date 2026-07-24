@@ -24,7 +24,6 @@
 #include <unordered_set>
 #include <vector>
 #include "pagx/FontConfig.h"
-#include "pagx/ImageResourceProvider.h"
 #include "pagx/PAGFont.h"
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/Layer.h"
@@ -34,6 +33,7 @@
 namespace pagx {
 
 class DataBind;
+class PAGImage;
 class LayoutContext;
 class PAGScene;
 class ViewModel;
@@ -41,9 +41,10 @@ class Image;
 class ImagePattern;
 
 /**
- * PAGXDocument is the root container for a PAGX document.
- * It contains resources and layers. This is a pure data structure class.
- * Use PAGXImporter to load documents and PAGXExporter to save documents.
+ * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
+ * configuration of a parsed/authored document, and tracks the live PAGScene instances created from
+ * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
+ * PAGXImporter to load documents and PAGXExporter to save documents.
  */
 class PAGXDocument : public Node {
  public:
@@ -70,9 +71,11 @@ class PAGXDocument : public Node {
   std::vector<Layer*> layers = {};
 
   /**
-   * Top-level animations.
+   * Top-level animation and state-machine definitions from the document's &lt;Animations&gt; block,
+   * in declaration order. Each entry is either an Animation or a StateMachine; check nodeType() to
+   * dispatch.
    */
-  std::vector<Animation*> animations = {};
+  std::vector<Node*> animations = {};
 
   /**
    * The ViewModel schema bound to this document (raw pointer, owned by nodes).
@@ -142,11 +145,19 @@ class PAGXDocument : public Node {
 
   /**
    * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. Image nodes
-   * for which the current ImageResourceProvider already holds a decoded counterpart are also
-   * excluded so the same resource is not fetched twice.
+   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. The caller is
+   * responsible for skipping paths it has already supplied (e.g. via PAGXDocument::loadFileData).
    */
   std::vector<std::string> getExternalFilePaths() const;
+
+  /**
+   * Returns a list of local file paths referenced by Image nodes that have no embedded data and
+   * can be read via local I/O. Data URIs and URL-scheme paths (http/https/file/etc., containing
+   * "://") are excluded, as are external composition layer paths. Use this instead of
+   * getExternalFilePaths() when the consumer performs direct local file reads (e.g. ImageEmbedder);
+   * URL-form resources are left untouched for the host to resolve.
+   */
+  std::vector<std::string> getExternalImagePaths() const;
 
   /**
    * Loads external file data matching the given file path. Image data is embedded into matching
@@ -162,22 +173,51 @@ class PAGXDocument : public Node {
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
 
   /**
-   * Sets the image resource provider used by the rendering pipeline to resolve pre-decoded images.
-   * When set, getExternalFilePaths() consults the provider to exclude paths that already have a
-   * decoded counterpart. The renderer queries the provider during layer building via
-   * resolveImage().
-   *
-   * Passing nullptr removes the provider; the renderer will use only embedded data / file paths.
-   * @param provider the platform-specific image resource provider, or nullptr to remove.
+   * Batch version of loadFileData. Loads file data for all Image nodes whose filePath matches
+   * a key in the map in a single pass over the nodes. More efficient than calling loadFileData
+   * individually for each file when embedding multiple images.
+   * @param fileDataMap a map from file path to the file content to embed
    */
-  void setImageResourceProvider(std::shared_ptr<ImageResourceProvider> provider);
+  void loadFileDataMap(
+      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+
+  /**
+   * Returns the document's font configuration. Importers populate fallback fonts here
+   * (e.g. the HTML importer registers every concrete name from CSS `font-family` stacks
+   * so glyph-level fallback can pick them up at layout time). Callers may also register
+   * additional typefaces or fallbacks directly before invoking `applyLayout`.
+   */
+  FontConfig& fontConfig() {
+    return _fontConfig;
+  }
+  const FontConfig& fontConfig() const {
+    return _fontConfig;
+  }
+
+  /**
+   * Supplies a host-decoded image for the given external file path. Image nodes whose filePath
+   * matches (in this document and its resolved external documents) render with this image instead
+   * of decoding from their own data or file path; passing an empty shared_ptr clears a previous
+   * one. The image is runtime-only state and is not serialized. Use this for resources the host
+   * loads itself (e.g. asynchronously, or from a GPU texture via PAGImage::MakeFromTexture).
+   * Existing scenes refresh the affected layers in place.
+   *
+   * Note: this affects ImagePattern rendering only. ViewModel image-valued properties resolve
+   * images through their own decode chain (data → dataURI → filePath) and do not consult the
+   * runtime image set here.
+   * @param filePath the external file path as declared in the document's Image nodes
+   * @param image the decoded image to use, or an empty shared_ptr to clear it
+   * @return true if a matching Image node was found
+   */
+  bool loadFileData(const std::string& filePath, std::shared_ptr<PAGImage> image);
 
   /**
    * Executes auto layout on the document, positioning layers according to their layout
    * constraints. Must be called before rendering or font embedding. Re-running layout on an
    * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
    * reset branch discards the cached layout outputs first so nodes are re-measured from their
-   * current fields.
+   * current fields. Before re-embedding a document that already has embedded fonts, call
+   * clearEmbed() so layout uses fresh shaping data.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
@@ -222,10 +262,11 @@ class PAGXDocument : public Node {
    * and content nodes; a content node refreshes its owning Layer. GlyphRun, Font, and Glyph are not
    * supported — edit the Text node with layoutChanged = true instead.
    *
-   * Only the listed nodes are refreshed, so include every node an edit affects: the whole chain for
-   * an "@id" reference change, and every Layer a layoutChanged re-layout repositions (or pass the
-   * container Layer). For external compositions, notify the document that owns the nodes; foreign
-   * nodes are skipped (see ownsNode()).
+   * When layoutChanged is true, only list nodes directly edited or whose child list changed: the
+   * whole chain for an "@id" reference change, or the container Layer for a structural child-list
+   * edit. Any other Layer that auto layout repositions as a side effect is refreshed automatically,
+   * so callers do not need to list such siblings. For external compositions, notify the document
+   * that owns the nodes; foreign nodes are skipped (see ownsNode()).
    *
    * @param dirtyNodes nodes whose fields or child lists changed. Must be owned by this document;
    * null and foreign entries are skipped; an empty list is a no-op.
@@ -259,10 +300,21 @@ class PAGXDocument : public Node {
 
   const std::vector<const Layer*>& findLayersByImageFilePath(const std::string& imageFilePath);
 
+  // Sets runtimeImage on every Image node matching filePath in this document and its resolved
+  // external documents, collecting the touched Image nodes per owning document.
+  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
+                               const std::shared_ptr<PAGImage>& image,
+                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+                               std::unordered_set<const PAGXDocument*>& visited);
+
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
-  // is detected and stops the recursion instead of overflowing the stack.
-  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited);
+  // is detected and stops the recursion instead of overflowing the stack. When changedOut is not
+  // null and the document was already laid out, every Layer whose layoutBounds differ from before
+  // the re-layout is appended to it, so notifyChange can auto-refresh siblings that auto layout
+  // repositioned without the caller having to list them.
+  void applyLayout(const FontConfig* config, std::unordered_set<const PAGXDocument*>& visited,
+                   std::vector<Layer*>* changedOut);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
 
@@ -272,16 +324,21 @@ class PAGXDocument : public Node {
   void registerLiveScene(const std::shared_ptr<PAGScene>& scene);
   void unregisterLiveScene(PAGScene* scene);
 
-  std::shared_ptr<ImageResourceProvider> _imageResourceProvider = nullptr;
-  FontConfig fontConfig;
+  FontConfig _fontConfig;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
   // O(1) containment check for ownsNode(), maintained alongside nodes.
   std::unordered_set<const Node*> nodeSet = {};
 
+  void removeNodes(const std::unordered_set<Node*>& nodesToRemove);
+  void setNodeId(Node* node, const std::string& id);
+  void resetLayoutState();
+
   // Live PAGScene instances created from this document. Stored as weak_ptr so that the document
   // does not keep PAGScene alive; expired entries are pruned during notifyChange.
   std::vector<std::weak_ptr<PAGScene>> liveScenes = {};
+
+  friend class FontEmbedder;
 
   // Lazily built index of Image node filePath -> pagx Layer list, used by
   // findLayersByImageFilePath(). Built on first query; invalidated by notifyChange() since edits

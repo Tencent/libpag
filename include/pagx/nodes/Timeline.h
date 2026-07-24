@@ -29,6 +29,7 @@ namespace pagx {
  */
 enum class TimelineType : uint8_t {
   Animation = 0,
+  StateMachine = 1,
 };
 
 /**

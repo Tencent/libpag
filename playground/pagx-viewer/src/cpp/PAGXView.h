@@ -22,11 +22,13 @@
 #include <deque>
 #include "pag/gpu.h"
 #include "pagx/FontConfig.h"
+#include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGSurface.h"
 #include "pagx/PAGTimeline.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/types/Color.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Recording.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
@@ -77,6 +79,17 @@ class PAGXView {
     return pagxHeight;
   }
 
+  // Playback control methods
+  void play();
+  void pause();
+  bool isPlaying() const;
+  int64_t currentTimeMicros() const;
+  int64_t durationMicros() const;
+  float frameRate() const;
+  void setCurrentTimeMicros(int64_t micros);
+  void setLoop(bool loop);
+  bool isLoop() const;
+
  private:
   void updateContentTransform();
   void applyDisplayTransform();
@@ -91,9 +104,23 @@ class PAGXView {
 
   std::string canvasID = {};
   std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::Surface> tgfxSurface = nullptr;
   std::shared_ptr<PAGSurface> pagSurface = nullptr;
   std::shared_ptr<PAGScene> scene = nullptr;
   std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
+  // The default timeline downcast to PAGAnimation when it is an animation. The playback value
+  // methods (duration/frameRate/currentTime/setCurrentTime) live on PAGAnimation, not on the
+  // PAGTimeline base, so they are routed through this pointer. Null when there is no default
+  // timeline or it is not an animation.
+  std::shared_ptr<PAGAnimation> defaultAnimation = nullptr;
+  // Playback state maintained by the view itself. The timeline API no longer carries play/pause
+  // state, and PAGComposition::pauseTimeline cannot gate the top-level timeline driven here, so the
+  // view gates advancement on this flag.
+  bool playing = true;
+  // Player-level loop switch that overrides the file's loop mode at cycle boundaries: the engine
+  // still drives in-cycle motion (including PingPong mirroring), but whether a completed cycle
+  // repeats or stops is decided here instead of by the file's LoopMode. Defaults to looping.
+  bool loopEnabled = true;
   std::unique_ptr<tgfx::Recording> lastRecording = nullptr;
   double lastAnimationTimeMs = -1.0;
   int lastSurfaceWidth = 0;

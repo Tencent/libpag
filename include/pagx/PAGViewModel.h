@@ -29,6 +29,7 @@
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
+#include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PAGViewModelValueViewModel.h"
 
 namespace pagx {
@@ -70,11 +71,17 @@ class PAGViewModel {
   std::shared_ptr<PAGViewModelValueString> propertyString(const std::string& name) const;
 
   /**
-   * Returns the boolean-typed property with the given name. Trigger-typed properties are also
-   * returned via this accessor, since a Trigger is backed by a boolean value. Returns nullptr if
-   * no such property exists or its type does not match.
+   * Returns the boolean-typed property with the given name. Returns nullptr if no such property
+   * exists or its type does not match.
    */
   std::shared_ptr<PAGViewModelValueBoolean> propertyBoolean(const std::string& name) const;
+
+  /**
+   * Returns the trigger-typed property with the given name. A trigger is a one-shot event; call
+   * fire() on the returned value to pulse it. Returns nullptr if no such property exists or its
+   * type does not match.
+   */
+  std::shared_ptr<PAGViewModelValueTrigger> propertyTrigger(const std::string& name) const;
 
   /**
    * Returns the color-typed property with the given name. Returns nullptr if no such property

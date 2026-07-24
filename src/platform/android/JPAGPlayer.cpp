@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGPlayer.h"
+#include <mutex>
 #include "JNIHelper.h"
 #include "JPAGLayerHandle.h"
 #include "JPAGSurface.h"
@@ -78,7 +79,7 @@ PAG_API void Java_org_libpag_PAGPlayer_nativeRelease(JNIEnv* env, jobject thiz) 
 }
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeFinalize(JNIEnv* env, jobject thiz) {
-  setPAGPlayer(env, thiz, nullptr);
+  clearPAGPlayer(env, thiz);
 }
 
 PAG_API jobject Java_org_libpag_PAGPlayer_getComposition(JNIEnv* env, jobject thiz) {

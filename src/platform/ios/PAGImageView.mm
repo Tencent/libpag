@@ -123,11 +123,22 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
                                              object:nil];
 }
 
+// Thread safety note: [animator cancel] / [animator release] are intentionally called BEFORE
+// acquiring imageViewLock. cancel() blocks up to 500ms waiting for an in-flight background flush
+// task, and that flush also needs imageViewLock. Acquiring the lock first would create a
+// cross-thread lock-order inversion: this thread would hold imageViewLock while cancel() waits on
+// the background flush that needs it, then time out and abandon the task, reintroducing the
+// flush-vs-reset race. After cancel() no new flush can be scheduled, and [self reset] is itself
+// lock-free, so acquiring the non-recursive imageViewLock here is safe and simply serializes reset
+// against any lingering flush.
 - (void)dealloc {
   [animator cancel];
   [animator release];
-  [self reset];
-  pagComposition = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(imageViewLock);
+    [self reset];
+    pagComposition = nullptr;
+  }
   if (_currentUIImage) {
     [_currentUIImage release];
   }
@@ -237,8 +248,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     if (pagComposition) {
       pagDecoder = pag::PAGDecoder::MakeFrom(pagComposition, self.maxFrameRate, scaleFactor);
     } else if (filePath) {
-      auto file = pag::PAGFile::Load([filePath UTF8String]);
-      pagDecoder = pag::PAGDecoder::MakeFrom(file, self.maxFrameRate, scaleFactor);
+      PAGFile* pagFile = [PAGFile Load:filePath];
+      if (pagFile != nil) {
+        auto layer = [[pagFile impl] pagLayer];
+        auto composition = std::static_pointer_cast<pag::PAGComposition>(layer);
+        pagDecoder = pag::PAGDecoder::MakeFrom(composition, self.maxFrameRate, scaleFactor);
+      }
     }
     if (pagDecoder) {
       width = pagDecoder->width();
@@ -594,9 +609,14 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     filePath = nil;
   }
   filePath = [path retain];
-  auto file = pag::PAGFile::Load([path UTF8String]);
-  [self setCompositionInternal:file maxFrameRate:maxFrameRate];
-  return file != nullptr;
+  PAGFile* pagFile = [PAGFile Load:path];
+  std::shared_ptr<pag::PAGComposition> composition = nullptr;
+  if (pagFile != nil) {
+    auto layer = [[pagFile impl] pagLayer];
+    composition = std::static_pointer_cast<pag::PAGComposition>(layer);
+  }
+  [self setCompositionInternal:composition maxFrameRate:maxFrameRate];
+  return composition != nullptr;
 }
 
 - (void)setPathAsync:(NSString*)path completionBlock:(void (^)(PAGFile*))callback {

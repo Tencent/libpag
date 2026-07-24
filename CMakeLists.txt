@@ -34,6 +34,7 @@ option(PAG_USE_C "Enable c API" OFF)
 option(PAG_BUILD_PAGX "Enable PAGX format support" OFF)
 option(PAG_BUILD_CLI "Enable building the command-line tool" OFF)
 option(PAG_BUILD_SVG "Enable SVG import/export support" OFF)
+option(PAG_BUILD_HTML "Enable HTML import support" OFF)
 option(PAG_BUILD_PPT "Enable PPT export support" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
@@ -93,13 +94,17 @@ elseif (PAG_USE_SWIFTSHADER)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
-# PAG_BUILD_CLI requires PAG_BUILD_PAGX, PAG_BUILD_SVG and PAG_BUILD_PPT
+# PAG_BUILD_CLI requires PAG_BUILD_PAGX, PAG_BUILD_SVG, PAG_BUILD_HTML and PAG_BUILD_PPT
 if (PAG_BUILD_CLI)
     set(PAG_BUILD_PAGX ON)
     set(PAG_BUILD_SVG ON)
+    set(PAG_BUILD_HTML ON)
     set(PAG_BUILD_PPT ON)
 endif ()
 if (PAG_BUILD_SVG)
+    set(PAG_BUILD_PAGX ON)
+endif ()
+if (PAG_BUILD_HTML)
     set(PAG_BUILD_PAGX ON)
 endif ()
 if (PAG_BUILD_PPT)
@@ -124,6 +129,7 @@ if (PAG_BUILD_TESTS)
     set(PAG_BUILD_PAGX ON)
     set(PAG_BUILD_CLI ON)
     set(PAG_BUILD_SVG ON)
+    set(PAG_BUILD_HTML ON)
     set(PAG_BUILD_PPT ON)
     set(PAG_USE_HARFBUZZ ON)
     set(PAG_USE_SYSTEM_LZ4 OFF)
@@ -138,6 +144,7 @@ message("PAG_USE_HARFBUZZ: ${PAG_USE_HARFBUZZ}")
 message("PAG_BUILD_PAGX: ${PAG_BUILD_PAGX}")
 message("PAG_BUILD_CLI: ${PAG_BUILD_CLI}")
 message("PAG_BUILD_SVG: ${PAG_BUILD_SVG}")
+message("PAG_BUILD_HTML: ${PAG_BUILD_HTML}")
 message("PAG_BUILD_PPT: ${PAG_BUILD_PPT}")
 message("PAG_USE_SYSTEM_LZ4: ${PAG_USE_SYSTEM_LZ4}")
 message("PAG_USE_C: ${PAG_USE_C}")
@@ -214,6 +221,47 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_FILES src/pagx/svg/SVGExporter.cpp src/pagx/svg/SVGFeatureProbe.cpp)
     endif ()
 
+    if (PAG_BUILD_HTML)
+        list(APPEND PAG_FILES
+            src/pagx/html/importer/HTMLBoxAttributes.h
+            src/pagx/html/importer/HTMLCssCascade.cpp
+            src/pagx/html/importer/HTMLCssCascade.h
+            src/pagx/html/importer/HTMLDetail.cpp
+            src/pagx/html/importer/HTMLDetail.h
+            src/pagx/html/importer/HTMLDiagnosticSink.cpp
+            src/pagx/html/importer/HTMLDiagnosticSink.h
+            src/pagx/html/importer/HTMLElementEmitter.cpp
+            src/pagx/html/importer/HTMLFlexInferencePass.cpp
+            src/pagx/html/importer/HTMLIdAllocator.cpp
+            src/pagx/html/importer/HTMLIdAllocator.h
+            src/pagx/html/importer/HTMLImageResources.cpp
+            src/pagx/html/importer/HTMLImageResources.h
+            src/pagx/html/importer/HTMLImporter.cpp
+            src/pagx/html/importer/HTMLInlineSvgEmitter.cpp
+            src/pagx/html/importer/HTMLInlineSvgEmitter.h
+            src/pagx/html/importer/HTMLLayerBuilder.cpp
+            src/pagx/html/importer/HTMLLayerBuilder.h
+            src/pagx/html/importer/HTMLParserContext.cpp
+            src/pagx/html/importer/HTMLParserContext.h
+            src/pagx/html/importer/HTMLStyleCascade.cpp
+            src/pagx/html/importer/HTMLStyleCascade.h
+            src/pagx/html/importer/HTMLSubsetPropertyTable.cpp
+            src/pagx/html/importer/HTMLSubsetPropertyTable.h
+            src/pagx/html/importer/HTMLSubsetTransformer.cpp
+            src/pagx/html/importer/HTMLSubsetTransformer.h
+            src/pagx/html/importer/HTMLSvgFilterDecoder.cpp
+            src/pagx/html/importer/HTMLSvgFilterDecoder.h
+            src/pagx/html/importer/HTMLTextFragmentBuilder.cpp
+            src/pagx/html/importer/HTMLTextFragmentBuilder.h
+            src/pagx/html/importer/HTMLTransformContext.h
+            src/pagx/html/importer/HTMLTransformPasses.cpp
+            src/pagx/html/importer/HTMLTransformPasses.h
+            src/pagx/html/importer/HTMLTransformPassUtils.cpp
+            src/pagx/html/importer/HTMLTransformPassUtils.h
+            src/pagx/html/importer/HTMLValueParser.cpp
+            src/pagx/html/importer/HTMLValueParser.h)
+    endif ()
+
     if (PAG_BUILD_PPT)
         file(GLOB_RECURSE PAGX_PPT_SOURCES CONFIGURE_DEPENDS src/pagx/ppt/*.*)
         list(APPEND PAG_FILES ${PAGX_PPT_SOURCES})
@@ -222,8 +270,10 @@ if (PAG_BUILD_PAGX)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
 
-    # HTML exporter
+    # HTML exporter (importer subtree is wired separately above so PAG_BUILD_HTML can keep
+    # it out of non-HTML builds)
     file(GLOB_RECURSE HTML_EXPORTER_SOURCES CONFIGURE_DEPENDS src/pagx/html/*.*)
+    list(FILTER HTML_EXPORTER_SOURCES EXCLUDE REGEX "src/pagx/html/importer/")
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 
     # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML/SVG exporters)
@@ -339,6 +389,10 @@ endif ()
 
 if (PAG_BUILD_SVG)
     list(APPEND PAG_DEFINES PAG_BUILD_SVG)
+endif ()
+
+if (PAG_BUILD_HTML)
+    list(APPEND PAG_DEFINES PAG_BUILD_HTML)
 endif ()
 
 if (PAG_BUILD_PPT)
@@ -824,6 +878,10 @@ if (PAG_BUILD_CLI)
     if (LINUX)
         find_package(Fontconfig REQUIRED)
         list(APPEND CLI_EXTRA_LIBS Fontconfig::Fontconfig)
+        # GCC < 9 requires explicit link to stdc++fs for std::filesystem
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+            list(APPEND CLI_EXTRA_LIBS stdc++fs)
+        endif ()
     endif ()
     target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} ${CLI_EXTRA_LIBS})
 endif ()

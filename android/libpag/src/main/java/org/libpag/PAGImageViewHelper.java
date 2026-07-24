@@ -22,6 +22,9 @@ import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.hardware.HardwareBuffer;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
+
 class PAGImageViewHelper {
 
     protected static Matrix ApplyScaleMode(int scaleMode, int sourceWidth, int sourceHeight,
@@ -92,67 +95,170 @@ class PAGImageViewHelper {
     }
 
     static class DecoderInfo {
-        int _width;
-        int _height;
-        long duration;
+        volatile int _width;
+        volatile int _height;
+        volatile long duration;
         private PAGDecoder _pagDecoder;
+        private final ReentrantLock locker = new ReentrantLock();
+        // resetToken is bumped by every reset(); decoderToken records the resetToken value captured
+        // when the current decoder was built. isValid() treats the decoder as invalid once a reset()
+        // has happened since it was built, so a lock-free reset() that races an in-flight initDecoder()
+        // always wins without having to block on the lock.
+        private final AtomicInteger resetToken = new AtomicInteger(0);
+        private volatile int decoderToken = 0;
+        // Cached snapshots so the main thread can query decoder state without taking the lock,
+        // which would block whenever the worker thread is stuck in readFrame() on a hung decoder.
+        private volatile boolean hasDecoder = false;
+        private volatile int frameCount = 0;
 
-        synchronized boolean isValid() {
-            return _width > 0 && _height > 0;
+        void lock() {
+            locker.lock();
         }
 
-        synchronized boolean hasPAGDecoder() {
-            return _pagDecoder != null;
+        void unlock() {
+            locker.unlock();
         }
 
-        synchronized boolean checkFrameChanged(int currentFrame) {
-            return _pagDecoder != null && _pagDecoder.checkFrameChanged(currentFrame);
+        boolean isValid() {
+            // Lock-free: all fields are volatile or atomic, so this read is safe without holding
+            // the lock and avoids blocking the main thread when the worker is stuck in readFrame().
+            return _width > 0 && _height > 0 && decoderToken == resetToken.get();
         }
 
-        synchronized boolean readFrame(int currentFrame, HardwareBuffer hardwareBuffer) {
-            return _pagDecoder != null && hardwareBuffer != null && _pagDecoder.readFrame(currentFrame,
-                    hardwareBuffer);
+        boolean hasPAGDecoder() {
+            // Lock-free read of a volatile snapshot; see isValid() for why the main thread must not
+            // block on the lock here.
+            return hasDecoder;
         }
 
-        synchronized boolean copyFrameTo(Bitmap bitmap, int currentFrame) {
-            return _pagDecoder != null && bitmap != null && _pagDecoder.copyFrameTo(bitmap,
-                    currentFrame);
-        }
-
-        synchronized boolean initDecoder(PAGComposition composition, int width, int height,
-                                         float maxFrameRate) {
-            if (composition == null || width <= 0 || height <= 0 || maxFrameRate <= 0) {
-                return false;
+        boolean checkFrameChanged(int currentFrame) {
+            // tryLock instead of lock: this is reachable from the main thread via handleFrame(), and
+            // a blocking lock would ANR when the worker holds the lock inside a hung readFrame().
+            // On a failed lock, report changed=true so the caller falls through to a real decode
+            // attempt rather than skipping the frame based on stale state.
+            if (!locker.tryLock()) {
+                return true;
             }
-            float scaleFactor;
-            if (composition.width() >= composition.height()) {
-                scaleFactor = width * 1.0f / composition.width();
-            } else {
-                scaleFactor = height * 1.0f / composition.height();
-            }
-            _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, scaleFactor);
-            _width = _pagDecoder.width();
-            _height = _pagDecoder.height();
-            duration = composition.duration();
-            return true;
-        }
-
-        synchronized void releaseDecoder() {
-            if (_pagDecoder != null) {
-                _pagDecoder.release();
-                _pagDecoder = null;
+            try {
+                return _pagDecoder != null && _pagDecoder.checkFrameChanged(currentFrame);
+            } finally {
+                locker.unlock();
             }
         }
 
-        synchronized void reset() {
-            releaseDecoder();
-            _width = 0;
-            _height = 0;
-            duration = 0;
+        boolean readFrame(int currentFrame, HardwareBuffer hardwareBuffer) {
+            locker.lock();
+            try {
+                return _pagDecoder != null && hardwareBuffer != null && _pagDecoder.readFrame(
+                        currentFrame, hardwareBuffer);
+            } finally {
+                locker.unlock();
+            }
         }
 
-        synchronized int numFrames() {
-            return _pagDecoder == null ? 0 : _pagDecoder.numFrames();
+        boolean copyFrameTo(Bitmap bitmap, int currentFrame) {
+            locker.lock();
+            try {
+                return _pagDecoder != null && bitmap != null && _pagDecoder.copyFrameTo(bitmap,
+                        currentFrame);
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        boolean initDecoder(PAGComposition composition, int width, int height,
+                            float maxFrameRate) {
+            locker.lock();
+            try {
+                if (composition == null || width <= 0 || height <= 0 || maxFrameRate <= 0) {
+                    return false;
+                }
+                // Release the previous decoder before creating a new one to avoid leaking native
+                // resources when the DecoderInfo is reused, for example on a detach-then-reattach in
+                // a RecyclerView, or when reset() skipped the release on a busy lock.
+                releaseDecoder();
+                // Capture the reset token before the slow Make() call. If a reset() bumps the token
+                // while we build, decoderToken will no longer match and isValid() reports this decoder
+                // as stale, so the racing reset() wins instead of being silently overwritten.
+                int token = resetToken.get();
+                float scaleFactor;
+                if (composition.width() >= composition.height()) {
+                    scaleFactor = width * 1.0f / composition.width();
+                } else {
+                    scaleFactor = height * 1.0f / composition.height();
+                }
+                PAGDecoder decoder = PAGDecoder.Make(composition, maxFrameRate, scaleFactor);
+                if (decoder == null) {
+                    return false;
+                }
+                // Re-check the reset token after the slow Make() call. If reset() was called during
+                // Make(), the token will have been bumped, meaning this decoder is already stale and
+                // should not overwrite the reset state.
+                if (resetToken.get() != token) {
+                    decoder.release();
+                    return false;
+                }
+                _pagDecoder = decoder;
+                _width = decoder.width();
+                _height = decoder.height();
+                frameCount = decoder.numFrames();
+                duration = composition.duration();
+                decoderToken = token;
+                hasDecoder = true;
+                return true;
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        void releaseDecoder() {
+            locker.lock();
+            try {
+                if (_pagDecoder != null) {
+                    _pagDecoder.release();
+                    _pagDecoder = null;
+                }
+                hasDecoder = false;
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        void reset() {
+            // tryLock avoids an ANR: a blocking reset() on the main thread would stall if the worker
+            // thread is stuck in readFrame() (e.g. the hardware decoder hangs). Bump the reset token
+            // first so that any initDecoder() building concurrently on the worker thread is marked
+            // stale by isValid(); this wins the race even though the field writes below are lock-free.
+            resetToken.incrementAndGet();
+            hasDecoder = false;
+            frameCount = 0;
+            if (!locker.tryLock()) {
+                // On a failed lock, skip the native release but still clear the size fields; the stale
+                // decoder is reclaimed by initDecoder() on reuse or PAGDecoder.finalize() on GC.
+                _width = 0;
+                _height = 0;
+                duration = 0;
+                // Bump the token a second time after clearing the fields. This closes the reverse race
+                // where an in-flight initDecoder() captured the token after our first increment: its
+                // post-Make() recheck (or the final isValid() comparison) now sees a newer resetToken
+                // than the token it recorded, so its stale decoder can never be judged valid.
+                resetToken.incrementAndGet();
+                return;
+            }
+            try {
+                releaseDecoder();
+                _width = 0;
+                _height = 0;
+                duration = 0;
+            } finally {
+                locker.unlock();
+            }
+        }
+
+        int numFrames() {
+            // Lock-free read of the cached frame count; see isValid() for why the main thread must
+            // not block on the lock here.
+            return frameCount;
         }
     }
 }

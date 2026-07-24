@@ -22,10 +22,12 @@
 #include <algorithm>
 #include <cstdint>
 #include "pagx/PAGXImporter.h"
+#include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
-#include "utils/ImagePatternMatrixCalculator.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 using namespace emscripten;
 
@@ -109,6 +111,7 @@ void PAGXView::parsePAGX(const val& pagxData) {
   document = nullptr;
   scene = nullptr;
   defaultTimeline = nullptr;
+  defaultAnimation = nullptr;
   lastRecording = nullptr;
   lastAnimationTimeMs = -1.0;
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -140,17 +143,17 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  // TODO: Remove ResolveAllImagePatternMatrices() and ResolveAllGradientCoordinates() after the
-  // pagx exporter adapts to relative coordinates for image and gradient fills. Currently we force
-  // them to absolute coordinates to ensure correct rendering.
-  ResolveAllImagePatternMatrices(document.get());
-  ResolveAllGradientCoordinates(document.get());
   document->applyLayout(&fontConfig);
   scene = PAGScene::Make(document);
   if (scene == nullptr) {
     return;
   }
   defaultTimeline = scene->getDefaultTimeline();
+  defaultAnimation = nullptr;
+  if (defaultTimeline != nullptr && defaultTimeline->type() == TimelineType::Animation) {
+    defaultAnimation = std::static_pointer_cast<PAGAnimation>(defaultTimeline);
+  }
+  playing = true;
   lastAnimationTimeMs = -1.0;
   pagxWidth = scene->width();
   pagxHeight = scene->height();
@@ -168,11 +171,47 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   if (deltaUs <= 0) {
     return;
   }
-  if (defaultTimeline != nullptr) {
-    defaultTimeline->advanceAndApply(deltaUs);
-  }
-  if (scene != nullptr) {
-    scene->advanceAndApply(deltaUs);
+  if (playing) {
+    if (defaultAnimation != nullptr) {
+      int64_t duration = defaultAnimation->duration();
+      int64_t before = defaultAnimation->currentTime();
+      // Let the engine advance and wrap according to the file's loop mode; this keeps the in-cycle
+      // motion intact, including PingPong mirroring. The view only overrides what happens at a cycle
+      // boundary based on loopEnabled, so the file's loop flag never dictates repeat vs stop.
+      bool changed = defaultAnimation->advanceAndApply(deltaUs);
+      int64_t after = defaultAnimation->currentTime();
+      if (!changed) {
+        // A Once file clamps at the last frame and stops changing. Rewind to the head either way;
+        // when looping keep playing for the next cycle, otherwise park on the first frame so a
+        // finished single pass resets to the start instead of freezing on the last frame.
+        if (duration > 0) {
+          defaultAnimation->setCurrentTime(0);
+          defaultAnimation->apply();
+        }
+        if (!loopEnabled) {
+          playing = false;
+        }
+      } else if (!loopEnabled && duration > 0 && after < before) {
+        // A Loop/PingPong file wrapped or reversed past the end while the user wants a single pass.
+        // Forward motion is monotonic until the boundary, so the first backward step marks one
+        // completed pass: rewind to the first frame and stop there. For PingPong this counts the
+        // forward half as the single pass and stops as soon as it reaches the end, so the mirrored
+        // return half is not played — "single pass" is inherently ambiguous for PingPong and this
+        // is the accepted tradeoff.
+        defaultAnimation->setCurrentTime(0);
+        defaultAnimation->apply();
+        playing = false;
+      }
+    } else if (defaultTimeline != nullptr) {
+      // Non-animation timelines (state machines) have no seekable duration to gate; drive as-is.
+      defaultTimeline->advanceAndApply(deltaUs);
+    }
+    // Drive the scene inside the playing gate so pausing freezes the whole picture: this advances
+    // the auto-playing nested compositions, which would otherwise keep animating (and keep
+    // hasContentChanged() true) even while the top-level animation is paused.
+    if (scene != nullptr) {
+      scene->advanceAndApply(deltaUs);
+    }
   }
 }
 
@@ -197,7 +236,7 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (!ensureWindow() || canvasWidth <= 0 || canvasHeight <= 0) {
     return;
   }
-  if (pagSurface != nullptr && lastSurfaceWidth == canvasWidth &&
+  if (tgfxSurface != nullptr && lastSurfaceWidth == canvasWidth &&
       lastSurfaceHeight == canvasHeight) {
     return;
   }
@@ -206,15 +245,12 @@ void PAGXView::syncSurfaceSize(int canvasWidth, int canvasHeight) {
   if (context == nullptr) {
     return;
   }
-  pag::GLFrameBufferInfo frameBufferInfo = {};
-  frameBufferInfo.id = 0;
-  frameBufferInfo.format = GL_RGBA8;
-  pag::BackendRenderTarget renderTarget(frameBufferInfo, canvasWidth, canvasHeight);
-  pagSurface = PAGSurface::MakeFrom(renderTarget, pag::ImageOrigin::BottomLeft);
+  tgfxSurface = tgfx::Surface::MakeFrom(context, window);
   device->unlock();
-  if (pagSurface == nullptr) {
+  if (tgfxSurface == nullptr) {
     return;
   }
+  pagSurface = pagx::MakeFrom(tgfxSurface);
   lastSurfaceWidth = canvasWidth;
   lastSurfaceHeight = canvasHeight;
   updateContentTransform();
@@ -317,7 +353,15 @@ void PAGXView::draw() {
   int currentCanvasHeight = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
   syncSurfaceSize(currentCanvasWidth, currentCanvasHeight);
-  if (pagSurface == nullptr) {
+  if (tgfxSurface == nullptr) {
+    return;
+  }
+  // Dirty gate: skip the Record()/submit pass on idle frames. advanceTimelines() above already
+  // refreshed the scene's content-changed flag, so hasContentChanged() reflects the latest state
+  // (a running animation or in-progress tile refinement keeps it true). presentImmediately forces a
+  // render after loads/resizes/zoom/background changes; lastRecording must still be flushed when
+  // present, otherwise the double-buffered frame it holds would be dropped.
+  if (!presentImmediately && lastRecording == nullptr && !scene->hasContentChanged()) {
     return;
   }
   if (useCustomBackgroundColor) {
@@ -325,21 +369,24 @@ void PAGXView::draw() {
   } else {
     scene->getDisplayOptions()->setBackgroundColor({});
   }
-  scene->draw(pagSurface, true);
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context != nullptr) {
-    auto recording = context->flush();
+    auto recording = pagx::Record(context, scene, pagSurface, true);
     if (presentImmediately) {
+      // Force the freshest frame on screen right now. Drop whatever frame is still parked in
+      // lastRecording so the deferred (older) content cannot resurface one frame later.
       presentImmediately = false;
       lastRecording = nullptr;
       if (recording) {
         context->submit(std::move(recording));
       }
-    } else if (lastRecording) {
-      context->submit(std::move(lastRecording));
-      lastRecording = std::move(recording);
     } else {
+      // Double buffer: park this frame's recording and submit the one deferred from the previous
+      // frame, giving the GPU an extra frame to finish. When the scene content is unchanged,
+      // Record() returns null; swapping that null into lastRecording lets the dirty gate resume
+      // skipping idle frames once the last deferred frame has been flushed out.
+      std::swap(lastRecording, recording);
       if (recording) {
         context->submit(std::move(recording));
       }
@@ -436,6 +483,65 @@ void PAGXView::updateAdaptiveTileRefinement() {
       scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
     }
   }
+}
+
+void PAGXView::play() {
+  playing = true;
+}
+
+void PAGXView::pause() {
+  playing = false;
+}
+
+bool PAGXView::isPlaying() const {
+  return playing;
+}
+
+int64_t PAGXView::currentTimeMicros() const {
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->currentTime();
+  }
+  return 0;
+}
+
+int64_t PAGXView::durationMicros() const {
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->duration();
+  }
+  return 0;
+}
+
+float PAGXView::frameRate() const {
+  if (defaultAnimation != nullptr) {
+    return defaultAnimation->frameRate();
+  }
+  return 0.0f;
+}
+
+// Known limitation: seek only repositions the default (top-level) animation. Nested
+// auto-playing compositions rendered by `scene` are delta-driven via advanceAndApply() and have
+// no absolute-time entry point, so their frame lags behind the main timeline after a scrub:
+// the main animation jumps to `micros` while the nested compositions stay wherever their
+// accumulated delta left them. Acceptable for the MVP viewer; a future fix would need per-scene
+// seek support (or a full scene rebuild) rather than a workaround here.
+void PAGXView::setCurrentTimeMicros(int64_t micros) {
+  if (defaultAnimation != nullptr) {
+    defaultAnimation->setCurrentTime(micros);
+    // setCurrentTime only moves the playhead; apply() is required to reflect it in the content.
+    // Force a present so a manual seek (e.g. dragging the progress bar while paused) updates the
+    // frame immediately instead of being skipped by the idle dirty gate in draw().
+    defaultAnimation->apply();
+    lastAnimationTimeMs = -1.0;
+    presentImmediately = true;
+  }
+}
+
+void PAGXView::setLoop(bool loop) {
+  loopEnabled = loop;
+}
+
+bool PAGXView::isLoop() const {
+  return loopEnabled;
 }
 
 }  // namespace pagx

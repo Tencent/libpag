@@ -1,0 +1,63 @@
+{
+  "name": "html-snapshot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Render a JS/React-driven HTML page in a headless browser and emit a flat, absolute-positioned snapshot that conforms to spec/html_subset.md.",
+  "main": "snapshot.js",
+  "bin": {
+    "html-snapshot": "./snapshot.js",
+    "html-snapshot-server": "./server.js"
+  },
+  "scripts": {
+    "snapshot": "node snapshot.js",
+    "server": "node server.js",
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "build:browser": "node build-browser-bundle.js",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/test/**/*.test.js"
+    ],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(pixelmatch)/)"
+    ],
+    "collectCoverageFrom": [
+      "dist/lib/**/*.js",
+      "bench/report-utils.js",
+      "eval/compare.js",
+      "!dist/lib/browser-snapshot.js",
+      "!dist/lib/page-loader.js",
+      "!dist/lib/snapshot-runner.js"
+    ],
+    "coverageDirectory": "<rootDir>/coverage",
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "lcov"
+    ]
+  },
+  "dependencies": {
+    "opentype.js": "^2.0.0",
+    "puppeteer": "^23.0.0",
+    "wawoff2": "^2.0.1"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@babel/preset-env": "^7.29.7",
+    "@types/node": "^22.19.19",
+    "@types/opentype.js": "^1.3.10",
+    "@types/pngjs": "^6.0.5",
+    "babel-jest": "^30.4.1",
+    "jest": "^30.4.2",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
+    "typescript": "^5.9.3"
+  }
+}

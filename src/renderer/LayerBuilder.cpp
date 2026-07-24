@@ -63,6 +63,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/runtime/MixUtils.h"
+#include "pagx/tgfx.h"
 #include "pagx/types/ColorSpace.h"
 #include "pagx/types/Data.h"
 #include "pagx/types/FillRule.h"
@@ -72,7 +73,9 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/TextUtils.h"
 #include "renderer/GlyphRunRenderer.h"
+#include "renderer/TextHolder.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Data.h"
@@ -119,6 +122,17 @@
 #include "tgfx/layers/vectors/VectorGroup.h"
 
 namespace pagx {
+
+void RuntimeBinding::remove(const Node* node) {
+  targets.erase(node);
+  std::vector<std::shared_ptr<TextHolder>> stillAlive;
+  for (auto& holder : textHolders) {
+    if (holder != nullptr && !holder->removeNode(node)) {
+      stillAlive.push_back(std::move(holder));
+    }
+  }
+  textHolders = std::move(stillAlive);
+}
 
 // Per-category switches to skip PAGX layer effects during conversion to the tgfx layer tree.
 // Each effect normally forces tgfx to allocate an offscreen surface at render time and run a
@@ -224,7 +238,55 @@ struct LayerRuntimeTarget : RuntimeTarget {
   }
 };
 
-// Decode a data URI (e.g., "data:image/png;base64,...") to an Image.
+// Runtime target for a Text's tgfx::Text. Text-shaping channels (text / fontFamily / fontStyle /
+// fontSize / letterSpacing / fauxBold / fauxItalic) are intercepted and forwarded to the shared
+// TextHolder, which records the change and reshapes once per draw. The x / y position channels
+// fall through to the base writer table (WriteTextX / WriteTextY) and mutate the tgfx::Text
+// directly, so position animation stays lightweight and independent of reshaping.
+struct TextRuntimeTarget : RuntimeTarget {
+  std::shared_ptr<TextHolder> holder = nullptr;
+  Text* node = nullptr;
+
+  static bool IsShapingChannel(const std::string& channel) {
+    return channel == "text" || channel == "fontFamily" || channel == "fontStyle" ||
+           channel == "fontSize" || channel == "letterSpacing" || channel == "fauxBold" ||
+           channel == "fauxItalic";
+  }
+
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+    if (holder != nullptr && IsShapingChannel(channel)) {
+      holder->apply(node, channel, value, mix);
+      return true;
+    }
+    return RuntimeTarget::apply(channel, value, mix);
+  }
+
+  bool hasWriter(const std::string& channel) const override {
+    if (holder != nullptr && IsShapingChannel(channel)) {
+      return true;
+    }
+    return RuntimeTarget::hasWriter(channel);
+  }
+
+  bool read(const std::string& channel, KeyValue* out) const override {
+    if (holder != nullptr && IsShapingChannel(channel)) {
+      return holder->read(node, channel, out);
+    }
+    return RuntimeTarget::read(channel, out);
+  }
+};
+
+// Context threaded through convertGroup/convertVectorElement/convertText while converting a
+// TextBox's children. Carries the shared TextHolder all child Texts attach to (they share one
+// line-breaking layout), plus each child's inverse matrix and the box padding so a reshape
+// reproduces the layout coordinate transform. Null / empty for standalone Texts and plain Groups.
+struct TextBoxConvertContext {
+  std::shared_ptr<TextHolder> holder = nullptr;
+  std::unordered_map<Text*, tgfx::Matrix> inverseMatrices = {};
+  float paddingLeft = 0.0f;
+  float paddingTop = 0.0f;
+};
+
 static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI) {
   auto data = DecodeBase64DataURI(dataURI);
   if (!data) {
@@ -240,10 +302,7 @@ static std::shared_ptr<tgfx::Image> ImageFromDataURI(const std::string& dataURI)
 class LayerBuilderContext {
  public:
   LayerBuilderContext() = default;
-
-  void setNeedsRuntimeData(bool value) {
-    _needsRuntimeData = value;
-  }
+  virtual ~LayerBuilderContext() = default;
 
   void setDocument(const PAGXDocument* document) {
     _document = document;
@@ -361,6 +420,16 @@ class LayerBuilderContext {
     // colorSourceUsers / imageUsers maps.
     for (auto* element : oldElements) {
       untrackElementColorSource(element);
+    }
+    // Clear old TextHolder entries for surviving Text elements before convertText rebuilds them.
+    // convertText's setTarget destroys the old TextRuntimeTarget for the node, but the old
+    // TextHolder still references it via entry.target; wireTextRuntime then appends a fresh holder
+    // without removing the stale one. Removing the binding now erases the old target and prunes the
+    // holder entry, so no dangling entry.target survives into flushTextHolders (use-after-free).
+    for (auto* element : oldElements) {
+      if (element->nodeType() == NodeType::Text) {
+        _result.binding.remove(element);
+      }
     }
     if (node->composition == nullptr && layer->type() == tgfx::LayerType::Vector) {
       auto* vectorLayer = static_cast<tgfx::VectorLayer*>(layer.get());
@@ -671,7 +740,7 @@ class LayerBuilderContext {
   }
 
   // Evicts any cached tgfx::Image whose backing Image node has the given filePath so the next
-  // conversion goes through getOrCreateImage() again and re-queries the provider.
+  // conversion goes through getOrCreateImage() again and re-reads the node's runtimeImage.
   void invalidateImagesByFilePath(const PAGXDocument& document, const std::string& filePath) {
     if (filePath.empty()) {
       return;
@@ -722,7 +791,7 @@ class LayerBuilderContext {
     return true;
   }
 
- private:
+ protected:
   std::shared_ptr<tgfx::Layer> convertLayer(const Layer* node) {
     if (!node) {
       return nullptr;
@@ -832,20 +901,15 @@ class LayerBuilderContext {
     _result.binding.setAccessor(node, "name", WriteLayerName, ReadLayerName);
   }
 
-  std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
+  // Converts a Composition slot. The base (static) build expands the composition's layers in place
+  // so a standalone build (optimizer / CLI rendering / exporters) renders a complete tree.
+  // RuntimeLayerBuilderContext overrides this to return an empty container that the runtime
+  // PAGComposition populates per-slot, keeping multiple references to one Composition independent.
+  virtual std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) {
     if (!comp) {
       return nullptr;
     }
-    // Composition slot: create an empty container layer. The runtime PAGComposition is
-    // responsible for populating this slot with its own per-slot layer subtree, so multiple
-    // Layers referencing the same Composition stay independent. When LayerBuilder is invoked
-    // standalone (no PAGFile in play, e.g. from optimizer / cli rendering paths) the slot is
-    // populated immediately with a flat expansion to preserve backward-compatible static
-    // rendering. PAGFile sets _needsRuntimeData before calling Build() to opt out of this path.
     auto containerLayer = tgfx::Layer::Make();
-    if (_needsRuntimeData) {
-      return containerLayer;
-    }
     for (const auto& compLayer : comp->layers) {
       auto childLayer = convertLayer(compLayer);
       if (childLayer) {
@@ -1047,7 +1111,7 @@ class LayerBuilderContext {
           return nullptr;
         }
         prepareTextBoxTextBlobs(textBox);
-        result = convertGroup(textBox);
+        result = convertTextBox(textBox);
         break;
       }
       default:
@@ -1339,11 +1403,26 @@ class LayerBuilderContext {
     if (tgfxText) {
       auto pos = node->renderPosition();
       tgfxText->setPosition(tgfx::Point::Make(pos.x, pos.y));
-      _result.binding.set(node, tgfxText);
-      _result.binding.setAccessor(node, "x", WriteTextX, ReadTextX);
-      _result.binding.setAccessor(node, "y", WriteTextY, ReadTextY);
+      // Install a TextRuntimeTarget so ViewModel/Animation writes to the text-shaping channels are
+      // routed to a TextHolder (deferred reshape), while x / y keep the direct position writers.
+      auto* target = static_cast<TextRuntimeTarget*>(
+          _result.binding.setTarget(node, std::unique_ptr<RuntimeTarget>(new TextRuntimeTarget())));
+      target->node = node;
+      target->setObject(tgfxText);
+      target->setWriter("x", WriteTextX);
+      target->setReader("x", ReadTextX);
+      target->setWriter("y", WriteTextY);
+      target->setReader("y", ReadTextY);
+      wireTextRuntime(node, target);
     }
     return tgfxText;
+  }
+
+  // Hook for wiring the runtime text-reshaping mechanism (TextHolder) onto a freshly built
+  // tgfx::Text. The base (static) build does nothing: a static tree carries no ViewModel/Animation
+  // drivers, so the shaping channels never fire. RuntimeLayerBuilderContext overrides this to
+  // create/attach a TextHolder for the node, reading any active TextBox context from its own state.
+  virtual void wireTextRuntime(Text* /*node*/, TextRuntimeTarget* /*target*/) {
   }
 
   std::shared_ptr<tgfx::FillStyle> convertFill(const Fill* node) {
@@ -1354,7 +1433,7 @@ class LayerBuilderContext {
     if (colorSource == nullptr) {
       // Image-backed fills drop out entirely until the underlying image arrives. Falling back to
       // an opaque SolidColor here would paint a black placeholder over every shape that uses an
-      // ImagePattern before its image is resolved via the provider; leaving the fill empty keeps
+      // ImagePattern before its runtimeImage is set via loadFileData; leaving the fill empty keeps
       // those shapes transparent until the image is ready.
       if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
         return nullptr;
@@ -1398,7 +1477,7 @@ class LayerBuilderContext {
     if (colorSource == nullptr) {
       // Image-backed strokes drop out entirely until the underlying image arrives. Falling back
       // to an opaque SolidColor here would paint a black placeholder along every stroke that uses
-      // an ImagePattern before its image is resolved via the provider; leaving the stroke empty
+      // an ImagePattern before its runtimeImage is set via loadFileData; leaving the stroke empty
       // keeps those shapes transparent until the image is ready, matching convertFill.
       if (node->color && node->color->nodeType() == NodeType::ImagePattern) {
         return nullptr;
@@ -1478,7 +1557,7 @@ class LayerBuilderContext {
 
   static bool ReadImagePatternImage(const void* object, KeyValue* out) {
     auto image = static_cast<const tgfx::ImagePattern*>(object)->image();
-    *out = KeyValue{LayerBuilder::WrapTGFXImage(image)};
+    *out = KeyValue{MakeFrom(image)};
     return true;
   }
 
@@ -1816,21 +1895,17 @@ class LayerBuilderContext {
       return it->second;
     }
     // Resolution chain. Two camps of sources exist:
-    //   1. Provider-resolved images (backend textures): already mipmapped at upload time by the
-    //      host's createBackendTexture helper. Re-wrapping with makeMipmapped(true) would force
-    //      tgfx to allocate a parallel mipmapped texture and copy the pixels. Use as-is.
+    //   1. Host-supplied texture-backed images (from PAGImage::MakeFromTexture): already mipmapped
+    //      at upload time by the host. Re-wrapping with makeMipmapped(true) would force tgfx to
+    //      allocate a parallel mipmapped texture and copy the pixels. Use as-is.
     //   2. CPU-decoded images (encoded data, file path, data URI): produced lazily by tgfx
     //      codecs. Wrap with makeMipmapped(true) so subsequent sampling at non-1:1 scales does
     //      not re-decode at every zoom level.
     std::shared_ptr<tgfx::Image> image = nullptr;
-    bool isBackendTexture = false;
-    // Priority 1: query the provider for a platform-decoded image.
-    auto* provider = _document ? _document->_imageResourceProvider.get() : nullptr;
-    if (provider && !imageNode->filePath.empty()) {
-      image = provider->resolveImage(imageNode->filePath);
-      if (image) {
-        isBackendTexture = true;
-      }
+    // Priority 1: a host-supplied ready image on the node (PAGXDocument::loadFileData(path, image)).
+    auto runtimeImage = LayerBuilder::GetNodeRuntimeImage(imageNode);
+    if (runtimeImage != nullptr) {
+      image = LayerBuilder::GetTGFXImage(runtimeImage);
     }
     // Priority 2: fallback to standard decoding chain.
     if (!image) {
@@ -1842,12 +1917,11 @@ class LayerBuilderContext {
         image = tgfx::Image::MakeFromFile(imageNode->filePath);
       }
     }
-    if (image && !isBackendTexture) {
+    if (image && !image->isTextureBacked()) {
       image = image->makeMipmapped(true);
     }
-    // Only memoize successful results. A null entry would cache the absence of a provider-
-    // resolved image forever, so a later provider update would never take effect after
-    // invalidation.
+    // Only memoize successful results. A null entry would cache the absence of a host-provided
+    // image forever, so a later loadFileData() update would never take effect after invalidation.
     if (image) {
       _imageCache[imageNode] = image;
     }
@@ -2170,6 +2244,13 @@ class LayerBuilderContext {
     modifier->setSelectors(std::move(tgfxSelectors));
 
     return modifier;
+  }
+
+  // Converts a TextBox. The base (static) build renders it as a plain Group; no shared TextHolder
+  // is needed because a static tree is never re-shaped. RuntimeLayerBuilderContext overrides this
+  // to build a shared TextHolder + per-child coordinate context and thread it through convertGroup.
+  virtual std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) {
+    return convertGroup(node);
   }
 
   std::shared_ptr<tgfx::VectorGroup> convertGroup(const Group* node) {
@@ -3077,7 +3158,84 @@ class LayerBuilderContext {
     std::vector<tgfx::Point> anchors;
   };
   std::unordered_map<uint64_t, TextBlobCacheEntry> _textBlobCache = {};
-  bool _needsRuntimeData = false;
+};
+
+// Runtime build variant. Adds the "live" runtime structure the static base omits:
+//   - Composition slots are left empty for the runtime PAGComposition to populate per-slot.
+//   - Each Text is wired to a TextHolder so ViewModel/Animation can reshape it at draw time.
+// Used by PAGScene / PAGComposition (BuildForRuntime / BuildCompositionSubtree / BuildLayerInto /
+// RefreshLayerInPlace). The static base is used for one-shot rendering (CLI / optimizer / export).
+class RuntimeLayerBuilderContext : public LayerBuilderContext {
+ protected:
+  std::shared_ptr<tgfx::Layer> convertComposition(const Composition* comp) override {
+    if (!comp) {
+      return nullptr;
+    }
+    // Empty slot: the runtime PAGComposition fills it with its own per-slot subtree so multiple
+    // Layers referencing the same Composition keep independent playback state.
+    return tgfx::Layer::Make();
+  }
+
+  std::shared_ptr<tgfx::VectorGroup> convertTextBox(const TextBox* node) override {
+    // Collect child Texts first. If there are none, the box has nothing to reshape and no holder is
+    // needed — skip the shared-holder setup so an empty TextBox does not register a no-op holder.
+    std::vector<Text*> childText = {};
+    std::vector<tgfx::Matrix> matrices = {};
+    TextLayout::CollectTextElements(node->elements, childText, matrices);
+    if (childText.empty()) {
+      return convertGroup(node);
+    }
+    // Build one shared TextHolder for the box: all child Texts share a single line-breaking layout,
+    // so they reshape together. Capture each child's inverse matrix and the box padding so a reshape
+    // reproduces the same coordinate transform as the layout pass. The context is published on the
+    // instance for the duration of the subtree build so wireTextRuntime() can read it as each child
+    // Text is converted (Texts may sit under intermediate Groups), then cleared on return.
+    TextBoxConvertContext context = {};
+    context.holder = std::make_shared<TextHolder>(MakeTextBoxParams(node));
+    bool hasPadding = !node->padding.isZero();
+    context.paddingLeft = hasPadding ? node->padding.left : 0.0f;
+    context.paddingTop = hasPadding ? node->padding.top : 0.0f;
+    for (size_t i = 0; i < childText.size(); i++) {
+      tgfx::Matrix inverse = {};
+      if (matrices[i].invert(&inverse)) {
+        context.inverseMatrices[childText[i]] = inverse;
+      }
+    }
+    const TextBoxConvertContext* previous = _textBoxContext;
+    _textBoxContext = &context;
+    auto group = convertGroup(node);
+    _textBoxContext = previous;
+    _result.binding.registerTextHolder(context.holder);
+    return group;
+  }
+
+  void wireTextRuntime(Text* node, TextRuntimeTarget* target) override {
+    const TextBoxConvertContext* textBoxContext = _textBoxContext;
+    if (textBoxContext != nullptr && textBoxContext->holder != nullptr) {
+      // TextBox child: attach to the box's shared holder with the child's inverse matrix and the
+      // box padding so a reshape reproduces the same coordinate transform as layout.
+      tgfx::Matrix inverse = {};
+      auto it = textBoxContext->inverseMatrices.find(node);
+      if (it != textBoxContext->inverseMatrices.end()) {
+        inverse = it->second;
+      }
+      textBoxContext->holder->addEntry(node, target, MakeGlyphParams(node), inverse,
+                                       textBoxContext->paddingLeft, textBoxContext->paddingTop);
+      target->holder = textBoxContext->holder;
+    } else {
+      // Standalone Text: its own holder, identity matrix, no padding.
+      auto holder = std::make_shared<TextHolder>(MakeStandaloneParams(node));
+      holder->addEntry(node, target, MakeGlyphParams(node), tgfx::Matrix::I(), 0.0f, 0.0f);
+      _result.binding.registerTextHolder(holder);
+      target->holder = holder;
+    }
+  }
+
+ private:
+  // Active TextBox context during convertTextBox's subtree build; null outside it. Read by
+  // wireTextRuntime to attach a child Text to the box's shared holder. Saved/restored around the
+  // subtree build so it is robust even if TextBoxes were ever nested.
+  const TextBoxConvertContext* _textBoxContext = nullptr;
 };
 
 // Public API implementation
@@ -3150,7 +3308,7 @@ size_t LayerBuilderSession::rebuildForFilePath(const std::string& filePath) {
     return 0;
   }
   // Evict the cached tgfx::Image for every Image node backing this filePath so the next call
-  // into convertImagePattern() re-queries the provider for the updated image.
+  // into convertImagePattern() re-reads the node's runtimeImage for the updated image.
   impl->context.invalidateImagesByFilePath(*impl->document, filePath);
 
   const auto& affectedLayers = impl->document->findLayersByImageFilePath(filePath);
@@ -3202,8 +3360,7 @@ LayerBuildResult LayerBuilder::BuildForRuntime(PAGXDocument* document) {
     DEBUG_ASSERT(false);
     return {};
   }
-  LayerBuilderContext context;
-  context.setNeedsRuntimeData(true);
+  RuntimeLayerBuilderContext context;
   return context.buildWithMap(*document);
 }
 
@@ -3211,9 +3368,8 @@ LayerBuildResult LayerBuilder::BuildCompositionSubtree(const Composition* compos
   if (composition == nullptr) {
     return {};
   }
-  LayerBuilderContext context;
+  RuntimeLayerBuilderContext context;
   // Slot's recursive children build their own subtrees independently.
-  context.setNeedsRuntimeData(true);
   return context.buildSubtree(composition);
 }
 
@@ -3222,8 +3378,7 @@ bool LayerBuilder::RefreshLayerInPlace(const Layer* node, RuntimeBinding* bindin
   if (node == nullptr || binding == nullptr) {
     return false;
   }
-  LayerBuilderContext context;
-  context.setNeedsRuntimeData(true);
+  RuntimeLayerBuilderContext context;
   context.setDocument(document);
   return context.refreshLayerInPlace(node, binding);
 }
@@ -3234,20 +3389,16 @@ std::shared_ptr<tgfx::Layer> LayerBuilder::BuildLayerInto(const Layer* node,
   if (node == nullptr || binding == nullptr) {
     return nullptr;
   }
-  LayerBuilderContext context;
-  context.setNeedsRuntimeData(true);
+  RuntimeLayerBuilderContext context;
   context.setDocument(document);
   return context.buildLayerInto(node, binding);
 }
 
-std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
-  return image ? image->_tgfxImage : nullptr;
+std::shared_ptr<PAGImage> LayerBuilder::GetNodeRuntimeImage(const Image* node) {
+  return node != nullptr ? node->runtimeImage : nullptr;
 }
 
-std::shared_ptr<PAGImage> LayerBuilder::WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image) {
-  if (image == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGImage>(new PAGImage(image, {}));
+std::shared_ptr<tgfx::Image> LayerBuilder::GetTGFXImage(const std::shared_ptr<PAGImage>& image) {
+  return image ? image->_tgfxImage : nullptr;
 }
 }  // namespace pagx

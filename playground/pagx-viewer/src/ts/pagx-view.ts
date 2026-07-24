@@ -293,6 +293,78 @@ export class PAGXView {
     this.nativeView._draw();
   }
 
+  // Playback control methods
+
+  /**
+   * Starts or resumes playback of the default timeline.
+   */
+  public play(): void {
+    this.nativeView._play();
+  }
+
+  /**
+   * Pauses playback of the default timeline.
+   */
+  public pause(): void {
+    this.nativeView._pause();
+  }
+
+  /**
+   * Returns whether the default timeline is currently playing.
+   */
+  public isPlaying(): boolean {
+    return this.nativeView._isPlaying();
+  }
+
+  /**
+   * Returns the current playback time in microseconds.
+   */
+  public currentTimeMicros(): number {
+    return this.nativeView._currentTimeMicros();
+  }
+
+  /**
+   * Returns the total duration in microseconds. Returns 0 if no content is loaded.
+   */
+  public durationMicros(): number {
+    return this.nativeView._durationMicros();
+  }
+
+  /**
+   * Returns the frame rate of the animation. Returns 0 if no content is loaded.
+   */
+  public frameRate(): number {
+    return this.nativeView._frameRate();
+  }
+
+  /**
+   * Sets the current playback time in microseconds.
+   * @param micros Time position in microseconds
+   */
+  public setCurrentTimeMicros(micros: number): void {
+    this.nativeView._setCurrentTimeMicros(micros);
+    if (!this._isRunning) {
+      this.nativeView._draw();
+    }
+  }
+
+  /**
+   * Sets whether playback loops, overriding the loop mode stored in the file. When enabled, each
+   * cycle repeats (preserving PingPong mirroring); when disabled, playback rewinds to the first
+   * frame and stops after a single pass.
+   * @param loop true to loop, false to play once
+   */
+  public setLoop(loop: boolean): void {
+    this.nativeView._setLoop(loop);
+  }
+
+  /**
+   * Returns whether playback is set to loop.
+   */
+  public isLoop(): boolean {
+    return this.nativeView._isLoop();
+  }
+
   /**
    * Starts the render loop.
    */

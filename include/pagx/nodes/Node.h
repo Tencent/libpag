@@ -98,6 +98,32 @@ enum class NodeType {
    */
   Channel,
 
+  // State Machine
+  /**
+   * A state machine that drives discrete state transitions across one or more parallel regions.
+   */
+  StateMachine,
+  /**
+   * A named orthogonal region inside a StateMachine.
+   */
+  StateRegion,
+  /**
+   * A state within a StateRegion. Concrete kinds are distinguished by State::stateType().
+   */
+  State,
+  /**
+   * A state transition with conditions, crossfade parameters, and exit-time gating.
+   */
+  StateTransition,
+  /**
+   * A condition that gates a StateTransition, referencing a StateMachine input.
+   */
+  TransitionCondition,
+  /**
+   * A named input port (bool / number / trigger) on a StateMachine.
+   */
+  StateMachineInput,
+
   // Layer
   /**
    * A layer node that contains vector elements and child layers.

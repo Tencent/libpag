@@ -2,6 +2,7 @@
   "compilerOptions": {
     "lib": ["es5", "es6", "dom"],
     "target": "es5",
+    "types": [],
     "declaration": true,
     "declarationDir": "./types",
     "emitDeclarationOnly": true,

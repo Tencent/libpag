@@ -29,6 +29,7 @@
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
+#include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/DataBind.h"
@@ -39,6 +40,26 @@
 #include "renderer/ToTGFX.h"
 
 namespace pagx {
+
+namespace {
+
+class TriggerChannelObserver {
+ public:
+  TriggerChannelObserver(RuntimeBinding* binding, const Node* targetNode, std::string channel)
+      : binding(binding), targetNode(targetNode), channel(std::move(channel)) {
+  }
+
+  void operator()() const {
+    binding->apply(targetNode, channel, KeyValue{true}, 1.0f);
+  }
+
+ private:
+  RuntimeBinding* binding;
+  const Node* targetNode;
+  std::string channel;
+};
+
+}  // namespace
 
 // ---- Destructor — cleanup dependents ---------------------------------------
 
@@ -69,6 +90,13 @@ static std::vector<std::string> ParseSourcePath(const std::string& source) {
 void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* context,
                            PAGXDocument* doc, RuntimeBinding* binding) {
   boundBinding = binding;
+  // A null binding means there is no scope to bind against. Without a scope, the contains() check
+  // below would be skipped, so any DataBind (including cross-composition ones) would silently pass
+  // through, defeating the scope filter. Mirrors PAGTimeline::resolveTargets, which also returns
+  // early when its binding is null. All current callers pass a non-null binding.
+  if (binding == nullptr) {
+    return;
+  }
   for (auto* db : binds) {
     if (db == nullptr || context == nullptr || doc == nullptr) {
       continue;
@@ -88,6 +116,14 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
       LOGE("DataBind skipped: target '%s' was not found in the document.", db->target.c_str());
       continue;
     }
+    // Drop out-of-scope targets. findNode does a flat document-wide lookup, so it can resolve a node
+    // living inside a nested composition; that node is bound in the composition's own binding, not
+    // here, so binding to it would cross the composition boundary (mirrors
+    // PAGTimeline::resolveTargets). The early return above guarantees binding is non-null here.
+    if (!binding->contains(targetNode)) {
+      LOGE("DataBind skipped: target '%s' is outside this binding's scope.", db->target.c_str());
+      continue;
+    }
     sourceValue->addDependent(this);
 
     BindingEntry entry;
@@ -96,7 +132,23 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
     entry.sourceGuard = sourceValue->weak_from_this();
     entry.targetNode = targetNode;
     entry.channel = db->channel;
-    entries.push_back(entry);
+
+    // Trigger sources are event-based: register an observer that pushes through the channel
+    // accessor immediately. All other source types (Bool, Number, etc.) go through the normal
+    // value-based applyEntry path via binding->apply, which routes to the target's channel writer
+    // (StateMachineInputTarget for SM inputs, RuntimeTarget writers for render nodes).
+    if (sourceValue->valueType() == ViewModelPropertyType::Trigger) {
+      auto sourceSelf = sourceValue->weak_from_this().lock();
+      if (sourceSelf == nullptr) {
+        LOGE("DataBind skipped: Trigger source is not managed by shared_ptr.");
+        continue;
+      }
+      auto triggerVal = std::static_pointer_cast<PAGViewModelValueTrigger>(sourceSelf);
+      triggerHandles[db] =
+          triggerVal->addObserver(TriggerChannelObserver(binding, targetNode, db->channel));
+    }
+
+    entries.push_back(std::move(entry));
 
     // Mark dirty so the first update() applies the ViewModel's configured default to the target.
     // Only ToTarget/TwoWay bindings drive the target, so a pure ToSource binding is not dirtied
@@ -172,7 +224,9 @@ static KeyValue ValueToKeyValue(PAGViewModelValue* value) {
     case ViewModelPropertyType::Enum:
       return KeyValue{static_cast<PAGViewModelValueEnum*>(value)->value()};
     case ViewModelPropertyType::Trigger:
-      return KeyValue{static_cast<PAGViewModelValueBoolean*>(value)->value()};
+      // A trigger is a value-less event and is not a data-binding source. Consumers (e.g. a bound
+      // StateMachine input) observe it directly via PAGViewModelValueTrigger::addObserver.
+      return KeyValue{0.0f};
     default:
       return KeyValue{0.0f};
   }
@@ -268,7 +322,6 @@ void DataBindRuntime::WriteVmValue(PAGViewModelValue* value, const KeyValue& kv)
       static_cast<PAGViewModelValueNumber*>(value)->setValueInternal(KeyValueToFloat(kv), false);
       break;
     case ViewModelPropertyType::Boolean:
-    case ViewModelPropertyType::Trigger:
       static_cast<PAGViewModelValueBoolean*>(value)->setValueInternal(KeyValueToFloat(kv) != 0.0f,
                                                                       false);
       break;

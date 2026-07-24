@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cmath>
+#include <set>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Animation.h"
@@ -55,16 +56,24 @@
 #include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/RoundCorner.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateMachineInput.h"
+#include "pagx/nodes/StateMachineTimeline.h"
+#include "pagx/nodes/StateRegion.h"
+#include "pagx/nodes/StateTransition.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/TransitionCondition.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLBuilder.h"
 
@@ -173,7 +182,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node);
 static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node);
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options);
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options);
-static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations);
+static void WriteAnimation(XMLBuilder& xml, const Animation* animation);
 
 static void WriteCustomData(XMLBuilder& xml, const Node* node) {
   for (const auto& [key, value] : node->customData) {
@@ -248,6 +257,7 @@ template <typename T>
 static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
                               const char* typeName) {
   xml.openElement("Channel");
+  xml.addAttribute("id", channel->id);
   xml.addRequiredAttribute("name", channel->name);
   xml.addAttribute("type", typeName);
   xml.closeElementStart();
@@ -299,27 +309,196 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
   }
 }
 
-static void WriteAnimations(XMLBuilder& xml, const std::vector<Animation*>& animations) {
-  if (animations.empty()) {
+static std::string TransitionConditionOpToString(TransitionConditionOp op) {
+  switch (op) {
+    case TransitionConditionOp::Equal:
+      return "equal";
+    case TransitionConditionOp::NotEqual:
+      return "notEqual";
+    case TransitionConditionOp::LessThan:
+      return "lessThan";
+    case TransitionConditionOp::LessThanOrEqual:
+      return "lessThanOrEqual";
+    case TransitionConditionOp::GreaterThan:
+      return "greaterThan";
+    case TransitionConditionOp::GreaterThanOrEqual:
+      return "greaterThanOrEqual";
+    case TransitionConditionOp::Trigger:
+      return "trigger";
+  }
+  return "equal";
+}
+
+static void WriteCondition(XMLBuilder& xml, const TransitionCondition* condition,
+                           const std::vector<StateMachineInput*>& inputs) {
+  xml.openElement("Condition");
+  xml.addAttribute("id", condition->id);
+  xml.addRequiredAttribute("input", condition->inputName);
+  xml.addRequiredAttribute("op", TransitionConditionOpToString(condition->op));
+  if (condition->op != TransitionConditionOp::Trigger) {
+    if (condition->op == TransitionConditionOp::Equal ||
+        condition->op == TransitionConditionOp::NotEqual) {
+      // Equal/NotEqual apply to both Bool and Number inputs. Look up the referenced input's type
+      // so the matching value field is serialized. Fall back to Bool serialization when the input
+      // is not found in sm->inputs (e.g. broken reference), which loses valueNumber for Number
+      // conditions but keeps the document exportable.
+      auto inputType = StateMachineInputType::Bool;
+      for (const auto* input : inputs) {
+        if (input != nullptr && input->name == condition->inputName) {
+          inputType = input->type;
+          break;
+        }
+      }
+      if (inputType == StateMachineInputType::Number) {
+        xml.addAttribute("value", FloatToString(condition->valueNumber));
+      } else {
+        xml.addAttribute("value", condition->valueBool ? "true" : "false");
+      }
+    } else {
+      xml.addAttribute("value", FloatToString(condition->valueNumber));
+    }
+  }
+  WriteCustomData(xml, condition);
+  xml.closeElementSelfClosing();
+}
+
+static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
+                            const std::vector<StateMachineInput*>& inputs) {
+  xml.openElement("Transition");
+  xml.addAttribute("id", transition->id);
+  xml.addRequiredAttribute("from", transition->from);
+  xml.addRequiredAttribute("to", transition->to);
+  xml.addRequiredAttribute("duration", transition->duration);
+  xml.addAttribute("frameRate", transition->frameRate, 60.0f);
+  if (transition->interpolation != KeyframeInterpolationType::Linear) {
+    xml.addAttribute("interpolation", KeyframeInterpolationToString(transition->interpolation));
+    if (transition->interpolation == KeyframeInterpolationType::Bezier) {
+      if (transition->bezierOut != Point{}) {
+        xml.addAttribute("bezier-out", PointToString(transition->bezierOut));
+      }
+      if (transition->bezierIn != Point{}) {
+        xml.addAttribute("bezier-in", PointToString(transition->bezierIn));
+      }
+    }
+  }
+  if (transition->enableEarlyExit) {
+    xml.addAttribute("earlyExit", "true");
+  }
+  if (transition->pauseOnExit) {
+    xml.addAttribute("pauseOnExit", "true");
+  }
+  WriteCustomData(xml, transition);
+  xml.closeElementStart();
+  for (const auto* condition : transition->conditions) {
+    if (condition != nullptr) {
+      WriteCondition(xml, condition, inputs);
+    }
+  }
+  xml.closeElement();
+}
+
+static void WriteStateRegion(XMLBuilder& xml, const StateRegion* region,
+                             const std::vector<StateMachineInput*>& inputs) {
+  xml.openElement("StateRegion");
+  xml.addAttribute("id", region->id);
+  xml.addRequiredAttribute("name", region->name);
+  xml.addRequiredAttribute("initialState", region->initialState);
+  WriteCustomData(xml, region);
+  xml.closeElementStart();
+
+  xml.openElement("States");
+  xml.closeElementStart();
+  for (const auto* state : region->states) {
+    if (state == nullptr) continue;
+    xml.openElement("State");
+    xml.addAttribute("id", state->id);
+    xml.addRequiredAttribute("name", state->name);
+    if (state->stateType() == StateType::Animation) {
+      auto* animState = static_cast<const AnimationState*>(state);
+      if (!animState->animationId.empty()) {
+        xml.addAttribute("animation", "@" + animState->animationId);
+      }
+    }
+    xml.closeElementSelfClosing();
+  }
+  xml.closeElement();
+
+  xml.openElement("Transitions");
+  xml.closeElementStart();
+  for (const auto* transition : region->transitions) {
+    if (transition != nullptr) {
+      WriteTransition(xml, transition, inputs);
+    }
+  }
+  xml.closeElement();
+
+  xml.closeElement();
+}
+
+static void WriteStateMachine(XMLBuilder& xml, const StateMachine* sm) {
+  if (sm == nullptr) {
     return;
   }
-  xml.openElement("Animations");
+  xml.openElement("StateMachine");
+  xml.addAttribute("id", sm->id);
+  WriteCustomData(xml, sm);
   xml.closeElementStart();
-  for (const auto* animation : animations) {
-    xml.openElement("Animation");
-    xml.addAttribute("id", animation->id);
-    xml.addRequiredAttribute("duration", animation->duration);
-    xml.addAttribute("frameRate", animation->frameRate, 60.0f);
-    xml.addAttribute("loop", LoopModeToString(animation->loop));
+
+  if (!sm->inputs.empty()) {
+    xml.openElement("Inputs");
     xml.closeElementStart();
-    for (const auto* object : animation->objects) {
-      xml.openElement("Object");
-      xml.addRequiredAttribute("target", object->target);
-      xml.closeElementStart();
-      for (const auto* ch : object->channels) {
-        WriteChannel(xml, ch);
+    for (const auto* input : sm->inputs) {
+      if (input == nullptr) continue;
+      xml.openElement("Input");
+      xml.addAttribute("id", input->id);
+      xml.addRequiredAttribute("name", input->name);
+      std::string typeStr;
+      switch (input->type) {
+        case StateMachineInputType::Bool:
+          typeStr = "bool";
+          if (input->defaultBool) xml.addAttribute("default", "true");
+          break;
+        case StateMachineInputType::Number:
+          typeStr = "number";
+          if (input->defaultNumber != 0.0f)
+            xml.addAttribute("default", FloatToString(input->defaultNumber));
+          break;
+        case StateMachineInputType::Trigger:
+          typeStr = "trigger";
+          break;
       }
-      xml.closeElement();
+      xml.addRequiredAttribute("type", typeStr);
+      xml.closeElementSelfClosing();
+    }
+    xml.closeElement();
+  }
+
+  for (const auto* region : sm->regions) {
+    if (region != nullptr) {
+      WriteStateRegion(xml, region, sm->inputs);
+    }
+  }
+
+  xml.closeElement();
+}
+
+static void WriteAnimation(XMLBuilder& xml, const Animation* animation) {
+  if (animation == nullptr) {
+    return;
+  }
+  xml.openElement("Animation");
+  xml.addAttribute("id", animation->id);
+  xml.addRequiredAttribute("duration", animation->duration);
+  xml.addAttribute("frameRate", animation->frameRate, 60.0f);
+  xml.addAttribute("loop", LoopModeToString(animation->loop));
+  xml.closeElementStart();
+  for (const auto* object : animation->objects) {
+    xml.openElement("Object");
+    xml.addAttribute("id", object->id);
+    xml.addRequiredAttribute("target", object->target);
+    xml.closeElementStart();
+    for (const auto* ch : object->channels) {
+      WriteChannel(xml, ch);
     }
     xml.closeElement();
   }
@@ -349,6 +528,7 @@ static bool WriteColorAttribute(XMLBuilder& xml, const ColorSource* color) {
 static void WriteColorStops(XMLBuilder& xml, const std::vector<ColorStop*>& stops) {
   for (const auto* stop : stops) {
     xml.openElement("ColorStop");
+    xml.addAttribute("id", stop->id);
     xml.addRequiredAttribute("offset", stop->offset);
     xml.addRequiredAttribute("color", ColorToHexString(stop->color, stop->color.alpha < 1.0f));
     WriteCustomData(xml, stop);
@@ -440,12 +620,15 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
       if (pattern->image != nullptr) {
         if (!pattern->image->id.empty()) {
           xml.addAttribute("image", "@" + pattern->image->id);
-        } else if (pattern->image->data) {
-          xml.addAttribute("image",
-                           "data:image/png;base64," + Base64Encode(pattern->image->data->bytes(),
-                                                                   pattern->image->data->size()));
         } else if (!pattern->image->filePath.empty()) {
           xml.addAttribute("image", pattern->image->filePath);
+        } else if (!pattern->image->filePath.empty()) {
+          xml.addAttribute("image", pattern->image->filePath);
+        } else if (pattern->image->data) {
+          const auto* bytes = pattern->image->data->bytes();
+          auto size = pattern->image->data->size();
+          xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                        ";base64," + Base64Encode(bytes, size));
         }
       }
       if (pattern->tileModeX != Default<ImagePattern>().tileModeX) {
@@ -484,6 +667,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Rectangle: {
       auto rect = static_cast<const Rectangle*>(node);
       xml.openElement("Rectangle");
+      xml.addAttribute("id", rect->id);
       if (!ShouldSkipPosition(rect->position, Default<Rectangle>().position, rect->left, rect->top,
                               rect->right, rect->bottom, rect->centerX, rect->centerY)) {
         xml.addAttribute("position", PointToString(rect->position));
@@ -508,6 +692,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Ellipse: {
       auto ellipse = static_cast<const Ellipse*>(node);
       xml.openElement("Ellipse");
+      xml.addAttribute("id", ellipse->id);
       if (!ShouldSkipPosition(ellipse->position, Default<Ellipse>().position, ellipse->left,
                               ellipse->top, ellipse->right, ellipse->bottom, ellipse->centerX,
                               ellipse->centerY)) {
@@ -532,6 +717,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Polystar: {
       auto polystar = static_cast<const Polystar*>(node);
       xml.openElement("Polystar");
+      xml.addAttribute("id", polystar->id);
       if (!ShouldSkipPosition(polystar->position, Default<Polystar>().position, polystar->left,
                               polystar->top, polystar->right, polystar->bottom, polystar->centerX,
                               polystar->centerY)) {
@@ -562,6 +748,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Path: {
       auto path = static_cast<const Path*>(node);
       xml.openElement("Path");
+      xml.addAttribute("id", path->id);
       if (path->data != nullptr && !path->data->id.empty()) {
         // Use the reference to PathData resource.
         xml.addAttribute("data", "@" + path->data->id);
@@ -589,6 +776,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Text: {
       auto text = static_cast<const Text*>(node);
       xml.openElement("Text");
+      xml.addAttribute("id", text->id);
       if (!text->text.empty()) {
         xml.addAttribute("text", text->text);
       }
@@ -625,6 +813,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
         xml.closeElementStart();
         for (const auto& run : text->glyphRuns) {
           xml.openElement("GlyphRun");
+          xml.addAttribute("id", run->id);
           if (run->font != nullptr && !run->font->id.empty()) {
             xml.addAttribute("font", "@" + run->font->id);
           }
@@ -694,6 +883,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Fill: {
       auto fill = static_cast<const Fill*>(node);
       xml.openElement("Fill");
+      xml.addAttribute("id", fill->id);
       bool needsInlineColorSource = WriteColorAttribute(xml, fill->color);
       xml.addAttribute("alpha", fill->alpha, Default<Fill>().alpha);
       if (fill->blendMode != Default<Fill>().blendMode) {
@@ -718,6 +908,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Stroke: {
       auto stroke = static_cast<const Stroke*>(node);
       xml.openElement("Stroke");
+      xml.addAttribute("id", stroke->id);
       bool needsInlineColorSource = WriteColorAttribute(xml, stroke->color);
       xml.addAttribute("width", stroke->width, Default<Stroke>().width);
       xml.addAttribute("alpha", stroke->alpha, Default<Stroke>().alpha);
@@ -755,6 +946,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TrimPath: {
       auto trim = static_cast<const TrimPath*>(node);
       xml.openElement("TrimPath");
+      xml.addAttribute("id", trim->id);
       xml.addAttribute("start", trim->start, Default<TrimPath>().start);
       xml.addAttribute("end", trim->end, Default<TrimPath>().end);
       xml.addAttribute("offset", trim->offset, Default<TrimPath>().offset);
@@ -768,6 +960,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::RoundCorner: {
       auto round = static_cast<const RoundCorner*>(node);
       xml.openElement("RoundCorner");
+      xml.addAttribute("id", round->id);
       xml.addAttribute("radius", round->radius, Default<RoundCorner>().radius);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -776,6 +969,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::MergePath: {
       auto merge = static_cast<const MergePath*>(node);
       xml.openElement("MergePath");
+      xml.addAttribute("id", merge->id);
       if (merge->mode != Default<MergePath>().mode) {
         xml.addAttribute("mode", MergePathModeToString(merge->mode));
       }
@@ -786,6 +980,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextModifier: {
       auto modifier = static_cast<const TextModifier*>(node);
       xml.openElement("TextModifier");
+      xml.addAttribute("id", modifier->id);
       if (modifier->anchor != Default<TextModifier>().anchor) {
         xml.addAttribute("anchor", PointToString(modifier->anchor));
       }
@@ -819,6 +1014,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
           }
           auto rangeSelector = static_cast<const RangeSelector*>(selector);
           xml.openElement("RangeSelector");
+          xml.addAttribute("id", rangeSelector->id);
           xml.addAttribute("start", rangeSelector->start, Default<RangeSelector>().start);
           xml.addAttribute("end", rangeSelector->end, Default<RangeSelector>().end);
           xml.addAttribute("offset", rangeSelector->offset, Default<RangeSelector>().offset);
@@ -848,6 +1044,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextPath: {
       auto textPath = static_cast<const TextPath*>(node);
       xml.openElement("TextPath");
+      xml.addAttribute("id", textPath->id);
       if (textPath->path != nullptr && !textPath->path->id.empty()) {
         // Use the reference to PathData resource.
         xml.addAttribute("path", "@" + textPath->path->id);
@@ -880,6 +1077,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::TextBox: {
       auto textBox = static_cast<const TextBox*>(node);
       xml.openElement("TextBox");
+      xml.addAttribute("id", textBox->id);
       // Group properties
       if (textBox->anchor != Default<TextBox>().anchor) {
         xml.addAttribute("anchor", PointToString(textBox->anchor));
@@ -940,6 +1138,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Repeater: {
       auto repeater = static_cast<const Repeater*>(node);
       xml.openElement("Repeater");
+      xml.addAttribute("id", repeater->id);
       xml.addAttribute("copies", repeater->copies, Default<Repeater>().copies);
       xml.addAttribute("offset", repeater->offset, Default<Repeater>().offset);
       if (repeater->order != Default<Repeater>().order) {
@@ -964,6 +1163,7 @@ static void WriteVectorElement(XMLBuilder& xml, const Element* node, const Optio
     case NodeType::Group: {
       auto group = static_cast<const Group*>(node);
       xml.openElement("Group");
+      xml.addAttribute("id", group->id);
       if (group->anchor != Default<Group>().anchor) {
         xml.addAttribute("anchor", PointToString(group->anchor));
       }
@@ -1024,6 +1224,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
     case NodeType::DropShadowStyle: {
       auto style = static_cast<const DropShadowStyle*>(node);
       xml.openElement("DropShadowStyle");
+      xml.addAttribute("id", style->id);
       if (style->blendMode != Default<DropShadowStyle>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
@@ -1040,6 +1241,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
     case NodeType::InnerShadowStyle: {
       auto style = static_cast<const InnerShadowStyle*>(node);
       xml.openElement("InnerShadowStyle");
+      xml.addAttribute("id", style->id);
       if (style->blendMode != Default<InnerShadowStyle>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
@@ -1054,6 +1256,7 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
     case NodeType::BackgroundBlurStyle: {
       auto style = static_cast<const BackgroundBlurStyle*>(node);
       xml.openElement("BackgroundBlurStyle");
+      xml.addAttribute("id", style->id);
       if (style->blendMode != Default<BackgroundBlurStyle>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
       }
@@ -1082,6 +1285,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::BlurFilter: {
       auto filter = static_cast<const BlurFilter*>(node);
       xml.openElement("BlurFilter");
+      xml.addAttribute("id", filter->id);
       xml.addRequiredAttribute("blurX", filter->blurX);
       xml.addRequiredAttribute("blurY", filter->blurY);
       if (filter->tileMode != Default<BlurFilter>().tileMode) {
@@ -1094,6 +1298,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::DropShadowFilter: {
       auto filter = static_cast<const DropShadowFilter*>(node);
       xml.openElement("DropShadowFilter");
+      xml.addAttribute("id", filter->id);
       WriteShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                             filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly, Default<DropShadowFilter>().shadowOnly);
@@ -1104,6 +1309,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::InnerShadowFilter: {
       auto filter = static_cast<const InnerShadowFilter*>(node);
       xml.openElement("InnerShadowFilter");
+      xml.addAttribute("id", filter->id);
       WriteShadowAttributes(xml, filter->offsetX, filter->offsetY, filter->blurX, filter->blurY,
                             filter->color);
       xml.addAttribute("shadowOnly", filter->shadowOnly, Default<InnerShadowFilter>().shadowOnly);
@@ -1114,6 +1320,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::BlendFilter: {
       auto filter = static_cast<const BlendFilter*>(node);
       xml.openElement("BlendFilter");
+      xml.addAttribute("id", filter->id);
       xml.addAttribute("color", ColorToHexString(filter->color, filter->color.alpha < 1.0f));
       if (filter->blendMode != Default<BlendFilter>().blendMode) {
         xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
@@ -1125,6 +1332,7 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
     case NodeType::ColorMatrixFilter: {
       auto filter = static_cast<const ColorMatrixFilter*>(node);
       xml.openElement("ColorMatrixFilter");
+      xml.addAttribute("id", filter->id);
       xml.addAttribute("matrix", FloatListToString(filter->matrix.data(), filter->matrix.size()));
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -1181,11 +1389,20 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       auto image = static_cast<const Image*>(node);
       xml.openElement("Image");
       xml.addAttribute("id", image->id);
-      if (image->data) {
-        xml.addAttribute("source", "data:image/png;base64," +
-                                       Base64Encode(image->data->bytes(), image->data->size()));
-      } else {
+      if (!image->filePath.empty()) {
         xml.addAttribute("source", image->filePath);
+      } else if (image->data) {
+        const auto* bytes = image->data->bytes();
+        auto size = image->data->size();
+        xml.addAttribute("source", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                       ";base64," + Base64Encode(bytes, size));
+      } else {
+        // `source` is a required attribute (see pagx.xsd). An unresolved image — e.g. an `<img>`
+        // whose `src` was missing/invalid at HTML import time, preserved so the element is not
+        // dropped — carries neither a file path nor inline data. `addAttribute` skips empty
+        // values, so emit the empty source explicitly to keep the document schema-valid (and to
+        // round-trip back to the same unresolved Image).
+        xml.addRequiredAttribute("source", "");
       }
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
@@ -1215,7 +1432,21 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
         for (const auto& layer : comp->layers) {
           WriteLayer(xml, layer, options);
         }
-        WriteAnimations(xml, comp->animations);
+        if (!comp->animations.empty()) {
+          xml.openElement("Animations");
+          xml.closeElementStart();
+          for (const auto* animChild : comp->animations) {
+            if (animChild == nullptr) {
+              continue;
+            }
+            if (animChild->nodeType() == NodeType::Animation) {
+              WriteAnimation(xml, static_cast<const Animation*>(animChild));
+            } else if (animChild->nodeType() == NodeType::StateMachine) {
+              WriteStateMachine(xml, static_cast<const StateMachine*>(animChild));
+            }
+          }
+          xml.closeElement();
+        }
         for (const auto& bind : comp->dataBinds) {
           WriteResource(xml, bind, options);
         }
@@ -1232,6 +1463,10 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.openElement("Font");
       xml.addAttribute("id", font->id);
       xml.addAttribute("unitsPerEm", font->unitsPerEm, Default<Font>().unitsPerEm);
+      if (!font->file.empty()) {
+        const std::string& fileAttr = !font->fileOriginal.empty() ? font->fileOriginal : font->file;
+        xml.addAttribute("file", fileAttr);
+      }
       WriteCustomData(xml, node);
       if (font->glyphs.empty()) {
         xml.closeElementSelfClosing();
@@ -1248,12 +1483,13 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
           if (glyph->image != nullptr) {
             if (!glyph->image->id.empty()) {
               xml.addAttribute("image", "@" + glyph->image->id);
-            } else if (glyph->image->data) {
-              xml.addAttribute("image",
-                               "data:image/png;base64," + Base64Encode(glyph->image->data->bytes(),
-                                                                       glyph->image->data->size()));
             } else if (!glyph->image->filePath.empty()) {
               xml.addAttribute("image", glyph->image->filePath);
+            } else if (glyph->image->data) {
+              const auto* bytes = glyph->image->data->bytes();
+              auto size = glyph->image->data->size();
+              xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+                                            ";base64," + Base64Encode(bytes, size));
             }
           }
           if (glyph->offset != Default<Glyph>().offset) {
@@ -1342,6 +1578,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
     case NodeType::DataBind: {
       auto bind = static_cast<const DataBind*>(node);
       xml.openElement("DataBind");
+      xml.addAttribute("id", bind->id);
       xml.addAttribute("source", bind->source);
       xml.addAttribute("target", bind->target);
       xml.addAttribute("channel", bind->channel);
@@ -1383,9 +1620,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
 
 static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& options) {
   xml.openElement("Layer");
-  if (!node->id.empty()) {
-    xml.addAttribute("id", node->id);
-  }
+  xml.addAttribute("id", node->id);
   xml.addAttribute("name", node->name);
   xml.addAttribute("visible", node->visible, Default<Layer>().visible);
   xml.addAttribute("alpha", node->alpha, Default<Layer>().alpha);
@@ -1501,6 +1736,14 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
           xml.openElement("Animation");
           xml.addRequiredAttribute("ref", "@" + anim->animationId);
           xml.addAttribute("playing", anim->playing, true);
+          xml.addAttribute("evaluationOffset", anim->evaluationOffset, static_cast<int64_t>(0));
+          xml.closeElementSelfClosing();
+          break;
+        }
+        case TimelineType::StateMachine: {
+          auto* sm = static_cast<const StateMachineTimeline*>(timeline.get());
+          xml.openElement("StateMachine");
+          xml.addRequiredAttribute("ref", "@" + sm->stateMachineId);
           xml.closeElementSelfClosing();
           break;
         }
@@ -1536,7 +1779,65 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   for (const auto& layer : doc.layers) {
     WriteLayer(xml, layer, options);
   }
-  WriteAnimations(xml, doc.animations);
+  // Write the document-level <Animations> block. doc.animations holds Animation and StateMachine
+  // definitions parsed from the document's <Animations> block (in declaration order). Animation and
+  // StateMachine nodes created programmatically only live in doc.nodes, so also scan doc.nodes for
+  // any of them not already written (either in doc.animations or nested inside a Composition).
+  std::set<const Node*> written;
+  for (const auto* node : doc.animations) {
+    written.insert(node);
+  }
+  // Composition-owned Animation and StateMachine nodes live in doc.nodes but are written nested
+  // inside their Composition (see WriteResource). Record them here so the orphan scan below does
+  // not emit them a second time at document root.
+  for (const auto& node : doc.nodes) {
+    if (node == nullptr || node->nodeType() != NodeType::Composition) {
+      continue;
+    }
+    for (const auto* animChild : static_cast<const Composition*>(node.get())->animations) {
+      if (animChild != nullptr) {
+        written.insert(animChild);
+      }
+    }
+  }
+  bool hasAnimOrSM = !doc.animations.empty();
+  if (!hasAnimOrSM) {
+    for (const auto& node : doc.nodes) {
+      if (node != nullptr &&
+          (node->nodeType() == NodeType::Animation || node->nodeType() == NodeType::StateMachine) &&
+          written.find(node.get()) == written.end()) {
+        hasAnimOrSM = true;
+        break;
+      }
+    }
+  }
+  if (hasAnimOrSM) {
+    xml.openElement("Animations");
+    xml.closeElementStart();
+    for (const auto* node : doc.animations) {
+      if (node == nullptr) {
+        continue;
+      }
+      if (node->nodeType() == NodeType::Animation) {
+        WriteAnimation(xml, static_cast<const Animation*>(node));
+      } else if (node->nodeType() == NodeType::StateMachine) {
+        WriteStateMachine(xml, static_cast<const StateMachine*>(node));
+      }
+    }
+    for (const auto& node : doc.nodes) {
+      if (node == nullptr ||
+          (node->nodeType() != NodeType::Animation && node->nodeType() != NodeType::StateMachine) ||
+          written.find(node.get()) != written.end()) {
+        continue;
+      }
+      if (node->nodeType() == NodeType::Animation) {
+        WriteAnimation(xml, static_cast<const Animation*>(node.get()));
+      } else {
+        WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
+      }
+    }
+    xml.closeElement();
+  }
   for (const auto& bind : doc.dataBinds) {
     WriteResource(xml, bind, options);
   }

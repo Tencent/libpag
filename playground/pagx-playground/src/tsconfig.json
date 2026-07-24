@@ -12,7 +12,8 @@
     "outDir": "../dist",
     "baseUrl": ".",
     "paths": {
-      "@tgfx/*": ["../../../third_party/tgfx/web/src/*"]
+      "@tgfx/*": ["../../../third_party/tgfx/web/src/*"],
+      "pagx-player": ["../../pagx-player/lib/pagx-player.d.ts"]
     },
     "resolveJsonModule": true
   },

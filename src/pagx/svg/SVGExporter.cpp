@@ -2811,7 +2811,8 @@ void SVGWriter::writeTextBoxGroup(SVGBuilder& out, const TextBox* textBox,
   }
 
   auto params = MakeTextBoxParams(textBox);
-  auto layoutResult = TextLayout::Layout(mutableTexts, params, _layoutContext);
+  auto layoutResult =
+      TextLayout::Layout(TextLayout::MakeElements(mutableTexts), params, _layoutContext);
 
   // Collect per-run line metadata from the layout result. Each run may span
   // multiple visual lines (if it contains wrapping or newlines), and multiple
@@ -2955,7 +2956,8 @@ void SVGWriter::writeText(SVGBuilder& out, const Text* text, const FillStrokeInf
 
   TextLayoutParams params = fs.textBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
   auto mutableText = const_cast<Text*>(text);
-  auto layoutResult = TextLayout::Layout({mutableText}, params, _layoutContext);
+  auto layoutResult =
+      TextLayout::Layout({{mutableText, MakeGlyphParams(mutableText)}}, params, _layoutContext);
   auto* textLines = layoutResult.getTextLines(mutableText);
   if (textLines && !textLines->empty()) {
     writeTextWithLayout(out, text, fs, layoutResult, m, alpha);

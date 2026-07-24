@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <string>
 #include "pagx/types/Overflow.h"
 #include "pagx/types/ParagraphAlign.h"
 #include "pagx/types/TextAlign.h"
@@ -26,6 +27,21 @@
 #include "pagx/types/WritingMode.h"
 
 namespace pagx {
+
+// Per-Text shaping attributes consumed by the shaper. Produced from a Text node's document fields,
+// or supplied by a runtime holder with ViewModel-driven overrides applied. The shaper reads only
+// this struct, never the Text node, so text content can be reshaped without mutating the document.
+// Container-level layout parameters (box size, alignment, writing mode, baseline, textScale) stay
+// in TextLayoutParams; this struct holds only the fields that vary per Text element.
+struct TextGlyphParams {
+  std::string text;
+  std::string fontFamily;
+  std::string fontStyle;
+  float fontSize = 12.0f;
+  float letterSpacing = 0.0f;
+  bool fauxBold = false;
+  bool fauxItalic = false;
+};
 
 /**
  * Parameters controlling text measurement and layout. Extracted from TextBox attributes so that

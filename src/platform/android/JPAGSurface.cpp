@@ -22,6 +22,7 @@
 #include <GLES3/gl3.h>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
+#include <mutex>
 #include "GPUDrawable.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"
@@ -66,13 +67,7 @@ PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz)
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeFinalize(JNIEnv* env, jobject thiz) {
-  JPAGSurface* old = nullptr;
-  {
-    std::lock_guard<std::mutex> autoLock(PAGSurface_contextLocker);
-    old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
-    env->SetLongField(thiz, PAGSurface_nativeSurface, 0);
-  }
-  delete old;
+  clearPAGSurface(env, thiz);
 }
 
 PAG_API jint Java_org_libpag_PAGSurface_width(JNIEnv* env, jobject thiz) {

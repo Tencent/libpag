@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "base/utils/Log.h"
 #include "pagx/PAGImage.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Channel.h"
@@ -37,6 +38,7 @@ namespace pagx {
 
 class ColorSource;
 class ImagePattern;
+class TextHolder;
 
 /**
  * Runtime color stop binding keeps the parent gradient and stop index for a ColorStop node.
@@ -155,10 +157,10 @@ struct RuntimeBinding {
   }
 
   // Drops the mapping for the given node, including its tgfx object and channel writers. Used when
-  // a node is removed from the document so the binding does not keep a stale entry alive.
-  void remove(const Node* node) {
-    targets.erase(node);
-  }
+  // a node is removed from the document so the binding does not keep a stale entry alive. Also
+  // cleans up TextHolder entries for the node to prevent use-after-free when targets are
+  // deleted before a subsequent flush.
+  void remove(const Node* node);
 
   // Returns the node whose bound tgfx object is the given pointer, or nullptr if none. Linear scan;
   // used by in-place refresh to map a tgfx child layer back to its source node when reconciling
@@ -260,6 +262,9 @@ struct RuntimeBinding {
   bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {
     auto it = targets.find(node);
     if (it == targets.end()) {
+      // A miss is legitimate when a cached target was removed from the binding after cache
+      // population (e.g. a Layer targeted by a top-level timeline is deleted without resetting the
+      // timeline's resolved cache). Fail gracefully.
       return false;
     }
     return it->second->apply(channel, value, mix);
@@ -303,6 +308,26 @@ struct RuntimeBinding {
     return it != targets.end() ? it->second.get() : nullptr;
   }
 
+  // Registers a TextHolder that owns the runtime text objects for a text layout source. Holders
+  // are flushed once per draw so ViewModel/Animation-driven text-shaping changes reshape at most
+  // once per frame instead of on every channel write.
+  void registerTextHolder(std::shared_ptr<TextHolder> holder) {
+    if (holder != nullptr) {
+      textHolders.push_back(std::move(holder));
+    }
+  }
+
+  // Appends every TextHolder registered on this binding to `out`. Used by PAGScene to collect a
+  // flat list of all holders across the composition tree so per-frame flush / dirty checks can
+  // skip the tree walk entirely.
+  void collectTextHolders(std::vector<std::shared_ptr<TextHolder>>& out) const {
+    for (const auto& holder : textHolders) {
+      if (holder != nullptr) {
+        out.push_back(holder);
+      }
+    }
+  }
+
  private:
   // Returns the existing target for the node, creating a plain RuntimeTarget if none exists yet.
   RuntimeTarget* ensureTarget(const Node* node) {
@@ -328,6 +353,12 @@ struct RuntimeBinding {
   // reference it. Maintained incrementally so unbindImageIfUnreferenced can check for surviving
   // references in O(1).
   std::unordered_map<const Node*, std::vector<const Node*>> imageUsers = {};
+
+  // TextHolders owning runtime text objects for this layer tree. shared_ptr so the
+  // TextRuntimeTarget can co-own its holder via its holder member. TextHolder entries are cleaned
+  // up when their RuntimeTargets are removed via remove(node) to prevent use-after-free on
+  // subsequent flush.
+  std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 };
 
 /**
@@ -361,19 +392,8 @@ struct LayerBuildResult {
  */
 class LayerBuilder {
  public:
-  /**
-   * Returns the tgfx::Image wrapped by a PAGImage. For internal use by channel writers that need
-   * to apply the image to a runtime object.
-   */
+  static std::shared_ptr<PAGImage> GetNodeRuntimeImage(const Image* node);
   static std::shared_ptr<tgfx::Image> GetTGFXImage(const std::shared_ptr<PAGImage>& image);
-
-  /**
-   * Wraps a tgfx::Image into a new PAGImage with an empty source string. Used by DataBind syncBack
-   * to read an image-valued channel back into the ViewModel. The returned PAGImage carries only the
-   * decoded bitmap (no originating path or data URI); syncBack compares the underlying tgfx::Image
-   * for change detection, so the empty source does not cause spurious writebacks.
-   */
-  static std::shared_ptr<PAGImage> WrapTGFXImage(const std::shared_ptr<tgfx::Image>& image);
 
   /**
    * Builds a layer tree from a PAGXDocument.
@@ -420,7 +440,7 @@ class LayerBuilder {
    * edits without rebuilding the layer tree.
    * @param node The Layer node to refresh.
    * @param binding The runtime binding that maps the node to its tgfx::Layer.
-   * @param document The owning document, used to resolve image resources via the provider.
+   * @param document The owning document, used to decode image resources.
    * @return true if the node had a tgfx::Layer in the binding and was refreshed, false otherwise.
    */
   static bool RefreshLayerInPlace(const Layer* node, RuntimeBinding* binding,
@@ -434,7 +454,7 @@ class LayerBuilder {
    * the whole tree.
    * @param node The Layer node to build.
    * @param binding The runtime binding to populate with the node's mapping.
-   * @param document The owning document, used to resolve image resources via the provider.
+   * @param document The owning document, used to decode image resources.
    * @return The new tgfx::Layer for the node, or nullptr if node or binding is null.
    */
   static std::shared_ptr<tgfx::Layer> BuildLayerInto(const Layer* node, RuntimeBinding* binding,
@@ -449,8 +469,8 @@ class LayerBuilder {
  * platforms should keep using the static LayerBuilder::Build / BuildWithMap entry points.
  *
  * Lifecycle: create a session, call build() once per document (matching parsePAGX+buildLayers
- * cycle), and then call rebuildForFilePath() whenever the ImageResourceProvider's state changes
- * for a given filePath (new image attached or evicted). Destroying the session releases all
+ * cycle), and then call rebuildForFilePath() whenever the decoded image for a given filePath
+ * changes (new image attached or evicted). Destroying the session releases all
  * cached layer/image state.
  *
  * IMPORTANT: The caller must guarantee that the PAGXDocument passed to build() remains valid
@@ -479,8 +499,8 @@ class LayerBuilderSession {
   /**
    * Rebuilds the tgfx vector contents of every layer whose fill/stroke references an
    * ImagePattern backed by an Image node whose filePath matches the given value. Call this
-   * after the ImageResourceProvider's state changes for the path so the renderer re-queries
-   * the provider and picks up the new tgfx::Image. A single filePath may match multiple Image
+   * after the decoded image for the path changes so the renderer re-resolves it and picks up
+   * the new tgfx::Image. A single filePath may match multiple Image
    * nodes and each Image node may be referenced by multiple Layers, which in turn may have
    * been duplicated by Composition instancing; all such copies are refreshed in one call.
    * @return The number of tgfx layers whose contents were regenerated. Zero means no layer

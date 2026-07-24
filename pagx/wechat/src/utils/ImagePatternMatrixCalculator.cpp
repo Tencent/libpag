@@ -21,9 +21,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-
-#include "pagx/ImageResourceProvider.h"
 #include "pagx/nodes/Image.h"
+#include "renderer/LayerBuilder.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
@@ -34,8 +33,8 @@ namespace pagx {
 // ResolveImagePatternMatrix() overwrites pattern->matrix with the baked result, so we stash the
 // original 6-float affine here on first call to make the whole routine idempotent: later calls
 // (for example after progressive image upgrades replace the thumbnail with a higher-resolution
-// full image in the provider) can re-bake against the correct source matrix instead of
-// re-baking the already baked matrix.
+// full image in the node's runtimeImage) can re-bake against the correct source matrix instead
+// of re-baking the already baked matrix.
 static constexpr const char* kPaintTransformKey = "paint-transform";
 
 // Same idempotency stash but for the "new PAGX standard format" path: the exporter already
@@ -90,9 +89,10 @@ static void ApplyStretchToNode(pagx::Matrix* matrix, float imageWidth, float ima
   matrix->d = nodeHeight / imageHeight;
 }
 
-pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth, float imageHeight,
-                                         float nodeWidth, float nodeHeight, const pagx::Matrix& paintTransform,
-                                         float scaleFactor, float origImageWidth, float origImageHeight) {
+pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWidth,
+                                         float imageHeight, float nodeWidth, float nodeHeight,
+                                         const pagx::Matrix& paintTransform, float scaleFactor,
+                                         float origImageWidth, float origImageHeight) {
   pagx::Matrix matrix = {};
   matrix.a = 1.0f;
   matrix.d = 1.0f;
@@ -109,7 +109,8 @@ pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
 
   switch (scaleMode) {
     case ImageScaleMode::FILL: {
-      float ratio = (imageRatio > nodeRatio) ? (nodeHeight / imageHeight) : (nodeWidth / imageWidth);
+      float ratio =
+          (imageRatio > nodeRatio) ? (nodeHeight / imageHeight) : (nodeWidth / imageWidth);
       float marginX = (nodeWidth - imageWidth * ratio) * 0.5f;
       float marginY = (nodeHeight - imageHeight * ratio) * 0.5f;
       matrix.a = ratio;
@@ -119,7 +120,8 @@ pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
       break;
     }
     case ImageScaleMode::FIT: {
-      float ratio = (nodeRatio > imageRatio) ? (nodeHeight / imageHeight) : (nodeWidth / imageWidth);
+      float ratio =
+          (nodeRatio > imageRatio) ? (nodeHeight / imageHeight) : (nodeWidth / imageWidth);
       float marginX = (nodeWidth - imageWidth * ratio) * 0.5f;
       float marginY = (nodeHeight - imageHeight * ratio) * 0.5f;
       matrix.a = ratio;
@@ -134,19 +136,25 @@ pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
       if (!paintTransform.isIdentity()) {
         float invNW = 1.0f / nodeWidth;
         float invNH = 1.0f / nodeHeight;
-        float s00 = paintTransform.a * invNW, s01 = paintTransform.c * invNH, s02 = paintTransform.tx;
-        float s10 = paintTransform.b * invNW, s11 = paintTransform.d * invNH, s12 = paintTransform.ty;
+        float s00 = paintTransform.a * invNW, s01 = paintTransform.c * invNH,
+              s02 = paintTransform.tx;
+        float s10 = paintTransform.b * invNW, s11 = paintTransform.d * invNH,
+              s12 = paintTransform.ty;
 
-        s00 *= imageWidth;  s01 *= imageWidth;  s02 *= imageWidth;
-        s10 *= imageHeight; s11 *= imageHeight; s12 *= imageHeight;
+        s00 *= imageWidth;
+        s01 *= imageWidth;
+        s02 *= imageWidth;
+        s10 *= imageHeight;
+        s11 *= imageHeight;
+        s12 *= imageHeight;
 
         float det = s00 * s11 - s01 * s10;
         if (std::abs(det) > SINGULAR_DETERMINANT_EPSILON) {
           float invDet = 1.0f / det;
-          matrix.a  =  s11 * invDet;
-          matrix.c  = -s01 * invDet;
-          matrix.b  = -s10 * invDet;
-          matrix.d  =  s00 * invDet;
+          matrix.a = s11 * invDet;
+          matrix.c = -s01 * invDet;
+          matrix.b = -s10 * invDet;
+          matrix.d = s00 * invDet;
           matrix.tx = (s01 * s12 - s11 * s02) * invDet;
           matrix.ty = (s10 * s02 - s00 * s12) * invDet;
         } else {
@@ -183,27 +191,33 @@ pagx::Matrix CalculateImagePatternMatrix(ImageScaleMode scaleMode, float imageWi
 // Returns the actual pixel dimensions of the image currently bound to the pattern, falling
 // back through the same source priority used by LayerBuilder::getOrCreateImage() so the matrix
 // stays consistent with the asset that will actually sample at draw time:
-//   1. Provider-resolved image (full or thumbnail from ImageResourceProvider).
-//   2. data - encoded bytes; peeked via ImageCodec::MakeFrom without a full decode.
+//   1. overrideWidth/overrideHeight, when positive — supplied by the caller that just uploaded
+//      a fresh texture and wants the matrix refreshed before the new image is installed on the
+//      node via loadFileData.
+//   2. runtimeImage on the Image node (set by PAGXDocument::loadFileData(path, PAGImage)).
+//   3. data - encoded bytes; peeked via ImageCodec::MakeFrom without a full decode.
 // fallbackWidth/fallbackHeight are returned untouched when none of the sources resolves
 // to a positive dimension; callers pass either origImageWidth (legacy path) or 0 (new-format
 // path) depending on what they want to fall back to.
-static void ReadActualImageDimensions(const pagx::Image* imageNode,
-                                      pagx::ImageResourceProvider* provider,
-                                      float fallbackWidth, float fallbackHeight,
-                                      float* outWidth, float* outHeight) {
+static void ReadActualImageDimensions(const pagx::Image* imageNode, float overrideWidth,
+                                      float overrideHeight, float fallbackWidth,
+                                      float fallbackHeight, float* outWidth, float* outHeight) {
   *outWidth = fallbackWidth;
   *outHeight = fallbackHeight;
+  if (overrideWidth > 0.0f && overrideHeight > 0.0f) {
+    *outWidth = overrideWidth;
+    *outHeight = overrideHeight;
+    return;
+  }
   if (!imageNode) {
     return;
   }
-  if (provider && !imageNode->filePath.empty()) {
-    auto resolved = provider->resolveImage(imageNode->filePath);
-    if (resolved && resolved->width() > 0 && resolved->height() > 0) {
-      *outWidth = static_cast<float>(resolved->width());
-      *outHeight = static_cast<float>(resolved->height());
-      return;
-    }
+  auto runtimeImage = pagx::LayerBuilder::GetNodeRuntimeImage(imageNode);
+  auto tgfxImage = LayerBuilder::GetTGFXImage(runtimeImage);
+  if (tgfxImage && tgfxImage->width() > 0 && tgfxImage->height() > 0) {
+    *outWidth = static_cast<float>(tgfxImage->width());
+    *outHeight = static_cast<float>(tgfxImage->height());
+    return;
   }
   if (imageNode->data && imageNode->data->size() > 0) {
     auto tgfxData = tgfx::Data::MakeWithoutCopy(imageNode->data->data(), imageNode->data->size());
@@ -228,8 +242,8 @@ static void ReadActualImageDimensions(const pagx::Image* imageNode,
 //      fallback for documents exported by older tools that bake the matrix but do not write
 //      the orig-image-* fields into customData.
 static bool ResolveNewFormatPattern(pagx::ImagePattern* pattern,
-                                    const ImageOriginalSizeMap* origSizeMap,
-                                    pagx::ImageResourceProvider* provider) {
+                                    const ImageOriginalSizeMap* origSizeMap, float overrideWidth,
+                                    float overrideHeight) {
   if (!pattern->image) {
     return false;
   }
@@ -269,8 +283,8 @@ static bool ResolveNewFormatPattern(pagx::ImagePattern* pattern,
 
   float actualWidth = 0.0f;
   float actualHeight = 0.0f;
-  ReadActualImageDimensions(pattern->image, provider, origWidth, origHeight, &actualWidth,
-                            &actualHeight);
+  ReadActualImageDimensions(pattern->image, overrideWidth, overrideHeight, origWidth, origHeight,
+                            &actualWidth, &actualHeight);
 
   if (actualWidth <= 0.0f || actualHeight <= 0.0f ||
       (actualWidth == origWidth && actualHeight == origHeight)) {
@@ -295,9 +309,8 @@ static bool ResolveNewFormatPattern(pagx::ImagePattern* pattern,
   return true;
 }
 
-bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
-                               const ImageOriginalSizeMap* origSizeMap,
-                               pagx::ImageResourceProvider* provider) {
+bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern, const ImageOriginalSizeMap* origSizeMap,
+                               float overrideWidth, float overrideHeight) {
   if (!pattern || !pattern->image) {
     return false;
   }
@@ -307,7 +320,7 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
     // No legacy customData: try the new PAGX standard format. When that path is also unable to
     // produce a meaningful result (e.g. origSize hasn't been registered yet), leave the
     // authored matrix unchanged and report unresolved.
-    return ResolveNewFormatPattern(pattern, origSizeMap, provider);
+    return ResolveNewFormatPattern(pattern, origSizeMap, overrideWidth, overrideHeight);
   }
 
   char* end = nullptr;
@@ -347,8 +360,8 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
   // no decoded asset has arrived yet (placeholder layout during progressive loading).
   float actualImageWidth = 0.0f;
   float actualImageHeight = 0.0f;
-  ReadActualImageDimensions(pattern->image, provider, origImageWidth, origImageHeight,
-                            &actualImageWidth, &actualImageHeight);
+  ReadActualImageDimensions(pattern->image, overrideWidth, overrideHeight, origImageWidth,
+                            origImageHeight, &actualImageWidth, &actualImageHeight);
 
   // The matrix stored during export is paint->transform() (normalized transform). After the
   // first successful resolve, pattern->matrix is overwritten with the baked result, so we keep
@@ -356,7 +369,8 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
   // by progressive image upgrades.
   pagx::Matrix paintTransform = {};
   auto ptIt = pattern->customData.find(kPaintTransformKey);
-  if (ptIt != pattern->customData.end() && DeserializePaintTransform(ptIt->second, &paintTransform)) {
+  if (ptIt != pattern->customData.end() &&
+      DeserializePaintTransform(ptIt->second, &paintTransform)) {
     // Already cached; use the original paint transform and ignore pattern->matrix, which holds
     // a previously baked result.
   } else {
@@ -364,17 +378,15 @@ bool ResolveImagePatternMatrix(pagx::ImagePattern* pattern,
     pattern->customData[kPaintTransformKey] = SerializePaintTransform(paintTransform);
   }
 
-  pattern->matrix = CalculateImagePatternMatrix(
-      scaleMode, actualImageWidth, actualImageHeight,
-      nodeWidth, nodeHeight, paintTransform, scaleFactor,
-      origImageWidth, origImageHeight);
+  pattern->matrix = CalculateImagePatternMatrix(scaleMode, actualImageWidth, actualImageHeight,
+                                                nodeWidth, nodeHeight, paintTransform, scaleFactor,
+                                                origImageWidth, origImageHeight);
 
   return true;
 }
 
 void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
-                                    const ImageOriginalSizeMap* origSizeMap,
-                                    pagx::ImageResourceProvider* provider) {
+                                    const ImageOriginalSizeMap* origSizeMap) {
   if (!document) {
     return;
   }
@@ -383,14 +395,14 @@ void ResolveAllImagePatternMatrices(pagx::PAGXDocument* document,
       continue;
     }
     auto* pattern = static_cast<pagx::ImagePattern*>(nodePtr.get());
-    ResolveImagePatternMatrix(pattern, origSizeMap, provider);
+    ResolveImagePatternMatrix(pattern, origSizeMap);
   }
 }
 
 size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
                                              const std::string& filePath,
                                              const ImageOriginalSizeMap* origSizeMap,
-                                             pagx::ImageResourceProvider* provider) {
+                                             float overrideWidth, float overrideHeight) {
   if (!document || filePath.empty()) {
     return 0;
   }
@@ -403,7 +415,7 @@ size_t ResolveImagePatternMatricesByFilePath(pagx::PAGXDocument* document,
     if (!pattern->image || pattern->image->filePath != filePath) {
       continue;
     }
-    if (ResolveImagePatternMatrix(pattern, origSizeMap, provider)) {
+    if (ResolveImagePatternMatrix(pattern, origSizeMap, overrideWidth, overrideHeight)) {
       ++updated;
     }
   }

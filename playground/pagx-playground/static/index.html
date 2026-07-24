@@ -12,7 +12,11 @@
 </head>
 <body>
 <div id="container" class="container">
-    <canvas class="canvas hidden" id="pagx-canvas"></canvas>
+    <!-- The PAGX player mounts its canvas / toolbar / playback bar / editor panel inside this
+         host element. The playground still owns the top-level navigation (Samples / Docs) and
+         the drop zone overlay; they live outside the player host as sibling absolutely-positioned
+         layers so they can appear before / on top of the player without leaking into its DOM. -->
+    <div id="player-host" class="player-host"></div>
     <div id="nav-btns" class="nav-btns">
         <a id="samples-btn" class="nav-btn" href="#samples" title="Samples">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -56,39 +60,9 @@
             </div>
         </div>
     </div>
-    <div id="toolbar" class="toolbar hidden">
-        <a id="toolbar-samples-btn" class="toolbar-btn" href="#samples" title="Samples">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7"/>
-                <rect x="14" y="3" width="7" height="7"/>
-                <rect x="3" y="14" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/>
-            </svg>
-        </a>
-        <span class="toolbar-divider"></span>
-        <button id="open-btn" class="toolbar-btn" title="Open PAGX File">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-        </button>
-        <button id="reset-btn" class="toolbar-btn" title="Reset View">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                <path d="M3 3v5h5"/>
-            </svg>
-        </button>
-        <span class="toolbar-divider"></span>
-        <button id="leave-btn" class="toolbar-btn" title="Leave">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16 17 21 12 16 7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-        </button>
-    </div>
     <div id="drop-zone" class="drop-zone">
         <div class="brand">
-            <img class="logo" src="./logo.png" alt="PAGX Logo"/>
+            <img class="logo" src="./logo.png" alt="PAGX Logo" draggable="false"/>
             <h1 class="title">PAGX Playground</h1>
         </div>
         <div id="drop-zone-content" class="drop-zone-content">

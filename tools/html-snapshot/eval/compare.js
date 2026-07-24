@@ -1,0 +1,240 @@
+#!/usr/bin/env node
+/**
+ * compare.js — given a baseline PNG (Chromium-rendered original HTML) and a
+ * subset PNG (`pagx render` of `pagx import` on the snapshot), produce a
+ * per-case row of metrics:
+ *
+ *   - pixelDiffRatio: fraction of differing pixels via pixelmatch (threshold 0.1)
+ *   - meanRgbDelta:   mean per-channel absolute difference, 0..255
+ *   - ssim:           luma-only SSIM (single-window block average) for a coarse
+ *                     structural signal that survives subpixel offsets
+ *   - flex live/subset counts: number of `display:flex|inline-flex` elements
+ *                     in the rendered live DOM vs. the rendered subset DOM
+ *                     (both measured via getComputedStyle, so the counts are
+ *                     directly comparable)
+ *   - importerWarnings: warning count from `pagx import` stderr (parsed)
+ *
+ * The PNGs may differ in size when the snapshot fails to capture the full
+ * body. We resize-pad the smaller image with white pixels rather than
+ * resampling so the structural signal doesn't get smoothed away.
+ */
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const { PNG } = require('pngjs');
+const { openAndSettlePage } = require('../dist/lib/page-loader');
+// pixelmatch v7+ is ESM-only (`export default`). Under Node's ESM-from-CJS
+// `require()` interop the module resolves to a namespace object whose default
+// export is the function, so `require('pixelmatch')` itself is not callable.
+// Unwrap defensively so both shapes (legacy CJS and the v7+ namespace) work.
+const pixelmatchMod = require('pixelmatch');
+const pixelmatch = typeof pixelmatchMod === 'function' ? pixelmatchMod : pixelmatchMod.default;
+
+// Composite the image over an opaque white background, in place. The baseline
+// PNG (Chromium) is rendered on an opaque white body, while the subset PNG
+// (`pagx render`) keeps a transparent background. Comparing the raw RGBA would
+// flag every transparent background pixel as different from opaque white, so
+// the whole empty canvas turns into a diff. Flattening both onto white (the
+// same fill `padToCommon` uses) removes that false signal and leaves only the
+// real content delta. Already-opaque white pixels are unchanged.
+function flattenToWhite(img) {
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3] / 255;
+    data[i] = Math.round(data[i] * alpha + 255 * (1 - alpha));
+    data[i + 1] = Math.round(data[i + 1] * alpha + 255 * (1 - alpha));
+    data[i + 2] = Math.round(data[i + 2] * alpha + 255 * (1 - alpha));
+    data[i + 3] = 255;
+  }
+  return img;
+}
+
+function loadPng(filePath) {
+  const data = fs.readFileSync(filePath);
+  return flattenToWhite(PNG.sync.read(data));
+}
+
+// Pad to common size with white pixels. We never resample because that would
+// smooth out the structural mismatches we want to measure.
+function padToCommon(a, b) {
+  const w = Math.max(a.width, b.width);
+  const h = Math.max(a.height, b.height);
+  const padOne = (img) => {
+    if (img.width === w && img.height === h) return img;
+    const out = new PNG({ width: w, height: h });
+    out.data.fill(255);
+    for (let y = 0; y < img.height; y++) {
+      const srcStart = y * img.width * 4;
+      const dstStart = y * w * 4;
+      img.data.copy(out.data, dstStart, srcStart, srcStart + img.width * 4);
+    }
+    return out;
+  };
+  return [padOne(a), padOne(b), w, h];
+}
+
+// Single-pass image metrics: walks both buffers exactly once and emits the
+// mean per-channel RGB delta together with luma-only SSIM. Caching luma into
+// Float32Arrays during the first pass lets the variance step skip the second
+// luma recomputation. Luma weights match BT.709 (matching previous behaviour).
+//
+// SSIM is computed over a single global window — the dependency-free,
+// approximate form chosen for this codebase. It tracks structural mismatches
+// well enough to rank cases relative to one another but does not match the
+// canonical 8x8 sliding-window value.
+function imageMetrics(aData, bData, w, h) {
+  const n = w * h;
+  const lumaA = new Float32Array(n);
+  const lumaB = new Float32Array(n);
+  let rgbDeltaTotal = 0;
+  let sumA = 0;
+  let sumB = 0;
+  for (let i = 0; i < n; i++) {
+    const j = i * 4;
+    const ar = aData[j];
+    const ag = aData[j + 1];
+    const ab = aData[j + 2];
+    const br = bData[j];
+    const bg = bData[j + 1];
+    const bb = bData[j + 2];
+    rgbDeltaTotal += (Math.abs(ar - br) + Math.abs(ag - bg) + Math.abs(ab - bb)) / 3;
+    const lA = 0.2126 * ar + 0.7152 * ag + 0.0722 * ab;
+    const lB = 0.2126 * br + 0.7152 * bg + 0.0722 * bb;
+    lumaA[i] = lA;
+    lumaB[i] = lB;
+    sumA += lA;
+    sumB += lB;
+  }
+  const muA = sumA / n;
+  const muB = sumB / n;
+  let varA = 0;
+  let varB = 0;
+  let covAB = 0;
+  for (let i = 0; i < n; i++) {
+    const dA = lumaA[i] - muA;
+    const dB = lumaB[i] - muB;
+    varA += dA * dA;
+    varB += dB * dB;
+    covAB += dA * dB;
+  }
+  varA /= n;
+  varB /= n;
+  covAB /= n;
+  const c1 = (0.01 * 255) * (0.01 * 255);
+  const c2 = (0.03 * 255) * (0.03 * 255);
+  const num = (2 * muA * muB + c1) * (2 * covAB + c2);
+  const den = (muA * muA + muB * muB + c1) * (varA + varB + c2);
+  return {
+    meanRgbDelta: rgbDeltaTotal / n,
+    ssim: den === 0 ? 1 : num / den,
+  };
+}
+
+function pixelMetrics(baselinePath, subsetPath, diffPath) {
+  const a = loadPng(baselinePath);
+  const b = loadPng(subsetPath);
+  const [pa, pb, w, h] = padToCommon(a, b);
+  const diff = new PNG({ width: w, height: h });
+  const diffPixels = pixelmatch(pa.data, pb.data, diff.data, w, h, {
+    threshold: 0.1,
+    includeAA: false,
+  });
+  if (diffPath) {
+    fs.writeFileSync(diffPath, PNG.sync.write(diff));
+  }
+  const m = imageMetrics(pa.data, pb.data, w, h);
+  return {
+    width: w,
+    height: h,
+    pixelDiffRatio: diffPixels / (w * h),
+    meanRgbDelta: m.meanRgbDelta,
+    ssim: m.ssim,
+  };
+}
+
+// Count flex containers in a rendered DOM. Both the live original HTML and the
+// subset HTML emitted by snapshot.js are rendered the same way and walked with
+// `getComputedStyle`, so the two counts are apples-to-apples. Counting the
+// subset via a `display:\s*flex` regex on the source (the previous approach)
+// inflates the count because each <div> wrapper emits its own style attribute,
+// and the live count uses computed style — the two metrics weren't comparable.
+//
+// `browserOrWrapper` accepts either a raw Puppeteer/Playwright browser or the
+// `{ browser, engine }` wrapper returned by `lib/browser-engine`. The wrapper
+// shape is preferred because it threads the engine name through to the
+// per-engine API differences (viewport setter, networkidle token).
+async function countFlexInRenderedHtml(browserOrWrapper, htmlPath, opts = {}) {
+  const {
+    viewportWidth = 1400,
+    viewportHeight = 900,
+    waitMs = 0,
+  } = opts;
+  // Reuse the shared page-loading flow rather than driving page.goto here.
+  // openAndSettlePage registers the Babel classic-runtime shim before
+  // navigation (so @babel/standalone React apps actually mount — otherwise the
+  // live DOM stays empty and flexLive collapses to 0, producing a false
+  // "snapshot invented flex where the live DOM had none" warning) and treats a
+  // flaky `networkidle` timeout as non-fatal. The built-in #root-children wait
+  // is a no-op for the static subset HTML (it has no #root), so the same call
+  // serves both the live and subset counts.
+  const page = await openAndSettlePage(browserOrWrapper, 'file://' + htmlPath, {
+    viewportWidth,
+    viewportHeight,
+    waitMs,
+  });
+  try {
+    // Capture the count before closing the page; otherwise the value would be
+    // returned via a still-open evaluation handle that gets cancelled when the
+    // browser shuts down (TargetCloseError surfaces as an unhandled rejection).
+    const total = await page.evaluate(() => {
+      // Count every body descendant whose computed display is `flex` or
+      // `inline-flex`. Excluding <html>/<body> avoids counting global style
+      // rules the snapshot pipeline injects (e.g. `html { display:flex }`).
+      let n = 0;
+      const all = document.body.querySelectorAll('*');
+      for (const el of all) {
+        const cs = getComputedStyle(el);
+        const d = cs.display || '';
+        if (d === 'flex' || d === 'inline-flex') n++;
+      }
+      return n;
+    });
+    return total;
+  } finally {
+    await page.close();
+  }
+}
+
+function countImporterWarnings(stderrPath) {
+  if (!fs.existsSync(stderrPath)) return { total: 0, flexInferred: 0, flexSkipped: 0 };
+  const text = fs.readFileSync(stderrPath, 'utf8');
+  const lines = text.split(/\r?\n/);
+  let total = 0;
+  let flexInferred = 0;
+  let flexSkipped = 0;
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    if (/warning:/i.test(line) || /\[subset:/i.test(line)) total++;
+    if (/subset:flex-inferred/.test(line)) flexInferred++;
+    if (/subset:flex-inference-skipped/.test(line)) flexSkipped++;
+  }
+  return { total, flexInferred, flexSkipped };
+}
+
+module.exports = {
+  pixelMetrics,
+  countFlexInRenderedHtml,
+  countImporterWarnings,
+};
+
+// CLI mode: ad-hoc per-case comparison.
+if (require.main === module) {
+  const [, , baselinePath, subsetPath, diffPath] = process.argv;
+  if (!baselinePath || !subsetPath) {
+    console.error('Usage: compare.js <baseline.png> <subset.png> [diff.png]');
+    process.exit(2);
+  }
+  const m = pixelMetrics(baselinePath, subsetPath, diffPath);
+  console.log(JSON.stringify(m, null, 2));
+}

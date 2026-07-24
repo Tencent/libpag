@@ -1,7 +1,6 @@
 package org.libpag;
 
 import android.graphics.SurfaceTexture;
-import android.view.Surface;
 
 import org.extra.tools.LibraryLoadUtils;
 
@@ -21,9 +20,6 @@ class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
     public void onFrameAvailable(SurfaceTexture st) {
         notifyFrameAvailable();
     }
-
-    native Surface getInputSurface();
-
 
     void release() {
         nativeRelease();

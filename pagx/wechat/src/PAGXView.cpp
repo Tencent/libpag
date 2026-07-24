@@ -17,30 +17,41 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGXView.h"
-#include <emscripten/html5.h>
 #include <GLES3/gl31.h>
-#include <algorithm>
-#include <cstdlib>
-#include <limits>
-#include <tgfx/gpu/Context.h>
+#include <emscripten/html5.h>
 #include <tgfx/gpu/Backend.h>
+#include <tgfx/gpu/Context.h>
 #include <tgfx/gpu/opengl/GLDevice.h>
 #include <tgfx/gpu/opengl/GLTypes.h>
-#include "GridBackground.h"
-#include "utils/StringParser.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <limits>
+#include "base/utils/Log.h"
+#include "pagx/PAGImage.h"
+#include "pagx/PAGLayer.h"
+#include "pagx/PAGXImporter.h"
+#include "pagx/nodes/ColorSource.h"
+#include "pagx/nodes/Element.h"
+#include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Group.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Layer.h"
+#include "pagx/nodes/Stroke.h"
+#include "pagx/tgfx.h"
+#include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/platform/Print.h"
-#include "pagx/nodes/Image.h"
-#include "pagx/nodes/ImagePattern.h"
-#include "pagx/PAGXImporter.h"
-#include "pagx/types/Data.h"
 #include "utils/ImagePatternMatrixCalculator.h"
-#include "base/utils/Log.h"
+#include "utils/StringParser.h"
 
 using namespace emscripten;
 
@@ -126,8 +137,6 @@ constexpr int SCALE_MODE_TILE = 3;
 // GPU probe log interval in frames.
 constexpr int GPU_PROBE_INTERVAL = 60;
 
-
-
 // Wasm linear memory size in bytes (HEAP8.byteLength equivalent). Each wasm page is 64 KiB.
 // Returns -1 on non-wasm platforms so the same probe can stay in cross-platform code.
 static int64_t SampleWasmHeap() {
@@ -140,8 +149,7 @@ static int64_t SampleWasmHeap() {
 
 // One-shot wasm heap log. Format kept simple so it can be grepped from the miniprogram console.
 static void LogMemProbe(const char* tag) {
-  LOGI("[MemProbe] tag=%s wasmHeap=%lld", tag,
-                 static_cast<long long>(SampleWasmHeap()));
+  LOGI("[MemProbe] tag=%s wasmHeap=%lld", tag, static_cast<long long>(SampleWasmHeap()));
 }
 
 // Bucket index for an image's pixel area. Boundaries align with the [Img] log analysis: tiny
@@ -216,17 +224,10 @@ static std::shared_ptr<Data> GetPagxDataFromEmscripten(const val& emscriptenData
 }
 
 PAGXView::PAGXView(std::shared_ptr<tgfx::Device> device, int width, int height)
-: device(device), canvasWidth(width), canvasHeight(height) {
-  displayList.setRenderMode(tgfx::RenderMode::Tiled);
-  // Keep zoomScalePrecision at tgfx's default (1000, i.e. 0.001 step) so pinch gestures feel
-  // smooth. A previous experiment bucketed zoom to 0.05 steps to improve TileCache reuse, but
-  // that produced visible stair-stepping without fixing the underlying shape-rasterize cost.
-  displayList.setTileUpdateMode(tgfx::TileUpdateMode::Fast);
-  displayList.setMaxTileCount(DEFAULT_MAX_TILE_COUNT);
-  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
-  // Subtree cache: caches static layers as textures to avoid per-layer shape retriangulation,
-  // the dominant hotspot for PAGX content (Shape=200-400ms/frame on singleton shapes).
-  displayList.setSubtreeCacheMaxSize(DEFAULT_SUBTREE_CACHE_SIZE);
+    : device(device), canvasWidth(width), canvasHeight(height) {
+  // Display-list configuration (render mode, tile budgets, subtree cache) now lives on the
+  // scene's PAGDisplayOptions and is applied in buildLayers() once the scene exists. The
+  // constructor only records the device and canvas dimensions.
 }
 
 PAGXView::~PAGXView() {
@@ -249,22 +250,14 @@ PAGXView::~PAGXView() {
 }
 
 void PAGXView::registerFonts(const val& fontVal, const val& emojiFontVal) {
-  std::vector<std::shared_ptr<tgfx::Typeface>> fallbackTypefaces;
   auto fontData = GetDataFromEmscripten(fontVal);
   if (fontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(fontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.registerFont(fontData->bytes(), fontData->size(), 0);
   }
   auto emojiFontData = GetDataFromEmscripten(emojiFontVal);
   if (emojiFontData) {
-    auto typeface = tgfx::Typeface::MakeFromData(emojiFontData, 0);
-    if (typeface) {
-      fallbackTypefaces.push_back(std::move(typeface));
-    }
+    fontConfig.addFallbackFont(emojiFontData->bytes(), emojiFontData->size(), 0);
   }
-  fontConfig.addFallbackTypefaces(std::move(fallbackTypefaces));
 }
 
 void PAGXView::loadPAGX(const val& pagxData) {
@@ -274,13 +267,14 @@ void PAGXView::loadPAGX(const val& pagxData) {
 
 void PAGXView::parsePAGX(const val& pagxData) {
   LogMemProbe("parsePAGX.enter");
-  // Release old resources early to reduce peak memory usage when switching pages.
-  displayList.root()->removeChildren();
-  contentLayer = nullptr;
-  // Drop the per-document layer builder state before releasing the document itself; its
-  // internal maps hold pagx::Layer* pointers that would dangle once `document` resets.
-  builderSession = nullptr;
-  imageProvider = nullptr;
+  // Release old resources early to reduce peak memory usage when switching pages. Dropping the
+  // scene detaches the entire runtime layer tree and ViewModel binding; the timeline goes with it.
+  // document resets last so the scene's teardown still sees it. `surface`/`pagSurface` are left
+  // intact: the on-screen render target is reused across the reload (same canvas size), and the
+  // wrapper must stay coupled to it so the next draw() after buildLayers() can Record() into it.
+  scene = nullptr;
+  defaultTimeline = nullptr;
+  lastAnimationTimeMs = -1.0;
   document = nullptr;
   // Drop snapshots so the new document doesn't blit pixels from the old one.
   fitSnapshot = nullptr;
@@ -288,13 +282,13 @@ void PAGXView::parsePAGX(const val& pagxData) {
   gestureActive = false;
   zoomedOutFrameSettled = false;
   lastGestureEndMs = 0.0;
-  // Reset displayList view state. Without this, a render that happens between parsePAGX
-  // and buildLayers (the loader is async; the render loop keeps running) captures a fresh
-  // snapshot keyed against the *previous* document's zoom/offset. The next gesture
-  // would then composite that stale snapshot using the new layout's view state, giving
-  // the user the look-and-feel of the previous page.
-  displayList.setZoomScale(1.0f);
-  displayList.setContentOffset(0.0f, 0.0f);
+  // Reset the user pan/zoom. Without this, a render that happens between parsePAGX and
+  // buildLayers (the loader is async; the render loop keeps running) would compose the new
+  // layout against the previous document's view state, giving the user the look-and-feel of the
+  // previous page.
+  userZoom = 1.0f;
+  userOffsetX = 0.0f;
+  userOffsetY = 0.0f;
   lastZoom = 1.0f;
   // Reset first-frame flag so JS-side loading flow can wait for the new document's first
   // render via isFirstFrameRendered() instead of seeing a stale true from the previous one.
@@ -339,7 +333,6 @@ void PAGXView::parsePAGX(const val& pagxData) {
   // from the freshly parsed document right after FromXML.
   pagxWidth = 0.0f;
   pagxHeight = 0.0f;
-  backgroundVisible = false;
   backgroundTGFXColor = DefaultBackgroundColor();
 
   auto data = GetPagxDataFromEmscripten(pagxData);
@@ -349,8 +342,6 @@ void PAGXView::parsePAGX(const val& pagxData) {
   size_t xmlSize = data->size();
   document = PAGXImporter::FromXML(data->bytes(), data->size());
   if (document) {
-    imageProvider = std::make_shared<PAGXImageResourceProvider>();
-    document->setImageResourceProvider(imageProvider);
     // Surface document dimensions and document-level custom data (background, bounds origin)
     // immediately after parse so contentWidth()/contentHeight()/getContentTransform() are usable
     // before buildLayers(). The progressive loader reads getContentTransform().fitScale right
@@ -359,9 +350,8 @@ void PAGXView::parsePAGX(const val& pagxData) {
     pagxHeight = document->height;
     applyDocumentCustomData();
     auto paths = document->getExternalFilePaths();
-    LOGI(
-        "[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
-        static_cast<long long>(SampleWasmHeap()), xmlSize, paths.size());
+    LOGI("[MemProbe] tag=parsePAGX.exit wasmHeap=%lld xmlBytes=%zu externalImageRefs=%zu",
+         static_cast<long long>(SampleWasmHeap()), xmlSize, paths.size());
   } else {
     LogMemProbe("parsePAGX.exit.failed");
   }
@@ -386,10 +376,7 @@ bool PAGXView::loadFileData(const val& filePathVal, const val& fileData) {
   return document->loadFileData(filePath, std::move(data));
 }
 
-
-
-bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
-                                 int qualityRaw) {
+bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage, int qualityRaw) {
   if (!document || !nativeImage.as<bool>()) {
     return false;
   }
@@ -417,9 +404,9 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
   if (width < 1 || height < 1) {
     return false;
   }
-  uint64_t bytes =
-      static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * static_cast<uint64_t>(RGBA_BYTES_PER_PIXEL)
-      * MIPMAP_FACTOR_NUM / MIPMAP_FACTOR_DEN;
+  uint64_t bytes = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) *
+                   static_cast<uint64_t>(RGBA_BYTES_PER_PIXEL) * MIPMAP_FACTOR_NUM /
+                   MIPMAP_FACTOR_DEN;
 
   // Thumbnail budget enforcement: estimate the upload's GPU footprint up front so we can run a
   // silent LRU eviction before queuing. The estimate must match flushPendingUploads' bytes
@@ -454,12 +441,11 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
       if (existing != thumbnailTextures.end()) {
         replacingBytes = existing->second.sizeBytes;
       }
-      projected =
-          thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes - replacingBytes;
+      projected = thumbnailTexturesTotalBytes + pendingThumbnailBytes + bytes - replacingBytes;
     }
     if (projected > thumbnailBudget) {
-      LOGI("[PAGX] thumbnailBudget exhausted, drop path=%s size=%dx%d",
-                     filePath.c_str(), width, height);
+      LOGI("[PAGX] thumbnailBudget exhausted, drop path=%s size=%dx%d", filePath.c_str(), width,
+           height);
       return false;
     }
   } else {
@@ -482,8 +468,7 @@ bool PAGXView::attachNativeImage(const val& filePathVal, const val& nativeImage,
     if (existing != externalTextures.end()) {
       replacingBytes = existing->second.sizeBytes;
     }
-    uint64_t projected =
-        externalTexturesTotalBytes + pendingFullBytes + bytes - replacingBytes;
+    uint64_t projected = externalTexturesTotalBytes + pendingFullBytes + bytes - replacingBytes;
     if (projected > fullBudget) {
       // enforceFullBudget evicts off-viewport paths until totalBytes <= fullBudget. Running
       // it before push_back means the upcoming upload sees an already-trimmed cache, so the
@@ -543,13 +528,11 @@ uint64_t PAGXView::evictOldestThumbnailsUntilFits(uint64_t neededBytes) {
     thumbnailTexturesTotalBytes -= it->second.sizeBytes;
     retireTextureId(it->second.textureId);
     thumbnailTextures.erase(it);
-    // Remove the thumbnail from the provider and rebuild affected layers so a subsequent draw
-    // does not keep referencing a tgfx::Image that no longer has a cache entry pinning its
-    // lifetime.
-    imageProvider->clearThumbnailImage(path);
-    if (builderSession) {
-      builderSession->rebuildForFilePath(path);
-    }
+    // Clear the runtime image on matching Image nodes so a subsequent draw does not keep
+    // referencing a tgfx::Image that no longer has a cache entry pinning its lifetime.
+    // loadFileData with an empty shared_ptr clears Image::runtimeImage and refreshes the
+    // affected layers in place.
+    document->loadFileData(path, std::shared_ptr<PAGImage>{});
   }
   return freed;
 }
@@ -578,8 +561,7 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
     int textureId = val::module_property("tgfx").call<int>(
         "createBackendTexture", val::module_property("GL"), p.nativeImage);
     if (textureId <= 0) {
-      LOGI("[PAGX] attachNativeImage: createBackendTexture failed path=%s",
-                     p.filePath.c_str());
+      LOGI("[PAGX] attachNativeImage: createBackendTexture failed path=%s", p.filePath.c_str());
       continue;
     }
 
@@ -595,66 +577,50 @@ void PAGXView::flushPendingUploads(tgfx::Context* context) {
     auto tgfxImage = tgfx::Image::MakeFrom(context, backendTex, tgfx::ImageOrigin::TopLeft);
     if (!tgfxImage) {
       LOGI("[PAGX] attachNativeImage: MakeFrom failed path=%s", p.filePath.c_str());
-      // The GL texture was created successfully but tgfx refused to wrap it. Reclaim the
-      // texture immediately so we don't leak the GPU memory; queueing into
-      // pendingTextureDeletes keeps the actual gl.deleteTexture call inside the same
-      // drainPendingTextureDeletes() pass that handles eviction-side retirements.
       retireTextureId(static_cast<unsigned>(textureId));
       continue;
     }
+    // Wrap the uploaded tgfx::Image as a PAGImage without re-locking the context.
+    auto pagImage = pagx::MakeFrom(tgfxImage);
 
     if (p.quality == ImageQuality::Full) {
-      // Store the tgfx::Image in the provider so the renderer picks it up via
-      // resolveImage() on the next getOrCreateImage call after cache invalidation.
-      imageProvider->putFullImage(p.filePath, tgfxImage);
-      // Replace the previous full entry. The old entry's tgfxImage drops here, immediately
-      // freeing tgfx's TextureView; retire the previous textureId so its GPU memory is
-      // reclaimed at the end of this same draw().
+      // Replace the previous full entry. The old entry's PAGImage drops here; retire the previous
+      // textureId so its GPU memory is reclaimed at the end of this same draw().
       auto& entry = externalTextures[p.filePath];
       if (entry.image) {
         externalTexturesTotalBytes -= entry.sizeBytes;
         retireTextureId(entry.textureId);
       }
-      entry.image = tgfxImage;
+      entry.image = pagImage;
       entry.sizeBytes = p.sizeBytes;
       entry.textureId = static_cast<unsigned>(textureId);
       externalTexturesTotalBytes += p.sizeBytes;
-      // Refresh ImagePattern matrices against the newly attached image dimensions so
-      // progressive thumbnail->full swaps stay aligned.
+      // Refresh ImagePattern matrices against the newly attached image dimensions before
+      // installing the runtime image, so the in-place refresh picks up the updated matrix.
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
-                                            imageProvider.get());
-      if (builderSession) {
-        builderSession->rebuildForFilePath(p.filePath);
-      }
+                                            static_cast<float>(tgfxImage->width()),
+                                            static_cast<float>(tgfxImage->height()));
+      // Push the PAGImage onto matching Image nodes. loadFileData sets Image::runtimeImage and
+      // refreshes affected layers in place.
+      document->loadFileData(p.filePath, pagImage);
     } else {
-      // Thumbnail: store in the provider's thumbnail slot. Budget enforcement and silent LRU
-      // eviction happen up front in attachNativeImage() so flushPendingUploads only sees
-      // uploads that already fit.
-      imageProvider->putThumbnailImage(p.filePath, tgfxImage);
+      // Thumbnail: budget enforcement and silent LRU eviction happen up front in
+      // attachNativeImage() so flushPendingUploads only sees uploads that already fit.
       auto& entry = thumbnailTextures[p.filePath];
       if (entry.image) {
         thumbnailTexturesTotalBytes -= entry.sizeBytes;
         retireTextureId(entry.textureId);
       }
-      entry.image = tgfxImage;
+      entry.image = pagImage;
       entry.sizeBytes = p.sizeBytes;
       entry.textureId = static_cast<unsigned>(textureId);
       thumbnailTexturesTotalBytes += p.sizeBytes;
-      // Refresh ImagePattern matrices against the freshly attached thumbnail's pixel
-      // dimensions. Without this, fills that have never seen a Full attach yet would keep
-      // the matrix baked at parsePAGX time (orig-image-* dimensions), which scales the UV
-      // mapping for a thumbnail-sized texture by the original full-resolution divisor —
-      // sampling lands outside the thumbnail's [0,1] domain and the fill renders blank
-      // (clamped to edge). ResolveImagePatternMatrix's source priority falls through to
-      // the provider's thumbnail when full is absent so this stays correct after a later
-      // Full attach overwrites the matrix to the full-resolution dimensions.
+      // Refresh ImagePattern matrices against the freshly attached thumbnail's pixel dimensions.
       ResolveImagePatternMatricesByFilePath(document.get(), p.filePath, &imageOriginalSizes,
-                                            imageProvider.get());
-      // Regenerate the affected layers' vector contents so the newly attached thumbnail is
-      // picked up by the cached layer tree.
-      if (builderSession) {
-        builderSession->rebuildForFilePath(p.filePath);
-      }
+                                            static_cast<float>(tgfxImage->width()),
+                                            static_cast<float>(tgfxImage->height()));
+      // Install the thumbnail as the runtime image so the renderer picks it up.
+      document->loadFileData(p.filePath, pagImage);
     }
   }
 }
@@ -728,22 +694,12 @@ void PAGXView::enforceFullBudget() {
     // those draws keep working until the buffer drains.
     retireTextureId(it->second.textureId);
     externalTextures.erase(it);
-    // Remove the full-quality image from the provider so the renderer falls back to thumbnail
-    // on the next rebuild. scanAndRequestMissingTextures() will pick the dropped paths up on
-    // the same frame and emit onTextureRequest, so the host can start fetching a replacement
-    // immediately.
-    imageProvider->clearFullImage(c.path);
-    // The render loop will fall back to thumbnail on the next draw. Recompute the
-    // ImagePattern matrix so it matches the thumbnail's pixel dimensions instead of the
-    // full-resolution dimensions that were baked when the now-evicted full image was
-    // attached; otherwise the fallback fill would sample outside the thumbnail's UV domain
-    // and render blank (clamp-to-edge). When a replacement Full is later re-attached, the
-    // upload path runs the same resolve again with the full-resolution dimensions.
-    ResolveImagePatternMatricesByFilePath(document.get(), c.path, &imageOriginalSizes,
-                                          imageProvider.get());
-    if (builderSession) {
-      builderSession->rebuildForFilePath(c.path);
-    }
+    // Clear the runtime image on matching Image nodes so the renderer falls back to thumbnail
+    // (or blank) on the next draw. loadFileData with an empty shared_ptr clears
+    // Image::runtimeImage and refreshes the affected layers in place.
+    // scanAndRequestMissingTextures() will pick the dropped paths up on the same frame and
+    // emit onTextureRequest, so the host can start fetching a replacement immediately.
+    document->loadFileData(c.path, std::shared_ptr<PAGImage>{});
     evictedPaths.push_back(c.path);
     // Mark the path as a candidate for the next scanAndRequestMissingTextures sweep so the
     // host receives onTextureRequest the same draw and can start re-fetching immediately.
@@ -758,10 +714,9 @@ void PAGXView::enforceFullBudget() {
   if (externalTexturesTotalBytes > fullBudget &&
       currentFrameIndex - lastFullBudgetOverflowWarnFrame >= GPU_PROBE_INTERVAL) {
     lastFullBudgetOverflowWarnFrame = currentFrameIndex;
-    LOGI(
-        "[PAGX] fullBudget exceeded by %lluMB; %zu visible paths protected from eviction",
-        static_cast<unsigned long long>((externalTexturesTotalBytes - fullBudget) / BYTES_PER_MB),
-        visibleCount);
+    LOGI("[PAGX] fullBudget exceeded by %lluMB; %zu visible paths protected from eviction",
+         static_cast<unsigned long long>((externalTexturesTotalBytes - fullBudget) / BYTES_PER_MB),
+         visibleCount);
   }
   // Notify the host once per draw with the full batch so JS only takes a single trip across
   // the boundary regardless of how many paths were dropped.
@@ -769,21 +724,22 @@ void PAGXView::enforceFullBudget() {
 }
 
 tgfx::Rect PAGXView::computeViewportInRootCoords() const {
-  if (canvasWidth <= 0 || canvasHeight <= 0) {
+  if (canvasWidth <= 0 || canvasHeight <= 0 || !scene) {
     return tgfx::Rect::MakeEmpty();
   }
-  // Layer hierarchy: displayList.root() applies (zoomScale, contentOffset); contentLayer below
-  // it carries the (fitScale, centerOffset) matrix from applyCenteringTransform(). Layer bounds
-  // returned by getBounds(rootLayer = displayList.root()) live in the root frame, AFTER
-  // contentLayer's matrix is folded in but BEFORE displayList's zoomScale/contentOffset are
-  // applied. So we only need to invert the displayList transform here:
-  //   canvas_pixel = root_coord * zoomScale + contentOffset
-  //   root_coord   = (canvas_pixel - contentOffset) / zoomScale
-  float zoomScale = static_cast<float>(displayList.zoomScale());
+  // collectRootLocalImageBounds() returns bounds in the root composition's local (document)
+  // coordinate space, before the display zoomScale/contentOffset are applied. The effective
+  // zoom/offset written to PAGDisplayOptions by applyMergedTransform() map that space onto the
+  // canvas:
+  //   canvas_pixel = doc_coord * effectiveZoom + effectiveOffset
+  //   doc_coord    = (canvas_pixel - effectiveOffset) / effectiveZoom
+  // so inverting the display transform maps the canvas viewport back into the bounds' space.
+  auto* options = scene->getDisplayOptions();
+  float zoomScale = options->getZoomScale();
   if (zoomScale <= 0.0f) {
     return tgfx::Rect::MakeEmpty();
   }
-  auto offset = displayList.contentOffset();
+  auto offset = options->getContentOffset();
   float left = (-offset.x) / zoomScale;
   float top = (-offset.y) / zoomScale;
   float width = static_cast<float>(canvasWidth) / zoomScale;
@@ -795,40 +751,149 @@ tgfx::Rect PAGXView::computeViewportInRootCoords() const {
   constexpr float kViewportExpansion = 1.2f;
   float expandX = width * (kViewportExpansion - 1.0f) * 0.5f;
   float expandY = height * (kViewportExpansion - 1.0f) * 0.5f;
-  return tgfx::Rect::MakeLTRB(left, top, left + width, top + height)
-      .makeOutset(expandX, expandY);
+  return tgfx::Rect::MakeLTRB(left, top, left + width, top + height).makeOutset(expandX, expandY);
+}
+
+namespace {
+
+// Records the Image node filePath referenced by `color` (when it is an ImagePattern) into `out`.
+// Mirrors PAGXDocument's RecordImagePattern so the WeChat host can resolve per-image bounds
+// without the (now-removed) PAGScene::getImageBounds helper.
+void CollectFilePathFromColor(const ColorSource* color, std::unordered_set<std::string>* out) {
+  if (color == nullptr || color->nodeType() != NodeType::ImagePattern) {
+    return;
+  }
+  const auto* pattern = static_cast<const ImagePattern*>(color);
+  if (pattern->image != nullptr && !pattern->image->filePath.empty()) {
+    out->insert(pattern->image->filePath);
+  }
+}
+
+// Recursively collects every ImagePattern filePath referenced by `element`. Fill/Stroke expose a
+// color source directly; Group/TextBox nest further elements. Mirrors PAGXDocument's
+// CollectImageFilePathsFromElement so matching stays byte-for-byte compatible with the old index.
+void CollectFilePathsFromElement(const Element* element, std::unordered_set<std::string>* out) {
+  if (element == nullptr) {
+    return;
+  }
+  switch (element->nodeType()) {
+    case NodeType::Fill:
+      CollectFilePathFromColor(static_cast<const Fill*>(element)->color, out);
+      break;
+    case NodeType::Stroke:
+      CollectFilePathFromColor(static_cast<const Stroke*>(element)->color, out);
+      break;
+    case NodeType::Group:
+    case NodeType::TextBox: {
+      const auto* group = static_cast<const Group*>(element);
+      for (const auto* child : group->elements) {
+        CollectFilePathsFromElement(child, out);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Returns the deduplicated set of ImagePattern filePaths referenced by a source layer's contents.
+// Returns an empty set when node is null (e.g. the root composition, which has no source layer).
+std::unordered_set<std::string> CollectImagePatternFilePaths(const Layer* node) {
+  std::unordered_set<std::string> paths;
+  if (node == nullptr) {
+    return paths;
+  }
+  for (const auto* element : node->contents) {
+    CollectFilePathsFromElement(element, &paths);
+  }
+  return paths;
+}
+
+}  // namespace
+
+tgfx::Rect PAGXView::rootLocalBounds(const std::shared_ptr<PAGLayer>& layer) const {
+  if (scene == nullptr || layer == nullptr) {
+    return tgfx::Rect::MakeEmpty();
+  }
+  auto* options = scene->getDisplayOptions();
+  float zoom = options->getZoomScale();
+  if (zoom <= 0.0f) {
+    return tgfx::Rect::MakeEmpty();
+  }
+  auto offset = options->getContentOffset();
+  Rect surfaceBounds = scene->getGlobalBounds(layer);
+  if (surfaceBounds.isEmpty()) {
+    return tgfx::Rect::MakeEmpty();
+  }
+  // getGlobalBounds maps root-local bounds to surface space through a uniform-scale-plus-translate
+  // transform (surface = root * zoom + offset). That transform has no rotation/skew, so inverting
+  // it recovers the exact axis-aligned root-local rect the removed getImageBounds returned (up to
+  // negligible float round-trip error). getDisplayOptions' zoom/offset are the same values
+  // getGlobalBounds folds in, so the inverse is consistent by construction.
+  float x = (surfaceBounds.x - offset.x) / zoom;
+  float y = (surfaceBounds.y - offset.y) / zoom;
+  float w = surfaceBounds.width / zoom;
+  float h = surfaceBounds.height / zoom;
+  return tgfx::Rect::MakeXYWH(x, y, w, h);
+}
+
+std::unordered_map<std::string, std::vector<tgfx::Rect>> PAGXView::collectRootLocalImageBounds()
+    const {
+  std::unordered_map<std::string, std::vector<tgfx::Rect>> result;
+  if (scene == nullptr) {
+    return result;
+  }
+  auto root = scene->rootComposition();
+  if (root == nullptr) {
+    return result;
+  }
+  if (scene->getDisplayOptions()->getZoomScale() <= 0.0f) {
+    return result;
+  }
+  // Iterative pre-order walk over the whole runtime tree. The root composition's source node is
+  // null and contributes no paths; every runtime instance of a source layer is a distinct
+  // PAGLayer, so multi-instanced layers are captured once per on-screen instance.
+  std::vector<std::shared_ptr<PAGLayer>> stack = {root};
+  while (!stack.empty()) {
+    auto layer = stack.back();
+    stack.pop_back();
+    if (layer == nullptr) {
+      continue;
+    }
+    auto paths = CollectImagePatternFilePaths(layer->getNode());
+    if (!paths.empty()) {
+      tgfx::Rect rect = rootLocalBounds(layer);
+      if (!rect.isEmpty()) {
+        for (const auto& path : paths) {
+          result[path].push_back(rect);
+        }
+      }
+    }
+    for (const auto& child : layer->getChildren()) {
+      stack.push_back(child);
+    }
+  }
+  return result;
 }
 
 std::unordered_map<std::string, tgfx::Rect> PAGXView::computeFullPathBounds() const {
   std::unordered_map<std::string, tgfx::Rect> result;
-  if (!document || !builderSession || !contentLayer) {
+  if (!scene) {
     return result;
   }
-  auto* rootLayer = contentLayer->root();
-  if (!rootLayer) {
-    return result;
-  }
+  auto allBounds = collectRootLocalImageBounds();
   result.reserve(externalTextures.size());
-  // Only inspect paths actually present in the cache — they are the only candidates the
-  // eviction sweep needs to reason about. Iterating every image node in the document would
-  // waste cycles on paths that have no full-quality entry to begin with. Mirrors the shape
-  // of getImageBounds() for consistency.
+  // Only inspect paths actually present in the cache — they are the only candidates the eviction
+  // sweep needs to reason about. Paths without a full-quality entry are skipped.
   for (const auto& kv : externalTextures) {
     const auto& path = kv.first;
-    auto tgfxLayers = builderSession->getTgfxLayersByImageFilePath(path);
-    if (tgfxLayers.empty()) {
+    auto it = allBounds.find(path);
+    if (it == allBounds.end()) {
       continue;
     }
     tgfx::Rect unionBounds = tgfx::Rect::MakeEmpty();
     bool hasAny = false;
-    for (const auto& tgfxLayer : tgfxLayers) {
-      if (!tgfxLayer) {
-        continue;
-      }
-      // tgfx caches bounds after the first getBounds() call, so repeated lookups across
-      // frames are O(1) — only the first eviction sweep on a freshly built layer tree
-      // pays the lazy compute cost.
-      auto bounds = tgfxLayer->getBounds(rootLayer);
+    for (const auto& bounds : it->second) {
       if (bounds.isEmpty()) {
         continue;
       }
@@ -924,10 +989,10 @@ void PAGXView::scanAndRequestMissingTextures() {
     return;
   }
   // We deliberately scan only paths that have been evicted by a previous LRU sweep. The
-  // initial-attach window — where the provider has no full image because the host has not yet
-  // downloaded and called attachNativeImage(Full) for the first time — is owned by the host's
-  // own progressive image flow, not by us. Emitting onTextureRequest there would force the
-  // host into an "always fetch full" mode and defeat thumbnail-first loading.
+  // initial-attach window — where externalTextures has no full image because the host has not
+  // yet downloaded and called attachNativeImage(Full) for the first time — is owned by the
+  // host's own progressive image flow, not by us. Emitting onTextureRequest there would force
+  // the host into an "always fetch full" mode and defeat thumbnail-first loading.
   //
   // Snapshot into a vector so the inFlight bookkeeping below can mutate evictedFullPaths
   // without invalidating an in-progress iterator.
@@ -962,19 +1027,33 @@ val RectToJSObject(const tgfx::Rect& rect) {
 
 val PAGXView::getImageBounds(const val& filePathList) const {
   val result = val::object();
-  if (!document || !builderSession || !contentLayer) {
+  if (!document || !scene) {
     return result;
   }
-  auto* rootLayer = contentLayer->root();
-  if (!rootLayer) {
+  // This native binding is exposed directly to JS, so a caller bypassing the TS wrapper may pass
+  // a non-array value. Reading ["length"].as<unsigned>() on undefined/null/non-array traps in
+  // emscripten, which cannot be caught (try/catch is disabled), so validate before touching it.
+  if (!filePathList.isArray()) {
     return result;
   }
+  float fitScale = computeFitScale();
+  if (fitScale <= 0.0f) {
+    return result;
+  }
+  // Map document-space bounds into canvas pixel space using only the contain-mode fit transform
+  // (fitScale + centering offset), WITHOUT the user pan/zoom. This matches the JS contract
+  // (types.ts): callers apply their own zoom/offset on top of these base positions.
+  float centerOffsetX = (static_cast<float>(canvasWidth) - pagxWidth * fitScale) * 0.5f;
+  float centerOffsetY = (static_cast<float>(canvasHeight) - pagxHeight * fitScale) * 0.5f;
+  tgfx::Matrix fitMatrix = tgfx::Matrix::MakeTrans(centerOffsetX, centerOffsetY);
+  fitMatrix.preScale(fitScale, fitScale);
 
+  auto allBounds = collectRootLocalImageBounds();
   auto count = filePathList["length"].as<unsigned>();
   for (unsigned i = 0; i < count; ++i) {
     std::string filePath = filePathList[i].as<std::string>();
-    auto tgfxLayers = builderSession->getTgfxLayersByImageFilePath(filePath);
-    if (tgfxLayers.empty()) {
+    auto it = allBounds.find(filePath);
+    if (it == allBounds.end() || it->second.empty()) {
       result.set(filePath, val::null());
       continue;
     }
@@ -982,14 +1061,11 @@ val PAGXView::getImageBounds(const val& filePathList) const {
     tgfx::Rect largestBounds = tgfx::Rect::MakeEmpty();
     float largestArea = 0.0f;
     bool hasAny = false;
-    for (const auto& tgfxLayer : tgfxLayers) {
-      if (!tgfxLayer) {
+    for (const auto& docRect : it->second) {
+      if (docRect.isEmpty()) {
         continue;
       }
-      // First getBounds(rootLayer) for a given tgfx Layer triggers tgfx's lazy localBounds
-      // evaluation (walks down to content, multiplies up ancestor matrices); later calls
-      // hit the cached value.
-      auto bounds = tgfxLayer->getBounds(rootLayer);
+      tgfx::Rect bounds = fitMatrix.mapRect(docRect);
       if (bounds.isEmpty()) {
         continue;
       }
@@ -1168,15 +1244,14 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
-  LOGI(
-      "[MemProbe] tag=buildLayers.enter wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
-      static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
-      static_cast<unsigned long long>(imageDecodedPixelTotal),
-      static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL / BYTES_PER_MB));
-  LOGI(
-      "[ImgHist] tiny<10K=%u small<100K=%u mid<500K=%u large<1M=%u xl<2M=%u huge>=2M=%u",
-      imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2],
-      imageSizeBuckets[3], imageSizeBuckets[4], imageSizeBuckets[5]);
+  LOGI("[MemProbe] tag=buildLayers.enter wasmHeap=%lld imageCount=%u pixels=%llu (~%lluMB RGBA)",
+       static_cast<long long>(SampleWasmHeap()), imageDecodedCount,
+       static_cast<unsigned long long>(imageDecodedPixelTotal),
+       static_cast<unsigned long long>(imageDecodedPixelTotal * RGBA_BYTES_PER_PIXEL /
+                                       BYTES_PER_MB));
+  LOGI("[ImgHist] tiny<10K=%u small<100K=%u mid<500K=%u large<1M=%u xl<2M=%u huge>=2M=%u",
+       imageSizeBuckets[0], imageSizeBuckets[1], imageSizeBuckets[2], imageSizeBuckets[3],
+       imageSizeBuckets[4], imageSizeBuckets[5]);
 
   // PAGX files exported by CoCraft reference images by hash, so actual pixel dimensions are
   // unavailable at export time. The exporter stores a normalized transform and scale parameters in
@@ -1184,47 +1259,54 @@ void PAGXView::buildLayers() {
   // to compute the final ImagePattern matrices. PAGX files generated by libpag embed image data
   // directly and do not need this step.
   // TODO: Integrate this into LayerBuilder so all PAGX renderers get it automatically.
-  ResolveAllImagePatternMatrices(document.get(), &imageOriginalSizes, imageProvider.get());
+  ResolveAllImagePatternMatrices(document.get(), &imageOriginalSizes);
 
   document->applyLayout(&fontConfig);
   LogMemProbe("buildLayers.afterApplyLayout");
 
-  // Route through LayerBuilderSession so the build state survives into the progressive image
-  // upgrade path; post-build attachNativeImage(Full) calls rebuildForFilePath() on this session.
-  builderSession = std::make_unique<LayerBuilderSession>();
-  auto buildResult = builderSession->build(document.get());
-  contentLayer = buildResult.root;
-
-  if (!contentLayer) {
-    LogMemProbe("buildLayers.exit.noContent");
+  // Build the runtime scene from the laid-out document. PAGScene::Make() would apply layout
+  // itself if it had not been applied, but it does so without our fontConfig, so we call
+  // applyLayout(&fontConfig) above first to keep text measurement correct.
+  scene = PAGScene::Make(document);
+  if (!scene) {
+    LogMemProbe("buildLayers.exit.noScene");
     return;
   }
+  defaultTimeline = scene->getDefaultTimeline();
+  lastAnimationTimeMs = -1.0;
+
+  // Mirror the display-list tuning that previously lived in the constructor onto the scene's
+  // options. Subtree cache: caches static layers as textures to avoid per-layer shape
+  // retriangulation, the dominant hotspot for PAGX content (Shape=200-400ms/frame on singleton
+  // shapes). The background color resolved from the document (or opaque white by default) is set
+  // on the scene so the display list paints it under the layer tree across the whole surface.
+  auto* options = scene->getDisplayOptions();
+  options->setRenderMode(PAGRenderMode::Tiled);
+  options->setTileUpdateMode(PAGTileUpdateMode::Fast);
+  options->setMaxTileCount(static_cast<int>(DEFAULT_MAX_TILE_COUNT));
+  options->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+  options->setSubtreeCacheMaxSize(static_cast<int>(DEFAULT_SUBTREE_CACHE_SIZE));
+  options->setBackgroundColor({backgroundTGFXColor.red, backgroundTGFXColor.green,
+                               backgroundTGFXColor.blue, backgroundTGFXColor.alpha});
+
   hasRenderedFirstFrame = false;
-  displayList.root()->addChild(contentLayer);
-  applyCenteringTransform();
+  applyMergedTransform();
   LogMemProbe("buildLayers.exit");
 }
 
 void PAGXView::applyDocumentCustomData() {
-  backgroundVisible = false;
   backgroundTGFXColor = DefaultBackgroundColor();
   auto& customData = document->customData;
-  auto visibleIt = customData.find("bg-visible");
-  if (visibleIt != customData.end()) {
-    backgroundVisible = (visibleIt->second == "true");
+  auto colorIt = customData.find("bg-color");
+  if (colorIt != customData.end()) {
+    backgroundTGFXColor = ParseHexColor(colorIt->second);
   }
-  if (backgroundVisible) {
-    auto colorIt = customData.find("bg-color");
-    if (colorIt != customData.end()) {
-      backgroundTGFXColor = ParseHexColor(colorIt->second);
-    }
-    auto alphaIt = customData.find("bg-alpha");
-    if (alphaIt != customData.end()) {
-      char* end = nullptr;
-      float alpha = std::strtof(alphaIt->second.c_str(), &end);
-      if (end != alphaIt->second.c_str()) {
-        backgroundTGFXColor.alpha *= alpha;
-      }
+  auto alphaIt = customData.find("bg-alpha");
+  if (alphaIt != customData.end()) {
+    char* end = nullptr;
+    float alpha = std::strtof(alphaIt->second.c_str(), &end);
+    if (end != alphaIt->second.c_str()) {
+      backgroundTGFXColor.alpha *= alpha;
     }
   }
   if (!boundsOriginOverridden) {
@@ -1255,6 +1337,9 @@ void PAGXView::updateSize(int width, int height) {
   canvasWidth = width;
   canvasHeight = height;
   surface = nullptr;
+  // The PAGSurface wraps the old tgfx::Surface; drop it so draw() rewraps the freshly created
+  // one against the new dimensions.
+  pagSurface = nullptr;
   // Snapshots are bound to the old surface size; drop them to avoid dimension mismatch.
   fitSnapshot = nullptr;
   fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
@@ -1262,13 +1347,13 @@ void PAGXView::updateSize(int width, int height) {
   zoomedOutFrameSettled = false;
   lastGestureEndMs = 0.0;
 
-  if (contentLayer) {
-    applyCenteringTransform();
+  if (scene) {
+    applyMergedTransform();
   }
 }
 
 // Computes the contain-mode fit scale for the PAGX content against the canvas. Used by both
-// applyCenteringTransform() (content matrix) and getContentTransform() (comment-pin
+// applyMergedTransform() (content matrix) and getContentTransform() (comment-pin
 // coordinates) so the two stay in sync; any divergence here produces pins that drift relative
 // to the content.
 //
@@ -1288,21 +1373,30 @@ float PAGXView::computeFitScale() const {
   return std::min(scaleX, scaleY);
 }
 
-void PAGXView::applyCenteringTransform() {
-  if (!contentLayer) {
+void PAGXView::applyMergedTransform() {
+  if (!scene) {
     return;
   }
-  float scale = computeFitScale();
-  if (scale <= 0.0f) {
+  float fitScale = computeFitScale();
+  if (fitScale <= 0.0f) {
     return;
   }
-  float offsetX = (static_cast<float>(canvasWidth) - pagxWidth * scale) * 0.5f;
-  float offsetY = (static_cast<float>(canvasHeight) - pagxHeight * scale) * 0.5f;
+  // Contain-mode centering offset in canvas pixels.
+  float centerOffsetX = (static_cast<float>(canvasWidth) - pagxWidth * fitScale) * 0.5f;
+  float centerOffsetY = (static_cast<float>(canvasHeight) - pagxHeight * fitScale) * 0.5f;
+  // Fold the two former transform levels into one. Old pipeline: contentLayer carried
+  //   root = doc * fitScale + centerOffset
+  // and the display list carried
+  //   screen = root * userZoom + userOffset.
+  // Substituting gives screen = doc * (fitScale*userZoom) + (centerOffset*userZoom + userOffset),
+  // which is exactly the single zoom/offset written to PAGDisplayOptions below.
+  float effectiveZoom = fitScale * userZoom;
+  float effectiveOffsetX = centerOffsetX * userZoom + userOffsetX;
+  float effectiveOffsetY = centerOffsetY * userZoom + userOffsetY;
 
-  auto matrix = tgfx::Matrix::MakeTrans(offsetX, offsetY);
-  matrix.preScale(scale, scale);
-
-  contentLayer->setMatrix(matrix);
+  auto* options = scene->getDisplayOptions();
+  options->setZoomScale(effectiveZoom);
+  options->setContentOffset(effectiveOffsetX, effectiveOffsetY);
 }
 
 void PAGXView::setBoundsOrigin(float x, float y) {
@@ -1403,10 +1497,13 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
   bool zoomChanged = (std::abs(zoom - lastZoom) > 0.001f);
   // View changed, invalidate the zoom-out idle token so the next draw() re-evaluates.
   zoomedOutFrameSettled = false;
-  if (zoom <= 1.0f) {
-    displayList.setSubtreeCacheMaxSize(ZOOMED_OUT_SUBTREE_CACHE_SIZE);
-  } else {
-    displayList.setSubtreeCacheMaxSize(0);
+  if (scene) {
+    auto* options = scene->getDisplayOptions();
+    if (zoom <= 1.0f) {
+      options->setSubtreeCacheMaxSize(static_cast<int>(ZOOMED_OUT_SUBTREE_CACHE_SIZE));
+    } else {
+      options->setSubtreeCacheMaxSize(0);
+    }
   }
 
   if (zoomChanged) {
@@ -1415,19 +1512,22 @@ void PAGXView::updateZoomScaleAndOffset(float zoom, float offsetX, float offsetY
       updateAdaptiveTileRefinement();
     }
 
-    // Direction tracking is owned by tgfx (DisplayList::setZoomScale + the deadband
-    // accumulator gated on setZoomOutTileThrottlePerFrame). pagx still needs a coarse
-    // direction signal for the in/out timeout split below (ZOOM_IN_END_TIMEOUT_MS vs
-    // ZOOM_OUT_END_TIMEOUT_MS), so we derive it from the current single-frame delta. Timeouts
-    // only fire after several hundred milliseconds of no updates, by which point any single
-    // jittery frame's direction has long stopped mattering.
+    // Direction tracking is owned by tgfx (the display list's zoom deadband accumulator). pagx
+    // still needs a coarse direction signal for the in/out timeout split below
+    // (ZOOM_IN_END_TIMEOUT_MS vs ZOOM_OUT_END_TIMEOUT_MS), so we derive it from the current
+    // single-frame delta. Timeouts only fire after several hundred milliseconds of no updates, by
+    // which point any single jittery frame's direction has long stopped mattering.
     isZoomingIn = (zoom > lastZoom);
 
     lastZoomUpdateTimestampMs = emscripten_get_now();
   }
 
-  displayList.setZoomScale(zoom);
-  displayList.setContentOffset(offsetX, offsetY);
+  // zoom is the user zoom relative to the fit transform; applyMergedTransform() combines it with
+  // fitScale and the centering offset before writing to PAGDisplayOptions.
+  userZoom = zoom;
+  userOffsetX = offsetX;
+  userOffsetY = offsetY;
+  applyMergedTransform();
   lastZoom = zoom;
 }
 
@@ -1439,7 +1539,9 @@ void PAGXView::onZoomEnd() {
   isZooming = false;
 
   currentMaxTilesRefinedPerFrame = 1;
-  displayList.setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+  if (scene) {
+    scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(currentMaxTilesRefinedPerFrame);
+  }
 
   tryUpgradeTimestampMs = emscripten_get_now() + POST_ZOOM_UPGRADE_DELAY_MS;
 }
@@ -1448,48 +1550,42 @@ bool PAGXView::draw() {
   if (device == nullptr) {
     return false;
   }
+  // The render loop may spin up (autoRender) before buildLayers() creates the scene. Skip those
+  // frames entirely so the rest of draw() can assume the scene exists; the WebGL drawing buffer
+  // starts out transparent, so there is nothing to present until the scene is built.
+  if (scene == nullptr) {
+    return false;
+  }
 
   double frameStartMs = emscripten_get_now();
 
-  float liveZoom = static_cast<float>(displayList.zoomScale());
-  const auto& liveOffset = displayList.contentOffset();
+  // Advance animations before rendering so Record() below captures the new frame. Mutates only
+  // CPU-side content (no GL state), so it runs before lockContext. Advancing here also refreshes
+  // the scene's content-changed flag, which the idle short-circuit and dirty gate below rely on.
+  advanceTimelines(frameStartMs);
 
-  // Idle short-circuit: a previous draw() finished the zoom-out fast path and nothing has
-  // moved since. The displayList still reports dirty (we never ran render() to drain it),
-  // but the pixels already on the surface match the current zoom/offset, so we can return
-  // immediately. Bail out as soon as tgfx reports actual content has changed -- once the
-  // fast path settled into idle, the only way hasContentChanged() flips back to true is a
-  // layer-tree mutation (progressive image upgrade swapping a higher-resolution texture, or
-  // the initial attachNativeImage() attaching pixels to nodes whose first render
-  // already happened). setZoomScale/setContentOffset cannot trigger this branch because both
-  // clear zoomedOutFrameSettled via updateZoomScaleAndOffset(); without the dirty guard
-  // those post-first-render content changes would be silently dropped. A queued
-  // attachNativeImage() upload neither marks the display list dirty nor clears
-  // zoomedOutFrameSettled, so we must also bail out of the short-circuit when pendingUploads
-  // is non-empty (mirrors the `dirty` computation below); otherwise a Full-quality upload
-  // queued while the view sits idle would never reach flushPendingUploads.
-  if (snapshotEnabled && zoomedOutFrameSettled && !gestureActive && liveZoom <= ZOOM_DRIFT_MARGIN &&
-      !displayList.hasContentChanged() && pendingUploads.empty()) {
+  // Idle short-circuit: a previous draw() finished the steady-state blit and nothing has moved or
+  // changed since. The pixels already on the surface match the current view, so skip the frame at
+  // zero GPU cost. Guarded by hasContentChanged() (a progressive image upgrade or a late
+  // attachNativeImage flips it back to true) and pendingUploads (a queued upload marks neither the
+  // scene dirty nor clears zoomedOutFrameSettled, yet must reach flushPendingUploads).
+  if (snapshotEnabled && zoomedOutFrameSettled && !gestureActive && userZoom <= ZOOM_DRIFT_MARGIN &&
+      !scene->hasContentChanged() && pendingUploads.empty()) {
     return true;
   }
 
-  // Composite-blit fast path. Skips the full displayList.render() pass in two cases:
-  //   1. Active gesture: user is panning/zooming, full render would cost 200-800ms/frame.
-  //   2. Steady state at zoom <= 1: fitSnapshot already contains all pixels any render
-  //      would produce at this zoom, so we can safely blit it instead of re-rendering.
-  // The 0.02 margin above 1.0 absorbs float drift on the user's release zoom.
-  //
-  // The non-gesture branch additionally requires displayList not to be dirty and no queued
-  // uploads: a dirty flag here means the layer tree changed since the snapshot was captured
-  // (typically a progressive image upgrade or a deferred image attach), and a non-empty
-  // pendingUploads means a queued attachNativeImage() texture has not been flushed yet
-  // (queuing marks neither dirty nor clears zoomedOutFrameSettled). Either case must take the
-  // full-render path so flushPendingUploads runs instead of blitting fitSnapshot over the new
-  // content. Active gestures override this because the user expects steady pan/zoom feedback
-  // even when async upgrades land mid-gesture; the snapshot will be refreshed on the next
-  // non-gesture frame.
+  // Composite-blit fast path. Skips the full Record() pass in two cases:
+  //   1. Active gesture: user is panning/zooming; a full render would cost 200-800ms/frame.
+  //   2. Steady state at zoom ~= 1: fitSnapshot already holds every pixel a render would produce
+  //      at this zoom, so blitting it is equivalent to (but far cheaper than) re-rendering.
+  // The non-gesture branch additionally requires the scene not to be dirty and no queued uploads,
+  // so a content change (progressive upgrade, deferred attach) or a pending texture upload always
+  // takes the full-render path. Blit coordinates use the fit/user decomposition, NOT the effective
+  // zoom on PAGDisplayOptions: the snapshot was rendered at zoomScale = fitScale*pixelScale with
+  // offset = centerOffset*pixelScale (userZoom = 1), so mapping it to screen = doc*effectiveZoom +
+  // effectiveOffset reduces to scale = userZoom/pixelScale, translate = userOffset.
   bool fitOnly = snapshotEnabled && !gestureActive && fitSnapshot != nullptr &&
-                 liveZoom <= ZOOM_DRIFT_MARGIN && !displayList.hasContentChanged() &&
+                 userZoom <= ZOOM_DRIFT_MARGIN && !scene->hasContentChanged() &&
                  pendingUploads.empty();
   if (snapshotEnabled && (gestureActive || fitOnly) && surface != nullptr &&
       fitSnapshot != nullptr) {
@@ -1497,39 +1593,29 @@ bool PAGXView::draw() {
     if (context == nullptr) {
       return false;
     }
-    auto canvas = surface->getCanvas();
-    canvas->clear();
-    if (backgroundVisible) {
-      DrawSolidBackground(canvas, canvasWidth, canvasHeight, backgroundTGFXColor);
-    } else {
-      DrawBackground(canvas, canvasWidth, canvasHeight, 1.0f);
-    }
-    // fit blit: fit is an N× supersample of the z=1 main-surface state, so the blit scale = liveZoom/N.
-    // The enclosing guard already ensures fitSnapshot != nullptr here.
-    float pixelScale = fitSnapshotPixelScale > 0.0f ? fitSnapshotPixelScale : 1.0f;
-    float fitScale = liveZoom / pixelScale;
-    float ftx = liveOffset.x;
-    float fty = liveOffset.y;
+    auto* canvas = surface->getCanvas();
+    // Paint the same solid background the full-render path gets from the display list, so blit
+    // regions the snapshot does not cover (edges exposed by pan/zoom) match the rendered look.
+    canvas->clear(backgroundTGFXColor);
+    float pixelScale = fitSnapshotPixelScale > 0.0f ? fitSnapshotPixelScale : DEFAULT_PIXEL_SCALE;
+    float blitScale = userZoom / pixelScale;
     canvas->save();
-    canvas->translate(ftx, fty);
-    canvas->scale(fitScale, fitScale);
+    canvas->translate(userOffsetX, userOffsetY);
+    canvas->scale(blitScale, blitScale);
     canvas->drawImage(fitSnapshot);
     canvas->restore();
     auto recording = context->flush();
     if (recording) {
       context->submit(std::move(recording));
     }
-    // Free GL textures retired earlier in the draw (typically by parsePAGX swapping
-    // documents while the gesture-freeze path was active). Must happen after submit so any
-    // in-flight render that referenced the texture has already been recorded into the
-    // command buffer and is safe to deletion.
+    // Free GL textures retired earlier (e.g. a parsePAGX document swap while the gesture-freeze
+    // path was active). Safe after submit: any in-flight command that sampled the texture has
+    // already been recorded.
     drainPendingTextureDeletes();
     device->unlock();
-    if (!hasRenderedFirstFrame) {
-      hasRenderedFirstFrame = true;
-    }
-    // Mark the zoom-out idle state so future draw() calls can short-circuit until the
-    // view moves. Only for the non-gesture path -- gestures expect to re-composite each frame.
+    hasRenderedFirstFrame = true;
+    // Mark idle so future frames can short-circuit until the view moves. Only for the non-gesture
+    // path -- gestures expect to re-composite every frame.
     if (fitOnly) {
       zoomedOutFrameSettled = true;
     }
@@ -1539,212 +1625,139 @@ bool PAGXView::draw() {
   // Capture before rendering so the post-render logging block can identify the first frame.
   bool wasFirstFrame = !hasRenderedFirstFrame;
 
-  // Per-stage timings in milliseconds. Zero for stages skipped this frame. All capture sites
-  // are gated on DRAW_LOG_ENABLED so the emscripten_get_now() probes are fully stripped from
-  // shipped builds, where the only consumers (the slow-frame / first-frame breakdowns below)
-  // are compiled out.
+  // Dirty gate: only run the full render pass when the scene content changed, an upload is queued,
+  // or the first frame has not been drawn yet. Otherwise the current surface pixels are still
+  // valid and the frame is skipped. Kept separate from the idle short-circuit above so it also
+  // covers the snapshotEnabled == false configuration (no blit / no idle token) and the window
+  // before the first fitSnapshot has been captured.
+  if (!(scene->hasContentChanged() || !pendingUploads.empty() || !hasRenderedFirstFrame)) {
+    return true;
+  }
+
+  // Per-stage timings in milliseconds. All capture sites are gated on DRAW_LOG_ENABLED so the
+  // emscripten_get_now() probes are fully stripped from shipped builds, where the only consumers
+  // (the slow-frame / first-frame breakdowns below) are compiled out.
   [[maybe_unused]] double surfaceMs = 0.0;
-  [[maybe_unused]] double bgMs = 0.0;
   [[maybe_unused]] double renderMs = 0.0;
-  [[maybe_unused]] double flushMs = 0.0;
   [[maybe_unused]] double submitMs = 0.0;
   [[maybe_unused]] double unlockMs = 0.0;
   [[maybe_unused]] double surfaceStartMs = 0.0;
-  [[maybe_unused]] double bgStartMs = 0.0;
   [[maybe_unused]] double renderStartMs = 0.0;
-  [[maybe_unused]] double flushStartMs = 0.0;
   [[maybe_unused]] double submitStartMs = 0.0;
   [[maybe_unused]] double unlockStartMs = 0.0;
-  // Force a render pass when there are pending GPU uploads so flushPendingUploads runs even on
-  // an otherwise idle frame; the upload itself will rebuild the affected layers and mark the
-  // display list dirty for subsequent frames.
-  bool dirty = displayList.hasContentChanged() || !pendingUploads.empty();
 
-  if (dirty) {
-    auto context = device->lockContext();
-    if (context == nullptr) {
+  // Full render path (dirty content, queued upload, or first frame). The gesture / steady-state
+  // blit and idle short-circuit above handle the cheap cases; reaching here means the scene must
+  // be re-recorded. The locked context is also needed so flushPendingUploads can commit queued
+  // attachNativeImage() textures and captureFitSnapshot can render the offscreen snapshot.
+  auto context = device->lockContext();
+  if (context == nullptr) {
+    return false;
+  }
+
+  // Drain queued attachNativeImage() requests inside the locked context so the texImage2D calls
+  // go to PAGXView's own GL context. Run before any rendering work; the resulting backend-texture
+  // images are picked up by the scene render through the Image-node rebuilds triggered inside
+  // flushPendingUploads.
+  flushPendingUploads(context);
+
+  if constexpr (DRAW_LOG_ENABLED) {
+    surfaceStartMs = emscripten_get_now();
+  }
+  if (surface == nullptr || surface->width() != canvasWidth || surface->height() != canvasHeight) {
+    context->setCacheLimit(MAX_CACHE_LIMIT);
+    context->setResourceExpirationFrames(EXPIRATION_FRAMES);
+    tgfx::GLFrameBufferInfo glInfo = {};
+    glInfo.id = 0;
+    glInfo.format = GL_RGBA8;
+    tgfx::BackendRenderTarget renderTarget(glInfo, canvasWidth, canvasHeight);
+    surface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::BottomLeft);
+    if (surface == nullptr) {
+      device->unlock();
       return false;
     }
+    // Wrap the surface so pagx::Record() renders into the same GL framebuffer. Recreated in
+    // lockstep with `surface` so the wrapper never points at a stale render target.
+    pagSurface = pagx::MakeFrom(surface);
+  } else if (pagSurface == nullptr) {
+    // `surface` survived (same-size reload), so the surface-recreation branch above did not run,
+    // but the wrapper may have been dropped independently (e.g. by parsePAGX during a page switch).
+    // Re-wrap the still-valid surface: Record() requires a non-null PAGSurface, so without this the
+    // freshly built scene would never be submitted and the new document would never appear.
+    pagSurface = pagx::MakeFrom(surface);
+  }
+  if constexpr (DRAW_LOG_ENABLED) {
+    surfaceMs = emscripten_get_now() - surfaceStartMs;
+  }
 
-    // Drain queued attachNativeImage() requests inside the locked context so the texImage2D
-    // calls go to PAGXView's own GL context. Run before any rendering work; the resulting
-    // backend-texture images are picked up by displayList.render() through the Image-node
-    // rebuilds triggered inside flushPendingUploads.
-    flushPendingUploads(context);
+  // Record the scene with autoClear=true: the display list clears the surface (Src blend) and
+  // paints its own background color across the whole surface under the layer tree, so no manual
+  // clear pass is needed. Record() flushes internally and returns a Recording we submit here.
+  // scene is guaranteed non-null by the early return above, and pagSurface is created in lockstep
+  // with surface right above, so both are valid here.
+  if constexpr (DRAW_LOG_ENABLED) {
+    renderStartMs = emscripten_get_now();
+  }
+  std::unique_ptr<tgfx::Recording> recording = Record(context, scene, pagSurface, true);
+  if constexpr (DRAW_LOG_ENABLED) {
+    renderMs = emscripten_get_now() - renderStartMs;
+  }
 
+  // Throttled GPU cache footprint probe. context->memoryUsage() reports total bytes held by the
+  // tgfx ResourceCache (textures + buffers); purgeableBytes is the LRU-evictable subset. The
+  // SDK-side accounting (external/thumb totals + entry counts + pending uploads) makes it possible
+  // to tell apart "tgfx is full of backend textures we asked for" from "tgfx is full of tile cache
+  // or other internal resources" by diffing against memoryUsage. imageCount is legacy: it counts
+  // only pre-build synchronous loads via attachNativeImage, so the post-build backend-texture path
+  // does not increment it; expect imageCount=0 in scenarios that exclusively use the post-build
+  // flow.
+  if ((gpuProbeCounter++ % GPU_PROBE_INTERVAL) == 0) {
+    LOGI(
+        "[MemProbe] tag=gpu.cache memoryUsage=%lluMB purgeable=%lluMB cacheLimit=%lluMB "
+        "imageCount=%u externalFull=%zu/%lluMB(budget=%lluMB) "
+        "thumb=%zu/%lluMB(budget=%lluMB) pendingUploads=%zu",
+        static_cast<unsigned long long>(context->memoryUsage() / BYTES_PER_MB),
+        static_cast<unsigned long long>(context->purgeableBytes() / BYTES_PER_MB),
+        static_cast<unsigned long long>(context->cacheLimit() / BYTES_PER_MB), imageDecodedCount,
+        externalTextures.size(),
+        static_cast<unsigned long long>(externalTexturesTotalBytes / BYTES_PER_MB),
+        static_cast<unsigned long long>(fullBudget / BYTES_PER_MB), thumbnailTextures.size(),
+        static_cast<unsigned long long>(thumbnailTexturesTotalBytes / BYTES_PER_MB),
+        static_cast<unsigned long long>(thumbnailBudget / BYTES_PER_MB), pendingUploads.size());
+  }
+
+  if (recording) {
     if constexpr (DRAW_LOG_ENABLED) {
-      surfaceStartMs = emscripten_get_now();
+      submitStartMs = emscripten_get_now();
     }
-    if (surface == nullptr || surface->width() != canvasWidth || surface->height() != canvasHeight) {
-      context->setCacheLimit(MAX_CACHE_LIMIT);
-      context->setResourceExpirationFrames(EXPIRATION_FRAMES);
-      tgfx::GLFrameBufferInfo glInfo = {};
-      glInfo.id = 0;
-      glInfo.format = GL_RGBA8;
-      tgfx::BackendRenderTarget renderTarget(glInfo, canvasWidth, canvasHeight);
-      surface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::BottomLeft);
-      if (surface == nullptr) {
-        device->unlock();
-        return false;
-      }
-    }
+    context->submit(std::move(recording));
     if constexpr (DRAW_LOG_ENABLED) {
-      surfaceMs = emscripten_get_now() - surfaceStartMs;
+      submitMs = emscripten_get_now() - submitStartMs;
     }
+    // Mark the first successfully submitted scene frame so the JS loading flow's
+    // firstFrameRendered() wait is satisfied. scene is guaranteed non-null here by the early
+    // return at the top of draw().
+    hasRenderedFirstFrame = true;
+  }
 
-    if constexpr (DRAW_LOG_ENABLED) {
-      bgStartMs = emscripten_get_now();
-    }
-    auto canvas = surface->getCanvas();
-    canvas->clear();
+  // Capture the fit-view snapshot once (fitSnapshot == null) so the gesture / steady-state blit
+  // fast paths have a source. Runs inside the still-locked context, after the main submit so the
+  // on-screen frame is already published and the offscreen render is pure overhead paid a single
+  // time per document (or after resetForFreshCapture / snapshot invalidation).
+  captureFitSnapshot(context);
 
-    if (backgroundVisible) {
-      DrawSolidBackground(canvas, canvasWidth, canvasHeight, backgroundTGFXColor);
-    } else {
-      DrawBackground(canvas, canvasWidth, canvasHeight, 1.0f);
-    }
-    if constexpr (DRAW_LOG_ENABLED) {
-      bgMs = emscripten_get_now() - bgStartMs;
-    }
+  // Free GL textures retired during this draw (eviction in enforceFullBudget, replacement upload
+  // in flushPendingUploads, or document swap in parsePAGX). Must happen after flush+submit so the
+  // command buffers that referenced the texture have all been built and queued; WebGL keeps
+  // in-flight commands valid even after deleteTexture.
+  drainPendingTextureDeletes();
 
-    if constexpr (DRAW_LOG_ENABLED) {
-      renderStartMs = emscripten_get_now();
-    }
-    displayList.render(surface.get(), false);
-    if constexpr (DRAW_LOG_ENABLED) {
-      renderMs = emscripten_get_now() - renderStartMs;
-    }
-
-    if constexpr (DRAW_LOG_ENABLED) {
-      flushStartMs = emscripten_get_now();
-    }
-    auto recording = context->flush();
-    if constexpr (DRAW_LOG_ENABLED) {
-      flushMs = emscripten_get_now() - flushStartMs;
-    }
-
-    // Throttled GPU cache footprint probe. context->memoryUsage() reports total bytes held by
-    // the tgfx ResourceCache (textures + buffers); purgeableBytes is the LRU-evictable subset.
-    // The SDK-side accounting (external/thumb totals + entry counts + pending uploads) makes it
-    // possible to tell apart "tgfx is full of backend textures we asked for" from "tgfx is full
-    // of tile cache or other internal resources" by diffing against memoryUsage. imageCount is
-    // legacy: it counts only pre-build synchronous loads via attachNativeImage, so the
-    // post-build backend-texture path does not increment it; expect imageCount=0 in scenarios
-    // that exclusively use the post-build flow.
-    if ((gpuProbeCounter++ % GPU_PROBE_INTERVAL) == 0) {
-      LOGI(
-          "[MemProbe] tag=gpu.cache memoryUsage=%lluMB purgeable=%lluMB cacheLimit=%lluMB "
-          "imageCount=%u externalFull=%zu/%lluMB(budget=%lluMB) "
-          "thumb=%zu/%lluMB(budget=%lluMB) pendingUploads=%zu",
-          static_cast<unsigned long long>(context->memoryUsage() / BYTES_PER_MB),
-          static_cast<unsigned long long>(context->purgeableBytes() / BYTES_PER_MB),
-          static_cast<unsigned long long>(context->cacheLimit() / BYTES_PER_MB),
-          imageDecodedCount,
-          externalTextures.size(),
-          static_cast<unsigned long long>(externalTexturesTotalBytes / BYTES_PER_MB),
-          static_cast<unsigned long long>(fullBudget / BYTES_PER_MB),
-          thumbnailTextures.size(),
-          static_cast<unsigned long long>(thumbnailTexturesTotalBytes / BYTES_PER_MB),
-          static_cast<unsigned long long>(thumbnailBudget / BYTES_PER_MB),
-          pendingUploads.size());
-    }
-
-    if (recording) {
-      if constexpr (DRAW_LOG_ENABLED) {
-        submitStartMs = emscripten_get_now();
-      }
-      context->submit(std::move(recording));
-      if constexpr (DRAW_LOG_ENABLED) {
-        submitMs = emscripten_get_now() - submitStartMs;
-      }
-      if (!hasRenderedFirstFrame) {
-        hasRenderedFirstFrame = true;
-      }
-      // Capture fit the first time there is content after a page switch / first frame. Ultra-wide /
-      // ultra-tall documents are captured offscreen at high resolution to avoid blurring when zoomed.
-      bool hasContent = contentLayer != nullptr;
-      bool fitMissing = fitSnapshot == nullptr;
-      if (snapshotEnabled && hasContent && fitMissing) {
-        float fitContentScale = computeFitScale();
-        // Memory grows by N² (2x≈57MB, 4x≈230MB); capped at 2x under the iOS 512MB limit.
-        float pixelScale = fitContentScale < HIGH_RES_FIT_SCALE_THRESHOLD ? HIGH_RES_PIXEL_SCALE : DEFAULT_PIXEL_SCALE;
-        // Runtime memory budget check: if the high-res snapshot would push total GPU memory
-        // (existing textures + snapshot) past fullBudget, fall back to DEFAULT_PIXEL_SCALE.
-        if (pixelScale > DEFAULT_PIXEL_SCALE) {
-          uint64_t snapshotBytes = static_cast<uint64_t>(canvasWidth * pixelScale) *
-                                   static_cast<uint64_t>(canvasHeight * pixelScale) *
-                                   RGBA_BYTES_PER_PIXEL;
-          uint64_t totalProjected = externalTexturesTotalBytes + thumbnailTexturesTotalBytes + snapshotBytes;
-          if (totalProjected > fullBudget) {
-            pixelScale = DEFAULT_PIXEL_SCALE;
-          }
-        }
-
-        if (pixelScale > DEFAULT_PIXEL_SCALE) {
-          int offW = static_cast<int>(canvasWidth * pixelScale);
-          int offH = static_cast<int>(canvasHeight * pixelScale);
-          auto offscreen = tgfx::Surface::Make(context, offW, offH);
-          if (offscreen != nullptr) {
-            // Temporarily set displayList to zoom=N, offset=0 to render into offscreen, then restore.
-            float savedZoom = static_cast<float>(displayList.zoomScale());
-            tgfx::Point savedOffset = displayList.contentOffset();
-            displayList.setZoomScale(pixelScale);
-            displayList.setContentOffset(0.0f, 0.0f);
-            auto offCanvas = offscreen->getCanvas();
-            offCanvas->clear();
-            if (backgroundVisible) {
-              DrawSolidBackground(offCanvas, offW, offH, backgroundTGFXColor);
-            } else {
-              DrawBackground(offCanvas, offW, offH, pixelScale);
-            }
-            displayList.render(offscreen.get(), false);
-            auto offRecording = context->flush();
-            if (offRecording) {
-              context->submit(std::move(offRecording));
-            }
-            fitSnapshot = offscreen->makeImageSnapshot();
-            fitSnapshotPixelScale = pixelScale;
-            // Same as the main surface path: the snapshot may have a deferred copy task attached;
-            // flush immediately so it completes while the source offscreen is still clean, avoiding
-            // later accidental overwrites.
-            auto copyRecording = context->flush();
-            if (copyRecording) {
-              context->submit(std::move(copyRecording));
-            }
-            displayList.setZoomScale(savedZoom);
-            displayList.setContentOffset(savedOffset.x, savedOffset.y);
-          } else {
-            fitSnapshot = surface->makeImageSnapshot();
-            fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
-          }
-        } else {
-          fitSnapshot = surface->makeImageSnapshot();
-          fitSnapshotPixelScale = DEFAULT_PIXEL_SCALE;
-          // makeImageSnapshot on an externallyOwned surface (mini-program main canvas) creates an
-          // asynchronous copy task. Without an immediate flush, this copy is deferred to the next
-          // draw, by which time the surface pixels may already be overwritten by a new render,
-          // causing the snapshot to capture wrong content.
-          auto snapRecording = context->flush();
-          if (snapRecording) {
-            context->submit(std::move(snapRecording));
-          }
-        }
-      }
-    }
-
-    // Free GL textures retired during this draw (eviction in enforceFullBudget, replacement
-    // upload in flushPendingUploads, or document swap in parsePAGX). Must happen after every
-    // flush+submit above so the command buffers that referenced the texture have all been
-    // built and queued; WebGL keeps in-flight commands valid even after deleteTexture.
-    drainPendingTextureDeletes();
-
-    if constexpr (DRAW_LOG_ENABLED) {
-      unlockStartMs = emscripten_get_now();
-    }
-    device->unlock();
-    if constexpr (DRAW_LOG_ENABLED) {
-      unlockMs = emscripten_get_now() - unlockStartMs;
-    }
+  if constexpr (DRAW_LOG_ENABLED) {
+    unlockStartMs = emscripten_get_now();
+  }
+  device->unlock();
+  if constexpr (DRAW_LOG_ENABLED) {
+    unlockMs = emscripten_get_now() - unlockStartMs;
   }
 
   double frameEndMs = emscripten_get_now();
@@ -1757,21 +1770,31 @@ bool PAGXView::draw() {
 
   if constexpr (DRAW_LOG_ENABLED) {
     if (shouldLogFrame) {
-      const auto& offset = displayList.contentOffset();
       float fitScale = computeFitScale();
-      float effectiveScale = fitScale * displayList.zoomScale();
+      // With the merged transform, PAGDisplayOptions carries the effective zoom (fitScale*userZoom)
+      // and effective content offset directly, so read them back for the drawn-size estimate.
+      float effectiveScale = fitScale;
+      float offsetX = 0.0f;
+      float offsetY = 0.0f;
+      if (scene != nullptr) {
+        auto* options = scene->getDisplayOptions();
+        effectiveScale = options->getZoomScale();
+        auto offset = options->getContentOffset();
+        offsetX = offset.x;
+        offsetY = offset.y;
+      }
       // Expected drawn content size in canvas pixels (before viewport clipping). Anything much
       // larger than the canvas itself means most fragment work is wasted off-screen.
       float drawWidthPx = pagxWidth * effectiveScale;
       float drawHeightPx = pagxHeight * effectiveScale;
       LOGI(
-          "[PAGXView] slow frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
-          "flush=%.2fms submit=%.2fms unlock=%.2fms dirty=%d zoom=%.4f quantized=%.4f "
+          "[PAGXView] slow frame: total=%.2fms surface=%.2fms render=%.2fms "
+          "submit=%.2fms unlock=%.2fms zoom=%.4f "
           "offset=(%.1f,%.1f) fitScale=%.4f effScale=%.4f canvas=(%dx%d) pagx=(%.0fx%.0f) "
           "drawPx=(%.0fx%.0f)",
-          frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs, dirty ? 1 : 0,
-          lastZoom, displayList.zoomScale(), offset.x, offset.y, fitScale, effectiveScale, canvasWidth,
-          canvasHeight, pagxWidth, pagxHeight, drawWidthPx, drawHeightPx);
+          frameDurationMs, surfaceMs, renderMs, submitMs, unlockMs, userZoom, offsetX, offsetY,
+          fitScale, effectiveScale, canvasWidth, canvasHeight, pagxWidth, pagxHeight, drawWidthPx,
+          drawHeightPx);
     }
   }
 
@@ -1779,9 +1802,9 @@ bool PAGXView::draw() {
   if constexpr (DRAW_LOG_ENABLED) {
     if (wasFirstFrame && hasRenderedFirstFrame) {
       LOGI(
-          "[PAGXView] first frame: total=%.2fms surface=%.2fms bg=%.2fms render=%.2fms "
-          "flush=%.2fms submit=%.2fms unlock=%.2fms",
-          frameDurationMs, surfaceMs, bgMs, renderMs, flushMs, submitMs, unlockMs);
+          "[PAGXView] first frame: total=%.2fms surface=%.2fms render=%.2fms "
+          "submit=%.2fms unlock=%.2fms",
+          frameDurationMs, surfaceMs, renderMs, submitMs, unlockMs);
     }
   }
 
@@ -1802,7 +1825,9 @@ bool PAGXView::draw() {
         if (!lastFrameSlow) {
           int targetCount = calculateTargetTileRefinement(lastZoom);
           currentMaxTilesRefinedPerFrame = targetCount;
-          displayList.setMaxTilesRefinedPerFrame(targetCount);
+          if (scene) {
+            scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
+          }
           tryUpgradeTimestampMs = 0.0;
         } else {
           tryUpgradeTimestampMs = frameStartMs + UPGRADE_RETRY_DELAY_MS;
@@ -1814,9 +1839,9 @@ bool PAGXView::draw() {
   }
 
   // Backend-texture cache bookkeeping. The call runs after lockContext has been released
-  // because it only mutates provider and tgfx layer state, never GL state. enforceFullBudget
-  // sweeps the full bucket against fullBudget; entries pushed past the budget are removed from
-  // the provider and the next draw falls back to thumbnail.
+  // because it only mutates externalTextures and runtimeImage state, never GL state.
+  // enforceFullBudget sweeps the full bucket against fullBudget; entries pushed past the
+  // budget are removed and the next draw falls back to thumbnail.
   enforceFullBudget();
   // After eviction, any path that just lost its full texture is now a candidate for the
   // request scan. Emitting onTextureRequest on the same draw shortens the time-to-recovery
@@ -1906,8 +1931,90 @@ void PAGXView::updateAdaptiveTileRefinement() {
 
   if (targetCount != currentMaxTilesRefinedPerFrame) {
     currentMaxTilesRefinedPerFrame = targetCount;
-    displayList.setMaxTilesRefinedPerFrame(targetCount);
+    if (scene) {
+      scene->getDisplayOptions()->setMaxTilesRefinedPerFrame(targetCount);
+    }
   }
+}
+
+void PAGXView::advanceTimelines(double frameStartMs) {
+  if (scene == nullptr) {
+    return;
+  }
+  int64_t deltaUs = 0;
+  if (lastAnimationTimeMs >= 0.0) {
+    deltaUs = static_cast<int64_t>(std::max(0.0, frameStartMs - lastAnimationTimeMs) * 1000.0);
+  }
+  lastAnimationTimeMs = frameStartMs;
+  if (deltaUs <= 0) {
+    return;
+  }
+  // Top-level animations are not driven by scene->advanceAndApply(), so advance the default
+  // timeline explicitly; then advance the scene for its auto-playing and nested-composition
+  // animations.
+  if (defaultTimeline != nullptr) {
+    defaultTimeline->advanceAndApply(deltaUs);
+  }
+  scene->advanceAndApply(deltaUs);
+}
+
+void PAGXView::captureFitSnapshot(tgfx::Context* context) {
+  if (!snapshotEnabled || fitSnapshot != nullptr || scene == nullptr || surface == nullptr ||
+      context == nullptr) {
+    return;
+  }
+  float fitScale = computeFitScale();
+  if (fitScale <= 0.0f) {
+    return;
+  }
+  // Supersample ultra-small fit views (very large documents shrunk to fit) so a subsequent zoom-in
+  // blit stays sharp. Everything else captures at 1x.
+  float pixelScale =
+      (fitScale < HIGH_RES_FIT_SCALE_THRESHOLD) ? HIGH_RES_PIXEL_SCALE : DEFAULT_PIXEL_SCALE;
+  int offW = std::max(1, static_cast<int>(std::lround(canvasWidth * pixelScale)));
+  int offH = std::max(1, static_cast<int>(std::lround(canvasHeight * pixelScale)));
+  // Budget guard: a 2x snapshot is 4x the canvas byte cost. If adding it would push the combined
+  // texture footprint past fullBudget, fall back to 1x rather than risk an OOM kill.
+  if (pixelScale > DEFAULT_PIXEL_SCALE) {
+    uint64_t snapshotBytes =
+        static_cast<uint64_t>(offW) * static_cast<uint64_t>(offH) * RGBA_BYTES_PER_PIXEL;
+    if (externalTexturesTotalBytes + thumbnailTexturesTotalBytes + snapshotBytes > fullBudget) {
+      pixelScale = DEFAULT_PIXEL_SCALE;
+      offW = std::max(1, static_cast<int>(std::lround(canvasWidth * pixelScale)));
+      offH = std::max(1, static_cast<int>(std::lround(canvasHeight * pixelScale)));
+    }
+  }
+  auto offscreen = tgfx::Surface::Make(context, offW, offH);
+  if (offscreen == nullptr) {
+    return;
+  }
+  auto offPagSurface = pagx::MakeFrom(offscreen);
+  if (offPagSurface == nullptr) {
+    return;
+  }
+  // Render the fit view (userZoom = 1) supersampled by pixelScale: offscreen_px = doc*fitScale*
+  // pixelScale + centerOffset*pixelScale. Override the merged transform temporarily; the display
+  // list paints its own background under the tree with autoClear = true, so the snapshot is
+  // self-contained.
+  float centerOffsetX = (static_cast<float>(canvasWidth) - pagxWidth * fitScale) * 0.5f;
+  float centerOffsetY = (static_cast<float>(canvasHeight) - pagxHeight * fitScale) * 0.5f;
+  auto* options = scene->getDisplayOptions();
+  options->setZoomScale(fitScale * pixelScale);
+  options->setContentOffset(centerOffsetX * pixelScale, centerOffsetY * pixelScale);
+  auto recording = Record(context, scene, offPagSurface, true);
+  if (recording) {
+    context->submit(std::move(recording));
+  }
+  fitSnapshot = offscreen->makeImageSnapshot();
+  fitSnapshotPixelScale = pixelScale;
+  // makeImageSnapshot may attach a deferred copy task; flush immediately so it completes while the
+  // offscreen surface is still clean, before the surface is dropped at function exit.
+  auto copyRecording = context->flush();
+  if (copyRecording) {
+    context->submit(std::move(copyRecording));
+  }
+  // Restore the user's effective zoom/offset for subsequent frames.
+  applyMergedTransform();
 }
 
 }  // namespace pagx

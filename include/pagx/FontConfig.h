@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <vector>
 #include "pagx/PAGFont.h"
 
 namespace pagx {
@@ -149,6 +150,13 @@ class FontConfig {
    * @param font The PAGFont describing the system fallback (fontFamily, fontStyle).
    */
   bool addFallbackSystemFont(const PAGFont& font);
+
+  /**
+   * Returns the family names of all fallback typefaces in registration order. Primarily
+   * intended for diagnostics and tests; callers should not rely on this for font lookup
+   * (use `applyLayout` and let `LayoutContext` resolve typefaces internally).
+   */
+  std::vector<std::string> fallbackFamilyNames() const;
 
  private:
   struct Data;

@@ -39,6 +39,43 @@ pagx-playground/
 First, ensure you have installed all the tools and dependencies listed in the
 [README.md](../../README.md#Development) in the project root, including Emscripten.
 
+> Important: The playground does not compile any WebAssembly itself. It consumes the compiled
+> WASM artifacts from [pagx-viewer](../pagx-viewer), and the compiled player ESM bundle from
+> [pagx-player](../pagx-player). You must build both first, and the multi-threaded (MT) /
+> single-threaded (ST) choice is made in pagx-viewer, not here. Read the
+> [pagx-viewer README](../pagx-viewer/README.md) before building the playground.
+
+### Build pagx-viewer First
+
+The MT and ST WASM builds are produced in pagx-viewer, not in the playground. Pick the flavor
+you need there:
+
+```bash
+# In playground/pagx-viewer
+npm install
+npm run build:release       # multi-threaded (default, requires SharedArrayBuffer)
+npm run build:release:st    # single-threaded (no SharedArrayBuffer required)
+```
+
+See the [pagx-viewer README](../pagx-viewer/README.md) for the full build matrix.
+
+### Build pagx-player
+
+The playground imports the player component as a pre-built ESM bundle from
+[pagx-player](../pagx-player). Build it before building the playground so the prebuild step
+can pick up the bundle:
+
+```bash
+# In playground/pagx-player
+npm install
+npm run build               # debug bundle with sourcemaps
+npm run build:release       # minified release bundle
+```
+
+The build writes `playground/pagx-player/lib/pagx-player.esm.js` (not tracked by git). The
+playground's prebuild step reads that file and copies it into `wasm-mt/`; if the file is
+missing, prebuild fails with a message pointing you back to the pagx-player build.
+
 ### Install Dependencies
 
 ```bash
@@ -48,31 +85,53 @@ npm install
 
 ### Build
 
-```bash
-# Build the TypeScript source
-npm run build
+Build the playground against the viewer artifacts. Use the plain commands to bundle against the
+multi-threaded viewer build, or the `:st` variants for the single-threaded one:
 
-# Build release version (minified)
+```bash
+# Bundle against the multi-threaded viewer artifacts (default)
+npm run build
 npm run build:release
+
+# Bundle against the single-threaded viewer artifacts
+npm run build:st
+npm run build:release:st
 
 # Clean build artifacts
 npm run clean
 ```
 
+The `:st` variants only tell the playground bundler to pick up the single-threaded viewer
+artifacts; the actual MT/ST WASM compilation happens in pagx-viewer. Multi-threaded builds rely
+on `SharedArrayBuffer`, which requires the `Cross-Origin-Opener-Policy` and
+`Cross-Origin-Embedder-Policy` headers. The development server detects the build type
+automatically and only sends these headers for multi-threaded builds, so no manual configuration
+is needed when switching between the two.
+
 ## Development
 
 ### Run Development Server
 
-Start a local development server with hot reload:
+Start a local development server:
 
 ```bash
 npm run server
 ```
 
-The server will automatically open http://localhost:8081 in your browser.
+The server automatically opens the playground in your default browser and applies the correct
+COOP/COEP headers based on the detected build type (see [Build](#build)).
 
-> Note: The development server requires SharedArrayBuffer for WASM threading.
-> If you encounter issues, ensure your browser supports the required COOP/COEP headers.
+### LAN Sharing
+
+By default the server binds to `localhost` only. To share it with other devices on the same
+network (e.g. testing on a phone), enable LAN binding with the `PAGX_LAN` environment variable:
+
+```bash
+PAGX_LAN=1 npm run server
+```
+
+The console then prints a `LAN access` URL. Only enable this on trusted networks, as it exposes
+the local file server to any device on the LAN.
 
 ## Publish
 
@@ -99,19 +158,6 @@ npm run publish -- -o /path/to/output
 
 # Skip build step (use pre-built files)
 npm run publish -- --skip-build
-```
-
-## Use with PAGX Viewer
-
-The playground consumes the compiled artifacts from [pagx-viewer](../pagx-viewer).
-Make sure to build the pagx-viewer first before building the playground:
-
-```bash
-# In playground/pagx-viewer
-npm run build:release
-
-# Then in playground/pagx-playground
-npm run build:release
 ```
 
 ## Browser Requirements

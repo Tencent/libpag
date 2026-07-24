@@ -22,11 +22,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "pagx/ObserverHandle.h"
 #include "pagx/nodes/ViewModelProperty.h"
 
 namespace pagx {
 
-class ObserverHandle;
 class PAGScene;
 class PAGViewModel;
 class PropertyData;
@@ -42,7 +42,7 @@ class DataConverter;
  * callbacks) and to any data bindings that consume this property. Setting the same value is a
  * no-op and produces no change notification.
  */
-class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue> {
+class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>, public Observable {
  public:
   using Observer = std::function<void()>;
 
@@ -136,7 +136,7 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
   int nextObserverId = 1;
   std::vector<DataBindRuntime*> dependents = {};
 
-  void removeObserver(int id);
+  void removeObserver(int id) override;
 
   void setScene(const std::shared_ptr<PAGScene>& scene) {
     this->scene = scene;
@@ -146,7 +146,6 @@ class PAGViewModelValue : public std::enable_shared_from_this<PAGViewModelValue>
 
   void removeDependent(DataBindRuntime* runtime);
 
-  friend class ObserverHandle;
   friend class PAGViewModel;
   friend class PAGScene;
   friend class SuppressDelegation;

@@ -1,0 +1,245 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** CSS rules for the editor panel, injected at runtime to avoid a separate rollup CSS plugin. */
+export const EDITOR_STYLES = `
+/* z-index sits above the player toolbar / playback bar (150) so a small viewport where those
+   controls can't fully fit in the shrunken container gets them cleanly clipped by the panel
+   instead of shown floating on top of the editor's own UI. The panel's opaque background acts
+   as the actual visual clip. */
+#editor-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    /* Width is driven by the --editor-width variable set while dragging the resizer; falls back
+       to 50% before any drag. min-width guards the CSS-only case against an overly narrow panel. */
+    width: var(--editor-width, 50%);
+    min-width: 320px;
+    display: none;
+    flex-direction: column;
+    background: #1E1E1E;
+    border-left: 1px solid #3C3C3C;
+    z-index: 300;
+}
+
+#editor-panel .editor-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 6px;
+    cursor: ew-resize;
+    /* Sits above the panel body so the 6px-wide grabber stays clickable when the panel's
+       raised z-index brings its own children in front of it. */
+    z-index: 320;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+
+#editor-panel .editor-resizer:hover,
+#editor-panel .editor-resizer.dragging {
+    background: #448EF9;
+}
+
+#editor-panel.visible {
+    display: flex;
+}
+
+/* Note: the container shrinking rule (.with-editor { width: calc(...) }) is defined on the
+   .pagx-player-root wrapper in pagx-player/src/styles.ts so the editor doesn't leak layout
+   assumptions about the host container's class name. */
+
+#editor-panel .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 40px;
+    padding: 0 12px;
+    background: #252526;
+    border-bottom: 1px solid #3C3C3C;
+    flex-shrink: 0;
+}
+
+#editor-panel .editor-title {
+    color: #CCCCCC;
+    font-size: 13px;
+    font-weight: 500;
+    user-select: none;
+}
+
+#editor-panel .editor-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #CCCCCC;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0;
+}
+
+#editor-panel .editor-close-btn:hover {
+    background: #3C3C3C;
+}
+
+#editor-panel .editor-host {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+#editor-panel .editor-host .cm-editor {
+    height: 100%;
+    font-size: 13px;
+    font-family: Menlo, Monaco, 'Courier New', monospace;
+}
+
+#editor-panel .editor-host .cm-scroller {
+    overflow: auto;
+}
+
+/* Fix white square at scrollbar corner */
+#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-corner {
+    background: #1E1E1E;
+}
+
+#editor-panel .editor-host .cm-gutters {
+    background: #1E1E1E;
+    border-right: 1px solid #3C3C3C;
+    color: #6E7681;
+}
+
+#editor-panel .editor-host .cm-focused {
+    outline: none;
+}
+
+/* Selection highlight. !important guards against CodeMirror's baseTheme and any focused-state
+   rule that may be injected inline; specificity alone is not always enough. */
+#editor-panel .editor-host .cm-editor .cm-selectionBackground,
+#editor-panel .editor-host .cm-editor.cm-focused .cm-selectionBackground,
+#editor-panel .editor-host .cm-editor ::selection {
+    background-color: rgba(68, 142, 249, 0.35) !important;
+}
+
+/* highlightSelectionMatches - subtle highlight for matching text under cursor */
+#editor-panel .editor-host .cm-editor .cm-selectionMatch {
+    background-color: rgba(234, 179, 8, 0.15);
+}
+
+#editor-panel .editor-host .cm-editor .cm-selectionMatch-selected {
+    background-color: rgba(68, 142, 249, 0.3);
+}
+
+/* Editor feedback ("Changes applied", validation errors, etc.) now flows through the player's
+   unified status pill (pagx-player styles.ts .pagx-player-status), so no dedicated .editor-toast
+   styles live here anymore. */
+
+#editor-panel .editor-button-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: 48px;
+    background: #16161D;
+    border-top: 1px solid #3C3C3C;
+    flex-shrink: 0;
+}
+
+#editor-panel .editor-btn {
+    width: 80px;
+    height: 32px;
+    border: 1px solid;
+    border-radius: 4px;
+    color: #FFFFFF;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.1s, transform 0.1s;
+    padding: 0;
+}
+
+#editor-panel .editor-btn:hover {
+    transform: scale(1.05);
+}
+
+#editor-panel .editor-btn:active {
+    transform: scale(1.0);
+}
+
+/* While the host's onApply/onSave is in flight the buttons are disabled to prevent
+   overlapping callbacks. Fades them and neutralizes hover so the pause is visible. */
+#editor-panel .editor-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+#editor-panel .editor-btn:disabled:hover {
+    transform: none;
+}
+
+#editor-panel .editor-btn.discard {
+    background: #3C3C3C;
+    border-color: #4B4B5A;
+}
+
+#editor-panel .editor-btn.discard:hover {
+    background: #5C5C6A;
+    border-color: #8B8B9A;
+}
+
+#editor-panel .editor-btn.apply {
+    background: #448EF9;
+    border-color: #5BA3FF;
+}
+
+#editor-panel .editor-btn.apply:hover {
+    background: #5BA3FF;
+    border-color: #8BC4FF;
+}
+
+#editor-panel .editor-btn.save {
+    background: #388E3C;
+    border-color: #4CAF50;
+}
+
+#editor-panel .editor-btn.save:hover {
+    background: #4CAF50;
+    border-color: #81C784;
+}
+
+#editor-panel .editor-host .cm-scroller::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-thumb {
+    background: rgba(75, 75, 90, 0.67);
+    border-radius: 4px;
+}
+
+#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-thumb:hover {
+    background: rgba(90, 90, 110, 0.8);
+}
+`;

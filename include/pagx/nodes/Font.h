@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
 #include "pagx/types/Point.h"
@@ -78,6 +79,26 @@ class Font : public Node {
    * The default value is 1000.
    */
   int unitsPerEm = 1000;
+
+  /**
+   * Path to an external font file. When set, this Font node serves as a font source declaration:
+   * `pagx embed` loads and registers the referenced font for text shaping. Extracted glyph data
+   * is stored in separate Font nodes (the source node's `glyphs` is preserved as empty across
+   * embed). The path is resolved relative to the PAGX file's directory. An empty string means
+   * no external reference.
+   *
+   * After PAGXImporter::FromFile() resolves relative paths to absolute paths for runtime use,
+   * the original verbatim string from the XML attribute is preserved here so that PAGXExporter
+   * can round-trip the authored path (relative or URL) unchanged.
+   */
+  std::string file = {};
+
+  /**
+   * The verbatim `file` attribute value as it appeared in the source XML, before any path
+   * resolution. PAGXExporter writes this value when non-empty, ensuring that relative paths
+   * authored by the user are preserved after a round-trip through embed and re-export.
+   */
+  std::string fileOriginal = {};
 
   /**
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing

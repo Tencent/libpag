@@ -20,7 +20,9 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
+#include "pagx/ObserverHandle.h"
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/DataBind.h"
 
@@ -96,6 +98,7 @@ class DataBindRuntime {
 
   std::vector<DataBind*> dirtyBinds = {};
   std::vector<BindingEntry> entries = {};
+  std::unordered_map<DataBind*, ObserverHandle> triggerHandles = {};
   // Borrowed from the owning composition (not owned). The composition holds both the RuntimeBinding
   // and this runtime and destroys them together, so the pointer is valid for this runtime's life.
   RuntimeBinding* boundBinding = nullptr;

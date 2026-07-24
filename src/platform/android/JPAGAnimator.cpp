@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <mutex>
 #include "JNIHelper.h"
 #include "rendering/PAGAnimator.h"
 
@@ -132,6 +133,9 @@ class JPAGAnimator {
       tempAnimator = std::move(animator);
       tempListener = std::move(listener);
     }
+    // Call cancel outside the lock to avoid deadlock: cancel() may synchronously invoke listener
+    // callbacks that re-enter methods on this JPAGAnimator, which would try to acquire locker
+    // again.
     if (tempAnimator) {
       tempAnimator->cancel();
     }

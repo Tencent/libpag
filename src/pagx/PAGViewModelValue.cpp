@@ -27,6 +27,7 @@
 #include "pagx/PAGViewModelValueImage.h"
 #include "pagx/PAGViewModelValueNumber.h"
 #include "pagx/PAGViewModelValueString.h"
+#include "pagx/PAGViewModelValueTrigger.h"
 #include "pagx/PropertyData.h"
 #include "pagx/SuppressDelegation.h"
 
@@ -35,9 +36,13 @@ namespace pagx {
 // ---- Observer registration ---------------------------------------------------
 
 ObserverHandle PAGViewModelValue::addObserver(Observer observer) {
+  auto self = weak_from_this().lock();
+  if (self == nullptr) {
+    return ObserverHandle();
+  }
   int id = nextObserverId++;
   observers.push_back({id, std::move(observer)});
-  return ObserverHandle(shared_from_this(), id);
+  return ObserverHandle(self, id);
 }
 
 void PAGViewModelValue::removeObserver(int id) {
@@ -192,12 +197,20 @@ void PAGViewModelValueImage::setValueInternal(std::shared_ptr<PAGImage> v, bool 
   notifyChanged(fromVM);
 }
 
+void PAGViewModelValueTrigger::fire() {
+  // A trigger is a value-less pulse: every call is a distinct event, so there is no same-value
+  // short-circuit. The dirty flag is set so dependent data bindings are notified, though triggers
+  // are typically consumed by observers (e.g. StateMachine inputs) rather than data bindings.
+  dirty = true;
+  notifyChanged(true);
+}
+
 // ---- ObserverHandle ----------------------------------------------------------
 
 ObserverHandle::ObserverHandle() = default;
 
-ObserverHandle::ObserverHandle(std::shared_ptr<PAGViewModelValue> src, int id)
-    : source(std::move(src)), observerId(id) {
+ObserverHandle::ObserverHandle(std::shared_ptr<Observable> src, int observerId)
+    : source(std::move(src)), id(observerId) {
 }
 
 ObserverHandle::~ObserverHandle() {
@@ -205,29 +218,29 @@ ObserverHandle::~ObserverHandle() {
 }
 
 ObserverHandle::ObserverHandle(ObserverHandle&& other) noexcept
-    : source(std::move(other.source)), observerId(other.observerId) {
-  other.observerId = 0;
+    : source(std::move(other.source)), id(other.id) {
+  other.id = -1;
 }
 
 ObserverHandle& ObserverHandle::operator=(ObserverHandle&& other) noexcept {
   if (this != &other) {
     detach();
     source = std::move(other.source);
-    observerId = other.observerId;
-    other.observerId = 0;
+    id = other.id;
+    other.id = -1;
   }
   return *this;
 }
 
 void ObserverHandle::detach() {
-  if (observerId == 0) {
+  if (id < 0) {
     return;
   }
   auto src = source.lock();
   if (src) {
-    src->removeObserver(observerId);
+    src->removeObserver(id);
   }
-  observerId = 0;
+  id = -1;
   source.reset();
 }
 

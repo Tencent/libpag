@@ -31,16 +31,26 @@ declare const wx: any;
 type DeviceTier = 'high' | 'mid' | 'low' | 'unknown';
 type Platform = 'ios' | 'android' | 'other';
 
-/** Full result returned by checkPagx */
+/** Full result returned by checkPagx. */
 export interface PagxCheckResult {
-  /** Score (0-100), higher means smoother; Android >= 65 renders normally, other platforms >= 75 render normally */
+  /** Score (0-100), higher means smoother. Always purely a file risk score (see deviceSupported for hardware checks). */
   score: number;
-  /** Device performance level (raw value returned by the WeChat API, -1 means unknown) */
+  /** Device performance level (raw value returned by the WeChat API, -1 means unknown). */
   benchmarkLevel: number;
-  /** Device tier */
+  /** Device tier. */
   deviceTier: DeviceTier;
-  /** Platform */
+  /** Platform. */
   platform: Platform;
+  /** Whether the device hardware is capable of rendering PAGX files. */
+  deviceSupported: boolean;
+  /** Reason why the hardware is unsupported (e.g., 'Mali-G925 driver defect'). Only set when deviceSupported is false. */
+  unsupportedReason?: string;
+  /** Device brand. */
+  brand?: string;
+  /** Device model. */
+  model?: string;
+  /** GPU RENDERER string (collected on Android, for diagnostics only). */
+  gpuRenderer?: string;
 }
 
 // ============================================================================
@@ -51,7 +61,20 @@ interface DeviceInfoCache {
   tier: DeviceTier;
   benchmarkLevel: number;
   platform: Platform;
+  brand: string;
+  model: string;
+  /** WebGL RENDERER string, e.g. "Mali-G925-Immortalis MP12". Only collected on Android. */
+  gpuRenderer: string;
 }
+
+/**
+ * Mali GPU families with a WebGL2 driver-level memory defect that causes WASM heap
+ * to bloat by 2GB during rendering, triggering LMK:
+ *   Mali-G925   → Dimensity 9400 / 9400+
+ *   Mali-G1-Ultra → Dimensity 9500
+ * Dimensity 9300 (Mali-G720) is unaffected.
+ */
+const DIMENSITY_GPU_RENDERER_PATTERN = /\b(Mali-G925|Mali-G1-Ultra)\b/;
 
 let cachedDeviceInfo: DeviceInfoCache | null = null;
 
@@ -59,17 +82,17 @@ let cachedDeviceInfo: DeviceInfoCache | null = null;
  * Determine the device tier from benchmarkLevel and platform.
  *
  * Android platform:
- *   - High tier: >=30 (Xiaomi 15, OPPO Find X8)
+ *   - High tier: ≥30 (Xiaomi 15, OPPO Find X8)
  *   - Mid tier: 23-29 (HONOR 200, REDMI K40)
- *   - Low tier: <=22 (HONOR Play 20, VIVO Y52s)
+ *   - Low tier: ≤22 (HONOR Play 20, VIVO Y52s)
  *
  * iOS platform:
- *   - High tier: >=36 (iPhone 15/16/17)
+ *   - High tier: ≥36 (iPhone 15/16/17)
  *   - Mid tier: 30-35 (iPhone 11/12)
- *   - Low tier: <=29 (iPhone 7/8/X)
+ *   - Low tier: ≤29 (iPhone 7/8/X)
  */
 function getDeviceTier(benchmarkLevel: number, platform: string): DeviceTier {
-  // benchmarkLevel = -1 means performance is unknown
+  // benchmarkLevel = -1 means performance is unknown.
   if (benchmarkLevel < 0) return 'unknown';
 
   if (platform === 'ios') {
@@ -77,7 +100,7 @@ function getDeviceTier(benchmarkLevel: number, platform: string): DeviceTier {
     if (benchmarkLevel >= 30) return 'mid';
     return 'low';
   } else {
-    // Android or other platforms
+    // Android or other platforms.
     if (benchmarkLevel >= 30) return 'high';
     if (benchmarkLevel >= 23) return 'mid';
     return 'low';
@@ -88,7 +111,7 @@ function getDeviceTier(benchmarkLevel: number, platform: string): DeviceTier {
  * Fetch device info asynchronously (calls wx.getDeviceBenchmarkInfo).
  */
 async function fetchDeviceInfoAsync(): Promise<DeviceInfoCache> {
-  // Return directly if already cached
+  // Return directly if already cached.
   if (cachedDeviceInfo !== null) {
     return cachedDeviceInfo;
   }
@@ -99,10 +122,35 @@ async function fetchDeviceInfoAsync(): Promise<DeviceInfoCache> {
     const platform: Platform = rawPlatform === 'ios' ? 'ios' : rawPlatform === 'android' ? 'android' : 'other';
     const benchmarkLevel = systemInfo.benchmarkLevel;
     const tier = getDeviceTier(benchmarkLevel, rawPlatform);
-    cachedDeviceInfo = { tier, benchmarkLevel, platform };
+    const brand = String(systemInfo.brand ?? '');
+    const model = String(systemInfo.model ?? '');
+
+    // Obtain the real GPU name via the WEBGL_debug_renderer_info extension (the standard
+    // WeChat RENDERER returns a generic string). Fall back to precise model matching for
+    // Dimensity chips when the extension is unavailable.
+    let gpuRenderer = '';
+    if (platform === 'android') {
+      try {
+        const glCanvas = wx.createOffscreenCanvas({ type: 'webgl', width: 1, height: 1 });
+        const gl = glCanvas.getContext('webgl');
+        if (gl) {
+          const debugExt = gl.getExtension('WEBGL_debug_renderer_info') as any;
+          if (debugExt) {
+            gpuRenderer = String(gl.getParameter(debugExt.UNMASKED_RENDERER_WEBGL) ?? '');
+          }
+          if (!gpuRenderer) {
+            gpuRenderer = String(gl.getParameter(0x1F01) ?? '');
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    cachedDeviceInfo = { tier, benchmarkLevel, platform, brand, model, gpuRenderer };
   } catch {
-    // Fetch failed, fall back to a conservative unknown
-    cachedDeviceInfo = { tier: 'unknown', benchmarkLevel: -1, platform: 'other' };
+    // Fetch failed, fall back to a conservative unknown.
+    cachedDeviceInfo = { tier: 'unknown', benchmarkLevel: -1, platform: 'other', brand: '', model: '', gpuRenderer: '' };
   }
 
   return cachedDeviceInfo;
@@ -135,9 +183,9 @@ const TIER_MULTIPLIERS: Record<DeviceTier, number> = {
  * Platform multipliers: iOS mini-program rendering performs worse than Android, so it needs stricter thresholds.
  *
  * Root-cause analysis:
- * - The WebGL implementation of the iOS mini-program WebView differs from Android
- * - iOS handles complex layer compositing less efficiently
- * - iOS mini-programs manage memory more strictly and trigger GC more easily
+ * - The WebGL implementation of the iOS mini-program WebView differs from Android.
+ * - iOS handles complex layer compositing less efficiently.
+ * - iOS mini-programs manage memory more strictly and trigger GC more easily.
  *
  * Multiplier notes (applied to the thresholds; a smaller multiplier lowers the threshold and makes scoring stricter):
  * - iOS: 0.6 (threshold lowered to 60%, stricter)
@@ -198,7 +246,7 @@ interface LayerScanState {
 
 /**
  * Adjust the thresholds by device tier and platform.
- * Final multiplier = device-tier multiplier × platform multiplier
+ * Final multiplier = device-tier multiplier × platform multiplier.
  */
 function getAdjustedRiskPaths(tier: DeviceTier, platform: Platform): Record<string, RiskPathConfig> {
   const tierMultiplier = TIER_MULTIPLIERS[tier];
@@ -380,11 +428,11 @@ function findAllByTag(node: XmlNode, tagName: string): XmlNode[] {
 function buildCompositionLookup(root: XmlNode): Map<string, XmlNode> {
   const lookup = new Map<string, XmlNode>();
 
-  // Find the Resources node
+  // Find the Resources node.
   const resources = root.children.find((c) => c.tag === 'Resources');
   if (!resources) return lookup;
 
-  // Collect all Composition definitions
+  // Collect all Composition definitions.
   for (const comp of findAllByTag(resources, 'Composition')) {
     const id = comp.attribs.id;
     if (id) {
@@ -404,7 +452,7 @@ function getCompositionTagCounts(
   compLookup: Map<string, XmlNode>,
   cache: Map<string, Map<string, number>>,
 ): Map<string, number> {
-  // Return directly if already cached
+  // Return directly if already cached.
   if (cache.has(compId)) {
     return cache.get(compId)!;
   }
@@ -416,11 +464,11 @@ function getCompositionTagCounts(
     return empty;
   }
 
-  // Guard against circular references: set an empty Map first
+  // Guard against circular references: set an empty Map first.
   const counts = new Map<string, number>();
   cache.set(compId, counts);
 
-  // Recursively count the tags inside the Composition (expands nested Composition references)
+  // Recursively count the tags inside the Composition (expands nested Composition references).
   countTagsInNodeInternal(comp, counts, compLookup, cache);
 
   return counts;
@@ -436,23 +484,23 @@ function countTagsInNodeInternal(
   compLookup: Map<string, XmlNode>,
   cache: Map<string, Map<string, number>>,
 ): void {
-  // Count the current node
+  // Count the current node.
   counts.set(node.tag, (counts.get(node.tag) || 0) + 1);
 
-  // If it is a Layer that references a Composition, fetch and accumulate the Composition tag counts
+  // If it is a Layer that references a Composition, fetch and accumulate the Composition tag counts.
   if (node.tag === 'Layer') {
     const compRef = node.attribs.composition;
     if (compRef && compRef.startsWith('@')) {
       const refId = compRef.slice(1);
       const refCounts = getCompositionTagCounts(refId, compLookup, cache);
-      // Merge the referenced Composition tag counts (accumulate into the current counts)
+      // Merge the referenced Composition tag counts (accumulate into the current counts).
       for (const [tag, count] of refCounts) {
         counts.set(tag, (counts.get(tag) || 0) + count);
       }
     }
   }
 
-  // Recurse into child nodes
+  // Recurse into child nodes.
   for (const child of node.children) {
     countTagsInNodeInternal(child, counts, compLookup, cache);
   }
@@ -467,7 +515,7 @@ function countTagsWithExpansion(root: XmlNode): Map<string, number> {
   const cache = new Map<string, Map<string, number>>();
   const totalCounts = new Map<string, number>();
 
-  // Traverse only the body nodes (excluding Resources)
+  // Traverse only the body nodes (excluding Resources).
   for (const child of root.children) {
     if (child.tag === 'Resources') continue;
     countTagsInNodeInternal(child, totalCounts, compLookup, cache);
@@ -495,7 +543,7 @@ function countPathDataWithExpansion(root: XmlNode): number {
   const compLookup = buildCompositionLookup(root);
   const pathDataCache = new Map<string, number>();
 
-  // Compute the Path data byte count for a single Composition (cached)
+  // Compute the Path data byte count for a single Composition (cached).
   function getCompPathData(compId: string): number {
     if (pathDataCache.has(compId)) {
       return pathDataCache.get(compId)!;
@@ -507,24 +555,24 @@ function countPathDataWithExpansion(root: XmlNode): number {
       return 0;
     }
 
-    // Guard against circular references: set 0 first
+    // Guard against circular references: set 0 first.
     pathDataCache.set(compId, 0);
     const bytes = countPathDataInNode(comp);
     pathDataCache.set(compId, bytes);
     return bytes;
   }
 
-  // Recursively compute the Path data of a node
+  // Recursively compute the Path data of a node.
   function countPathDataInNode(node: XmlNode): number {
     let total = 0;
 
-    // If it is a Path, accumulate the data length
+    // If it is a Path, accumulate the data length.
     if (node.tag === 'Path') {
       const d = node.attribs.data || '';
       if (d) total += d.length;
     }
 
-    // If it is a Layer that references a Composition
+    // If it is a Layer that references a Composition.
     if (node.tag === 'Layer') {
       const compRef = node.attribs.composition;
       if (compRef && compRef.startsWith('@')) {
@@ -532,7 +580,7 @@ function countPathDataWithExpansion(root: XmlNode): number {
       }
     }
 
-    // Recurse into child nodes
+    // Recurse into child nodes.
     for (const child of node.children) {
       total += countPathDataInNode(child);
     }
@@ -540,7 +588,7 @@ function countPathDataWithExpansion(root: XmlNode): number {
     return total;
   }
 
-  // Count only the body part
+  // Count only the body part.
   let totalBytes = 0;
   for (const child of root.children) {
     if (child.tag === 'Resources') continue;
@@ -691,29 +739,17 @@ function scoreBgBlurAreaRadius(value: number): number {
   );
 }
 
-// Empirical calibration weights for the image runtime-risk heuristic, mirroring the Python
-// reference scorer. Each divisor normalizes a raw count/area into the formula's unit scale.
-const RUNTIME_RISK_DOWNSCALE_BASELINE_MP = 10;
-const RUNTIME_RISK_LAYER_COMPLEXITY_DIVISOR = 1500;
-const RUNTIME_RISK_TEXT_COMPLEXITY_DIVISOR = 400;
-const RUNTIME_RISK_INNER_SHADOW_COMPLEXITY_DIVISOR = 10;
-const RUNTIME_RISK_BG_BLUR_RADIUS_DIVISOR = 60;
-const RUNTIME_RISK_LAYOUT_LAYER_DIVISOR = 6000;
-const RUNTIME_RISK_LAYOUT_DOC_MP_DIVISOR = 100;
-
 function getImageRuntimeRisk(raw: LocalRiskRaw): number {
-  const effectiveDownscaleMP = Math.max(0, raw.imageDownscaleMP - RUNTIME_RISK_DOWNSCALE_BASELINE_MP);
+  const effectiveDownscaleMP = Math.max(0, raw.imageDownscaleMP - 10);
   if (effectiveDownscaleMP <= 0) return 0;
 
-  const contentComplexity = raw.layerCount / RUNTIME_RISK_LAYER_COMPLEXITY_DIVISOR
-    + raw.textCount / RUNTIME_RISK_TEXT_COMPLEXITY_DIVISOR
-    + raw.innerShadowCount / RUNTIME_RISK_INNER_SHADOW_COMPLEXITY_DIVISOR;
+  const contentComplexity = raw.layerCount / 1500 + raw.textCount / 400 + raw.innerShadowCount / 10;
   const bgBlurInteraction = raw.bgBlurAreaRadius > 0
     && raw.bgBlurAreaRadius <= LOCAL_RISK_PATHS.bgBlurAreaRadius.red
-    ? (raw.bgBlurAreaRadius / RUNTIME_RISK_BG_BLUR_RADIUS_DIVISOR) * contentComplexity
+    ? (raw.bgBlurAreaRadius / 60) * contentComplexity
     : 0;
   const layoutInteraction = raw.imageDownscaleMP >= LOCAL_RISK_PATHS.imageLoadMP.yellow
-    ? raw.layerCount / RUNTIME_RISK_LAYOUT_LAYER_DIVISOR + raw.docMP / RUNTIME_RISK_LAYOUT_DOC_MP_DIVISOR
+    ? raw.layerCount / 6000 + raw.docMP / 100
     : 0;
   return effectiveDownscaleMP * (bgBlurInteraction + layoutInteraction);
 }
@@ -778,27 +814,44 @@ function uint8ArrayToString(data: Uint8Array): string {
 }
 
 // ============================================================================
+// Mali GPU Driver Defect Detection (Dimensity 9500 / 9400+ / 9400)
+// ============================================================================
+//
+// The WeChat WebGL RENDERER returns a generic string. Use the WEBGL_debug_renderer_info
+// extension to obtain the real GPU name from UNMASKED_RENDERER: Mali-G925 (Dimensity 9400)
+// / Mali-G1-Ultra (Dimensity 9500). Dimensity 9300 (Mali-G720) is unaffected.
+
+const MALI_DEFECT_REASON = 'Mali-G925 driver defect';
+
+function getUnsupportedReason(gpuRenderer: string): string | null {
+  if (gpuRenderer && DIMENSITY_GPU_RENDERER_PATTERN.test(gpuRenderer)) {
+    return MALI_DEFECT_REASON;
+  }
+  return null;
+}
+
+// ============================================================================
 // Main Export Function
 // ============================================================================
 
 /**
  * Evaluate the render-stutter risk of a PAGX file; a higher score means smoother rendering.
  *
- * This is an **optional** diagnostic utility — it is NOT required for rendering. The module is
- * built as a standalone JS file (`lib/pagx-check.js`) with no dependency on the WASM renderer
- * or WebGL context. Hosts that do not need pre-render stutter detection can omit it entirely.
+ * Check `deviceSupported` first to determine whether the device hardware can render PAGX files
+ * at all (e.g., Mali-G925 GPU driver defect). Only when `deviceSupported` is true should the
+ * `score` field be used to assess file-level stutter risk.
  *
  * Rendering recommendation (decided by runtime platform):
- * - Android: score >= 65 renders normally
- * - Other platforms (iOS, etc.): score >= 75 renders normally
+ * - Android: score >= 65 renders normally.
+ * - Other platforms (iOS, etc.): score >= 75 renders normally.
  *
  * It automatically fetches device performance info and adjusts the thresholds by device tier:
- * - High-end (benchmarkLevel >=30/36): use the default thresholds (calibration baseline)
- * - Mid-range (benchmarkLevel 23-29/30-35): tightened thresholds
- * - Low-end (benchmarkLevel <=22/29): thresholds tightened further
+ * - High-end (benchmarkLevel >=30/36): use the default thresholds (calibration baseline).
+ * - Mid-range (benchmarkLevel 23-29/30-35): tightened thresholds.
+ * - Low-end (benchmarkLevel <=22/29): thresholds tightened further.
  *
- * @param pagxData - Binary data of the PAGX file (Uint8Array)
- * @returns Promise<PagxCheckResult> - contains the score, device performance level and device tier
+ * @param pagxData - Binary data of the PAGX file (Uint8Array).
+ * @returns Promise<PagxCheckResult> - contains the score, device support info, device performance level and device tier.
  *
  * @example
  * ```typescript
@@ -808,6 +861,10 @@ function uint8ArrayToString(data: Uint8Array): string {
  * const data = fs.readFileSync(filePath);
  * const result = await CheckPagx(new Uint8Array(data));
  *
+ * if (!result.deviceSupported) {
+ *   wx.showToast({ title: 'This device cannot render PAGX files', icon: 'none' });
+ *   return;
+ * }
  * const minScore = result.platform === 'android' ? 65 : 75;
  * if (result.score < minScore) {
  *   wx.showToast({ title: 'This file may cause stutter', icon: 'none' });
@@ -815,18 +872,36 @@ function uint8ArrayToString(data: Uint8Array): string {
  * ```
  */
 export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> {
-  // Fetch device info first (device info must be returned even if parsing fails)
+  // Fetch device info first (device info must be returned even if parsing fails).
   const deviceInfo = await fetchDeviceInfoAsync();
 
-  // Default return value (used when parsing fails)
+  // Dimensity 9400 / 9400+ / 9500 have a driver-level memory defect; the hardware cannot render.
+  const unsupportedReason = getUnsupportedReason(deviceInfo.gpuRenderer);
+  if (unsupportedReason) {
+    return {
+      score: 0,
+      benchmarkLevel: deviceInfo.benchmarkLevel,
+      deviceTier: deviceInfo.tier,
+      platform: deviceInfo.platform,
+      deviceSupported: false,
+      unsupportedReason,
+      brand: deviceInfo.brand,
+      model: deviceInfo.model,
+      gpuRenderer: deviceInfo.gpuRenderer,
+    };
+  }
+
+  // Default return value (used when parsing fails).
   const defaultResult: PagxCheckResult = {
     score: 0,
     benchmarkLevel: deviceInfo.benchmarkLevel,
     deviceTier: deviceInfo.tier,
     platform: deviceInfo.platform,
+    deviceSupported: true,
+    gpuRenderer: deviceInfo.gpuRenderer,
   };
 
-  // Convert the Uint8Array to a string
+  // Convert the Uint8Array to a string.
   let pagxContent: string;
   try {
     pagxContent = uint8ArrayToString(pagxData);
@@ -834,24 +909,24 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
     return defaultResult;
   }
 
-  // Parse the XML
+  // Parse the XML.
   const root = parseXml(pagxContent);
   if (!root) return defaultResult;
 
-  // Adjust the thresholds by device tier and platform
+  // Adjust the thresholds by device tier and platform.
   const riskPaths = getAdjustedRiskPaths(deviceInfo.tier, deviceInfo.platform);
 
-  // Read the document dimensions (use readNumericAttr like scanLocalRisk to avoid Number/parseFloat parsing differences)
+  // Read the document dimensions (use readNumericAttr like scanLocalRisk for consistency).
   const docWidth = readNumericAttr(root.attribs, 'width');
   const docHeight = readNumericAttr(root.attribs, 'height');
 
-  // Count the raw XML tags (not expanded, used by the layer_xml risk path)
+  // Count the raw XML tags (not expanded, used by the layer_xml risk path).
   const rawTagCounts = countTagsRaw(root);
 
-  // Count the tags after expanding Composition (used for the actual rendering-cost calculation)
+  // Count the tags after expanding Composition (used for the actual rendering-cost calculation).
   const expandedTagCounts = countTagsWithExpansion(root);
 
-  // Key metrics (use the expanded counts to reflect the real rendering cost)
+  // Key metrics (use the expanded counts to reflect the real rendering cost).
   const bgBlurCount = expandedTagCounts.get('BackgroundBlurStyle') || 0;
   const imagePattern = expandedTagCounts.get('ImagePattern') || 0;
   const innerShadowCount = expandedTagCounts.get('InnerShadowStyle') || 0;
@@ -861,35 +936,35 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
     (expandedTagCounts.get('RadialGradient') || 0) +
     (expandedTagCounts.get('SweepGradient') || 0);
 
-  // Compute the total Path data byte count (expanding Composition references)
+  // Compute the total Path data byte count (expanding Composition references).
   const pathDataBytes = countPathDataWithExpansion(root);
 
-  // layer_xml uses the raw XML count (consistent with the Python version)
+  // layer_xml uses the raw XML count (consistent with the Python version).
   const layerXml = rawTagCounts.get('Layer') || 0;
 
-  // The expanded Layer count is used for the density calculation of path C
+  // The expanded Layer count is used for the density calculation of path C.
   const expandedLayerCount = expandedTagCounts.get('Layer') || 0;
 
   const docPixels = Math.floor(docWidth * docHeight);
   const pixM = docPixels / 1_000_000;
 
-  // Compute the raw values of the five risk paths
+  // Compute the raw values of the five risk paths.
   const riskRaw: Record<string, number> = {
-    // Path A: BgBlur × uncacheable elements (uses the expanded counts)
+    // Path A: BgBlur × uncacheable elements (uses the expanded counts).
     A_bg_x_uncacheable:
       bgBlurCount * (innerShadowCount + blurFilterCount + gradientCount / 10),
-    // Path B: Path data volume (uses the expanded counts)
+    // Path B: Path data volume (uses the expanded counts).
     B_path_data_MB: pathDataBytes / (1024 * 1024),
-    // Path C: canvas × element density (uses the expanded Layer count)
+    // Path C: canvas × element density (uses the expanded Layer count).
     C_canvas_x_density:
       (pixM / 100) * (imagePattern + expandedLayerCount / 30 + gradientCount / 20),
-    // Path D: BgBlur count (uses the expanded counts)
+    // Path D: BgBlur count (uses the expanded counts).
     bg_blur_count: bgBlurCount,
-    // Path E: Layer XML count (uses the raw XML count, consistent with the Python version)
+    // Path E: Layer XML count (uses the raw XML count, consistent with the Python version).
     layer_xml: layerXml,
   };
 
-  // Compute the contribution score of each path and take the minimum
+  // Compute the contribution score of each path and take the minimum.
   let minScore = 100;
   for (const [key, cfg] of Object.entries(riskPaths)) {
     const score = normalize(riskRaw[key], cfg.yellow, cfg.red);
@@ -897,19 +972,23 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   }
 
   // Supplementary calibration from real-device business samples:
-  // - Large-area bgBlur bottoms out at 50 (openable but not recommended)
-  // - Image pressure only counts as a runtime FPS risk when combined with bgBlur / layers / text / canvas complexity
-  // - Small-area but high-count blur is kept from being wrongly killed by the SDK A path
+  // - Large-area bgBlur bottoms out at 50 (openable but not recommended).
+  // - Image pressure only counts as a runtime FPS risk when combined with bgBlur / layers / text / canvas complexity.
+  // - Small-area but high-count blur is kept from being wrongly killed by the SDK A path.
   const localRiskRaw = scanLocalRisk(root);
   const localScore = scoreLocalRisk(localRiskRaw);
   const neutralScore = scoreNeutralSdkRisk(localRiskRaw);
   const protectedBaseScore = protectDeviceSpread(minScore, localScore, neutralScore, localRiskRaw);
 
-  // Return the full result
+  // Return the full result.
   return {
     score: Math.min(protectedBaseScore, localScore),
     benchmarkLevel: deviceInfo.benchmarkLevel,
     deviceTier: deviceInfo.tier,
     platform: deviceInfo.platform,
+    deviceSupported: true,
+    brand: deviceInfo.brand,
+    model: deviceInfo.model,
+    gpuRenderer: deviceInfo.gpuRenderer,
   };
 }

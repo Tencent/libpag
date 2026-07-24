@@ -29,13 +29,11 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.view.TextureView;
 import android.view.View;
-import org.extra.tools.Lifecycle;
-import org.extra.tools.LifecycleListener;
 import java.util.ArrayList;
 
 
 public class PAGView extends TextureView implements TextureView.SurfaceTextureListener,
-        LifecycleListener, PAGAnimator.Listener {
+        PAGAnimator.Listener {
 
     public interface PAGViewListener {
         /**
@@ -74,6 +72,11 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private String filePath = "";
     private boolean isAttachedToWindow = false;
     private EGLContext sharedContext = null;
+    // Serializes the asynchronous flush() with surface lifecycle changes (create/destroy/release).
+    // Without it, an in-flight async render on the worker thread may present to an ANativeWindow
+    // while the framework is tearing down its SurfaceTexture, leading to a double-close of the
+    // underlying GraphicBuffer fd. This mirrors the std::mutex used in the iOS/macOS PAGView.
+    private final Object renderLock = new Object();
 
     /**
      * [Deprecated](Please use PAGViewListener's onAnimationUpdate instead.)
@@ -467,7 +470,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     private void setupSurfaceTexture() {
-        Lifecycle.getInstance().addListener(this);
         setOpaque(false);
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
@@ -497,16 +499,20 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-        if (pagSurface != null) {
-            pagSurface.release();
-            pagSurface = null;
+        synchronized (renderLock) {
+            if (pagSurface != null) {
+                pagSurface.release();
+                pagSurface = null;
+            }
+            pagSurface = PAGSurface.FromSurfaceTexture(surface, sharedContext);
+            pagPlayer.setSurface(pagSurface);
+            if (pagSurface != null) {
+                pagSurface.clearAll();
+            }
         }
-        pagSurface = PAGSurface.FromSurfaceTexture(surface, sharedContext);
-        pagPlayer.setSurface(pagSurface);
         if (pagSurface == null) {
             return;
         }
-        pagSurface.clearAll();
         animator.update();
         if (mListener != null) {
             mListener.onSurfaceTextureAvailable(surface, width, height);
@@ -515,9 +521,13 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+        synchronized (renderLock) {
+            if (pagSurface != null) {
+                pagSurface.updateSize();
+                pagSurface.clearAll();
+            }
+        }
         if (pagSurface != null) {
-            pagSurface.updateSize();
-            pagSurface.clearAll();
             animator.update();
         }
         if (mListener != null) {
@@ -527,12 +537,14 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        pagPlayer.setSurface(null);
+        synchronized (renderLock) {
+            pagPlayer.setSurface(null);
+            if (pagSurface != null) {
+                pagSurface.freeCache();
+            }
+        }
         if (mListener != null) {
             mListener.onSurfaceTextureDestroyed(surface);
-        }
-        if (pagSurface != null) {
-            pagSurface.freeCache();
         }
         // 延迟释放 SurfaceTexture，否则Android 4.4之前版本会在 onDetachedFromWindow() 时 Crash:
         // https://www.jianshu.com/p/675455c225bd
@@ -555,7 +567,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     protected void onAttachedToWindow() {
-        synchronized (PAGView.this) {
+        synchronized (renderLock) {
             isAttachedToWindow = true;
         }
         super.onAttachedToWindow();
@@ -564,14 +576,16 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     protected void onDetachedFromWindow() {
-        synchronized (PAGView.this) {
+        synchronized (renderLock) {
             isAttachedToWindow = false;
         }
         checkVisible();
         super.onDetachedFromWindow();
-        if (pagSurface != null) {
-            pagSurface.release();
-            pagSurface = null;
+        synchronized (renderLock) {
+            if (pagSurface != null) {
+                pagSurface.release();
+                pagSurface = null;
+            }
         }
     }
 
@@ -592,12 +606,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private boolean isVisible = false;
 
     private void checkVisible() {
-        boolean attached = false;
-        synchronized (PAGView.this) {
+        boolean attached;
+        synchronized (renderLock) {
             attached = isAttachedToWindow;
         }
+        // isShown() must be called outside renderLock because it may trigger view hierarchy
+        // callbacks that re-enter PAGView methods; holding renderLock across the call risks
+        // reentrant deadlock with async render on the worker thread.
         boolean visible = attached && isShown();
-        synchronized (PAGView.this) {
+        synchronized (renderLock) {
             if (isVisible == visible) {
                 return;
             }
@@ -612,10 +629,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     @Override
-    public void onResume() {
-        // When the device is locked and then unlocked, the PAGView's content may disappear,
-        // use the following way to make the content appear.
-        if (isVisible) {
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        if (visibility == View.VISIBLE && isVisible) {
             setVisibility(View.INVISIBLE);
             setVisibility(View.VISIBLE);
         }
@@ -671,8 +687,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     public void onAnimationUpdate(PAGAnimator animator) {
-        boolean changed = false;
-        synchronized (PAGView.this) {
+        boolean changed;
+        synchronized (renderLock) {
             if (!isAttachedToWindow) {
                 return;
             }
