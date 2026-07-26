@@ -124,7 +124,7 @@ function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl }) {
     content: [
       {
         type: 'text',
-        text: `Previewing ${path.basename(file)}${reused ? ' (reusing existing session)' : ''}. Open in browser: ${url} — ${stats}. Note: the inline widget may not render in all hosts; if the preview area is blank, open the browser URL above instead.`,
+        text: `Previewing ${path.basename(file)}${reused ? ' (reusing existing session)' : ''} — ${stats}.\n\nIf the inline preview does not appear above, you can:\n1. Open in browser: ${url}\n2. Open the URL in IDE webview for in-editor preview`,
       },
     ],
     structuredContent: {
