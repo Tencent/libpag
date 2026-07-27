@@ -109,20 +109,8 @@ class PPTExporter {
   using Options = PPTExportOptions;
 
   /**
-   * Exports a single PAGXDocument to a one-slide PPTX file at the specified path.
-   * @param document the PAGXDocument to export. Passed as non-const because internal layout
-   *        computation may cache intermediate results.
-   * @param filePath the output file path. The file will be created or overwritten.
-   * @param options export options controlling text rendering and mask handling.
-   * @return true if the PPTX file was written successfully, false if the file could not be created
-   *         or a write error occurred.
-   */
-  static bool ToFile(PAGXDocument& document, const std::string& filePath,
-                     const Options& options = {});
-
-  /**
    * Exports a sequence of PAGXDocuments to a multi-slide PPTX file at the specified path. Each
-   * document produces one slide in the order given.
+   * document produces one slide in the order given; a single-element list yields a one-slide deck.
    * @param documents the PAGXDocuments to export, one slide per entry. Pointers are non-const
    *        because internal layout computation may cache intermediate results. Must not be empty
    *        and must not contain nullptr entries.
@@ -135,20 +123,10 @@ class PPTExporter {
                      const Options& options = {});
 
   /**
-   * Exports a single PAGXDocument to an in-memory one-slide PPTX buffer without writing to disk.
-   * This lets the caller decide what to do with the bytes — persist them to a file, upload them
-   * over the network, hand them to another library, etc.
-   * @param document the PAGXDocument to export. Passed as non-const because internal layout
-   *        computation may cache intermediate results.
-   * @param options export options controlling text rendering and mask handling.
-   * @return a Data object holding the complete PPTX (OOXML .zip) payload, or nullptr if the
-   *         document could not be serialized.
-   */
-  static std::shared_ptr<Data> ToData(PAGXDocument& document, const Options& options = {});
-
-  /**
    * Exports a sequence of PAGXDocuments to an in-memory multi-slide PPTX buffer without writing to
-   * disk. Each document produces one slide in the order given.
+   * disk. This lets the caller decide what to do with the bytes — persist them to a file, upload
+   * them over the network, hand them to another library, etc. Each document produces one slide in
+   * the order given; a single-element list yields a one-slide deck.
    * @param documents the PAGXDocuments to export, one slide per entry. Pointers are non-const
    *        because internal layout computation may cache intermediate results. Must not be empty
    *        and must not contain nullptr entries.

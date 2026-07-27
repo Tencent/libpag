@@ -79,7 +79,7 @@ static std::string PPTOutDir() {
 static bool ExportAndVerify(pagx::PAGXDocument& doc, const std::string& name,
                             const pagx::PPTExportOptions& options = {}) {
   auto path = PPTOutDir() + "/" + name + ".pptx";
-  bool ok = pagx::PPTExporter::ToFile(doc, path, options);
+  bool ok = pagx::PPTExporter::ToFile({&doc}, path, options);
   if (ok) {
     ok = std::filesystem::exists(path) && std::filesystem::file_size(path) > 0;
   }
@@ -128,7 +128,7 @@ PAGX_TEST(PAGXPPTTest, PPTExport_FromSVG) {
     ASSERT_NE(reimported, nullptr) << baseName << " PAGX re-import failed";
 
     auto pptxPath = outDir + "/" + baseName + ".pptx";
-    ASSERT_TRUE(pagx::PPTExporter::ToFile(*reimported, pptxPath))
+    ASSERT_TRUE(pagx::PPTExporter::ToFile({reimported.get()}, pptxPath))
         << baseName << " PPT export failed";
     EXPECT_TRUE(std::filesystem::exists(pptxPath));
     EXPECT_GT(std::filesystem::file_size(pptxPath), 0u) << baseName << " PPTX file is empty";
@@ -1478,7 +1478,7 @@ PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
 
 PAGX_TEST(PAGXPPTTest, InvalidFilePath) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
-  EXPECT_FALSE(pagx::PPTExporter::ToFile(*doc, "/nonexistent/dir/file.pptx"));
+  EXPECT_FALSE(pagx::PPTExporter::ToFile({doc.get()}, "/nonexistent/dir/file.pptx"));
 }
 
 PAGX_TEST(PAGXPPTTest, LargeCanvas) {
@@ -2033,11 +2033,11 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeProducesSmaller) {
 
   pagx::PPTExportOptions bakedOpts;
   bakedOpts.bakeUnsupported = true;
-  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, bakedPath, bakedOpts));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, bakedPath, bakedOpts));
 
   pagx::PPTExportOptions vectorOpts;
   vectorOpts.bakeUnsupported = false;
-  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, vectorPath, vectorOpts));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, vectorPath, vectorOpts));
 
   auto bakedSize = std::filesystem::file_size(bakedPath);
   auto vectorSize = std::filesystem::file_size(vectorPath);
@@ -5883,7 +5883,7 @@ static std::shared_ptr<pagx::PAGXDocument> MakeSimplePPTDoc() {
 
 PAGX_TEST(PAGXPPTTest, ToData_SimpleDocument) {
   auto doc = MakeSimplePPTDoc();
-  auto data = pagx::PPTExporter::ToData(*doc);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
   ASSERT_NE(data, nullptr);
   EXPECT_GT(data->size(), 0u);
   EXPECT_TRUE(HasZipMagic(data.get()));
@@ -5891,7 +5891,7 @@ PAGX_TEST(PAGXPPTTest, ToData_SimpleDocument) {
 
 PAGX_TEST(PAGXPPTTest, ToData_EmptyDocument) {
   auto doc = pagx::PAGXDocument::Make(800, 600);
-  auto data = pagx::PPTExporter::ToData(*doc);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
   ASSERT_NE(data, nullptr);
   EXPECT_GT(data->size(), 0u);
   EXPECT_TRUE(HasZipMagic(data.get()));
@@ -5903,12 +5903,12 @@ PAGX_TEST(PAGXPPTTest, ToData_EmptyDocument) {
 PAGX_TEST(PAGXPPTTest, ToData_MatchesToFile) {
   auto doc = MakeSimplePPTDoc();
 
-  auto data = pagx::PPTExporter::ToData(*doc);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
   ASSERT_NE(data, nullptr);
   ASSERT_GT(data->size(), 0u);
 
   auto path = PPTOutDir() + "/to_data_parity.pptx";
-  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, path));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, path));
   auto fileBytes = ReadFileBytes(path);
   ASSERT_FALSE(fileBytes.empty());
 
@@ -5936,12 +5936,12 @@ PAGX_TEST(PAGXPPTTest, ToData_WithImageMedia) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
 
-  auto data = pagx::PPTExporter::ToData(*doc);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
   ASSERT_NE(data, nullptr);
   EXPECT_TRUE(HasZipMagic(data.get()));
 
   auto path = PPTOutDir() + "/to_data_with_image.pptx";
-  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, path));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, path));
   auto fileBytes = ReadFileBytes(path);
   ASSERT_FALSE(fileBytes.empty());
   ASSERT_EQ(data->size(), fileBytes.size());
@@ -5952,7 +5952,7 @@ PAGX_TEST(PAGXPPTTest, ToData_WithImageMedia) {
 // clear, so we can spot-check the slide part without pulling in an unzip lib.
 PAGX_TEST(PAGXPPTTest, ToData_ContainsSlidePart) {
   auto doc = MakeSimplePPTDoc();
-  auto data = pagx::PPTExporter::ToData(*doc);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
   ASSERT_NE(data, nullptr);
 
   std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
@@ -5967,7 +5967,7 @@ PAGX_TEST(PAGXPPTTest, ToData_RespectsOptions) {
   pagx::PPTExportOptions options;
   options.bakeUnsupported = false;
   options.convertTextToPath = true;
-  auto data = pagx::PPTExporter::ToData(*doc, options);
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
   ASSERT_NE(data, nullptr);
   EXPECT_TRUE(HasZipMagic(data.get()));
 }
@@ -6042,21 +6042,20 @@ PAGX_TEST(PAGXPPTTest, MultiPage_ToDataContainsAllSlideParts) {
   EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
 }
 
-// A one-element vector must produce byte-identical output to the single-document
-// overload, proving the wrapper simply forwards to the vector path.
-PAGX_TEST(PAGXPPTTest, MultiPage_SingleElementMatchesSingleOverload) {
-  auto single = MakeSimplePPTDoc();
-  auto vectorDoc = MakeSimplePPTDoc();
+// A one-element list yields a valid single-slide deck: exactly one slide part,
+// and no second slide. This is the common single-document case expressed through
+// the multi-document API.
+PAGX_TEST(PAGXPPTTest, MultiPage_SingleElementYieldsOneSlide) {
+  auto doc = MakeSimplePPTDoc();
+  std::vector<pagx::PAGXDocument*> docs = {doc.get()};
 
-  auto singleData = pagx::PPTExporter::ToData(*single);
-  ASSERT_NE(singleData, nullptr);
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
 
-  std::vector<pagx::PAGXDocument*> docs = {vectorDoc.get()};
-  auto vectorData = pagx::PPTExporter::ToData(docs);
-  ASSERT_NE(vectorData, nullptr);
-
-  ASSERT_EQ(singleData->size(), vectorData->size());
-  EXPECT_EQ(0, std::memcmp(singleData->data(), vectorData->data(), vectorData->size()));
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
 }
 
 // Media from different slides must land in distinct ppt/media/ files so nothing

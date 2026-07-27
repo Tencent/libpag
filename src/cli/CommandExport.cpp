@@ -213,7 +213,7 @@ static int ExportToPPT(const ExportOptions& options) {
   pptOptions.convertTextToPath = options.textToPath;
   pptOptions.bakeUnsupported = options.pptBakeUnsupported;
 
-  if (!PPTExporter::ToFile(*document, options.outputFile, pptOptions)) {
+  if (!PPTExporter::ToFile({document.get()}, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
     return 1;
   }

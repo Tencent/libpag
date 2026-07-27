@@ -1058,10 +1058,6 @@ bool WriteZipEntries(zipFile zf, const std::vector<SlideBuild>& slides, float sl
 // PPTExporter::ToFile
 //==============================================================================
 
-bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const Options& options) {
-  return ToFile(std::vector<PAGXDocument*>{&doc}, filePath, options);
-}
-
 bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std::string& filePath,
                          const Options& options) {
   auto slides = BuildSlides(documents, options);
@@ -1095,10 +1091,6 @@ bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std:
 //==============================================================================
 // PPTExporter::ToData
 //==============================================================================
-
-std::shared_ptr<Data> PPTExporter::ToData(PAGXDocument& doc, const Options& options) {
-  return ToData(std::vector<PAGXDocument*>{&doc}, options);
-}
 
 std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& documents,
                                           const Options& options) {
