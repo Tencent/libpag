@@ -42,13 +42,13 @@
 #include "pagx/ppt/PPTGeomEmitter.h"
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
+#include "pagx/types/Data.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
-#include "pagx/types/Data.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "zip.h"
@@ -1002,13 +1002,13 @@ bool WriteZipEntries(zipFile zf, const std::vector<SlideBuild>& slides, float sl
   }
 
   bool ok = true;
-  ok = ok && AddZipString(zf, "[Content_Types].xml",
-                          GenerateContentTypes(hasPNG, hasJPEG, slideCount));
+  ok = ok &&
+       AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(hasPNG, hasJPEG, slideCount));
   ok = ok && AddZipString(zf, "_rels/.rels", GenerateRootRels());
   ok = ok &&
        AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(slideW, slideH, slideCount));
-  ok = ok && AddZipString(zf, "ppt/_rels/presentation.xml.rels",
-                          GeneratePresentationRels(slideCount));
+  ok = ok &&
+       AddZipString(zf, "ppt/_rels/presentation.xml.rels", GeneratePresentationRels(slideCount));
   for (size_t i = 0; i < slideCount && ok; i++) {
     std::string n = std::to_string(i + 1);
     std::string slidePath = "ppt/slides/slide" + n + ".xml";
