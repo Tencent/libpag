@@ -3249,6 +3249,146 @@ PAG_TEST(PAGXHTMLImporterTest, LinearGradientThreeStopsInterpolatesMiddleOffset)
   EXPECT_TRUE(NearlyEqual(lg->colorStops[2]->offset, 1.0f, 0.01f));
 }
 
+// Reads the pixel width/height from the IHDR chunk of a PNG blob (8-byte signature, then a chunk
+// whose 8-byte header is followed by width and height as big-endian uint32s).
+static bool ReadPngSize(const std::shared_ptr<pagx::Data>& data, uint32_t* width,
+                        uint32_t* height) {
+  if (data == nullptr || data->size() < 24) return false;
+  const uint8_t* b = data->bytes();
+  static const uint8_t kSig[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+  for (int i = 0; i < 8; ++i) {
+    if (b[i] != kSig[i]) return false;
+  }
+  auto be32 = [](const uint8_t* p) {
+    return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) |
+           (static_cast<uint32_t>(p[2]) << 8) | static_cast<uint32_t>(p[3]);
+  };
+  *width = be32(b + 16);
+  *height = be32(b + 20);
+  return true;
+}
+
+// A fine `repeating-linear-gradient` cannot be represented as gradient stops: PAGX/tgfx bake >16
+// stops into a 256px color texture, so a 10px band every 20px undersamples and drops lines. The
+// importer instead emits a one-period tile (native resolution) as a repeating ImagePattern. A
+// vertical (default `to bottom`) 20px period yields a 1x20 tile repeated on both axes.
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientTilesPeriod) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:100px">
+      <div style="width:50px;height:100px;background-image:repeating-linear-gradient(#000 0px,#000 10px,#FFF 10px,#FFF 20px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Repeat);
+  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Repeat);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
+  EXPECT_EQ(pattern->filterMode, pagx::FilterMode::Nearest);
+  ASSERT_NE(pattern->image, nullptr);
+  ASSERT_NE(pattern->image->data, nullptr);
+  uint32_t tileW = 0;
+  uint32_t tileH = 0;
+  ASSERT_TRUE(ReadPngSize(pattern->image->data, &tileW, &tileH));
+  // Vertical pattern: 1px-wide strip whose height is exactly one 20px period.
+  EXPECT_EQ(tileW, 1u);
+  EXPECT_EQ(tileH, 20u);
+}
+
+// The same tiling applies to a horizontal (`to right`) line with percentage stops: percentages are
+// line-relative, so a 25% period over a 200px line becomes a 50x1 tile repeated horizontally.
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientPercentStopsHorizontal) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <div style="width:200px;height:40px;background-image:repeating-linear-gradient(to right,#0A0 0%,#0A0 10%,#FFF 10%,#FFF 25%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Repeat);
+  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Repeat);
+  ASSERT_NE(pattern->image, nullptr);
+  ASSERT_NE(pattern->image->data, nullptr);
+  uint32_t tileW = 0;
+  uint32_t tileH = 0;
+  ASSERT_TRUE(ReadPngSize(pattern->image->data, &tileW, &tileH));
+  // Horizontal pattern: period is 25% of the 200px line = 50px wide, 1px tall.
+  EXPECT_EQ(tileW, 50u);
+  EXPECT_EQ(tileH, 1u);
+}
+
+// The CSS `background-color` is painted behind `background-image`, so a repeating tile with
+// transparent gaps must keep the color beneath it (it shows through). Guards the regression where
+// the no-blend path dropped the color and left the gaps transparent.
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientKeepsBackgroundColorBehind) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:100px">
+      <div style="width:50px;height:100px;background-color:#FDFBF7;background-image:repeating-linear-gradient(transparent,transparent 10px,#E0E7EE 10px,#E0E7EE 12px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  std::vector<pagx::Fill*> fills;
+  for (auto* e : div->contents) {
+    if (auto* f = As<pagx::Fill>(e)) fills.push_back(f);
+  }
+  ASSERT_EQ(fills.size(), 2u);
+  // Bottom fill is the solid background-color; the tile pattern paints on top.
+  auto* solid = As<pagx::SolidColor>(fills[0]->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0xFDFBF7)));
+  EXPECT_NE(As<pagx::ImagePattern>(fills[1]->color), nullptr);
+}
+
+// A fractional period (a percentage stop that does not land on an integer pixel) still tiles
+// seamlessly: the tile is rounded up to whole pixels but the pattern matrix stretches it back to
+// the exact period so the repeat spacing stays correct. Here 7.5% of a 100px line = 7.5px, tiled
+// as an 8px strip scaled by 7.5/8.
+PAG_TEST(PAGXHTMLImporterTest, RepeatingLinearGradientFractionalPeriodScalesTile) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:100px">
+      <div style="width:50px;height:100px;background-image:repeating-linear-gradient(#000 0%,#000 2.5%,#FFF 2.5%,#FFF 7.5%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  uint32_t tileW = 0;
+  uint32_t tileH = 0;
+  ASSERT_TRUE(ReadPngSize(pattern->image->data, &tileW, &tileH));
+  EXPECT_EQ(tileW, 1u);
+  EXPECT_EQ(tileH, 8u);  // round(7.5)
+  // Vertical pattern stretches the 8px tile back onto the exact 7.5px period.
+  EXPECT_TRUE(NearlyEqual(pattern->matrix.d, 7.5f / 8.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(pattern->matrix.a, 1.0f, 0.001f));
+}
+
+// `repeating-conic-gradient` tiles the authored angular period across the full turn through the
+// shared normalised tiler. A 30deg period repeats twelve times around the circle.
+PAG_TEST(PAGXHTMLImporterTest, RepeatingConicGradientTilesTurn) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <div style="width:80px;height:80px;background-image:repeating-conic-gradient(#EEE 0deg,#EEE 15deg,#999 15deg,#999 30deg)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front()->children.front());
+  ASSERT_NE(fill, nullptr);
+  auto* cg = As<pagx::ConicGradient>(fill->color);
+  ASSERT_NE(cg, nullptr);
+  // Twelve 30deg periods, so well beyond a single period's four stops.
+  ASSERT_GE(cg->colorStops.size(), 24u);
+  EXPECT_TRUE(NearlyEqual(cg->colorStops.front()->offset, 0.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(cg->colorStops.back()->offset, 1.0f, 0.001f));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientFrom90DegMapsToZero) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
