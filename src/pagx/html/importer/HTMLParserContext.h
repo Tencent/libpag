@@ -211,6 +211,10 @@ class HTMLParserContext {
   std::vector<std::string> _fallbackFamilyNames = {};
   std::unordered_set<std::string> _fallbackFamilyNameSet = {};
 
+  // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
+  // probed against the font system at most once during traversal.
+  std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
+
   float _canvasWidth = 0;
   float _canvasHeight = 0;
   // Records concrete family names from a font-family stack into the document-wide
@@ -221,6 +225,17 @@ class HTMLParserContext {
   // user data) to the parser context's `recordFontFallbacks` member, so the cascade can stay
   // independent of `HTMLParserContext` and we avoid `std::bind` / lambda at the wiring site.
   static void RecordFontFallbacksThunk(void* userData, const std::vector<std::string>& chain);
+
+  // Reports whether `family` will resolve at render time without triggering system font
+  // substitution: it is registered/embedded in the document's FontConfig, or it is a genuinely
+  // installed system font (the family the platform resolves matches the request). A name the
+  // renderer would silently swap for a mismatched default (e.g. the hidden "SF Mono" system font,
+  // which `MakeFromName` replaces with a proportional face) counts as unavailable. Results are
+  // memoised in `_fontAvailabilityCache`.
+  bool isFontFamilyAvailable(const std::string& family);
+
+  // Static trampoline adapting the cascade's `FontAvailabilityThunk` to `isFontFamilyAvailable`.
+  static bool IsFontFamilyAvailableThunk(void* userData, const std::string& family);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack

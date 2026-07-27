@@ -18,8 +18,10 @@
 
 #include "pagx/html/importer/HTMLParserContext.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <utility>
+#include "pagx/FontConfig.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/nodes/Image.h"
@@ -27,6 +29,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
@@ -47,6 +50,30 @@ HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Opti
   return result;
 }
 
+// Lower-cases and strips whitespace so family names compare case- and spacing-insensitively.
+// Written as a free function to honour the project's no-lambda rule.
+std::string NormalizeFamilyName(const std::string& name) {
+  std::string out;
+  out.reserve(name.size());
+  for (unsigned char c : name) {
+    if (std::isspace(c)) {
+      continue;
+    }
+    out.push_back(static_cast<char>(std::tolower(c)));
+  }
+  return out;
+}
+
+// True when the family the renderer resolved matches the family we requested. A mismatch means
+// the platform substituted a different face (e.g. a hidden or missing font), so the requested
+// family should be treated as unavailable.
+bool FontFamilyNamesMatch(const std::string& requested, const std::string& resolved) {
+  if (resolved.empty()) {
+    return false;
+  }
+  return NormalizeFamilyName(requested) == NormalizeFamilyName(resolved);
+}
+
 }  // namespace
 
 //==================================================================================================
@@ -56,6 +83,10 @@ HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Opti
 void HTMLParserContext::RecordFontFallbacksThunk(void* userData,
                                                  const std::vector<std::string>& chain) {
   static_cast<HTMLParserContext*>(userData)->recordFontFallbacks(chain);
+}
+
+bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::string& family) {
+  return static_cast<HTMLParserContext*>(userData)->isFontFamilyAvailable(family);
 }
 
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
@@ -70,12 +101,41 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
   _styleCascade->setFontFallbackSink(&HTMLParserContext::RecordFontFallbacksThunk, this);
+  // Let the cascade pick the first *resolvable* family from each font-family stack, so a leading
+  // family the renderer can't resolve (e.g. the hidden "SF Mono" system font) doesn't get written
+  // to `Text::fontFamily` and silently substituted with a mismatched proportional default.
+  _styleCascade->setFontAvailabilitySink(&HTMLParserContext::IsFontFamilyAvailableThunk, this);
   // The byte/string entry points have no implicit anchor for relative `<img src>` paths;
   // honour the caller-supplied base path here. The file entry point overrides this with
   // the input file's parent directory.
   if (!_options.basePath.empty()) {
     _imageResources->setBasePath(_options.basePath);
   }
+}
+
+bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
+  if (family.empty()) {
+    return false;
+  }
+  auto cached = _fontAvailabilityCache.find(family);
+  if (cached != _fontAvailabilityCache.end()) {
+    return cached->second;
+  }
+  bool available = false;
+  // Embedded/registered fonts resolve by their registration key regardless of the platform's
+  // installed fonts, so honour them first (mirrors LayoutContext's registered-typeface stages).
+  if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
+    available = true;
+  } else {
+    // Otherwise the renderer resolves the family through the system font manager, which silently
+    // substitutes a default face for an unknown name (on some platforms `MakeFromName` never
+    // returns null). Treat the family as available only when the resolved typeface reports a
+    // matching family — i.e. no substitution happened.
+    auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
+    available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
+  }
+  _fontAvailabilityCache.emplace(family, available);
+  return available;
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {

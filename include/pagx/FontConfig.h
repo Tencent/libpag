@@ -158,6 +158,15 @@ class FontConfig {
    */
   std::vector<std::string> fallbackFamilyNames() const;
 
+  /**
+   * Returns true when a typeface with the given family (in any style) is registered as either a
+   * primary or fallback font. The comparison is exact, matching how `LayoutContext` resolves
+   * registered typefaces. Intended for callers that need to know whether a family will resolve
+   * without falling through to system font substitution (which silently swaps an unknown name
+   * for a default face).
+   */
+  bool containsFamily(const std::string& fontFamily) const;
+
  private:
   struct Data;
   std::unique_ptr<Data> data;

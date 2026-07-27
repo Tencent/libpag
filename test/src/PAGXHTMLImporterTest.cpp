@@ -2895,11 +2895,19 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyAndLetterSpacing) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackPicksFirstConcreteAndStripsQuotes) {
-  auto doc = ParseFromString(R"HTML(
+  // Register the leading family so it resolves deterministically on every platform (whether or not
+  // "PingFang SC" is installed). The test verifies quote-stripping and that a resolvable concrete
+  // family wins over the generic keyword that follows it.
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(std::string(), 0, "PingFang SC", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style='font-family:"PingFang SC", -apple-system, sans-serif'>Hi</span>
     </body></html>
-  )HTML");
+  )HTML",
+                                             opts);
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
@@ -2951,13 +2959,20 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyAllUnmappableGenericsFallsBackToDefault
 }
 
 PAG_TEST(PAGXHTMLImporterTest, FontFamilyInheritedFromAncestor) {
-  auto doc = ParseFromString(R"HTML(
+  // Register the ancestor's family so it resolves deterministically on every platform; the test
+  // verifies the span inherits the concrete family from the div rather than the generic fallback.
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(std::string(), 0, "Inter", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:200px;height:40px">
       <div style='font-family:"Inter", sans-serif'>
         <span>Hi</span>
       </div>
     </body></html>
-  )HTML");
+  )HTML",
+                                             opts);
   ASSERT_NE(doc, nullptr);
   auto* divLayer = doc->layers.front()->children.front();
   ASSERT_FALSE(divLayer->children.empty());
@@ -2965,6 +2980,41 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyInheritedFromAncestor) {
   auto* text = FindElementOfType<pagx::Text>(spanLayer);
   ASSERT_NE(text, nullptr);
   EXPECT_EQ(text->fontFamily, "Inter");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackSkipsUnavailableLeadingFamily) {
+  // A leading concrete family the renderer cannot resolve is skipped in favour of the first
+  // resolvable family in the stack, so `Text::fontFamily` reflects what will actually render.
+  // Regression: an unresolvable leading family (e.g. the hidden "SF Mono" system font) was emitted
+  // verbatim and then silently substituted with a mismatched default face at render time.
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(std::string(), 0, "Menlo", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'No Such Font 12345', Menlo, monospace">Hi</span>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "Menlo");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackKeepsFirstWhenNoneResolvable) {
+  // When no family in the stack resolves, the first concrete family is kept verbatim as a last
+  // resort (there is nothing better to fall through to, and the author intent is preserved).
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'No Such Font A', 'No Such Font B'">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "No Such Font A");
 }
 
 PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackRegistersFallbacksOnDocFontConfig) {
