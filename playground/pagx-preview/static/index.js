@@ -485,21 +485,6 @@ function connectSSE() {
       // ignore
     }
   });
-  es.addEventListener('patch', (ev) => {
-    // MCP-driven incremental patch: the server emitted a set of channel ops for the live
-    // document. Forward to player.applyPatch for <10ms incremental update without reload.
-    try {
-      const data = JSON.parse(ev.data);
-      if (data.ops && player) {
-        const result = player.applyPatch(data.ops);
-        // eslint-disable-next-line no-console
-        console.log('[patch] applied:', result);
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('[patch] failed:', e);
-    }
-  });
   es.addEventListener('fonts-ready', async () => {
     // The background font download finished. Re-register so the currently displayed PAGX picks
     // up the newly available glyphs; then repaint by re-running the load pipeline.

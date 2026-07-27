@@ -33,8 +33,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PREVIEW_DIR = path.dirname(__dirname);
-const VIEWER_LIB_DIR = path.resolve(PREVIEW_DIR, '../pagx-viewer/lib');
-const PLAYER_LIB_DIR = path.resolve(PREVIEW_DIR, '../pagx-player/lib');
+const VIEWER_DIR = path.resolve(PREVIEW_DIR, '../pagx-viewer');
+const PLAYER_DIR = path.resolve(PREVIEW_DIR, '../pagx-player');
+const VIEWER_LIB_DIR = path.join(VIEWER_DIR, 'lib');
+const PLAYER_LIB_DIR = path.join(PLAYER_DIR, 'lib');
 const OUTPUT_DIR = path.join(PREVIEW_DIR, 'static', 'viewer');
 const PLAYER_OUTPUT_DIR = path.join(PREVIEW_DIR, 'static', 'player');
 
@@ -65,7 +67,7 @@ function cleanOldArtifacts() {
   }
 }
 
-function copyPagxPlayerArtifacts() {
+function copyPagxPlayerArtifacts({ release } = {}) {
   if (!fs.existsSync(PLAYER_LIB_DIR)) {
     console.error('\npagx-preview prebuild: ERROR: pagx-player has not been built.');
     console.error(`Looked in: ${PLAYER_LIB_DIR}`);
@@ -92,12 +94,16 @@ function copyPagxPlayerArtifacts() {
   }
   fs.copyFileSync(src, path.join(PLAYER_OUTPUT_DIR, bundleFile));
   console.log(`  Copied: ${bundleFile}`);
-  // Also copy the source map when the debug build was produced; harmless when absent.
-  const mapFile = bundleFile + '.map';
-  const mapSrc = path.join(PLAYER_LIB_DIR, mapFile);
-  if (fs.existsSync(mapSrc)) {
-    fs.copyFileSync(mapSrc, path.join(PLAYER_OUTPUT_DIR, mapFile));
-    console.log(`  Copied: ${mapFile}`);
+  // Copy the source map only for debug builds (local development). The 2MB+ map is useless in a
+  // published/release package — it would only bloat the tarball — so release skips it. The
+  // .unlink loop above already removed any stale map from a previous debug run.
+  if (!release) {
+    const mapFile = bundleFile + '.map';
+    const mapSrc = path.join(PLAYER_LIB_DIR, mapFile);
+    if (fs.existsSync(mapSrc)) {
+      fs.copyFileSync(mapSrc, path.join(PLAYER_OUTPUT_DIR, mapFile));
+      console.log(`  Copied: ${mapFile}`);
+    }
   }
 }
 
@@ -133,14 +139,71 @@ function copyExtAppsBundle() {
   console.log('  Copied: ext/app-with-deps.js');
 }
 
+// Builds the upstream pagx-viewer and pagx-player packages in place so a single
+// `npm run build` from pagx-preview produces every artifact this script then copies. Without
+// --build the script only detects + copies pre-built artifacts (the historical behavior), which
+// is what `npm pack` / a clean checkout with committed artifacts relies on.
+//
+// The viewer defaults to the single-threaded (st) variant because the MCP widget runs inside a
+// sandbox iframe with no cross-origin isolation, so SharedArrayBuffer (required by the
+// multi-threaded wasm) is unavailable there — st is the only variant that works in every
+// consumer. --mt opts into the multi-threaded build, which renders faster but only works in the
+// plain browser preview (`pagx-preview file.pagx`), where the server can send COOP/COEP headers;
+// in an MCP host the widget then falls back to the browser URL.
+function buildUpstreamDependencies({ release, mt }) {
+  let viewerScript;
+  if (mt) {
+    viewerScript = release ? 'build:release' : 'build:debug';
+  } else {
+    viewerScript = release ? 'build:release:st' : 'build:debug:st';
+  }
+  const playerScript = release ? 'build:release' : 'build';
+
+  if (!fs.existsSync(VIEWER_DIR)) {
+    console.error(`\npagx-preview prebuild: ERROR: pagx-viewer not found at ${VIEWER_DIR}.`);
+    process.exit(1);
+  }
+  if (!fs.existsSync(PLAYER_DIR)) {
+    console.error(`\npagx-preview prebuild: ERROR: pagx-player not found at ${PLAYER_DIR}.`);
+    process.exit(1);
+  }
+
+  // pagx-viewer's wasm build is guarded by a source-hash cache (.pagx-viewer.wasm.md5) that does
+  // not distinguish debug from release: after a debug build it will skip recompiling for a
+  // release run and reuse the ~100MB debug wasm (full DWARF info). Clean the viewer first on a
+  // release build so the wasm is actually recompiled with -O3 and stripped down to a few MB.
+  // Debug builds keep the cache to preserve fast incremental rebuilds during development.
+  if (release) {
+    console.log('pagx-preview prebuild: cleaning pagx-viewer (release: force wasm recompile)...');
+    execSync('npm run clean', { cwd: VIEWER_DIR, stdio: 'inherit' });
+  }
+
+  console.log(`pagx-preview prebuild: building pagx-viewer (npm run ${viewerScript})...`);
+  execSync(`npm run ${viewerScript}`, { cwd: VIEWER_DIR, stdio: 'inherit' });
+
+  console.log(`pagx-preview prebuild: building pagx-player (npm run ${playerScript})...`);
+  execSync(`npm run ${playerScript}`, { cwd: PLAYER_DIR, stdio: 'inherit' });
+}
+
 function main() {
+  const args = process.argv.slice(2);
+  const doBuild = args.includes('--build');
+  const release = args.includes('--release');
+  const mt = args.includes('--mt');
+  if (doBuild) {
+    buildUpstreamDependencies({ release, mt });
+  }
+
   const variant = detectVariant();
   if (!variant) {
     console.error('\npagx-preview prebuild: ERROR: no pagx-viewer build found.');
     console.error(`Looked in: ${VIEWER_LIB_DIR}`);
-    console.error('Please build pagx-viewer first (either variant works):');
-    console.error(`  cd ${path.dirname(VIEWER_LIB_DIR)} && npm run build:debug       # multi-threaded`);
-    console.error(`  cd ${path.dirname(VIEWER_LIB_DIR)} && npm run build:debug:st    # single-threaded\n`);
+    console.error('Build the upstream dependencies automatically:');
+    console.error(`  cd ${PREVIEW_DIR} && npm run build            # debug`);
+    console.error(`  cd ${PREVIEW_DIR} && npm run build:release    # release`);
+    console.error('Or build pagx-viewer manually first (either variant works):');
+    console.error(`  cd ${VIEWER_DIR} && npm run build:debug       # multi-threaded`);
+    console.error(`  cd ${VIEWER_DIR} && npm run build:debug:st    # single-threaded\n`);
     process.exit(1);
   }
 
@@ -171,7 +234,7 @@ function main() {
   );
   console.log(`  Wrote:  info.json (${info.variant})`);
 
-  copyPagxPlayerArtifacts();
+  copyPagxPlayerArtifacts({ release });
   copyExtAppsBundle();
   buildMcpWidgetBundle();
 

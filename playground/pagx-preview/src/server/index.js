@@ -172,12 +172,28 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
   // path; a session id of "drop" indicates a one-shot ephemeral upload from the browser drop
   // handler (see the /session/drop endpoint below).
   app.post('/sessions', (req, res) => {
+    // /sessions is a CLI-only endpoint that creates/reuses a session for a filesystem path. No
+    // browser context ever calls it: the same-origin preview tab and the cross-origin widget
+    // iframe only POST to /session/:id/{resources,document}. Any request carrying browser
+    // fetch-metadata is therefore a cross-site attempt to inject an arbitrary path and read the
+    // file back via GET /session/:id/pagx, so reject it. The Node CLI sends neither header.
+    const site = req.get('Sec-Fetch-Site');
+    if (req.get('Origin') || (site && site !== 'same-origin' && site !== 'none')) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
     const filePath = typeof req.body?.file === 'string' ? req.body.file : null;
     if (!filePath) {
       res.status(400).json({ error: 'missing file' });
       return;
     }
     const absolute = path.resolve(filePath);
+    // Defense in depth: the preview only ever handles .pagx files, so refuse any other extension.
+    // This shrinks the arbitrary-file-read surface even if the guard above is ever bypassed.
+    if (path.extname(absolute).toLowerCase() !== '.pagx') {
+      res.status(400).json({ error: 'not a .pagx file', file: absolute });
+      return;
+    }
     if (!fs.existsSync(absolute)) {
       res.status(404).json({ error: 'file not found', file: absolute });
       return;
@@ -447,7 +463,7 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
   });
 
   // MCP Apps endpoint. CodeBuddy (or any MCP client) connects to /mcp via Streamable HTTP
-  // transport. The MCP server exposes 5 tools (preview_pagx, set_channel, reset_channel,
+  // transport. The MCP server exposes 4 tools (preview_pagx, preview_pagx_widget,
   // reload_file, get_document) and 1 HTML resource (ui://pagx-preview/main) so that the host
   // can render a pagx widget directly inside the conversation flow. The MCP server shares the
   // same express app, port, and session state as the rest of pagx-preview.

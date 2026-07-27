@@ -35,9 +35,13 @@
     "README.md"
   ],
   "scripts": {
+    "build": "node scripts/prebuild.js --build",
+    "build:release": "node scripts/prebuild.js --build --release",
+    "build:mt": "node scripts/prebuild.js --build --mt",
+    "build:release:mt": "node scripts/prebuild.js --build --release --mt",
     "prebuild": "node scripts/prebuild.js",
     "preview": "node src/cli.js",
-    "prepack": "node scripts/prebuild.js && node scripts/check-artifacts.js",
+    "prepack": "node scripts/prebuild.js --build --release && node scripts/check-artifacts.js",
     "prepublishOnly": "node scripts/check-artifacts.js"
   },
   "dependencies": {

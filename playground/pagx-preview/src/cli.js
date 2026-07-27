@@ -22,7 +22,7 @@ import http from 'http';
 import path from 'path';
 import { execFile } from 'child_process';
 import { fileURLToPath } from 'url';
-import { probeLiveServer, readLock, clearLock } from './server/lock.js';
+import { probeLiveServer, clearLock } from './server/lock.js';
 import { runServer, runStdioServer, spawnDaemon, stopDaemon, printLog, LOG_FILE } from './daemon.js';
 
 const USAGE = `Usage: pagx-preview <file.pagx> [options]

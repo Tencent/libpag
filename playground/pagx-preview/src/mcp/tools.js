@@ -33,7 +33,21 @@ const TOOLS = [
   {
     name: 'preview_pagx',
     description:
-      'Load a pagx file for preview. Renders an interactive widget in the conversation showing the pagx animation, and returns a url that can be opened in a browser / webview. Returns session info including sessionId for use with reload_file / get_document.',
+      'Preview a pagx file (default preview tool). Use it whenever the user asks to "preview", "open", or "view" a pagx file. It loads the file and returns a session url. IMPORTANT: after this tool returns, you MUST immediately open the returned url yourself by calling your own webview / browser preview capability (e.g. a preview_url / open-in-webview / open-in-browser action) so the animation is actually shown to the user. Do NOT just print the url as text and stop — that leaves the user with nothing to look at. Only fall back to pasting the url as plain text if you genuinely have no tool available to open a url. Returns session info including sessionId for use with reload_file / get_document. Do NOT use this for inline widget preview — use preview_pagx_widget only when the user explicitly asks for an inline / small-window ("小窗") preview.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'Absolute path to the .pagx file to preview.' },
+      },
+      required: ['file'],
+    },
+    // Intentionally NO _meta.ui here: this tool must not trigger an inline widget iframe in hosts
+    // that support MCP Apps. It is the default "open in a webview panel / browser" path.
+  },
+  {
+    name: 'preview_pagx_widget',
+    description:
+      'Preview a pagx file as an inline widget rendered directly in the conversation (a small in-chat window). Use this ONLY when the user explicitly asks for an inline / small-window preview ("小窗预览"). For a normal preview, use preview_pagx instead. Returns session info including sessionId for use with reload_file / get_document.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -86,7 +100,10 @@ export function buildToolHandlers({ sessions, createOrGetSession, getServerBaseU
       const { name, arguments: args } = req.params;
 
       if (name === 'preview_pagx') {
-        return handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl });
+        return handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget: false });
+      }
+      if (name === 'preview_pagx_widget') {
+        return handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget: true });
       }
       if (name === 'reload_file') {
         return handleReloadFile(args, { sessions });
@@ -102,7 +119,7 @@ export function buildToolHandlers({ sessions, createOrGetSession, getServerBaseU
   };
 }
 
-function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl }) {
+function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget = false }) {
   const file = args?.file;
   if (!file || !fs.existsSync(file)) {
     return {
@@ -115,18 +132,19 @@ function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl }) {
   const url = baseUrl ? `${baseUrl}/session/${session.id}/` : `/session/${session.id}/`;
   const summary = session.documentSummary;
   // The summary is uploaded by the client (widget or browser tab) only after it finishes
-  // rendering, so on the first preview_pagx call it is usually still null. Report "rendering"
-  // instead of a misleading "0 nodes, 0.0s"; get_document can be polled once the widget appears.
+  // rendering, so on the first call it is usually still null. Report "rendering" instead of a
+  // misleading "0 nodes, 0.0s"; get_document can be polled once the preview appears.
   const stats = summary
     ? `${summary.nodeCount} nodes, ${(summary.duration / 1000000).toFixed(1)}s duration`
-    : 'rendering (document summary available after the widget finishes loading)';
+    : 'rendering (document summary available after the preview finishes loading)';
+  const reusedNote = reused ? ' (reusing existing session)' : '';
+  // Two distinct presentations: the widget tool renders inline (with a browser/webview fallback),
+  // while the default tool has no inline UI and must be surfaced via an IDE webview panel.
+  const text = widget
+    ? `Previewing ${path.basename(file)}${reusedNote} as an inline widget — ${stats}.\n\nIf the inline widget does not appear above, open this url in a webview / browser instead: ${url}`
+    : `Previewing ${path.basename(file)}${reusedNote} — ${stats}.\n\nACTION REQUIRED: open ${url} right now by calling your webview / browser preview tool so the user can actually see the animation. Do NOT just show this url as text — open it. Only if you have no tool to open a url, paste it for the user to open manually.`;
   return {
-    content: [
-      {
-        type: 'text',
-        text: `Previewing ${path.basename(file)}${reused ? ' (reusing existing session)' : ''} — ${stats}.\n\nIf the inline preview does not appear above, you can:\n1. Open in browser: ${url}\n2. Open the URL in IDE webview for in-editor preview`,
-      },
-    ],
+    content: [{ type: 'text', text }],
     structuredContent: {
       sessionId: session.id,
       file: session.entryFile,

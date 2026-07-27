@@ -8,7 +8,7 @@
 // 3. app.connect() establishes postMessage bridge with host
 // 4. app.ontoolresult fires with { file, sessionId } from preview_pagx's structuredContent
 // 5. widget fetches /session/:id/pagx, loads it via PAGXPlayer
-// 6. widget opens SSE stream to /session/:id/events for patch / reload events
+// 6. widget opens SSE stream to /session/:id/events for reload events
 
 import { App } from '/static/ext/app-with-deps.js';
 import { PAGXPlayer } from '/static/player/pagx-player.esm.js';
