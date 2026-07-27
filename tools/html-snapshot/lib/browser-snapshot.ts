@@ -3327,7 +3327,9 @@ function renderChildrenInto(el, parentRect, hostComputed) {
 // fragment — naming that fragment would strand `layer->name` on a box with no children. The
 // renderer marks the child-bearing wrapper with this attribute so `applyLayerName` targets it
 // instead of the first tag, then removes the marker so it never reaches the output.
-const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
+// NOTE: the value itself is defined in PAYLOAD_CONSTANTS_SRC (browser scope), not here — the
+// helpers below reach the browser via `.toString()`, so a Node-side `const` would never ship
+// and every reference would throw `ReferenceError: NAME_ANCHOR_ATTR is not defined` in-page.
 
 // Removes the (single) NAME_ANCHOR_ATTR marker from `html`. Called on every path where the
 // marker must not survive: no name to forward, a `display: contents` host, or the
@@ -3744,6 +3746,8 @@ const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
 
 const BOUNDARY_SPACE = '\\u00a0';
 
+const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
+
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
 const INLINE_BY_DEFAULT_TAGS = new Set([
@@ -3947,6 +3951,7 @@ const HELPER_FNS = [
   renderFlexContainer,
   renderContainer,
   renderChildrenInto,
+  stripNameAnchor,
   applyLayerName,
   renderElementBox,
   render,
