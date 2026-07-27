@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>养成生命周期</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+*, *::before, *::after { animation: none !important; transition: none !important; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body>
+<div class="slide" style="width:1280px;height:720px;overflow:hidden;position:relative;background:linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);">
+  <!-- Watermark -->
+  <div class="absolute z-0 text-[300px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="left:50%;top:55%;transform:translate(-50%,-50%);">GROW</div>
+  <!-- Header -->
+  <div class="absolute z-20" style="top:40px;left:120px;width:1040px;">
+    <div class="text-[14px] font-[300] text-[#FFFFFF]/40 tracking-[0.15em] uppercase mb-[8px]">Growth Lifecycle</div>
+    <h2 class="text-[36px] font-[300] text-[#FFFFFF] leading-tight">养成生命周期</h2>
+    <div class="w-[48px] h-[1px] bg-[#FFFFFF]/20 mt-[16px]"></div>
+  </div>
+  <!-- Horizontal timeline line -->
+  <div class="absolute z-10" style="top:260px;left:140px;width:1000px;height:0;border-top:1px dashed rgba(255,255,255,0.15);"></div>
+  <!-- Stage 1: 领养 -->
+  <div class="absolute z-20" style="top:150px;left:100px;width:240px;">
+    <div class="text-center mb-[10px]">
+      <i class="ph ph-egg text-[28px] text-[#FFFFFF]/40"></i>
+    </div>
+    <div class="text-center mb-[6px]">
+      <div class="text-[22px] font-[400] text-[#FFFFFF]">领养</div>
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/40 uppercase tracking-[0.08em] mt-[2px]">Day 0</div>
+    </div>
+    <div class="w-[6px] h-[6px] rounded-full bg-[#FFFFFF] mx-auto mt-[16px] mb-[20px]"></div>
+    <div class="space-y-[8px] text-center">
+      <div class="text-[12px] font-[400] text-[#FFFFFF]/50">取名字 / 选形象 / 初始化</div>
+      <div class="flex justify-center gap-[12px] mt-[8px]">
+        <div class="text-[11px] font-[300] text-[#FFFFFF]/30">记忆 0</div>
+        <div class="text-[11px] font-[300] text-[#FFFFFF]/30">技能 基础</div>
+        <div class="text-[11px] font-[300] text-[#FFFFFF]/30">了解 0%</div>
+      </div>
+    </div>
+  </div>
+  <!-- Stage 2: 调教 -->
+  <div class="absolute z-20" style="top:150px;left:370px;width:240px;">
+    <div class="text-center mb-[10px]">
+      <i class="ph ph-baby text-[28px] text-[#82D0A4]/60"></i>
+    </div>
+    <div class="text-center mb-[6px]">
+      <div class="text-[22px] font-[400] text-[#FFFFFF]">调教</div>
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/40 uppercase tracking-[0.08em] mt-[2px]">Day 1 - 7</div>
+    </div>
+    <div class="w-[6px] h-[6px] rounded-full bg-[#82D0A4]/60 mx-auto mt-[16px] mb-[20px]"></div>
+    <div class="space-y-[8px] text-center">
+      <div class="text-[12px] font-[400] text-[#FFFFFF]/50">定义性格 / 告诉偏好 / 纠正错误</div>
+      <div class="flex justify-center gap-[12px] mt-[8px]">
+        <div class="text-[11px] font-[300] text-[#82D0A4]/50">记忆 少</div>
+        <div class="text-[11px] font-[300] text-[#82D0A4]/50">技能 5-10</div>
+        <div class="text-[11px] font-[300] text-[#82D0A4]/50">了解 30%</div>
+      </div>
+    </div>
+  </div>
+  <!-- Stage 3: 进化 -->
+  <div class="absolute z-20" style="top:150px;left:640px;width:240px;">
+    <div class="text-center mb-[10px]">
+      <i class="ph ph-rocket-launch text-[28px] text-[#82D0A4]/80"></i>
+    </div>
+    <div class="text-center mb-[6px]">
+      <div class="text-[22px] font-[400] text-[#FFFFFF]">进化</div>
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/40 uppercase tracking-[0.08em] mt-[2px]">Day 7 - 30</div>
+    </div>
+    <div class="w-[6px] h-[6px] rounded-full bg-[#82D0A4]/80 mx-auto mt-[16px] mb-[20px]"></div>
+    <div class="space-y-[8px] text-center">
+      <div class="text-[12px] font-[400] text-[#FFFFFF]/50">安装技能 / 训练工作流 / 积累记忆</div>
+      <div class="flex justify-center gap-[12px] mt-[8px]">
+        <div class="text-[11px] font-[300] text-[#82D0A4]/70">记忆 中等</div>
+        <div class="text-[11px] font-[300] text-[#82D0A4]/70">技能 20-40</div>
+        <div class="text-[11px] font-[300] text-[#82D0A4]/70">了解 70%</div>
+      </div>
+    </div>
+  </div>
+  <!-- Stage 4: 共生 -->
+  <div class="absolute z-20" style="top:150px;left:910px;width:240px;">
+    <div class="text-center mb-[10px]">
+      <i class="ph ph-gem text-[28px] text-[#82D0A4]"></i>
+    </div>
+    <div class="text-center mb-[6px]">
+      <div class="text-[22px] font-[500] text-[#FFFFFF]">共生</div>
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/40 uppercase tracking-[0.08em] mt-[2px]">Day 30+</div>
+    </div>
+    <div class="w-[8px] h-[8px] rounded-full bg-[#82D0A4] mx-auto mt-[16px] mb-[20px]"></div>
+    <div class="space-y-[8px] text-center">
+      <div class="text-[12px] font-[400] text-[#FFFFFF]/50">自动运转 / 主动推送 / 不可替代</div>
+      <div class="flex justify-center gap-[12px] mt-[8px]">
+        <div class="text-[11px] font-[400] text-[#82D0A4]">记忆 丰富</div>
+        <div class="text-[11px] font-[400] text-[#82D0A4]">技能 40+</div>
+        <div class="text-[11px] font-[400] text-[#82D0A4]">了解 95%</div>
+      </div>
+    </div>
+  </div>
+  <!-- Progress bar -->
+  <div class="absolute z-20" style="top:480px;left:120px;width:1040px;">
+    <div class="text-[12px] font-[300] text-[#FFFFFF]/30 tracking-[0.08em] uppercase mb-[10px]">Understanding Curve</div>
+    <div class="flex items-center">
+      <div class="h-[4px] bg-[#FFFFFF]/10 rounded-full flex-1 relative overflow-hidden">
+        <div class="h-full rounded-full" style="width:95%;background:linear-gradient(90deg, rgba(130,208,164,0.2), rgba(130,208,164,0.8));"></div>
+      </div>
+      <div class="ml-[16px] text-[24px] font-[400] text-[#82D0A4]">95%</div>
+      <div class="ml-[8px] text-[12px] font-[300] text-[#FFFFFF]/40">max</div>
+    </div>
+  </div>
+  <!-- Footer -->
+  <div class="absolute z-50 flex flex-col items-center justify-center" style="bottom:48px;left:0;right:0;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/70">ima</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/30 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

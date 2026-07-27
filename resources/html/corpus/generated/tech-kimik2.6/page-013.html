@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>竞品综合对比矩阵</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">13 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">竞品综合对比矩阵</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 矩阵表格 -->
+  <div class="absolute top-[170px] left-[80px] w-[1120px]">
+    <table class="w-full text-[13px]/[20px] border-collapse">
+      <thead>
+        <tr class="border-b-[1px] border-[#111111]/20">
+          <th class="text-left py-[10px] px-[8px] font-[600] w-[140px]">对比维度</th>
+          <th class="text-center py-[10px] px-[8px] font-[600]">Figma</th>
+          <th class="text-center py-[10px] px-[8px] font-[600]">Sketch</th>
+          <th class="text-center py-[10px] px-[8px] font-[600]">Ardot</th>
+          <th class="text-center py-[10px] px-[8px] font-[600]">MasterGo</th>
+          <th class="text-center py-[10px] px-[8px] font-[600]">即时设计</th>
+          <th class="text-center py-[10px] px-[8px] font-[600]">Pixso</th>
+          <th class="text-center py-[10px] px-[8px] font-[600]">墨刀</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b-[1px] border-[#111111]/10">
+          <td class="py-[10px] px-[8px] font-[500]">功能完整度</td>
+          <td class="text-center py-[10px] px-[8px]">极高</td>
+          <td class="text-center py-[10px] px-[8px]">高</td>
+          <td class="text-center py-[10px] px-[8px]">高</td>
+          <td class="text-center py-[10px] px-[8px]">高</td>
+          <td class="text-center py-[10px] px-[8px]">中高</td>
+          <td class="text-center py-[10px] px-[8px]">极高</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+        </tr>
+        <tr class="border-b-[1px] border-[#111111]/10">
+          <td class="py-[10px] px-[8px] font-[500]">AI能力</td>
+          <td class="text-center py-[10px] px-[8px]">高</td>
+          <td class="text-center py-[10px] px-[8px]">低</td>
+          <td class="text-center py-[10px] px-[8px] font-[600]">极高</td>
+          <td class="text-center py-[10px] px-[8px]">中高</td>
+          <td class="text-center py-[10px] px-[8px]">高</td>
+          <td class="text-center py-[10px] px-[8px]">高</td>
+          <td class="text-center py-[10px] px-[8px]">中高</td>
+        </tr>
+        <tr class="border-b-[1px] border-[#111111]/10">
+          <td class="py-[10px] px-[8px] font-[500]">团队协作</td>
+          <td class="text-center py-[10px] px-[8px]">极强</td>
+          <td class="text-center py-[10px] px-[8px]">弱</td>
+          <td class="text-center py-[10px] px-[8px]">强</td>
+          <td class="text-center py-[10px] px-[8px]">强</td>
+          <td class="text-center py-[10px] px-[8px]">强</td>
+          <td class="text-center py-[10px] px-[8px]">强</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+        </tr>
+        <tr class="border-b-[1px] border-[#111111]/10">
+          <td class="py-[10px] px-[8px] font-[500]">价格</td>
+          <td class="text-center py-[10px] px-[8px]">$$$</td>
+          <td class="text-center py-[10px] px-[8px]">$$</td>
+          <td class="text-center py-[10px] px-[8px]">免费</td>
+          <td class="text-center py-[10px] px-[8px]">$$</td>
+          <td class="text-center py-[10px] px-[8px]">免费</td>
+          <td class="text-center py-[10px] px-[8px]">$$</td>
+          <td class="text-center py-[10px] px-[8px]">$</td>
+        </tr>
+        <tr class="border-b-[1px] border-[#111111]/10">
+          <td class="py-[10px] px-[8px] font-[500]">生态成熟度</td>
+          <td class="text-center py-[10px] px-[8px]">极高</td>
+          <td class="text-center py-[10px] px-[8px]">高</td>
+          <td class="text-center py-[10px] px-[8px]">初期</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+        </tr>
+        <tr class="border-b-[1px] border-[#111111]/10">
+          <td class="py-[10px] px-[8px] font-[500]">数据安全</td>
+          <td class="text-center py-[10px] px-[8px]">海外</td>
+          <td class="text-center py-[10px] px-[8px]">本地</td>
+          <td class="text-center py-[10px] px-[8px] font-[600]">国内</td>
+          <td class="text-center py-[10px] px-[8px]">国内</td>
+          <td class="text-center py-[10px] px-[8px]">国内</td>
+          <td class="text-center py-[10px] px-[8px]">国内</td>
+          <td class="text-center py-[10px] px-[8px]">国内</td>
+        </tr>
+        <tr>
+          <td class="py-[10px] px-[8px] font-[500]">代码交付</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+          <td class="text-center py-[10px] px-[8px]">插件</td>
+          <td class="text-center py-[10px] px-[8px] font-[600]">MCP</td>
+          <td class="text-center py-[10px] px-[8px]">强</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+          <td class="text-center py-[10px] px-[8px]">中</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 底部总结 -->
+    <div class="mt-[20px] pt-[12px] border-t-[1px] border-[#111111]/20">
+      <p class="text-[14px]/[22px]"><span class="font-[600]">核心洞察</span>：Ardot在AI资产化和MCP代码交付维度领先，Figma在生态成熟度和市场占有率领先，国产工具在本土化、安全合规方面具备优势</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

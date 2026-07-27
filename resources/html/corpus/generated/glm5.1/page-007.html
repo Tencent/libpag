@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>消费升级</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .gradient-dark { background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%); }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide gradient-dark">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+      <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">消费升级</span>
+    </div>
+    <div class="flex items-center gap-[24px]">
+      <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35">中国宠物经济趋势洞察</span>
+      <span class="text-[13px] font-[600] text-[#FFFFFF]/50">07</span>
+    </div>
+  </div>
+
+  <!-- 标题 -->
+  <div class="pt-[88px] px-[48px]">
+    <div class="flex items-end gap-[32px]">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          拟人化驱动增长
+        </h1>
+      </div>
+      <div class="text-[16px] text-[#F5F5DC]/50 pb-[8px]">从吃饱到吃好，从功能到情感</div>
+    </div>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+  </div>
+
+  <!-- 三列卡片 -->
+  <div class="grid grid-cols-3 gap-[24px] px-[48px] mt-[36px]">
+    <!-- 饮食精细化 -->
+    <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[28px] flex flex-col">
+      <div class="flex items-center gap-[12px] mb-[16px]">
+        <div class="w-[48px] h-[48px] rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+          <i class="ph ph-fork-knife text-[#2563EB] text-[24px]"></i>
+        </div>
+        <div class="text-[20px] font-[700] text-[#F5F5DC]">饮食精细化</div>
+      </div>
+      <div class="text-[14px] text-[#F5F5DC]/60 leading-[1.7] flex-1">
+        鲜食兴起：39.2%宠主追求更鲜更健康食材，烘焙粮、冻干粮偏好大幅上升。禽肉+果蔬成宠粮顶配，鲜肉关注度63.4%。
+      </div>
+      <div class="mt-[16px] pt-[12px] border-t-[1px] border-[#FFFFFF]/10">
+        <div class="text-[28px] font-[700] text-[#2563EB]">39.2%</div>
+        <div class="text-[12px] text-[#F5F5DC]/40">追求鲜食的宠主占比</div>
+      </div>
+    </div>
+    <!-- 健康管理专业化 -->
+    <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[28px] flex flex-col">
+      <div class="flex items-center gap-[12px] mb-[16px]">
+        <div class="w-[48px] h-[48px] rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+          <i class="ph ph-heartbeat text-[#2563EB] text-[24px]"></i>
+        </div>
+        <div class="text-[20px] font-[700] text-[#F5F5DC]">健康管理专业化</div>
+      </div>
+      <div class="text-[14px] text-[#F5F5DC]/60 leading-[1.7] flex-1">
+        功能化零食增长：消化健康关注度69%，免疫支持52%，关节健康51%。AI无创体检、基因检测技术发展，精准营养方案受追捧。
+      </div>
+      <div class="mt-[16px] pt-[12px] border-t-[1px] border-[#FFFFFF]/10">
+        <div class="text-[28px] font-[700] text-[#2563EB]">69%</div>
+        <div class="text-[12px] text-[#F5F5DC]/40">关注消化健康的宠主</div>
+      </div>
+    </div>
+    <!-- 情感需求具象化 -->
+    <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[28px] flex flex-col">
+      <div class="flex items-center gap-[12px] mb-[16px]">
+        <div class="w-[48px] h-[48px] rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+          <i class="ph ph-heart text-[#2563EB] text-[24px]"></i>
+        </div>
+        <div class="text-[20px] font-[700] text-[#F5F5DC]">情感需求具象化</div>
+      </div>
+      <div class="text-[14px] text-[#F5F5DC]/60 leading-[1.7] flex-1">
+        设计师宠物服饰增长42%，互动型零食占比75%，71%宠主有携宠出行意愿，宠物成为社交货币与家庭成员。
+      </div>
+      <div class="mt-[16px] pt-[12px] border-t-[1px] border-[#FFFFFF]/10">
+        <div class="text-[28px] font-[700] text-[#2563EB]">71%</div>
+        <div class="text-[12px] text-[#F5F5DC]/40">有携宠出行意愿</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部重点提示 -->
+  <div class="absolute bottom-[72px] left-[48px] right-[48px]">
+    <div class="bg-[#2563EB]/15 border-[1px] border-[#2563EB]/30 rounded-[8px] px-[24px] py-[12px] text-center">
+      <span class="text-[15px] text-[#F5F5DC]/70">47%宠主表示经济环境变化不影响"娇养"爱宠，愿在主粮、零食、营养品、药品方面增加支出</span>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#F5F5DC]/30">中国宠物经济趋势洞察</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+</body>
+</html>

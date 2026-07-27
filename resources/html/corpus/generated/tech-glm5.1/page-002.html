@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>执行摘要</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .grid-line {
+      position: absolute;
+      background: rgba(17,17,17,0.2);
+    }
+    .grid-line-h {
+      width: 100%;
+      height: 1px;
+      left: 0;
+    }
+    .grid-line-v {
+      height: 100%;
+      width: 1px;
+      top: 0;
+    }
+    .card {
+      border: 1px solid rgba(17,17,17,0.2);
+      background: rgba(255,255,255,0.15);
+      padding: 24px;
+    }
+    .arrow-bullet {
+      display: inline-flex;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- Grid lines -->
+    <div class="grid-line grid-line-h" style="top: 110px;"></div>
+    <div class="grid-line grid-line-h" style="top: 340px;"></div>
+    <div class="grid-line grid-line-h" style="top: 570px;"></div>
+    <div class="grid-line grid-line-v" style="left: 640px;"></div>
+
+    <!-- zone-1: Title area -->
+    <div style="position:absolute; top:30px; left:60px; width:1160px; height:80px;">
+      <h1 style="font-size:56px; font-weight:600; letter-spacing:-0.025em; margin:0; line-height:1.2;">执行摘要</h1>
+      <p style="font-size:20px; font-weight:500; color:rgba(17,17,17,0.5); margin:8px 0 0 0;">四大核心发现</p>
+    </div>
+
+    <!-- zone-2: Card 1 - Ardot正式公测 -->
+    <div class="card" style="position:absolute; top:140px; left:60px; width:580px; height:200px;">
+      <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:12px;">
+        <i class="ph ph-rocket-launch" style="font-size:24px; color:#111111;"></i>
+        <span style="font-size:20px; font-weight:500;">Ardot正式公测</span>
+      </div>
+      <p style="font-size:16px; font-weight:400; line-height:1.625; color:rgba(17,17,17,0.75); margin:0;">
+        2026年5月18日，腾讯云自研AI设计智能体平台Ardot开启公测，覆盖视觉设计、代码交付到团队协作的全流程
+      </p>
+    </div>
+
+    <!-- zone-3: Card 2 - 市场高速增长 -->
+    <div class="card" style="position:absolute; top:140px; left:660px; width:580px; height:200px;">
+      <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:12px;">
+        <i class="ph ph-chart-line-up" style="font-size:24px; color:#111111;"></i>
+        <span style="font-size:20px; font-weight:500;">市场高速增长</span>
+      </div>
+      <p style="font-size:16px; font-weight:400; line-height:1.625; color:rgba(17,17,17,0.75); margin:0;">
+        全球UI/UX设计工具市场2025年约21.4亿美元，预计2035年达159.9亿美元，CAGR 22.25%
+      </p>
+    </div>
+
+    <!-- zone-4: Card 3 - 资产化思维差异化 -->
+    <div class="card" style="position:absolute; top:370px; left:60px; width:580px; height:200px;">
+      <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:12px;">
+        <i class="ph ph-cube" style="font-size:24px; color:#111111;"></i>
+        <span style="font-size:20px; font-weight:500;">资产化思维差异化</span>
+      </div>
+      <p style="font-size:16px; font-weight:400; line-height:1.625; color:rgba(17,17,17,0.75); margin:0;">
+        Ardot核心差异化在于将AI能力与设计资产全生命周期管理深度结合，生成可编辑、可复用、可交付的团队资产
+      </p>
+    </div>
+
+    <!-- zone-5: Card 4 - 六大竞品对比 -->
+    <div class="card" style="position:absolute; top:370px; left:660px; width:580px; height:200px;">
+      <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:12px;">
+        <i class="ph ph-scales" style="font-size:24px; color:#111111;"></i>
+        <span style="font-size:20px; font-weight:500;">六大竞品对比</span>
+      </div>
+      <p style="font-size:16px; font-weight:400; line-height:1.625; color:rgba(17,17,17,0.75); margin:0;">
+        与Figma、Sketch、MasterGo、即时设计、Pixso、墨刀横向对比，Ardot在AI生成与代码交付维度领先
+      </p>
+    </div>
+
+    <!-- zone-6: Highlight bar -->
+    <div style="position:absolute; top:600px; left:60px; width:1160px; height:50px; display:flex; align-items:center; gap:8px; border-top:1px solid rgba(17,17,17,0.2); padding-top:16px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+      <span style="font-size:16px; font-weight:500; color:rgba(17,17,17,0.8);">不是生成图片，而是生成资产</span>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute; bottom:20px; left:60px; width:1160px; height:20px; display:flex; justify-content:space-between;">
+      <span style="font-size:14px; font-weight:400; color:rgba(17,17,17,0.4);">腾讯Ardot设计平台</span>
+      <span style="font-size:14px; font-weight:400; color:rgba(17,17,17,0.4);">02 / 15</span>
+    </div>
+
+  </div>
+</body>
+</html>

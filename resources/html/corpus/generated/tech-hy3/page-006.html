@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>核心功能：企业级安全与协作</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid -->
+    <div class="absolute left-[50%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-shield-check text-[20px]"></i>
+      <span class="text-[14px]/[20px]">核心功能 · 安全协作</span>
+    </div>
+
+    <!-- Page Title -->
+    <div class="absolute top-[60px] left-[80px] z-[10]">
+      <h1 class="text-[56px] font-[600] leading-[1.2] tracking-[-0.01em]">核心功能：企业级安全与协作</h1>
+      <div class="w-[80px] h-[2px] bg-[#111111] mt-[12px]"></div>
+    </div>
+
+    <!-- Left Column -->
+    <div class="absolute top-[200px] left-[80px] w-[520px] z-[10] space-y-[24px]">
+      <div class="flex items-start gap-[12px]">
+        <i class="ph ph-shield-check text-[20px] mt-[4px] shrink-0"></i>
+        <div>
+          <h3 class="text-[17px] font-[600] mb-[8px]">智能权限中心</h3>
+          <p class="text-[14px]/[22px] leading-[1.6] text-[#111111]/70">超管精细分配权限，关键资源更安全</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-[12px]">
+        <i class="ph ph-clipboard-text text-[20px] mt-[4px] shrink-0"></i>
+        <div>
+          <h3 class="text-[17px] font-[600] mb-[8px]">全方位行为追溯</h3>
+          <p class="text-[14px]/[22px] leading-[1.6] text-[#111111]/70">操作日志全记录，资产变更清晰可查</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-[12px]">
+        <i class="ph ph-user-switch text-[20px] mt-[4px] shrink-0"></i>
+        <div>
+          <h3 class="text-[17px] font-[600] mb-[8px]">无缝人员与资产管理</h3>
+          <p class="text-[14px]/[22px] leading-[1.6] text-[#111111]/70">离职自动回收权限，数据交接更省心</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="absolute top-[200px] left-[680px] w-[520px] z-[10]">
+      <div class="flex items-start gap-[12px]">
+        <i class="ph ph-users-three text-[20px] mt-[4px] shrink-0"></i>
+        <div>
+          <h3 class="text-[17px] font-[600] mb-[8px]">多人协同评审决策</h3>
+          <p class="text-[14px]/[22px] leading-[1.6] text-[#111111]/70">支持多人在线实时评论、标注反馈和版本比对</p>
+        </div>
+      </div>
+      <!-- Decorative circle -->
+      <div class="absolute -right-[5%] -bottom-[5%] w-[400px] h-[400px] rounded-[9999px] border-[1px] border-[#111111]/15 pointer-events-none"></div>
+    </div>
+
+    <!-- Bottom border -->
+    <div class="absolute bottom-[40px] left-[80px] right-[80px] h-[1px] bg-[#111111]/20 z-[10]"></div>
+  </div>
+</body>
+</html>

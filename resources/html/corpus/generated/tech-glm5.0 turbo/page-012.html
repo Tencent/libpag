@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>竞品综合对比矩阵</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .rating-block {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    margin-right: 3px;
+  }
+  .rating-filled { background-color: #111111; }
+  .rating-empty { background-color: transparent; border: 1px solid rgba(17,17,17,0.3); }
+</style>
+</head>
+<body>
+<div class="bg-noise w-[1280px] h-[720px] relative overflow-hidden">
+  <!-- Header -->
+  <div class="absolute" style="top:40px;left:48px;width:1184px;height:60px;">
+    <div class="flex items-center">
+      <div class="flex items-center justify-center w-10 h-10 rounded-full mr-4" style="border:1px solid #111111;">
+        <i class="ph ph-table text-[20px]" style="color:#111111;"></i>
+      </div>
+      <h1 class="text-[56px] font-semibold tracking-[-0.01em]" style="color:#111111;line-height:1.15;">竞品综合对比矩阵</h1>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="absolute" style="top:120px;left:48px;width:1184px;height:540px;">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding:10px 12px;border-bottom:1px solid rgba(17,17,17,0.3);color:#111111;font-weight:600;font-size:14px;width:150px;">维度</th>
+          <th style="text-align:center;padding:10px 8px;border-bottom:1px solid rgba(17,17,17,0.3);color:#111111;font-weight:600;font-size:14px;width:130px;">Ardot</th>
+          <th style="text-align:center;padding:10px 8px;border-bottom:1px solid rgba(17,17,17,0.3);color:#111111;font-weight:600;font-size:14px;width:130px;">Figma</th>
+          <th style="text-align:center;padding:10px 8px;border-bottom:1px solid rgba(17,17,17,0.3);color:#111111;font-weight:600;font-size:14px;width:130px;">Sketch</th>
+          <th style="text-align:center;padding:10px 8px;border-bottom:1px solid rgba(17,17,17,0.3);color:#111111;font-weight:600;font-size:14px;width:130px;">MasterGo</th>
+          <th style="text-align:center;padding:10px 8px;border-bottom:1px solid rgba(17,17,17,0.3);color:#111111;font-weight:600;font-size:14px;width:130px;">即时设计</th>
+          <th style="text-align:center;padding:10px 8px;border-bottom:1px solid rgba(17,17,17,0.3);color:#111111;font-weight:600;font-size:14px;width:130px;">Pixso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Row 1: AI生成设计稿 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">AI生成设计稿</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+        <!-- Row 2: 可编辑输出 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">可编辑输出</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+        <!-- Row 3: 实时协作 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">实时协作</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+        <!-- Row 4: 代码交付 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">代码交付</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+        <!-- Row 5: 设计系统 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">设计系统</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+        </tr>
+        <!-- Row 6: 插件生态 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">插件生态</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+        <!-- Row 7: 跨平台 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">跨平台</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+        <!-- Row 8: 数据安全/合规 -->
+        <tr>
+          <td style="padding:14px 12px;border-bottom:1px solid rgba(17,17,17,0.08);color:#111111;font-weight:500;">数据安全/合规</td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;border-bottom:1px solid rgba(17,17,17,0.08);">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+        <!-- Row 9: 价格优势 -->
+        <tr>
+          <td style="padding:14px 12px;color:#111111;font-weight:500;">价格优势</td>
+          <td style="text-align:center;padding:14px 8px;">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span>
+          </td>
+          <td style="text-align:center;padding:14px 8px;">
+            <span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-filled"></span><span class="rating-block rating-empty"></span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

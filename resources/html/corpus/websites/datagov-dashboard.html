@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DataGov · Data Governance</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#0a0a0f',
+          panel: '#13131a',
+          card: '#16161e',
+          card2: '#1b1b25',
+          border: '#23232e',
+          'border-soft': '#1e1e28',
+          fg: '#e9e9ee',
+          mute: '#8a8a96',
+          mute2: '#5d5d68',
+          violet: {
+            500: '#7c5cff',
+            400: '#9b85ff',
+            600: '#6a47ff',
+          },
+          accent: '#a78bfa',
+          teal: '#22d3c5',
+          rose: '#ff5e7a',
+          emerald: '#34d399',
+          amber: '#fbbf24',
+        },
+        fontFamily: {
+          sans: ['Inter','-apple-system','BlinkMacSystemFont','Helvetica Neue','Arial','sans-serif'],
+          mono: ['"JetBrains Mono"','ui-monospace','SFMono-Regular','Menlo','Consolas','monospace'],
+        },
+      }
+    }
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html, body { background: #0a0a0f; color: #e9e9ee; }
+  body { font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; letter-spacing: -0.01em; }
+  .card {
+    background: #13131a;
+    border: 1px solid #1e1e28;
+    border-radius: 14px;
+  }
+  .label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6c6c78;
+  }
+  .nav-item {
+    position: relative;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: #9a9aa6;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .nav-item:hover { color: #e9e9ee; background: #16161e; }
+  .nav-item.active {
+    color: #ffffff;
+    background: linear-gradient(90deg, rgba(124,92,255,0.12) 0%, rgba(124,92,255,0.02) 100%);
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute; left: 0; top: 6px; bottom: 6px;
+    width: 2px; border-radius: 2px;
+    background: linear-gradient(180deg, #7c5cff, #a78bfa);
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 500;
+    border: 1px solid #23232e; color: #d8d8e0; background: #16161e;
+    transition: all .15s ease; cursor: pointer;
+  }
+  .btn:hover { background: #1d1d27; border-color: #2c2c38; }
+  .btn-primary {
+    background: linear-gradient(180deg, #7c5cff, #6a47ff);
+    border-color: #7c5cff;
+    color: #fff;
+    box-shadow: 0 6px 18px -8px rgba(124,92,255,0.7), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .btn-primary:hover { filter: brightness(1.07); }
+
+  .seg-btn {
+    padding: 4px 10px; font-size: 11px; border-radius: 6px;
+    color: #8a8a96; cursor: pointer;
+  }
+  .seg-btn.active { background: #23232e; color: #ffffff; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500;
+  }
+  .pill-success { background: rgba(34,211,197,0.12); color: #5eead4; border: 1px solid rgba(34,211,197,0.25); }
+
+  .status {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9.5px; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.12em;
+    text-transform: uppercase; font-weight: 600;
+  }
+  .status-healthy { background: rgba(34,211,197,0.12); color: #34d3c5; border: 1px solid rgba(34,211,197,0.25); }
+  .status-risk { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.28); }
+  .status-review { background: rgba(167,139,250,0.14); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.3); }
+
+  .priority {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    width: 28px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  .p0 { background: rgba(255,94,122,0.14); color: #ff7a90; border: 1px solid rgba(255,94,122,0.3); }
+  .p1 { background: rgba(167,139,250,0.16); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.3); }
+  .p2 { background: rgba(124,92,255,0.14); color: #b9a4ff; border: 1px solid rgba(124,92,255,0.28); }
+
+  .left-bar { width: 3px; border-radius: 2px; }
+  .lb-rose { background: linear-gradient(180deg,#ff5e7a,#ff8aa3); }
+  .lb-violet { background: linear-gradient(180deg,#7c5cff,#a78bfa); }
+  .lb-amber { background: linear-gradient(180deg,#fbbf24,#fcd34d); }
+  .lb-teal { background: linear-gradient(180deg,#22d3c5,#5eead4); }
+
+  .grid-line { stroke: #20202a; stroke-dasharray: 2 4; }
+  .axis-label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    fill: #4d4d58; font-size: 10px; letter-spacing: 0.1em;
+  }
+
+  .scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll::-webkit-scrollbar-thumb { background: #23232e; border-radius: 3px; }
+  .scroll::-webkit-scrollbar-track { background: transparent; }
+
+  .row-hover:hover { background: #1a1a23; }
+  .divider { border-color: #1e1e28; }
+
+  .glow-violet {
+    box-shadow: 0 0 0 1px rgba(124,92,255,0.18), 0 10px 40px -20px rgba(124,92,255,0.4);
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useEffect, useRef } = React;
+
+// ============= Icon =============
+const Icon = ({ name, size = 16, className = "", color, strokeWidth = 1.75 }) => {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current && window.lucide) {
+      ref.current.innerHTML = "";
+      const def = window.lucide.icons[name] || window.lucide.icons.Circle;
+      const svg = window.lucide.createElement(def);
+      svg.setAttribute("width", size);
+      svg.setAttribute("height", size);
+      svg.setAttribute("stroke-width", strokeWidth);
+      if (color) svg.setAttribute("stroke", color);
+      ref.current.appendChild(svg);
+    }
+  }, [name, size, color, strokeWidth]);
+  return <span ref={ref} className={`inline-flex items-center justify-center ${className}`} />;
+};
+
+// ============= Sidebar =============
+function Sidebar() {
+  const items = [
+    { name: "Overview", active: true },
+    { name: "Data Catalog" },
+    { name: "Quality Rules" },
+    { name: "Lineage" },
+    { name: "Stewardship" },
+    { name: "Compliance" },
+  ];
+  return (
+    <aside className="w-[212px] shrink-0 bg-bg flex flex-col h-screen sticky top-0 border-r border-border-soft">
+      {/* Logo */}
+      <div className="px-5 pt-5 pb-6 flex items-center gap-2.5">
+        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center text-white font-bold text-[13px] shadow-md shadow-violet-500/30">
+          D
+        </div>
+        <span className="text-[15px] font-semibold tracking-tight">DataGov</span>
+      </div>
+
+      {/* Section label */}
+      <div className="px-5 pb-2">
+        <div className="label">Platform</div>
+      </div>
+
+      {/* Nav */}
+      <nav className="px-3 flex flex-col gap-0.5">
+        {items.map(it => (
+          <div key={it.name} className={`nav-item ${it.active ? "active" : ""}`}>{it.name}</div>
+        ))}
+      </nav>
+
+      <div className="flex-1" />
+
+      {/* User */}
+      <div className="m-3 p-2.5 rounded-xl bg-card border border-border-soft flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-accent flex items-center justify-center text-[11px] font-bold">
+          JH
+        </div>
+        <div className="min-w-0">
+          <div className="text-[12.5px] font-medium text-fg truncate">Junzhi He</div>
+          <div className="text-[10.5px] text-mute2 truncate">Data Admin</div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// ============= Header =============
+function Header() {
+  return (
+    <div className="flex items-start justify-between mb-6">
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-[28px] font-bold tracking-tight leading-none">Data Governance</h1>
+          <span className="pill pill-success">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></span>
+            All systems healthy
+          </span>
+        </div>
+        <p className="text-[12.5px] text-mute mt-2">
+          Enterprise data health overview <span className="text-mute2">— last synced 5 min ago</span>
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button className="btn"><Icon name="Search" size={13}/> Search</button>
+        <button className="btn"><Icon name="Download" size={13}/> Export</button>
+        <button className="btn btn-primary"><Icon name="Plus" size={13} color="#fff"/> New Rule</button>
+      </div>
+    </div>
+  );
+}
+
+// ============= KPI Card =============
+function KpiCard({ label, value, unit, delta, deltaType, sub, valueClass }) {
+  const deltaColor = deltaType === "up" ? "text-teal"
+    : deltaType === "down" ? "text-rose"
+    : "text-mute";
+  const arrow = deltaType === "up" ? "↑" : deltaType === "down" ? "↓" : "→";
+  return (
+    <div className="card p-4">
+      <div className="label mb-3">{label}</div>
+      <div className="flex items-baseline gap-1.5">
+        <span className={`mono text-[34px] font-bold leading-none tracking-tight ${valueClass || "text-fg"}`}>{value}</span>
+        <span className="mono text-[13px] text-mute font-medium">{unit}</span>
+      </div>
+      <div className="mt-3 flex items-center gap-1.5 text-[11.5px]">
+        <span className={`mono font-semibold ${deltaColor}`}>{arrow} {delta}</span>
+        <span className="text-mute2">{sub}</span>
+      </div>
+    </div>
+  );
+}
+
+function KpiRow() {
+  return (
+    <div className="grid grid-cols-4 gap-4 mb-4">
+      <KpiCard label="Data ingested today" value="4.82" unit="TB" delta="12.3%" deltaType="up" sub="vs yesterday" />
+      <KpiCard label="Anomaly tables" value="37" unit="tables" delta="18.5%" deltaType="down" sub="needs attention" valueClass="text-rose" />
+      <KpiCard label="API calls · 24h" value="2.41" unit="M" delta="8.4%" deltaType="up" sub="vs yesterday" />
+      <KpiCard label="System health" value="94.7" unit="%" delta="2.1%" deltaType="up" sub="improving" valueClass="text-teal" />
+    </div>
+  );
+}
+
+// ============= Area Chart =============
+function AreaChart() {
+  const [range, setRange] = useState("7d");
+  // 7 days quality score data
+  const data = [91.2, 92.4, 92.0, 93.6, 94.7, 94.2, 94.0];
+  const days = ["MON","TUE","WED","THU","FRI","SAT","SUN"];
+  const W = 720, H = 220, P = { l: 28, r: 20, t: 20, b: 30 };
+  const min = 88, max = 96;
+
+  const px = (i) => P.l + (i * (W - P.l - P.r)) / (data.length - 1);
+  const py = (v) => P.t + (1 - (v - min) / (max - min)) * (H - P.t - P.b);
+
+  const path = data.map((v, i) => `${i === 0 ? "M" : "L"} ${px(i)} ${py(v)}`).join(" ");
+  const areaPath = `${path} L ${px(data.length - 1)} ${H - P.b} L ${px(0)} ${H - P.b} Z`;
+
+  // highlighted point at FRI (index 4)
+  const hi = 4;
+
+  return (
+    <div className="card p-5 col-span-2">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-[14px] font-semibold">Data Quality Score · 7d</div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="mono text-[34px] font-bold leading-none">94.7</span>
+            <span className="mono text-[12px] text-mute">/100</span>
+            <span className="mono text-[11.5px] text-teal font-semibold ml-2">↑ 2.1 from last week</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 bg-card2 rounded-lg p-1 border border-border-soft">
+          {["24h","7d","30d"].map(r => (
+            <button key={r} onClick={() => setRange(r)} className={`seg-btn ${range === r ? "active" : ""}`}>{r}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 -mx-1">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[220px]" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#7c5cff" stopOpacity="0.55"/>
+              <stop offset="60%" stopColor="#7c5cff" stopOpacity="0.12"/>
+              <stop offset="100%" stopColor="#7c5cff" stopOpacity="0"/>
+            </linearGradient>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#9b85ff"/>
+              <stop offset="100%" stopColor="#7c5cff"/>
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          {[0,1,2,3].map(i => {
+            const y = P.t + ((H - P.t - P.b) / 3) * i;
+            return <line key={i} x1={P.l} x2={W - P.r} y1={y} y2={y} className="grid-line"/>;
+          })}
+
+          {/* Area */}
+          <path d={areaPath} fill="url(#areaGrad)" />
+          {/* Line */}
+          <path d={path} fill="none" stroke="url(#lineGrad)" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"/>
+
+          {/* Highlight point */}
+          <line x1={px(hi)} x2={px(hi)} y1={py(data[hi])} y2={H - P.b} stroke="#7c5cff" strokeWidth="1" strokeDasharray="3 3" opacity="0.4"/>
+          <circle cx={px(hi)} cy={py(data[hi])} r="9" fill="#7c5cff" opacity="0.18"/>
+          <circle cx={px(hi)} cy={py(data[hi])} r="4" fill="#fff" stroke="#7c5cff" strokeWidth="2"/>
+
+          {/* X axis labels */}
+          {days.map((d, i) => (
+            <text key={d} x={px(i)} y={H - 8} textAnchor="middle" className="axis-label">{d}</text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ============= Donut Chart =============
+function DonutChart() {
+  const segs = [
+    { name: "E-Commerce",     value: 39.9, color: "#7c5cff" },
+    { name: "Entertainment",  value: 29.0, color: "#22d3c5" },
+    { name: "Cloud Services", value: 19.1, color: "#a78bfa" },
+    { name: "Others",         value: 12.0, color: "#3a3a48" },
+  ];
+  const total = segs.reduce((s,x) => s + x.value, 0);
+  const R = 56, r = 38, cx = 70, cy = 70;
+  const C = 2 * Math.PI * R;
+
+  let acc = 0;
+  const arcs = segs.map((s, i) => {
+    const frac = s.value / total;
+    const dash = `${frac * C} ${C - frac * C}`;
+    const offset = -acc * C;
+    acc += frac;
+    return { ...s, dash, offset, i };
+  });
+
+  return (
+    <div className="card p-5">
+      <div className="text-[14px] font-semibold">Storage by Business Line</div>
+      <div className="text-[11.5px] text-mute mt-1">Total 142.8 TB · across 4 domains</div>
+
+      <div className="mt-4 flex items-center gap-5">
+        <div className="relative shrink-0" style={{ width: 140, height: 140 }}>
+          <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx={cx} cy={cy} r={R} fill="none" stroke="#1a1a24" strokeWidth={R - r}/>
+            {arcs.map(a => (
+              <circle key={a.i}
+                cx={cx} cy={cy} r={R} fill="none"
+                stroke={a.color} strokeWidth={R - r}
+                strokeDasharray={a.dash}
+                strokeDashoffset={a.offset}
+                strokeLinecap="butt"
+              />
+            ))}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="mono text-[22px] font-bold leading-none">12.8</div>
+            <div className="mono text-[10px] text-mute mt-1">TB</div>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col gap-2 min-w-0">
+          {segs.map(s => (
+            <div key={s.name} className="flex items-center text-[12px]">
+              <span className="w-1.5 h-1.5 rounded-full mr-2" style={{ background: s.color }}/>
+              <span className="text-mute truncate flex-1">{s.name}</span>
+              <span className="mono text-fg font-semibold ml-2">{s.value.toFixed(1)}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= Action Required =============
+function ActionRequired() {
+  const items = [
+    { type: "rose",   title: "PII detected · analytics.user_events", cat: "DATA CLEAN", time: "18 min ago", p: "P0" },
+    { type: "violet", title: "Access request · finance_revenue (M.Park)", cat: "APPROVAL", time: "42 min ago", p: "P1" },
+    { type: "amber",  title: "Schema drift · orders_db.transactions", cat: "DATA CLEAN", time: "1 hr ago", p: "P2" },
+    { type: "teal",   title: "Approve dataset · marketing.campaigns", cat: "APPROVAL", time: "3 hr ago", p: "P1" },
+  ];
+  const lbCls = { rose: "lb-rose", violet: "lb-violet", amber: "lb-amber", teal: "lb-teal" };
+  const pCls = { P0: "p0", P1: "p1", P2: "p2" };
+
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[14px] font-semibold">Action Required</span>
+          <span className="w-4 h-4 rounded-full bg-card2 border border-border text-mute text-[10px] flex items-center justify-center mono">?</span>
+        </div>
+        <button className="text-[11.5px] text-violet-400 flex items-center gap-1 hover:text-accent">
+          View all <Icon name="ArrowRight" size={12} color="#a78bfa"/>
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-3 px-2 py-2.5 rounded-lg row-hover">
+            <div className={`left-bar h-9 ${lbCls[it.type]}`}/>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] text-fg font-medium truncate">{it.title}</div>
+              <div className="mt-0.5 flex items-center gap-2">
+                <span className="mono text-[10px] text-mute2 tracking-wider">{it.cat}</span>
+                <span className="text-mute2 text-[10px]">·</span>
+                <span className="text-[10.5px] text-mute2">{it.time}</span>
+              </div>
+            </div>
+            <span className={`priority ${pCls[it.p]}`}>{it.p}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============= Top Monitored Assets =============
+function TopAssets() {
+  const rows = [
+    { asset: "orders_db.transactions", domain: "E-Commerce",   q: "98.2", owner: "J. Chen",  status: "HEALTHY", sCls: "status-healthy" },
+    { asset: "analytics.user_events",  domain: "Entertainment", q: "72.4", owner: "M. Park",  status: "AT RISK", sCls: "status-risk" },
+    { asset: "finance.revenue_table",  domain: "Finance",       q: "91.8", owner: "S. Kim",   status: "REVIEW",  sCls: "status-review" },
+  ];
+  return (
+    <div className="card p-5 col-span-2">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[14px] font-semibold">Top Monitored Assets</span>
+        <button className="text-[11.5px] text-violet-400 flex items-center gap-1 hover:text-accent">
+          View all <Icon name="ArrowRight" size={12} color="#a78bfa"/>
+        </button>
+      </div>
+
+      {/* Header */}
+      <div className="grid grid-cols-12 px-2 pb-2 border-b divider">
+        <div className="col-span-5 label">Asset</div>
+        <div className="col-span-3 label">Domain</div>
+        <div className="col-span-2 label">Quality</div>
+        <div className="col-span-1 label">Owner</div>
+        <div className="col-span-1 label text-right pr-1">Status</div>
+      </div>
+
+      <div className="flex flex-col">
+        {rows.map((r, i) => {
+          const qNum = parseFloat(r.q);
+          const qColor = qNum >= 90 ? "text-teal" : qNum >= 80 ? "text-violet-400" : "text-rose";
+          return (
+            <div key={i} className="grid grid-cols-12 items-center px-2 py-3.5 border-b divider last:border-b-0 row-hover rounded-md">
+              <div className="col-span-5 mono text-[12.5px] text-fg truncate">{r.asset}</div>
+              <div className="col-span-3 text-[12.5px] text-mute">{r.domain}</div>
+              <div className="col-span-2">
+                <span className={`mono text-[12.5px] font-semibold ${qColor}`}>{r.q}</span>
+              </div>
+              <div className="col-span-1 text-[12px] text-fg whitespace-nowrap">{r.owner}</div>
+              <div className="col-span-1 flex justify-end">
+                <span className={`status ${r.sCls}`}>{r.status}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============= App =============
+function App() {
+  return (
+    <div className="min-h-screen flex bg-bg">
+      <Sidebar />
+      <main className="flex-1 min-w-0 p-7 max-w-[1280px]">
+        <Header />
+        <KpiRow />
+
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <AreaChart />
+          <DonutChart />
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <ActionRequired />
+          <TopAssets />
+        </div>
+      </main>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>

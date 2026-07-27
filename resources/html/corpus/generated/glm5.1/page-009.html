@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>未来展望</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .gradient-dark { background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%); }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide gradient-dark">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+      <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">未来展望</span>
+    </div>
+    <div class="flex items-center gap-[24px]">
+      <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35">中国宠物经济趋势洞察</span>
+      <span class="text-[13px] font-[600] text-[#FFFFFF]/50">09</span>
+    </div>
+  </div>
+
+  <!-- 标题 + 大数字 -->
+  <div class="pt-[88px] px-[48px]">
+    <div class="italic-heading">
+      <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+        迈向万亿市场
+      </h1>
+    </div>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+    <div class="mt-[24px] flex items-end gap-[16px]">
+      <div class="text-[72px] font-[900] text-[#2563EB] leading-[1]">1.15</div>
+      <div class="text-[28px] font-[500] text-[#F5F5DC]/60 pb-[8px]">万亿元</div>
+      <div class="text-[16px] text-[#F5F5DC]/40 pb-[12px]">2028年全产业链预测规模</div>
+    </div>
+  </div>
+
+  <!-- 三列卡片 -->
+  <div class="grid grid-cols-3 gap-[24px] px-[48px] mt-[32px]">
+    <!-- 宠物出行 -->
+    <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[24px]">
+      <div class="flex items-center gap-[12px] mb-[12px]">
+        <div class="w-[44px] h-[44px] rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+          <i class="ph ph-car text-[#2563EB] text-[22px]"></i>
+        </div>
+        <div class="text-[18px] font-[700] text-[#F5F5DC]">宠物出行</div>
+      </div>
+      <div class="text-[14px] text-[#F5F5DC]/60 leading-[1.7]">
+        71%宠主有携宠出行意愿，50.6%曾使用付费出行服务。航空/高铁宠物托运政策持续放开，出行服务潜力释放。
+      </div>
+      <div class="mt-[12px] flex gap-[12px]">
+        <div class="bg-[#2563EB]/15 rounded-[6px] px-[12px] py-[6px] text-[13px] text-[#60A5FA]">71% 出行意愿</div>
+        <div class="bg-[#2563EB]/15 rounded-[6px] px-[12px] py-[6px] text-[13px] text-[#60A5FA]">50.6% 已使用</div>
+      </div>
+    </div>
+    <!-- AI健康管理 -->
+    <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[24px]">
+      <div class="flex items-center gap-[12px] mb-[12px]">
+        <div class="w-[44px] h-[44px] rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+          <i class="ph ph-brain text-[#2563EB] text-[22px]"></i>
+        </div>
+        <div class="text-[18px] font-[700] text-[#F5F5DC]">AI健康管理</div>
+      </div>
+      <div class="text-[14px] text-[#F5F5DC]/60 leading-[1.7]">
+        AI诊断检测覆盖500余项，53款试剂盒已开发。疾病智能预警与辅助诊断将深度渗透预防-诊断-治疗全场景。
+      </div>
+      <div class="mt-[12px] flex gap-[12px]">
+        <div class="bg-[#2563EB]/15 rounded-[6px] px-[12px] py-[6px] text-[13px] text-[#60A5FA]">500+ 检测项</div>
+        <div class="bg-[#2563EB]/15 rounded-[6px] px-[12px] py-[6px] text-[13px] text-[#60A5FA]">53款 试剂盒</div>
+      </div>
+    </div>
+    <!-- 宠物中医 -->
+    <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[24px]">
+      <div class="flex items-center gap-[12px] mb-[12px]">
+        <div class="w-[44px] h-[44px] rounded-full bg-[#2563EB]/20 flex items-center justify-center">
+          <i class="ph ph-leaf text-[#2563EB] text-[22px]"></i>
+        </div>
+        <div class="text-[18px] font-[700] text-[#F5F5DC]">宠物中医</div>
+      </div>
+      <div class="text-[14px] text-[#F5F5DC]/60 leading-[1.7]">
+        43.3%宠主愿在西医无效后尝试中医，19.6%优先考虑中医治疗。针灸/推拿/中草药等疗法静待破圈。
+      </div>
+      <div class="mt-[12px] flex gap-[12px]">
+        <div class="bg-[#2563EB]/15 rounded-[6px] px-[12px] py-[6px] text-[13px] text-[#60A5FA]">43.3% 愿尝试</div>
+        <div class="bg-[#2563EB]/15 rounded-[6px] px-[12px] py-[6px] text-[13px] text-[#60A5FA]">19.6% 优先选</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#F5F5DC]/30">中国宠物经济趋势洞察</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+</body>
+</html>

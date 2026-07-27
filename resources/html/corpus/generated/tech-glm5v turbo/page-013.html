@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 13 - 竞品综合对比矩阵</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.bg-noise {
+  background-color: #DFDDDA;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height['100%25'] filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+.star-on { opacity: 1; }
+.star-off { opacity: 0.2; }
+</style>
+</head>
+<body>
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden m-auto">
+  <!-- Page Title -->
+  <div class="absolute top-[50px] left-[48px]">
+    <h1 class="text-[44px] font-semibold tracking-[-0.01em] leading-[1.2]">竞品综合对比矩阵</h1>
+  </div>
+
+  <!-- Horizontal Divider -->
+  <div class="absolute left-[48px] right-[48px] top-[130px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- Comparison Table -->
+  <div class="absolute top-[144px] left-[48px] w-[1184px]">
+    <table class="w-full border-collapse text-left">
+      <thead>
+        <tr class="border-b border-[#111111]/30">
+          <th class="py-[10px] px-[14px] text-[11px] font-semibold uppercase tracking-wider opacity-60 w-[16%]">维度</th>
+          <th class="py-[10px] px-[10px] text-center text-[12px] font-bold">Ardot</th>
+          <th class="py-[10px] px-[10px] text-center text-[12px] font-medium opacity-75">Figma</th>
+          <th class="py-[10px] px-[10px] text-center text-[12px] font-medium opacity-75">Sketch</th>
+          <th class="py-[10px] px-[10px] text-center text-[12px] font-medium opacity-75">MasterGo</th>
+          <th class="py-[10px] px-[10px] text-center text-[12px] font-medium opacity-75">即时设计</th>
+          <th class="py-[10px] px-[10px] text-center text-[12px] font-medium opacity-75">Pixso</th>
+        </tr>
+      </thead>
+      <tbody class="text-[13px]" style="font-family: 'Plus Jakarta Sans'">
+        <!-- Row 1: AI生成设计稿 -->
+        <tr class="border-b border-[#111111]/8 hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">AI生成设计稿</td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 2: 可编辑输出 -->
+        <tr class="border-b border-[#111111]/8 hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">可编辑输出</td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 3: 实时协作 -->
+        <tr class="border-b border-[#111111]/8 hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">实时协作</td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 4: 代码交付 -->
+        <tr class="border-b border-[#111111]/8 bg-[rgba(17,17,17,0.03)]">
+          <td class="py-[9px] px-[14px] font-semibold whitespace-nowrap">代码交付</td>
+          <td class="py-[9px] px-[10px] text-center font-semibold"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 5: 设计系统 -->
+        <tr class="border-b border-[#111111]/8 hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">设计系统</td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 6: 插件生态 -->
+        <tr class="border-b border-[#111111]/8 hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">插件生态</td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 7: 跨平台 -->
+        <tr class="border-b border-[#111111]/8 hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">跨平台</td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 8: 数据安全合规 -->
+        <tr class="border-b border-[#111111]/8 hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">数据安全 / 合规</td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+        <!-- Row 9: 价格优势 -->
+        <tr class="hover:bg-[rgba(17,17,17,0.02)]">
+          <td class="py-[9px] px-[14px] font-medium whitespace-nowrap">价格优势</td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-off">&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span class="star-on">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+          <td class="py-[9px] px-[10px] text-center"><span>&#9733;&#9733;&#9733;&#9733;</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Insight Bar at bottom -->
+  <div class="absolute bottom-[40px] left-[48px] right-[48px] flex items-start gap-[12px] p-[14px] border-t border-[#111111]/20">
+    <i class="ph ph-lightbulb text-[18px] shrink-0 mt-[2px]"></i>
+    <p class="text-[12px]/[1.6] opacity-80"><strong>Key Insight:</strong> Ardot在<strong>AI生成、代码交付、数据安全、价格优势</strong>上五星领先；主要短板在于<strong>插件生态</strong>（起步阶段）和<strong>跨平台覆盖</strong>（Windows / 小程序待上线）</p>
+  </div>
+</div>
+</body>
+</html>

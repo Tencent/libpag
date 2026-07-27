@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>IMA 养成系人格体系</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; }
+.slide {
+  width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0;
+  background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+  font-family: 'Noto Sans SC', sans-serif; color: #FFFFFF;
+}
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Watermark -->
+  <div class="absolute text-[500px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="z-index:0; top: 60px; left: 100px;">IMA</div>
+
+  <!-- Giant Parentheses Title -->
+  <div class="absolute flex flex-col items-center justify-center" style="z-index:20; top: 150px; left: 0; right: 0;">
+    <div class="text-[20px] font-[300] text-[#FFFFFF]/60 tracking-[0.1em] mb-[16px]">PERSONALITY EVOLUTION SYSTEM</div>
+    <div class="flex items-center gap-[24px]">
+      <span class="text-[100px] font-[300] text-[#FFFFFF] leading-none">(</span>
+      <div class="flex flex-col items-center">
+        <h1 class="text-[80px] font-[400] text-[#FFFFFF] leading-[1.1] tracking-[0.05em]">养成系</h1>
+        <h1 class="text-[80px] font-[400] text-[#FFFFFF] leading-[1.1] tracking-[0.05em]">人格体系</h1>
+      </div>
+      <span class="text-[100px] font-[300] text-[#FFFFFF] leading-none">)</span>
+    </div>
+    <div class="text-[24px] font-[300] text-[#FFFFFF]/50 mt-[24px] tracking-[0.1em]">从工具到伙伴</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <!-- 背景水印 -->
+    <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="top: 80px; left: 150px;">WORKFLOW</div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-[32px] right-[48px] z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+    </div>
+
+    <!-- 标题区域 -->
+    <div class="absolute z-20" style="top: 40px; left: 0; width: 1280px; height: 70px;">
+      <div class="flex flex-col items-center justify-center h-full gap-[8px]">
+        <div class="text-[16px] font-[300] text-[#FFFFFF]/60 tracking-[0.1em] uppercase">Agents</div>
+        <h1 class="text-[36px] font-[300] text-[#FFFFFF] leading-[1.1]">第3层：工作流程层</h1>
+      </div>
+    </div>
+
+    <!-- 正文区域 (Z-BODY: x=100, y=140, w=1080, h=500) -->
+    <div class="absolute z-20" style="top: 140px; left: 100px; width: 1080px; height: 500px;">
+      <div class="flex flex-col gap-[32px] h-full">
+
+        <!-- 启动协议 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10">
+          <div class="flex items-center gap-[12px] mb-[14px]">
+            <div class="w-[32px] h-[32px] rounded-full bg-[#82D0A4]/20 flex items-center justify-center text-[#82D0A4] font-[500] text-[14px]">1</div>
+            <div class="text-[18px] font-[400] text-[#82D0A4]">启动协议</div>
+          </div>
+          <div class="grid grid-cols-3 gap-[16px]">
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-arrow-right text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">读取 MEMORY.md</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-arrow-right text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">检查可用 Skills</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-arrow-right text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">确认当前用户状态</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 任务执行 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10">
+          <div class="flex items-center gap-[12px] mb-[14px]">
+            <div class="w-[32px] h-[32px] rounded-full bg-[#82D0A4]/20 flex items-center justify-center text-[#82D0A4] font-[500] text-[14px]">2</div>
+            <div class="text-[18px] font-[400] text-[#82D0A4]">任务执行</div>
+          </div>
+          <div class="grid grid-cols-2 gap-[16px]">
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-check text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">收到任务 → 复述确认（避免理解偏差）</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-check text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">拆解步骤 → 逐步执行</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-check text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">遇到决策点 → 列选项给用户拍板</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-check text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">完成后 → 写入记忆</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 自我进化 -->
+        <div class="bg-[#1E332A] rounded-[12px] p-[24px] border-[1px] border-[#FFFFFF]/10">
+          <div class="flex items-center gap-[12px] mb-[14px]">
+            <div class="w-[32px] h-[32px] rounded-full bg-[#82D0A4]/20 flex items-center justify-center text-[#82D0A4] font-[500] text-[14px]">3</div>
+            <div class="text-[18px] font-[400] text-[#82D0A4]">自我进化</div>
+          </div>
+          <div class="grid grid-cols-3 gap-[16px]">
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-trend-up text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">犯错时 → 把教训写入 MEMORY</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-trend-up text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">发现新模式 → 总结为可复用流程</span>
+            </div>
+            <div class="flex items-start gap-[8px]">
+              <i class="ph ph-trend-up text-[#82D0A4] mt-[2px] shrink-0"></i>
+              <span class="text-[13px] text-[#FFFFFF]/60">用户反馈 → 调整行为偏好</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 进化示例 -->
+        <div class="bg-[#82D0A4]/10 rounded-[8px] p-[14px] border-[1px] border-[#82D0A4]/20">
+          <div class="text-[12px] text-[#82D0A4] mb-[6px]">进化示例</div>
+          <div class="flex items-center gap-[12px] text-[12px] text-[#FFFFFF]/50">
+            <span>Day 1 文案太正式</span>
+            <i class="ph ph-arrow-right text-[#82D0A4]"></i>
+            <span>Day 5 自动口语化</span>
+            <i class="ph ph-arrow-right text-[#82D0A4]"></i>
+            <span>Day 15 学会用户口头禅</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+      <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+    </div>
+  </div>
+</body>
+</html>

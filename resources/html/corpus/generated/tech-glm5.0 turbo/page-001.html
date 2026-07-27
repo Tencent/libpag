@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720, initial-scale=1.0">
+<title>腾讯Ardot设计平台 - 分析与竞品分析报告</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .geo-circle {
+    border: 1px solid #111111;
+    border-radius: 50%;
+  }
+  .hairline-grid {
+    border: 1px solid rgba(17,17,17,0.2);
+  }
+</style>
+</head>
+<body class="bg-noise">
+<div class="relative w-[1280px] h-[720px] overflow-hidden">
+
+  <!-- Geometric Circles Decorations -->
+  <div class="absolute geo-circle" style="top: -100px; left: 720px; width: 560px; height: 560px; opacity: 0.6;"></div>
+  <div class="absolute geo-circle" style="top: -20px; left: 800px; width: 400px; height: 400px; opacity: 0.3;"></div>
+  <div class="absolute geo-circle" style="top: 60px; left: 880px; width: 240px; height: 240px; opacity: 0.2;"></div>
+
+  <!-- Hairline Grid Lines -->
+  <div class="absolute" style="top: 0; left: 624px; width: 1px; height: 720px; background: rgba(17,17,17,0.08);"></div>
+  <div class="absolute" style="top: 360px; left: 0; width: 1280px; height: 1px; background: rgba(17,17,17,0.08);"></div>
+
+  <!-- Logo Zone -->
+  <div class="absolute" style="top: 40px; left: 48px; width: 300px; height: 30px;">
+    <div class="flex items-center gap-2">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" class="w-5 h-5">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      <span class="text-sm font-semibold tracking-tight" style="color: #111111; font-family: 'Plus Jakarta Sans', sans-serif;">TENCENT DESIGN</span>
+    </div>
+  </div>
+
+  <!-- Headline Zone -->
+  <div class="absolute" style="top: 200px; left: 80px; width: 700px; height: 240px;">
+    <h1 class="font-semibold leading-none" style="font-size: 80px; letter-spacing: -0.02em; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif;">
+      腾讯Ardot设计平台<br>
+      <span style="font-size: 68px; opacity: 0.7;">分析与竞品分析报告</span>
+    </h1>
+  </div>
+
+  <!-- Subtitle Zone -->
+  <div class="absolute" style="top: 460px; left: 80px; width: 600px; height: 40px;">
+    <p class="text-base" style="color: #111111; opacity: 0.6; font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.02em;">
+      AI驱动设计工具市场深度研究  |  2026年5月
+    </p>
+  </div>
+
+  <!-- Divider line below subtitle -->
+  <div class="absolute" style="top: 520px; left: 80px; width: 120px; height: 1px; background: #111111;"></div>
+
+  <!-- Meta Bar -->
+  <div class="absolute" style="top: 640px; left: 80px; width: 1120px; height: 40px;">
+    <div class="flex items-center justify-between" style="color: #111111; opacity: 0.5; font-size: 12px; font-family: 'Plus Jakarta Sans', sans-serif;">
+      <span>CONFIDENTIAL</span>
+      <div class="flex items-center gap-6">
+        <span>腾讯设计</span>
+        <span style="opacity: 0.4;">|</span>
+        <span>产品分析部</span>
+        <span style="opacity: 0.4;">|</span>
+        <span>2026.05</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page Number -->
+  <div class="absolute" style="bottom: 40px; right: 48px;">
+    <span style="color: #111111; opacity: 0.4; font-size: 12px; font-family: 'Plus Jakarta Sans', sans-serif;">01</span>
+  </div>
+
+</div>
+</body>
+</html>

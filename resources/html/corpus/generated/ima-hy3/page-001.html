@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <!-- 背景水印 -->
+    <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="top: -80px; left: -50px;">
+      IMA
+    </div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-[32px] right-[48px] z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+    </div>
+
+    <!-- 主标题区域 (Z-TITLE: x=0, y=280, w=1280, h=200) -->
+    <div class="absolute z-20" style="top: 240px; left: 0; width: 1280px; height: 200px;">
+      <div class="flex flex-col items-center justify-center h-full gap-[16px]">
+        <div class="flex items-center gap-[24px]">
+          <span class="text-[100px] font-[300] text-[#FFFFFF] leading-none">(</span>
+          <div class="flex flex-col items-center">
+            <h1 class="text-[60px] font-[400] text-[#FFFFFF] leading-[1.1] tracking-[0.05em]">IMA 养成系</h1>
+            <h1 class="text-[60px] font-[400] text-[#FFFFFF] leading-[1.1] tracking-[0.05em]">人格体系</h1>
+          </div>
+          <span class="text-[100px] font-[300] text-[#FFFFFF] leading-none">)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 副标题 (Z-SUBTITLE: x=0, y=520, w=1280, h=60) -->
+    <div class="absolute z-20" style="top: 500px; left: 0; width: 1280px; height: 60px;">
+      <div class="flex items-center justify-center h-full">
+        <span class="text-[20px] font-[300] text-[#FFFFFF]/60 tracking-[0.1em]">完整拆解</span>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+      <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+    </div>
+  </div>
+</body>
+</html>

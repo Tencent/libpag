@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>腾讯Ardot设计平台分析与竞品分析报告</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; background-color: #DFDDDA; font-family: 'Plus Jakarta Sans', sans-serif; color: #111111; box-sizing: border-box; }
+  .bg-noise { background-color: #DFDDDA; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); }
+  .hairline { position: absolute; background-color: rgba(17,17,17,0.2); }
+  .meta-text { font-size: 14px; font-weight: 400; color: rgba(17,17,17,0.6); }
+  .top-label { font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(17,17,17,0.5); }
+  .section-title { font-size: 48px; font-weight: 600; letter-spacing: -0.01em; color: #111111; line-height: 1.1; }
+  .heading-xl { font-size: 88px; font-weight: 600; letter-spacing: -0.025em; color: #111111; line-height: 1.05; }
+  .body-text { font-size: 14px; font-weight: 400; color: #111111; line-height: 1.6; }
+  .sub-label { font-size: 13px; font-weight: 500; color: rgba(17,17,17,0.7); }
+  .card { background-color: rgba(17,17,17,0.04); border: 1px solid rgba(17,17,17,0.15); padding: 28px; }
+  .highlight-box { background-color: rgba(17,17,17,0.06); border: 1px solid rgba(17,17,17,0.2); padding: 20px 28px; }
+  .vline { position: absolute; background-color: rgba(17,17,17,0.2); width: 1px; }
+  .hl { position: absolute; left: 48px; right: 48px; height: 1px; background-color: rgba(17,17,17,0.2); }
+  .circle-deco { border: 1px solid rgba(17,17,17,0.25); border-radius: 50%; position: absolute; }
+  .arrow-icon { stroke: rgba(17,17,17,0.4); stroke-width: 1.5; fill: none; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="slide bg-noise">
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+  <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.5)" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+  <span class="meta-text">Salford & Co.</span>
+</div>
+<div class="absolute top-[40px] right-[48px]">
+  <span class="meta-text">May 2026</span>
+</div>
+  <div class="hl" style="top:0px;"></div>
+  <div class="circle-deco" style="right:-180px;top:60px;width:600px;height:600px;"></div>
+  <div class="circle-deco" style="right:-80px;top:120px;width:400px;height:400px;opacity:0.5;"></div>
+  <div class="absolute" style="top:180px;left:48px;right:200px;">
+    <h1 class="heading-xl" style="margin:0 0 24px 0;">腾讯Ardot设计平台</h1>
+    <h1 class="heading-xl" style="margin:0 0 40px 0;">分析与竞品分析报告</h1>
+    <p style="font-size:22px;font-weight:500;color:#111111;margin:0;">AI驱动产设研协作新范式</p>
+  </div>
+  <div class="hl" style="bottom:80px;"></div>
+  <div class="absolute" style="bottom:40px;left:48px;display:flex;gap:64px;">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <svg class="w-[18px] h-[18px] arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="sub-label">Presented By</span>
+      </div>
+      <span style="font-size:16px;font-weight:500;">Research Team</span>
+    </div>
+    <div>
+      <span style="font-size:16px;font-weight:500;display:block;margin-bottom:6px;">腾讯设计</span>
+      <span class="sub-label">Ardot Platform</span>
+    </div>
+  </div>
+  <div class="absolute bottom-[40px] right-[48px]">
+    <span class="meta-text">2026年5月 · 深度研究报告</span>
+  </div>
+  <div class="hl" style="bottom:0px;"></div>
+</div>
+</body></html>

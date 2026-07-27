@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>腾讯Ardot设计平台 - 封面</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid Lines -->
+    <div class="absolute left-[33%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-palette text-[20px]"></i>
+      <span class="text-[14px]/[20px]">腾讯设计 · Ardot</span>
+    </div>
+    <div class="absolute top-[40px] right-[48px] z-[10]">
+      <span class="text-[14px]/[20px]">2026年5月</span>
+    </div>
+
+    <!-- Decorative Geometric Circle -->
+    <div class="absolute -right-[8%] top-[5%] w-[750px] h-[750px] rounded-[9999px] border-[1px] border-[#111111] pointer-events-none"></div>
+    <!-- Inner Circle -->
+    <div class="absolute right-[12%] top-[18%] w-[450px] h-[450px] rounded-[9999px] border-[1px] border-[#111111]/30 pointer-events-none"></div>
+
+    <!-- Main Content -->
+    <div class="absolute top-[180px] left-[80px] w-[55%] z-[10]">
+      <h1 class="text-[80px] font-[600] leading-[1.15] tracking-[-0.025em] mb-[28px]">
+        腾讯Ardot<br/>设计平台
+      </h1>
+      <div class="w-[60%] border-l-[2px] border-[#111111] pl-[20px]">
+        <p class="text-[22px]/[32px] font-[400] leading-[1.6] tracking-[-0.01em]">
+          AI驱动产设研协作平台<br/>分析与竞品报告
+        </p>
+      </div>
+    </div>
+
+    <!-- Bottom Info -->
+    <div class="absolute bottom-[60px] left-[80px] right-[80px] flex justify-between items-end z-[10]">
+      <div>
+        <div class="flex items-center gap-[8px] mb-[8px]">
+          <i class="ph ph-cursor text-[18px]"></i>
+          <span class="text-[16px]/[24px]">智能设计工具，让灵感鲜活落地</span>
+        </div>
+        <span class="text-[14px]/[20px] text-[#111111]/60">腾讯云 · 腾讯设计</span>
+      </div>
+      <div class="text-right">
+        <div class="flex items-center gap-[8px] mb-[4px] justify-end">
+          <span class="text-[16px]/[24px]">出品方</span>
+          <i class="ph ph-arrow-up-right text-[16px]"></i>
+        </div>
+        <span class="text-[16px]/[24px] font-[500]">腾讯Ardot 团队</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

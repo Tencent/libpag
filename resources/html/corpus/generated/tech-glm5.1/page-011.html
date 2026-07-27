@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竞品分析：国产四强</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .arrow-bullet {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .card-border {
+      border: 1px solid rgba(17,17,17,0.2);
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- 极细网格线装饰 -->
+    <div class="absolute inset-0 pointer-events-none" style="background-image: linear-gradient(rgba(17,17,17,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(17,17,17,0.06) 1px, transparent 1px); background-size: 80px 80px;"></div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-0 left-0 w-full h-[2px]" style="background: rgba(17,17,17,0.2);"></div>
+
+    <!-- zone-1: 标题区 -->
+    <div class="absolute" style="top:30px; left:60px; width:1160px; height:60px;">
+      <h1 class="text-[56px] font-semibold" style="letter-spacing: -0.025em; line-height: 1.1;">竞品分析：国产四强</h1>
+      <p class="text-[20px] font-medium mt-1" style="color: rgba(17,17,17,0.6);">MasterGo / 即时设计 / Pixso / 墨刀</p>
+    </div>
+
+    <!-- zone-2: MasterGo卡片 -->
+    <div class="absolute card-border bg-white/40 backdrop-blur-sm" style="top:110px; left:60px; width:570px; height:240px; border-radius:8px; padding:24px;">
+      <div class="flex items-center gap-3 mb-3">
+        <i class="ph ph-buildings text-[24px]"></i>
+        <h3 class="text-[20px] font-medium">MasterGo</h3>
+      </div>
+      <p class="text-[16px] leading-[1.625] mb-2" style="color:rgba(17,17,17,0.7);">定位AI时代的数字界面生产平台，蓝湖出品</p>
+      <div class="space-y-1.5">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">设计稿秒转高可用代码，企业级方案完善，服务中国电信、科大讯飞等</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.4)" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]" style="color:rgba(17,17,17,0.5);">插件生态仍在发展，初创版仅支持3个文件</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-3: 即时设计卡片 -->
+    <div class="absolute card-border bg-white/40 backdrop-blur-sm" style="top:110px; left:660px; width:570px; height:240px; border-radius:8px; padding:24px;">
+      <div class="flex items-center gap-3 mb-3">
+        <i class="ph ph-lightning text-[24px]"></i>
+        <h3 class="text-[20px] font-medium">即时设计</h3>
+      </div>
+      <p class="text-[16px] leading-[1.625] mb-2" style="color:rgba(17,17,17,0.7);">为中国设计师量身打造，上线两年累积200万用户</p>
+      <div class="space-y-1.5">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">全平台支持，基础版永久免费，30秒生成可编辑UI设计稿</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.4)" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]" style="color:rgba(17,17,17,0.5);">专业设计功能较基础，AI以独立产品形式提供</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-4: Pixso卡片 -->
+    <div class="absolute card-border bg-white/40 backdrop-blur-sm" style="top:370px; left:60px; width:570px; height:240px; border-radius:8px; padding:24px;">
+      <div class="flex items-center gap-3 mb-3">
+        <i class="ph ph-palette text-[24px]"></i>
+        <h3 class="text-[20px] font-medium">Pixso</h3>
+      </div>
+      <p class="text-[16px] leading-[1.625] mb-2" style="color:rgba(17,17,17,0.7);">产品设计协作一体化工具，国内覆盖度最广的全流程设计协作工具</p>
+      <div class="space-y-1.5">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">高级设计功能最完整，国内首款推出完整变量系统，AI功能一站式集成</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.4)" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]" style="color:rgba(17,17,17,0.5);">品牌知名度相对较低</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-5: 墨刀卡片 -->
+    <div class="absolute card-border bg-white/40 backdrop-blur-sm" style="top:370px; left:660px; width:570px; height:240px; border-radius:8px; padding:24px;">
+      <div class="flex items-center gap-3 mb-3">
+        <i class="ph ph-frame-corners text-[24px]"></i>
+        <h3 class="text-[20px] font-medium">墨刀</h3>
+      </div>
+      <p class="text-[16px] leading-[1.625] mb-2" style="color:rgba(17,17,17,0.7);">产品团队的专业原型设计与协作平台</p>
+      <div class="space-y-1.5">
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]">原型交互能力极强，墨刀AI Agent支持生成产品原型/方案/PRD</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <svg class="arrow-bullet mt-1" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.4)" stroke-width="2"><path d="M7 7l10 10M17 7v10H7"/></svg>
+          <span class="text-[14px] leading-[1.5]" style="color:rgba(17,17,17,0.5);">高级设计能力有限，更偏向原型交互</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- zone-6: 亮点条 -->
+    <div class="absolute" style="top:640px; left:60px; width:1160px; height:40px;">
+      <div class="flex items-center gap-3 px-5 py-2.5 card-border" style="border-radius:6px; background: rgba(17,17,17,0.04);">
+        <i class="ph ph-star text-[18px]"></i>
+        <span class="text-[16px] font-medium">国产四强各有所长，生态与AI深度成竞争焦点</span>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-0 left-0 w-full flex justify-between items-center px-[60px]" style="height:30px;">
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">腾讯Ardot设计平台 - 分析与竞品分析报告</span>
+      <span class="text-[14px]" style="color:rgba(17,17,17,0.4);">11</span>
+    </div>
+
+    <!-- 几何圆环装饰 -->
+    <div class="absolute" style="top:20px; right:60px; width:40px; height:40px; border:1px solid #111111; border-radius:50%; opacity:0.15;"></div>
+    <div class="absolute" style="top:32px; right:72px; width:16px; height:16px; border:1px solid #111111; border-radius:50%; opacity:0.1;"></div>
+  </div>
+</body>
+</html>
