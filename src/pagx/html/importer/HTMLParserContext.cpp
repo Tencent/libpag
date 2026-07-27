@@ -130,14 +130,6 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (family.empty()) {
     return false;
   }
-  // Cache on the normalised key so spelling/spacing variants of the same CSS family
-  // ("SF Mono" / "sf  mono") share one entry and probe the system font manager at most once.
-  std::string cacheKey = NormalizeFamilyName(family);
-  auto cached = _fontAvailabilityCache.find(cacheKey);
-  if (cached != _fontAvailabilityCache.end()) {
-    return cached->second;
-  }
-  bool available = false;
   // Two matching rules are used on purpose. Registered/embedded fonts must resolve exactly the
   // way `LayoutContext` resolves them, so honour them first via `containsFamily` (exact string
   // match) — loosening this would claim availability the renderer can't actually deliver. System
@@ -146,12 +138,26 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // may report the same family under a differently-spaced spelling; there we compare with the
   // spacing/case-insensitive `FontFamilyNamesMatch` and treat the family as available only when
   // the resolved typeface's family matches the request — i.e. no substitution happened.
+  //
+  // The registered branch is checked *before* the cache and against the exact `family` string.
+  // `containsFamily` is a cheap in-memory scan, and its result depends on the exact spelling, so
+  // it must not be served from — or written to — the spacing/case-insensitive cache below: two
+  // variants sharing a normalised key can disagree on the exact match (only one is registered),
+  // and caching one variant's verdict under the shared key would wrongly answer the other.
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
-    available = true;
-  } else {
-    auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
-    available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
+    return true;
   }
+  // Only the system-font probe is cached, keyed on the normalised name so spelling/spacing
+  // variants of the same CSS family ("SF Mono" / "sf  mono") share one entry and touch the
+  // platform font manager at most once. This is safe because the probe itself compares with the
+  // same spacing/case-insensitive rule, so all variants of a key genuinely share one verdict.
+  std::string cacheKey = NormalizeFamilyName(family);
+  auto cached = _fontAvailabilityCache.find(cacheKey);
+  if (cached != _fontAvailabilityCache.end()) {
+    return cached->second;
+  }
+  auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
+  bool available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }

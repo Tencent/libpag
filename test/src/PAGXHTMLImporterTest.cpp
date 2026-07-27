@@ -3106,6 +3106,28 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyRegisteredMatchIsExactNotSpaceInsensiti
   EXPECT_EQ(text->fontFamily, "My Custom Mono");
 }
 
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyRegisteredMatchNotPollutedByCasingVariantCache) {
+  // The availability cache is keyed on the case/spacing-insensitive normalised name, but the
+  // registered branch matches exactly. Guards against the cache poisoning that verdict: a leading
+  // variant that only differs in case ("my custom mono") fails the exact registered match and,
+  // under the old code, cached a `false` under the shared normalised key, wrongly making the
+  // later exact-matching "My Custom Mono" resolve as unavailable and skipping the registered font.
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(std::string(), 0, "My Custom Mono", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'my custom mono', 'My Custom Mono'">Hi</span>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "My Custom Mono");
+}
+
 PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackRegistersFallbacksOnDocFontConfig) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
