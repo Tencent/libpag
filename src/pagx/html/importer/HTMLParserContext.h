@@ -130,6 +130,18 @@ class HTMLParserContext {
   // to frame a contour clip-path SVG.
   void applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box);
 
+  // Replaces the rectangular `overflow: hidden` clip (`clipToBounds`) with a mask shaped like the
+  // element's `border-radius` geometry, so descendants are clipped to the rounded outline rather
+  // than the layer rectangle. PAGX's only native clip primitive (`clipToBounds`) squares off the
+  // corners a rounded container is meant to cut, and `foldRoundedImageWrapper` only handles the
+  // narrow single-full-cover-image case; this generalises rounded clipping to any content (text,
+  // multiple children, bordered rings, ...). The mask is an Ellipse for `border-radius: 50%`, a
+  // uniform rounded Rectangle, or a per-corner Path — filled opaque white and read as a contour
+  // mask. No-op unless the box both rounds its corners and clips overflow; when a CSS
+  // mask-image / clip-path already claimed the layer's single mask slot the rectangular clip is
+  // kept and a diagnostic is emitted. Must run after `applyMaskOrClip` so that check is accurate.
+  void applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttributes& box);
+
   // Applies the CSS `mask-size` / `mask-position` transform onto a rebuilt alpha/luminance mask
   // layer (the inverse of the size/position emission in `HTMLWriter::writeMaskCSS`). The mask SVG
   // is imported at its intrinsic pixel size; CSS then scales it to `mask-size` and offsets it by

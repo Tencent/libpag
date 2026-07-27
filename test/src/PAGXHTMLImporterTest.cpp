@@ -1208,6 +1208,48 @@ PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenMapsToClipToBounds) {
   EXPECT_TRUE(div->clipToBounds);
 }
 
+// `border-radius` + `overflow: hidden` on a container that is NOT a single-image fold (here a
+// nested text child) must clip descendants to the rounded outline. PAGX's `clipToBounds` is
+// rectangular, so the importer swaps it for a contour mask shaped like the border-radius geometry
+// — otherwise the child would leak past the rounded corners.
+PAG_TEST(PAGXHTMLImporterTest, RoundedOverflowClipUsesContourMaskForNonImageChild) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:60px;height:60px">
+      <div style="width:60px;height:60px;border-radius:50%;overflow:hidden">
+        <div style="width:60px;height:60px;background-color:#000"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  // The rectangular clip is replaced by a rounded contour mask.
+  EXPECT_FALSE(wrapper->clipToBounds);
+  ASSERT_NE(wrapper->mask, nullptr);
+  EXPECT_EQ(wrapper->maskType, pagx::MaskType::Contour);
+  // `border-radius: 50%` inscribes an ellipse, so the mask geometry is an Ellipse.
+  auto* ellipse = FindElementOfType<pagx::Ellipse>(wrapper->mask);
+  EXPECT_NE(ellipse, nullptr);
+  // The mask is an invisible, layout-excluded child that shares the container's coordinate space.
+  EXPECT_FALSE(wrapper->mask->visible);
+  EXPECT_FALSE(wrapper->mask->includeInLayout);
+}
+
+// A zero `border-radius` rounds nothing, so `overflow: hidden` must stay on the cheap rectangular
+// clipToBounds rather than paying for a redundant contour mask.
+PAG_TEST(PAGXHTMLImporterTest, ZeroBorderRadiusOverflowKeepsRectangularClip) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:60px;height:60px">
+      <div style="width:60px;height:60px;border-radius:0;overflow:hidden">
+        <div style="width:60px;height:60px;background-color:#000"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_TRUE(wrapper->clipToBounds);
+  EXPECT_EQ(wrapper->mask, nullptr);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, SimpleTextLeafSingleStyle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -3763,7 +3805,11 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperKeepsLayoutForExtraChildren) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* wrapper = doc->layers.front()->children.front();
-  EXPECT_TRUE(wrapper->clipToBounds);
+  // The extra child blocks the single-image fold, so the container clips its children to the
+  // border-radius outline via a contour mask instead of the (rectangular) clipToBounds.
+  EXPECT_FALSE(wrapper->clipToBounds);
+  EXPECT_NE(wrapper->mask, nullptr);
+  EXPECT_EQ(wrapper->maskType, pagx::MaskType::Contour);
   // The image stayed in its own child layer (not folded into the wrapper).
   EXPECT_FALSE(wrapper->children.empty());
 }
@@ -3825,10 +3871,10 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperFoldsThroughTwoLayoutOnlyDivs)
   ASSERT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
 }
 
-// Negative: the intermediate wrapper must be visually transparent. A
-// `background-color` on it would paint a square fill that the rounded outer
-// outline cannot clip in PAGX (the only clip primitive is rectangular), so the
-// fold must keep the standard nested layout in that case.
+// The intermediate wrapper paints a `background-color`, so it cannot be collapsed into the
+// single image-pattern fill the fold produces — the fold bails and keeps the nested layout. The
+// rounded clip is instead honoured as a contour mask on the container, so the inner square fill
+// (and the image) are still clipped to the border-radius outline rather than leaking past it.
 PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithBackground) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:64px;height:64px">
@@ -3841,14 +3887,16 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithBackground
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* wrapper = doc->layers.front()->children.front();
-  EXPECT_TRUE(wrapper->clipToBounds);
+  EXPECT_FALSE(wrapper->clipToBounds);
+  EXPECT_NE(wrapper->mask, nullptr);
+  EXPECT_EQ(wrapper->maskType, pagx::MaskType::Contour);
   EXPECT_FALSE(wrapper->children.empty());
 }
 
-// Negative: an intermediate wrapper that does not exactly cover the outer
-// content box would shift the image out from under the rounded outline. The
-// fold has to bail so the image renders inside its own child layer at the
-// authored position.
+// An intermediate wrapper that does not exactly cover the outer content box (e.g. inset by a
+// border) would shift the image out from under a folded rounded fill, so the fold bails and the
+// image renders inside its own child layer at the authored position. The container still clips
+// that child to the border-radius outline through a contour mask.
 PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithSizeMismatch) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:64px;height:64px">
@@ -3861,7 +3909,9 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsLayoutDivWithSizeMismat
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* wrapper = doc->layers.front()->children.front();
-  EXPECT_TRUE(wrapper->clipToBounds);
+  EXPECT_FALSE(wrapper->clipToBounds);
+  EXPECT_NE(wrapper->mask, nullptr);
+  EXPECT_EQ(wrapper->maskType, pagx::MaskType::Contour);
   EXPECT_FALSE(wrapper->children.empty());
 }
 

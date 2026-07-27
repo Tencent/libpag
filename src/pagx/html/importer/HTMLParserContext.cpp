@@ -553,6 +553,10 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // after children are attached so the mask layer is appended last; it shares `layer`'s local
   // coordinate origin (the mask SVG geometry is in the masked element's own 0..W/0..H space).
   applyMaskOrClip(layer, box);
+  // Reshape the rectangular `overflow: hidden` clip into the border-radius outline so descendants
+  // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
+  // and is skipped for the folded single-image case (which returned early above).
+  applyRoundedOverflowClip(layer, box);
   _idAllocator->assign(wrapper, element);
   return wrapper;
 }
