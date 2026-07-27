@@ -206,8 +206,8 @@ CLI_TEST(PAGTypefaceCacheTest, TypefaceHolderLoadsPathBytesAndPrebuiltTypeface) 
   // The second access returns the cached face instead of decoding the path again.
   EXPECT_EQ(pathHolder.getTypeface(), pathHolder.getTypeface());
 
-  auto bytes = std::make_shared<const std::vector<uint8_t>>(
-      fontData->bytes(), fontData->bytes() + fontData->size());
+  auto bytes = std::make_shared<const std::vector<uint8_t>>(fontData->bytes(),
+                                                            fontData->bytes() + fontData->size());
   pagx::TypefaceHolder bytesHolder(bytes, 0, "Bytes Alias", "Medium");
   EXPECT_NE(bytesHolder.getTypeface(), nullptr);
 
@@ -286,8 +286,9 @@ CLI_TEST(PAGTypefaceCacheTest, FontConfigCoversRegistrationFallbackAndValueSeman
 
   // Use an installed face to cover the eager system-font holder and PAGFont forwarders. The
   // resource's family may also be installed, so prefer it before the ubiquitous macOS families.
-  std::vector<pagx::PAGFont> systemCandidates = {
-      {sourceFamily, sourceStyle}, {"Helvetica", "Regular"}, {"Arial", "Regular"}};
+  std::vector<pagx::PAGFont> systemCandidates = {{sourceFamily, sourceStyle},
+                                                 {"Helvetica", "Regular"},
+                                                 {"Arial", "Regular"}};
   pagx::PAGFont installed;
   for (const auto& candidate : systemCandidates) {
     if (Typeface::MakeFromName(candidate.fontFamily, candidate.fontStyle) != nullptr) {
