@@ -16,13 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdint>
 #include <memory>
+#include <vector>
 #include "base/PAGTest.h"
 #include "pagx/FontConfig.h"
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGFont.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/TypefaceHolder.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/FontRenderCache.h"
@@ -35,6 +39,7 @@
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Typeface.h"
 #include "utils/ProjectPath.h"
+#include "utils/TestUtils.h"
 
 namespace pag {
 using namespace tgfx;
@@ -187,6 +192,121 @@ CLI_TEST(PAGTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
 
   doc->clearEmbed();
   EXPECT_EQ(CachedTypeface(fontNode), nullptr);
+}
+
+CLI_TEST(PAGTypefaceCacheTest, TypefaceHolderLoadsPathBytesAndPrebuiltTypeface) {
+  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto fontData = ReadFile("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_NE(fontData, nullptr);
+
+  pagx::TypefaceHolder pathHolder(fontPath, 0, "Path Alias", "Regular");
+  EXPECT_EQ(pathHolder.getFontFamily(), "Path Alias");
+  EXPECT_EQ(pathHolder.getFontStyle(), "Regular");
+  EXPECT_NE(pathHolder.getTypeface(), nullptr);
+  // The second access returns the cached face instead of decoding the path again.
+  EXPECT_EQ(pathHolder.getTypeface(), pathHolder.getTypeface());
+
+  auto bytes = std::make_shared<const std::vector<uint8_t>>(
+      fontData->bytes(), fontData->bytes() + fontData->size());
+  pagx::TypefaceHolder bytesHolder(bytes, 0, "Bytes Alias", "Medium");
+  EXPECT_NE(bytesHolder.getTypeface(), nullptr);
+
+  auto prebuilt = Typeface::MakeFromPath(fontPath);
+  ASSERT_NE(prebuilt, nullptr);
+  pagx::TypefaceHolder prebuiltHolder(prebuilt, "Prebuilt Alias", "Regular");
+  EXPECT_EQ(prebuiltHolder.getTypeface(), prebuilt);
+
+  pagx::TypefaceHolder missingPath("/definitely/missing/font.otf", 0, "Missing", "Regular");
+  EXPECT_EQ(missingPath.getTypeface(), nullptr);
+  auto emptyBytes = std::make_shared<const std::vector<uint8_t>>();
+  pagx::TypefaceHolder emptyBytesHolder(emptyBytes, 0, "Empty", "Regular");
+  EXPECT_EQ(emptyBytesHolder.getTypeface(), nullptr);
+}
+
+CLI_TEST(PAGTypefaceCacheTest, FontConfigCoversRegistrationFallbackAndValueSemantics) {
+  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto fontData = ReadFile("resources/font/NotoSansSC-Regular.otf");
+  auto sourceTypeface = Typeface::MakeFromPath(fontPath);
+  ASSERT_NE(fontData, nullptr);
+  ASSERT_NE(sourceTypeface, nullptr);
+
+  const auto sourceFamily = sourceTypeface->fontFamily();
+  const auto sourceStyle = sourceTypeface->fontStyle();
+  pagx::PAGFont pathAlias("Path Alias", "");
+  pagx::PAGFont bytesAlias("Bytes Alias", "Medium");
+
+  pagx::FontConfig config;
+  EXPECT_FALSE(config.containsFamily(""));
+  EXPECT_FALSE(config.containsFamily("not registered"));
+
+  // Exercise both PAGFont forwarding overloads and both lazy holder source kinds.
+  config.registerFont(pathAlias, fontPath, 0);
+  config.registerFont(bytesAlias, fontData->bytes(), fontData->size(), 0);
+  EXPECT_TRUE(config.containsFamily("Path Alias"));
+  EXPECT_TRUE(config.containsFamily("Bytes Alias"));
+  pagx::LayoutContext lazyContext(&config);
+  EXPECT_NE(lazyContext.findTypeface("Path Alias", ""), nullptr);
+  EXPECT_NE(lazyContext.findTypeface("Bytes Alias", "Medium"), nullptr);
+
+  // Empty families reverse-lookup the real family/style from the source.
+  config.registerFont(fontPath, 0);
+  config.registerFont(fontData->bytes(), fontData->size(), 0);
+  EXPECT_TRUE(config.containsFamily(sourceFamily));
+  config.registerFont("/definitely/missing/font.otf", 0);
+  const uint8_t invalidFont[] = {0, 1, 2, 3};
+  config.registerFont(invalidFont, sizeof(invalidFont), 0);
+
+  config.addFallbackFont(pathAlias, fontPath, 0);
+  config.addFallbackFont(bytesAlias, fontData->bytes(), fontData->size(), 0);
+  config.addFallbackFont(fontPath, 0);
+  config.addFallbackFont(fontData->bytes(), fontData->size(), 0);
+  config.addFallbackFont("/definitely/missing/font.otf", 0);
+  config.addFallbackFont(invalidFont, sizeof(invalidFont), 0);
+  auto fallbackNames = config.fallbackFamilyNames();
+  ASSERT_EQ(fallbackNames.size(), 4u);
+  EXPECT_EQ(fallbackNames[0], "Path Alias");
+  EXPECT_EQ(fallbackNames[1], "Bytes Alias");
+  EXPECT_EQ(fallbackNames[2], sourceFamily);
+  EXPECT_EQ(fallbackNames[3], sourceFamily);
+
+  // Copying retains registrations independently; assignment handles both a different object and
+  // self-assignment. Moving exercises the explicitly declared value semantics.
+  pagx::FontConfig copied(config);
+  EXPECT_TRUE(copied.containsFamily("Path Alias"));
+  pagx::FontConfig assigned;
+  assigned = config;
+  auto* assignedPointer = &assigned;
+  assigned = *assignedPointer;
+  EXPECT_TRUE(assigned.containsFamily("Bytes Alias"));
+  pagx::FontConfig moved(std::move(copied));
+  EXPECT_TRUE(moved.containsFamily(sourceFamily));
+  pagx::FontConfig moveAssigned;
+  moveAssigned = std::move(assigned);
+  EXPECT_TRUE(moveAssigned.containsFamily("Path Alias"));
+
+  // Use an installed face to cover the eager system-font holder and PAGFont forwarders. The
+  // resource's family may also be installed, so prefer it before the ubiquitous macOS families.
+  std::vector<pagx::PAGFont> systemCandidates = {
+      {sourceFamily, sourceStyle}, {"Helvetica", "Regular"}, {"Arial", "Regular"}};
+  pagx::PAGFont installed;
+  for (const auto& candidate : systemCandidates) {
+    if (Typeface::MakeFromName(candidate.fontFamily, candidate.fontStyle) != nullptr) {
+      installed = candidate;
+      break;
+    }
+  }
+  if (installed.fontFamily.empty()) {
+    // Headless test environments can expose no system-name lookup at all. The same calls still
+    // exercise the documented failure path without making the test platform-dependent.
+    pagx::PAGFont unavailable("Definitely Missing Font Family", "Regular");
+    EXPECT_FALSE(moveAssigned.registerSystemFont(unavailable));
+    EXPECT_FALSE(moveAssigned.addFallbackSystemFont(unavailable));
+  } else {
+    EXPECT_TRUE(moveAssigned.registerSystemFont(installed));
+    EXPECT_TRUE(moveAssigned.addFallbackSystemFont(installed));
+    EXPECT_TRUE(moveAssigned.containsFamily(installed.fontFamily));
+    EXPECT_EQ(moveAssigned.fallbackFamilyNames().back(), installed.fontFamily);
+  }
 }
 
 }  // namespace pag

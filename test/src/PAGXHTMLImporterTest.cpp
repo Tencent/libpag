@@ -7915,6 +7915,94 @@ PAG_TEST(PAGXHTMLImporterTest, RawUnmatchedFilterParenthesisWarns) {
   EXPECT_TRUE(HasDiagnosticContaining(doc, "unmatched '(' in filter"));
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RawUnsupportedBackgroundImageFallsBackToSolidColor) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-color:#10B981;
+                  background-image:paint(custom-worklet)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(layer), HexColor(0x10B981)));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "background-image"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawAsymmetricRadiusWithoutSizeUsesRectangleApproximation) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="background-color:#6366F1;border-radius:1px 2px 3px 4px"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* rectangle = FindElementOfType<pagx::Rectangle>(layer);
+  ASSERT_NE(rectangle, nullptr);
+  EXPECT_FLOAT_EQ(rectangle->roundness, 4.0f);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "per-corner border-radius without fixed px"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ClipPathPathWithFillRuleRebuildsContourMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-color:#6366F1;
+                  clip-path:path(evenodd, 'M0 0 L100 0 L50 100 Z')"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* clipped = doc->layers.front()->children.front();
+  ASSERT_NE(clipped->mask, nullptr);
+  EXPECT_EQ(clipped->maskType, pagx::MaskType::Contour);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "unsupported clip-path"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ClipPathEllipseKeywordRadiiRebuildsContourMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:80px">
+      <div style="width:100px;height:80px;background-color:#6366F1;
+                  clip-path:ellipse(farthest-side closest-side at 25% 25%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* clipped = doc->layers.front()->children.front();
+  ASSERT_NE(clipped->mask, nullptr);
+  EXPECT_EQ(clipped->maskType, pagx::MaskType::Contour);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "unsupported clip-path"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ClipPathInsetRoundRebuildsRoundedContourMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:80px">
+      <div style="width:100px;height:80px;background-color:#6366F1;
+                  clip-path:inset(10px 20px 15px 5px round 8px)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* clipped = doc->layers.front()->children.front();
+  ASSERT_NE(clipped->mask, nullptr);
+  EXPECT_EQ(clipped->maskType, pagx::MaskType::Contour);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "unsupported clip-path"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BackgroundDataImageExplicitSizeUsesNativeDimensions) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:80px">
+      <div style="width:100px;height:80px;
+                  background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+                  background-size:20px 30px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
+  EXPECT_TRUE(NearlyEqual(pattern->matrix.a, 20.0f));
+  EXPECT_TRUE(NearlyEqual(pattern->matrix.d, 30.0f));
+}
+
 // CSS `mask-image: url(data:image/svg+xml,...)` with `mask-mode: alpha` rebuilds an alpha mask
 // layer (the inverse of HTMLWriter::writeMaskCSS). The ellipse geometry round-trips and the mask
 // layer is attached invisibly and excluded from layout.
@@ -9357,6 +9445,56 @@ PAG_TEST(PAGXHTMLStyleCascadeTest, EmptyStylePropertyFallbackAndShorthandGradien
   // The second lookup returns the already-resolved map from the cache.
   EXPECT_EQ(cascade.getResolvedStyle(custom).at("background-image"),
             "linear-gradient(90deg, red, blue)");
+}
+
+PAG_TEST(PAGXHTMLValueParserTest, FilterDefaultsAndRepeatingGradientBoundaries) {
+  auto document = pagx::PAGXDocument::Make(100.0f, 100.0f);
+  float canvasWidth = 100.0f;
+  float canvasHeight = 100.0f;
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  diagnostics.bindDocument(document.get());
+  pagx::HTMLValueParser parser(diagnostics, canvasWidth, canvasHeight);
+  parser.bindDocument(document.get());
+
+  auto filters = parser.parseFilterChain("brightness() invert(nope) url('#shared-filter')");
+  ASSERT_EQ(filters.size(), 3u);
+  EXPECT_EQ(filters[0].kind, pagx::HTMLValueParser::FilterStep::Kind::ColorMatrix);
+  EXPECT_FLOAT_EQ(filters[0].matrix[0], 1.0f);
+  EXPECT_EQ(filters[1].kind, pagx::HTMLValueParser::FilterStep::Kind::Unsupported);
+  EXPECT_EQ(filters[2].kind, pagx::HTMLValueParser::FilterStep::Kind::SvgRef);
+  EXPECT_EQ(filters[2].refId, "shared-filter");
+
+  // Calling parseLinearGradient directly exercises the explicit-stop tiler used when the
+  // ImagePattern optimisation cannot represent an oblique repeat. The unpositioned middle stop
+  // also covers interpolation between the authored period endpoints.
+  auto* repeatingLinear = parser.parseLinearGradient(
+      "repeating-linear-gradient(45deg, red 0px, green, blue 10px)", 100.0f, 100.0f, true);
+  ASSERT_NE(repeatingLinear, nullptr);
+  EXPECT_GT(repeatingLinear->colorStops.size(), 3u);
+
+  // A tiny period is bounded to the parser's maximum expanded-stop count and emits a diagnostic
+  // instead of growing without limit.
+  auto* truncatedLinear = parser.parseLinearGradient(
+      "repeating-linear-gradient(45deg, red 0px, blue 0.01px)", 100.0f, 100.0f, true);
+  ASSERT_NE(truncatedLinear, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(document, "repeating gradient truncated"));
+
+  // A zero-length period falls back to one non-repeating period for each gradient family.
+  auto* degenerateLinear = parser.parseLinearGradient(
+      "repeating-linear-gradient(45deg, red 10px, blue 10px)", 100.0f, 100.0f, true);
+  ASSERT_NE(degenerateLinear, nullptr);
+  auto* degenerateRadial = parser.parseRadialGradient(
+      "repeating-radial-gradient(circle 50px, red 10px, blue 10px)", 100.0f, 100.0f, true);
+  ASSERT_NE(degenerateRadial, nullptr);
+  auto* degenerateConic =
+      parser.parseConicGradient("repeating-conic-gradient(red 0deg, blue 0deg)", true);
+  ASSERT_NE(degenerateConic, nullptr);
+
+  // The native tiled-pattern path fills a missing middle offset before rasterising one period.
+  auto* repeatingPattern = parser.parseRepeatingLinearGradientPattern(
+      "repeating-linear-gradient(to bottom, red 0px, green, blue 10px)", 100.0f, 100.0f);
+  ASSERT_NE(repeatingPattern, nullptr);
+  EXPECT_EQ(repeatingPattern->nodeType(), pagx::NodeType::ImagePattern);
 }
 
 PAG_TEST(PAGXHTMLIdAllocatorTest, NullEmptyDepthAndCollisionBoundaries) {
