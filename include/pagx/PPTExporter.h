@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
 
 class FontConfig;
+class Data;
 
 /**
  * Export options for PPTExporter.
@@ -114,6 +116,18 @@ class PPTExporter {
    */
   static bool ToFile(PAGXDocument& document, const std::string& filePath,
                      const Options& options = {});
+
+  /**
+   * Exports a PAGXDocument to an in-memory PPTX buffer without writing to disk. This lets the
+   * caller decide what to do with the bytes — persist them to a file, upload them over the
+   * network, hand them to another library, etc.
+   * @param document the PAGXDocument to export. Passed as non-const because internal layout
+   *        computation may cache intermediate results.
+   * @param options export options controlling text rendering and mask handling.
+   * @return a Data object holding the complete PPTX (OOXML .zip) payload, or nullptr if the
+   *         document could not be serialized.
+   */
+  static std::shared_ptr<Data> ToData(PAGXDocument& document, const Options& options = {});
 };
 
 }  // namespace pagx

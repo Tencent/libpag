@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <string>
@@ -47,6 +48,7 @@
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
+#include "pagx/types/Data.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/layers/DisplayList.h"
 #include "zip.h"
@@ -814,25 +816,117 @@ static bool AddZipString(zipFile zf, const char* name, const std::string& conten
 }
 
 //==============================================================================
-// PPTExporter::ToFile
+// In-memory ZIP backend
 //==============================================================================
 
-bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const Options& options) {
-  if (!doc.isLayoutApplied()) {
-    doc.applyLayout();
+namespace {
+
+// Growable byte buffer with a read/write cursor, driving minizip through a
+// custom zlib_filefunc_def so a PPTX can be assembled entirely in RAM. minizip
+// seeks backward to patch each local file header's CRC / sizes once the entry
+// is closed, so this must support seek/tell/overwrite in addition to append.
+struct MemZipBuffer {
+  std::string data;
+  size_t position = 0;
+};
+
+voidpf ZCALLBACK MemZipOpen(voidpf opaque, const char*, int) {
+  // A single buffer is shared for the whole archive; reset the cursor so the
+  // stream starts writing at the beginning.
+  auto* buffer = static_cast<MemZipBuffer*>(opaque);
+  buffer->data.clear();
+  buffer->position = 0;
+  return opaque;
+}
+
+uLong ZCALLBACK MemZipRead(voidpf, voidpf stream, void* buf, uLong size) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  if (buffer->position >= buffer->data.size()) {
+    return 0;
   }
+  uLong available = static_cast<uLong>(buffer->data.size() - buffer->position);
+  uLong toRead = std::min(size, available);
+  std::memcpy(buf, buffer->data.data() + buffer->position, toRead);
+  buffer->position += toRead;
+  return toRead;
+}
 
-  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+uLong ZCALLBACK MemZipWrite(voidpf, voidpf stream, const void* buf, uLong size) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  size_t end = buffer->position + size;
+  if (end > buffer->data.size()) {
+    buffer->data.resize(end);
+  }
+  std::memcpy(&buffer->data[buffer->position], buf, size);
+  buffer->position += size;
+  return size;
+}
 
-  PPTWriterContext context;
-  PPTWriter writer(&context, &doc, options, layoutContext.get());
+long ZCALLBACK MemZipTell(voidpf, voidpf stream) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  return static_cast<long>(buffer->position);
+}
 
-  // Build slide body content
+long ZCALLBACK MemZipSeek(voidpf, voidpf stream, uLong offset, int origin) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  size_t base = 0;
+  switch (origin) {
+    case ZLIB_FILEFUNC_SEEK_SET:
+      base = 0;
+      break;
+    case ZLIB_FILEFUNC_SEEK_CUR:
+      base = buffer->position;
+      break;
+    case ZLIB_FILEFUNC_SEEK_END:
+      base = buffer->data.size();
+      break;
+    default:
+      return -1;
+  }
+  buffer->position = base + offset;
+  return 0;
+}
+
+int ZCALLBACK MemZipClose(voidpf, voidpf) {
+  return 0;
+}
+
+int ZCALLBACK MemZipError(voidpf, voidpf) {
+  return 0;
+}
+
+zlib_filefunc_def MakeMemZipFileFunc(MemZipBuffer* buffer) {
+  zlib_filefunc_def def = {};
+  def.zopen_file = MemZipOpen;
+  def.zread_file = MemZipRead;
+  def.zwrite_file = MemZipWrite;
+  def.ztell_file = MemZipTell;
+  def.zseek_file = MemZipSeek;
+  def.zclose_file = MemZipClose;
+  def.zerror_file = MemZipError;
+  def.opaque = buffer;
+  return def;
+}
+
+}  // namespace
+
+//==============================================================================
+// Shared assembly
+//==============================================================================
+
+namespace {
+
+// Serializes the document into the single slide XML string and populates
+// `context` with the media entries referenced by that slide. Shared by ToFile
+// and ToData so both entry points produce byte-identical archives.
+std::string BuildSlideXml(PAGXDocument& doc, const PPTExportOptions& options,
+                          PPTWriterContext& context, LayoutContext* layoutContext) {
+  PPTWriter writer(&context, &doc, options, layoutContext);
+
   XMLBuilder body(false, 2, 0, 16384);
   writer.writeDocument(body);
   std::string bodyContent = body.release();
 
-  // Assemble slide XML
   std::string slide;
   slide.reserve(2048 + bodyContent.size());
   slide += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
@@ -849,13 +943,14 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
   slide += "</p:spTree></p:cSld>";
   slide += "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>";
   slide += "</p:sld>";
+  return slide;
+}
 
-  // Write ZIP via minizip
-  zipFile zf = zipOpen(filePath.c_str(), APPEND_STATUS_CREATE);
-  if (!zf) {
-    return false;
-  }
-
+// Writes every OOXML part (boilerplate XML + media) into the already-opened zip
+// handle. Returns false on the first write failure so callers can discard the
+// partial archive.
+bool WriteZipEntries(zipFile zf, PPTWriterContext& context, PAGXDocument& doc,
+                     const std::string& slide) {
   bool ok = true;
   ok = ok && AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(context));
   ok = ok && AddZipString(zf, "_rels/.rels", GenerateRootRels());
@@ -891,6 +986,32 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
                        static_cast<unsigned>(img.cachedData->size()));
     }
   }
+  return ok;
+}
+
+}  // namespace
+
+//==============================================================================
+// PPTExporter::ToFile
+//==============================================================================
+
+bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const Options& options) {
+  if (!doc.isLayoutApplied()) {
+    doc.applyLayout();
+  }
+
+  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+
+  PPTWriterContext context;
+  std::string slide = BuildSlideXml(doc, options, context, layoutContext.get());
+
+  // Write ZIP via minizip
+  zipFile zf = zipOpen(filePath.c_str(), APPEND_STATUS_CREATE);
+  if (!zf) {
+    return false;
+  }
+
+  bool ok = WriteZipEntries(zf, context, doc, slide);
 
   if (!ok) {
     zipClose(zf, nullptr);
@@ -905,6 +1026,39 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
     return false;
   }
   return true;
+}
+
+//==============================================================================
+// PPTExporter::ToData
+//==============================================================================
+
+std::shared_ptr<Data> PPTExporter::ToData(PAGXDocument& doc, const Options& options) {
+  if (!doc.isLayoutApplied()) {
+    doc.applyLayout();
+  }
+
+  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+
+  PPTWriterContext context;
+  std::string slide = BuildSlideXml(doc, options, context, layoutContext.get());
+
+  // Assemble the archive into a growable RAM buffer instead of a file on disk.
+  MemZipBuffer memBuffer;
+  zlib_filefunc_def fileFunc = MakeMemZipFileFunc(&memBuffer);
+  zipFile zf = zipOpen2("in-memory.pptx", APPEND_STATUS_CREATE, nullptr, &fileFunc);
+  if (!zf) {
+    return nullptr;
+  }
+
+  bool ok = WriteZipEntries(zf, context, doc, slide);
+  if (zipClose(zf, nullptr) != ZIP_OK) {
+    ok = false;
+  }
+  if (!ok) {
+    return nullptr;
+  }
+
+  return Data::MakeWithCopy(memBuffer.data.data(), memBuffer.data.size());
 }
 
 }  // namespace pagx

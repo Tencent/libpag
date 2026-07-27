@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include "pagx/PAGXExporter.h"
@@ -5840,6 +5841,135 @@ PAGX_TEST(PAGXPPTTest, ImagePatternFill_TileFlipNone) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_tile_flip_none"));
+}
+
+//==============================================================================
+// PPTExporter::ToData — in-memory export
+//==============================================================================
+
+static std::string ReadFileBytes(const std::string& path) {
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  if (!file.good()) {
+    return {};
+  }
+  auto size = static_cast<std::streamsize>(file.tellg());
+  std::string contents(static_cast<size_t>(size), '\0');
+  file.seekg(0);
+  file.read(contents.data(), size);
+  return contents;
+}
+
+// Every ZIP (and therefore every PPTX/OOXML container) begins with the local
+// file header signature "PK\x03\x04".
+static bool HasZipMagic(const pagx::Data* data) {
+  if (data == nullptr || data->size() < 4) {
+    return false;
+  }
+  const auto* bytes = data->bytes();
+  return bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeSimplePPTDoc() {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 100};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {1.0f, 0.0f, 0.0f, 1.0f}));
+  doc->layers.push_back(layer);
+  return doc;
+}
+
+PAGX_TEST(PAGXPPTTest, ToData_SimpleDocument) {
+  auto doc = MakeSimplePPTDoc();
+  auto data = pagx::PPTExporter::ToData(*doc);
+  ASSERT_NE(data, nullptr);
+  EXPECT_GT(data->size(), 0u);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+}
+
+PAGX_TEST(PAGXPPTTest, ToData_EmptyDocument) {
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto data = pagx::PPTExporter::ToData(*doc);
+  ASSERT_NE(data, nullptr);
+  EXPECT_GT(data->size(), 0u);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+}
+
+// The in-memory archive is assembled from the same parts as the on-disk one and
+// minizip zeroes the per-entry timestamps (zip_fileinfo{}), so ToData must be
+// byte-for-byte identical to ToFile.
+PAGX_TEST(PAGXPPTTest, ToData_MatchesToFile) {
+  auto doc = MakeSimplePPTDoc();
+
+  auto data = pagx::PPTExporter::ToData(*doc);
+  ASSERT_NE(data, nullptr);
+  ASSERT_GT(data->size(), 0u);
+
+  auto path = PPTOutDir() + "/to_data_parity.pptx";
+  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, path));
+  auto fileBytes = ReadFileBytes(path);
+  ASSERT_FALSE(fileBytes.empty());
+
+  ASSERT_EQ(data->size(), fileBytes.size());
+  EXPECT_EQ(0, std::memcmp(data->data(), fileBytes.data(), fileBytes.size()));
+}
+
+// A document with an embedded image produces media entries in the archive; the
+// in-memory path must handle those binary parts the same way ToFile does.
+PAGX_TEST(PAGXPPTTest, ToData_WithImageMedia) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto data = pagx::PPTExporter::ToData(*doc);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  auto path = PPTOutDir() + "/to_data_with_image.pptx";
+  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, path));
+  auto fileBytes = ReadFileBytes(path);
+  ASSERT_FALSE(fileBytes.empty());
+  ASSERT_EQ(data->size(), fileBytes.size());
+  EXPECT_EQ(0, std::memcmp(data->data(), fileBytes.data(), fileBytes.size()));
+}
+
+// The buffer is a real ZIP whose local file headers store each part name in the
+// clear, so we can spot-check the slide part without pulling in an unzip lib.
+PAGX_TEST(PAGXPPTTest, ToData_ContainsSlidePart) {
+  auto doc = MakeSimplePPTDoc();
+  auto data = pagx::PPTExporter::ToData(*doc);
+  ASSERT_NE(data, nullptr);
+
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("[Content_Types].xml"), std::string::npos);
+}
+
+// Options that route through the rasterizer (bakeUnsupported) must not crash the
+// in-memory path and still yield a valid archive.
+PAGX_TEST(PAGXPPTTest, ToData_RespectsOptions) {
+  auto doc = MakeSimplePPTDoc();
+  pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
+  options.convertTextToPath = true;
+  auto data = pagx::PPTExporter::ToData(*doc, options);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
 }
 
 }  // namespace pag
