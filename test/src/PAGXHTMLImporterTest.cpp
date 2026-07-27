@@ -3063,6 +3063,49 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackKeepsFirstWhenNoneResolvable) {
   EXPECT_EQ(text->fontFamily, "No Such Font A");
 }
 
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackPrefersRegisteredFallbackOverUnavailableLeader) {
+  // A registered fallback font is treated as available even when the platform has no matching
+  // system font, so a stack whose leading family is unresolvable skips ahead to the registered
+  // one. This exercises the registered-typeface branch of the availability check
+  // (`FontConfig::containsFamily`), which must match `LayoutContext`'s exact resolution.
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(std::string(), 0, "My Custom Mono", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'No Such Font 98765', 'My Custom Mono'">Hi</span>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "My Custom Mono");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyRegisteredMatchIsExactNotSpaceInsensitive) {
+  // The registered-typeface availability branch matches exactly (mirroring LayoutContext), so a
+  // spaceless variant of a registered family does NOT count as available and the stack falls
+  // through to its next entry. Guards against loosening the match to a "delete all spaces" rule,
+  // which would have wrongly claimed "MyCustomMono" resolves against the registered "My Custom
+  // Mono" and defeated the substitution guard.
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(std::string(), 0, "My Custom Mono", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'MyCustomMono', 'My Custom Mono'">Hi</span>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "My Custom Mono");
+}
+
 PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackRegistersFallbacksOnDocFontConfig) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">

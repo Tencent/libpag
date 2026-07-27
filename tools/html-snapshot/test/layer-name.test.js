@@ -67,4 +67,38 @@ describe('applyLayerName', () => {
   test('tolerates a missing element', () => {
     expect(applyLayerName(null, '<div>x</div>', {}, blockStyle)).toBe('<div>x</div>');
   });
+
+  // Wrapped inline box: the renderer emits `${fragments}<div data-pagx-name-anchor …>children`,
+  // where the leading tag is a visuals-only line fragment. The name must land on the
+  // child-bearing wrapper (the anchor), not the fragment, or `layer->name` strands on a
+  // childless box.
+  test('targets the anchor-marked wrapper, not the leading line fragment', () => {
+    const html =
+      '<div style="frag1"></div><div style="frag2"></div>' +
+      '<div data-pagx-name-anchor style="wrapper">child</div>';
+    const out = applyLayerName(mockEl({ name: 'Mark' }), html, {}, blockStyle);
+    expect(out).toBe(
+      '<div style="frag1"></div><div style="frag2"></div>' +
+      '<div name="Mark" style="wrapper">child</div>');
+    // The leading fragment stays unnamed.
+    expect(out.startsWith('<div style="frag1">')).toBe(true);
+  });
+
+  test('strips the anchor marker when the element has no name', () => {
+    const html = '<div style="frag"></div><div data-pagx-name-anchor style="wrapper">child</div>';
+    expect(applyLayerName(mockEl({}), html, {}, blockStyle)).toBe(
+      '<div style="frag"></div><div style="wrapper">child</div>');
+  });
+
+  test('strips the anchor marker on display:contents hosts', () => {
+    const html = '<div data-pagx-name-anchor style="wrapper">child</div>';
+    expect(applyLayerName(mockEl({ name: 'Mark' }), html, {}, { display: 'contents' })).toBe(
+      '<div style="wrapper">child</div>');
+  });
+
+  test('strips the anchor marker on stripped-transform re-entry', () => {
+    const html = '<div data-pagx-name-anchor style="wrapper">child</div>';
+    expect(applyLayerName(mockEl({ name: 'Mark' }), html, { _strippedTransform: true },
+                          blockStyle)).toBe('<div style="wrapper">child</div>');
+  });
 });

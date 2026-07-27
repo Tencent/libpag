@@ -50,14 +50,27 @@ HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Opti
   return result;
 }
 
-// Lower-cases and strips whitespace so family names compare case- and spacing-insensitively.
-// Written as a free function to honour the project's no-lambda rule.
+// Normalises a font-family name for case- and spacing-insensitive comparison the way CSS
+// treats family identifiers: lower-cased, leading/trailing whitespace trimmed, and internal
+// runs of whitespace collapsed to a single space. Whitespace is *significant* in CSS family
+// names (only its amount is not), so this deliberately preserves single spaces rather than
+// deleting all whitespace — a "delete every space" rule would fold "SF Mono" into "sfmono" and
+// wrongly match a platform's spaceless variant "SFMono", defeating the substitution guard this
+// availability check exists to enforce. Written as a free function to honour the no-lambda rule.
 std::string NormalizeFamilyName(const std::string& name) {
   std::string out;
   out.reserve(name.size());
+  bool pendingSpace = false;
   for (unsigned char c : name) {
     if (std::isspace(c)) {
+      // Defer emitting a separator until a non-space follows, so leading/trailing runs are
+      // dropped and interior runs collapse to exactly one space.
+      pendingSpace = !out.empty();
       continue;
+    }
+    if (pendingSpace) {
+      out.push_back(' ');
+      pendingSpace = false;
     }
     out.push_back(static_cast<char>(std::tolower(c)));
   }
@@ -117,24 +130,29 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (family.empty()) {
     return false;
   }
-  auto cached = _fontAvailabilityCache.find(family);
+  // Cache on the normalised key so spelling/spacing variants of the same CSS family
+  // ("SF Mono" / "sf  mono") share one entry and probe the system font manager at most once.
+  std::string cacheKey = NormalizeFamilyName(family);
+  auto cached = _fontAvailabilityCache.find(cacheKey);
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
   bool available = false;
-  // Embedded/registered fonts resolve by their registration key regardless of the platform's
-  // installed fonts, so honour them first (mirrors LayoutContext's registered-typeface stages).
+  // Two matching rules are used on purpose. Registered/embedded fonts must resolve exactly the
+  // way `LayoutContext` resolves them, so honour them first via `containsFamily` (exact string
+  // match) — loosening this would claim availability the renderer can't actually deliver. System
+  // fonts, in contrast, are resolved by the platform font manager, which silently substitutes a
+  // default face for an unknown name (on some platforms `MakeFromName` never returns null) and
+  // may report the same family under a differently-spaced spelling; there we compare with the
+  // spacing/case-insensitive `FontFamilyNamesMatch` and treat the family as available only when
+  // the resolved typeface's family matches the request — i.e. no substitution happened.
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
     available = true;
   } else {
-    // Otherwise the renderer resolves the family through the system font manager, which silently
-    // substitutes a default face for an unknown name (on some platforms `MakeFromName` never
-    // returns null). Treat the family as available only when the resolved typeface reports a
-    // matching family — i.e. no substitution happened.
     auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
     available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
   }
-  _fontAvailabilityCache.emplace(family, available);
+  _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }
 

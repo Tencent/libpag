@@ -3102,7 +3102,9 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   const fragments = emitInlineBoxFragments(el, parentRect, computed);
   if (fragments) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {});
-    return `${fragments}<div style="${wrapperStyle}">${lineSpans.join('')}</div>`;
+    // The leading tag here is a visuals-only line fragment, not this element's box; mark the
+    // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
+    return `${fragments}<div ${NAME_ANCHOR_ATTR} style="${wrapperStyle}">${lineSpans.join('')}</div>`;
   }
   return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
 }
@@ -3261,7 +3263,9 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const fragments = emitInlineBoxFragments(el, parentRect, computed);
   if (fragments) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { ...opts });
-    return `${fragments}<div style="${wrapperStyle}">${childHTML}</div>`;
+    // The leading tag here is a visuals-only line fragment, not this element's box; mark the
+    // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
+    return `${fragments}<div ${NAME_ANCHOR_ATTR} style="${wrapperStyle}">${childHTML}</div>`;
   }
   const style = buildStyle(left, top, rect.width, rect.height, computed, {
     box: true, ...opts,
@@ -3317,6 +3321,24 @@ function renderChildrenInto(el, parentRect, hostComputed) {
   return items.map((it) => it.html).join('');
 }
 
+// Marker a renderer stamps on the specific box that should carry the author `name` when the
+// element's own outer box is NOT the first tag in the emitted markup. A wrapped inline box
+// emits `${fragments}<div>…children…</div>`, whose leading tag is a visuals-only line
+// fragment — naming that fragment would strand `layer->name` on a box with no children. The
+// renderer marks the child-bearing wrapper with this attribute so `applyLayerName` targets it
+// instead of the first tag, then removes the marker so it never reaches the output.
+const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
+
+// Removes the (single) NAME_ANCHOR_ATTR marker from `html`. Called on every path where the
+// marker must not survive: no name to forward, a `display: contents` host, or the
+// stripped-transform re-entry. A no-op when the marker is absent. Written as a free function
+// to honour the project's no-lambda rule.
+function stripNameAnchor(html) {
+  const anchor = ` ${NAME_ANCHOR_ATTR}`;
+  const at = html.indexOf(anchor);
+  return at === -1 ? html : html.slice(0, at) + html.slice(at + anchor.length);
+}
+
 // Render a subtree rooted at `el` into a string. parentRect is its parent's
 // bounding rect (used to compute relative left/top). `precomputed`, when
 // supplied, is the result of a prior `getComputedStyle(el)` call upstream;
@@ -3325,19 +3347,33 @@ function renderChildrenInto(el, parentRect, hostComputed) {
 // importer can surface it as `layer->name` (mirroring how `id` maps to `layer->id`). The
 // snapshot rebuilds every element from computed style rather than cloning the live tree, so
 // the attribute has to be re-emitted here or it never reaches the importer. `html` is the
-// markup an element renderer produced; its first tag is always that element's own outer box.
-// No-op when the element carries no `name`, when `html` is empty, when the box already has a
-// `name`, or for `display: contents` hosts (which emit their children's markup, not a box of
-// their own).
+// markup an element renderer produced; its first tag is normally that element's own outer box,
+// except in the wrapped-inline-box path where a renderer marks the real wrapper with
+// `NAME_ANCHOR_ATTR` (see below). No-op when the element carries no `name`, when `html` is
+// empty, when the box already has a `name`, or for `display: contents` hosts (which emit their
+// children's markup, not a box of their own).
 function applyLayerName(el, html, opts, precomputed) {
   if (!html || !el || typeof el.getAttribute !== 'function') return html;
   // `_strippedTransform` marks the recursive re-entry that re-renders this same element with
   // its transform cleared; let the outer (non-stripped) call own the name so it is added once.
-  if (opts && opts._strippedTransform) return html;
+  // Still strip any anchor marker so it never leaks into the re-entry's output.
+  if (opts && opts._strippedTransform) return stripNameAnchor(html);
   const name = el.getAttribute('name');
-  if (!name) return html;
+  // A renderer may have stamped the anchor marker on the child-bearing wrapper (it is emitted
+  // unconditionally in the fragment path). When there is no name to forward, strip it so the
+  // marker never leaks into the snapshot output.
+  if (!name) return stripNameAnchor(html);
   const computed = precomputed || getComputedStyle(el);
-  if (computed.display === 'contents') return html;
+  if (computed.display === 'contents') return stripNameAnchor(html);
+  // Wrapped inline box: the child-bearing wrapper is not the first tag, so its renderer marked
+  // it with NAME_ANCHOR_ATTR. Replace the marker with the name attribute so `layer->name` lands
+  // on the box that actually carries the element's children rather than a leading line fragment.
+  const anchor = ` ${NAME_ANCHOR_ATTR}`;
+  const anchorAt = html.indexOf(anchor);
+  if (anchorAt !== -1) {
+    return html.slice(0, anchorAt) + ` name="${escapeHtml(name)}"` +
+           html.slice(anchorAt + anchor.length);
+  }
   // Insert the attribute immediately after the opening tag's NAME, never scanning the
   // attribute list: an outer box `style` can legitimately contain a raw '>' (e.g. an
   // inline-SVG `data:` URI in `background-image`), which an attribute-aware splice would
