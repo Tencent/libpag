@@ -6854,6 +6854,48 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceBboxFallbackLiftsSharedCros
   (void)body;
 }
 
+// A `flex:1` child has its cross-axis width imposed by its flex parent, so its rendered box is
+// wider than its children's bounding box. Two same-left absolutely positioned lines inside it are
+// centered content, not left-padded. The importer must NOT fold the shared left inset into padding
+// — doing so (and then centering the child inside the shrunken content box) shifted the text right
+// (slide-4 pill regression). The lift stays disabled here because the parent is sized by an outer
+// layout, so the layout centres within the true flex width instead.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceDoesNotBakePaddingForFlexGrowParent) {
+  pagx::HTMLSubsetTransformer::Options opts = {};
+  opts.inferFlexFromAbsolute = true;
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      R"HTML(<html><body style="width:600px;height:200px;display:flex;flex-direction:row">
+               <div data-id="pill" style="position:relative;flex:1;height:184px">
+                 <div style="position:absolute;left:162px;top:40px;width:160px;height:52px"></div>
+                 <div style="position:absolute;left:162px;top:92px;width:160px;height:52px"></div>
+               </div>
+             </body></html>)HTML",
+      &root, opts);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:flex-inferred"));
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  auto pill = body->firstChild;
+  while (pill && pill->type != pagx::DOMNodeType::Element) pill = pill->nextSibling;
+  ASSERT_NE(pill, nullptr);
+  EXPECT_TRUE(StyleContains(pill, "display: flex"));
+  EXPECT_TRUE(StyleContains(pill, "flex-direction: column"));
+  // The shared 162px left inset is a centering offset, not padding — nothing may be baked in.
+  EXPECT_FALSE(StyleContains(pill, "padding"));
+  // Vertically the two lines sit with symmetric top/bottom insets → centered, not padded.
+  EXPECT_TRUE(StyleContains(pill, "justify-content: center"));
+  // The bbox underestimates the true flex width, so "stretch" (children fill the bbox) is not
+  // trustworthy: the lines are centered on the cross axis with their measured width preserved,
+  // not stretched (which would collapse the width-less child and pin the text to the left edge).
+  EXPECT_TRUE(StyleContains(pill, "align-items: center"));
+  for (auto c = pill->firstChild; c; c = c->nextSibling) {
+    if (c->type != pagx::DOMNodeType::Element) continue;
+    EXPECT_TRUE(StyleContains(c, "width: 160px"));
+    EXPECT_FALSE(StyleContains(c, "position"));
+  }
+}
+
 // A column layout whose content sits with symmetric top/bottom insets inside an explicitly-sized
 // parent is centred via justify-content instead of baking symmetric main-axis padding.
 PAG_TEST(PAGXHTMLSubsetTransformerTest, FlexInferenceColumnCentersMainAxis) {
