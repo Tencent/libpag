@@ -473,7 +473,12 @@ Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see abov
 Export a PAGX file to another format (SVG, PPTX, or HTML). The output format is inferred from the
 output file extension. If neither `--format` nor an output file with a recognizable extension is
 provided, the command reports an error (there is no implicit default format — `--input icon.pagx`
-alone fails). Once the format is known, `--output` defaults to `<input>.<format>`.
+alone fails). Once the format is known, `--output` defaults to `<first input>.<format>`.
+
+For **PPTX only**, `--input` may be repeated to build a multi-slide deck — each `--input` becomes one
+slide, in the order given, and the deck adopts the first document's canvas size (PPTX stores a single
+slide size for the whole presentation). SVG and HTML take a single document, so passing more than one
+`--input` for those formats is rejected. If any input fails to load, the whole export aborts.
 
 ```bash
 pagx export --format svg --input icon.pagx       # PAGX to icon.svg
@@ -481,6 +486,7 @@ pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
 pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --format pptx --input icon.pagx      # force PPTX output format
+pagx export --input a.pagx --input b.pagx --output deck.pptx  # multi-slide deck (one slide per input)
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported  # keep unsupported features editable
@@ -489,8 +495,8 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input PAGX file (required) |
-| `--output <file>` | Output file (default: `<input>.<format>`) |
+| `--input <file>` | Input PAGX file (required). Repeat to add more slides — **pptx only**; each `--input` becomes one slide in deck order |
+| `--output <file>` | Output file (default: `<first input>.<format>`) |
 | `--format <format>` | Output format (`svg`, `pptx`, or `html`; inferred from output extension). Required if output has no extension |
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |

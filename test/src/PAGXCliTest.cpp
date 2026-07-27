@@ -1518,6 +1518,61 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_ValidateSimple) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
+// Multiple --input flags produce a multi-slide deck, one slide per input in the
+// order given. slide2.xml only appears when the second document became its own slide.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputs) {
+  auto firstInput = TestResourcePath("render_basic.pagx");
+  auto secondInput = TestResourcePath("render_gradient.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_MultiSlide.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", firstInput, "--input", secondInput,
+                                            "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  ASSERT_TRUE(std::filesystem::exists(outputPath));
+  auto bytes = ReadFile(outputPath);
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+}
+
+// Repeating --input three times yields three slides; the default output name is
+// derived from the first input.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_ThreeInputsDefaultOutput) {
+  auto firstInput = CopyToTemp("render_basic.pagx", "ExportPPTXThree.pagx");
+  auto secondInput = TestResourcePath("render_gradient.pagx");
+  auto thirdInput = TestResourcePath("render_text.pagx");
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--format", "pptx", "--input", firstInput,
+                                            "--input", secondInput, "--input", thirdInput});
+  EXPECT_EQ(ret, 0);
+  auto defaultOutput = TempDir() + "/ExportPPTXThree.pptx";
+  ASSERT_TRUE(std::filesystem::exists(defaultOutput));
+  auto bytes = ReadFile(defaultOutput);
+  EXPECT_NE(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide4.xml"), std::string::npos);
+}
+
+// A single --input still yields a valid one-slide deck (no slide2.xml), confirming
+// the vector refactor did not regress the single-document path.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_SingleInputOneSlide) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_SingleSlide.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  auto bytes = ReadFile(outputPath);
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+}
+
+// If one of several inputs fails to load, the whole export aborts with an error
+// rather than silently dropping the bad slide.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputsOneMissing) {
+  auto firstInput = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_MultiMissing.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", firstInput, "--input",
+                                            "nonexistent.pagx", "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
 #endif  // PAG_BUILD_PPT
 
 CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
@@ -1558,6 +1613,18 @@ CLI_TEST(PAGXCliTest, Export_WriteFailure) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
+}
+
+// Multiple --input flags are only meaningful for the multi-slide pptx deck; every
+// other format takes a single document, so a repeated --input is rejected up front.
+CLI_TEST(PAGXCliTest, Export_MultipleInputsRejectedForSvg) {
+  auto firstInput = TestResourcePath("render_basic.pagx");
+  auto secondInput = TestResourcePath("render_gradient.pagx");
+  auto outputPath = TempDir() + "/ExportMultiSvg.svg";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", firstInput, "--input", secondInput,
+                                            "--output", outputPath});
+  EXPECT_NE(ret, 0);
+  EXPECT_FALSE(std::filesystem::exists(outputPath));
 }
 
 CLI_TEST(PAGXCliTest, Import_WriteFailure) {

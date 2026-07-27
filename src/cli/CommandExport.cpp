@@ -20,7 +20,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
+#include <vector>
 #include "cli/CliUtils.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -30,7 +32,7 @@
 namespace pagx::cli {
 
 struct ExportOptions {
-  std::string inputFile = {};
+  std::vector<std::string> inputFiles = {};
   std::string outputFile = {};
   std::string format = {};
   int svgIndent = 2;
@@ -46,8 +48,9 @@ static void PrintUsage() {
       << "Export a PAGX file to another format.\n"
       << "\n"
       << "Options:\n"
-      << "  --input <file>              Input PAGX file (required)\n"
-      << "  --output <file>             Output file (default: <input>.<format>)\n"
+      << "  --input <file>              Input PAGX file (required; repeat to add more slides,\n"
+      << "                              pptx only). Each --input becomes one slide in the deck.\n"
+      << "  --output <file>             Output file (default: <first input>.<format>)\n"
       << "  --format <format>           Output format (svg, pptx, html; inferred from --output "
          "extension)\n"
       << "  --text-to-path              Convert text to path geometry (default: native text)\n"
@@ -78,6 +81,9 @@ static void PrintUsage() {
       << "  pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx\n"
       << "  pagx export --format svg --input icon.pagx       # force SVG output format\n"
       << "  pagx export --format pptx --input icon.pagx      # force PPTX output format\n"
+      << "  pagx export --input a.pagx --input b.pagx --output deck.pptx\n"
+      << "                                                   # multi-slide deck (one slide per "
+         "input)\n"
       << "  pagx export --input icon.pagx --svg-indent 4     # 4-space indent\n"
       << "  pagx export --input icon.pagx --text-to-path     # convert text to paths\n"
       << "  pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported\n"
@@ -91,7 +97,7 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
   while (i < argc) {
     std::string arg = argv[i];
     if (arg == "--input" && i + 1 < argc) {
-      options->inputFile = argv[++i];
+      options->inputFiles.emplace_back(argv[++i]);
     } else if (arg == "--output" && i + 1 < argc) {
       options->outputFile = argv[++i];
     } else if (arg == "--format" && i + 1 < argc) {
@@ -124,7 +130,7 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     i++;
   }
 
-  if (options->inputFile.empty()) {
+  if (options->inputFiles.empty()) {
     std::cerr << "pagx export: error: missing --input file\n";
     return 1;
   }
@@ -138,15 +144,20 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
     return 1;
   }
 
+  if (options->format != "pptx" && options->inputFiles.size() > 1) {
+    std::cerr << "pagx export: error: multiple --input files are only supported for pptx output\n";
+    return 1;
+  }
+
   if (options->outputFile.empty()) {
-    options->outputFile = ReplaceExtension(options->inputFile, options->format);
+    options->outputFile = ReplaceExtension(options->inputFiles.front(), options->format);
   }
 
   return 0;
 }
 
 static int ExportToSVG(const ExportOptions& options) {
-  auto document = LoadDocument(options.inputFile, "pagx export");
+  auto document = LoadDocument(options.inputFiles.front(), "pagx export");
   if (document == nullptr) {
     return 1;
   }
@@ -170,9 +181,10 @@ static int ExportToSVG(const ExportOptions& options) {
 }
 
 static int ExportToHTML(const ExportOptions& options) {
-  auto document = PAGXImporter::FromFile(options.inputFile);
+  const auto& inputFile = options.inputFiles.front();
+  auto document = PAGXImporter::FromFile(inputFile);
   if (document == nullptr) {
-    std::cerr << "pagx export: error: failed to load '" << options.inputFile << "'\n";
+    std::cerr << "pagx export: error: failed to load '" << inputFile << "'\n";
     return 1;
   }
   for (auto& error : document->errors) {
@@ -194,26 +206,36 @@ static int ExportToHTML(const ExportOptions& options) {
 }
 
 static int ExportToPPT(const ExportOptions& options) {
-  auto document = PAGXImporter::FromFile(options.inputFile);
-  if (document == nullptr) {
-    std::cerr << "pagx export: error: failed to load '" << options.inputFile << "'\n";
-    return 1;
-  }
-  if (!document->errors.empty()) {
+  std::vector<std::shared_ptr<PAGXDocument>> documents = {};
+  documents.reserve(options.inputFiles.size());
+  for (const auto& inputFile : options.inputFiles) {
+    auto document = PAGXImporter::FromFile(inputFile);
+    if (document == nullptr) {
+      std::cerr << "pagx export: error: failed to load '" << inputFile << "'\n";
+      return 1;
+    }
     for (auto& error : document->errors) {
       std::cerr << "pagx export: warning: " << error << "\n";
     }
+    if (document->hasUnresolvedImports()) {
+      std::cerr << "pagx export: error: unresolved import directive in '" << inputFile
+                << "', run 'pagx resolve' first\n";
+      return 1;
+    }
+    documents.emplace_back(std::move(document));
   }
-  if (document->hasUnresolvedImports()) {
-    std::cerr << "pagx export: error: unresolved import directive, run 'pagx resolve' first\n";
-    return 1;
+
+  std::vector<PAGXDocument*> documentPtrs = {};
+  documentPtrs.reserve(documents.size());
+  for (const auto& document : documents) {
+    documentPtrs.emplace_back(document.get());
   }
 
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
   pptOptions.bakeUnsupported = options.pptBakeUnsupported;
 
-  if (!PPTExporter::ToFile({document.get()}, options.outputFile, pptOptions)) {
+  if (!PPTExporter::ToFile(documentPtrs, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";
     return 1;
   }
