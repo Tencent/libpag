@@ -18,16 +18,24 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 namespace pagx {
 
 class PPTWriterContext;
 
-std::string GenerateContentTypes(const PPTWriterContext& ctx);
+// `hasPNG` / `hasJPEG` are aggregated across every slide's context so the deck
+// declares each media default extension exactly once. `slideCount` controls how
+// many `/ppt/slides/slideN.xml` overrides are emitted.
+std::string GenerateContentTypes(bool hasPNG, bool hasJPEG, size_t slideCount);
 std::string GenerateRootRels();
-std::string GeneratePresentation(float w, float h);
-std::string GeneratePresentationRels();
+// `w` / `h` are the deck's slide size (taken from the first document). `slideCount`
+// controls the number of <p:sldId> entries in the slide id list.
+std::string GeneratePresentation(float w, float h, size_t slideCount);
+// Emits the slideMaster relationship followed by one relationship per slide, then
+// the presProps / viewProps / theme / tableStyles relationships.
+std::string GeneratePresentationRels(size_t slideCount);
 std::string GenerateSlideRels(const PPTWriterContext& ctx);
 std::string GenerateSlideMaster();
 std::string GenerateSlideMasterRels();
@@ -38,6 +46,6 @@ std::string GeneratePresProps();
 std::string GenerateViewProps();
 std::string GenerateTableStyles();
 std::string GenerateCoreProps();
-std::string GenerateAppProps();
+std::string GenerateAppProps(size_t slideCount);
 
 }  // namespace pagx

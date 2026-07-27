@@ -946,18 +946,76 @@ std::string BuildSlideXml(PAGXDocument& doc, const PPTExportOptions& options,
   return slide;
 }
 
-// Writes every OOXML part (boilerplate XML + media) into the already-opened zip
-// handle. Returns false on the first write failure so callers can discard the
-// partial archive.
-bool WriteZipEntries(zipFile zf, PPTWriterContext& context, PAGXDocument& doc,
-                     const std::string& slide) {
+// One serialized slide: the slide XML plus the media context that XML
+// references. The context is kept alive because WriteZipEntries streams the
+// slide's media (and its slideN.xml.rels) out of it; the LayoutContext that
+// produced the XML is short-lived and freed as soon as the XML is built.
+struct SlideBuild {
+  std::string xml;
+  std::unique_ptr<PPTWriterContext> context;
+};
+
+// Serializes every document into its own slide. Returns an empty vector when the
+// input is invalid (empty list or a nullptr entry) so callers can bail out. Each
+// slide's media numbering is offset by the running image total so all slides can
+// share the single ppt/media/ directory without file-name collisions.
+std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
+                                    const PPTExportOptions& options) {
+  std::vector<SlideBuild> slides;
+  if (documents.empty()) {
+    return slides;
+  }
+  slides.reserve(documents.size());
+  int imageBase = 0;
+  for (auto* doc : documents) {
+    if (doc == nullptr) {
+      return {};
+    }
+    if (!doc->isLayoutApplied()) {
+      doc->applyLayout();
+    }
+    SlideBuild slide;
+    slide.context = std::make_unique<PPTWriterContext>(imageBase);
+    // The LayoutContext only backs the writer while the slide XML is produced;
+    // once BuildSlideXml returns the XML is self-contained, so scope it to this
+    // iteration instead of holding one per slide alive for the whole deck.
+    auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+    slide.xml = BuildSlideXml(*doc, options, *slide.context, layoutContext.get());
+    imageBase += static_cast<int>(slide.context->images().size());
+    slides.push_back(std::move(slide));
+  }
+  return slides;
+}
+
+// Writes every OOXML part (boilerplate XML + per-slide XML + media) into the
+// already-opened zip handle. `slideW` / `slideH` are the deck-wide slide size
+// taken from the first document. Returns false on the first write failure so
+// callers can discard the partial archive.
+bool WriteZipEntries(zipFile zf, const std::vector<SlideBuild>& slides, float slideW,
+                     float slideH) {
+  size_t slideCount = slides.size();
+  bool hasPNG = false;
+  bool hasJPEG = false;
+  for (const auto& slide : slides) {
+    hasPNG = hasPNG || slide.context->hasPNG();
+    hasJPEG = hasJPEG || slide.context->hasJPEG();
+  }
+
   bool ok = true;
-  ok = ok && AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(context));
+  ok = ok && AddZipString(zf, "[Content_Types].xml",
+                          GenerateContentTypes(hasPNG, hasJPEG, slideCount));
   ok = ok && AddZipString(zf, "_rels/.rels", GenerateRootRels());
-  ok = ok && AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
-  ok = ok && AddZipString(zf, "ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
-  ok = ok && AddZipString(zf, "ppt/slides/slide1.xml", slide);
-  ok = ok && AddZipString(zf, "ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
+  ok = ok &&
+       AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(slideW, slideH, slideCount));
+  ok = ok && AddZipString(zf, "ppt/_rels/presentation.xml.rels",
+                          GeneratePresentationRels(slideCount));
+  for (size_t i = 0; i < slideCount && ok; i++) {
+    std::string n = std::to_string(i + 1);
+    std::string slidePath = "ppt/slides/slide" + n + ".xml";
+    std::string slideRelsPath = "ppt/slides/_rels/slide" + n + ".xml.rels";
+    ok = ok && AddZipString(zf, slidePath.c_str(), slides[i].xml);
+    ok = ok && AddZipString(zf, slideRelsPath.c_str(), GenerateSlideRels(*slides[i].context));
+  }
   ok = ok && AddZipString(zf, "ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
   ok = ok &&
        AddZipString(zf, "ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
@@ -969,21 +1027,26 @@ bool WriteZipEntries(zipFile zf, PPTWriterContext& context, PAGXDocument& doc,
   ok = ok && AddZipString(zf, "ppt/viewProps.xml", GenerateViewProps());
   ok = ok && AddZipString(zf, "ppt/tableStyles.xml", GenerateTableStyles());
   ok = ok && AddZipString(zf, "docProps/core.xml", GenerateCoreProps());
-  ok = ok && AddZipString(zf, "docProps/app.xml", GenerateAppProps());
+  ok = ok && AddZipString(zf, "docProps/app.xml", GenerateAppProps(slideCount));
 
-  for (const auto& img : context.images()) {
-    if (!ok) {
-      break;
-    }
-    if (img.cachedData && img.cachedData->size() > 0) {
-      // minizip's zipWriteInFileInZip takes a 32-bit length. Reject entries
-      // that would be silently truncated rather than writing a corrupt PPTX.
-      if (img.cachedData->size() > std::numeric_limits<unsigned>::max()) {
-        ok = false;
+  for (const auto& slide : slides) {
+    for (const auto& img : slide.context->images()) {
+      if (!ok) {
         break;
       }
-      ok = AddZipEntry(zf, img.mediaPath.c_str(), img.cachedData->bytes(),
-                       static_cast<unsigned>(img.cachedData->size()));
+      if (img.cachedData && img.cachedData->size() > 0) {
+        // minizip's zipWriteInFileInZip takes a 32-bit length. Reject entries
+        // that would be silently truncated rather than writing a corrupt PPTX.
+        if (img.cachedData->size() > std::numeric_limits<unsigned>::max()) {
+          ok = false;
+          break;
+        }
+        ok = AddZipEntry(zf, img.mediaPath.c_str(), img.cachedData->bytes(),
+                         static_cast<unsigned>(img.cachedData->size()));
+      }
+    }
+    if (!ok) {
+      break;
     }
   }
   return ok;
@@ -996,14 +1059,15 @@ bool WriteZipEntries(zipFile zf, PPTWriterContext& context, PAGXDocument& doc,
 //==============================================================================
 
 bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const Options& options) {
-  if (!doc.isLayoutApplied()) {
-    doc.applyLayout();
+  return ToFile(std::vector<PAGXDocument*>{&doc}, filePath, options);
+}
+
+bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std::string& filePath,
+                         const Options& options) {
+  auto slides = BuildSlides(documents, options);
+  if (slides.empty()) {
+    return false;
   }
-
-  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
-
-  PPTWriterContext context;
-  std::string slide = BuildSlideXml(doc, options, context, layoutContext.get());
 
   // Write ZIP via minizip
   zipFile zf = zipOpen(filePath.c_str(), APPEND_STATUS_CREATE);
@@ -1011,7 +1075,7 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
     return false;
   }
 
-  bool ok = WriteZipEntries(zf, context, doc, slide);
+  bool ok = WriteZipEntries(zf, slides, documents.front()->width, documents.front()->height);
 
   if (!ok) {
     zipClose(zf, nullptr);
@@ -1033,14 +1097,15 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
 //==============================================================================
 
 std::shared_ptr<Data> PPTExporter::ToData(PAGXDocument& doc, const Options& options) {
-  if (!doc.isLayoutApplied()) {
-    doc.applyLayout();
+  return ToData(std::vector<PAGXDocument*>{&doc}, options);
+}
+
+std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& documents,
+                                          const Options& options) {
+  auto slides = BuildSlides(documents, options);
+  if (slides.empty()) {
+    return nullptr;
   }
-
-  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
-
-  PPTWriterContext context;
-  std::string slide = BuildSlideXml(doc, options, context, layoutContext.get());
 
   // Assemble the archive into a growable RAM buffer instead of a file on disk.
   MemZipBuffer memBuffer;
@@ -1050,7 +1115,7 @@ std::shared_ptr<Data> PPTExporter::ToData(PAGXDocument& doc, const Options& opti
     return nullptr;
   }
 
-  bool ok = WriteZipEntries(zf, context, doc, slide);
+  bool ok = WriteZipEntries(zf, slides, documents.front()->width, documents.front()->height);
   if (zipClose(zf, nullptr) != ZIP_OK) {
     ok = false;
   }

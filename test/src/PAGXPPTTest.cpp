@@ -5972,6 +5972,163 @@ PAGX_TEST(PAGXPPTTest, ToData_RespectsOptions) {
   EXPECT_TRUE(HasZipMagic(data.get()));
 }
 
+//==============================================================================
+// PPTExporter — multi-slide export
+//==============================================================================
+
+// Counts non-overlapping occurrences of `needle` in `haystack`. Used to spot-
+// check how many times a part name appears in the raw ZIP bytes.
+static size_t CountOccurrences(const std::string& haystack, const std::string& needle) {
+  if (needle.empty()) {
+    return 0;
+  }
+  size_t count = 0;
+  for (size_t pos = haystack.find(needle); pos != std::string::npos;
+       pos = haystack.find(needle, pos + needle.size())) {
+    ++count;
+  }
+  return count;
+}
+
+// Builds a one-rectangle document with a distinct fill colour so each slide in a
+// deck is visually different.
+static std::shared_ptr<pagx::PAGXDocument> MakeColoredPPTDoc(float r, float g, float b) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 100};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {r, g, b, 1.0f}));
+  doc->layers.push_back(layer);
+  return doc;
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_ToFileThreeSlides) {
+  auto page1 = MakeColoredPPTDoc(1.0f, 0.0f, 0.0f);
+  auto page2 = MakeColoredPPTDoc(0.0f, 1.0f, 0.0f);
+  auto page3 = MakeColoredPPTDoc(0.0f, 0.0f, 1.0f);
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get(), page3.get()};
+
+  auto path = PPTOutDir() + "/multi_page_three.pptx";
+  ASSERT_TRUE(pagx::PPTExporter::ToFile(docs, path));
+  EXPECT_TRUE(std::filesystem::exists(path));
+  EXPECT_GT(std::filesystem::file_size(path), 0u);
+
+  auto bytes = ReadFileBytes(path);
+  ASSERT_FALSE(bytes.empty());
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_ToDataContainsAllSlideParts) {
+  auto page1 = MakeColoredPPTDoc(1.0f, 0.0f, 0.0f);
+  auto page2 = MakeColoredPPTDoc(0.0f, 1.0f, 0.0f);
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get()};
+
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  // Both slide parts and both slide-rels parts must be present as local file
+  // entries in the archive.
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/_rels/slide1.xml.rels"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/_rels/slide2.xml.rels"), std::string::npos);
+  // A third slide part must not exist for a two-document deck.
+  EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+}
+
+// A one-element vector must produce byte-identical output to the single-document
+// overload, proving the wrapper simply forwards to the vector path.
+PAGX_TEST(PAGXPPTTest, MultiPage_SingleElementMatchesSingleOverload) {
+  auto single = MakeSimplePPTDoc();
+  auto vectorDoc = MakeSimplePPTDoc();
+
+  auto singleData = pagx::PPTExporter::ToData(*single);
+  ASSERT_NE(singleData, nullptr);
+
+  std::vector<pagx::PAGXDocument*> docs = {vectorDoc.get()};
+  auto vectorData = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(vectorData, nullptr);
+
+  ASSERT_EQ(singleData->size(), vectorData->size());
+  EXPECT_EQ(0, std::memcmp(singleData->data(), vectorData->data(), vectorData->size()));
+}
+
+// Media from different slides must land in distinct ppt/media/ files so nothing
+// is overwritten inside the shared media directory.
+PAGX_TEST(PAGXPPTTest, MultiPage_ImageMediaNamesAreUnique) {
+  auto MakeImageDoc = []() {
+    auto doc = pagx::PAGXDocument::Make(400, 300);
+    auto* layer = doc->makeNode<pagx::Layer>();
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {200, 150};
+    rect->size = {200, 150};
+    auto* image = MakeTestPNGImage(doc.get());
+    auto* pattern = doc->makeNode<pagx::ImagePattern>();
+    pattern->image = image;
+    pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+    auto* fill = doc->makeNode<pagx::Fill>();
+    fill->color = pattern;
+    layer->contents.push_back(rect);
+    layer->contents.push_back(fill);
+    doc->layers.push_back(layer);
+    return doc;
+  };
+
+  auto page1 = MakeImageDoc();
+  auto page2 = MakeImageDoc();
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get()};
+
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+
+  // Each slide contributes its own media file with a distinct index; the second
+  // slide's image must not reuse image1's path.
+  EXPECT_NE(bytes.find("ppt/media/image1.png"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/media/image2.png"), std::string::npos);
+  // The full media path "ppt/media/image1.png" is stored once in each entry's
+  // local file header and once in the central directory — so exactly twice.
+  // Seeing it more than that would mean a name collision wrote it repeatedly.
+  EXPECT_EQ(CountOccurrences(bytes, "ppt/media/image1.png"), 2u);
+  EXPECT_EQ(CountOccurrences(bytes, "ppt/media/image2.png"), 2u);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_EmptyListFails) {
+  std::vector<pagx::PAGXDocument*> docs;
+  auto path = PPTOutDir() + "/multi_page_empty.pptx";
+  EXPECT_FALSE(pagx::PPTExporter::ToFile(docs, path));
+  EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_NullEntryFails) {
+  auto page1 = MakeSimplePPTDoc();
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), nullptr};
+  auto path = PPTOutDir() + "/multi_page_null.pptx";
+  EXPECT_FALSE(pagx::PPTExporter::ToFile(docs, path));
+  EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
+}
+
+// Slides may declare different canvas sizes; the deck adopts the first document's
+// size and still produces a valid archive with a slide per document.
+PAGX_TEST(PAGXPPTTest, MultiPage_MixedDocumentSizes) {
+  auto page1 = pagx::PAGXDocument::Make(800, 600);
+  auto page2 = MakeColoredPPTDoc(0.2f, 0.4f, 0.6f);  // 400x300
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get()};
+
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+}
+
 }  // namespace pag
 
 #endif

@@ -65,7 +65,7 @@ static void AppendOfficeRel(std::string& s, const char* id, const char* typeSuff
   s += "\"/>";
 }
 
-std::string GenerateContentTypes(const PPTWriterContext& ctx) {
+std::string GenerateContentTypes(bool hasPNG, bool hasJPEG, size_t slideCount) {
   std::string s;
   s.reserve(2048);
   s += XML_DECL;
@@ -73,17 +73,20 @@ std::string GenerateContentTypes(const PPTWriterContext& ctx) {
   s += "<Default Extension=\"xml\" ContentType=\"application/xml\"/>";
   s += "<Default Extension=\"rels\" "
        "ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>";
-  if (ctx.hasPNG()) {
+  if (hasPNG) {
     s += "<Default Extension=\"png\" ContentType=\"image/png\"/>";
   }
-  if (ctx.hasJPEG()) {
+  if (hasJPEG) {
     s += "<Default Extension=\"jpeg\" ContentType=\"image/jpeg\"/>";
   }
   s += "<Override PartName=\"/ppt/presentation.xml\" "
        "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.presentation."
        "main+xml\"/>";
-  s += "<Override PartName=\"/ppt/slides/slide1.xml\" "
-       "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slide+xml\"/>";
+  for (size_t i = 1; i <= slideCount; i++) {
+    s += "<Override PartName=\"/ppt/slides/slide" + std::to_string(i) +
+         ".xml\" "
+         "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slide+xml\"/>";
+  }
   s += "<Override PartName=\"/ppt/slideMasters/slideMaster1.xml\" "
        "ContentType=\"application/vnd.openxmlformats-officedocument.presentationml.slideMaster+"
        "xml\"/>";
@@ -123,7 +126,7 @@ std::string GenerateRootRels() {
   return s;
 }
 
-std::string GeneratePresentation(float w, float h) {
+std::string GeneratePresentation(float w, float h, size_t slideCount) {
   int64_t cx = PxToEMU(w);
   int64_t cy = PxToEMU(h);
   if (cx > MAX_SLIDE_SIZE_EMU || cy > MAX_SLIDE_SIZE_EMU) {
@@ -147,7 +150,14 @@ std::string GeneratePresentation(float w, float h) {
   s += NS_PRESENTATIONML;
   s += ">";
   s += "<p:sldMasterIdLst><p:sldMasterId id=\"2147483648\" r:id=\"rId1\"/></p:sldMasterIdLst>";
-  s += "<p:sldIdLst><p:sldId id=\"256\" r:id=\"rId2\"/></p:sldIdLst>";
+  s += "<p:sldIdLst>";
+  for (size_t i = 1; i <= slideCount; i++) {
+    // Slide object ids must be unique and >= 256; the slide relationships start
+    // at rId2 (rId1 is the slideMaster), so slide i maps to rId{i + 1}.
+    s += "<p:sldId id=\"" + std::to_string(255 + i) + "\" r:id=\"rId" + std::to_string(i + 1) +
+         "\"/>";
+  }
+  s += "</p:sldIdLst>";
   s += "<p:sldSz cx=\"" + std::to_string(cx) + "\" cy=\"" + std::to_string(cy) + "\"/>";
   s += "<p:notesSz cx=\"" + std::to_string(cx) + "\" cy=\"" + std::to_string(cy) + "\"/>";
   s += "<p:defaultTextStyle>"
@@ -170,17 +180,27 @@ std::string GeneratePresentation(float w, float h) {
   return s;
 }
 
-std::string GeneratePresentationRels() {
+std::string GeneratePresentationRels(size_t slideCount) {
   std::string s;
   s.reserve(1024);
   s += XML_DECL;
   s += RELATIONSHIPS_OPEN;
   AppendOfficeRel(s, "rId1", "slideMaster", "slideMasters/slideMaster1.xml");
-  AppendOfficeRel(s, "rId2", "slide", "slides/slide1.xml");
-  AppendOfficeRel(s, "rId3", "presProps", "presProps.xml");
-  AppendOfficeRel(s, "rId4", "viewProps", "viewProps.xml");
-  AppendOfficeRel(s, "rId5", "theme", "theme/theme1.xml");
-  AppendOfficeRel(s, "rId6", "tableStyles", "tableStyles.xml");
+  // Slides occupy rId2 .. rId{slideCount + 1}; the fixed parts follow after them
+  // so their ids shift with the slide count.
+  for (size_t i = 1; i <= slideCount; i++) {
+    std::string id = "rId" + std::to_string(i + 1);
+    AppendOfficeRel(s, id.c_str(), "slide", "slides/slide" + std::to_string(i) + ".xml");
+  }
+  size_t next = slideCount + 2;
+  std::string presPropsId = "rId" + std::to_string(next++);
+  std::string viewPropsId = "rId" + std::to_string(next++);
+  std::string themeId = "rId" + std::to_string(next++);
+  std::string tableStylesId = "rId" + std::to_string(next++);
+  AppendOfficeRel(s, presPropsId.c_str(), "presProps", "presProps.xml");
+  AppendOfficeRel(s, viewPropsId.c_str(), "viewProps", "viewProps.xml");
+  AppendOfficeRel(s, themeId.c_str(), "theme", "theme/theme1.xml");
+  AppendOfficeRel(s, tableStylesId.c_str(), "tableStyles", "tableStyles.xml");
   s += "</Relationships>";
   return s;
 }
@@ -408,7 +428,7 @@ std::string GenerateCoreProps() {
   return s;
 }
 
-std::string GenerateAppProps() {
+std::string GenerateAppProps(size_t slideCount) {
   std::string s;
   s.reserve(512);
   s += XML_DECL;
@@ -419,7 +439,9 @@ std::string GenerateAppProps() {
        "<Words>0</Words>"
        "<Application>PAGX</Application>"
        "<Paragraphs>0</Paragraphs>"
-       "<Slides>1</Slides>"
+       "<Slides>" +
+       std::to_string(slideCount) +
+       "</Slides>"
        "<Notes>0</Notes>"
        "<HiddenSlides>0</HiddenSlides>"
        "<MMClips>0</MMClips>"
