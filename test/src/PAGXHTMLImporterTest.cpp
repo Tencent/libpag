@@ -32,11 +32,15 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/html/importer/HTMLDetail.h"
+#include "pagx/html/importer/HTMLDiagnosticSink.h"
+#include "pagx/html/importer/HTMLIdAllocator.h"
 #include "pagx/html/importer/HTMLInlineSvgEmitter.h"
+#include "pagx/html/importer/HTMLStyleCascade.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/html/importer/HTMLTransformContext.h"
 #include "pagx/html/importer/HTMLTransformPassUtils.h"
 #include "pagx/html/importer/HTMLTransformPasses.h"
+#include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -8995,6 +8999,133 @@ PAG_TEST(PAGXHTMLImporterTest, BodyBackgroundColorEmitsRectangleFill) {
   ASSERT_NE(doc, nullptr);
   auto* body = doc->layers.front();
   EXPECT_TRUE(ColorNear(SolidFillColorOf(body), HexColor(0xF59E0B)));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BasePathResolvesBodyBackgroundImage) {
+  // String parsing has no file-system anchor of its own, so Options::basePath must be forwarded
+  // to the image registry. Putting the url() directly on <body> also exercises the body-specific
+  // image-pattern path in HTMLParserContext::convertBody.
+  pagx::HTMLImporter::Options opts;
+  auto basePath = (std::filesystem::temp_directory_path() / "pagx-html-base").string() +
+                  std::filesystem::path::preferred_separator;
+  opts.basePath = basePath;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:80px;height:80px;background-image:url(body.png)"></body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  auto paths = doc->getExternalImagePaths();
+  EXPECT_NE(std::find(paths.begin(), paths.end(), basePath + "body.png"), paths.end());
+  auto* fill = FindElementOfType<pagx::Fill>(doc->layers.front());
+  ASSERT_NE(fill, nullptr);
+  EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RawStrictWarningAfterBodyConversionRejectsDocument) {
+  // With normalisation disabled, the unsupported element reaches convertElement(). Strict mode
+  // upgrades that late warning into a hard error, which parseDOM checks after convertBody().
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  opts.strict = true;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><body style="width:50px;height:50px"><unknown-element/></body></html>
+  )HTML",
+                                             opts);
+  EXPECT_EQ(doc, nullptr);
+}
+
+//==================================================================================================
+// HTMLStyleCascade / HTMLIdAllocator — direct boundary tests
+//==================================================================================================
+
+PAG_TEST(PAGXHTMLStyleCascadeTest, EmptyStylePropertyFallbackAndShorthandGradient) {
+  auto root = ParseHtml(R"HTML(
+    <html>
+      <head><style/></head>
+      <body style="width:100px;height:50px">
+        <custom style="background:linear-gradient(90deg, red, blue);
+                       background-clip:text;
+                       background-blend-mode:multiply,multiply"/>
+      </body>
+    </html>
+  )HTML");
+  ASSERT_NE(root, nullptr);
+  auto head = root->getFirstChild("head");
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(head, nullptr);
+  ASSERT_NE(body, nullptr);
+  auto custom = body->getFirstChild("custom");
+  ASSERT_NE(custom, nullptr);
+
+  float canvasWidth = 100.0f;
+  float canvasHeight = 50.0f;
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  pagx::HTMLValueParser valueParser(diagnostics, canvasWidth, canvasHeight);
+  pagx::HTMLStyleCascade cascade(diagnostics, valueParser);
+
+  // A self-closing <style/> has no text child and is ignored.
+  cascade.collectStyles(head);
+  EXPECT_EQ(cascade.getStyleProperty(custom, "missing", "fallback"), "fallback");
+  EXPECT_EQ(cascade.getStyleProperty(custom, "background-image"),
+            "linear-gradient(90deg, red, blue)");
+
+  // The shorthand supplies both inherited gradient text fill and box backgroundImage. Repeating
+  // the same blend mode traverses the full comparison loop without emitting a mismatch warning.
+  auto inherited = cascade.resolveInheritedStyle(custom, pagx::HTMLInheritedStyle{});
+  EXPECT_EQ(inherited.textFillImage, "linear-gradient(90deg, red, blue)");
+  EXPECT_FLOAT_EQ(inherited.fontSizePx, pagx::HTML_DEFAULT_FONT_SIZE);
+  auto box = cascade.computeBoxAttributes(custom);
+  EXPECT_EQ(box.backgroundImage, "linear-gradient(90deg, red, blue)");
+  EXPECT_TRUE(box.backgroundClipText);
+  EXPECT_EQ(box.backgroundBlendMode, "multiply,multiply");
+
+  // The second lookup returns the already-resolved map from the cache.
+  EXPECT_EQ(cascade.getResolvedStyle(custom).at("background-image"),
+            "linear-gradient(90deg, red, blue)");
+}
+
+PAG_TEST(PAGXHTMLIdAllocatorTest, NullEmptyDepthAndCollisionBoundaries) {
+  auto root = ParseHtml(R"HTML(
+    <html><body>
+      <div id="generated0" name="named-layer"/>
+      <span id="" name=""/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(root, nullptr);
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  auto div = body->getFirstChild("div");
+  auto span = body->getFirstChild("span");
+  ASSERT_NE(div, nullptr);
+  ASSERT_NE(span, nullptr);
+
+  auto document = pagx::PAGXDocument::Make(1.0f, 1.0f);
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  diagnostics.bindDocument(document.get());
+  pagx::HTMLIdAllocator allocator;
+
+  allocator.collectAll(nullptr, diagnostics);
+  allocator.collectAll(root, diagnostics);
+  allocator.collectAll(root, diagnostics, pagx::MAX_HTML_RECURSION_DEPTH);
+  EXPECT_TRUE(HasDiagnosticContaining(document, "maximum recursion depth"));
+
+  EXPECT_TRUE(allocator.consume(nullptr).empty());
+  EXPECT_TRUE(allocator.consume(span).empty());
+  EXPECT_EQ(allocator.consume(div), "generated0");
+
+  auto* layer = document->makeNode<pagx::Layer>();
+  allocator.assign(nullptr, div);
+  allocator.assign(layer, nullptr);
+  allocator.assign(layer, span);
+  EXPECT_TRUE(layer->id.empty());
+  EXPECT_TRUE(layer->name.empty());
+  allocator.assign(layer, div);
+  EXPECT_EQ(layer->id, "generated0");
+  EXPECT_EQ(layer->name, "named-layer");
+
+  // generated0 was reserved by collectAll(), so the first generated id must retry once.
+  EXPECT_EQ(allocator.generateUnique("generated"), "generated1");
+  EXPECT_EQ(allocator.generateUnique("generated"), "generated2");
 }
 
 //==================================================================================================
