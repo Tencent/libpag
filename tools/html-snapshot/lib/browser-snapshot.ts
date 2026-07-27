@@ -48,6 +48,14 @@ import { DROP_TAG_NAMES_JSON } from './dom-tags';
 // DROP_TAG_NAMES_JSON → the browser-scope DROP_TAGS Set).
 import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 
+// Marker a renderer stamps on the box that must carry the author `name` when the element's
+// own outer box is not the first emitted tag (see `applyLayerName`). Declared as a plain
+// module-level `const` (not an import) so tsc leaves the bare identifier untouched when it
+// stringifies the helper functions into the browser payload; the same value is re-declared in
+// PAYLOAD_CONSTANTS_SRC via interpolation so the shipped helpers resolve it in-page, while the
+// Node-side helpers (and their unit tests) resolve it here.
+const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
+
 /* eslint-disable no-undef, no-inner-declarations */
 
 // ===== Style-value normalisers =====
@@ -3327,9 +3335,8 @@ function renderChildrenInto(el, parentRect, hostComputed) {
 // fragment — naming that fragment would strand `layer->name` on a box with no children. The
 // renderer marks the child-bearing wrapper with this attribute so `applyLayerName` targets it
 // instead of the first tag, then removes the marker so it never reaches the output.
-// NOTE: the value itself is defined in PAYLOAD_CONSTANTS_SRC (browser scope), not here — the
-// helpers below reach the browser via `.toString()`, so a Node-side `const` would never ship
-// and every reference would throw `ReferenceError: NAME_ANCHOR_ATTR is not defined` in-page.
+// NOTE: `NAME_ANCHOR_ATTR` is declared once near the top of this module (Node scope) and
+// re-declared in PAYLOAD_CONSTANTS_SRC (browser scope); the helpers below resolve it in both.
 
 // Removes the (single) NAME_ANCHOR_ATTR marker from `html`. Called on every path where the
 // marker must not survive: no name to forward, a `display: contents` host, or the
@@ -3746,7 +3753,7 @@ const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
 
 const BOUNDARY_SPACE = '\\u00a0';
 
-const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
+const NAME_ANCHOR_ATTR = '${NAME_ANCHOR_ATTR}';
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
