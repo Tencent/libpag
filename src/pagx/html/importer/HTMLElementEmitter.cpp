@@ -755,8 +755,9 @@ void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttr
   // PAGX models a single mask per layer. If a CSS mask-image / clip-path already claimed it, keep
   // the rectangular overflow clip rather than silently dropping either effect, and warn.
   if (layer->mask != nullptr) {
-    warn("html: border-radius overflow clip combined with mask/clip-path; rounded corners not "
-         "clipped");
+    warn(
+        "html: border-radius overflow clip combined with mask/clip-path; rounded corners not "
+        "clipped");
     return;
   }
 

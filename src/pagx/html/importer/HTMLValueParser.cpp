@@ -537,8 +537,8 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, f
   float angle = CssToPagxAngle(cssAngle) * HtmlPi / 180.0f;
   float dirX = std::cos(angle);
   float dirY = std::sin(angle);
-  bool boxKnown = !(std::isnan(boxWidth) || std::isnan(boxHeight) || boxWidth <= 0.0f ||
-                    boxHeight <= 0.0f);
+  bool boxKnown =
+      !(std::isnan(boxWidth) || std::isnan(boxHeight) || boxWidth <= 0.0f || boxHeight <= 0.0f);
 
   // The CSS gradient-line length is the "magic corners" extent L = |W*cosφ| + |H*sinφ| (φ is the
   // PAGX angle, 0deg = +X), centred on the box, so the 0% / 100% stops land exactly on the
