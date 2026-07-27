@@ -3321,7 +3321,43 @@ function renderChildrenInto(el, parentRect, hostComputed) {
 // bounding rect (used to compute relative left/top). `precomputed`, when
 // supplied, is the result of a prior `getComputedStyle(el)` call upstream;
 // reusing it avoids a redundant style query on every visited element.
+// Forward an author `name` attribute onto the outer box the element emits so the PAGX
+// importer can surface it as `layer->name` (mirroring how `id` maps to `layer->id`). The
+// snapshot rebuilds every element from computed style rather than cloning the live tree, so
+// the attribute has to be re-emitted here or it never reaches the importer. `html` is the
+// markup an element renderer produced; its first tag is always that element's own outer box.
+// No-op when the element carries no `name`, when `html` is empty, when the box already has a
+// `name`, or for `display: contents` hosts (which emit their children's markup, not a box of
+// their own).
+function applyLayerName(el, html, opts, precomputed) {
+  if (!html || !el || typeof el.getAttribute !== 'function') return html;
+  // `_strippedTransform` marks the recursive re-entry that re-renders this same element with
+  // its transform cleared; let the outer (non-stripped) call own the name so it is added once.
+  if (opts && opts._strippedTransform) return html;
+  const name = el.getAttribute('name');
+  if (!name) return html;
+  const computed = precomputed || getComputedStyle(el);
+  if (computed.display === 'contents') return html;
+  // Insert the attribute immediately after the opening tag's NAME, never scanning the
+  // attribute list: an outer box `style` can legitimately contain a raw '>' (e.g. an
+  // inline-SVG `data:` URI in `background-image`), which an attribute-aware splice would
+  // mistake for the end of the tag and corrupt. No renderer emits `name`, and the
+  // stripped-transform re-entry is guarded above, so a single element box is never named twice.
+  const match = html.match(/^<([a-zA-Z][\w-]*)/);
+  if (!match) return html;
+  return `<${match[1]} name="${escapeHtml(name)}"` + html.slice(match[0].length);
+}
+
+// Thin dispatcher wrapper: delegates to `renderElementBox` for the actual markup, then folds
+// the author `name` attribute onto the emitted box. Kept separate so every render path (flex
+// children, absolute children, body roots, stripped-transform re-entry) picks up name
+// forwarding through the single entry point they all already call.
 function render(el, parentRect, opts, precomputed) {
+  const html = renderElementBox(el, parentRect, opts, precomputed);
+  return applyLayerName(el, html, opts, precomputed);
+}
+
+function renderElementBox(el, parentRect, opts, precomputed) {
   opts = opts || {};
   const computed = precomputed || getComputedStyle(el);
 
@@ -3875,6 +3911,8 @@ const HELPER_FNS = [
   renderFlexContainer,
   renderContainer,
   renderChildrenInto,
+  applyLayerName,
+  renderElementBox,
   render,
   prepareBodyForSnapshot,
   measureCanvas,
@@ -4403,6 +4441,7 @@ export {
   emitInlineBoxFragments,
   dashedBorderSideSvg,
   forwardDataAttrs,
+  applyLayerName,
   normalizeBackgroundImage,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,

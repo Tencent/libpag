@@ -3386,6 +3386,19 @@ PAG_TEST(PAGXHTMLImporterTest, IdAttributePropagatesToLayer) {
   EXPECT_EQ(div->id, "hero");
 }
 
+PAG_TEST(PAGXHTMLImporterTest, NameAttributePropagatesToLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div name="Hero Banner" id="hero"
+           style="width:50px;height:50px;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_EQ(div->name, "Hero Banner");
+  EXPECT_EQ(div->id, "hero");
+}
+
 //==================================================================================================
 // Image / SVG / Options tests
 //==================================================================================================
