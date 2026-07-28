@@ -25,40 +25,22 @@ import { fileURLToPath } from 'url';
 import { probeLiveServer, clearLock } from './server/lock.js';
 import { runServer, runStdioServer, spawnDaemon, stopDaemon, printLog, LOG_FILE } from './daemon.js';
 
-const USAGE = `Usage: pagx-preview <file.pagx> [options]
-       pagx-preview --mcp
-       pagx-preview stop
-       pagx-preview --log
+const USAGE = `Usage:
+  pagx-preview <file.pagx>      Preview a .pagx file (opens in the browser)
+  pagx-preview --mcp            Run as an MCP server for AI assistants (e.g. CodeBuddy)
+  pagx-preview stop             Stop the running background server
+  pagx-preview --log            Print the server log
+  pagx-preview --help           Show this help
 
 Options:
-  --mcp            Run as a self-bootstrapping stdio MCP server (see "MCP / CodeBuddy" below).
-                   No file argument is needed; files are opened via the preview_pagx tool.
-  --port <n>       Bind to a specific port (default: 0 = system-assigned)
-                   For the HTTP MCP endpoint, pin a port (e.g. --port 7300) so the mcp.json URL
-                   stays stable across restarts. Not needed for --mcp (stdio) mode.
-  --host <addr>    Bind host (default: 127.0.0.1)
-  --fonts <dir>    Directory containing NotoSansSC-Regular.otf / NotoColorEmoji.ttf
-                   (falls back to PAGX_FONTS_DIR env, then a libpag checkout if detected)
-  --no-open        Do not open the browser automatically (auto-enabled when stdout isn't a TTY)
-  --json           Emit a single-line JSON record ({url, pid, logFile, reused}) instead of the
-                   human-readable banner. Implies --no-open. Intended for IDE / agent callers.
-  --foreground     Run the server in the foreground (default: run detached in the background)
-  --log            Print the server's log file (${LOG_FILE}) and exit
+  --mcp            Run as a stdio MCP server so an AI assistant can open .pagx files and render an
+                   inline preview widget. Add to CodeBuddy mcp.json:
+                     { "mcpServers": { "pagx-preview": { "command": "pagx-preview", "args": ["--mcp"] } } }
+  --log            Print the server log file (${LOG_FILE}) and exit
   -h, --help       Show this help
 
 Commands:
   stop             Stop the background server (if any)
-
-MCP / CodeBuddy:
-  Recommended (self-starting, stdio). The MCP client spawns pagx-preview on demand and manages its
-  lifetime; the user never starts a server manually. Add to ~/.codebuddy/mcp.json:
-    { "mcpServers": { "pagx-preview": { "command": "pagx-preview", "args": ["--mcp"] } } }
-  Then just ask the assistant to preview a .pagx file; the preview_pagx tool renders an inline
-  widget and returns a url you can open in a browser / webview.
-
-  Alternative (HTTP, manual start). Pre-start a server, then point mcp.json at its /mcp endpoint:
-    pagx-preview --port 7300 <file.pagx>
-    { "mcpServers": { "pagx-preview": { "type": "http", "url": "http://127.0.0.1:7300/mcp" } } }
 `;
 
 function parseArgs(argv) {
