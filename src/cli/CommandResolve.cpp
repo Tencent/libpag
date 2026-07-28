@@ -30,7 +30,6 @@
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Group.h"
-#include "pagx/nodes/LayoutNode.h"
 
 namespace pagx::cli {
 
@@ -221,52 +220,37 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
       layer->contents.push_back(element);
     }
   } else if (canDowngradeAll) {
-    for (size_t i = 0; i < elementLayers.size(); i++) {
-      auto* elemLayer = elementLayers[i];
-      bool unpackFirst = false;
-      if (i == 0 && elemLayer->matrix.isIdentity()) {
-        unpackFirst = true;
-        for (auto* child : elemLayer->contents) {
-          auto* layoutNode = LayoutNode::AsLayoutNode(child);
-          if (layoutNode != nullptr &&
-              (!std::isnan(layoutNode->right) || !std::isnan(layoutNode->bottom) ||
-               !std::isnan(layoutNode->centerX) || !std::isnan(layoutNode->centerY))) {
-            unpackFirst = false;
-            break;
+    // Wrap every element layer uniformly in its own Group so sibling shapes stay at the same
+    // depth (peer Groups), preserving the source hierarchy. Flattening only the first layer's
+    // contents while wrapping the rest would break that symmetry and is unnecessary — a trailing
+    // painter is isolated by its enclosing Group either way. This mirrors the uniform handling in
+    // PAGXOptimizer::DowngradeShellChildren.
+    for (auto* elemLayer : elementLayers) {
+      auto m = elemLayer->matrix;
+      bool hasSkew = !pag::FloatNearlyEqual(m.a * m.c + m.b * m.d, 0.0f);
+      if (hasSkew) {
+        // Matrix contains skew which cannot be represented by Group's
+        // position/scale/rotation. Keep it as a Layer instead of downgrading.
+        layer->children.push_back(elemLayer);
+        continue;
+      }
+      auto* group = doc->makeNode<Group>();
+      group->elements = std::move(elemLayer->contents);
+      if (!elemLayer->matrix.isIdentity()) {
+        group->position = {m.tx, m.ty};
+        if (m.a != 1 || m.b != 0 || m.c != 0 || m.d != 1) {
+          float sx = std::sqrt(m.a * m.a + m.b * m.b);
+          float sy = std::sqrt(m.c * m.c + m.d * m.d);
+          float det = m.a * m.d - m.b * m.c;
+          if (det < 0) {
+            sy = -sy;
           }
+          float rot = pag::RadiansToDegrees(std::atan2(m.b, m.a));
+          group->scale = {sx, sy};
+          group->rotation = rot;
         }
       }
-      if (unpackFirst) {
-        for (auto* element : elemLayer->contents) {
-          layer->contents.push_back(element);
-        }
-      } else {
-        auto m = elemLayer->matrix;
-        bool hasSkew = !pag::FloatNearlyEqual(m.a * m.c + m.b * m.d, 0.0f);
-        if (hasSkew) {
-          // Matrix contains skew which cannot be represented by Group's
-          // position/scale/rotation. Keep it as a Layer instead of downgrading.
-          layer->children.push_back(elemLayer);
-          continue;
-        }
-        auto* group = doc->makeNode<Group>();
-        group->elements = std::move(elemLayer->contents);
-        if (!elemLayer->matrix.isIdentity()) {
-          group->position = {m.tx, m.ty};
-          if (m.a != 1 || m.b != 0 || m.c != 0 || m.d != 1) {
-            float sx = std::sqrt(m.a * m.a + m.b * m.b);
-            float sy = std::sqrt(m.c * m.c + m.d * m.d);
-            float det = m.a * m.d - m.b * m.c;
-            if (det < 0) {
-              sy = -sy;
-            }
-            float rot = pag::RadiansToDegrees(std::atan2(m.b, m.a));
-            group->scale = {sx, sy};
-            group->rotation = rot;
-          }
-        }
-        layer->contents.push_back(group);
-      }
+      layer->contents.push_back(group);
     }
   } else {
     for (auto* elemLayer : elementLayers) {
