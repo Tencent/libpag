@@ -163,7 +163,12 @@ bool HardwareDecoder::resetVideoToolBox() {
   const void* combineDics[] = {inAttrs};
   CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
   CFDictionaryRef outAttrs = NULL;
-  CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
+  // CVPixelBufferCreateResolvedAttributesDictionary may fail on newer macOS
+  // versions (e.g., macOS 27 beta) and set outAttrs to NULL.
+  auto resolvedResult = CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
+  if (resolvedResult != kCVReturnSuccess) {
+    outAttrs = NULL;
+  }
   VTDecompressionOutputCallbackRecord callBackRecord;
   callBackRecord.decompressionOutputCallback = DidDecompress;
   callBackRecord.decompressionOutputRefCon = NULL;
@@ -171,7 +176,9 @@ bool HardwareDecoder::resetVideoToolBox() {
   OSStatus status = VTDecompressionSessionCreate(kCFAllocatorDefault, videoFormatDescription, NULL,
                                                  outAttrs, &callBackRecord, &session);
 
-  CFRelease(outAttrs);
+  if (outAttrs != NULL) {
+    CFRelease(outAttrs);
+  }
   CFRelease(combines);
   CFRelease(inAttrs);
   CFRelease(pixelFormatTypeValue);
