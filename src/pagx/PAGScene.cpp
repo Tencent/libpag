@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <chrono>
 #include "pagx/PAGScene.h"
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
@@ -111,9 +110,7 @@ void PAGScene::buildRuntimeTree() {
   pendingNotifications.clear();
   suppressNotify = false;
   instantiatedTimelines.clear();
-  auto treeT0 = std::chrono::steady_clock::now();
   auto buildResult = LayerBuilder::BuildForRuntime(document.get());
-  auto treeT1 = std::chrono::steady_clock::now();
   auto rootComp = std::shared_ptr<PAGComposition>(
       new PAGComposition(nullptr, std::move(buildResult.root), shared_from_this()));
   *rootComp->binding = std::move(buildResult.binding);
@@ -121,7 +118,6 @@ void PAGScene::buildRuntimeTree() {
   _rootComposition = rootComp;
   std::unordered_set<const Composition*> visited = {};
   _rootComposition->buildChildren(document->layers, visited);
-  auto treeT2 = std::chrono::steady_clock::now();
   displayList->root()->addChild(rootComp->runtimeLayer);
   // Eagerly create top-level PAGStateMachine instances so DataBindRuntime can resolve
   // DataBind targets that reference state machines during buildViewModels().
@@ -142,17 +138,9 @@ void PAGScene::buildRuntimeTree() {
     }
   }
   buildViewModels();
-  auto treeT3 = std::chrono::steady_clock::now();
   // Cache the flat TextHolder list so flushTextHolders / hasContentChanged iterate it directly
   // instead of walking the composition tree every frame.
   collectTextHolders();
-  auto treeT4 = std::chrono::steady_clock::now();
-  LOGI("[buildRuntimeTree] layers=%.2fms children=%.2fms viewmodels=%.2fms collect=%.2fms total=%.2fms",
-       std::chrono::duration<double, std::milli>(treeT1 - treeT0).count(),
-       std::chrono::duration<double, std::milli>(treeT2 - treeT1).count(),
-       std::chrono::duration<double, std::milli>(treeT3 - treeT2).count(),
-       std::chrono::duration<double, std::milli>(treeT4 - treeT3).count(),
-       std::chrono::duration<double, std::milli>(treeT4 - treeT0).count());
 }
 
 std::shared_ptr<PAGViewModel> PAGScene::CreateViewModelFromSchema(

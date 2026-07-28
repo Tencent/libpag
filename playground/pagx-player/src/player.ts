@@ -292,11 +292,8 @@ export class PAGXPlayer extends EventTarget {
         const generation = ++this.loadGeneration;
         // Snapshots taken while it's still safe to read pre-existing view state; used after
         // the reset() inside parsePAGX() to restore playback position and play/pause state.
-        const totalStart = performance.now();
-        let stepStart = performance.now();
         try {
             await this.ensureView();
-            console.log(`[Player.load] ensureView: ${(performance.now() - stepStart).toFixed(2)} ms`);
             if (!this.isCurrentLoad(generation)) return;
             const view = this.view!;
 
@@ -305,16 +302,12 @@ export class PAGXPlayer extends EventTarget {
                 : 0;
             const wasPlaying = options.preserveCurrentTime && view.isPlaying();
 
-            stepStart = performance.now();
             view.parsePAGX(pagxBytes);
-            console.log(`[Player.load] parsePAGX: ${(performance.now() - stepStart).toFixed(2)} ms`);
 
             // Register fonts (host-supplied); the view resets font registration on each load
             // so this must run before buildLayers.
             if (options.registerFonts) {
-                stepStart = performance.now();
                 await options.registerFonts(view);
-                console.log(`[Player.load] registerFonts: ${(performance.now() - stepStart).toFixed(2)} ms`);
                 if (!this.isCurrentLoad(generation)) return;
             }
 
@@ -323,7 +316,6 @@ export class PAGXPlayer extends EventTarget {
             // concurrently but push in order so a hypothetical duplicate path list stays
             // deterministic.
             if (options.resolveResource) {
-                stepStart = performance.now();
                 const paths: string[] = view.getExternalFilePaths();
                 if (paths && paths.length > 0) {
                     const resolve = options.resolveResource;
@@ -340,14 +332,10 @@ export class PAGXPlayer extends EventTarget {
                         }
                     }
                 }
-                console.log(`[Player.load] resolveResource: ${(performance.now() - stepStart).toFixed(2)} ms`);
             }
 
-            stepStart = performance.now();
             view.buildLayers();
-            console.log(`[Player.load] buildLayers: ${(performance.now() - stepStart).toFixed(2)} ms`);
 
-            stepStart = performance.now();
             if (options.forceLoop !== false) {
                 view.setLoop(true);
             }
@@ -384,16 +372,12 @@ export class PAGXPlayer extends EventTarget {
                 // an SSE reload expect their viewport to stay put.
                 this.gesture.resetTransform();
             }
-            console.log(`[Player.load] postBuildSetup: ${(performance.now() - stepStart).toFixed(2)} ms`);
 
             // Force a synchronous first frame so the canvas reflects the newly built document
             // before we unhide it below; without this the view is drawn one rAF later and the
             // previous document's last frame briefly ghosts through when hidden -> visible.
-            stepStart = performance.now();
             view.draw();
-            console.log(`[Player.load] draw: ${(performance.now() - stepStart).toFixed(2)} ms`);
 
-            stepStart = performance.now();
             this.canvas.classList.remove('hidden');
             setToolbarVisible(this.toolbarRoot, true);
             const hasAnimation = view.durationMicros() > 0;
@@ -415,7 +399,6 @@ export class PAGXPlayer extends EventTarget {
                 xmlText,
             };
             this.dispatchEvent(new CustomEvent('loaded', { detail }));
-            console.log(`[Player.load] uiUpdate: ${(performance.now() - stepStart).toFixed(2)} ms`);
         } catch (err) {
             // Only the currently active load reports the failure. Superseded loads dropping
             // out via isCurrentLoad() never enter this branch since generation checks come
@@ -443,8 +426,6 @@ export class PAGXPlayer extends EventTarget {
             const detail: LoadErrorEventDetail = { error };
             this.dispatchEvent(new CustomEvent('loadError', { detail }));
             throw error;
-        } finally {
-            console.log(`[Player.load] total: ${(performance.now() - totalStart).toFixed(2)} ms`);
         }
     }
 

@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/nodes/Text.h"
-#include <chrono>
-#include "pagx/LayoutContext.h"
 #include "pagx/TextLayout.h"
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/LayoutNode.h"
@@ -34,7 +32,6 @@ Text::Text() : glyphData(new GlyphData()) {
 }
 
 void Text::onMeasure(LayoutContext* context) {
-  auto shapeStart = std::chrono::steady_clock::now();
   textScale = 1.0f;
   auto params = MakeStandaloneParams(this);
   auto result = TextLayout::Layout({{this, MakeGlyphParams(this)}}, params, context);
@@ -50,8 +47,6 @@ void Text::onMeasure(LayoutContext* context) {
   // Preferred size: authored width/height overrides the intrinsic text bounds when present.
   preferredWidth = std::isnan(width) ? textBounds.width : width;
   preferredHeight = std::isnan(height) ? textBounds.height : height;
-  auto shapeEnd = std::chrono::steady_clock::now();
-  context->textMeasureMs += std::chrono::duration<double, std::milli>(shapeEnd - shapeStart).count();
 }
 
 void Text::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {

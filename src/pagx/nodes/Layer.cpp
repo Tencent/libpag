@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
-#include "pagx/LayoutContext.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/types/Alignment.h"
@@ -196,10 +195,8 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   // are skipped here, collapsing the otherwise exponential 2^depth re-layout to linear. layoutWidth/
   // layoutHeight retain their previously resolved values, so the parent still positions this layer
   // via setLayoutPosition. resetLayout() clears layoutResolved before a re-run after an edit.
-  context->setLayoutSizeCount++;
   if (layoutResolved && SameLayoutInput(targetWidth, lastLayoutTargetWidth) &&
       SameLayoutInput(targetHeight, lastLayoutTargetHeight)) {
-    context->setLayoutSizeSkipped++;
     return;
   }
   lastLayoutTargetWidth = targetWidth;
@@ -323,7 +320,6 @@ Point Layer::renderPosition() const {
 }
 
 void Layer::updateLayout(LayoutContext* context) {
-  context->updateLayoutCount++;
   // Flex container layout: arrange flex children.
   if (layout != LayoutMode::None && !children.empty()) {
     performContainerLayout(context);

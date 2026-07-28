@@ -52,19 +52,6 @@ class LayoutContext {
     return fontConfig;
   }
 
-  // Layout profiling accumulators (temporary instrumentation): total onMeasure time across all
-  // nodes and the text-shaping subset, summed over one applyLayout pass.
-  double measureMs = 0;
-  double textMeasureMs = 0;
-  // Counts Layer::updateLayout entries over one applyLayout pass; a very large value would confirm
-  // redundant recursive re-layout.
-  int updateLayoutCount = 0;
-  // Counts Layer::setLayoutSize entries and the subset short-circuited by the memoized-target skip
-  // over one applyLayout pass. A high skipped/total ratio confirms the memo is collapsing the
-  // two-pass exponential re-layout.
-  int setLayoutSizeCount = 0;
-  int setLayoutSizeSkipped = 0;
-
  private:
   void ensureSystemFallbacks();
 
