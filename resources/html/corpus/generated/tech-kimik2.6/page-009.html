@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>技术架构：资产化思维</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .arrow-icon { width: 20px; height: 20px; flex-shrink: 0; margin-top: 3px; }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">09 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">技术架构：资产化思维</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 内容区 -->
+  <div class="absolute top-[180px] left-[80px] w-[1120px] flex flex-col gap-[20px]">
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-cpu text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">腾讯混元大模型</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">提供自然语言理解与生成能力，支撑AI设计核心算法</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-eye text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">优图视觉算法</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">支撑图像识别、分层与转换，实现图片秒变设计稿</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-plug text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">CodeBuddy底层架构</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">确保与开发工具链的无缝衔接，实现设计到开发零损耗</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-code text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">MCP模型上下文协议</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">实现设计与代码的无缝连接，设计稿可直接导入主流IDE</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-cube text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">核心差异化：生成资产而非图片</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">传统AI工具输出静态图片，Ardot输出结构化设计资产，可编辑、可复用、可交付</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-git-merge text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">天然适配团队级资产管理</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">结构化输出天然适配团队级设计资产管理体系，支持全生命周期管理</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

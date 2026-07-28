@@ -213,7 +213,9 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
     auto& dashes = strokeElement != nullptr ? strokeElement->dashes : gradientStrokeElement->dashes;
     auto& dashOffset =
         strokeElement != nullptr ? strokeElement->dashOffset : gradientStrokeElement->dashOffset;
-    for (A_long index = 0; index < numStreams; index++) {
+    // The dashes group contains dash values followed by a trailing offset as the last child.
+    // Skip the last child here and read it as dashOffset separately below.
+    for (A_long index = 0; index < numStreams - 1; index++) {
       AEGP_StreamRefH childStreamHandle = nullptr;
       Suites->DynamicStreamSuite4()->AEGP_GetNewStreamRefByIndex(PluginID, dashStreamHandle, index,
                                                                  &childStreamHandle);
@@ -224,10 +226,10 @@ static void GetDashes(const AEGP_StreamRefH& streamHandle, pag::ShapeElement* el
         Suites->StreamSuite4()->AEGP_DisposeStream(childStreamHandle);
         continue;
       }
-      if (!IsStreamHidden(childStreamHandle)) {
-        auto dash = GetProperty(childStreamHandle, index, AEStreamParser::FloatParser);
-        dashes.push_back(dash);
-      }
+      // childStreamHandle is already a single dash value stream, not a group. Use the direct
+      // GetProperty overload without index to avoid calling GetNewStreamRefByIndex on it.
+      auto dash = GetProperty(childStreamHandle, AEStreamParser::FloatParser);
+      dashes.push_back(dash);
       Suites->StreamSuite4()->AEGP_DisposeStream(childStreamHandle);
     }
     if (!dashes.empty()) {

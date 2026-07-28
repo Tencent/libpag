@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>中国宠物经济趋势洞察</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .gradient-dark { background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%); }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+  .vertical-text { writing-mode: vertical-rl; text-orientation: mixed; }
+</style>
+</head>
+<body>
+<div class="slide gradient-dark">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+      <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">CHINA PET ECONOMY</span>
+    </div>
+    <div class="flex items-center gap-[24px]">
+      <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35">趋势洞察报告</span>
+      <span class="text-[13px] font-[600] text-[#FFFFFF]/50">2025</span>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="absolute inset-0 flex flex-col items-center justify-center px-[48px]">
+    <!-- 大标题 -->
+    <div class="text-center mb-[32px]">
+      <h1 class="text-[72px] font-[900] italic leading-[1.15] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+        中国宠物经济<br>趋势洞察
+      </h1>
+      <div class="w-[96px] h-[4px] bg-[#2563EB] mx-auto mt-[24px]"></div>
+    </div>
+    <!-- 副标题 -->
+    <div class="text-[22px] font-[500] text-[#F5F5DC]/70 mt-[16px] tracking-[0.05em]">
+      3126亿市场，谁在领跑下一个十年
+    </div>
+    <!-- 描述 -->
+    <div class="text-[15px] text-[#F5F5DC]/45 mt-[20px] max-w-[680px] text-center leading-[1.7]">
+      从猫经济崛起到AI智能入局，一场关于情感消费与产业变革的深度洞察
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#F5F5DC]/30">数据驱动洞察</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+
+  <!-- 竖排装饰 -->
+  <div class="vertical-text absolute right-[48px] top-[50%] text-[12px] tracking-[0.3em] text-[#FFFFFF]/10 uppercase">
+    Pet Economy Report 2025
+  </div>
+</div>
+</body>
+</html>

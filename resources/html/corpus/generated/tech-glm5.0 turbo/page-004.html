@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720, initial-scale=1.0">
+<title>核心功能：AI协同设计能力</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .geo-circle {
+    border: 1px solid #111111;
+    border-radius: 50%;
+  }
+  .bullet-arrow {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+  .feature-card {
+    background: rgba(17,17,17,0.03);
+    border: 1px solid rgba(17,17,17,0.08);
+    border-radius: 6px;
+    padding: 20px;
+    transition: background 0.2s;
+  }
+  .feature-card:hover {
+    background: rgba(17,17,17,0.06);
+  }
+</style>
+</head>
+<body class="bg-noise">
+<div class="relative w-[1280px] h-[720px] overflow-hidden">
+
+  <!-- Decorative elements -->
+  <div class="absolute geo-circle" style="top: -60px; right: -40px; width: 200px; height: 200px; opacity: 0.1;"></div>
+  <div class="absolute geo-circle" style="bottom: -40px; left: -40px; width: 160px; height: 160px; opacity: 0.08;"></div>
+
+  <!-- Hairline Grid Lines -->
+  <div class="absolute" style="top: 110px; left: 48px; width: 1184px; height: 1px; background: rgba(17,17,17,0.15);"></div>
+
+  <!-- Header Zone -->
+  <div class="absolute" style="top: 40px; left: 48px; width: 1184px; height: 60px;">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="ph-duotone ph-sparkle" style="font-size: 28px; color: #111111;"></i>
+        <h1 class="font-semibold" style="font-size: 56px; letter-spacing: -0.01em; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif;">核心功能：AI协同设计能力</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-[2px]" style="background: #111111; opacity: 0.3;"></div>
+        <span style="font-size: 12px; color: #111111; opacity: 0.4;">04</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column 1 -->
+  <div class="absolute" style="top: 130px; left: 48px; width: 372px; height: 520px;">
+    <div class="flex flex-col gap-4 h-full">
+      <!-- Card: 文生UI -->
+      <div class="feature-card flex-1 flex flex-col">
+        <div class="flex items-center gap-2 mb-3">
+          <div style="width: 36px; height: 36px; background: rgba(17,17,17,0.08); border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-chat-circle-text" style="font-size: 20px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 18px; color: #111111;">文生UI</span>
+        </div>
+        <div class="flex flex-col gap-2 flex-1">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; font-weight: 500; line-height: 1.4;">描述即生成</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.7; line-height: 1.5;">自然语言描述需求，AI自动生成布局与组件</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card: AI助手 -->
+      <div class="feature-card flex-1 flex flex-col">
+        <div class="flex items-center gap-2 mb-3">
+          <div style="width: 36px; height: 36px; background: rgba(17,17,17,0.08); border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-sparkle" style="font-size: 20px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 18px; color: #111111;">AI助手</span>
+        </div>
+        <div class="flex flex-col gap-2 flex-1">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.7; line-height: 1.5;">智能重命名、生成图片</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.7; line-height: 1.5;">链接转UI、AI搜索</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card: 批量图标生成 -->
+      <div class="feature-card flex-1 flex flex-col">
+        <div class="flex items-center gap-2 mb-3">
+          <div style="width: 36px; height: 36px; background: rgba(17,17,17,0.08); border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-icons" style="font-size: 20px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 18px; color: #111111;">批量图标生成</span>
+        </div>
+        <div class="flex flex-col gap-2 flex-1">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.7; line-height: 1.5;">一键生成整套</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.7; line-height: 1.5;">风格统一的矢量图标</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider 1 -->
+  <div class="absolute" style="top: 130px; left: 428px; width: 1px; height: 520px; background: rgba(17,17,17,0.2);"></div>
+
+  <!-- Column 2 -->
+  <div class="absolute" style="top: 130px; left: 436px; width: 372px; height: 520px;">
+    <div class="flex flex-col gap-4 h-full">
+      <!-- Card: 图片秒变设计稿 -->
+      <div class="feature-card flex flex-col" style="height: 100%;">
+        <div class="flex items-center gap-2 mb-3">
+          <div style="width: 36px; height: 36px; background: rgba(17,17,17,0.08); border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-image" style="font-size: 20px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 18px; color: #111111;">图片秒变设计稿</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; font-weight: 500; line-height: 1.4;">上传图片，智能分层</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.7; line-height: 1.5;">转为可编辑设计稿</span>
+          </div>
+        </div>
+        <!-- Visual placeholder -->
+        <div class="flex-1 flex items-center justify-center" style="margin-top: 16px;">
+          <div style="width: 100%; height: 200px; background: rgba(17,17,17,0.04); border-radius: 4px; border: 1px dashed rgba(17,17,17,0.15); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+            <i class="ph ph-arrow-square-in" style="font-size: 24px; color: #111111; opacity: 0.3;"></i>
+            <span style="font-size: 11px; color: #111111; opacity: 0.3;">图片转设计稿流程</span>
+            <div class="flex items-center gap-2" style="margin-top: 4px;">
+              <div style="width: 40px; height: 32px; background: rgba(17,17,17,0.08); border-radius: 3px; display: flex; align-items: center; justify-content: center;">
+                <i class="ph ph-image" style="font-size: 14px; color: #111111; opacity: 0.5;"></i>
+              </div>
+              <i class="ph ph-arrow-right" style="font-size: 12px; color: #111111; opacity: 0.3;"></i>
+              <div style="width: 40px; height: 32px; background: rgba(17,17,17,0.08); border-radius: 3px; display: flex; align-items: center; justify-content: center;">
+                <i class="ph ph-stack" style="font-size: 14px; color: #111111; opacity: 0.5;"></i>
+              </div>
+              <i class="ph ph-arrow-right" style="font-size: 12px; color: #111111; opacity: 0.3;"></i>
+              <div style="width: 40px; height: 32px; background: rgba(17,17,17,0.08); border-radius: 3px; display: flex; align-items: center; justify-content: center;">
+                <i class="ph ph-pencil-simple" style="font-size: 14px; color: #111111; opacity: 0.5;"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider 2 -->
+  <div class="absolute" style="top: 130px; left: 816px; width: 1px; height: 520px; background: rgba(17,17,17,0.2);"></div>
+
+  <!-- Column 3 -->
+  <div class="absolute" style="top: 130px; left: 824px; width: 408px; height: 520px;">
+    <div class="flex flex-col gap-4 h-full">
+      <!-- Card: 文/图生图 -->
+      <div class="feature-card flex flex-col" style="height: 100%;">
+        <div class="flex items-center gap-2 mb-3">
+          <div style="width: 36px; height: 36px; background: rgba(17,17,17,0.08); border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <i class="ph ph-paint-brush" style="font-size: 20px; color: #111111;"></i>
+          </div>
+          <span class="font-semibold" style="font-size: 18px; color: #111111;">文/图生图</span>
+        </div>
+        <div class="flex flex-col gap-2">
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; font-weight: 500; line-height: 1.4;">快速生成插画、配图</span>
+          </div>
+          <div class="flex items-start gap-2">
+            <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span style="font-size: 13px; color: #111111; opacity: 0.7; line-height: 1.5;">运营海报等视觉素材</span>
+          </div>
+        </div>
+        <!-- Visual placeholder -->
+        <div class="flex-1 flex items-center justify-center" style="margin-top: 16px;">
+          <div style="width: 100%; height: 200px; background: rgba(17,17,17,0.04); border-radius: 4px; border: 1px dashed rgba(17,17,17,0.15); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+            <i class="ph ph-paint-brush-broad" style="font-size: 24px; color: #111111; opacity: 0.3;"></i>
+            <span style="font-size: 11px; color: #111111; opacity: 0.3;">AI图像生成能力</span>
+            <div class="flex items-center gap-3" style="margin-top: 4px;">
+              <div style="width: 48px; height: 36px; background: rgba(17,17,17,0.06); border-radius: 3px;"></div>
+              <div style="width: 48px; height: 36px; background: rgba(17,17,17,0.1); border-radius: 3px;"></div>
+              <div style="width: 48px; height: 36px; background: rgba(17,17,17,0.06); border-radius: 3px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page Number -->
+  <div class="absolute" style="bottom: 20px; right: 48px;">
+    <span style="color: #111111; opacity: 0.4; font-size: 12px;">04</span>
+  </div>
+
+</div>
+</body>
+</html>

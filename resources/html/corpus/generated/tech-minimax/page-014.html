@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>Ardot SWOT分析</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; background-color: #DFDDDA; font-family: 'Plus Jakarta Sans', sans-serif; color: #111111; box-sizing: border-box; }
+  .bg-noise { background-color: #DFDDDA; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E"); }
+  .hairline { position: absolute; background-color: rgba(17,17,17,0.2); }
+  .meta-text { font-size: 14px; font-weight: 400; color: rgba(17,17,17,0.6); }
+  .top-label { font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(17,17,17,0.5); }
+  .section-title { font-size: 48px; font-weight: 600; letter-spacing: -0.01em; color: #111111; line-height: 1.1; }
+  .heading-xl { font-size: 88px; font-weight: 600; letter-spacing: -0.025em; color: #111111; line-height: 1.05; }
+  .body-text { font-size: 14px; font-weight: 400; color: #111111; line-height: 1.6; }
+  .sub-label { font-size: 13px; font-weight: 500; color: rgba(17,17,17,0.7); }
+  .card { background-color: rgba(17,17,17,0.04); border: 1px solid rgba(17,17,17,0.15); padding: 28px; }
+  .highlight-box { background-color: rgba(17,17,17,0.06); border: 1px solid rgba(17,17,17,0.2); padding: 20px 28px; }
+  .vline { position: absolute; background-color: rgba(17,17,17,0.2); width: 1px; }
+  .hl { position: absolute; left: 48px; right: 48px; height: 1px; background-color: rgba(17,17,17,0.2); }
+  .circle-deco { border: 1px solid rgba(17,17,17,0.25); border-radius: 50%; position: absolute; }
+  .arrow-icon { stroke: rgba(17,17,17,0.4); stroke-width: 1.5; fill: none; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+</head>
+<body>
+<div class="slide bg-noise">
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+  <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.5)" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+  <span class="meta-text">Salford & Co.</span>
+</div>
+<div class="absolute top-[40px] right-[48px]">
+  <span class="meta-text">May 2026</span>
+</div>
+  <div class="hl" style="top:0px;"></div>
+  <div class="absolute top-[90px] left-[48px]"><span class="top-label">SWOT ANALYSIS</span></div>
+  <div class="absolute" style="top:120px;left:48px;"><h2 class="section-title" style="margin:0;">Ardot SWOT分析</h2></div>
+  <div class="hl" style="top:200px;"></div>
+  <div class="hl" style="top:370px;"></div>
+  <div class="vline" style="top:200px;left:640px;height:376px;"></div>
+  <div style="position:absolute;top:220px;left:48px;width:580px;height:160px;background:rgba(17,17,17,0.04);border:1px solid rgba(17,17,17,0.12);padding:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:20px;font-weight:700;color:#111111;">S</span>
+        <span style="font-size:13px;font-weight:600;color:#111111;">优势 Strengths</span>
+      </div>
+      <ul style="margin:0;padding:0;column-count:2;column-gap:16px;"><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>AI生成可编辑设计稿（非静态图片）</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>MCP协议实现设计一键转代码</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>腾讯混元大模型+优图视觉算法</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>与CodeBuddy/WorkBuddy深度集成</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>Figma文件无缝导入</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>企业级权限管理与行为追溯</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>公测期间免费，注册送1000 Credits</li></ul>
+    </div><div style="position:absolute;top:220px;left:652px;width:580px;height:160px;background:rgba(17,17,17,0.04);border:1px solid rgba(17,17,17,0.12);padding:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:20px;font-weight:700;color:#111111;">W</span>
+        <span style="font-size:13px;font-weight:600;color:#111111;">劣势 Weaknesses</span>
+      </div>
+      <ul style="margin:0;padding:0;column-count:2;column-gap:16px;"><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>品牌知名度低于Figma</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>插件生态尚在起步阶段</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>仅支持macOS和Web端</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>Windows版和小程序尚未上线</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>新产品稳定性和成熟度待验证</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>国际化能力有限</li></ul>
+    </div><div style="position:absolute;top:390px;left:48px;width:580px;height:160px;background:rgba(17,17,17,0.04);border:1px solid rgba(17,17,17,0.12);padding:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:20px;font-weight:700;color:#111111;">O</span>
+        <span style="font-size:13px;font-weight:600;color:#111111;">机会 Opportunities</span>
+      </div>
+      <ul style="margin:0;padding:0;column-count:2;column-gap:16px;"><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>国产替代政策驱动，国内企业寻求本土方案</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>AI设计工具市场高速增长（CAGR 22.25%）</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>Figma国内访问受限带来用户迁移需求</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>与腾讯生态（微信、企业微信）协同</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>MCP协议成为行业标准，先发优势</li></ul>
+    </div><div style="position:absolute;top:390px;left:652px;width:580px;height:160px;background:rgba(17,17,17,0.04);border:1px solid rgba(17,17,17,0.12);padding:20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:20px;font-weight:700;color:#111111;">T</span>
+        <span style="font-size:13px;font-weight:600;color:#111111;">威胁 Threats</span>
+      </div>
+      <ul style="margin:0;padding:0;column-count:2;column-gap:16px;"><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>Figma市场地位稳固，用户粘性强</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>MasterGo、即时设计、Pixso等国产竞品已积累用户</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>AI技术迭代快，需持续投入研发</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>设计工具切换成本高，用户迁移难度大</li><li style="margin-bottom:8px;font-size:13px;list-style:none;display:flex;gap:8px;align-items:flex-start;"><svg class="w-[14px] h-[14px] mt-[2px] shrink-0 arrow-icon" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7v10H7"/></svg>大厂纷纷入局AI设计赛道，竞争加剧</li></ul>
+    </div>
+  <div class="hl" style="bottom:0px;"></div>
+</div>
+</body></html>

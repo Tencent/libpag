@@ -43,6 +43,7 @@
 #include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/DataBind.h"
 #include "pagx/nodes/DataConverter.h"
@@ -73,6 +74,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/nodes/Timeline.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
@@ -307,6 +309,22 @@ static void CollectRefsFromLayer(const Layer* layer, std::unordered_set<std::str
   if (layer->composition != nullptr && !layer->composition->id.empty()) {
     refs.insert(layer->composition->id);
   }
+  for (const auto& timeline : layer->timelines) {
+    if (timeline == nullptr) {
+      continue;
+    }
+    if (timeline->timelineType() == TimelineType::Animation) {
+      auto* animTimeline = static_cast<const AnimationTimeline*>(timeline.get());
+      if (!animTimeline->animationId.empty()) {
+        refs.insert(animTimeline->animationId);
+      }
+    } else if (timeline->timelineType() == TimelineType::StateMachine) {
+      auto* smTimeline = static_cast<const StateMachineTimeline*>(timeline.get());
+      if (!smTimeline->stateMachineId.empty()) {
+        refs.insert(smTimeline->stateMachineId);
+      }
+    }
+  }
   for (auto* element : layer->contents) {
     CollectRefsFromElement(element, refs);
   }
@@ -459,6 +477,48 @@ static void CollectReferencedIds(const PAGXDocument* doc, std::unordered_set<std
       CollectRefsFromViewModel(static_cast<const ViewModel*>(node.get()), refs);
     }
   }
+  // Collect behavior references from animation and ViewModel nodes: a resource is "referenced"
+  // when a Property points at a DataConverter/ViewModel, a State plays an Animation, or an
+  // AnimationObject targets a node. These references are held as pointers/id strings rather than
+  // @id attributes, so they must be gathered explicitly to avoid false unreferenced reports.
+  for (auto& node : doc->nodes) {
+    auto type = node->nodeType();
+    if (type == NodeType::ViewModelProperty) {
+      auto* prop = static_cast<const ViewModelProperty*>(node.get());
+      if (prop->dataConverter != nullptr && !prop->dataConverter->id.empty()) {
+        refs.insert(prop->dataConverter->id);
+      }
+      if (prop->viewModelRef != nullptr && !prop->viewModelRef->id.empty()) {
+        refs.insert(prop->viewModelRef->id);
+      }
+      if (prop->defaultImage != nullptr && !prop->defaultImage->id.empty()) {
+        refs.insert(prop->defaultImage->id);
+      }
+    } else if (type == NodeType::State) {
+      auto* state = static_cast<const State*>(node.get());
+      if (state->stateType() == StateType::Animation) {
+        auto* animState = static_cast<const AnimationState*>(state);
+        if (!animState->animationId.empty()) {
+          refs.insert(animState->animationId);
+        }
+      }
+    } else if (type == NodeType::AnimationObject) {
+      auto* object = static_cast<const AnimationObject*>(node.get());
+      if (!object->target.empty()) {
+        refs.insert(object->target);
+      }
+      for (auto* ch : object->channels) {
+        if (ch->valueType() == ChannelValueType::ImageRef) {
+          auto* typedCh = static_cast<const TypedChannel<ImageRef>*>(ch);
+          for (auto& kf : typedCh->keyframes) {
+            if (!kf.value.id.empty()) {
+              refs.insert(kf.value.id);
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 static void DetectUnreferencedResources(const PAGXDocument* doc,
@@ -473,6 +533,18 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
     }
     auto type = node->nodeType();
     if (type == NodeType::Layer || type == NodeType::Document || type == NodeType::Glyph) {
+      continue;
+    }
+    // Behavior resources are not referenced via @id attributes: top-level Animations, ViewModels,
+    // and DataBinds take effect directly on their owning document/composition, and the internal
+    // sub-nodes of animations and state machines are structural children rather than referenceable
+    // resources. Exempt them from the unreferenced-resource check to avoid false positives.
+    if (type == NodeType::Animation || type == NodeType::StateMachine ||
+        type == NodeType::ViewModel || type == NodeType::DataBind ||
+        type == NodeType::AnimationObject || type == NodeType::Channel ||
+        type == NodeType::StateRegion || type == NodeType::State ||
+        type == NodeType::StateTransition || type == NodeType::TransitionCondition ||
+        type == NodeType::StateMachineInput || type == NodeType::ViewModelProperty) {
       continue;
     }
     if (refs.find(node->id) == refs.end()) {
@@ -1683,10 +1755,16 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 
 static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
                                       bool parentHasLayout, const LineNodeMap& lineNodeMap,
-                                      std::vector<VerifyDiagnostic>& diagnostics) {
+                                      std::vector<VerifyDiagnostic>& diagnostics,
+                                      bool isMaskLayer = false) {
   DetectEmptyLayer(layer, parentHasLayout, diagnostics);
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
-  DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
+  // A mask layer is a synthetic, layout-excluded construct attached to its owner; its
+  // `includeInLayout="false"` is required regardless of the owner's layout mode, so the
+  // "ineffective layout attr" lint does not apply to it.
+  if (!isMaskLayer) {
+    DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
+  }
   DetectDowngradableLayers(layer, diagnostics);
   // Dedup with DetectDowngradableLayers: it fires when parent has no contents and no layout.
   bool dedupWithDowngrade = layer->contents.empty() && layer->layout == LayoutMode::None;
@@ -1716,7 +1794,7 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   bool thisHasLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
     RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, lineNodeMap,
-                              diagnostics);
+                              diagnostics, /*isMaskLayer=*/child == layer->mask);
   }
 }
 

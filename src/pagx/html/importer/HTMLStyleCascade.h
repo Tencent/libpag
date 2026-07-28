@@ -52,11 +52,22 @@ class HTMLStyleCascade {
   // without `std::bind`.
   using FontFallbackThunk = void (*)(void* userData, const std::vector<std::string>& chain);
 
+  // Reports whether a concrete family resolves to a typeface whose family name matches — i.e. a
+  // registered/embedded font or a genuinely installed system font, as opposed to a name the
+  // renderer silently substitutes with a mismatched default. Used to choose the first *resolvable*
+  // family from a CSS font-family stack as `primaryFontFamily`. Same function-pointer + opaque-user
+  // -data shape as `FontFallbackThunk` so the cascade stays free of `<functional>`.
+  using FontAvailabilityThunk = bool (*)(void* userData, const std::string& family);
+
   HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
   /** Wires the callback that receives concrete font-family chains discovered by
    *  `resolveInheritedStyle`. Caller pools them for FontConfig fallback registration. */
   void setFontFallbackSink(FontFallbackThunk thunk, void* userData);
+
+  /** Wires the predicate that reports whether a concrete family resolves to a matching typeface.
+   *  When unset, `resolveInheritedStyle` keeps the stack's first concrete family verbatim. */
+  void setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData);
 
   /** Walks `<head>` and populates the class / element rule tables from `<style>` blocks. */
   void collectStyles(const std::shared_ptr<DOMNode>& head);
@@ -112,6 +123,8 @@ class HTMLStyleCascade {
   HTMLValueParser& _valueParser;
   FontFallbackThunk _fontFallbackThunk = nullptr;
   void* _fontFallbackUserData = nullptr;
+  FontAvailabilityThunk _fontAvailabilityThunk = nullptr;
+  void* _fontAvailabilityUserData = nullptr;
 
   // CSS class selectors (key = class name without the dot). Pre-parsed at <style>-collection
   // time so per-element resolution can copy entries instead of re-running ParseStyleString

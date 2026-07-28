@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>养成系 vs 传统 AI 助手</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; }
+.slide {
+  width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0;
+  background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+  font-family: 'Noto Sans SC', sans-serif; color: #FFFFFF;
+}
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Watermark -->
+  <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="z-index:0; top: 120px; left: 300px;">VS</div>
+
+  <!-- Page Header -->
+  <div class="absolute top-[32px] right-[48px]" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- Section Title -->
+  <div class="absolute" style="z-index:20; top: 50px; left: 80px;">
+    <div class="text-[12px] font-[500] tracking-[0.15em] text-[#82D0A4] mb-[8px]">COMPARISON</div>
+    <h1 class="text-[32px] font-[300] text-[#FFFFFF]">养成系 vs 传统 AI 助手</h1>
+  </div>
+
+  <!-- Column Headers -->
+  <div class="absolute flex" style="z-index:20; top: 130px; left: 80px; width: 1120px;">
+    <div class="w-[160px] text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.05em]">维度</div>
+    <div class="w-[420px] text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.05em] text-center">
+      <i class="ph ph-x-circle text-[14px] mr-[4px]"></i>传统 AI 助手
+    </div>
+    <div class="w-[420px] text-[14px] font-[500] text-[#82D0A4] tracking-[0.05em] text-center">
+      <i class="ph ph-check-circle text-[14px] mr-[4px]"></i>养成系 AI
+    </div>
+  </div>
+
+  <!-- Comparison Rows -->
+  <div class="absolute flex flex-col gap-[8px]" style="z-index:20; top: 165px; left: 80px; width: 1120px;">
+    <!-- Row 1 -->
+    <div class="flex items-center bg-[#FFFFFF]/[0.03] border-[1px] border-[#FFFFFF]/10 rounded-[8px] h-[64px] px-[24px]">
+      <div class="w-[160px] text-[16px] font-[500] text-[#FFFFFF]">记忆</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/50 text-center">每次对话清零</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/80 text-center">长期记忆持久化，越用越懂你</div>
+    </div>
+    <!-- Row 2 -->
+    <div class="flex items-center bg-[#FFFFFF]/[0.03] border-[1px] border-[#FFFFFF]/10 rounded-[8px] h-[64px] px-[24px]">
+      <div class="w-[160px] text-[16px] font-[500] text-[#FFFFFF]">人格</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/50 text-center">千人一面，标准客服语气</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/80 text-center">有独特性格、说话风格、价值观</div>
+    </div>
+    <!-- Row 3 -->
+    <div class="flex items-center bg-[#FFFFFF]/[0.03] border-[1px] border-[#FFFFFF]/10 rounded-[8px] h-[64px] px-[24px]">
+      <div class="w-[160px] text-[16px] font-[500] text-[#FFFFFF]">能力</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/50 text-center">出厂即定型</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/80 text-center">可安装新技能，持续扩展</div>
+    </div>
+    <!-- Row 4 -->
+    <div class="flex items-center bg-[#FFFFFF]/[0.03] border-[1px] border-[#FFFFFF]/10 rounded-[8px] h-[64px] px-[24px]">
+      <div class="w-[160px] text-[16px] font-[500] text-[#FFFFFF]">主动性</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/50 text-center">被动等提问</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/80 text-center">主动推送、定时巡检、自动干活</div>
+    </div>
+    <!-- Row 5 -->
+    <div class="flex items-center bg-[#FFFFFF]/[0.03] border-[1px] border-[#FFFFFF]/10 rounded-[8px] h-[64px] px-[24px]">
+      <div class="w-[160px] text-[16px] font-[500] text-[#FFFFFF]">关系</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/50 text-center">工具关系（用完即弃）</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/80 text-center">养成关系（有情感连接和沉没成本）</div>
+    </div>
+    <!-- Row 6 -->
+    <div class="flex items-center bg-[#82D0A4]/[0.08] border-[1px] border-[#82D0A4]/30 rounded-[8px] h-[64px] px-[24px]">
+      <div class="w-[160px] text-[16px] font-[500] text-[#82D0A4]">差异化</div>
+      <div class="w-[420px] text-[14px] text-[#FFFFFF]/50 text-center">你的和别人的一模一样</div>
+      <div class="w-[420px] text-[14px] text-[#82D0A4] text-center font-[500]">每个人养出来的都不一样</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

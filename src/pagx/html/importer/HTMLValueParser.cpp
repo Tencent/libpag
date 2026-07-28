@@ -26,9 +26,14 @@
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/nodes/ConicGradient.h"
+#include "pagx/nodes/Image.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/RadialGradient.h"
+#include "pagx/types/Data.h"
 #include "pagx/utils/StringParser.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace pagx {
 
@@ -544,13 +549,28 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, f
   float dirY = std::sin(angle);
   bool boxKnown =
       !(std::isnan(boxWidth) || std::isnan(boxHeight) || boxWidth <= 0.0f || boxHeight <= 0.0f);
-  // The CSS gradient-line length is the "magic corners" extent L = |W*sinφ| + |H*cosφ| (φ is the
-  // PAGX angle, 0deg = +X), which is also the px extent a px stop offset is measured against.
+  // The CSS gradient-line length is the "magic corners" extent L = |W*cosφ| + |H*sinφ| (φ is the
+  // PAGX angle, 0deg = +X), centred on the box, so the 0% / 100% stops land exactly on the
+  // covering corners. Only meaningful when the box size is known. It is also the px extent a px
+  // stop offset is measured against.
   float lineLength = boxKnown ? std::abs(boxWidth * dirX) + std::abs(boxHeight * dirY) : NAN;
-  GradientStops stops =
-      parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, lineLength);
-  if (!finaliseGradientStops(stops)) return nullptr;
-  if (repeating) appendRepeatingReset(stops);
+
+  // `repeating-linear-gradient` has no native PAGX equivalent (gradients carry no spread mode), so
+  // tile the authored period into explicit stops across the whole gradient line. This needs the
+  // pixel line length; without a concrete box we fall through to a single non-repeating period.
+  GradientStops stops;
+  bool tiled = false;
+  if (repeating && boxKnown && lineLength > 0.0f) {
+    tiled = buildRepeatingLinearStops(parts, stopStart, lineLength, stops);
+  }
+  if (!tiled) {
+    stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, lineLength);
+    if (!finaliseGradientStops(stops)) return nullptr;
+    if (repeating) {
+      _diagnostics.warn(
+          "html: repeating-linear-gradient approximated as a single non-repeating period");
+    }
+  }
 
   auto grad = _document->makeNode<LinearGradient>();
   if (!boxKnown) {
@@ -566,8 +586,7 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, f
   // With a concrete box, resolve the gradient line in absolute pixel space and disable per-geometry
   // fitting (matching the SVG importer). PAGX's fitsToGeometry=true non-uniformly scales the
   // normalised (0,0)-(1,1) line by the box size, which tilts the equal-color lines off perpendicular
-  // on a non-square box; pixel-space endpoints keep them perpendicular for any aspect ratio. The
-  // line is centred on the box so the 0% / 100% stops land exactly on the covering corners.
+  // on a non-square box; pixel-space endpoints keep them perpendicular for any aspect ratio.
   float halfX = dirX * lineLength * 0.5f;
   float halfY = dirY * lineLength * 0.5f;
   float cx = boxWidth * 0.5f;
@@ -577,6 +596,269 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, f
   grad->fitsToGeometry = false;
   emitColorStops(grad->colorStops, stops);
   return grad;
+}
+
+namespace {
+
+uint8_t ColorChannelToByte(float v) {
+  if (v <= 0.0f) return 0;
+  if (v >= 1.0f) return 255;
+  return static_cast<uint8_t>(v * 255.0f + 0.5f);
+}
+
+// Samples one repeating period at `linePos` (px along the gradient line). `stops` hold the
+// period's (position-px, color) pairs in non-decreasing order; positions outside [firstPos,
+// firstPos+periodPx) wrap. Coincident positions (hard stops) resolve to the later stop's color so
+// crisp edges are preserved; a genuine two-color band interpolates linearly.
+Color SampleRepeatingPeriod(const HTMLValueParser::GradientStops& stops, float firstPos,
+                            float periodPx, float linePos) {
+  float local = std::fmod(linePos - firstPos, periodPx);
+  if (local < 0.0f) local += periodPx;
+  float pos = firstPos + local;
+  for (size_t i = 1; i < stops.size(); ++i) {
+    float p0 = stops[i - 1].first;
+    float p1 = stops[i].first;
+    bool last = (i + 1 == stops.size());
+    if (pos < p1 || last) {
+      if (p1 - p0 <= 1e-6f) {
+        return stops[i].second;
+      }
+      if (pos <= p0) {
+        return stops[i - 1].second;
+      }
+      float t = (pos - p0) / (p1 - p0);
+      t = std::max(0.0f, std::min(1.0f, t));
+      const Color& a = stops[i - 1].second;
+      const Color& b = stops[i].second;
+      return {a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t,
+              a.blue + (b.blue - a.blue) * t, a.alpha + (b.alpha - a.alpha) * t, a.colorSpace};
+    }
+  }
+  return stops.back().second;
+}
+
+}  // namespace
+
+ColorSource* HTMLValueParser::parseRepeatingLinearGradientPattern(const std::string& value,
+                                                                  float boxWidth, float boxHeight) {
+  if (_document == nullptr) return nullptr;
+  if (std::isnan(boxWidth) || std::isnan(boxHeight) || boxWidth <= 0.0f || boxHeight <= 0.0f) {
+    return nullptr;
+  }
+  std::vector<std::string> parts;
+  if (!ExtractGradientParts(value, parts)) return nullptr;
+
+  float cssAngle = 180.0f;  // CSS default: to bottom
+  size_t stopStart = 0;
+  std::string first = Trim(parts[0]);
+  std::string firstLower = ToLower(first);
+  if (firstLower.compare(0, 3, "to ") == 0) {
+    cssAngle = CssDirectionToAngle(firstLower);
+    stopStart = 1;
+  } else if (firstLower.find("deg") != std::string::npos ||
+             firstLower.find("rad") != std::string::npos ||
+             firstLower.find("turn") != std::string::npos) {
+    cssAngle = ParseAngle(first);
+    stopStart = 1;
+  }
+  float angle = CssToPagxAngle(cssAngle) * HtmlPi / 180.0f;
+  float dirX = std::cos(angle);
+  float dirY = std::sin(angle);
+
+  // Only axis-aligned patterns tile seamlessly with a 1D strip; oblique angles need a 2D tile /
+  // rotation, so let the caller fall back to the gradient-stop tiling for those.
+  constexpr float kAxisEps = 1e-3f;
+  bool vertical = std::abs(dirX) < kAxisEps;
+  bool horizontal = std::abs(dirY) < kAxisEps;
+  if (!vertical && !horizontal) return nullptr;
+
+  float lineLength = std::abs(boxWidth * dirX) + std::abs(boxHeight * dirY);
+  if (!(lineLength > 0.0f)) return nullptr;
+
+  // Parse one authored period into (position-px, color) pairs, filling and clamping positions the
+  // same way as the gradient-stop path.
+  GradientStops period;
+  for (size_t i = stopStart; i < parts.size(); ++i) {
+    auto tokens = SplitTopLevelWhitespace(parts[i]);
+    if (tokens.empty()) continue;
+    Color color = parseColor(tokens[0]);
+    size_t positions = 0;
+    for (size_t t = 1; t < tokens.size() && t <= 2; ++t) {
+      const std::string& tk = tokens[t];
+      float pos = NAN;
+      if (!tk.empty() && tk.back() == '%') {
+        float fraction = NAN;
+        if (ParseCssPercentage(tk, fraction)) pos = fraction * lineLength;
+      } else {
+        pos = parseAbsoluteLengthPx(tk);
+      }
+      period.emplace_back(pos, color);
+      ++positions;
+    }
+    if (positions == 0) period.emplace_back(NAN, color);
+  }
+  if (period.size() < 2) return nullptr;
+  if (std::isnan(period.front().first)) period.front().first = 0.0f;
+  if (std::isnan(period.back().first)) period.back().first = lineLength;
+  for (size_t i = 1; i + 1 < period.size(); ++i) {
+    if (!std::isnan(period[i].first)) continue;
+    size_t next = i + 1;
+    while (next < period.size() && std::isnan(period[next].first)) ++next;
+    float prev = period[i - 1].first;
+    float nxt = next < period.size() ? period[next].first : lineLength;
+    float steps = static_cast<float>(next - (i - 1));
+    period[i].first = prev + (nxt - prev) / steps;
+  }
+  for (size_t i = 1; i < period.size(); ++i) {
+    if (period[i].first < period[i - 1].first) period[i].first = period[i - 1].first;
+  }
+  float firstPos = period.front().first;
+  float periodPx = period.back().first - firstPos;
+  if (!(periodPx > 0.0f)) return nullptr;
+
+  // One-period tile at native resolution. Reject a period coarser than the box (no visible repeat;
+  // the gradient path renders it faithfully) or absurdly large to bound the embedded image.
+  int tileN = static_cast<int>(std::lround(periodPx));
+  if (tileN < 1) tileN = 1;
+  constexpr int kMaxTile = 4096;
+  if (tileN > kMaxTile || static_cast<float>(tileN) > lineLength) return nullptr;
+
+  // Covering-corner start of the gradient line, so the tile's baked phase matches CSS (positions
+  // are measured from the line's 0 end).
+  float startAxis = vertical ? boxHeight * 0.5f - dirY * lineLength * 0.5f
+                             : boxWidth * 0.5f - dirX * lineLength * 0.5f;
+  float dir = vertical ? dirY : dirX;
+
+  // The tile has `tileN` integer pixels but the period may be fractional; scale it so the tile maps
+  // to exactly one `periodPx`-tall (or wide) span in the layer, keeping the repeat seamless and the
+  // spacing exact. For an integer period this is exactly 1.0 (no resampling).
+  float tileScale = periodPx / static_cast<float>(tileN);
+
+  int tileW = vertical ? 1 : tileN;
+  int tileH = vertical ? tileN : 1;
+  std::vector<uint8_t> rgba(static_cast<size_t>(tileW) * static_cast<size_t>(tileH) * 4, 0);
+  for (int idx = 0; idx < tileN; ++idx) {
+    float devicePos = static_cast<float>(idx) * tileScale;
+    float linePos = (devicePos - startAxis) * dir;
+    Color c = SampleRepeatingPeriod(period, firstPos, periodPx, linePos);
+    uint8_t* px = rgba.data() + static_cast<size_t>(idx) * 4;
+    px[0] = ColorChannelToByte(c.red);
+    px[1] = ColorChannelToByte(c.green);
+    px[2] = ColorChannelToByte(c.blue);
+    px[3] = ColorChannelToByte(c.alpha);
+  }
+
+  tgfx::Bitmap bitmap(tileW, tileH, /*alphaOnly=*/false, /*tryHardware=*/false);
+  if (bitmap.isEmpty()) return nullptr;
+  auto srcInfo = tgfx::ImageInfo::Make(tileW, tileH, tgfx::ColorType::RGBA_8888,
+                                       tgfx::AlphaType::Unpremultiplied);
+  if (!bitmap.writePixels(srcInfo, rgba.data())) return nullptr;
+  auto png = bitmap.encode(tgfx::EncodedFormat::PNG, 100);
+  if (png == nullptr || png->empty()) return nullptr;
+
+  auto* image = _document->makeNode<Image>();
+  image->data = Data::MakeWithCopy(png->data(), png->size());
+
+  auto* pattern = _document->makeNode<ImagePattern>();
+  pattern->image = image;
+  pattern->tileModeX = TileMode::Repeat;
+  pattern->tileModeY = TileMode::Repeat;
+  // The tile sits in the layer's pixel space (scaleMode None) with the phase baked into the pixels;
+  // the matrix only stretches the tile along its axis to the exact fractional period (identity for
+  // an integer period). Nearest sampling keeps the hard line edges crisp.
+  if (vertical) {
+    pattern->matrix.d = tileScale;
+  } else {
+    pattern->matrix.a = tileScale;
+  }
+  pattern->filterMode = FilterMode::Nearest;
+  pattern->mipmapMode = MipmapMode::None;
+  pattern->scaleMode = ScaleMode::None;
+  return pattern;
+}
+
+bool HTMLValueParser::buildRepeatingLinearStops(const std::vector<std::string>& parts,
+                                                size_t stopStart, float lineLength,
+                                                GradientStops& out) {
+  // Parse one authored period into normalised (offset-along-line, color) pairs: a percentage is
+  // already line-relative, a px length is normalised by the line length, and a color with no
+  // position leaves NaN for `tileRepeatingStops` to fill. A color may carry up to two positions
+  // (CSS shorthand for two coincident stops that form a hard colour edge).
+  for (size_t i = stopStart; i < parts.size(); ++i) {
+    auto tokens = SplitTopLevelWhitespace(parts[i]);
+    if (tokens.empty()) continue;
+    Color color = parseColor(tokens[0]);
+    size_t positions = 0;
+    for (size_t t = 1; t < tokens.size() && t <= 2; ++t) {
+      const std::string& tk = tokens[t];
+      float offset = NAN;
+      if (!tk.empty() && tk.back() == '%') {
+        float fraction = NAN;
+        if (ParseCssPercentage(tk, fraction)) offset = fraction;
+      } else {
+        float px = parseAbsoluteLengthPx(tk);
+        if (!std::isnan(px)) offset = px / lineLength;
+      }
+      out.emplace_back(offset, color);
+      ++positions;
+    }
+    if (positions == 0) out.emplace_back(NAN, color);
+  }
+  if (out.size() < 2) return false;
+  return tileRepeatingStops(out);
+}
+
+bool HTMLValueParser::tileRepeatingStops(GradientStops& stops) {
+  if (stops.size() < 2) return false;
+  if (std::isnan(stops.front().first)) stops.front().first = 0.0f;
+  if (std::isnan(stops.back().first)) stops.back().first = 1.0f;
+  for (size_t i = 1; i + 1 < stops.size(); ++i) {
+    if (!std::isnan(stops[i].first)) continue;
+    size_t next = i + 1;
+    while (next < stops.size() && std::isnan(stops[next].first)) ++next;
+    float prev = stops[i - 1].first;
+    float nxt = next < stops.size() ? stops[next].first : 1.0f;
+    float steps = static_cast<float>(next - (i - 1));
+    stops[i].first = prev + (nxt - prev) / steps;
+  }
+  for (size_t i = 1; i < stops.size(); ++i) {
+    if (stops[i].first < stops[i - 1].first) stops[i].first = stops[i - 1].first;
+  }
+  float origin = stops.front().first;
+  float span = stops.back().first - origin;
+  if (!(span > 0.0f)) return false;
+  GradientStops period = stops;
+  for (auto& stop : period) stop.first -= origin;
+
+  GradientStops out;
+  constexpr size_t kMaxStops = 1024;
+  bool truncated = false;
+  bool done = false;
+  for (int k = 0; !done; ++k) {
+    float base = static_cast<float>(k) * span;
+    if (base > 1.0f) break;
+    for (const auto& stop : period) {
+      float pos = base + stop.first;
+      if (pos >= 1.0f) {
+        out.emplace_back(1.0f, stop.second);
+        done = true;
+        break;
+      }
+      out.emplace_back(pos, stop.second);
+      if (out.size() >= kMaxStops) {
+        truncated = true;
+        done = true;
+        break;
+      }
+    }
+  }
+  if (out.empty()) return false;
+  if (out.back().first < 1.0f) out.emplace_back(1.0f, out.back().second);
+  stops = std::move(out);
+  if (truncated) {
+    _diagnostics.warn("html: repeating gradient truncated (too many repetitions)");
+  }
+  return true;
 }
 
 RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value, float boxWidth,
@@ -619,32 +901,44 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value, f
   }
 
   // Resolve the descriptor (center / radius / coordinate space) before parsing stops so px stop
-  // offsets can be normalised against the gradient's radius in px. The radius in px is `radius *
-  // boxWidth` in the default fitsToGeometry model (the normalised radius stretched by the box) and
-  // already-px when the circle switched to the pixel-space model on a non-square box.
-  RadialDescriptor desc;
-  if (hasDescriptor) {
-    parseRadialDescriptor(first, boxWidth, boxHeight, desc);
-  }
-  float radiusPx = NAN;
-  if (std::isfinite(boxWidth) && boxWidth > 0.0f) {
-    radiusPx = desc.fitsToGeometry ? desc.radius * boxWidth : desc.radius;
-  }
-  GradientStops stops =
-      parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, radiusPx);
-  if (!finaliseGradientStops(stops)) return nullptr;
-  if (repeating) appendRepeatingReset(stops);
-
+  // offsets can be normalised against the gradient's radius in px.
   auto grad = _document->makeNode<RadialGradient>();
-  grad->center = {desc.centerX, desc.centerY};
-  grad->radius = desc.radius;
-  grad->fitsToGeometry = desc.fitsToGeometry;
+  grad->center = {0.5f, 0.5f};
+  grad->radius = 0.5f;
+  if (hasDescriptor) {
+    parseRadialDescriptor(first, boxWidth, boxHeight, grad);
+  }
+
+  // The gradient's px extent is its radius in px, used both to tile a repeating period and to
+  // normalise px-positioned stops onto the [0,1] radius axis. With the default fitsToGeometry model
+  // the exporter scales the normalised radius by box width, so recover px as `radius * boxWidth`; a
+  // px circle already stores its radius in px. NaN when the box size is unknown.
+  float radiusPx = NAN;
+  if (!std::isnan(boxWidth) && boxWidth > 0.0f) {
+    radiusPx = grad->fitsToGeometry ? grad->radius * boxWidth : grad->radius;
+  }
+
+  // `repeating-radial-gradient` tiles the authored period across the normalised radius (offset
+  // 1.0 == the gradient radius).
+  GradientStops stops;
+  bool tiled = false;
+  if (repeating && std::isfinite(radiusPx) && radiusPx > 0.0f) {
+    tiled = buildRepeatingLinearStops(parts, stopStart, radiusPx, stops);
+  }
+  if (!tiled) {
+    stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, radiusPx);
+    if (!finaliseGradientStops(stops)) return nullptr;
+    if (repeating) {
+      _diagnostics.warn(
+          "html: repeating-radial-gradient approximated as a single non-repeating period");
+    }
+  }
   emitColorStops(grad->colorStops, stops);
   return grad;
 }
 
 void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float boxWidth,
-                                            float boxHeight, RadialDescriptor& out) {
+                                            float boxHeight, RadialGradient* grad) {
   auto tokens = SplitTopLevelWhitespace(descriptor);
   std::vector<std::string> sizeTokens;
   std::vector<std::string> positionTokens;
@@ -680,7 +974,7 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
   if (!sizeTokens.empty() && boxWidth > 0) {
     float radius = resolveRadialLength(sizeTokens[0], boxWidth);
     if (!std::isnan(radius)) {
-      out.radius = radius;
+      grad->radius = radius;
       radiusFromPxLength = !sizeTokens[0].empty() && sizeTokens[0].back() != '%';
     } else {
       // Extent keywords (closest-side / farthest-corner / ...) have no scalar PAGX radius; keep
@@ -716,8 +1010,8 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
       cy = (token == "center") ? 0.5f : resolveRadialLength(token, boxHeight);
     }
   }
-  if (!std::isnan(cx)) out.centerX = cx;
-  if (!std::isnan(cy)) out.centerY = cy;
+  if (!std::isnan(cx)) grad->center.x = cx;
+  if (!std::isnan(cy)) grad->center.y = cy;
 
   // A CSS `circle <r>px` keeps a single uniform radius regardless of box aspect ratio. PAGX's
   // default fitsToGeometry=true model stretches the normalised radius by box width and height
@@ -728,10 +1022,9 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
   bool isCircle = explicitCircle || (!explicitEllipse && sizeTokens.size() == 1);
   if (isCircle && radiusFromPxLength && boxWidth > 0 && boxHeight > 0 &&
       std::abs(boxWidth - boxHeight) > 0.01f) {
-    out.centerX = out.centerX * boxWidth;
-    out.centerY = out.centerY * boxHeight;
-    out.radius = out.radius * boxWidth;
-    out.fitsToGeometry = false;
+    grad->center = {grad->center.x * boxWidth, grad->center.y * boxHeight};
+    grad->radius = grad->radius * boxWidth;
+    grad->fitsToGeometry = false;
   }
 }
 
@@ -749,7 +1042,7 @@ float HTMLValueParser::resolveRadialLength(const std::string& token, float boxAx
   return px / boxAxis;
 }
 
-ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {
+ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value, bool repeating) {
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
@@ -760,7 +1053,17 @@ ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value) {
     stopStart = 1;
   }
   GradientStops stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/true);
-  if (!finaliseGradientStops(stops)) return nullptr;
+  // `repeating-conic-gradient` tiles the authored angular period across the full turn; the stop
+  // offsets are already normalised (angle / 360), so the shared normalised tiler applies directly.
+  if (repeating) {
+    if (!tileRepeatingStops(stops)) {
+      if (!finaliseGradientStops(stops)) return nullptr;
+      _diagnostics.warn(
+          "html: repeating-conic-gradient approximated as a single non-repeating period");
+    }
+  } else if (!finaliseGradientStops(stops)) {
+    return nullptr;
+  }
 
   auto grad = _document->makeNode<ConicGradient>();
   grad->center = {0.5f, 0.5f};
@@ -831,24 +1134,6 @@ bool HTMLValueParser::finaliseGradientStops(GradientStops& stops) {
     stops[i].first = prevOffset + (nextOffset - prevOffset) / steps;
   }
   return true;
-}
-
-void HTMLValueParser::appendRepeatingReset(GradientStops& stops) {
-  if (stops.size() < 2) return;
-  float lastOffset = stops.back().first;
-  // Only meaningful when the declared pattern ends before the gradient's 1.0 extent — that leftover
-  // [lastOffset, 1] band is what a real repeating gradient would tile. If the last stop already
-  // sits at (or past) the edge there is nothing to reset.
-  if (!(lastOffset < 1.0f)) return;
-  // Copy by value: the emplace_back calls below can reallocate `stops` and invalidate a reference
-  // into it.
-  Color firstColor = stops.front().second;
-  // A hair past the last stop so the tile boundary stays sharp instead of ramping the last color
-  // across the whole leftover band, then hold the first color out to the edge. Together these make
-  // the downgrade render one period at its true scale with the base color filling the remainder.
-  float resetOffset = std::min(1.0f, lastOffset + 1.0e-4f);
-  stops.emplace_back(resetOffset, firstColor);
-  if (resetOffset < 1.0f) stops.emplace_back(1.0f, firstColor);
 }
 
 template <typename T>

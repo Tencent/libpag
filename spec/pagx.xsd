@@ -1046,19 +1046,19 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <!-- Channel value type. Export writes float/bool/int/string/image/color/matrix; the importer
-       also accepts the lowercase aliases shown below for those same types. -->
+  <!-- Channel value type. The schema only enumerates the canonical forms; the importer
+       additionally accepts these aliases for backward compatibility:
+         - `number`   -> `float`
+         - `enum`     -> `int`
+         - `text`     -> `string`
+         - `imageRef` -> `image` -->
   <xs:simpleType name="ChannelValueType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="float"/>
-      <xs:enumeration value="number"/>
       <xs:enumeration value="bool"/>
       <xs:enumeration value="int"/>
-      <xs:enumeration value="enum"/>
       <xs:enumeration value="string"/>
-      <xs:enumeration value="text"/>
       <xs:enumeration value="image"/>
-      <xs:enumeration value="imageRef"/>
       <xs:enumeration value="color"/>
       <xs:enumeration value="matrix"/>
     </xs:restriction>
@@ -1069,6 +1069,9 @@
     <xs:attribute name="time" type="xs:integer" use="required"/>
     <xs:attribute name="value" type="xs:string" use="required"/>
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
+    <xs:attribute name="bezierOut" type="PointType"/>
+    <xs:attribute name="bezierIn" type="PointType"/>
+    <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
     <xs:attribute name="bezier-out" type="PointType"/>
     <xs:attribute name="bezier-in" type="PointType"/>
   </xs:complexType>
@@ -1095,7 +1098,7 @@
       <xs:element name="Object" type="AnimationObjectType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attributeGroup ref="CommonAttributes"/>
-    <xs:attribute name="duration" type="xs:integer" use="required"/>
+    <xs:attribute name="duration" type="xs:integer" default="0"/>
     <xs:attribute name="frameRate" type="xs:decimal" default="60"/>
     <xs:attribute name="loop" type="LoopModeType" default="once"/>
   </xs:complexType>
@@ -1145,9 +1148,12 @@
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="from" type="xs:string" use="required"/>
     <xs:attribute name="to" type="xs:string" use="required"/>
-    <xs:attribute name="duration" type="xs:integer" use="required"/>
+    <xs:attribute name="duration" type="xs:integer" default="0"/>
     <xs:attribute name="frameRate" type="xs:decimal" default="60"/>
     <xs:attribute name="interpolation" type="KeyframeInterpolationType" default="linear"/>
+    <xs:attribute name="bezierOut" type="PointType"/>
+    <xs:attribute name="bezierIn" type="PointType"/>
+    <!-- Deprecated aliases for bezierOut/bezierIn, kept for backward compatibility. -->
     <xs:attribute name="bezier-out" type="PointType"/>
     <xs:attribute name="bezier-in" type="PointType"/>
     <xs:attribute name="earlyExit" type="BoolType" default="false"/>

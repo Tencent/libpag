@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Demonstrates PAGX animation system: keyframes, channels, and a top-level Animation. -->
+<pagx width="400" height="400">
+  <!-- Background -->
+  <Layer name="bg" width="100%" height="100%">
+    <Rectangle width="100%" height="100%"/>
+    <Fill>
+      <LinearGradient endPoint="0,1">
+        <ColorStop color="#0F172A" offset="0"/>
+        <ColorStop color="#1E293B" offset="1"/>
+      </LinearGradient>
+    </Fill>
+  </Layer>
+
+  <!-- Layer 1: Pulsing circle -->
+  <Layer id="pulseCircle" centerX="0" centerY="-90">
+    <Ellipse width="64" height="64"/>
+    <Fill>
+      <RadialGradient>
+        <ColorStop color="#6366F1" offset="0"/>
+        <ColorStop color="#8B5CF6" offset="1"/>
+      </RadialGradient>
+    </Fill>
+    <DropShadowStyle offsetY="4" blurX="12" blurY="12" color="#6366F180"/>
+  </Layer>
+
+  <!-- Layer 2: Sliding dot -->
+  <Layer id="slidingBar" centerX="0" centerY="20" width="24" height="24">
+    <Ellipse width="24" height="24"/>
+    <Fill>
+      <RadialGradient>
+        <ColorStop color="#22D3EE" offset="0"/>
+        <ColorStop color="#0EA5E9" offset="1"/>
+      </RadialGradient>
+    </Fill>
+    <DropShadowStyle offsetY="2" blurX="8" blurY="8" color="#0EA5E980"/>
+  </Layer>
+
+  <!-- Static track behind the sliding dot -->
+  <Layer centerX="0" centerY="20" width="340" height="4">
+    <Rectangle width="340" height="4" roundness="2"/>
+    <Fill color="#334155"/>
+  </Layer>
+
+  <!-- Layer 3: Fading label -->
+  <Layer id="labelText" centerX="0" centerY="80" width="400" height="40">
+    <TextBox textAlign="center" width="400" height="40">
+      <Text text="PAGX Animation" fontFamily="Arial" fontStyle="Bold" fontSize="22"/>
+      <Fill color="#FFF"/>
+    </TextBox>
+  </Layer>
+
+  <!-- Layer 4: Static decorative ring -->
+  <Layer centerX="0" centerY="-90">
+    <Ellipse width="80" height="80"/>
+    <Stroke color="#6366F130" width="1" dashes="4,8"/>
+  </Layer>
+
+  <!-- Layer 5: Animated indicator dots -->
+  <Layer id="dotIndicator" centerX="0" centerY="-20" layout="horizontal" gap="8">
+    <Layer id="dot1" width="8" height="8">
+      <Ellipse width="8" height="8"/>
+      <Fill color="#10B981"/>
+    </Layer>
+    <Layer id="dot2" width="8" height="8">
+      <Ellipse width="8" height="8"/>
+      <Fill color="#10B981"/>
+    </Layer>
+    <Layer id="dot3" width="8" height="8">
+      <Ellipse width="8" height="8"/>
+      <Fill color="#10B981"/>
+    </Layer>
+  </Layer>
+
+  <Animations>
+  <Animation id="mainAnim" duration="120" frameRate="60" loop="loop">
+
+    <!-- Purple pulsing circle: 0.2 -> 1 -> 0.2 -> 1 -> 0.2 (seamless) -->
+    <Object target="pulseCircle">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="0.2" interpolation="linear"/>
+        <Key time="30" value="1" interpolation="linear"/>
+        <Key time="60" value="0.2" interpolation="linear"/>
+        <Key time="90" value="1" interpolation="linear"/>
+        <Key time="120" value="0.2"/>
+      </Channel>
+    </Object>
+
+    <!-- Green dots: sequential blink, cycles seamlessly -->
+    <Object target="dot1">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="1" interpolation="hold"/>
+        <Key time="30" value="0.2" interpolation="hold"/>
+        <Key time="90" value="0.2" interpolation="hold"/>
+        <Key time="120" value="1"/>
+      </Channel>
+    </Object>
+    <Object target="dot2">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="0.2" interpolation="hold"/>
+        <Key time="30" value="1" interpolation="hold"/>
+        <Key time="60" value="0.2" interpolation="hold"/>
+        <Key time="120" value="0.2"/>
+      </Channel>
+    </Object>
+    <Object target="dot3">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="0.2" interpolation="hold"/>
+        <Key time="60" value="1" interpolation="hold"/>
+        <Key time="90" value="0.2" interpolation="hold"/>
+        <Key time="120" value="0.2"/>
+      </Channel>
+    </Object>
+
+    <!-- Cyan sliding dot: drives the runtime x translation from 20 to 360 and back. -->
+    <Object target="slidingBar">
+      <Channel name="x" type="float">
+        <Key time="0" value="20" interpolation="bezier"/>
+        <Key time="60" value="360" interpolation="bezier"/>
+        <Key time="120" value="20"/>
+      </Channel>
+    </Object>
+
+    <!-- Label text fade in/out (0.1 -> 1 -> 0.1), seamless -->
+    <Object target="labelText">
+      <Channel name="alpha" type="float">
+        <Key time="0" value="0.1" interpolation="linear"/>
+        <Key time="60" value="1" interpolation="linear"/>
+        <Key time="120" value="0.1"/>
+      </Channel>
+    </Object>
+  </Animation>
+  </Animations>
+
+</pagx>

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>关系认知层</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; }
+.slide {
+  width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0;
+  background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+  font-family: 'Noto Sans SC', sans-serif; color: #FFFFFF;
+}
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Watermark -->
+  <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="z-index:0; top: 120px; left: 250px;">MEMORY</div>
+
+  <!-- Page Header -->
+  <div class="absolute top-[32px] right-[48px]" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- Section Title -->
+  <div class="absolute" style="z-index:20; top: 50px; left: 80px;">
+    <div class="text-[12px] font-[500] tracking-[0.15em] text-[#82D0A4] mb-[8px]">LAYER 2 — RELATIONSHIP & COGNITION</div>
+    <h1 class="text-[32px] font-[300] text-[#FFFFFF]">关系认知层 <span class="text-[16px] text-[#FFFFFF]/40 ml-[12px]">USER + MEMORY</span></h1>
+  </div>
+
+  <!-- USER.md Row -->
+  <div class="absolute flex gap-[16px]" style="z-index:20; top: 130px; left: 80px; width: 1120px;">
+    <div class="flex items-center gap-[8px]">
+      <i class="ph ph-user-circle text-[20px] text-[#82D0A4]"></i>
+      <span class="text-[18px] font-[400] text-[#FFFFFF]">USER.md</span>
+    </div>
+    <div class="flex gap-[12px] flex-1">
+      <div class="border-[1px] border-[#FFFFFF]/30 rounded-full px-[16px] py-[6px] text-[12px] text-[#FFFFFF]/60">基本信息</div>
+      <div class="border-[1px] border-[#FFFFFF]/30 rounded-full px-[16px] py-[6px] text-[12px] text-[#FFFFFF]/60">工作偏好</div>
+      <div class="border-[1px] border-[#FFFFFF]/30 rounded-full px-[16px] py-[6px] text-[12px] text-[#FFFFFF]/60">当前状态</div>
+      <div class="border-[1px] border-[#FFFFFF]/30 rounded-full px-[16px] py-[6px] text-[12px] text-[#FFFFFF]/60">个人特点</div>
+    </div>
+  </div>
+
+  <!-- Memory System - Nested Boxes -->
+  <div class="absolute" style="z-index:20; top: 190px; left: 80px; width: 700px; height: 370px;">
+    <!-- Long-term memory outer -->
+    <div class="w-[700px] h-[370px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[16px] p-[20px]">
+      <div class="flex items-center gap-[8px] mb-[12px]">
+        <i class="ph ph-notebook text-[18px] text-[#82D0A4]"></i>
+        <span class="text-[16px] font-[400] text-[#FFFFFF]">MEMORY.md（长期记忆）</span>
+      </div>
+      <div class="text-[12px] text-[#FFFFFF]/40 mb-[12px]">核心偏好 · 重要决策 · 工作规范 · 踩过的坑</div>
+
+      <!-- Daily memory -->
+      <div class="w-[640px] h-[210px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[12px] p-[16px]">
+        <div class="flex items-center gap-[8px] mb-[8px]">
+          <i class="ph ph-clock-counter-clockwise text-[16px] text-[#82D0A4]/60"></i>
+          <span class="text-[14px] font-[400] text-[#FFFFFF]/70">YYYY-MM-DD.md（每日记忆）</span>
+        </div>
+        <div class="text-[12px] text-[#FFFFFF]/30 mb-[10px]">今天做了什么 · 学到了什么 · 需要跟进什么</div>
+
+        <!-- Session memory -->
+        <div class="w-[600px] h-[100px] border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[8px] p-[12px]">
+          <div class="flex items-center gap-[8px] mb-[6px]">
+            <i class="ph ph-chat-circle text-[14px] text-[#82D0A4]/40"></i>
+            <span class="text-[13px] font-[400] text-[#FFFFFF]/50">会话记忆（Session）</span>
+          </div>
+          <div class="text-[12px] text-[#FFFFFF]/25">当前对话的短期上下文</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core Mechanisms -->
+  <div class="absolute" style="z-index:20; top: 190px; left: 810px; width: 390px; height: 370px;">
+    <div class="text-[14px] font-[500] text-[#82D0A4] mb-[16px]">养成核心机制</div>
+    <div class="flex flex-col gap-[16px]">
+      <div class="bg-[#FFFFFF]/[0.04] border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[20px]">
+        <div class="flex items-center gap-[8px] mb-[6px]">
+          <i class="ph ph-plus-circle text-[18px] text-[#82D0A4]"></i>
+          <span class="text-[14px] font-[500] text-[#FFFFFF]">只追加不修改</span>
+        </div>
+        <div class="text-[12px] text-[#FFFFFF]/40">新记忆追加到文件末尾，防止"遗忘"</div>
+      </div>
+      <div class="bg-[#FFFFFF]/[0.04] border-[1px] border-[#FFFFFF]/10 rounded-[12px] p-[20px]">
+        <div class="flex items-center gap-[8px] mb-[6px]">
+          <i class="ph ph-eye text-[18px] text-[#82D0A4]"></i>
+          <span class="text-[14px] font-[500] text-[#FFFFFF]">执行前必读</span>
+        </div>
+        <div class="text-[12px] text-[#FFFFFF]/40">每次做事前先读记忆，确保行为一致性</div>
+      </div>
+      <div class="bg-[#82D0A4]/[0.08] border-[1px] border-[#82D0A4]/20 rounded-[12px] p-[20px]">
+        <div class="flex items-center gap-[8px] mb-[6px]">
+          <i class="ph ph-lightning text-[18px] text-[#82D0A4]"></i>
+          <span class="text-[14px] font-[500] text-[#82D0A4]">错误比成功更重要</span>
+        </div>
+        <div class="text-[12px] text-[#FFFFFF]/40">犯错时立刻把教训写入记忆，下次不再犯</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Practice Data -->
+  <div class="absolute flex items-center justify-center gap-[40px]" style="z-index:20; top: 580px; left: 200px; width: 880px;">
+    <div class="text-center">
+      <div class="text-[36px] font-[400] text-[#82D0A4]">14</div>
+      <div class="text-[12px] text-[#FFFFFF]/40">天</div>
+    </div>
+    <div class="w-[1px] h-[40px] bg-[#FFFFFF]/10"></div>
+    <div class="text-center">
+      <div class="text-[36px] font-[400] text-[#82D0A4]">1157</div>
+      <div class="text-[12px] text-[#FFFFFF]/40">条消息</div>
+    </div>
+    <div class="w-[1px] h-[40px] bg-[#FFFFFF]/10"></div>
+    <div class="text-center">
+      <div class="text-[36px] font-[400] text-[#82D0A4]">22</div>
+      <div class="text-[12px] text-[#FFFFFF]/40">万字</div>
+    </div>
+    <div class="w-[1px] h-[40px] bg-[#FFFFFF]/10"></div>
+    <div class="text-center">
+      <div class="text-[36px] font-[400] text-[#82D0A4]">40+</div>
+      <div class="text-[12px] text-[#FFFFFF]/40">技能</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">关系·认知</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

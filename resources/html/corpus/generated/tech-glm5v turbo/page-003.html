@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 3 - 产品概述与定位</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.bg-noise {
+  background-color: #DFDDDA;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+.arrow-icon { stroke-width: 1.5px; fill: none; stroke: #111111; }
+</style>
+</head>
+<body>
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden m-auto">
+  <!-- Page Title -->
+  <div class="absolute top-[50px] left-[48px]">
+    <h1 class="text-[48px] font-semibold tracking-[-0.01em] leading-[1.2]">产品概述与定位</h1>
+  </div>
+
+  <!-- Horizontal Divider -->
+  <div class="absolute left-[48px] right-[48px] top-[130px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- Vertical Dividers between columns -->
+  <div class="absolute left-[413px] top-[150px] bottom-[40px] w-[1px] bg-[#111111]/15"></div>
+  <div class="absolute left-[822px] top-[150px] bottom-[40px] w-[1px] bg-[#111111]/15"></div>
+
+  <!-- Column 1: 产品定位 -->
+  <div class="absolute top-[160px] left-[48px] w-[355px]">
+    <div class="flex items-center gap-[8px] mb-[20px]">
+      <i class="ph ph-target text-[20px]"></i>
+      <h2 class="text-[18px] font-semibold">产品定位</h2>
+    </div>
+    <div class="space-y-[14px]">
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[1.65]">AI驱动的产设研协作平台</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[1.65]">面向设计师与产品经理</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[1.65]">支持多人实时协作的UI/UX工具</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[1.65]">让每个设计稿都成为团队资产</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column 2: 核心技术底座 -->
+  <div class="absolute top-[160px] left-[430px] w-[380px]">
+    <div class="flex items-center gap-[8px] mb-[20px]">
+      <i class="ph ph-cpu text-[20px]"></i>
+      <h2 class="text-[18px] font-semibold">核心技术底座</h2>
+    </div>
+    <div class="space-y-[14px]">
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p class="text-[14px]/[1.65] font-medium">腾讯混元大模型</p>
+          <p class="text-[12px]/[1.5] opacity-60 mt-[2px]">自然语言理解与生成能力</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p class="text-[14px]/[1.65] font-medium">优图视觉算法</p>
+          <p class="text-[12px]/[1.5] opacity-60 mt-[2px]">图像识别、分层与转换</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p class="text-[14px]/[1.65] font-medium">WorkBuddy / CodeBuddy</p>
+          <p class="text-[12px]/[1.5] opacity-60 mt-[2px]">开发工具链无缝衔接架构</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <div>
+          <p class="text-[14px]/[1.65] font-medium">MCP 协议</p>
+          <p class="text-[12px]/[1.5] opacity-60 mt-[2px]">模型上下文协议，设计与代码无缝连接</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column 3: 产品口号与支持 -->
+  <div class="absolute top-[160px] left-[838px] w-[365px]">
+    <div class="flex items-center gap-[8px] mb-[20px]">
+      <i class="ph ph-quote text-[20px]"></i>
+      <h2 class="text-[18px] font-semibold">产品口号 & 支持</h2>
+    </div>
+    <!-- Quote box -->
+    <div class="border-l-[2px] border-[#111111] pl-[16px] py-[8px] mb-[20px]">
+      <p class="text-[16px]/[1.55] font-medium italic leading-snug">"智能设计工具，让灵感鲜活落地"</p>
+    </div>
+    <div class="space-y-[14px]">
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[1.65]">2026年5月18日正式公测</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[1.65]">注册即享 <strong>1000 Credits</strong> 免费额度</p>
+      </div>
+      <div class="flex items-start gap-[10px]">
+        <svg class="w-[18px] h-[18px] mt-[3px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 7l10 10M17 7v10H7"/></svg>
+        <p class="text-[14px]/[1.65]">macOS + Web 端（Windows / 小程序即将上线）</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

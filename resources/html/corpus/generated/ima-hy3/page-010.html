@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <!-- 背景水印 -->
+    <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="top: 80px; left: 100px;">LIFECYCLE</div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-[32px] right-[48px] z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+    </div>
+
+    <!-- 标题区域 -->
+    <div class="absolute z-20" style="top: 40px; left: 0; width: 1280px; height: 70px;">
+      <div class="flex flex-col items-center justify-center h-full gap-[8px]">
+        <div class="text-[16px] font-[300] text-[#FFFFFF]/60 tracking-[0.1em] uppercase">Lifecycle</div>
+        <h1 class="text-[36px] font-[300] text-[#FFFFFF] leading-[1.1]">IMA 养成系完整生命周期</h1>
+      </div>
+    </div>
+
+    <!-- 时间线区域 (Z-TIMELINE: x=60, y=140, w=1160, h=500) -->
+    <div class="absolute z-20" style="top: 140px; left: 60px; width: 1160px; height: 500px;">
+      <div class="relative w-full h-full">
+
+        <!-- 时间线底座 -->
+        <div class="absolute" style="top: 100px; left: 80px; width: 1000px; height: 2px; background: linear-gradient(90deg, #82D0A4, #529B75, #34684D, #82D0A4);"></div>
+
+        <!-- 阶段1: 领养 (Day 0) -->
+        <div class="absolute" style="top: 20px; left: 80px; width: 200px;">
+          <div class="flex flex-col items-center text-center">
+            <div class="w-[64px] h-[64px] rounded-full bg-[#1E332A] border-[2px] border-[#82D0A4] flex items-center justify-center mb-[12px]">
+              <i class="ph ph-egg text-[28px] text-[#82D0A4]"></i>
+            </div>
+            <div class="text-[14px] font-[500] text-[#82D0A4] mb-[4px]">领养</div>
+            <div class="text-[12px] text-[#FFFFFF]/40 mb-[8px]">Day 0</div>
+            <div class="text-[11px] text-[#FFFFFF]/50 leading-[1.6]">取名字<br>选形象<br>初始化</div>
+            <div class="mt-[8px] text-[10px] text-[#FFFFFF]/30">记忆量：0<br>技能数：基础包</div>
+          </div>
+        </div>
+
+        <!-- 阶段2: 调教 (Day 1-7) -->
+        <div class="absolute" style="top: 20px; left: 420px; width: 200px;">
+          <div class="flex flex-col items-center text-center">
+            <div class="w-[64px] h-[64px] rounded-full bg-[#1E332A] border-[2px] border-[#529B75] flex items-center justify-center mb-[12px]">
+              <i class="ph ph-bug text-[28px] text-[#529B75]"></i>
+            </div>
+            <div class="text-[14px] font-[500] text-[#529B75] mb-[4px]">调教</div>
+            <div class="text-[12px] text-[#FFFFFF]/40 mb-[8px]">Day 1-7</div>
+            <div class="text-[11px] text-[#FFFFFF]/50 leading-[1.6]">定义性格<br>告诉偏好<br>纠正错误</div>
+            <div class="mt-[8px] text-[10px] text-[#FFFFFF]/30">记忆量：少<br>技能数：5-10</div>
+          </div>
+        </div>
+
+        <!-- 阶段3: 进化 (Day 7-30) -->
+        <div class="absolute" style="top: 20px; left: 760px; width: 200px;">
+          <div class="flex flex-col items-center text-center">
+            <div class="w-[64px] h-[64px] rounded-full bg-[#1E332A] border-[2px] border-[#34684D] flex items-center justify-center mb-[12px]">
+              <i class="ph ph-crab text-[28px] text-[#34684D]"></i>
+            </div>
+            <div class="text-[14px] font-[500] text-[#34684D] mb-[4px]">进化</div>
+            <div class="text-[12px] text-[#FFFFFF]/40 mb-[8px]">Day 7-30</div>
+            <div class="text-[11px] text-[#FFFFFF]/50 leading-[1.6]">安装技能<br>训练工作流<br>积累记忆</div>
+            <div class="mt-[8px] text-[10px] text-[#FFFFFF]/30">记忆量：中等<br>技能数：20-40</div>
+          </div>
+        </div>
+
+        <!-- 阶段4: 共生 (Day 30+) -->
+        <div class="absolute" style="top: 20px; left: 960px; width: 200px;">
+          <div class="flex flex-col items-center text-center">
+            <div class="w-[64px] h-[64px] rounded-full bg-[#1E332A] border-[2px] border-[#FFFFFF] flex items-center justify-center mb-[12px]">
+              <i class="ph ph-crab ph-fill text-[28px] text-[#82D0A4]"></i>
+            </div>
+            <div class="text-[14px] font-[500] text-[#FFFFFF] mb-[4px]">共生</div>
+            <div class="text-[12px] text-[#FFFFFF]/40 mb-[8px]">Day 30+</div>
+            <div class="text-[11px] text-[#FFFFFF]/50 leading-[1.6]">自动运转<br>主动推送<br>风格稳定</div>
+            <div class="mt-[8px] text-[10px] text-[#FFFFFF]/30">记忆量：丰富<br>技能数：40+</div>
+          </div>
+        </div>
+
+        <!-- 底部箭头 -->
+        <div class="absolute" style="top: 180px; left: 80px; width: 1000px;">
+          <div class="flex items-center justify-between text-[11px] text-[#FFFFFF]/30 px-[40px]">
+            <span>了解你 0%</span>
+            <span>了解你 30%</span>
+            <span>了解你 70%</span>
+            <span>了解你 95%</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+      <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+    </div>
+  </div>
+</body>
+</html>

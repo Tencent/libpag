@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 1 - 腾讯Ardot设计平台分析与竞品分析报告</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.bg-noise {
+  background-color: #DFDDDA;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+</style>
+</head>
+<body>
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden m-auto flex flex-col justify-center">
+  <!-- Header Brand -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-lightning text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[400] tracking-wide">Tencent Ardot Analysis</span>
+  </div>
+
+  <!-- Header Date -->
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px] font-[400]">2026.05</span>
+  </div>
+
+  <!-- Vertical Grid Line at 33% -->
+  <div class="absolute left-[33%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+
+  <!-- Horizontal Grid Line at 25% -->
+  <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- Large Decorative Circle -->
+  <div class="absolute -right-[10%] top-[10%] w-[800px] min-h-[800px] rounded-full border border-[#111111] pointer-events-none"></div>
+
+  <!-- Main Content Area -->
+  <div class="relative z-10 ml-[80px] mt-[80px] w-[60%]">
+    <h1 class="text-[88px] font-semibold leading-[1.15] tracking-[-0.025em] mb-[20px]">腾讯Ardot设计平台</h1>
+    <p class="text-[22px]/[32px] font-normal leading-[1.625] opacity-80 w-[75%]">分析与竞品分析报告</p>
+    <div class="mt-[40px] flex items-center gap-[12px]">
+      <div class="w-[32px] h-[1px] bg-[#111111]"></div>
+      <span class="text-[14px] font-[400] opacity-70 tracking-wider">AI DRIVEN DESIGN COLLABORATION PLATFORM</span>
+    </div>
+  </div>
+
+  <!-- Footer Info -->
+  <div class="absolute bottom-[72px] right-[80px] text-right">
+    <p class="text-[16px]/[26px] font-medium">AI驱动的产设研协作平台深度解析</p>
+    <p class="text-[13px]/[20px] mt-[4px] opacity-60 font-[400]">Competitive Analysis Report · May 2026</p>
+  </div>
+</div>
+</body>
+</html>

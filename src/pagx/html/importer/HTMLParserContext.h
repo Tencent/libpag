@@ -154,6 +154,18 @@ class HTMLParserContext {
   // mask. The complement of the SVG data-URI branch handled directly in `applyMaskOrClip`.
   bool applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box, const std::string& url);
 
+  // Replaces the rectangular `overflow: hidden` clip (`clipToBounds`) with a mask shaped like the
+  // element's `border-radius` geometry, so descendants are clipped to the rounded outline rather
+  // than the layer rectangle. PAGX's only native clip primitive (`clipToBounds`) squares off the
+  // corners a rounded container is meant to cut, and `foldRoundedImageWrapper` only handles the
+  // narrow single-full-cover-image case; this generalises rounded clipping to any content (text,
+  // multiple children, bordered rings, ...). The mask is an Ellipse for `border-radius: 50%`, a
+  // uniform rounded Rectangle, or a per-corner Path — filled opaque white and read as a contour
+  // mask. No-op unless the box both rounds its corners and clips overflow; when a CSS
+  // mask-image / clip-path already claimed the layer's single mask slot the rectangular clip is
+  // kept and a diagnostic is emitted. Must run after `applyMaskOrClip` so that check is accurate.
+  void applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttributes& box);
+
   // Applies the CSS `mask-size` / `mask-position` transform onto a rebuilt alpha/luminance mask
   // layer (the inverse of the size/position emission in `HTMLWriter::writeMaskCSS`). The mask SVG
   // is imported at its intrinsic pixel size; CSS then scales it to `mask-size` and offsets it by
@@ -280,6 +292,10 @@ class HTMLParserContext {
   std::vector<std::string> _fallbackFamilyNames = {};
   std::unordered_set<std::string> _fallbackFamilyNameSet = {};
 
+  // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
+  // probed against the font system at most once during traversal.
+  std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
+
   float _canvasWidth = 0;
   float _canvasHeight = 0;
   // Records concrete family names from a font-family stack into the document-wide
@@ -290,6 +306,17 @@ class HTMLParserContext {
   // user data) to the parser context's `recordFontFallbacks` member, so the cascade can stay
   // independent of `HTMLParserContext` and we avoid `std::bind` / lambda at the wiring site.
   static void RecordFontFallbacksThunk(void* userData, const std::vector<std::string>& chain);
+
+  // Reports whether `family` will resolve at render time without triggering system font
+  // substitution: it is registered/embedded in the document's FontConfig, or it is a genuinely
+  // installed system font (the family the platform resolves matches the request). A name the
+  // renderer would silently swap for a mismatched default (e.g. the hidden "SF Mono" system font,
+  // which `MakeFromName` replaces with a proportional face) counts as unavailable. Results are
+  // memoised in `_fontAvailabilityCache`.
+  bool isFontFamilyAvailable(const std::string& family);
+
+  // Static trampoline adapting the cascade's `FontAvailabilityThunk` to `isFontFamilyAvailable`.
+  static bool IsFontFamilyAvailableThunk(void* userData, const std::string& family);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack

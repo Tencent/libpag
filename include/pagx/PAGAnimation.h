@@ -121,19 +121,7 @@ class PAGAnimation : public PAGTimeline {
   // cached result and only re-runs this when targetsDirty is set.
   void resolveTargets(const RuntimeBinding* effectiveBinding);
 
-  // Owning scene. animation / binding / contextDoc point into content this scene keeps alive, so
-  // advance() and apply() bail out once the scene is gone to avoid dereferencing freed memory.
-  std::weak_ptr<PAGScene> owner;
   Animation* animation = nullptr;
-  // Runtime binding the channel writers should target. A null binding marks a top-level timeline:
-  // the owning scene's current root binding is resolved lazily at apply time, so the timeline keeps
-  // working after the scene rebuilds its runtime tree (which frees and replaces that binding). A
-  // non-null binding is a fixed composition binding co-owned with that composition.
-  RuntimeBinding* binding = nullptr;
-  // Document used to resolve channel target IDs at apply time. Top-level timelines use the scene's
-  // primary document; timelines spawned by external composition layers use the layer's externalDoc
-  // so internal IDs of the external file stay self-contained.
-  PAGXDocument* contextDoc = nullptr;
   // Scratch buffer holding the resolved (target node, channels) pairs. Rebuilt by resolveTargets()
   // only when targetsDirty is set, and reused across frames otherwise; its capacity is retained to
   // avoid per-frame reallocation.

@@ -269,10 +269,10 @@ static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
       xml.addAttribute("interpolation", KeyframeInterpolationToString(key.interpolation));
     }
     if (key.bezierOut != Point{}) {
-      xml.addAttribute("bezier-out", PointToString(key.bezierOut));
+      xml.addAttribute("bezierOut", PointToString(key.bezierOut));
     }
     if (key.bezierIn != Point{}) {
-      xml.addAttribute("bezier-in", PointToString(key.bezierIn));
+      xml.addAttribute("bezierIn", PointToString(key.bezierIn));
     }
     xml.closeElementSelfClosing();
   }
@@ -374,10 +374,10 @@ static void WriteTransition(XMLBuilder& xml, const StateTransition* transition,
     xml.addAttribute("interpolation", KeyframeInterpolationToString(transition->interpolation));
     if (transition->interpolation == KeyframeInterpolationType::Bezier) {
       if (transition->bezierOut != Point{}) {
-        xml.addAttribute("bezier-out", PointToString(transition->bezierOut));
+        xml.addAttribute("bezierOut", PointToString(transition->bezierOut));
       }
       if (transition->bezierIn != Point{}) {
-        xml.addAttribute("bezier-in", PointToString(transition->bezierIn));
+        xml.addAttribute("bezierIn", PointToString(transition->bezierIn));
       }
     }
   }

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>养成系 vs 传统 AI 助手</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+*, *::before, *::after { animation: none !important; transition: none !important; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body>
+<div class="slide" style="width:1280px;height:720px;overflow:hidden;position:relative;background:linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);">
+  <!-- Watermark -->
+  <div class="absolute z-0 text-[300px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="left:50%;top:50%;transform:translate(-50%,-50%);">VS</div>
+  <!-- Header -->
+  <div class="absolute z-20" style="top:50px;left:120px;width:1040px;">
+    <div class="text-[14px] font-[300] text-[#FFFFFF]/40 tracking-[0.15em] uppercase mb-[8px]">Comparison</div>
+    <h2 class="text-[36px] font-[300] text-[#FFFFFF] leading-tight">养成系 vs 传统 AI 助手</h2>
+    <div class="w-[48px] h-[1px] bg-[#FFFFFF]/20 mt-[16px]"></div>
+  </div>
+  <!-- Table -->
+  <div class="absolute z-20" style="top:160px;left:120px;width:1040px;">
+    <!-- Table Header -->
+    <div class="flex" style="height:48px;border-bottom:1px solid rgba(255,255,255,0.15);">
+      <div class="flex items-center text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.05em]" style="width:180px;padding-left:20px;">维度</div>
+      <div class="flex items-center text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.05em]" style="width:430px;padding-left:20px;">传统 AI 助手</div>
+      <div class="flex items-center text-[14px] font-[500] text-[#82D0A4]/80 tracking-[0.05em]" style="width:430px;padding-left:20px;">养成系 AI (IMA)</div>
+    </div>
+    <!-- Row 1 -->
+    <div class="flex" style="height:68px;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div class="flex items-center text-[16px] font-[400] text-[#FFFFFF]/80" style="width:180px;padding-left:20px;">
+        <i class="ph ph-database text-[18px] text-[#FFFFFF]/30 mr-[12px]"></i>记忆
+      </div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/40" style="width:430px;padding-left:20px;">每次对话清零</div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/70" style="width:430px;padding-left:20px;">长期记忆持久化，越用越懂你</div>
+    </div>
+    <!-- Row 2 -->
+    <div class="flex" style="height:68px;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div class="flex items-center text-[16px] font-[400] text-[#FFFFFF]/80" style="width:180px;padding-left:20px;">
+        <i class="ph ph-smiley text-[18px] text-[#FFFFFF]/30 mr-[12px]"></i>人格
+      </div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/40" style="width:430px;padding-left:20px;">千人一面，标准客服语气</div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/70" style="width:430px;padding-left:20px;">有独特性格、说话风格、价值观</div>
+    </div>
+    <!-- Row 3 -->
+    <div class="flex" style="height:68px;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div class="flex items-center text-[16px] font-[400] text-[#FFFFFF]/80" style="width:180px;padding-left:20px;">
+        <i class="ph ph-plugs text-[18px] text-[#FFFFFF]/30 mr-[12px]"></i>能力
+      </div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/40" style="width:430px;padding-left:20px;">出厂即定型</div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/70" style="width:430px;padding-left:20px;">可安装新技能，持续扩展</div>
+    </div>
+    <!-- Row 4 -->
+    <div class="flex" style="height:68px;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div class="flex items-center text-[16px] font-[400] text-[#FFFFFF]/80" style="width:180px;padding-left:20px;">
+        <i class="ph ph-lightning text-[18px] text-[#FFFFFF]/30 mr-[12px]"></i>主动性
+      </div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/40" style="width:430px;padding-left:20px;">被动等提问</div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/70" style="width:430px;padding-left:20px;">主动推送、定时巡检、自动干活</div>
+    </div>
+    <!-- Row 5 -->
+    <div class="flex" style="height:68px;border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div class="flex items-center text-[16px] font-[400] text-[#FFFFFF]/80" style="width:180px;padding-left:20px;">
+        <i class="ph ph-handshake text-[18px] text-[#FFFFFF]/30 mr-[12px]"></i>关系
+      </div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/40" style="width:430px;padding-left:20px;">工具关系（用完即弃）</div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/70" style="width:430px;padding-left:20px;">养成关系（有情感连接和沉没成本）</div>
+    </div>
+    <!-- Row 6 -->
+    <div class="flex" style="height:68px;">
+      <div class="flex items-center text-[16px] font-[400] text-[#FFFFFF]/80" style="width:180px;padding-left:20px;">
+        <i class="ph ph-fingerprint text-[18px] text-[#FFFFFF]/30 mr-[12px]"></i>差异化
+      </div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/40" style="width:430px;padding-left:20px;">你的和别人的一模一样</div>
+      <div class="flex items-center text-[14px] font-[400] text-[#FFFFFF]/70" style="width:430px;padding-left:20px;">每个人养出来的都不一样</div>
+    </div>
+  </div>
+  <!-- Footer -->
+  <div class="absolute z-50 flex flex-col items-center justify-center" style="bottom:48px;left:0;right:0;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/70">ima</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/30 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

@@ -496,24 +496,12 @@ PAGWindow {
     function resizeContentView() {
         if (!contentView)
             return;
-        let width = contentView.viewModel.width;
-        let height = contentView.viewModel.height;
         let windowWidth = mainForm.centerItem.width;
         let windowHeight = mainForm.centerItem.height - mainForm.controlForm.height;
-        let finalHeight = 1;
-        let finalWidth = 1;
-        let pagIsNarrower = height / width > windowHeight / windowWidth;
-        if (pagIsNarrower) {
-            finalHeight = windowHeight;
-            finalWidth = finalHeight / height * width;
-        } else {
-            finalWidth = windowWidth;
-            finalHeight = finalWidth / width * height;
-        }
-        mainForm.contentViewLoader.item.width = finalWidth;
-        mainForm.contentViewLoader.item.height = finalHeight;
-        mainForm.contentViewLoader.item.x = (windowWidth - finalWidth) / 2;
-        mainForm.contentViewLoader.item.y = (windowHeight - finalHeight) / 2;
+        mainForm.contentViewLoader.item.width = windowWidth;
+        mainForm.contentViewLoader.item.height = windowHeight;
+        mainForm.contentViewLoader.item.x = 0;
+        mainForm.contentViewLoader.item.y = 0;
     }
 
     function updateAvailable(hasNewVersion) {
@@ -578,6 +566,18 @@ PAGWindow {
             break;
         case "toggle-edit-panel":
             toggleEditPanel();
+            break;
+        case "zoom-in":
+            if (contentView)
+                contentView.zoomAt(1.5, contentView.width / 2, contentView.height / 2);
+            break;
+        case "zoom-out":
+            if (contentView)
+                contentView.zoomAt(1.0 / 1.5, contentView.width / 2, contentView.height / 2);
+            break;
+        case "reset-zoom":
+            if (contentView)
+                contentView.resetView();
             break;
         case "open-help":
             Qt.openUrlExternally("https://pag.io/#pag-player");

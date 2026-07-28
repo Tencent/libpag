@@ -28,6 +28,7 @@
 
 namespace pagx {
 
+class ColorSource;
 class ConicGradient;
 class HTMLDiagnosticSink;
 class LinearGradient;
@@ -100,18 +101,32 @@ class HTMLValueParser {
    *  when both are known the gradient line is resolved in absolute pixel space (using the CSS
    *  magic-corner extent) with `fitsToGeometry=false`, so the equal-color lines stay perpendicular
    *  on any aspect ratio. Pass NaN when the box size is unknown to keep the geometry-normalised
-   *  (0,0)-(1,1) space, which is only exact for axis-aligned gradients. `repeating` marks a
-   *  `repeating-linear-gradient(...)` being downgraded to a single gradient; see
-   *  `appendRepeatingReset`. */
+   *  (0,0)-(1,1) space, which is only exact for axis-aligned gradients. When `repeating` is set
+   *  (CSS `repeating-linear-gradient`) and the box size is known, the authored period of stops is
+   *  tiled across the whole gradient line as explicit color stops (PAGX gradients have no native
+   *  spread/repeat mode); the box-unknown case degrades to a single non-repeating period. */
   LinearGradient* parseLinearGradient(const std::string& value, float boxWidth = NAN,
                                       float boxHeight = NAN, bool repeating = false);
+  /**
+   * Builds a `repeating-linear-gradient(...)` as a tiled `ImagePattern` rather than a gradient.
+   * PAGX/tgfx gradients bake >16 stops into a fixed 256px color texture, so a fine repeat (e.g. a
+   * 2px ruled line every 49px) undersamples and drops most lines. A one-period tile rendered at
+   * native resolution and repeated reproduces the pattern crisply at any density. Returns nullptr
+   * when the box size is unknown, the gradient direction is not axis-aligned (only horizontal /
+   * vertical patterns tile seamlessly with a 1D strip), or the period is degenerate — the caller
+   * then falls back to the coarser gradient-stop tiling of `parseLinearGradient`.
+   */
+  ColorSource* parseRepeatingLinearGradientPattern(const std::string& value, float boxWidth,
+                                                   float boxHeight);
   /** Parses a CSS `radial-gradient(...)`. `boxWidth` / `boxHeight` are the painted box size in px
    *  used to normalise the `<size> at <position>` descriptor back into the gradient's (0,0)-(1,1)
    *  geometry space; pass NaN when unknown to keep the centered, box-filling default. `repeating`
-   *  marks a `repeating-radial-gradient(...)` being downgraded; see `appendRepeatingReset`. */
+   *  (CSS `repeating-radial-gradient`) tiles the authored period across the normalised radius. */
   RadialGradient* parseRadialGradient(const std::string& value, float boxWidth = NAN,
                                       float boxHeight = NAN, bool repeating = false);
-  ConicGradient* parseConicGradient(const std::string& value);
+  /** Parses a CSS `conic-gradient(...)`. `repeating` (CSS `repeating-conic-gradient`) tiles the
+   *  authored angular period across the full turn. */
+  ConicGradient* parseConicGradient(const std::string& value, bool repeating = false);
 
   /** Parses the comma-separated tail of a gradient call into (offset, color) pairs. Offsets that
    *  fail to parse are left as NaN for `finaliseGradientStops` to fill in. `pxOffsetScale` is the
@@ -126,32 +141,27 @@ class HTMLValueParser {
    *  evenly). Returns false when the list is empty. */
   static bool finaliseGradientStops(GradientStops& stops);
 
-  /** PAGX gradient nodes have no tile/repeat axis, so a `repeating-*-gradient(...)` is downgraded
-   *  to a single gradient. Left alone, the region past the last stop would flood the whole box with
-   *  the last color (e.g. a subtle 4px scanline overlay turns into a solid dark wash). Each CSS tile
-   *  instead resets to the first color at the period boundary, so this appends a sharp reset back to
-   *  the first stop's color just past the last stop, making the pattern render as one period at its
-   *  true scale with the base (usually transparent) color filling the rest. */
-  static void appendRepeatingReset(GradientStops& stops);
-
   /** Appends the resolved stops onto a gradient node's `colorStops` field. */
   template <typename T>
   void emitColorStops(T& targetStops, const GradientStops& stops);
 
  private:
-  // The center / radius / coordinate-space recovered from a radial-gradient leading descriptor.
-  // Kept as plain locals (rather than a RadialGradient node) so the extent can be resolved before
-  // the node is allocated, which lets px stop offsets be normalised against it.
-  struct RadialDescriptor {
-    float centerX = 0.5f;
-    float centerY = 0.5f;
-    float radius = 0.5f;
-    bool fitsToGeometry = true;
-  };
+  // Builds the tiled color stops of a `repeating-linear-gradient` in the gradient line's
+  // normalised (0..1) space. One authored period is parsed into pixel positions along the line
+  // (`lineLength` px), then repeated forward until the far edge is covered. Returns false when the
+  // stops cannot form a repeating pattern (fewer than two stops or a non-positive period), so the
+  // caller can fall back to a non-repeating gradient.
+  bool buildRepeatingLinearStops(const std::vector<std::string>& parts, size_t stopStart,
+                                 float lineLength, GradientStops& out);
+  // Tiles one authored period of `stops` (already expressed in a normalised 0..1 domain, with the
+  // last stop's offset defining the period) across the full [0,1] range, replacing `stops` with
+  // the expanded list. Used for the angular (conic) and radial repeating variants. Returns false
+  // when the stops cannot form a repeating pattern.
+  bool tileRepeatingStops(GradientStops& stops);
   // Parses a radial-gradient leading descriptor ("circle 50px at 50px 50px") and writes the
-  // recovered center / radius into `out`, normalised against the box size.
+  // recovered center / radius onto `grad`, normalised against the box size.
   void parseRadialDescriptor(const std::string& descriptor, float boxWidth, float boxHeight,
-                             RadialDescriptor& out);
+                             RadialGradient* grad);
   // Resolves a single radial size/position length token to a value normalised against `boxAxis`.
   // Handles px lengths and `<pct>%`; returns NaN when the token is not a length.
   float resolveRadialLength(const std::string& token, float boxAxis);

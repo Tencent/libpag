@@ -348,6 +348,11 @@ void HTMLStyleCascade::setFontFallbackSink(FontFallbackThunk thunk, void* userDa
   _fontFallbackUserData = userData;
 }
 
+void HTMLStyleCascade::setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData) {
+  _fontAvailabilityThunk = thunk;
+  _fontAvailabilityUserData = userData;
+}
+
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
   while (child) {
@@ -501,7 +506,20 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
       out.fontFamilyChain.push_back(resolved);
     }
     if (!out.fontFamilyChain.empty()) {
+      // Default to the stack's first concrete family, then prefer the first family the renderer
+      // can actually resolve. A leading family that the renderer would silently substitute (a
+      // hidden system font such as "SF Mono", or any font absent on this machine) is skipped so
+      // the later CSS fallbacks that DO resolve (e.g. "Menlo" for a `monospace` stack) win —
+      // matching the browser cascade instead of collapsing to the default proportional face.
       out.primaryFontFamily = out.fontFamilyChain.front();
+      if (_fontAvailabilityThunk != nullptr) {
+        for (const auto& family : out.fontFamilyChain) {
+          if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
+            out.primaryFontFamily = family;
+            break;
+          }
+        }
+      }
     }
     if (_fontFallbackThunk) {
       _fontFallbackThunk(_fontFallbackUserData, out.fontFamilyChain);

@@ -31,12 +31,15 @@
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
+#include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
+#include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/LinearGradient.h"
@@ -175,6 +178,24 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, fl
   std::string trimmed = Trim(value);
   if (trimmed.empty()) return nullptr;
   std::string lower = ToLower(trimmed);
+  // CSS `repeating-*-gradient` shares the base syntax; the parsers tile the authored period into
+  // explicit stops (PAGX gradients have no native spread/repeat mode). `ExtractParenArgs` is
+  // prefix-agnostic, so the same value string is handed straight through with a repeating flag.
+  if (lower.compare(0, 26, "repeating-linear-gradient(") == 0) {
+    // Prefer a tiled ImagePattern (crisp at any density); fall back to gradient-stop tiling when
+    // the pattern is unavailable (unknown box, oblique angle, degenerate period).
+    if (auto* pattern =
+            _valueParser.parseRepeatingLinearGradientPattern(trimmed, boxWidth, boxHeight)) {
+      return pattern;
+    }
+    return _valueParser.parseLinearGradient(trimmed, boxWidth, boxHeight, /*repeating=*/true);
+  }
+  if (lower.compare(0, 26, "repeating-radial-gradient(") == 0) {
+    return _valueParser.parseRadialGradient(trimmed, boxWidth, boxHeight, /*repeating=*/true);
+  }
+  if (lower.compare(0, 25, "repeating-conic-gradient(") == 0) {
+    return _valueParser.parseConicGradient(trimmed, /*repeating=*/true);
+  }
   if (lower.compare(0, 16, "linear-gradient(") == 0) {
     return _valueParser.parseLinearGradient(trimmed, boxWidth, boxHeight);
   }
@@ -183,32 +204,6 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, fl
   }
   if (lower.compare(0, 15, "conic-gradient(") == 0) {
     return _valueParser.parseConicGradient(trimmed);
-  }
-  // CSS `repeating-*-gradient(...)` forms. PAGX has no tile/repeat axis on its gradient
-  // nodes, so we cannot reproduce the tiled effect natively. Falling back to the non-repeating
-  // variant preserves the dominant color and direction (e.g. a teal scanline overlay collapses
-  // into a single teal-to-transparent stripe instead of being dropped to opaque black). The
-  // caller still emits a "background-image not supported" diagnostic via a separate code path
-  // for cases where even this degraded version fails to parse.
-  static constexpr size_t kRepeatingPrefixLen = 10;  // length of "repeating-"
-  auto warnDowngrade = [&](ColorSource* color) -> ColorSource* {
-    if (color != nullptr) {
-      _diagnostics.warn("html: " + lower.substr(0, lower.find('(')) +
-                        " is not supported as a repeating pattern; "
-                        "rendered as a single non-repeating gradient instead");
-    }
-    return color;
-  };
-  if (lower.compare(0, 26, "repeating-linear-gradient(") == 0) {
-    return warnDowngrade(_valueParser.parseLinearGradient(trimmed.substr(kRepeatingPrefixLen),
-                                                          boxWidth, boxHeight, /*repeating=*/true));
-  }
-  if (lower.compare(0, 26, "repeating-radial-gradient(") == 0) {
-    return warnDowngrade(_valueParser.parseRadialGradient(trimmed.substr(kRepeatingPrefixLen),
-                                                          boxWidth, boxHeight, /*repeating=*/true));
-  }
-  if (lower.compare(0, 25, "repeating-conic-gradient(") == 0) {
-    return warnDowngrade(_valueParser.parseConicGradient(trimmed.substr(kRepeatingPrefixLen)));
   }
   return nullptr;
 }
@@ -357,6 +352,34 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
   return emitted;
 }
 
+namespace {
+
+// Whether a background paint can let the layers below it show through, so the CSS
+// background-color must be preserved underneath. Gradients are transparent when any stop carries
+// alpha < 1; image patterns (e.g. a `repeating-linear-gradient` tile with transparent gaps) are
+// treated as potentially transparent.
+bool ColorSourceMayShowThrough(const ColorSource* source) {
+  if (source == nullptr) return false;
+  switch (source->nodeType()) {
+    case NodeType::ImagePattern:
+      return true;
+    case NodeType::LinearGradient:
+    case NodeType::RadialGradient:
+    case NodeType::ConicGradient:
+    case NodeType::DiamondGradient: {
+      const auto* gradient = static_cast<const Gradient*>(source);
+      for (const auto* stop : gradient->colorStops) {
+        if (stop != nullptr && stop->color.alpha < 1.0f) return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}
+
+}  // namespace
+
 void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box,
                                            Element* geometry, bool& emitted) {
   if (!geometry) return;
@@ -404,14 +427,22 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
     // `background-blend-mode` blends each background layer against the layers *below* it, with
     // the background-color as the bottom-most layer. Emit the solid colour first so the blended
     // gradient Fill has a backdrop to composite against; without a blend mode an opaque gradient
-    // fully hides the colour, so the no-blend path keeps dropping it to avoid an inert extra Fill.
+    // fully hides the colour, so the no-blend path drops it to avoid an inert extra Fill — but a
+    // transparent gradient / repeating-pattern tile lets the colour show through, so it must stay.
     BlendMode blend = resolveBackgroundBlendMode(box.backgroundBlendMode);
+    bool anyShowsThrough = false;
+    for (auto* color : colors) {
+      if (ColorSourceMayShowThrough(color)) {
+        anyShowsThrough = true;
+        break;
+      }
+    }
     // Tracks whether a background layer has already been painted beneath the current Fill. The
     // bottom-most layer has nothing below it in the element's own background, so it must draw
     // with Normal (matching CSS, where a lone/bottom layer's blend mode is a no-op) rather than
     // blending against whatever sits behind the whole layer.
     bool hasBackdrop = false;
-    if (blend != BlendMode::Normal && box.backgroundColorSet) {
+    if ((blend != BlendMode::Normal || anyShowsThrough) && box.backgroundColorSet) {
       layer->contents.push_back(buildSolidFill(box.backgroundColor));
       hasBackdrop = true;
     }

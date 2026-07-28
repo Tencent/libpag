@@ -18,8 +18,10 @@
 
 #include "pagx/html/importer/HTMLParserContext.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <utility>
+#include "pagx/FontConfig.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/nodes/Animation.h"
@@ -30,6 +32,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pagx {
 
@@ -91,6 +94,43 @@ size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::st
   return removed;
 }
 
+// Normalises a font-family name for case- and spacing-insensitive comparison the way CSS
+// treats family identifiers: lower-cased, leading/trailing whitespace trimmed, and internal
+// runs of whitespace collapsed to a single space. Whitespace is *significant* in CSS family
+// names (only its amount is not), so this deliberately preserves single spaces rather than
+// deleting all whitespace — a "delete every space" rule would fold "SF Mono" into "sfmono" and
+// wrongly match a platform's spaceless variant "SFMono", defeating the substitution guard this
+// availability check exists to enforce. Written as a free function to honour the no-lambda rule.
+std::string NormalizeFamilyName(const std::string& name) {
+  std::string out;
+  out.reserve(name.size());
+  bool pendingSpace = false;
+  for (unsigned char c : name) {
+    if (std::isspace(c)) {
+      // Defer emitting a separator until a non-space follows, so leading/trailing runs are
+      // dropped and interior runs collapse to exactly one space.
+      pendingSpace = !out.empty();
+      continue;
+    }
+    if (pendingSpace) {
+      out.push_back(' ');
+      pendingSpace = false;
+    }
+    out.push_back(static_cast<char>(std::tolower(c)));
+  }
+  return out;
+}
+
+// True when the family the renderer resolved matches the family we requested. A mismatch means
+// the platform substituted a different face (e.g. a hidden or missing font), so the requested
+// family should be treated as unavailable.
+bool FontFamilyNamesMatch(const std::string& requested, const std::string& resolved) {
+  if (resolved.empty()) {
+    return false;
+  }
+  return NormalizeFamilyName(requested) == NormalizeFamilyName(resolved);
+}
+
 }  // namespace
 
 //==================================================================================================
@@ -100,6 +140,10 @@ size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::st
 void HTMLParserContext::RecordFontFallbacksThunk(void* userData,
                                                  const std::vector<std::string>& chain) {
   static_cast<HTMLParserContext*>(userData)->recordFontFallbacks(chain);
+}
+
+bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::string& family) {
+  return static_cast<HTMLParserContext*>(userData)->isFontFamilyAvailable(family);
 }
 
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
@@ -116,12 +160,52 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
   _styleCascade->setFontFallbackSink(&HTMLParserContext::RecordFontFallbacksThunk, this);
+  // Let the cascade pick the first *resolvable* family from each font-family stack, so a leading
+  // family the renderer can't resolve (e.g. the hidden "SF Mono" system font) doesn't get written
+  // to `Text::fontFamily` and silently substituted with a mismatched proportional default.
+  _styleCascade->setFontAvailabilitySink(&HTMLParserContext::IsFontFamilyAvailableThunk, this);
   // The byte/string entry points have no implicit anchor for relative `<img src>` paths;
   // honour the caller-supplied base path here. The file entry point overrides this with
   // the input file's parent directory.
   if (!_options.basePath.empty()) {
     _imageResources->setBasePath(_options.basePath);
   }
+}
+
+bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
+  if (family.empty()) {
+    return false;
+  }
+  // Two matching rules are used on purpose. Registered/embedded fonts must resolve exactly the
+  // way `LayoutContext` resolves them, so honour them first via `containsFamily` (exact string
+  // match) — loosening this would claim availability the renderer can't actually deliver. System
+  // fonts, in contrast, are resolved by the platform font manager, which silently substitutes a
+  // default face for an unknown name (on some platforms `MakeFromName` never returns null) and
+  // may report the same family under a differently-spaced spelling; there we compare with the
+  // spacing/case-insensitive `FontFamilyNamesMatch` and treat the family as available only when
+  // the resolved typeface's family matches the request — i.e. no substitution happened.
+  //
+  // The registered branch is checked *before* the cache and against the exact `family` string.
+  // `containsFamily` is a cheap in-memory scan, and its result depends on the exact spelling, so
+  // it must not be served from — or written to — the spacing/case-insensitive cache below: two
+  // variants sharing a normalised key can disagree on the exact match (only one is registered),
+  // and caching one variant's verdict under the shared key would wrongly answer the other.
+  if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
+    return true;
+  }
+  // Only the system-font probe is cached, keyed on the normalised name so spelling/spacing
+  // variants of the same CSS family ("SF Mono" / "sf  mono") share one entry and touch the
+  // platform font manager at most once. This is safe because the probe itself compares with the
+  // same spacing/case-insensitive rule, so all variants of a key genuinely share one verdict.
+  std::string cacheKey = NormalizeFamilyName(family);
+  auto cached = _fontAvailabilityCache.find(cacheKey);
+  if (cached != _fontAvailabilityCache.end()) {
+    return cached->second;
+  }
+  auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
+  bool available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
+  _fontAvailabilityCache.emplace(std::move(cacheKey), available);
+  return available;
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {
@@ -656,6 +740,10 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // after children are attached so the mask layer is appended last; it shares `layer`'s local
   // coordinate origin (the mask SVG geometry is in the masked element's own 0..W/0..H space).
   applyMaskOrClip(layer, box);
+  // Reshape the rectangular `overflow: hidden` clip into the border-radius outline so descendants
+  // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
+  // and is skipped for the folded single-image case (which returned early above).
+  applyRoundedOverflowClip(layer, box);
   assignElementId(wrapper, element);
   return wrapper;
 }

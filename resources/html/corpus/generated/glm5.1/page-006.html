@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>宠主画像</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide bg-[#F5F0E8]">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="star-decor text-[24px]">*</span>
+      <span class="text-[16px] font-[500] text-[#111827]">宠主画像</span>
+    </div>
+    <span class="text-[14px] text-[#6B7280]">第 06 页</span>
+  </div>
+
+  <!-- 标题 -->
+  <div class="pt-[88px] px-[48px]">
+    <div class="flex items-end gap-[32px]">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#111827]" style="transform: skewX(-5deg);">
+          年轻化浪潮
+        </h1>
+      </div>
+      <div class="text-[16px] text-[#4B5563] pb-[8px]">69%宠主为90后及更年轻群体</div>
+    </div>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="flex px-[48px] mt-[24px] gap-[40px]">
+    <!-- 饼图 -->
+    <div class="flex-1">
+      <div id="chart-owner" style="width: 560px; height: 400px;"></div>
+    </div>
+    <!-- 人群卡片 -->
+    <div class="w-[500px] flex flex-col justify-center gap-[14px]">
+      <div class="bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <div class="flex items-center gap-[12px] mb-[8px]">
+          <i class="ph ph-user text-[#2563EB] text-[22px]"></i>
+          <span class="text-[16px] font-[700] text-[#111827]">90后</span>
+          <span class="text-[28px] font-[900] text-[#2563EB] ml-auto">42.7%</span>
+        </div>
+        <div class="text-[13px] text-[#4B5563]">主力军，消费决策感性，愿为品质和品牌溢价买单</div>
+      </div>
+      <div class="bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <div class="flex items-center gap-[12px] mb-[8px]">
+          <i class="ph ph-user text-[#3B82F6] text-[22px]"></i>
+          <span class="text-[16px] font-[700] text-[#111827]">00后</span>
+          <span class="text-[28px] font-[900] text-[#3B82F6] ml-auto">26.3%</span>
+        </div>
+        <div class="text-[13px] text-[#4B5563]">追涨最快，偏好鲜食和智能用品，社交分享驱动消费</div>
+      </div>
+      <div class="bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <div class="flex items-center gap-[12px] mb-[8px]">
+          <i class="ph ph-user text-[#60A5FA] text-[22px]"></i>
+          <span class="text-[16px] font-[700] text-[#111827]">80后</span>
+          <span class="text-[28px] font-[900] text-[#60A5FA] ml-auto">24.5%</span>
+        </div>
+        <div class="text-[13px] text-[#4B5563]">稳健消费，注重医疗和品质，信赖专业推荐</div>
+      </div>
+      <div class="bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <div class="flex items-center gap-[12px]">
+          <i class="ph ph-users text-[#111827] text-[22px]"></i>
+          <span class="text-[14px] text-[#4B5563]">城镇养宠家庭</span>
+          <span class="text-[28px] font-[900] text-[#111827] ml-auto">7689<span class="text-[14px] font-[400]">万户</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#6B7280]">中国宠物经济趋势洞察</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+
+<script>
+  var chart = echarts.init(document.getElementById('chart-owner'));
+  chart.setOption({
+    animation: false,
+    series: [{
+      type: 'pie',
+      radius: ['40%', '70%'],
+      center: ['50%', '50%'],
+      data: [
+        { value: 42.7, name: '90后', itemStyle: { color: '#2563EB' } },
+        { value: 26.3, name: '00后', itemStyle: { color: '#3B82F6' } },
+        { value: 24.5, name: '80后', itemStyle: { color: '#60A5FA' } },
+        { value: 6.5, name: '80前', itemStyle: { color: '#93C5FD' } }
+      ],
+      label: {
+        color: '#111827',
+        fontSize: 14,
+        fontWeight: 500,
+        formatter: '{b}\n{d}%'
+      },
+      labelLine: { lineStyle: { color: '#D1D5DB' } },
+      emphasis: { disabled: true }
+    }]
+  });
+</script>
+</body>
+</html>
