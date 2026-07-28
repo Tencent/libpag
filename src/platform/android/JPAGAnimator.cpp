@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <mutex>
 #include "JNIHelper.h"
 #include "rendering/PAGAnimator.h"
 
@@ -26,6 +27,7 @@ static jmethodID PAGAnimator_onAnimationEnd;
 static jmethodID PAGAnimator_onAnimationCancel;
 static jmethodID PAGAnimator_onAnimationRepeat;
 static jmethodID PAGAnimator_onAnimationUpdate;
+static std::mutex PAGAnimator_contextLocker = {};
 
 class AnimatorListener : public pag::PAGAnimator::Listener {
  public:
@@ -131,7 +133,9 @@ class JPAGAnimator {
       tempAnimator = std::move(animator);
       tempListener = std::move(listener);
     }
-    // Call cancel outside the lock to avoid deadlock
+    // Call cancel outside the lock to avoid deadlock: cancel() may synchronously invoke listener
+    // callbacks that re-enter methods on this JPAGAnimator, which would try to acquire locker
+    // again.
     if (tempAnimator) {
       tempAnimator->cancel();
     }
@@ -147,6 +151,7 @@ class JPAGAnimator {
 using namespace pag;
 
 std::shared_ptr<PAGAnimator> getPAGAnimator(JNIEnv* env, jobject thiz) {
+  std::lock_guard<std::mutex> autoLock(PAGAnimator_contextLocker);
   auto animator =
       reinterpret_cast<JPAGAnimator*>(env->GetLongField(thiz, PAGAnimator_nativeContext));
   if (animator == nullptr) {
@@ -156,9 +161,23 @@ std::shared_ptr<PAGAnimator> getPAGAnimator(JNIEnv* env, jobject thiz) {
 }
 
 void setPAGAnimator(JNIEnv* env, jobject thiz, JPAGAnimator* animator) {
-  auto old = reinterpret_cast<JPAGAnimator*>(env->GetLongField(thiz, PAGAnimator_nativeContext));
+  JPAGAnimator* old = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(PAGAnimator_contextLocker);
+    old = reinterpret_cast<JPAGAnimator*>(env->GetLongField(thiz, PAGAnimator_nativeContext));
+    env->SetLongField(thiz, PAGAnimator_nativeContext, (jlong)animator);
+  }
   delete old;
-  env->SetLongField(thiz, PAGAnimator_nativeContext, (jlong)animator);
+}
+
+void clearPAGAnimator(JNIEnv* env, jobject thiz) {
+  JPAGAnimator* old = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(PAGAnimator_contextLocker);
+    old = reinterpret_cast<JPAGAnimator*>(env->GetLongField(thiz, PAGAnimator_nativeContext));
+    env->SetLongField(thiz, PAGAnimator_nativeContext, 0);
+  }
+  delete old;
 }
 
 extern "C" {
@@ -177,15 +196,11 @@ PAG_API void Java_org_libpag_PAGAnimator_nativeSetup(JNIEnv* env, jobject thiz) 
 }
 
 PAG_API void Java_org_libpag_PAGAnimator_nativeRelease(JNIEnv* env, jobject thiz) {
-  auto jPlayer =
-      reinterpret_cast<JPAGAnimator*>(env->GetLongField(thiz, PAGAnimator_nativeContext));
-  if (jPlayer != nullptr) {
-    jPlayer->clear();
-  }
+  clearPAGAnimator(env, thiz);
 }
 
 PAG_API void Java_org_libpag_PAGAnimator_nativeFinalize(JNIEnv* env, jobject thiz) {
-  setPAGAnimator(env, thiz, nullptr);
+  clearPAGAnimator(env, thiz);
 }
 
 PAG_API jboolean Java_org_libpag_PAGAnimator_isSync(JNIEnv* env, jobject thiz) {
