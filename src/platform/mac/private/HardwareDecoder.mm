@@ -163,7 +163,15 @@ bool HardwareDecoder::resetVideoToolBox() {
   const void* combineDics[] = {inAttrs};
   CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
   CFDictionaryRef outAttrs = NULL;
-  CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
+  // CVPixelBufferCreateResolvedAttributesDictionary may fail when attributes
+  // contain keys unsupported by the current environment (e.g., the OpenGL
+  // compatibility key is no longer recognized on newer macOS), and will set
+  // outAttrs to NULL in that case.
+  CVReturn resolvedResult =
+      CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
+  if (resolvedResult != kCVReturnSuccess) {
+    outAttrs = NULL;
+  }
   VTDecompressionOutputCallbackRecord callBackRecord;
   callBackRecord.decompressionOutputCallback = DidDecompress;
   callBackRecord.decompressionOutputRefCon = NULL;
@@ -171,7 +179,9 @@ bool HardwareDecoder::resetVideoToolBox() {
   OSStatus status = VTDecompressionSessionCreate(kCFAllocatorDefault, videoFormatDescription, NULL,
                                                  outAttrs, &callBackRecord, &session);
 
-  CFRelease(outAttrs);
+  if (outAttrs != NULL) {
+    CFRelease(outAttrs);
+  }
   CFRelease(combines);
   CFRelease(inAttrs);
   CFRelease(pixelFormatTypeValue);
