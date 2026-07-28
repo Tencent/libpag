@@ -1164,10 +1164,45 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleOmittedSizeUsesFarthestCorner
   EXPECT_TRUE(NearlyEqual(rg->radius, 335.41f, 0.5f));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleClosestSideExtent) {
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleExtentKeywordsUseDistanceFromCenter) {
+  struct ExtentCase {
+    const char* keyword;
+    float radius;
+  };
+  // Center (100,50) in a 400x200 box gives side distances 100, 300, 50, 150.
+  // Corner radii are therefore hypot(100,50) and hypot(300,150).
+  const std::vector<ExtentCase> cases = {
+      {"closest-side", 50.0f},
+      {"farthest-side", 300.0f},
+      {"closest-corner", 111.80f},
+      {"farthest-corner", 335.41f},
+  };
+  for (const auto& extent : cases) {
+    SCOPED_TRACE(extent.keyword);
+    auto html = std::string(
+                    "<html><body style=\"width:400px;height:400px\">"
+                    "<div style=\"width:400px;height:200px;background-image:radial-gradient("
+                    "circle ") +
+                extent.keyword +
+                " at 25% 25%, #FFFFFF 0%, transparent 100%)\"></div></body></html>";
+    auto doc = ParseFromString(html);
+    ASSERT_NE(doc, nullptr);
+    auto* div = doc->layers.front()->children.front();
+    auto* fill = FindElementOfType<pagx::Fill>(div);
+    ASSERT_NE(fill, nullptr);
+    auto* rg = As<pagx::RadialGradient>(fill->color);
+    ASSERT_NE(rg, nullptr);
+    EXPECT_FALSE(rg->fitsToGeometry);
+    EXPECT_TRUE(NearlyEqual(rg->center.x, 100.0f, 0.01f));
+    EXPECT_TRUE(NearlyEqual(rg->center.y, 50.0f, 0.01f));
+    EXPECT_TRUE(NearlyEqual(rg->radius, extent.radius, 0.01f));
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleExtentOnSquareBoxKeepsNormalised) {
   auto doc = ParseFromString(R"HTML(
-    <html><body style="width:400px;height:400px">
-      <div style="width:400px;height:200px;background-image:radial-gradient(circle closest-side at 25% 50%, #FFFFFF 0%, transparent 100%)"></div>
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:100px;background-image:radial-gradient(circle farthest-corner at center, #FFFFFF 0%, transparent 100%)"></div>
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
@@ -1176,12 +1211,34 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleClosestSideExtent) {
   ASSERT_NE(fill, nullptr);
   auto* rg = As<pagx::RadialGradient>(fill->color);
   ASSERT_NE(rg, nullptr);
-  // closest-side: center (100,100) on a 400x200 box; nearest edge distances are left=100,
-  // right=300, top=100, bottom=100, so the radius is 100px in the isotropic pixel model.
-  EXPECT_FALSE(rg->fitsToGeometry);
-  EXPECT_TRUE(NearlyEqual(rg->center.x, 100.0f, 0.5f));
-  EXPECT_TRUE(NearlyEqual(rg->center.y, 100.0f, 0.5f));
-  EXPECT_TRUE(NearlyEqual(rg->radius, 100.0f, 0.5f));
+  // A square box is already isotropic in geometry space, so the farthest-corner radius
+  // hypot(50,50) is stored as hypot(0.5,0.5) instead of switching to pixel coordinates.
+  EXPECT_TRUE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 0.5f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 0.5f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 0.7071f, 0.001f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, GradientTransparentStopsBorrowOpaqueNeighborRGB) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <div style="width:100px;height:50px;background-image:linear-gradient(
+        90deg, transparent 0%, rgba(220, 210, 255, 0.4) 50%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 3u);
+
+  // The renderer interpolates unpremultiplied colors. Giving both transparent edge stops the
+  // purple neighbor's RGB preserves a purple fade instead of blending through transparent black.
+  EXPECT_TRUE(ColorNear(lg->colorStops[0]->color, HexColor(0xDCD2FF, 0.0f)));
+  EXPECT_TRUE(ColorNear(lg->colorStops[1]->color, HexColor(0xDCD2FF, 0.4f)));
+  EXPECT_TRUE(ColorNear(lg->colorStops[2]->color, HexColor(0xDCD2FF, 0.0f)));
 }
 
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {

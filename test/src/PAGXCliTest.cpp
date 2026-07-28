@@ -38,6 +38,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "tgfx/core/Bitmap.h"
@@ -2679,8 +2680,9 @@ CLI_TEST(PAGXCliTest, Resolve_MissingFile) {
 }
 
 CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
-  // Verifies that resolving an inline SVG with multiple elements preserves each SVG element
-  // in a separate painter scope, preventing painter accumulation bugs.
+  // Resolving an inline SVG with two sibling paths must preserve their common source depth:
+  // each path and its painter live in a separate peer Group. Flattening only the first path while
+  // grouping the second would make the output asymmetric and can change painter accumulation.
   auto pagxPath = CopyToTemp("import_resolve_multi_layer.pagx", "resolve_multi_layer.pagx");
   auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
   EXPECT_EQ(ret, 0);
@@ -2691,14 +2693,15 @@ CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
 
   ASSERT_EQ(doc->layers.size(), 1u);
   auto* hostLayer = doc->layers[0];
-  EXPECT_FALSE(hostLayer->contents.empty());
-  size_t groupCount = 0;
+  EXPECT_TRUE(hostLayer->children.empty());
+  ASSERT_EQ(hostLayer->contents.size(), 2u);
   for (auto* element : hostLayer->contents) {
-    if (element->nodeType() == pagx::NodeType::Group) {
-      groupCount++;
-    }
+    ASSERT_EQ(element->nodeType(), pagx::NodeType::Group);
+    auto* group = static_cast<pagx::Group*>(element);
+    ASSERT_EQ(group->elements.size(), 2u);
+    EXPECT_EQ(group->elements[0]->nodeType(), pagx::NodeType::Path);
+    EXPECT_EQ(group->elements[1]->nodeType(), pagx::NodeType::Stroke);
   }
-  EXPECT_GE(groupCount, 1u);
 
   // Screenshot test: render the resolved file and compare against baseline.
   EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
