@@ -81,6 +81,7 @@ class PAGXViewModel : public ContentViewModel {
     double progress = 0.0;
     bool seekRequested = false;
     uint64_t generation = 0;
+    ViewTransform viewTransform = {};
   };
 
   void setWindow(QQuickWindow* window);
@@ -123,6 +124,9 @@ class PAGXViewModel : public ContentViewModel {
    * This is used to defer XmlLinesModel updates until the first render is done.
    */
   Q_SLOT void onRenderCompleted();
+
+ protected:
+  void onViewTransformChanged() override;
 
  private:
   void clearContent();
