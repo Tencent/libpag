@@ -1143,6 +1143,47 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientEllipseOnNonSquareBoxKeepsNormalise
   EXPECT_TRUE(rg->fitsToGeometry);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleOmittedSizeUsesFarthestCorner) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:400px">
+      <div style="width:400px;height:200px;background-image:radial-gradient(circle at 25% 25%, #FFFFFF 0%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // A `circle` with no size defaults to farthest-corner: center (100,50) on a 400x200 box reaches
+  // the farthest corner (400,200) at sqrt(300^2 + 150^2) ~= 335.4px. The pixel model keeps the
+  // radius isotropic, so center/radius are stored in px with fitsToGeometry disabled.
+  EXPECT_FALSE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 100.0f, 0.5f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 50.0f, 0.5f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 335.41f, 0.5f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleClosestSideExtent) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:400px">
+      <div style="width:400px;height:200px;background-image:radial-gradient(circle closest-side at 25% 50%, #FFFFFF 0%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // closest-side: center (100,100) on a 400x200 box; nearest edge distances are left=100,
+  // right=300, top=100, bottom=100, so the radius is 100px in the isotropic pixel model.
+  EXPECT_FALSE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 100.0f, 0.5f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 100.0f, 0.5f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 100.0f, 0.5f));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
