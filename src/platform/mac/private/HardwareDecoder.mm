@@ -163,9 +163,12 @@ bool HardwareDecoder::resetVideoToolBox() {
   const void* combineDics[] = {inAttrs};
   CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
   CFDictionaryRef outAttrs = NULL;
-  // CVPixelBufferCreateResolvedAttributesDictionary may fail on newer macOS
-  // versions (e.g., macOS 27 beta) and set outAttrs to NULL.
-  auto resolvedResult = CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
+  // CVPixelBufferCreateResolvedAttributesDictionary may fail when attributes
+  // contain keys unsupported by the current environment (e.g., the OpenGL
+  // compatibility key is no longer recognized on newer macOS), and will set
+  // outAttrs to NULL in that case.
+  CVReturn resolvedResult =
+      CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
   if (resolvedResult != kCVReturnSuccess) {
     outAttrs = NULL;
   }
