@@ -21,6 +21,9 @@
 #import "PAGLayer.h"
 
 @class PAGView;
+#if __has_attribute(swift_attr)
+__attribute__((swift_attr("@MainActor")))
+#endif
 @protocol PAGViewListener <NSObject>
 
 @optional
