@@ -226,4 +226,21 @@ std::vector<std::string> FontConfig::fallbackFamilyNames() const {
   return names;
 }
 
+bool FontConfig::containsFamily(const std::string& fontFamily) const {
+  if (fontFamily.empty()) {
+    return false;
+  }
+  for (const auto& pair : data->registeredTypefaces) {
+    if (pair.first.family == fontFamily) {
+      return true;
+    }
+  }
+  for (const auto& holder : data->fallbackTypefaces) {
+    if (holder.getFontFamily() == fontFamily) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace pagx

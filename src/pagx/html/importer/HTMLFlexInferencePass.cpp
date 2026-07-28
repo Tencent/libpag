@@ -249,6 +249,21 @@ const char* AxisName(FlexAxis a) {
   return a == FlexAxis::Row ? "row" : "column";
 }
 
+// Returns true when the parent's extent along `axis` is imposed by an outer layout — a positive
+// flex-grow factor, or a declared non-px size such as a percentage — rather than shrink-wrapping
+// to its children. Such a parent renders larger than the children's bounding box, so a shared
+// child inset on that axis is a centering artifact, not padding. When the axis carries no
+// declaration at all the parent shrink-wraps and the inset is real padding, so this returns false
+// and the bbox-fallback lift stays enabled (see FlexInferenceBboxFallbackLiftsSharedCrossInset).
+bool AxisSizedByOuterLayout(const PropertyMap* props, FlexAxis axis) {
+  if (!props) return false;
+  if (ChildHasFlexGrow(*props)) return true;
+  const std::string& val = LookupResolved(*props, axis == FlexAxis::Row ? "width" : "height");
+  if (val.empty()) return false;
+  float px = 0.0f;
+  return !ParseNormalisedPx(val, px);
+}
+
 // Mutates the parent's resolved style to declare the inferred flex layout. Strips any
 // per-side padding overrides we just folded into the shorthand. When `centerMain` is set the
 // content is centred on the main axis via `justify-content: center` instead of symmetric
@@ -426,10 +441,15 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
   }
   // Lift any inset that every child shares on the cross axis into extra padding. Only safe
   // when the cross dimension came from the children-bbox fallback: an explicit parent
-  // dimension already reserves the inset.
+  // dimension already reserves the inset. It is also unsafe when the parent is sized by an
+  // outer layout (flex-grow, percentage width/height): its rendered box is larger than the
+  // bbox, so a shared inset is a centering offset — baking it as padding, plus the child then
+  // centering inside the shrunken content box, shifts the content off-centre. Skip the lift in
+  // that case and let the alignment inference below centre/stretch within the true extent.
   float extraCrossLeading = 0.0f;
   float extraCrossTrailing = 0.0f;
-  if (!crossFromExplicit) {
+  bool crossOuterSized = !crossFromExplicit && AxisSizedByOuterLayout(parentResolved, crossAxis);
+  if (!crossFromExplicit && !crossOuterSized) {
     float childCrossLoMin = std::numeric_limits<float>::infinity();
     float childCrossLoMax = -std::numeric_limits<float>::infinity();
     float childCrossHiMin = std::numeric_limits<float>::infinity();
@@ -461,6 +481,15 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
     ctx.warn("subset:flex-inference-skipped",
              "html: <" + tag + "> children have mixed cross-axis alignment; kept absolute", parent);
     return;
+  }
+  // When the cross axis is sized by an outer layout, the children's bounding box underestimates
+  // the parent's true extent, so a "stretch" verdict (children exactly fill the bbox) cannot be
+  // trusted — the children have a definite measured size and sit within a larger box. Preserve
+  // their size and centre them instead of stretching to a width we cannot confirm; stretching a
+  // width-less child inside an outer-sized parent leaves it collapsed and pins the content to the
+  // leading edge (slide-4 pill regression).
+  if (align == CrossAlign::Stretch && crossOuterSized) {
+    align = CrossAlign::Center;
   }
 
   MainAxisFit fit = InferMainAxisSpacing(sorted, axis, mainContentLow, mainContentHigh, tol);
