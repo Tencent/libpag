@@ -18,6 +18,7 @@
 
 #include "pagx/nodes/LayoutNode.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include "LayoutContext.h"
 #include "pagx/nodes/Element.h"
@@ -50,6 +51,9 @@ void LayoutNode::resetLayout() {
   layoutY = NAN;
   layoutWidth = NAN;
   layoutHeight = NAN;
+  lastLayoutTargetWidth = NAN;
+  lastLayoutTargetHeight = NAN;
+  layoutResolved = false;
 }
 
 Rect LayoutNode::layoutBounds() const {
@@ -95,7 +99,10 @@ void LayoutNode::updateSize(LayoutContext* context) {
   if (!std::isnan(preferredWidth) && !std::isnan(preferredHeight)) {
     return;
   }
+  auto measureStart = std::chrono::steady_clock::now();
   onMeasure(context);
+  auto measureEnd = std::chrono::steady_clock::now();
+  context->measureMs += std::chrono::duration<double, std::milli>(measureEnd - measureStart).count();
 }
 
 void LayoutNode::setLayoutSize(LayoutContext*, float, float) {

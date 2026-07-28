@@ -28,6 +28,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "base/utils/Log.h"
 
 using namespace emscripten;
 
@@ -143,9 +144,13 @@ void PAGXView::buildLayers() {
   if (!document) {
     return;
   }
+  auto t0 = emscripten_get_now();
   document->applyLayout(&fontConfig);
+  auto t1 = emscripten_get_now();
   scene = PAGScene::Make(document);
+  auto t2 = emscripten_get_now();
   if (scene == nullptr) {
+    LOGI("[buildLayers] layout=%.2fms scene=%.2fms (scene null)", t1 - t0, t2 - t1);
     return;
   }
   defaultTimeline = scene->getDefaultTimeline();
@@ -160,6 +165,9 @@ void PAGXView::buildLayers() {
   applySceneDisplayOptions();
   updateContentTransform();
   presentImmediately = true;
+  auto t3 = emscripten_get_now();
+  LOGI("[buildLayers] layout=%.2fms scene=%.2fms setup=%.2fms total=%.2fms",
+       t1 - t0, t2 - t1, t3 - t2, t3 - t0);
 }
 
 void PAGXView::advanceTimelines(double frameStartMs) {
@@ -349,11 +357,14 @@ void PAGXView::draw() {
   }
   double frameStartMs = emscripten_get_now();
   advanceTimelines(frameStartMs);
+  double t1 = emscripten_get_now();
   int currentCanvasWidth = 0;
   int currentCanvasHeight = 0;
   emscripten_get_canvas_element_size(canvasID.c_str(), &currentCanvasWidth, &currentCanvasHeight);
   syncSurfaceSize(currentCanvasWidth, currentCanvasHeight);
+  double t2 = emscripten_get_now();
   if (tgfxSurface == nullptr) {
+    LOGI("[draw] advance=%.2fms sync=%.2fms (surface null)", t1 - frameStartMs, t2 - t1);
     return;
   }
   // Dirty gate: skip the Record()/submit pass on idle frames. advanceTimelines() above already
@@ -371,8 +382,11 @@ void PAGXView::draw() {
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
+  double tRecord = 0.0;
+  double tSubmit = 0.0;
   if (context != nullptr) {
     auto recording = pagx::Record(context, scene, pagSurface, true);
+    tRecord = emscripten_get_now();
     if (presentImmediately) {
       // Force the freshest frame on screen right now. Drop whatever frame is still parked in
       // lastRecording so the deferred (older) content cannot resurface one frame later.
@@ -391,8 +405,11 @@ void PAGXView::draw() {
         context->submit(std::move(recording));
       }
     }
+    tSubmit = emscripten_get_now();
     device->unlock();
   }
+  LOGI("[draw] advance=%.2fms sync=%.2fms record=%.2fms submit=%.2fms",
+       t1 - frameStartMs, t2 - t1, tRecord - t2, tSubmit - tRecord);
 
   double frameEndMs = emscripten_get_now();
   double frameDurationMs = frameEndMs - frameStartMs;

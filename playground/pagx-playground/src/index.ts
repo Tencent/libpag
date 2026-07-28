@@ -481,11 +481,16 @@ async function applyXml(xmlText: string): Promise<string> {
     if (!player) {
         return 'Player not initialized';
     }
+    const totalStart = performance.now();
     try {
+        let stepStart = performance.now();
         const bytes = new TextEncoder().encode(xmlText);
+        console.log(`[Apply] encode: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
         // Preserve playback position so an Apply doesn't jump the animation back to frame 0.
         // baseURL for external resources stays the same as the currently loaded sample (or
         // empty for drag-and-drop) - re-editing XML keeps the same resource root.
+        stepStart = performance.now();
         await player.load(bytes, {
             preserveCurrentTime: true,
             xmlText,
@@ -494,9 +499,13 @@ async function applyXml(xmlText: string): Promise<string> {
                 ? makeResourceResolver(assetUrl('samples/'))
                 : undefined,
         });
+        console.log(`[Apply] player.load: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
         return '';
     } catch (e) {
         return e instanceof Error ? e.message : String(e);
+    } finally {
+        console.log(`[Apply] total: ${(performance.now() - totalStart).toFixed(2)} ms`);
     }
 }
 
@@ -614,7 +623,10 @@ async function loadPAGXData(
     // Callers (loadPAGXFile / loadPAGXSample) invoke prepareForLoading() and closeEditor()
     // before their own file / network read so the loading overlay is visible - and the editor
     // panel is out of the way - while the bytes are being fetched, not just after.
+    const totalStart = performance.now();
+    let stepStart = performance.now();
     const p = ensurePlayer();
+    console.log(`[Load] ensurePlayer: ${(performance.now() - stepStart).toFixed(2)} ms`);
 
     // Hide the nav-btns overlay so it doesn't sit on top of the player's own toolbar. It is
     // restored on goHome().
@@ -622,21 +634,32 @@ async function loadPAGXData(
 
     // Decode xmlText once for the source editor; the player forwards it into the editor via
     // the load option so the editor doesn't have to redo the TextDecoder work.
+    stepStart = performance.now();
     const xmlText = new TextDecoder('utf-8').decode(data);
+    console.log(`[Load] decodeXml: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
+    stepStart = performance.now();
     await p.load(data, {
         xmlText,
         registerFonts: registerFontsToView,
         resolveResource,
     });
+    console.log(`[Load] player.load: ${(performance.now() - stepStart).toFixed(2)} ms`);
 
+    stepStart = performance.now();
     p.show();
+    console.log(`[Load] player.show: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
     hideDropZone();
     document.title = `PAGX Playground - ${name}`;
     currentFileName = name;
+    console.log(`[Load] total: ${(performance.now() - totalStart).toFixed(2)} ms`);
 }
 
 async function loadPAGXFile(file: File): Promise<void> {
+    const totalStart = performance.now();
     try {
+        let stepStart = performance.now();
         // Close the source editor and show the loading overlay before reading the file so
         // users get immediate feedback that the drop was accepted, and don't see the editor
         // panel lingering over the loading screen while arrayBuffer() reads the bytes.
@@ -644,12 +667,23 @@ async function loadPAGXFile(file: File): Promise<void> {
         // editor; editor Apply/Save go through applyXml -> player.load directly and preserve
         // the editor state.
         player?.closeEditor();
+        console.log(`[LoadFile] closeEditor: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
+        stepStart = performance.now();
         await prepareForLoading();
+        console.log(`[LoadFile] prepareForLoading: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
+        stepStart = performance.now();
         const fileBuffer = await file.arrayBuffer();
+        console.log(`[LoadFile] readArrayBuffer: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
         // Drag-and-drop files have no baseURL for external references (external assets
         // packaged next to a .pagx aren't accessible over http); pass undefined so the
         // player's default (no external fetches) applies.
+        stepStart = performance.now();
         await loadPAGXData(new Uint8Array(fileBuffer), file.name);
+        console.log(`[LoadFile] loadPAGXData: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
         currentPlayingFile = null;
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
@@ -662,6 +696,8 @@ async function loadPAGXFile(file: File): Promise<void> {
         currentPlayingFile = null;
         document.getElementById('nav-btns')?.classList.remove('hidden');
         showErrorUI(error instanceof Error ? error.message : t().errorFormat);
+    } finally {
+        console.log(`[LoadFile] total: ${(performance.now() - totalStart).toFixed(2)} ms`);
     }
 }
 
@@ -676,11 +712,19 @@ async function loadPAGXSample(name: string, pushHistory: boolean = true): Promis
         showErrorUI(t().errorFormat);
         return;
     }
+    const totalStart = performance.now();
     try {
+        let stepStart = performance.now();
         // Mirror loadPAGXFile: close the editor and reveal the loading overlay before the
         // network round-trip so click feedback is immediate even on slow CDN networks.
         player?.closeEditor();
+        console.log(`[LoadSample] closeEditor: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
+        stepStart = performance.now();
         await prepareForLoading();
+        console.log(`[LoadSample] prepareForLoading: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
+        stepStart = performance.now();
         const url = assetUrl(`samples/${name}`);
         // Fetch the sample bytes ourselves (rather than delegating to prepareForLoading) so a
         // 404 from the CDN surfaces as a network error in the drop-zone instead of stalling
@@ -690,11 +734,16 @@ async function loadPAGXSample(name: string, pushHistory: boolean = true): Promis
             throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
         }
         const fileBuffer = await response.arrayBuffer();
+        console.log(`[LoadSample] fetchSample: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
+        stepStart = performance.now();
         await loadPAGXData(
             new Uint8Array(fileBuffer),
             name,
             makeResourceResolver(assetUrl('samples/')),
         );
+        console.log(`[LoadSample] loadPAGXData: ${(performance.now() - stepStart).toFixed(2)} ms`);
+
         currentPlayingFile = name;
 
         const cleanUrl = `${window.location.pathname}?sample=${encodeURIComponent(name)}`;
@@ -709,6 +758,8 @@ async function loadPAGXSample(name: string, pushHistory: boolean = true): Promis
         currentPlayingFile = null;
         document.getElementById('nav-btns')?.classList.remove('hidden');
         showErrorUI(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+        console.log(`[LoadSample] total: ${(performance.now() - totalStart).toFixed(2)} ms`);
     }
 }
 

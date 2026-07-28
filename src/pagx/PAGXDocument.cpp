@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXDocument.h"
 #include <algorithm>
+#include <chrono>
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
@@ -213,6 +214,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
   // When changedOut is requested, snapshot each Layer's layoutBounds here (before resetLayout()
   // clears them to NAN) so the post-layout pass can detect which Layers auto layout repositioned.
+  auto layoutT0 = std::chrono::steady_clock::now();
   std::unordered_map<Layer*, Rect> beforeBounds = {};
   if (layoutApplied) {
     for (auto& node : nodes) {
@@ -244,6 +246,7 @@ void PAGXDocument::applyLayout(const FontConfig* config,
       }
     }
   }
+  auto layoutT1 = std::chrono::steady_clock::now();
   LayoutContext context(&_fontConfig);
   // Composition layers are laid out first since they may be referenced by document layers.
   for (auto& node : nodes) {
@@ -252,7 +255,9 @@ void PAGXDocument::applyLayout(const FontConfig* config,
       layoutLayers(comp->layers, comp->width, comp->height, &context);
     }
   }
+  auto layoutT2 = std::chrono::steady_clock::now();
   layoutLayers(layers, width, height, &context);
+  auto layoutT3 = std::chrono::steady_clock::now();
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
@@ -267,6 +272,15 @@ void PAGXDocument::applyLayout(const FontConfig* config,
       }
     }
   }
+  auto layoutT4 = std::chrono::steady_clock::now();
+  LOGI("[applyLayout] reset=%.2fms comp=%.2fms top=%.2fms external=%.2fms total=%.2fms "
+       "updateLayoutCount=%d setLayoutSize=%d skipped=%d",
+       std::chrono::duration<double, std::milli>(layoutT1 - layoutT0).count(),
+       std::chrono::duration<double, std::milli>(layoutT2 - layoutT1).count(),
+       std::chrono::duration<double, std::milli>(layoutT3 - layoutT2).count(),
+       std::chrono::duration<double, std::milli>(layoutT4 - layoutT3).count(),
+       std::chrono::duration<double, std::milli>(layoutT4 - layoutT0).count(),
+       context.updateLayoutCount, context.setLayoutSizeCount, context.setLayoutSizeSkipped);
   // Mark layout complete only after all external subtrees have finished. Setting it earlier would
   // leave the document flagged as laid out even when a downstream cycle aborts the recursion,
   // letting PAGScene::Make build from an inconsistent tree.

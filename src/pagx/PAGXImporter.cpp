@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXImporter.h"
 #include <cerrno>
+#include <chrono>
 #include <climits>
 #include <cmath>
 #include <cstdlib>
@@ -1456,7 +1457,7 @@ static ImagePattern* ParseImagePattern(const DOMNode* node, PAGXDocument* doc) {
   if (!pattern) {
     return nullptr;
   }
-  auto imageAttr = GetAttribute(node, "image");
+  const auto& imageAttr = GetAttribute(node, "image");
   if (!imageAttr.empty()) {
     if (imageAttr[0] == '@') {
       pattern->image = doc->findNode<Image>(imageAttr.substr(1));
@@ -1509,7 +1510,7 @@ static Image* ParseImage(const DOMNode* node, PAGXDocument* doc) {
   if (!image) {
     return nullptr;
   }
-  auto source = GetAttribute(node, "source");
+  const auto& source = GetAttribute(node, "source");
   auto data = DecodeBase64DataURI(source);
   if (data) {
     image->data = data;
@@ -1524,7 +1525,7 @@ static PathData* ParsePathData(const DOMNode* node, PAGXDocument* doc) {
   if (!pathData) {
     return nullptr;
   }
-  auto data = GetAttribute(node, "data");
+  const auto& data = GetAttribute(node, "data");
   if (!data.empty()) {
     *pathData = PathDataFromSVGString(data);
   }
@@ -2188,7 +2189,7 @@ static Glyph* ParseGlyph(const DOMNode* node, PAGXDocument* doc) {
       *glyph->path = PathDataFromSVGString(pathAttr);
     }
   }
-  auto imageAttr = GetAttribute(node, "image");
+  const auto& imageAttr = GetAttribute(node, "image");
   if (!imageAttr.empty()) {
     if (imageAttr[0] == '@') {
       // Reference to existing Image resource
@@ -2942,7 +2943,9 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const std::string& xmlConten
 }
 
 std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t length) {
+  auto t0 = std::chrono::steady_clock::now();
   auto dom = XMLDOM::Make(data, length);
+  auto t1 = std::chrono::steady_clock::now();
   if (!dom) {
     return nullptr;
   }
@@ -2952,10 +2955,16 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   ParseDocument(root.get(), doc.get());
+  auto t2 = std::chrono::steady_clock::now();
+  LOGI("[FromXML] dom=%.2fms doc=%.2fms total=%.2fms",
+       std::chrono::duration<double, std::milli>(t1 - t0).count(),
+       std::chrono::duration<double, std::milli>(t2 - t1).count(),
+       std::chrono::duration<double, std::milli>(t2 - t0).count());
   return doc;
 }
 
 static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
+  auto t0 = std::chrono::steady_clock::now();
   doc->width = GetFloatAttribute(root, "width", 0, doc);
   doc->height = GetFloatAttribute(root, "height", 0, doc);
   ParseCustomData(root, doc);
@@ -2966,6 +2975,7 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
   if (child) {
     ParseResources(child.get(), doc);
   }
+  auto t1 = std::chrono::steady_clock::now();
 
   auto viewModelAttr = GetAttribute(root, "viewModel");
   if (!viewModelAttr.empty() && viewModelAttr[0] == '@') {
@@ -2998,6 +3008,7 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
     child = child->nextSibling;
   }
+  auto t2 = std::chrono::steady_clock::now();
 
   // Third pass: resolve any forward `mask="@id"` references now that every Layer id is in nodeMap.
   for (const auto& pending : gPendingMaskRefs) {
@@ -3010,6 +3021,13 @@ static void ParseDocument(const DOMNode* root, PAGXDocument* doc) {
     }
   }
   gPendingMaskRefs.clear();
+  auto t3 = std::chrono::steady_clock::now();
+  LOGI("[ParseDocument] resources=%.2fms layers=%.2fms masks=%.2fms total=%.2fms nodes=%zu",
+       std::chrono::duration<double, std::milli>(t1 - t0).count(),
+       std::chrono::duration<double, std::milli>(t2 - t1).count(),
+       std::chrono::duration<double, std::milli>(t3 - t2).count(),
+       std::chrono::duration<double, std::milli>(t3 - t0).count(),
+       doc->nodes.size());
 }
 
 // Splits a comma-joined enum "options" attribute, honoring backslash escapes produced on export:
