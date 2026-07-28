@@ -39,11 +39,42 @@ pagx-playground/
 First, ensure you have installed all the tools and dependencies listed in the
 [README.md](../../README.md#Development) in the project root, including Emscripten.
 
-> The playground does not compile any WebAssembly itself — the WASM comes from
-> [pagx-viewer](../pagx-viewer) and the player ESM bundle from [pagx-player](../pagx-player).
-> You no longer need to build those by hand: the `build` commands below compile both upstream
-> packages automatically before bundling the playground. The multi-threaded (MT) /
-> single-threaded (ST) choice is made via the command variant (`:st` = single-threaded).
+> Important: The playground does not compile any WebAssembly itself. It consumes the compiled
+> WASM artifacts from [pagx-viewer](../pagx-viewer), and the compiled player ESM bundle from
+> [pagx-player](../pagx-player). You must build both first, and the multi-threaded (MT) /
+> single-threaded (ST) choice is made in pagx-viewer, not here. Read the
+> [pagx-viewer README](../pagx-viewer/README.md) before building the playground.
+
+### Build pagx-viewer First
+
+The MT and ST WASM builds are produced in pagx-viewer, not in the playground. Pick the flavor
+you need there:
+
+```bash
+# In playground/pagx-viewer
+npm install
+npm run build:release       # multi-threaded (default, requires SharedArrayBuffer)
+npm run build:release:st    # single-threaded (no SharedArrayBuffer required)
+```
+
+See the [pagx-viewer README](../pagx-viewer/README.md) for the full build matrix.
+
+### Build pagx-player
+
+The playground imports the player component as a pre-built ESM bundle from
+[pagx-player](../pagx-player). Build it before building the playground so the prebuild step
+can pick up the bundle:
+
+```bash
+# In playground/pagx-player
+npm install
+npm run build               # debug bundle with sourcemaps
+npm run build:release       # minified release bundle
+```
+
+The build writes `playground/pagx-player/lib/pagx-player.esm.js` (not tracked by git). The
+playground's prebuild step reads that file and copies it into `wasm-mt/`; if the file is
+missing, prebuild fails with a message pointing you back to the pagx-player build.
 
 ### Install Dependencies
 
@@ -52,48 +83,27 @@ cd playground/pagx-playground
 npm install
 ```
 
-### Build and Run
+### Build
 
-Each `build` command compiles the upstream `pagx-viewer` (MT or ST) and `pagx-player` first,
-then bundles the playground. Pick the variant you need, then start the dev server:
+Build the playground against the viewer artifacts. Use the plain commands to bundle against the
+multi-threaded viewer build, or the `:st` variants for the single-threaded one:
 
 ```bash
-# Multi-threaded viewer (default, requires SharedArrayBuffer / COOP+COEP)
+# Bundle against the multi-threaded viewer artifacts (default)
 npm run build
 npm run build:release
 
-# Single-threaded viewer (no SharedArrayBuffer required)
+# Bundle against the single-threaded viewer artifacts
 npm run build:st
 npm run build:release:st
 
-# Then serve
-npm run server
-```
-
-So the common single-threaded dev loop is just:
-
-```bash
-npm run build:release:st && npm run server
-```
-
-`clean` removes build artifacts:
-
-```bash
+# Clean build artifacts
 npm run clean
 ```
 
-If you already have the upstream artifacts built (or a clean checkout that ships them) and want
-to skip recompiling, use the copy-only `bundle` commands instead — they stage the existing
-artifacts and bundle without rebuilding pagx-viewer / pagx-player:
-
-```bash
-npm run bundle        # multi-threaded, copy-only
-npm run bundle:st     # single-threaded, copy-only
-```
-
-The `:st` variants select the single-threaded viewer flavor; the actual MT/ST WASM compilation
-happens in pagx-viewer (triggered automatically by the `build` commands). Multi-threaded builds
-rely on `SharedArrayBuffer`, which requires the `Cross-Origin-Opener-Policy` and
+The `:st` variants only tell the playground bundler to pick up the single-threaded viewer
+artifacts; the actual MT/ST WASM compilation happens in pagx-viewer. Multi-threaded builds rely
+on `SharedArrayBuffer`, which requires the `Cross-Origin-Opener-Policy` and
 `Cross-Origin-Embedder-Policy` headers. The development server detects the build type
 automatically and only sends these headers for multi-threaded builds, so no manual configuration
 is needed when switching between the two.

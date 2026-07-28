@@ -72,7 +72,6 @@ export class PlaybackBar {
     private isDraggingSlider = false;
     private wasPlayingBeforeDrag = false;
     private wasPlaying = false;
-    // Handle of the pending requestAnimationFrame callback; null when the tick loop is stopped.
     private tickHandle: number | null = null;
 
     constructor(opts: PlaybackBarOptions) {
@@ -129,10 +128,7 @@ export class PlaybackBar {
     }
 
     /** Step one frame in either direction (-1 previous, +1 next). Always pauses first so the
-     *  render loop can't advance the playhead past the destination frame. Steps on frame
-     *  boundaries (not raw float microseconds) so repeated stepping keeps the frame counter and
-     *  the time label perfectly in sync — the underlying playhead is snapped to `frame / rate`
-     *  rather than drifting by the non-integer `1e6 / rate` each click. */
+     *  render loop can't advance the playhead past the destination frame. */
     public stepFrame(direction: number): void {
         const view = this.getView();
         if (!view) {
@@ -145,10 +141,9 @@ export class PlaybackBar {
         }
         view.pause();
         this.callbacks.onPause?.();
-        const totalFrames = Math.ceil((duration * rate) / 1_000_000);
-        const currentFrame = Math.round((Math.max(0, view.currentTimeMicros()) * rate) / 1_000_000);
-        const targetFrame = Math.max(0, Math.min(totalFrames, currentFrame + direction));
-        const clamped = Math.min(duration, (targetFrame * 1_000_000) / rate);
+        const frameDurationUs = 1_000_000 / rate;
+        const target = view.currentTimeMicros() + direction * frameDurationUs;
+        const clamped = Math.max(0, Math.min(duration, target));
         view.setCurrentTimeMicros(clamped);
         this.callbacks.onSeek?.(clamped);
         this.updateAll();
@@ -157,7 +152,7 @@ export class PlaybackBar {
     /** Detach listeners and stop the tick. */
     public destroy(): void {
         if (this.tickHandle !== null) {
-            window.cancelAnimationFrame(this.tickHandle);
+            window.clearInterval(this.tickHandle);
             this.tickHandle = null;
         }
         this.root.remove();
@@ -304,31 +299,25 @@ export class PlaybackBar {
     }
 
     private startTick(): void {
-        // Drive UI updates off requestAnimationFrame so the slider/counters advance in lockstep
-        // with the render loop (which also runs on rAF). A prior setInterval(100) cadence sampled
-        // the playhead at ~10Hz out of phase with the ~60Hz render loop, which made the slider
-        // visibly stutter. Also fires once on the play -> stop transition so the slider/counters
-        // land on the final frame after a single (non-looping) playback ends, and hosts
-        // subscribing to 'framechange' see the terminal frame explicitly.
-        const tick = () => {
-            if (this.tickHandle === null) {
+        // 100ms cadence matches the playground; smoother updates would just waste DOM work.
+        // Also fires once on the play -> stop transition so the slider/counters land on the
+        // final frame after a single (non-looping) playback ends, and hosts subscribing to
+        // 'framechange' see the terminal frame explicitly.
+        this.tickHandle = window.setInterval(() => {
+            const view = this.getView();
+            if (!view || !this.isVisible()) {
                 return;
             }
-            const view = this.getView();
-            if (view && this.isVisible()) {
-                const playing = view.isPlaying();
-                if (!this.isDraggingSlider && (playing || this.wasPlaying)) {
-                    this.updateAll();
-                    // Emit onFrameChange on both playing frames and the play -> stop transition so
-                    // hosts can react to the final frame settling; skipping the transition case
-                    // would leave subscribers stuck on the last "playing" frame value.
-                    this.callbacks.onFrameChange?.(view.currentTimeMicros());
-                }
-                this.wasPlaying = playing;
+            const playing = view.isPlaying();
+            if (!this.isDraggingSlider && (playing || this.wasPlaying)) {
+                this.updateAll();
+                // Emit onFrameChange on both playing ticks and the play -> stop transition so
+                // hosts can react to the final frame settling; skipping the transition case
+                // would leave subscribers stuck on the last "playing" frame value.
+                this.callbacks.onFrameChange?.(view.currentTimeMicros());
             }
-            this.tickHandle = window.requestAnimationFrame(tick);
-        };
-        this.tickHandle = window.requestAnimationFrame(tick);
+            this.wasPlaying = playing;
+        }, 100);
     }
 
     // --- UI updaters (private) ---
@@ -364,17 +353,11 @@ export class PlaybackBar {
     private updateTimeDisplay(): void {
         const view = this.getView();
         if (!view) return;
-        const rate = view.frameRate();
+        const current = view.currentTimeMicros();
         const duration = view.durationMicros();
-        const currentFrame = getCurrentFrame(view);
-        const totalFrames = getTotalFrames(view);
-        // Derive the displayed seconds from the (rounded) frame number rather than the raw
-        // playhead microseconds so the time label and the frame counter can never disagree —
-        // e.g. frame 30 always reads exactly 1.00s at 30fps instead of 0.99s / 1.01s depending
-        // on sub-frame drift.
-        this.timeText.textContent =
-            formatFrameTime(currentFrame, rate) + ' / ' + formatTime(duration);
-        this.frameText.textContent = String(currentFrame) + ' / ' + String(totalFrames);
+        this.timeText.textContent = formatTime(current) + ' / ' + formatTime(duration);
+        this.frameText.textContent =
+            String(getCurrentFrame(view)) + ' / ' + String(getTotalFrames(view));
     }
 
     private updateLoopIcon(): void {
@@ -387,13 +370,6 @@ export class PlaybackBar {
 function formatTime(microseconds: number): string {
     const seconds = Math.max(0, microseconds / 1_000_000);
     return seconds.toFixed(2) + 's';
-}
-
-// Formats the seconds label for a frame number so it stays consistent with the frame counter
-// (frame / rate) instead of the raw sub-frame playhead time.
-function formatFrameTime(frame: number, rate: number): string {
-    if (rate <= 0) return '0.00s';
-    return (Math.max(0, frame) / rate).toFixed(2) + 's';
 }
 
 function getCurrentFrame(view: PlayerView): number {

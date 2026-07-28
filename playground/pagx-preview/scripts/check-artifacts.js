@@ -18,8 +18,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Guard for `npm publish` / `npm pack`: verifies that prebuild has staged the pagx-viewer
-// artifacts and playback icons into static/, otherwise the published tarball would be broken.
-// Mirrors the intent of cli/npm/scripts/check-binaries.js.
+// artifacts (into wasm/) and the source-side static assets, otherwise the published tarball
+// would be broken. Mirrors the intent of cli/npm/scripts/check-binaries.js.
 
 import fs from 'fs';
 import path from 'path';
@@ -33,8 +33,8 @@ const REQUIRED = [
   'static/index.html',
   'static/index.css',
   'static/index.js',
-  'static/viewer/info.json',
-  'static/player/pagx-player.esm.js',
+  'wasm/viewer/info.json',
+  'wasm/player/pagx-player.esm.js',
   'static/icons/play.png',
   'static/icons/pause.png',
   'static/icons/previous.png',
@@ -59,10 +59,10 @@ function main() {
   }
 
   // Extra: the wasm/glue files referenced by info.json must exist too.
-  const infoPath = path.join(PKG_DIR, 'static/viewer/info.json');
+  const infoPath = path.join(PKG_DIR, 'wasm/viewer/info.json');
   const info = JSON.parse(fs.readFileSync(infoPath, 'utf8'));
   for (const rel of [info.wasmFile, info.glueFile]) {
-    const abs = path.join(PKG_DIR, 'static/viewer', rel);
+    const abs = path.join(PKG_DIR, 'wasm/viewer', rel);
     if (!fs.existsSync(abs)) {
       process.stderr.write(
         `check-artifacts: ERROR: info.json references ${rel} but the file is missing.\n`

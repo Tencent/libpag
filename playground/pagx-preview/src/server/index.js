@@ -31,7 +31,10 @@ const __dirname = path.dirname(__filename);
 
 const PREVIEW_DIR = path.resolve(__dirname, '../..');
 const STATIC_DIR = path.join(PREVIEW_DIR, 'static');
-const VIEWER_INFO_PATH = path.join(STATIC_DIR, 'viewer', 'info.json');
+// Compiled/copied artifacts (viewer wasm+glue, player bundle, ext bundle, MCP widget bundle) live
+// in a single gitignored directory outside static/, mirroring pagx-playground's wasm-mt/ layout.
+const GENERATED_DIR = path.join(PREVIEW_DIR, 'wasm');
+const VIEWER_INFO_PATH = path.join(GENERATED_DIR, 'viewer', 'info.json');
 
 // Once every tab has closed its SSE stream, wait this long before shutting the server down.
 // A short grace period covers "close tab, immediately re-run pagx-preview" without a respawn.
@@ -51,7 +54,7 @@ function randomSessionId() {
 function readViewerInfo() {
   if (!fs.existsSync(VIEWER_INFO_PATH)) {
     throw new Error(
-      `pagx-preview: viewer artifacts not found at ${STATIC_DIR}/viewer. Run "npm run prebuild" first.`
+      `pagx-preview: viewer artifacts not found at ${GENERATED_DIR}/viewer. Run "npm run prebuild" first.`
     );
   }
   return JSON.parse(fs.readFileSync(VIEWER_INFO_PATH, 'utf8'));
@@ -416,10 +419,23 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
     });
   });
 
-  // Static assets for the client bundle (viewer wasm/glue, index.js, index.css).
+  // Source-only static assets (index.html/css/js, mcp-widget.html/js, icons).
   app.use(
     '/static',
     express.static(STATIC_DIR, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.wasm')) {
+          res.set('Content-Type', 'application/wasm');
+        }
+      },
+    })
+  );
+
+  // Generated artifacts (viewer wasm/glue, player bundle, ext bundle) served under /wasm. Kept
+  // separate from /static so the source tree stays free of build outputs (see scripts/prebuild.js).
+  app.use(
+    '/wasm',
+    express.static(GENERATED_DIR, {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith('.wasm')) {
           res.set('Content-Type', 'application/wasm');
@@ -477,6 +493,7 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
     dropSessions,
     createOrGetSession,
     staticDir: STATIC_DIR,
+    generatedDir: GENERATED_DIR,
     getServerBaseUrl: () => serverBaseUrl,
   });
 
@@ -538,6 +555,7 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
         dropSessions,
         createOrGetSession,
         staticDir: STATIC_DIR,
+        generatedDir: GENERATED_DIR,
         getServerBaseUrl: () => serverBaseUrl,
         get fontsDir() {
           // Reflects the currently-resolved directory: with lazy download, initial startup can

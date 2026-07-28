@@ -35,20 +35,21 @@ import { buildToolHandlers, buildResourceHandlers } from './tools.js';
  * @param {object} opts
  * @param {Map} opts.sessions - live PreviewSession map keyed by session id.
  * @param {Function} opts.createOrGetSession - creates or reuses a session for a file path.
- * @param {string} opts.staticDir - directory holding mcp-widget.html and static assets.
+ * @param {string} opts.staticDir - directory holding mcp-widget.html and source static assets.
+ * @param {string} opts.generatedDir - directory holding generated artifacts (mcp-widget.bundle.js).
  * @param {Function} [opts.getServerBaseUrl] - returns the preview server's base URL (used to
  *   rewrite widget resource URLs and to build the browser-openable session url).
  * @returns {Server} a ready-to-connect MCP Server.
  */
 export function createMcpServer(opts) {
-  const { sessions, createOrGetSession, staticDir, getServerBaseUrl } = opts;
+  const { sessions, createOrGetSession, staticDir, generatedDir, getServerBaseUrl } = opts;
   const server = new Server(
     { name: 'pagx-preview', version: '0.1.0' },
     { capabilities: { tools: {}, resources: {} } },
   );
 
   const handlers = buildToolHandlers({ sessions, createOrGetSession, getServerBaseUrl });
-  const resourceHandlers = buildResourceHandlers({ staticDir, getServerBaseUrl });
+  const resourceHandlers = buildResourceHandlers({ staticDir, generatedDir, getServerBaseUrl });
 
   server.setRequestHandler(ListToolsRequestSchema, handlers.listTools);
   server.setRequestHandler(CallToolRequestSchema, handlers.callTool);

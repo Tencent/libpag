@@ -142,12 +142,6 @@ Chrome 扩展，然后打开 DevTools → Settings → Experiments，勾选
 同级的 [`pagx-playground`](../pagx-playground) 项目会直接消费 `pagx-viewer/lib` 下的构建产物。
 在本目录执行 `npm run build:release` 后，切换到 playground 目录即可运行其构建/发布脚本。
 
-## 与 PAGX Preview 配合使用
-
-[`pagx-preview`](../pagx-preview) MCP / CLI 工具同样消费 `pagx-viewer/lib`（使用单线程 `st`
-变体，因为它的 MCP widget 运行在没有跨源隔离的沙箱 iframe 中）。你无需先在本目录构建：在
-`pagx-preview` 执行 `npm run build` 会自动先构建本包（以及 `pagx-player`）再拷贝产物。
-
 ## 浏览器要求
 
 - Chrome 69+

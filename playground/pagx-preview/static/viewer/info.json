@@ -1,6 +1,0 @@
-{
-  "variant": "st",
-  "multiThreaded": false,
-  "glueFile": "pagx-viewer.st.esm.js",
-  "wasmFile": "pagx-viewer.st.wasm"
-}

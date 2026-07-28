@@ -18,11 +18,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Detects which pagx-viewer build is available (multi-threaded or single-threaded), copies its
-// artifacts into static/viewer/, and writes info.json so both the server (COOP/COEP headers)
+// artifacts into wasm/viewer/, and writes info.json so both the server (COOP/COEP headers)
 // and the client (dynamic import path) know which variant is in use. Also copies the compiled
-// pagx-player esm bundle into static/player/ so the client can import it without going through
+// pagx-player esm bundle into wasm/player/ so the client can import it without going through
 // a bundler; pagx-player is workspace-local and has no npm publish target, so the preview owns
 // the file copy the same way it owns the pagx-viewer copy.
+//
+// All generated/copied artifacts live under a single gitignored wasm/ directory (mirroring
+// pagx-playground's wasm-mt/ layout) so the source-only static/ dir stays clean and no heavy
+// binaries are committed. They are regenerated on demand via `npm run build` and on publish via
+// the prepack hook.
 
 import fs from 'fs';
 import path from 'path';
@@ -37,8 +42,11 @@ const VIEWER_DIR = path.resolve(PREVIEW_DIR, '../pagx-viewer');
 const PLAYER_DIR = path.resolve(PREVIEW_DIR, '../pagx-player');
 const VIEWER_LIB_DIR = path.join(VIEWER_DIR, 'lib');
 const PLAYER_LIB_DIR = path.join(PLAYER_DIR, 'lib');
-const OUTPUT_DIR = path.join(PREVIEW_DIR, 'static', 'viewer');
-const PLAYER_OUTPUT_DIR = path.join(PREVIEW_DIR, 'static', 'player');
+// Single gitignored directory holding every compiled/copied artifact (viewer, player, ext, and
+// the MCP widget bundle). Kept out of static/ so the source tree stays free of build outputs.
+const GENERATED_DIR = path.join(PREVIEW_DIR, 'wasm');
+const OUTPUT_DIR = path.join(GENERATED_DIR, 'viewer');
+const PLAYER_OUTPUT_DIR = path.join(GENERATED_DIR, 'player');
 
 // (infix, humanLabel, isMultiThreaded). Order matters: MT is preferred when both are present
 // so the preview matches pagx-playground's default flavor.
@@ -107,13 +115,13 @@ function copyPagxPlayerArtifacts({ release } = {}) {
   }
 }
 
-// Copies the @modelcontextprotocol/ext-apps browser bundle (app-with-deps.js) into static/ext/
+// Copies the @modelcontextprotocol/ext-apps browser bundle (app-with-deps.js) into wasm/ext/
 // so the MCP widget HTML can import it from the same origin without depending on esm.sh. The
 // bundle is self-contained (includes all transitive runtime deps) so no further bundling is
 // needed. If the package is not installed (e.g. dev environment without MCP support), the copy
 // is skipped with a warning — the widget will fail to load but the rest of pagx-preview works.
 function copyExtAppsBundle() {
-  const EXT_OUTPUT_DIR = path.join(PREVIEW_DIR, 'static', 'ext');
+  const EXT_OUTPUT_DIR = path.join(GENERATED_DIR, 'ext');
   // Try to locate the ext-apps package via node_modules resolution. The package may be hoisted
   // to a parent node_modules in a monorepo / npm workspace setup, so we walk up from the preview
   // dir rather than hard-coding a single path.
@@ -246,21 +254,25 @@ function main() {
 // widget HTML at runtime by the readResource handler so the MCP Apps sandbox iframe does not
 // need to load external scripts (which many hosts block).
 function buildMcpWidgetBundle() {
-  const STATIC_DIR = path.join(PREVIEW_DIR, 'static');
-  const widgetSrc = path.join(STATIC_DIR, 'mcp-widget.js');
+  const widgetSrc = path.join(PREVIEW_DIR, 'static', 'mcp-widget.js');
   if (!fs.existsSync(widgetSrc)) {
     console.log('  Skipped: mcp-widget.js not found (MCP widget bundle not built)');
     return;
   }
-  // Create a temp entry with relative imports (esbuild cannot resolve absolute /static/... paths)
-  const entryPath = path.join(STATIC_DIR, '_mcp_bundle_entry.js');
+  if (!fs.existsSync(GENERATED_DIR)) {
+    fs.mkdirSync(GENERATED_DIR, { recursive: true });
+  }
+  // Create a temp entry inside GENERATED_DIR with imports rewritten relative to that dir (esbuild
+  // cannot resolve absolute /wasm/... URLs). The ext/ and player/ artifacts were copied into
+  // GENERATED_DIR earlier in this run, so './ext/...' / './player/...' resolve correctly.
+  const entryPath = path.join(GENERATED_DIR, '_mcp_bundle_entry.js');
   let src = fs.readFileSync(widgetSrc, 'utf8');
   src = src
-    .replace(/from '\/static\/ext\/app-with-deps\.js'/g, "from './ext/app-with-deps.js'")
-    .replace(/from '\/static\/player\/pagx-player\.esm\.js'/g, "from './player/pagx-player.esm.js'");
+    .replace(/from '\/wasm\/ext\/app-with-deps\.js'/g, "from './ext/app-with-deps.js'")
+    .replace(/from '\/wasm\/player\/pagx-player\.esm\.js'/g, "from './player/pagx-player.esm.js'");
   fs.writeFileSync(entryPath, src);
   try {
-    const outPath = path.join(STATIC_DIR, 'mcp-widget.bundle.js');
+    const outPath = path.join(GENERATED_DIR, 'mcp-widget.bundle.js');
     execSync(`npx esbuild "${entryPath}" --bundle --format=esm --outfile="${outPath}" --minify`, {
       cwd: PREVIEW_DIR,
       stdio: 'pipe',

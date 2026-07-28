@@ -9,7 +9,7 @@
 // reloads, drop-to-open, status pill, refresh banner. Everything player-related now lives in
 // pagx-player; this file is deliberately kept small and preview-specific.
 
-import { PAGXPlayer } from '/static/player/pagx-player.esm.js';
+import { PAGXPlayer } from '/wasm/player/pagx-player.esm.js';
 
 const SESSION_MATCH = window.location.pathname.match(/^\/session\/([^/]+)\//);
 if (!SESSION_MATCH) {
@@ -73,10 +73,10 @@ let fontsRegistered = false;
 
 async function loadPagxInit() {
   if (PAGXInit) return PAGXInit;
-  const infoResp = await fetch('/static/viewer/info.json', { cache: 'no-store' });
+  const infoResp = await fetch('/wasm/viewer/info.json', { cache: 'no-store' });
   if (!infoResp.ok) throw new Error(`fetch viewer info failed: ${infoResp.status}`);
   viewerInfo = await infoResp.json();
-  const glueUrl = `/static/viewer/${viewerInfo.glueFile}`;
+  const glueUrl = `/wasm/viewer/${viewerInfo.glueFile}`;
   const mod = await import(glueUrl);
   PAGXInit = mod.PAGXInit;
   return PAGXInit;
@@ -85,7 +85,7 @@ async function loadPagxInit() {
 async function moduleFactory() {
   const init = await loadPagxInit();
   return init({
-    locateFile: (file) => `/static/viewer/${file}`,
+    locateFile: (file) => `/wasm/viewer/${file}`,
   });
 }
 

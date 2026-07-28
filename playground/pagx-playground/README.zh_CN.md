@@ -38,10 +38,39 @@ pagx-playground/
 首先，请确保已安装项目根目录 [README.md](../../README.md#Development) 中列出的所有工具和依赖，
 包括 Emscripten。
 
-> Playground 本身不编译任何 WebAssembly——WASM 来自 [pagx-viewer](../pagx-viewer)，播放器 ESM
-> 包来自 [pagx-player](../pagx-player)。你不再需要手动构建它们：下面的 `build` 命令会在打包
-> playground 前自动编译这两个上游包。多线程（MT）/ 单线程（ST）的选择通过命令变体决定
-> （`:st` = 单线程）。
+> 重要：Playground 本身不编译任何 WebAssembly，它直接使用 [pagx-viewer](../pagx-viewer) 编译出的
+> WASM 产物，以及 [pagx-player](../pagx-player) 编译出的 ESM 组件包。你必须先分别构建这两个模块，
+> 且多线程（MT）/ 单线程（ST）的选择是在 pagx-viewer 中完成的，而不是在这里。构建 playground 前
+> 请先阅读 [pagx-viewer README](../pagx-viewer/README.zh_CN.md)。
+
+### 先构建 pagx-viewer
+
+MT 和 ST 的 WASM 构建都是在 pagx-viewer 中进行的，而非 playground。请在那里选择所需的版本：
+
+```bash
+# 在 playground/pagx-viewer 中
+npm install
+npm run build:release       # 多线程（默认，需要 SharedArrayBuffer）
+npm run build:release:st    # 单线程（无需 SharedArrayBuffer）
+```
+
+完整的构建命令矩阵参见 [pagx-viewer README](../pagx-viewer/README.zh_CN.md)。
+
+### 构建 pagx-player
+
+Playground 以预编译 ESM 包的形式引用 [pagx-player](../pagx-player) 组件。请先在其目录下完成构建，
+再构建 playground，这样 prebuild 步骤才能拿到产物：
+
+```bash
+# 在 playground/pagx-player 中
+npm install
+npm run build               # 带 sourcemap 的调试版本
+npm run build:release       # 压缩后的 release 版本
+```
+
+构建后会生成 `playground/pagx-player/lib/pagx-player.esm.js`（不纳入 git 版本管理）。
+Playground 的 prebuild 步骤会读取该文件并复制到 `wasm-mt/`；若文件缺失，prebuild 会以清晰的
+错误提示中止，引导你回到 pagx-player 执行构建。
 
 ### 安装依赖
 
@@ -50,46 +79,25 @@ cd playground/pagx-playground
 npm install
 ```
 
-### 构建与运行
+### 构建
 
-每个 `build` 命令都会先编译上游的 `pagx-viewer`（MT 或 ST）和 `pagx-player`，再打包 playground。
-选择所需变体，然后启动开发服务器：
+Playground 基于 viewer 的产物进行打包。使用普通命令对应多线程 viewer 构建，使用 `:st` 变体对应单线程构建：
 
 ```bash
-# 多线程 viewer（默认，需要 SharedArrayBuffer / COOP+COEP）
+# 对应多线程 viewer 产物（默认）
 npm run build
 npm run build:release
 
-# 单线程 viewer（无需 SharedArrayBuffer）
+# 对应单线程 viewer 产物
 npm run build:st
 npm run build:release:st
 
-# 然后启动服务
-npm run server
-```
-
-所以常用的单线程开发流程就是：
-
-```bash
-npm run build:release:st && npm run server
-```
-
-`clean` 清理构建产物：
-
-```bash
+# 清理构建产物
 npm run clean
 ```
 
-如果上游产物已构建好（或克隆的仓库已自带产物），想跳过重新编译，可改用仅拷贝的 `bundle` 命令
-——它们只暂存已有产物并打包，不重新构建 pagx-viewer / pagx-player：
-
-```bash
-npm run bundle        # 多线程，仅拷贝
-npm run bundle:st     # 单线程，仅拷贝
-```
-
-`:st` 变体选择单线程 viewer 版本；真正的 MT/ST WASM 编译发生在 pagx-viewer 中（由 `build`
-命令自动触发）。多线程构建依赖 `SharedArrayBuffer`，需要 `Cross-Origin-Opener-Policy` 和
+`:st` 变体只是告诉 playground 打包器选用单线程 viewer 产物；真正的 MT/ST WASM 编译发生在
+pagx-viewer 中。多线程构建依赖 `SharedArrayBuffer`，需要 `Cross-Origin-Opener-Policy` 和
 `Cross-Origin-Embedder-Policy` 头。开发服务器会自动检测构建类型，仅在多线程构建时发送这些头，
 因此在两种构建之间切换时无需手动配置。
 

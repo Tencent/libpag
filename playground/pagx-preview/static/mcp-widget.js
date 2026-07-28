@@ -10,8 +10,8 @@
 // 5. widget fetches /session/:id/pagx, loads it via PAGXPlayer
 // 6. widget opens SSE stream to /session/:id/events for reload events
 
-import { App } from '/static/ext/app-with-deps.js';
-import { PAGXPlayer } from '/static/player/pagx-player.esm.js';
+import { App } from '/wasm/ext/app-with-deps.js';
+import { PAGXPlayer } from '/wasm/player/pagx-player.esm.js';
 
 // Server base URL — injected as a global (`__SERVER_BASE__`) when inlined into the widget HTML.
 // Falls back to '' (relative paths) when running as an external script in basic-host.
@@ -22,10 +22,10 @@ const BASE = (typeof __SERVER_BASE__ !== 'undefined') ? __SERVER_BASE__ : '';
 let PAGXInit = null;
 async function loadPagxInit() {
   if (PAGXInit) return PAGXInit;
-  const infoResp = await fetch(`${BASE}/static/viewer/info.json`, { cache: 'no-store' });
+  const infoResp = await fetch(`${BASE}/wasm/viewer/info.json`, { cache: 'no-store' });
   if (!infoResp.ok) throw new Error(`fetch viewer info failed: ${infoResp.status}`);
   const viewerInfo = await infoResp.json();
-  const glueUrl = `${BASE}/static/viewer/${viewerInfo.glueFile}`;
+  const glueUrl = `${BASE}/wasm/viewer/${viewerInfo.glueFile}`;
   const mod = await import(glueUrl);
   PAGXInit = mod.PAGXInit;
   return PAGXInit;
@@ -52,7 +52,7 @@ async function moduleFactory() {
     }
   }
   const init = await loadPagxInit();
-  return init({ locateFile: (file) => `${BASE}/static/viewer/${file}` });
+  return init({ locateFile: (file) => `${BASE}/wasm/viewer/${file}` });
 }
 
 const container = document.getElementById('pagx-container');

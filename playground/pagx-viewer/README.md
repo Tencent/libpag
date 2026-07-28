@@ -147,14 +147,6 @@ The companion [`pagx-playground`](../pagx-playground) project consumes the compi
 directly from `pagx-viewer/lib`. After running `npm run build:release` here, you can switch to the
 playground directory and run its own build/publish scripts.
 
-## Use with PAGX Preview
-
-The [`pagx-preview`](../pagx-preview) MCP / CLI tool also consumes `pagx-viewer/lib` (the
-single-threaded `st` variant, since its MCP widget runs in a sandbox iframe without
-cross-origin isolation). You do not need to build pagx-viewer here first: running
-`npm run build` in `pagx-preview` builds this package (and `pagx-player`) automatically before
-staging the artifacts.
-
 ## Browser Requirements
 
 - Chrome 69+

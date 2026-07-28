@@ -31,6 +31,7 @@
   "files": [
     "src/",
     "static/",
+    "wasm/",
     "scripts/check-artifacts.js",
     "README.md"
   ],

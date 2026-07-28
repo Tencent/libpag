@@ -230,7 +230,7 @@ function handleGetDocument(args, { sessions, getServerBaseUrl }) {
  * Builds the listResources / readResource handlers for the MCP server.
  * @returns {{ listResources: Function, readResource: Function }}
  */
-export function buildResourceHandlers({ staticDir, getServerBaseUrl }) {
+export function buildResourceHandlers({ staticDir, generatedDir, getServerBaseUrl }) {
   return {
     async listResources() {
       return {
@@ -265,7 +265,7 @@ export function buildResourceHandlers({ staticDir, getServerBaseUrl }) {
       // Read the pre-built bundle and inject via a self-decoding <script>. We base64-encode
       // the JS to avoid any characters in the bundle (backticks, </script>, quotes, etc.) from
       // breaking `document.write()` or the <script> tag parser.
-      const bundlePath = path.join(staticDir, 'mcp-widget.bundle.js');
+      const bundlePath = path.join(generatedDir, 'mcp-widget.bundle.js');
       let bundleJs = fs.readFileSync(bundlePath, 'utf8');
       const baseUrlDecl = `var __SERVER_BASE__=${JSON.stringify(baseUrl || '')};`;
       bundleJs = baseUrlDecl + bundleJs;
