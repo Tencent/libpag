@@ -35,8 +35,18 @@ bool PAGRenderer::isReady() const {
 
 void PAGRenderer::updateSize() {
   auto pagSurface = viewModel->getPAGPlayer()->getSurface();
-  if (pagSurface != nullptr) {
-    pagSurface->updateSize();
+  if (pagSurface == nullptr || drawable == nullptr) {
+    return;
+  }
+  auto oldWidth = static_cast<double>(drawable->width());
+  auto oldHeight = static_cast<double>(drawable->height());
+  pagSurface->updateSize();
+  auto newWidth = static_cast<double>(drawable->width());
+  auto newHeight = static_cast<double>(drawable->height());
+  if (oldWidth != newWidth || oldHeight != newHeight) {
+    viewModel->adjustForSurfaceResize(oldWidth, oldHeight, newWidth, newHeight,
+                                      static_cast<double>(viewModel->getWidth()),
+                                      static_cast<double>(viewModel->getHeight()));
   }
 }
 

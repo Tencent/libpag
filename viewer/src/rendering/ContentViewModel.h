@@ -97,11 +97,26 @@ class ContentViewModel : public QObject {
     double offsetY = 0.0;
   };
 
+  /// Returns the current zoom scale factor.
   double zoomScale() const;
+
+  /// Returns a snapshot of the current view transform (zoom + pan offset).
   ViewTransform getViewTransform() const;
+
+  /// Applies a zoom factor anchored at the given point in surface pixel coordinates.
   void zoomAt(double factor, double anchorX, double anchorY);
+
+  /// Pans the view by the given delta in surface pixel coordinates.
   void panBy(double deltaX, double deltaY);
+
+  /// Resets the view transform to the default (no zoom, no pan).
   void resetView();
+
+  /// Adjusts the pan offset to compensate for a surface size change, keeping the content visually
+  /// anchored at the same position. All parameters are in surface pixel coordinates.
+  void adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
+                              double newSurfaceWidth, double newSurfaceHeight, double contentWidth,
+                              double contentHeight);
 
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void hasAnimationChanged(bool hasAnimation);
@@ -122,7 +137,7 @@ class ContentViewModel : public QObject {
   }
 
  private:
-  void notifyViewTransformChanged(double zoomScale);
+  void notifyViewTransformChanged(double newZoomScale);
 
   mutable std::mutex viewTransformMutex = {};
   ViewTransform viewTransform = {};

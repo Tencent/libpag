@@ -22,9 +22,9 @@
 
 namespace pag {
 
-static constexpr double MinZoom = 0.001;
-static constexpr double MaxZoom = 1000.0;
-static constexpr double TransformEpsilon = 0.001;
+static constexpr double MIN_ZOOM = 0.001;
+static constexpr double MAX_ZOOM = 1000.0;
+static constexpr double TRANSFORM_EPSILON = 0.001;
 
 double ContentViewModel::zoomScale() const {
   std::lock_guard<std::mutex> lock(viewTransformMutex);
@@ -40,7 +40,7 @@ void ContentViewModel::zoomAt(double factor, double anchorX, double anchorY) {
   double newZoomScale = 1.0;
   {
     std::lock_guard<std::mutex> lock(viewTransformMutex);
-    newZoomScale = std::clamp(viewTransform.zoomScale * factor, MinZoom, MaxZoom);
+    newZoomScale = std::clamp(viewTransform.zoomScale * factor, MIN_ZOOM, MAX_ZOOM);
     if (newZoomScale == viewTransform.zoomScale) {
       return;
     }
@@ -53,7 +53,7 @@ void ContentViewModel::zoomAt(double factor, double anchorX, double anchorY) {
 }
 
 void ContentViewModel::panBy(double deltaX, double deltaY) {
-  if (std::abs(deltaX) < TransformEpsilon && std::abs(deltaY) < TransformEpsilon) {
+  if (std::abs(deltaX) < TRANSFORM_EPSILON && std::abs(deltaY) < TRANSFORM_EPSILON) {
     return;
   }
   double currentZoomScale = 1.0;
@@ -72,6 +72,34 @@ void ContentViewModel::resetView() {
     viewTransform = {};
   }
   notifyViewTransformChanged(1.0);
+}
+
+void ContentViewModel::adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
+                                              double newSurfaceWidth, double newSurfaceHeight,
+                                              double contentWidth, double contentHeight) {
+  if (contentWidth <= 0 || contentHeight <= 0 || oldSurfaceWidth <= 0 || oldSurfaceHeight <= 0 ||
+      newSurfaceWidth <= 0 || newSurfaceHeight <= 0) {
+    return;
+  }
+  auto oldContentScale =
+      std::min(oldSurfaceWidth / contentWidth, oldSurfaceHeight / contentHeight);
+  auto newContentScale =
+      std::min(newSurfaceWidth / contentWidth, newSurfaceHeight / contentHeight);
+  auto oldContentOffsetX = (oldSurfaceWidth - contentWidth * oldContentScale) * 0.5;
+  auto oldContentOffsetY = (oldSurfaceHeight - contentHeight * oldContentScale) * 0.5;
+  auto newContentOffsetX = (newSurfaceWidth - contentWidth * newContentScale) * 0.5;
+  auto newContentOffsetY = (newSurfaceHeight - contentHeight * newContentScale) * 0.5;
+  {
+    std::lock_guard<std::mutex> lock(viewTransformMutex);
+    if (viewTransform.zoomScale == 1.0 && viewTransform.offsetX == 0.0 &&
+        viewTransform.offsetY == 0.0) {
+      return;
+    }
+    viewTransform.offsetX +=
+        (oldContentOffsetX - newContentOffsetX) * viewTransform.zoomScale;
+    viewTransform.offsetY +=
+        (oldContentOffsetY - newContentOffsetY) * viewTransform.zoomScale;
+  }
 }
 
 void ContentViewModel::notifyViewTransformChanged(double newZoomScale) {
