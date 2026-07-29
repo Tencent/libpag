@@ -33,6 +33,8 @@ const REQUIRED = [
   'static/index.html',
   'static/index.css',
   'static/index.js',
+  'static/mcp-widget.html',
+  'static/mcp-widget.js',
   'wasm/viewer/info.json',
   'wasm/player/pagx-player.esm.js',
   'static/icons/play.png',

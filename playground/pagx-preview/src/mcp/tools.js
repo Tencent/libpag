@@ -112,7 +112,7 @@ export function buildToolHandlers({ sessions, createOrGetSession, getServerBaseU
         return handleGetDocument(args, { sessions, getServerBaseUrl });
       }
       return {
-        content: [{ type: 'text', text: `unknown tool: ${name}` }],
+        content: [{ type: 'text', text: 'unknown tool' }],
         isError: true,
       };
     },
@@ -121,9 +121,31 @@ export function buildToolHandlers({ sessions, createOrGetSession, getServerBaseU
 
 function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget = false }) {
   const file = args?.file;
-  if (!file || !fs.existsSync(file)) {
+  if (!file) {
     return {
-      content: [{ type: 'text', text: `file not found: ${file}` }],
+      content: [{ type: 'text', text: 'file path is required' }],
+      isError: true,
+    };
+  }
+  const resolved = path.resolve(file);
+  // Reject paths that escape the working directory to prevent information probing of
+  // arbitrary system files (e.g. /etc/passwd). The tool is local-only so cwd is a
+  // natural trust boundary — users preview files within their project.
+  if (!resolved.startsWith(process.cwd() + path.sep) && resolved !== process.cwd()) {
+    return {
+      content: [{ type: 'text', text: 'file path must be within the current working directory' }],
+      isError: true,
+    };
+  }
+  if (resolved.includes('..')) {
+    return {
+      content: [{ type: 'text', text: 'file path must not contain ".."' }],
+      isError: true,
+    };
+  }
+  if (!fs.existsSync(resolved)) {
+    return {
+      content: [{ type: 'text', text: 'file not found' }],
       isError: true,
     };
   }
@@ -162,13 +184,13 @@ function handleReloadFile(args, { sessions }) {
   const session = sessions.get(sessionId);
   if (!session) {
     return {
-      content: [{ type: 'text', text: `session not found: ${sessionId}` }],
+      content: [{ type: 'text', text: 'session not found' }],
       isError: true,
     };
   }
   session.emit({ type: 'reload', file: session.entryFile, event: 'mcp-reload' });
   return {
-    content: [{ type: 'text', text: `reload triggered for session ${sessionId}` }],
+    content: [{ type: 'text', text: `reload triggered` }],
     structuredContent: { sessionId, reloaded: true },
   };
 }
@@ -178,7 +200,7 @@ function handleGetDocument(args, { sessions, getServerBaseUrl }) {
   const session = sessions.get(sessionId);
   if (!session) {
     return {
-      content: [{ type: 'text', text: `session not found: ${sessionId}` }],
+      content: [{ type: 'text', text: 'session not found' }],
       isError: true,
     };
   }
@@ -209,10 +231,10 @@ function handleGetDocument(args, { sessions, getServerBaseUrl }) {
         },
       };
     }
-    return {
-      content: [{ type: 'text', text: `document not loaded yet for session ${sessionId}` }],
-      isError: true,
-    };
+      return {
+        content: [{ type: 'text', text: `document not loaded yet for session` }],
+        isError: true,
+      };
   }
   session.documentQueryFailures = 0;
   return {
@@ -266,7 +288,30 @@ export function buildResourceHandlers({ staticDir, generatedDir, getServerBaseUr
       // the JS to avoid any characters in the bundle (backticks, </script>, quotes, etc.) from
       // breaking `document.write()` or the <script> tag parser.
       const bundlePath = path.join(generatedDir, 'mcp-widget.bundle.js');
-      let bundleJs = fs.readFileSync(bundlePath, 'utf8');
+      let bundleJs;
+      try {
+        bundleJs = fs.readFileSync(bundlePath, 'utf8');
+      } catch (_) {
+        html = '<html><body>pagx-preview widget bundle not found. Run npm run prebuild.</body></html>';
+        return {
+          contents: [
+            {
+              uri: UI_URI,
+              mimeType: UI_MIME,
+              text: html,
+              _meta: connectDomains.length ? {
+                ui: {
+                  csp: {
+                    resourceDomains: connectDomains,
+                    connectDomains,
+                    baseUriDomains: connectDomains,
+                  },
+                },
+              } : undefined,
+            },
+          ],
+        };
+      }
       const baseUrlDecl = `var __SERVER_BASE__=${JSON.stringify(baseUrl || '')};`;
       bundleJs = baseUrlDecl + bundleJs;
       const b64 = Buffer.from(bundleJs).toString('base64');

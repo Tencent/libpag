@@ -220,11 +220,17 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
   // memory only (never written to disk) and the session watches nothing: dropped files are
   // preview-only. Storing on disk with live watch would require the browser to give us a real
   // absolute path, which it never does.
+  const DROP_SESSION_MAX = 100;
   const dropSessions = new Map();
   app.post('/session/drop', express.raw({ type: '*/*', limit: '32mb' }), (req, res) => {
     if (!req.body || req.body.length === 0) {
       res.status(400).json({ error: 'empty body' });
       return;
+    }
+    // Evict oldest entries when the cap is reached to prevent unbounded memory growth.
+    if (dropSessions.size >= DROP_SESSION_MAX) {
+      const firstKey = dropSessions.keys().next().value;
+      if (firstKey !== undefined) dropSessions.delete(firstKey);
     }
     const name = String(req.query.name || 'dropped.pagx');
     const id = randomSessionId();
