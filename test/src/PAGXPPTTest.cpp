@@ -1470,6 +1470,10 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRuns) {
   run->font = font;
   run->fontSize = 48.0f;
   run->glyphs = {1};
+  // Non-zero run offset: native fallback must fold this into the shape frame
+  // (mirroring writeTextAsPath) so per-line Texts that separate purely through
+  // run->y don't collapse onto a shared origin.
+  run->y = 36.0f;
   text->glyphRuns.push_back(run);
 
   auto* fill = doc->makeNode<pagx::Fill>();

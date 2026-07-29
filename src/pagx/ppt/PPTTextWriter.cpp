@@ -178,6 +178,36 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
     const Text* text, Text* mutableText, const FillStrokeInfo& fs,
     const TextLayoutResult* precomputed) {
   NativeTextGeometry geom;
+
+  // A Text that carries pre-shaped GlyphRuns encodes its placement in the run's
+  // pen origin (x, y), exactly like the authoritative writeTextAsPath path,
+  // which positions glyphs at text->renderPosition() + run offset via WalkGlyphs
+  // and ignores any modifier TextBox. Sibling per-line Texts commonly share a
+  // single modifier TextBox while separating their lines purely through
+  // run->y (e.g. 27 / 63 / 99 for a 36px line height), so routing them through
+  // the TextBox branch below would collapse every line onto the box's single
+  // origin. Mirror writeTextAsPath here so native fallback keeps the same
+  // vertical layout. Only the first run carries the block-level offset.
+  if (!text->glyphRuns.empty() && text->glyphRuns.front() != nullptr) {
+    const GlyphRun* firstRun = text->glyphRuns.front();
+    auto renderPos = text->renderPosition();
+    auto textBounds = precomputed->getTextBounds(mutableText);
+    if (textBounds.width > 0 && textBounds.height > 0) {
+      geom.posX = renderPos.x + firstRun->x + textBounds.x;
+      geom.posY = renderPos.y + firstRun->y + textBounds.y;
+      geom.estWidth = textBounds.width;
+      geom.estHeight = textBounds.height;
+    } else {
+      float effectiveFontSize = text->renderFontSize();
+      geom.estWidth =
+          static_cast<float>(CountUTF8Characters(text->text)) * effectiveFontSize * 0.6f;
+      geom.estHeight = effectiveFontSize * 1.4f;
+      geom.posX = renderPos.x + firstRun->x;
+      geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
+    }
+    return geom;
+  }
+
   float boxWidth = fs.textBox ? EffectiveTextBoxWidth(fs.textBox) : NAN;
   float boxHeight = fs.textBox ? EffectiveTextBoxHeight(fs.textBox) : NAN;
   geom.hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
