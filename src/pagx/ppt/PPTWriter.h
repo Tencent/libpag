@@ -491,7 +491,12 @@ inline void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t 
 // Adds the TextBox-derived attributes to a currently-open <a:bodyPr>: vertical
 // writing mode, paragraph anchoring, and the vertical-mode anchorCtr override
 // for TextAlign::Center. Returns true when the box uses vertical writing mode.
-inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box) {
+// When `suppressAnchor` is true, only the writing-mode `vert` attribute is
+// emitted (glyph orientation), while the paragraph anchor and anchorCtr — which
+// place the text block within the frame — are skipped. Callers that anchor the
+// frame to the exact glyph pen origin pass true so the block is not re-offset.
+inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box,
+                                     bool suppressAnchor = false) {
   if (box == nullptr) {
     return false;
   }
@@ -501,6 +506,9 @@ inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box) {
   // text). Latin "vert"/"vert270" rotate glyphs sideways which is wrong here.
   if (isVertical) {
     out.addRequiredAttribute("vert", "eaVert");
+  }
+  if (suppressAnchor) {
+    return isVertical;
   }
   // OOXML's "anchor" describes alignment along the block-flow axis, which
   // matches paragraphAlign in both writing modes:
@@ -907,8 +915,14 @@ class PPTWriter {
   // supplies the decomposed Xform, the in-scope TextBox (for bodyPr paragraph
   // attributes), and the pre-computed wrap value ("square" vs "none"). Leaves
   // <p:txBody> open so the caller can stream <a:p> children into it.
+  // When `suppressBoxLayout` is true the TextBox's padding insets and paragraph
+  // anchor are dropped (the frame is already positioned at the exact glyph pen
+  // origin, so re-applying them would offset the text a second time); the
+  // vertical writing mode is still honoured because it drives glyph orientation
+  // rather than placement. Used by the glyphRun-origin native fallback so it
+  // matches the authoritative writeTextAsPath path, which ignores the box.
   void emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
-                             const char* wrap);
+                             const char* wrap, bool suppressBoxLayout = false);
 
   // p:pic helpers (declared after Xform)
   void beginPicture(XMLBuilder& out, const char* name);

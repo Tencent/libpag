@@ -249,7 +249,7 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
 }
 
 void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
-                                      const char* wrap) {
+                                      const char* wrap, bool suppressBoxLayout) {
   int id = _ctx->nextShapeId();
   out.openElement("p:sp").closeElementStart();
   out.openElement("p:nvSpPr").closeElementStart();
@@ -282,8 +282,11 @@ void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const Te
   // OOXML's default insets are non-zero, so we always emit explicit values
   // -- zeros for standalone text (no TextBox parent) and for TextBoxes with
   // zero padding, to preserve the pre-padding-support behavior.
+  // When suppressBoxLayout is set the frame is already anchored to the glyph
+  // pen origin (which the box padding was baked into during shaping), so the
+  // insets are forced to zero to avoid indenting the text a second time.
   int64_t lIns = 0, tIns = 0, rIns = 0, bIns = 0;
-  if (textBox) {
+  if (textBox && !suppressBoxLayout) {
     lIns = PxToEMU(textBox->padding.left);
     tIns = PxToEMU(textBox->padding.top);
     rIns = PxToEMU(textBox->padding.right);
@@ -295,7 +298,7 @@ void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const Te
       .addRequiredAttribute("tIns", tIns)
       .addRequiredAttribute("rIns", rIns)
       .addRequiredAttribute("bIns", bIns);
-  AddBodyPrAttrsForTextBox(out, textBox);
+  AddBodyPrAttrsForTextBox(out, textBox, suppressBoxLayout);
   out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
 }
@@ -312,7 +315,7 @@ void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
   bool justifyAlign = textBox && textBox->textAlign == TextAlign::Justify;
   const char* wrap =
       useLineLayout ? (justifyAlign ? "square" : "none") : (geom.hasTextBox ? "square" : "none");
-  emitTextShapeEnvelope(out, xf, textBox, wrap);
+  emitTextShapeEnvelope(out, xf, textBox, wrap, geom.originFromGlyphRun);
 }
 
 void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
