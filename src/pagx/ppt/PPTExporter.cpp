@@ -405,7 +405,10 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
       // The convertTextToPath flag has the same effect, but only when GlyphRun
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
-      if (!text->glyphRuns.empty()) {
+      // The ignoreGlyphRuns flag is the inverse override: it discards the
+      // GlyphRun geometry and forces native text even when GlyphRun data is
+      // present, trading glyph-level fidelity for editable PowerPoint text.
+      if (!text->glyphRuns.empty() && !_ignoreGlyphRuns) {
         writeTextAsPath(out, text, localFs, entry.transform, alpha, filters, styles);
       } else {
         writeNativeText(out, text, localFs, entry.transform, alpha, filters, styles);

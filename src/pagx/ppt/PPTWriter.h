@@ -658,8 +658,8 @@ class PPTWriter {
   PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options,
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
-        _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
-        _bakeUnsupported(options.bakeUnsupported),
+        _ignoreGlyphRuns(options.ignoreGlyphRuns), _bridgeContours(options.bridgeContours),
+        _resolveModifiers(options.resolveModifiers), _bakeUnsupported(options.bakeUnsupported),
         _rasterScale(std::clamp(options.rasterScale, 0.01f, 4.0f)), _layoutContext(layoutContext),
         _resolver(doc) {
   }
@@ -690,6 +690,7 @@ class PPTWriter {
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = false;
+  bool _ignoreGlyphRuns = false;
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
   bool _bakeUnsupported = true;

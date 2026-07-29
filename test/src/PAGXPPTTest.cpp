@@ -1442,6 +1442,50 @@ PAGX_TEST(PAGXPPTTest, TextWithGlyphRuns) {
   ASSERT_TRUE(ExportAndVerify(*doc, "text_glyph_runs", options));
 }
 
+// ignoreGlyphRuns forces the native-text path even when a Text carries GlyphRun
+// data, so the exporter derives editable runs from Text::text instead of
+// walking the pre-shaped glyphs. Exercises the branch in emitGeometryWithFs.
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRuns) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 500;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  glyph->path->moveTo(100, 0);
+  glyph->path->lineTo(400, 0);
+  glyph->path->lineTo(400, 800);
+  glyph->path->lineTo(100, 800);
+  glyph->path->close();
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A";
+  text->position = {100, 200};
+  text->fontSize = 48.0f;
+
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 48.0f;
+  run->glyphs = {1};
+  text->glyphRuns.push_back(run);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_ignore_glyph_runs", options));
+}
+
 PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
   auto doc = pagx::PAGXDocument::Make(500, 400);
   auto* layer = doc->makeNode<pagx::Layer>();

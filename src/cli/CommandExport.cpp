@@ -39,6 +39,7 @@ struct ExportOptions {
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
   bool pptBakeUnsupported = true;
+  bool pptIgnoreGlyphRuns = false;
 };
 
 static void PrintUsage() {
@@ -74,6 +75,14 @@ static void PrintUsage() {
       << "                              drop those features and emit the layer as editable\n"
       << "                              shapes instead (mask ignored, scrollRect dropped, blend\n"
       << "                              falls back to Normal, wide-gamut clamped to sRGB).\n"
+      << "  --ppt-ignore-glyphruns\n"
+      << "                              Ignore the GlyphRun geometry carried by Text nodes and\n"
+      << "                              emit native, editable PowerPoint text derived from the\n"
+      << "                              Text's text attribute instead. By default a Text with\n"
+      << "                              GlyphRun data is rendered as custom glyph paths for exact\n"
+      << "                              fidelity; pass this flag to trade that fidelity for\n"
+      << "                              editable text. Text nodes without GlyphRun data are\n"
+      << "                              unaffected.\n"
       << "\n"
       << "Examples:\n"
       << "  pagx export --input icon.pagx                    # PAGX to icon.svg\n"
@@ -89,6 +98,9 @@ static void PrintUsage() {
       << "  pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported\n"
       << "                                                   # keep unsupported features "
          "editable\n"
+      << "  pagx export --input icon.pagx --output out.pptx --ppt-ignore-glyphruns\n"
+      << "                                                   # emit editable text, ignore "
+         "GlyphRuns\n"
       << "  pagx export --input icon.pagx --output icon.html # PAGX to HTML\n";
 }
 
@@ -116,6 +128,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->textToPath = true;
     } else if (arg == "--ppt-no-bake-unsupported") {
       options->pptBakeUnsupported = false;
+    } else if (arg == "--ppt-ignore-glyphruns") {
+      options->pptIgnoreGlyphRuns = true;
     } else if (arg == "--help" || arg == "-h") {
       PrintUsage();
       return -1;
@@ -234,6 +248,7 @@ static int ExportToPPT(const ExportOptions& options) {
   PPTExporter::Options pptOptions = {};
   pptOptions.convertTextToPath = options.textToPath;
   pptOptions.bakeUnsupported = options.pptBakeUnsupported;
+  pptOptions.ignoreGlyphRuns = options.pptIgnoreGlyphRuns;
 
   if (!PPTExporter::ToFile(documentPtrs, options.outputFile, pptOptions)) {
     std::cerr << "pagx export: error: failed to write '" << options.outputFile << "'\n";

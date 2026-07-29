@@ -41,6 +41,17 @@ struct PPTExportOptions {
   bool convertTextToPath = false;
 
   /**
+   * Whether to ignore the GlyphRun elements carried by a Text node and always render it as native
+   * PPTX text runs derived from the Text's `text` attribute. When a Text carries GlyphRun data the
+   * exporter normally treats those pre-shaped glyphs as the authoritative geometry and emits them
+   * as custom paths, because native a:r runs cannot express arbitrary glyph IDs / per-glyph offsets
+   * / anchors / rotations. Enabling this flag discards the GlyphRun geometry and falls back to
+   * native, editable PowerPoint text instead, at the cost of exact glyph-level fidelity. Text nodes
+   * that have no GlyphRun data are unaffected. The default value is false.
+   */
+  bool ignoreGlyphRuns = false;
+
+  /**
    * Whether to bridge nested contours within a single path element. When enabled, contours that
    * contain inner holes are connected by bridge edges so the hole is expressed as a single
    * self-intersecting sub-path, which some renderers require for correct even-odd fill. When
