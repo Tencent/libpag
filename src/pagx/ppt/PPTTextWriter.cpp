@@ -199,12 +199,27 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
       geom.estWidth = textBounds.width;
       geom.estHeight = textBounds.height;
     } else {
-      float effectiveFontSize = text->renderFontSize();
-      geom.estWidth =
-          static_cast<float>(CountUTF8Characters(text->text)) * effectiveFontSize * 0.6f;
-      geom.estHeight = effectiveFontSize * 1.4f;
-      geom.posX = renderPos.x + firstRun->x;
-      geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
+      // No layout-computed perTextBounds (embedded glyph runs skip the layout
+      // pass, so getTextBounds is empty). Derive the box directly from the
+      // pre-shaped runs: advance-width span + authored linebox height, in the
+      // Text's local space (pen positions already include firstRun->x, so we
+      // only add renderPosition here — no separate firstRun->x term).
+      auto glyphBounds = ComputeGlyphRunTextBounds(*text);
+      if (glyphBounds.width > 0 && glyphBounds.height > 0) {
+        geom.posX = renderPos.x + glyphBounds.x;
+        geom.posY = renderPos.y + glyphBounds.y;
+        geom.estWidth = glyphBounds.width;
+        geom.estHeight = glyphBounds.height;
+      } else {
+        // Last-resort estimate when the runs carry no usable glyph metrics
+        // (e.g. font glyph list unavailable): fall back to a font-size guess.
+        float effectiveFontSize = text->renderFontSize();
+        geom.estWidth =
+            static_cast<float>(CountUTF8Characters(text->text)) * effectiveFontSize * 0.6f;
+        geom.estHeight = effectiveFontSize * 1.4f;
+        geom.posX = renderPos.x + firstRun->x;
+        geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
+      }
     }
     return geom;
   }

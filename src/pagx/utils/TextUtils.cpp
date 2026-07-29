@@ -19,6 +19,7 @@
 #include "pagx/utils/TextUtils.h"
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include "base/utils/MathUtil.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
@@ -236,6 +237,93 @@ std::vector<GlyphImage> ComputeGlyphImages(const Text& text, float textPosX, flo
   std::vector<GlyphImage> result;
   ComputeGlyphPathsAndImages(text, textPosX, textPosY, nullptr, &result);
   return result;
+}
+
+Rect ComputeGlyphRunTextBounds(const Text& text) {
+  // Horizontal span: walk the pen exactly like WalkGlyphs (same positions /
+  // xOffsets / advance-accumulator fallback and the same missing-glyph skips),
+  // tracking each rendered glyph's pen origin and its advance edge. This yields
+  // the advance-width span that TextLayout records in perTextBounds, rather than
+  // the ink-only width, so start/centre/end anchoring reproduces the interactive
+  // layout. Per-glyph rotation / skew / scale doesn't move the pen and is
+  // intentionally ignored here (it only reshapes the glyph, not its advance).
+  float minX = std::numeric_limits<float>::max();
+  float maxX = std::numeric_limits<float>::lowest();
+  bool hasGlyph = false;
+  for (const auto* run : text.glyphRuns) {
+    if (!run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
+      continue;
+    }
+    float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
+    float baseX = run->x;
+    float baseY = run->y;
+    float currentX = baseX;
+    for (size_t i = 0; i < run->glyphs.size(); i++) {
+      uint16_t glyphID = run->glyphs[i];
+      if (glyphID == 0) {
+        continue;
+      }
+      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndex >= run->font->glyphs.size()) {
+        continue;
+      }
+      auto* glyph = run->font->glyphs[glyphIndex];
+      if (!glyph) {
+        continue;
+      }
+      float posX = 0;
+      float posY = 0;
+      ResolveGlyphPosition(run, i, baseX, baseY, currentX, &posX, &posY);
+      float advance = glyph->advance * scale;
+      currentX += advance;
+      minX = std::min(minX, posX);
+      maxX = std::max(maxX, posX + advance);
+      hasGlyph = true;
+    }
+  }
+  if (!hasGlyph) {
+    return {};
+  }
+  float width = std::max(0.0f, maxX - minX);
+
+  // Vertical extent: the authored linebox height on the first GlyphRun that
+  // carries bounds is the value layout produced, so prefer it. Its top is at
+  // bounds.y (in the same local space) so we keep that offset. Fall back to the
+  // union of glyph path ink heights only when no authored bounds exist (e.g. a
+  // hand-authored document that never went through the layout/embed pass).
+  float top = std::numeric_limits<float>::max();
+  float bottom = std::numeric_limits<float>::lowest();
+  for (const auto* run : text.glyphRuns) {
+    if (run->bounds.height > 0) {
+      top = run->bounds.y;
+      bottom = run->bounds.y + run->bounds.height;
+      break;
+    }
+  }
+  if (bottom <= top) {
+    top = std::numeric_limits<float>::max();
+    bottom = std::numeric_limits<float>::lowest();
+    auto paths = ComputeGlyphPaths(text, 0.0f, 0.0f);
+    for (const auto& gp : paths) {
+      if (!gp.pathData || gp.pathData->isEmpty()) {
+        continue;
+      }
+      auto pb = const_cast<PathData*>(gp.pathData)->getBounds();
+      const Point corners[4] = {{pb.x, pb.y},
+                                {pb.x + pb.width, pb.y},
+                                {pb.x, pb.y + pb.height},
+                                {pb.x + pb.width, pb.y + pb.height}};
+      for (const auto& corner : corners) {
+        Point p = gp.transform.mapPoint(corner);
+        top = std::min(top, p.y);
+        bottom = std::max(bottom, p.y);
+      }
+    }
+  }
+  if (bottom <= top) {
+    return {};
+  }
+  return Rect::MakeXYWH(minX, top, width, bottom - top);
 }
 
 bool HasNonASCII(const std::string& str) {

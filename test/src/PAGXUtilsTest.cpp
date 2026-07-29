@@ -1067,6 +1067,150 @@ PAGX_TEST(PAGXUtilsTest, ComputeGlyphPaths_PositionWithXOffset) {
 }
 
 // ---------------------------------------------------------------------------
+// ComputeGlyphRunTextBounds
+// ---------------------------------------------------------------------------
+
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphRunTextBounds_EmptyText) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto text = doc->makeNode<pagx::Text>();
+  auto bounds = pagx::ComputeGlyphRunTextBounds(*text);
+  EXPECT_FLOAT_EQ(bounds.width, 0.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 0.0f);
+}
+
+// The advance-width span must run from the first glyph's pen origin to the last
+// glyph's advance edge, NOT the (much wider) authored container width that a
+// tool like ardot bakes into GlyphRun::bounds for centering. This is the exact
+// regression that produced too-narrow CJK text boxes in the PPT native path.
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphRunTextBounds_AdvanceWidthIgnoresContainerBounds) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto text = doc->makeNode<pagx::Text>();
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M0 0 L1000 0 L1000 800 L0 800 Z");
+  glyph->advance = 1000.0f;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 72.0f;
+  run->glyphs = {1, 1, 1};
+  run->x = 248.0f;
+  run->positions = {{0.0f, 0.0f}, {72.0f, 0.0f}, {144.0f, 0.0f}};
+  // Authored container bounds are far wider than the ink (1000 vs the real
+  // advance span) and carry the linebox height on y/height.
+  run->bounds = pagx::Rect::MakeXYWH(0.0f, 0.0f, 1000.0f, 87.0f);
+  text->glyphRuns.push_back(run);
+
+  auto bounds = pagx::ComputeGlyphRunTextBounds(*text);
+  // scale = 72/1000, advance px = 72. minX = run->x + positions[0].x = 248.
+  // maxX = run->x + positions[2].x + advance = 248 + 144 + 72 = 464. width = 216.
+  EXPECT_FLOAT_EQ(bounds.x, 248.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 216.0f);
+  // Height comes from the authored linebox bounds, not the container width.
+  EXPECT_FLOAT_EQ(bounds.y, 0.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 87.0f);
+}
+
+// GlyphID 0 (missing glyph) is skipped and does not contribute an advance,
+// mirroring WalkGlyphs (there is no glyph entry to read an advance from). In the
+// no-positions fallback the pen therefore only advances for rendered glyphs, so
+// the width reflects the two real glyphs and not the skipped slot.
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphRunTextBounds_MissingGlyphSkipped) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto text = doc->makeNode<pagx::Text>();
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M0 0 L1000 0 L1000 1000 L0 1000 Z");
+  glyph->advance = 1000.0f;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 10.0f;
+  run->glyphs = {1, 0, 1};  // gap in the middle
+  run->bounds = pagx::Rect::MakeXYWH(0.0f, 0.0f, 40.0f, 12.0f);
+  text->glyphRuns.push_back(run);
+
+  auto bounds = pagx::ComputeGlyphRunTextBounds(*text);
+  // advance px = 10. Glyph 0 pen at 0..10; glyph id 0 is skipped without
+  // advancing; glyph 2 pen at 10..20. Rendered span = [0, 20]. width = 20.
+  EXPECT_FLOAT_EQ(bounds.x, 0.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 20.0f);
+}
+
+// With no authored bounds the height falls back to the union of glyph path ink
+// extents (mapped through the per-glyph transform), so hand-authored documents
+// that never went through the layout/embed pass still get a usable box.
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphRunTextBounds_FallsBackToInkHeight) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto text = doc->makeNode<pagx::Text>();
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  // Ink spans y in [-800, 0] in design space (ascender-negative-Y).
+  *glyph->path = pagx::PathDataFromSVGString("M0 0 L500 0 L500 -800 L0 -800 Z");
+  glyph->advance = 500.0f;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 10.0f;  // scale = 10/1000 = 0.01
+  run->glyphs = {1};
+  // No run->bounds: force the ink-height fallback.
+  text->glyphRuns.push_back(run);
+
+  auto bounds = pagx::ComputeGlyphRunTextBounds(*text);
+  // Ink y in [-800, 0] * 0.01 = [-8, 0]. height = 8, top = -8.
+  EXPECT_FLOAT_EQ(bounds.y, -8.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 8.0f);
+  // width = advance * scale = 500 * 0.01 = 5.
+  EXPECT_FLOAT_EQ(bounds.width, 5.0f);
+}
+
+// The horizontal span must union across all runs of a Text, using the first
+// run that carries authored bounds for the height.
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphRunTextBounds_UnionsMultipleRuns) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto text = doc->makeNode<pagx::Text>();
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M0 0 L1000 0 L1000 1000 L0 1000 Z");
+  glyph->advance = 1000.0f;
+  font->glyphs.push_back(glyph);
+
+  auto run1 = doc->makeNode<pagx::GlyphRun>();
+  run1->font = font;
+  run1->fontSize = 10.0f;  // advance px = 10
+  run1->glyphs = {1};
+  run1->x = 0.0f;
+  run1->bounds = pagx::Rect::MakeXYWH(0.0f, 2.0f, 100.0f, 12.0f);
+  text->glyphRuns.push_back(run1);
+
+  auto run2 = doc->makeNode<pagx::GlyphRun>();
+  run2->font = font;
+  run2->fontSize = 10.0f;
+  run2->glyphs = {1};
+  run2->x = 50.0f;  // second run starts far to the right
+  text->glyphRuns.push_back(run2);
+
+  auto bounds = pagx::ComputeGlyphRunTextBounds(*text);
+  // run1 span [0, 10], run2 span [50, 60]. Union width = 60 - 0 = 60.
+  EXPECT_FLOAT_EQ(bounds.x, 0.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 60.0f);
+  // Height/top taken from the first run carrying authored bounds.
+  EXPECT_FLOAT_EQ(bounds.y, 2.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 12.0f);
+}
+
+// ---------------------------------------------------------------------------
 // GetPNGDimensionsFromPath (data URI variant)
 // ---------------------------------------------------------------------------
 
