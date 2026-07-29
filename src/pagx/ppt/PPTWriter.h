@@ -768,6 +768,12 @@ class PPTWriter {
     float estWidth = 0;
     float estHeight = 0;
     bool hasTextBox = false;
+    // True when posX/posY were taken from the GlyphRun pen origin (glyphRun-
+    // carrying Text rendered as native fallback). In that case the modifier
+    // TextBox's horizontal alignment is already baked into the origin, so the
+    // caller must NOT re-apply it as an OOXML algn or the text is centered
+    // twice.
+    bool originFromGlyphRun = false;
   };
 
   NativeTextGeometry computeNativeTextGeometry(const Text* text, Text* mutableText,

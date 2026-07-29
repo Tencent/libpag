@@ -190,6 +190,7 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
   // vertical layout. Only the first run carries the block-level offset.
   if (!text->glyphRuns.empty() && text->glyphRuns.front() != nullptr) {
     const GlyphRun* firstRun = text->glyphRuns.front();
+    geom.originFromGlyphRun = true;
     auto renderPos = text->renderPosition();
     auto textBounds = precomputed->getTextBounds(mutableText);
     if (textBounds.width > 0 && textBounds.height > 0) {
@@ -437,32 +438,40 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   // and to the left for End. Center / Justify are direction-symmetric.
   // OOXML's default algn is "l", so we leave style.algn as nullptr for the
   // physical-Start case and emit explicit "r" only for the physical-End case.
-  switch (ResolveLogicalAnchor(text->textAnchor, rtl)) {
-    case TextAnchor::Center:
-      style.algn = "ctr";
-      break;
-    case TextAnchor::End:
-      style.algn = "r";
-      break;
-    case TextAnchor::Start:
-    default:
-      break;
-  }
-  if (fs.textBox) {
-    switch (ResolveLogicalAlign(fs.textBox->textAlign, rtl)) {
-      case TextAlign::Center:
+  // When the shape frame is anchored to the GlyphRun pen origin, the modifier
+  // TextBox's horizontal alignment (and the Text's own anchor) is already baked
+  // into that origin — the frame's left edge sits exactly where the first glyph
+  // starts. Re-emitting an OOXML algn here would center/right-align the text a
+  // second time inside the frame, so leave algn at its default (left) and let
+  // the origin do the positioning.
+  if (!geom.originFromGlyphRun) {
+    switch (ResolveLogicalAnchor(text->textAnchor, rtl)) {
+      case TextAnchor::Center:
         style.algn = "ctr";
         break;
-      case TextAlign::End:
+      case TextAnchor::End:
         style.algn = "r";
         break;
-      case TextAlign::Justify:
-        style.algn = "just";
-        break;
-      case TextAlign::Start:
+      case TextAnchor::Start:
       default:
-        style.algn = nullptr;
         break;
+    }
+    if (fs.textBox) {
+      switch (ResolveLogicalAlign(fs.textBox->textAlign, rtl)) {
+        case TextAlign::Center:
+          style.algn = "ctr";
+          break;
+        case TextAlign::End:
+          style.algn = "r";
+          break;
+        case TextAlign::Justify:
+          style.algn = "just";
+          break;
+        case TextAlign::Start:
+        default:
+          style.algn = nullptr;
+          break;
+      }
     }
   }
   // PAGX lineHeight maps onto OOXML <a:lnSpc> in both writing modes: in horizontal mode each
