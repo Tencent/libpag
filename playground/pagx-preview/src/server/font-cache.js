@@ -57,7 +57,7 @@ function ensureCacheDir() {
 }
 
 function log(msg) {
-  process.stderr.write(`pagx-preview font-cache: ${msg}\n`);
+  process.stderr.write(`pagx preview font-cache: ${msg}\n`);
 }
 
 /** Returns true when a cached font file exists and looks intact. */

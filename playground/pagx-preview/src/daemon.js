@@ -71,40 +71,40 @@ export async function runServer({ entryFile, port, host, fontsDir }) {
   try {
     server = await startServer({ entryFile, port, host, fontsDir });
   } catch (err) {
-    process.stderr.write(`pagx-preview: failed to start server: ${err.message}\n`);
+    process.stderr.write(`pagx preview: failed to start server: ${err.message}\n`);
     process.exit(1);
   }
 
   try {
     writeLock({ port: server.port, host: server.host, pid: process.pid });
   } catch (err) {
-    process.stderr.write(`pagx-preview: warning: could not write lock file: ${err.message}\n`);
+    process.stderr.write(`pagx preview: warning: could not write lock file: ${err.message}\n`);
   }
 
-  process.stdout.write(`pagx-preview: watching ${entryFile}\n`);
+  process.stdout.write(`pagx preview: watching ${entryFile}\n`);
   if (server.fontsDir) {
-    process.stdout.write(`pagx-preview: fonts from ${server.fontsDir}\n`);
+    process.stdout.write(`pagx preview: fonts from ${server.fontsDir}\n`);
   } else if (server.useLazyDownload) {
-    process.stdout.write('pagx-preview: fonts downloading in background; text may render blank until ready\n');
+    process.stdout.write('pagx preview: fonts downloading in background; text may render blank until ready\n');
   } else {
     process.stderr.write(
-      'pagx-preview: no fonts directory found. Text glyphs will render blank. ' +
+      'pagx preview: no fonts directory found. Text glyphs will render blank. ' +
       'Pass --fonts <dir> or set PAGX_FONTS_DIR to a directory containing ' +
       'NotoSansSC-Regular.otf and NotoColorEmoji.ttf.\n'
     );
   }
-  process.stdout.write(`pagx-preview: ${server.url}\n`);
+  process.stdout.write(`pagx preview: ${server.url}\n`);
 
   let shuttingDown = false;
   const shutdown = async (reason) => {
     if (shuttingDown) {
-      process.stderr.write('pagx-preview: force exit.\n');
+      process.stderr.write('pagx preview: force exit.\n');
       process.exit(1);
     }
     shuttingDown = true;
-    process.stdout.write(`\npagx-preview: ${reason}, shutting down...\n`);
+    process.stdout.write(`\npagx preview: ${reason}, shutting down...\n`);
     const forceTimer = setTimeout(() => {
-      process.stderr.write('pagx-preview: graceful shutdown timed out, forcing exit.\n');
+      process.stderr.write('pagx preview: graceful shutdown timed out, forcing exit.\n');
       process.exit(1);
     }, 3000);
     forceTimer.unref();
@@ -145,11 +145,11 @@ export async function runStdioServer({ port, host, fontsDir }) {
   try {
     server = await startServer({ entryFile: null, port, host, fontsDir });
   } catch (err) {
-    process.stderr.write(`pagx-preview: failed to start server: ${err.message}\n`);
+    process.stderr.write(`pagx preview: failed to start server: ${err.message}\n`);
     process.exit(1);
     return;
   }
-  process.stderr.write(`pagx-preview: MCP stdio server ready (preview at ${server.url})\n`);
+  process.stderr.write(`pagx preview: MCP stdio server ready (preview at ${server.url})\n`);
 
   const mcp = await connectStdioMcpServer({
     sessions: server.sessions,
@@ -250,7 +250,7 @@ export function readLogTail(lines = 40) {
 export async function stopDaemon() {
   const lock = readLock();
   if (!lock) {
-    process.stdout.write('pagx-preview: no running server.\n');
+    process.stdout.write('pagx preview: no running server.\n');
     return;
   }
   try {
@@ -258,10 +258,10 @@ export async function stopDaemon() {
   } catch (err) {
     if (err.code === 'ESRCH') {
       clearLock();
-      process.stdout.write('pagx-preview: server was not running (stale lock cleared).\n');
+      process.stdout.write('pagx preview: server was not running (stale lock cleared).\n');
       return;
     }
-    process.stderr.write(`pagx-preview: failed to stop server (pid ${lock.pid}): ${err.message}\n`);
+    process.stderr.write(`pagx preview: failed to stop server (pid ${lock.pid}): ${err.message}\n`);
     process.exit(1);
   }
 
@@ -270,20 +270,20 @@ export async function stopDaemon() {
   const deadline = Date.now() + 3000;
   while (Date.now() < deadline) {
     if (!readLock()) {
-      process.stdout.write(`pagx-preview: stopped (pid ${lock.pid}).\n`);
+      process.stdout.write(`pagx preview: stopped (pid ${lock.pid}).\n`);
       return;
     }
     await sleep(50);
   }
   process.stdout.write(
-    `pagx-preview: sent SIGTERM to pid ${lock.pid}; lock still present (shutdown in progress).\n`
+    `pagx preview: sent SIGTERM to pid ${lock.pid}; lock still present (shutdown in progress).\n`
   );
 }
 
 /** Prints the log file to stdout. */
 export function printLog() {
   if (!fs.existsSync(LOG_FILE)) {
-    process.stdout.write('pagx-preview: no log file yet.\n');
+    process.stdout.write('pagx preview: no log file yet.\n');
     return;
   }
   const data = fs.readFileSync(LOG_FILE, 'utf8');

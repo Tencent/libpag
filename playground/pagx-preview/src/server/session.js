@@ -114,7 +114,7 @@ export class PreviewSession {
       try {
         listener(payload);
       } catch (err) {
-        console.error('pagx-preview: subscriber threw', err);
+        console.error('pagx preview: subscriber threw', err);
       }
     }
   }

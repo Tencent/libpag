@@ -26,16 +26,16 @@ import { probeLiveServer, clearLock } from './server/lock.js';
 import { runServer, runStdioServer, spawnDaemon, stopDaemon, printLog, LOG_FILE } from './daemon.js';
 
 const USAGE = `Usage:
-  pagx-preview <file.pagx>      Preview a .pagx file (opens in the browser)
-  pagx-preview --mcp            Run as an MCP server for AI assistants (e.g. CodeBuddy)
-  pagx-preview stop             Stop the running background server
-  pagx-preview --log            Print the server log
-  pagx-preview --help           Show this help
+  pagx preview <file.pagx>      Preview a .pagx file (opens in the browser)
+  pagx preview --mcp            Run as an MCP server for AI assistants (e.g. CodeBuddy)
+  pagx preview stop             Stop the running background server
+  pagx preview --log            Print the server log
+  pagx preview --help           Show this help
 
 Options:
   --mcp            Run as a stdio MCP server so an AI assistant can open .pagx files and render an
                    inline preview widget. Add to CodeBuddy mcp.json:
-                     { "mcpServers": { "pagx-preview": { "command": "pagx-preview", "args": ["--mcp"] } } }
+                     { "mcpServers": { "pagx-preview": { "command": "pagx", "args": ["preview", "--mcp"] } } }
   --log            Print the server log file (${LOG_FILE}) and exit
   -h, --help       Show this help
 
@@ -167,7 +167,7 @@ export async function run(argv) {
   try {
     args = parseArgs(argv);
   } catch (err) {
-    process.stderr.write(`pagx-preview: ${err.message}\n\n${USAGE}`);
+    process.stderr.write(`pagx preview: ${err.message}\n\n${USAGE}`);
     process.exit(2);
   }
 
@@ -188,7 +188,7 @@ export async function run(argv) {
   // actual event loop that hosts express + chokidar lives here.
   if (args.serverMode) {
     if (!args.file) {
-      process.stderr.write('pagx-preview: internal error: --__server without file\n');
+      process.stderr.write('pagx preview: internal error: --__server without file\n');
       process.exit(2);
     }
     const absoluteFile = path.resolve(args.file);
@@ -217,7 +217,7 @@ export async function run(argv) {
 
   const absoluteFile = path.resolve(args.file);
   if (!fs.existsSync(absoluteFile)) {
-    process.stderr.write(`pagx-preview: file not found: ${absoluteFile}\n`);
+    process.stderr.write(`pagx preview: file not found: ${absoluteFile}\n`);
     process.exit(1);
   }
 
@@ -237,15 +237,15 @@ export async function run(argv) {
       // pagx-preview invocations. When a tab is already active we surface the URL and rely on
       // the user's browser being one Cmd+Tab away.
       if (info.reused && info.hadActiveTab) {
-        process.stdout.write(`pagx-preview: already open at ${url}\n`);
+        process.stdout.write(`pagx preview: already open at ${url}\n`);
       } else {
-        process.stdout.write(`pagx-preview: ${url}\n`);
+        process.stdout.write(`pagx preview: ${url}\n`);
         if (args.open) openBrowser(url);
       }
       return;
     } catch (err) {
       process.stderr.write(
-        `pagx-preview: existing server unreachable (${err.message}); starting a new one\n`
+        `pagx preview: existing server unreachable (${err.message}); starting a new one\n`
       );
       clearLock();
     }
@@ -273,7 +273,7 @@ export async function run(argv) {
       fontsDir: args.fonts,
     });
   } catch (err) {
-    process.stderr.write(`pagx-preview: ${err.message}\n`);
+    process.stderr.write(`pagx preview: ${err.message}\n`);
     process.exit(1);
   }
 
@@ -282,7 +282,7 @@ export async function run(argv) {
   try {
     info = await requestSession(lock, absoluteFile);
   } catch (err) {
-    process.stderr.write(`pagx-preview: server started but session request failed: ${err.message}\n`);
+    process.stderr.write(`pagx preview: server started but session request failed: ${err.message}\n`);
     process.exit(1);
   }
 
@@ -291,11 +291,11 @@ export async function run(argv) {
     emitJson({ url, pid: lock.pid, logFile: LOG_FILE, reused: false });
     return;
   }
-  process.stdout.write(`pagx-preview: ${url}\n`);
+  process.stdout.write(`pagx preview: ${url}\n`);
   process.stdout.write(
-    `pagx-preview: server running in background (pid ${lock.pid}, log ${LOG_FILE})\n`
+    `pagx preview: server running in background (pid ${lock.pid}, log ${LOG_FILE})\n`
   );
-  process.stdout.write('pagx-preview: run `pagx-preview stop` to stop it.\n');
+  process.stdout.write('pagx preview: run `pagx preview stop` to stop it.\n');
   if (args.open) openBrowser(url);
 }
 

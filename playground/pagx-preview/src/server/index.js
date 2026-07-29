@@ -54,7 +54,7 @@ function randomSessionId() {
 function readViewerInfo() {
   if (!fs.existsSync(VIEWER_INFO_PATH)) {
     throw new Error(
-      `pagx-preview: viewer artifacts not found at ${GENERATED_DIR}/viewer. Run "npm run prebuild" first.`
+      `pagx preview: viewer artifacts not found at ${GENERATED_DIR}/viewer. Run "npm run prebuild" first.`
     );
   }
   return JSON.parse(fs.readFileSync(VIEWER_INFO_PATH, 'utf8'));
@@ -296,7 +296,7 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
         await fs.promises.writeFile(session.entryFile, req.body);
         res.json({ ok: true, bytes: req.body.length });
       } catch (err) {
-        console.error(`pagx-preview: failed to save ${session.entryFile}`, err);
+        console.error(`pagx preview: failed to save ${session.entryFile}`, err);
         res.status(500).json({ error: err && err.message ? err.message : 'write failed' });
       }
     },
@@ -537,7 +537,7 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
         broadcastToAll({ type: 'fonts-ready' });
       }
     })().catch((err) => {
-      process.stderr.write(`pagx-preview: font download failed: ${err.message}\n`);
+      process.stderr.write(`pagx preview: font download failed: ${err.message}\n`);
     });
   }
 

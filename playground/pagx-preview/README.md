@@ -1,16 +1,19 @@
 # PAGX Preview
 
-Local live-reload preview server for [PAGX](https://pag.io/pagx/latest/) files. Provides a
-`pagx-preview` CLI that renders a `.pagx` file in the browser and automatically refreshes on
-file changes.
+Local live-reload preview server for [PAGX](https://pag.io/pagx/latest/) files. Powers the
+`pagx preview` subcommand of [`@libpag/pagx`](https://www.npmjs.com/package/@libpag/pagx),
+rendering a `.pagx` file in the browser and automatically refreshing on file changes.
 
-Companion tool to [`@libpag/pagx`](https://www.npmjs.com/package/@libpag/pagx) and
-[`pagx-viewer`](../pagx-viewer). See [PAGX](https://pag.io/pagx/latest/) for the format
-specification.
+End users invoke it as `pagx preview` through the `@libpag/pagx` CLI. This package can also run
+standalone as `pagx-preview` — that form is used for local development and maintainer testing
+(see [Development](#development)).
+
+Companion tool to [`pagx-viewer`](../pagx-viewer). See [PAGX](https://pag.io/pagx/latest/) for
+the format specification.
 
 ## Introduction
 
-`pagx-preview` starts a local HTTP server, watches the target `.pagx` file (and any external
+`pagx preview` starts a local HTTP server, watches the target `.pagx` file (and any external
 resources it references) with `chokidar`, and pushes reload events to the browser over
 Server-Sent Events. The rendering itself is delegated to `pagx-viewer` (WebAssembly). The first
 invocation spawns a detached daemon so the shell returns immediately; subsequent invocations
@@ -24,20 +27,20 @@ reuse the running daemon and open additional tabs for different files.
 ## Quick Start (End Users)
 
 ```bash
-# Install (from an npm tarball; publishing to the registry is planned)
-npm install -g ./libpag-pagx-preview-<version>.tgz
+# Install the main PAGX CLI (ships the preview subcommand)
+npm install -g @libpag/pagx
 
 # Open a PAGX file
-pagx-preview /path/to/animation.pagx
+pagx preview /path/to/animation.pagx
 
 # Open another file (reuses the same background server, opens a new tab)
-pagx-preview /path/to/other.pagx
+pagx preview /path/to/other.pagx
 
 # Stop the background server
-pagx-preview stop
+pagx preview stop
 
 # Inspect the server log
-pagx-preview --log
+pagx preview --log
 ```
 
 On first run, fallback fonts (~18 MB) are lazily downloaded to `~/.pagx/fonts/`. Subsequent
@@ -84,7 +87,7 @@ Set `PAGX_FONTS_NO_AUTO_DOWNLOAD=1` to disable the lazy download step (for offli
 
 ## MCP Server Mode
 
-`pagx-preview` can run as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/)
+`pagx preview` can run as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/)
 server, allowing AI coding assistants to preview `.pagx` files directly in conversation.
 
 ### Tools
@@ -117,8 +120,8 @@ Add to `~/.codebuddy/mcp.json`:
 {
   "mcpServers": {
     "pagx-preview": {
-      "command": "pagx-preview",
-      "args": ["--mcp"]
+      "command": "pagx",
+      "args": ["preview", "--mcp"]
     }
   }
 }
@@ -133,8 +136,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 {
   "mcpServers": {
     "pagx-preview": {
-      "command": "pagx-preview",
-      "args": ["--mcp"]
+      "command": "pagx",
+      "args": ["preview", "--mcp"]
     }
   }
 }
@@ -155,7 +158,7 @@ Add to `.vscode/mcp.json` in your project:
 }
 ```
 
-Note: Copilot uses HTTP transport. Start the preview server first (`pagx-preview --port <port>
+Note: Copilot uses HTTP transport. Start the preview server first (`pagx preview --port <port>
 <file>`) then configure the URL.
 
 ### Known compatibility issues
@@ -189,6 +192,10 @@ Because of this, `preview_pagx` (open in an IDE webview panel / browser) is the 
   SSE, and drive the playback bar.
 
 ## Development
+
+> The commands in this section drive the **standalone** `pagx-preview` binary (via `npm link` or
+> `node src/cli.js`), which is how this package is developed and tested in isolation. End users
+> instead reach the same tool as `pagx preview` through the `@libpag/pagx` CLI.
 
 ### First-time setup
 
@@ -356,8 +363,8 @@ npm install -g @tencent/pagx-preview@alpha --registry https://mirrors.tencent.co
 ```
 
 Once the tool is proven, publish the canonical `@libpag/pagx-preview` to the public registry (see
-above), or fold it into `@libpag/pagx` as a `preview` subcommand (add `@libpag/pagx-preview` as a
-dependency and dispatch `pagx preview ...` to it from the CLI wrapper).
+above). Note that `@libpag/pagx` already dispatches `pagx preview ...` to this tool, so end users
+reach it through the main CLI without installing this package directly.
 
 ### Force a font-download rehearsal
 
@@ -400,8 +407,8 @@ CLI invocations, by the CLI itself.
 - [`pagx-playground`](../pagx-playground) — The hosted online viewer at
   [pag.io/pagx](https://pag.io/pagx/). Reuses the same viewer with a richer editing UI.
 - [`@libpag/pagx`](https://www.npmjs.com/package/@libpag/pagx) — The main PAGX command-line
-  tool (validate, render, optimize, format, etc.). Not yet integrated with `pagx-preview`
-  as a subcommand.
+  tool (validate, render, optimize, format, etc.). Exposes this tool as its `pagx preview`
+  subcommand.
 
 ## License
 

@@ -2,6 +2,8 @@
 
 本地实时预览服务器，用于 [PAGX](https://pag.io/pagx/latest/) 动画文件的渲染和调试。支持文件变更自动刷新、MCP 协议接入 AI 编码助手。
 
+它作为 [`@libpag/pagx`](https://www.npmjs.com/package/@libpag/pagx) 的 `pagx preview` 子命令对外提供。终端用户通过 `@libpag/pagx` CLI 以 `pagx preview` 调用；本包也可作为独立命令 `pagx-preview` 运行，该形式用于本地开发和维护者测试（见[开发](#开发)）。
+
 ## 功能
 
 - 一行命令启动，浏览器自动打开预览
@@ -19,17 +21,17 @@
 ## 快速开始
 
 ```bash
-# 全局安装
-npm install -g ./libpag-pagx-preview-<version>.tgz
+# 全局安装主 CLI（内置 preview 子命令）
+npm install -g @libpag/pagx
 
 # 预览文件
-pagx-preview /path/to/animation.pagx
+pagx preview /path/to/animation.pagx
 
 # 预览另一个文件（复用已有服务）
-pagx-preview /path/to/other.pagx
+pagx preview /path/to/other.pagx
 
 # 停止后台服务
-pagx-preview stop
+pagx preview stop
 ```
 
 ## CLI 参数
@@ -47,7 +49,7 @@ pagx-preview stop
 
 ## MCP Server 模式
 
-`pagx-preview` 可作为 MCP (Model Context Protocol) 服务器运行，让 AI 编码助手在对话中直接预览 `.pagx` 文件。
+`pagx preview` 可作为 MCP (Model Context Protocol) 服务器运行，让 AI 编码助手在对话中直接预览 `.pagx` 文件。
 
 ### 工作原理
 
@@ -77,8 +79,8 @@ pagx-preview stop
 {
   "mcpServers": {
     "pagx-preview": {
-      "command": "pagx-preview",
-      "args": ["--mcp"]
+      "command": "pagx",
+      "args": ["preview", "--mcp"]
     }
   }
 }
@@ -93,8 +95,8 @@ Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 {
   "mcpServers": {
     "pagx-preview": {
-      "command": "pagx-preview",
-      "args": ["--mcp"]
+      "command": "pagx",
+      "args": ["preview", "--mcp"]
     }
   }
 }
@@ -115,7 +117,7 @@ Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 }
 ```
 
-注意：Copilot 使用 HTTP 传输，需先手动启动服务（`pagx-preview --port <端口> <文件>`）。
+注意：Copilot 使用 HTTP 传输，需先手动启动服务（`pagx preview --port <端口> <文件>`）。
 
 ### 已知兼容性问题
 
@@ -132,6 +134,9 @@ Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 预览。
 
 ## 开发
+
+> 本节命令针对**独立**的 `pagx-preview` 命令（通过 `npm link` 或 `node src/cli.js` 运行），这是本包
+> 单独开发和测试的方式。终端用户则通过 `@libpag/pagx` CLI 以 `pagx preview` 使用同一工具。
 
 ### 首次设置
 
@@ -289,9 +294,8 @@ npm pkg set name=@libpag/pagx-preview
 npm install -g @tencent/pagx-preview@alpha --registry https://mirrors.tencent.com/npm/
 ```
 
-工具验证稳定后，再把正式的 `@libpag/pagx-preview` 发到公开源（见上文），或并入 `@libpag/pagx`
-做成 `preview` 子命令（把 `@libpag/pagx-preview` 加为依赖，在 CLI wrapper 里把 `pagx preview ...`
-转发给它）。
+工具验证稳定后，再把正式的 `@libpag/pagx-preview` 发到公开源（见上文）。注意 `@libpag/pagx` 已经
+把 `pagx preview ...` 转发给本工具，因此终端用户无需单独安装本包即可通过主 CLI 使用。
 
 ## 目录结构
 
