@@ -42,9 +42,14 @@
     "x64",
     "arm64"
   ],
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "express": "^4.21.1"
+  },
   "files": [
     "bin/",
     "html-snapshot/",
+    "preview/",
     "README.md"
   ]
 }

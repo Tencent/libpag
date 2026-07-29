@@ -68,6 +68,21 @@ if (!process.env.PAGX_HTML_SNAPSHOT_BIN) {
   }
 }
 
+// Intercept the preview sub-command and delegate to pagx-preview (a Node.js-based
+// HTTP server + MCP service). The preview module lives under preview/ at the package
+// root so it can be bundled and published alongside the native binary.
+if (process.argv[2] === 'preview') {
+  const previewEntry = path.join(__dirname, '..', 'preview', 'src', 'cli.js');
+  if (!fs.existsSync(previewEntry)) {
+    console.error('pagx: preview command not available. Preview module not found.');
+    process.exit(1);
+  }
+  const { spawn } = require('child_process');
+  const child = spawn('node', [previewEntry, ...process.argv.slice(3)], { stdio: 'inherit' });
+  child.on('exit', (code) => process.exit(code != null ? code : 1));
+  return;
+}
+
 try {
   execFileSync(binPath, process.argv.slice(2), { stdio: "inherit" });
 } catch (e) {
