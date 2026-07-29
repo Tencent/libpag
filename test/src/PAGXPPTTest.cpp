@@ -2145,6 +2145,75 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithChildLayers) {
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_children", options));
 }
 
+// Regression: a mask layer authored as an INVISIBLE CHILD of the layer it masks
+// (the pattern the PAGX / HTML importer produces) must not be emitted as visible
+// content when the mask clip is dropped in the no-bake vector path. Previously
+// the mask layer's own fill (here a solid rect covering the whole slide) painted
+// on top of the masked content as an opaque patch — the "white cover layer" seen
+// in exported website decks. The fix skips the child that equals layer->mask.
+//
+// Verify via deck size: exporting with the mask layer also linked as a child
+// must match exporting without the mask child present at all (the mask
+// contributes zero visible shapes either way). Both paths keep bakeUnsupported
+// off so the clip is dropped rather than rasterized, isolating the child-
+// emission behaviour.
+PAGX_TEST(PAGXPPTTest, MaskAsChildNotEmittedAsContent) {
+  // Build a layer masked by a full-slide white rectangle that is ALSO one of the
+  // layer's children (the real-world importer pattern that triggered the bug).
+  auto makeDoc = [](bool linkMaskAsChild) {
+    auto doc = pagx::PAGXDocument::Make(400, 300);
+
+    auto* contentLayer = doc->makeNode<pagx::Layer>();
+    auto* contentEllipse = doc->makeNode<pagx::Ellipse>();
+    contentEllipse->position = {200, 150};
+    contentEllipse->size = {250, 200};
+    auto* contentFill = doc->makeNode<pagx::Fill>();
+    auto* contentSolid = doc->makeNode<pagx::SolidColor>();
+    contentSolid->color = {0.0f, 0.5f, 1.0f, 1.0f};
+    contentFill->color = contentSolid;
+    contentLayer->contents.push_back(contentEllipse);
+    contentLayer->contents.push_back(contentFill);
+
+    // The mask: a full-slide opaque white rect. If wrongly emitted it covers all.
+    auto* maskLayer = doc->makeNode<pagx::Layer>();
+    auto* maskRect = doc->makeNode<pagx::Rectangle>();
+    maskRect->position = {200, 150};
+    maskRect->size = {400, 300};
+    auto* maskFill = doc->makeNode<pagx::Fill>();
+    auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+    maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+    maskFill->color = maskSolid;
+    maskLayer->contents.push_back(maskRect);
+    maskLayer->contents.push_back(maskFill);
+
+    contentLayer->mask = maskLayer;
+    if (linkMaskAsChild) {
+      contentLayer->children.push_back(maskLayer);
+    }
+    doc->layers.push_back(contentLayer);
+    return doc;
+  };
+
+  auto outDir = PPTOutDir();
+  auto withChildPath = outDir + "/mask_as_child.pptx";
+  auto withoutChildPath = outDir + "/mask_not_child.pptx";
+
+  pagx::PPTExportOptions opts;
+  opts.bakeUnsupported = false;
+  auto docWithChild = makeDoc(true);
+  auto docWithoutChild = makeDoc(false);
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({docWithChild.get()}, withChildPath, opts));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({docWithoutChild.get()}, withoutChildPath, opts));
+
+  // The mask layer must contribute no visible shapes in either case, so linking
+  // it as a child must not change the exported deck size. Before the fix the
+  // child path emitted two extra shapes (the mask rect + its fill), inflating
+  // the archive; equal sizes prove the mask child is now skipped.
+  auto withChildSize = std::filesystem::file_size(withChildPath);
+  auto withoutChildSize = std::filesystem::file_size(withoutChildPath);
+  EXPECT_EQ(withChildSize, withoutChildSize);
+}
+
 PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
   auto doc = pagx::PAGXDocument::Make(400, 400);
 

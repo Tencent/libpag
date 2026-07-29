@@ -764,6 +764,16 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
       childTgfx = (*tgfxChildren)[tgfxChildIndex];
     }
     ++tgfxChildIndex;
+    // The mask layer is authored as an invisible child of the layer it masks (the PAGX / HTML
+    // importer attaches the rebuilt mask this way). It defines the clip shape, not visible content,
+    // so tgfx never draws it (LayerBuilder marks it visible only for hasValidMask() and skips it via
+    // maskOwner). When the mask clip itself is dropped here (bakeUnsupported off, or an unbakeable
+    // environment) we must still skip emitting the mask layer's own geometry — otherwise its fill
+    // (e.g. a solid rounded rect) paints as an opaque patch over the masked content. The tgfx child
+    // slot is still consumed above so later children stay aligned with the tgfx subtree.
+    if (child == layer->mask) {
+      continue;
+    }
     writeLayer(out, child, childTgfx, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
   }
 
