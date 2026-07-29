@@ -40,8 +40,8 @@ static constexpr const char* HTML_DEFAULT_FONT_FAMILY = "Arial";
 
 /**
  * Default font style/variant name written to every imported `Text` node. The synthesis in
- * `ResolveFontStyleSynthesis` leaves the style label empty for the plain base face (bold / italic
- * are carried by `fauxBold` / `fauxItalic`); this constant substitutes the canonical "Regular"
+ * `ResolveFontStyleSynthesis` leaves the style label empty for the plain Regular-weight upright
+ * face (italic is carried by `fauxItalic`); this constant substitutes the canonical "Regular"
  * name so every HTML-imported `Text` node always carries a concrete `fontStyle`.
  */
 static constexpr const char* HTML_DEFAULT_FONT_STYLE = "Regular";
@@ -74,12 +74,13 @@ struct HTMLInheritedStyle {
   std::string fontSize = {};
   std::string fontWeight = {};
   std::string fontStyle = {};
-  std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Medium" / ""
-  // Synthetic weight / slant the renderer must emboss on top of the resolved face. Set by
-  // `resolveInheritedStyle` for bold (CSS weight >= 600) and italic/oblique requests whose axis is
-  // dropped from `fontStyleName` (see `ResolveFontStyleSynthesis`). Carried through to
-  // `Text::fauxBold` / `Text::fauxItalic` so authored weight / slant survives even when the styled
-  // web face is not installed on the render host.
+  std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Black" / ""
+  // Synthetic slant the renderer must emboss on top of the resolved face. Set by
+  // `resolveInheritedStyle` for italic/oblique requests, whose axis is dropped from `fontStyleName`
+  // (see `ResolveFontStyleSynthesis`) and carried through to `Text::fauxItalic` so the authored
+  // slant survives even when the styled italic face is not installed on the render host. The weight
+  // axis is never synthesised (it stays in `fontStyleName` as a real-face keyword), so `fauxBold`
+  // is always false here.
   bool fauxBold = false;
   bool fauxItalic = false;
   std::string letterSpacing = {};

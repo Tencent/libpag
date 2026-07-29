@@ -2969,16 +2969,16 @@ PAG_TEST(PAGXHTMLImporterTest, HeadingDefaultFontSizes) {
     auto* text = FindElementOfType<pagx::Text>(leaf);
     ASSERT_NE(text, nullptr) << r.tag;
     EXPECT_FLOAT_EQ(text->fontSize, r.size) << r.tag;
-    // Headings default to font-weight:bold, which is baked as faux bold (synthesised on a base
-    // face) rather than a "Bold" style label so the authored weight survives a missing styled face.
-    // The base-face label surfaces as the canonical "Regular" so every Text node carries a style.
-    EXPECT_EQ(text->fontStyle, "Regular") << r.tag;
-    EXPECT_TRUE(text->fauxBold) << r.tag;
+    // Headings default to font-weight:bold, which is written as a real-face "Bold" style label so
+    // the renderer resolves the authored heavy face (falling back to host faux emboldening only for
+    // a missing face). No faux flag is baked into the Text node.
+    EXPECT_EQ(text->fontStyle, "Bold") << r.tag;
+    EXPECT_FALSE(text->fauxBold) << r.tag;
     EXPECT_FALSE(text->fauxItalic) << r.tag;
   }
 }
 
-PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToFauxBold) {
+PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToBold) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-weight:700">Heavy</span>
@@ -2987,10 +2987,10 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToFauxBold) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // Bold (weight >= 600) is synthesised via faux bold rather than locking onto a "Bold" face; the
-  // base-face label surfaces as the canonical "Regular".
-  EXPECT_EQ(text->fontStyle, "Regular");
-  EXPECT_TRUE(text->fauxBold);
+  // Weight 700 is written as a real-face "Bold" style label so the renderer can resolve the
+  // authored heavy face; no faux flag is baked in.
+  EXPECT_EQ(text->fontStyle, "Bold");
+  EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
 }
 
@@ -3018,10 +3018,10 @@ PAG_TEST(PAGXHTMLImporterTest, BoldItalicCombined) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // Both axes are synthesised: the style label drops to the canonical "Regular" base face and both
-  // faux flags are set so the run renders bold + italic even when the styled face is unavailable.
-  EXPECT_EQ(text->fontStyle, "Regular");
-  EXPECT_TRUE(text->fauxBold);
+  // The weight axis becomes a real-face "Bold" style label; only the italic axis is synthesised via
+  // faux italic so the slant survives a missing styled italic face.
+  EXPECT_EQ(text->fontStyle, "Bold");
+  EXPECT_FALSE(text->fauxBold);
   EXPECT_TRUE(text->fauxItalic);
 }
 

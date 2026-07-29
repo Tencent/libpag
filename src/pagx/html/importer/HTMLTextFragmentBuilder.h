@@ -58,10 +58,11 @@ class HTMLTextFragmentBuilder {
   struct TextFragment {
     std::string text = {};
     std::string fontFamily = {};
-    std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Medium" / ""
-    // Synthetic weight / slant baked in from the CSS request (see `ResolveFontStyleSynthesis`).
-    // Surface as `Text::fauxBold` / `Text::fauxItalic` so authored bold / italic survives a
-    // missing styled face on the render host.
+    std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Black" / ""
+    // Synthetic slant baked in from the CSS request (see `ResolveFontStyleSynthesis`). Surfaces as
+    // `Text::fauxItalic` so an authored oblique slant survives a missing styled italic face on the
+    // render host. The weight axis is never synthesised (it stays in `fontStyleName`), so
+    // `fauxBold` is always false.
     bool fauxBold = false;
     bool fauxItalic = false;
     float fontSize = HTML_DEFAULT_FONT_SIZE;
