@@ -83,6 +83,27 @@ if (process.argv[2] === 'preview') {
   return;
 }
 
+// Inject the preview sub-command into the native binary's --help output. The native binary is
+// unaware of preview (it lives in the Node.js wrapper), so we run its help, then splice a preview
+// line under the "Commands:" header. Any future native command changes flow through untouched;
+// only the preview line is maintained here.
+if ((process.argv[2] === '--help' || process.argv[2] === '-h') && process.argv.length === 3) {
+  const { spawnSync } = require('child_process');
+  const result = spawnSync(binPath, ['--help'], { encoding: 'utf8' });
+  const lines = result.stdout.split('\n');
+  const output = lines
+    .map((line) => {
+      if (line.trim() === 'Commands:') {
+        return line + '\n  preview        Preview a PAGX file in the browser with live reload';
+      }
+      return line;
+    })
+    .join('\n');
+  process.stdout.write(output);
+  if (result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.status || 0);
+}
+
 try {
   execFileSync(binPath, process.argv.slice(2), { stdio: "inherit" });
 } catch (e) {
