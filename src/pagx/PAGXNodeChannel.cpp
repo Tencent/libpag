@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXNodeChannel.h"
+#include <climits>
+#include <cstdlib>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -340,37 +342,40 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 // Convenience macros that turn a (channel, member) pair into a ChannelDef row. They only build the
 // table entries; all access logic lives in the templated generators above.
 #define FIELD_FLOAT(T, name, member, cls) \
-  { name, cls, &AccessFloat<T, &T::member> }
+  { name, cls, &AccessFloat<T, &T::member>, ChannelValueType::Float }
 #define FIELD_BOOL(T, name, member, cls) \
-  { name, cls, &AccessBool<T, &T::member> }
+  { name, cls, &AccessBool<T, &T::member>, ChannelValueType::Bool }
 #define FIELD_INT(T, name, member, cls) \
-  { name, cls, &AccessInt<T, &T::member> }
+  { name, cls, &AccessInt<T, &T::member>, ChannelValueType::Int }
 #define FIELD_STRING(T, name, member, cls) \
-  { name, cls, &AccessString<T, &T::member> }
+  { name, cls, &AccessString<T, &T::member>, ChannelValueType::String }
 #define FIELD_COLOR(T, name, member, cls) \
-  { name, cls, &AccessColor<T, &T::member> }
+  { name, cls, &AccessColor<T, &T::member>, ChannelValueType::Color }
 #define FIELD_POINT_X(T, name, member, cls) \
-  { name, cls, &AccessPointAxis<T, &T::member, true> }
+  { name, cls, &AccessPointAxis<T, &T::member, true>, ChannelValueType::Float }
 #define FIELD_POINT_Y(T, name, member, cls) \
-  { name, cls, &AccessPointAxis<T, &T::member, false> }
+  { name, cls, &AccessPointAxis<T, &T::member, false>, ChannelValueType::Float }
 #define FIELD_SIZE_W(T, name, member, cls) \
-  { name, cls, &AccessSizeAxis<T, &T::member, true> }
+  { name, cls, &AccessSizeAxis<T, &T::member, true>, ChannelValueType::Float }
 #define FIELD_SIZE_H(T, name, member, cls) \
-  { name, cls, &AccessSizeAxis<T, &T::member, false> }
+  { name, cls, &AccessSizeAxis<T, &T::member, false>, ChannelValueType::Float }
 #define FIELD_PADDING_L(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 0> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 0>, ChannelValueType::Float }
 #define FIELD_PADDING_T(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 1> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 1>, ChannelValueType::Float }
 #define FIELD_PADDING_R(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 2> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 2>, ChannelValueType::Float }
 #define FIELD_PADDING_B(T, name, member, cls) \
-  { name, cls, &AccessPaddingComp<T, &T::member, 3> }
+  { name, cls, &AccessPaddingComp<T, &T::member, 3>, ChannelValueType::Float }
 #define FIELD_OPT_FLOAT(T, name, member, cls) \
-  { name, cls, &AccessOptionalFloat<T, &T::member> }
+  { name, cls, &AccessOptionalFloat<T, &T::member>, ChannelValueType::Float }
 #define FIELD_OPT_COLOR(T, name, member, cls) \
-  { name, cls, &AccessOptionalColor<T, &T::member> }
-#define FIELD_ENUM(T, name, member, cls, E) \
-  { name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String> }
+  { name, cls, &AccessOptionalColor<T, &T::member>, ChannelValueType::Color }
+#define FIELD_ENUM(T, name, member, cls, E)                                                 \
+  {                                                                                         \
+    name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String>, \
+        ChannelValueType::String                                                            \
+  }
 
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.
 // T must derive from LayoutNode so the member pointers resolve through the base subobject.
@@ -496,7 +501,7 @@ static std::vector<ChannelDef> BuildTextFields() {
 
 static std::vector<ChannelDef> BuildFillFields() {
   return {
-      {"color", Anim, &AccessFillStrokeColor},
+      {"color", Anim, &AccessFillStrokeColor, ChannelValueType::Color},
       FIELD_FLOAT(Fill, "alpha", alpha, Anim),
       FIELD_ENUM(Fill, "blendMode", blendMode, NoFlags, BlendMode),
       FIELD_ENUM(Fill, "fillRule", fillRule, NoFlags, FillRule),
@@ -506,7 +511,7 @@ static std::vector<ChannelDef> BuildFillFields() {
 
 static std::vector<ChannelDef> BuildStrokeFields() {
   return {
-      {"color", Anim, &AccessFillStrokeColor},
+      {"color", Anim, &AccessFillStrokeColor, ChannelValueType::Color},
       FIELD_FLOAT(Stroke, "width", width, Anim),
       FIELD_FLOAT(Stroke, "alpha", alpha, Anim),
       FIELD_ENUM(Stroke, "blendMode", blendMode, NoFlags, BlendMode),
@@ -985,6 +990,83 @@ bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& valu
   if (field == nullptr || !field->access(node, nullptr, &value)) {
     LOGE("SetNodeChannel: unhandled channel '%s' or value type mismatch for node type %d.",
          channel.c_str(), static_cast<int>(node->nodeType()));
+    return false;
+  }
+  return true;
+}
+
+// Parses a raw attribute string into the KeyValue alternative the channel expects, matching the
+// importer's per-type parsing exactly so an incremental edit yields the same value a full reparse
+// would. Returns false (leaving out unset) when the string is not a valid value for that type.
+static bool ParseChannelValue(ChannelValueType type, const std::string& raw, KeyValue* out) {
+  switch (type) {
+    case ChannelValueType::Float: {
+      const char* start = raw.c_str();
+      char* endPtr = nullptr;
+      float value = strtof(start, &endPtr);
+      if (endPtr == start) {
+        return false;
+      }
+      *out = value;
+      return true;
+    }
+    case ChannelValueType::Int: {
+      const char* start = raw.c_str();
+      char* endPtr = nullptr;
+      long value = strtol(start, &endPtr, 10);
+      if (endPtr == start || value < INT_MIN || value > INT_MAX) {
+        return false;
+      }
+      *out = static_cast<int>(value);
+      return true;
+    }
+    case ChannelValueType::Bool: {
+      if (raw == "true" || raw == "1") {
+        *out = true;
+        return true;
+      }
+      if (raw == "false" || raw == "0") {
+        *out = false;
+        return true;
+      }
+      return false;
+    }
+    case ChannelValueType::Color: {
+      bool valid = false;
+      Color color = ParseColor(raw, &valid);
+      if (!valid) {
+        return false;
+      }
+      *out = color;
+      return true;
+    }
+    case ChannelValueType::String:
+    default:
+      // Strings and enums are carried verbatim; enum validity is checked by the accessor.
+      *out = raw;
+      return true;
+  }
+}
+
+bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw) {
+  if (node == nullptr) {
+    return false;
+  }
+  const auto* field = FindChannel(node->nodeType(), channel);
+  if (field == nullptr) {
+    LOGE("SetNodeChannelFromString: unhandled channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
+    return false;
+  }
+  KeyValue value = {};
+  if (!ParseChannelValue(field->valueType, raw, &value)) {
+    LOGE("SetNodeChannelFromString: cannot parse value '%s' for channel '%s'.", raw.c_str(),
+         channel.c_str());
+    return false;
+  }
+  if (!field->access(node, nullptr, &value)) {
+    LOGE("SetNodeChannelFromString: failed to set channel '%s' for node type %d.", channel.c_str(),
+         static_cast<int>(node->nodeType()));
     return false;
   }
   return true;

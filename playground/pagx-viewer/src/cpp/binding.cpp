@@ -62,5 +62,9 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
                   self.setCurrentTimeMicros(static_cast<int64_t>(micros));
                 }))
       .function("_setLoop", &pagx::PAGXView::setLoop)
-      .function("_isLoop", &pagx::PAGXView::isLoop);
+      .function("_isLoop", &pagx::PAGXView::isLoop)
+      .function("_hitTest", &pagx::PAGXView::hitTest)
+      .function("_getNodeSourceMap", &pagx::PAGXView::getNodeSourceMap)
+      .function("_getNodeBounds", &pagx::PAGXView::getNodeBounds)
+      .function("_setNodeChannel", &pagx::PAGXView::setNodeChannel);
 }

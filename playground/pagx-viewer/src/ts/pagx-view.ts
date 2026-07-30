@@ -366,6 +366,44 @@ export class PAGXView {
   }
 
   /**
+   * Returns the node index of the top-most layer under the surface point, or -1 if none.
+   * Coordinates are surface (backing-store) pixels; convert from CSS pixels via
+   * canvas.width / rect.width so DPR is absorbed.
+   */
+  public hitTest(surfaceX: number, surfaceY: number): number {
+    return this.nativeView._hitTest(surfaceX, surfaceY);
+  }
+
+  /**
+   * Exports every node's source span and incrementable channel list. Call after buildLayers()
+   * and rebuild on full reload. Returns a plain JS array (emscripten::val, no delete() needed).
+   */
+  public getNodeSourceMap(): any {
+    return this.nativeView._getNodeSourceMap();
+  }
+
+  /**
+   * Returns the current-frame surface bounds { x, y, w, h } of the layer built from
+   * nodes[index], or null if the index is out of range or has no runtime layer.
+   */
+  public getNodeBounds(index: number): any {
+    return this.nativeView._getNodeBounds(index);
+  }
+
+  /**
+   * Sets a channel on nodes[index] from its raw PAGX attribute string and refreshes the scene in
+   * place (the incremental fast path for a source-editor attribute edit). Returns false when the
+   * index is invalid, the channel is unknown for the node type, or the string cannot be parsed;
+   * the caller should then fall back to a full reparse.
+   * @param index Node index from the source map
+   * @param channel Channel name (e.g. `'alpha'`, `'color'`, `'position.x'`)
+   * @param value Value in PAGX attribute string form
+   */
+  public setNodeChannel(index: number, channel: string, value: string): boolean {
+    return this.nativeView._setNodeChannel(index, channel, value);
+  }
+
+  /**
    * Starts the render loop.
    */
   public start(): void {

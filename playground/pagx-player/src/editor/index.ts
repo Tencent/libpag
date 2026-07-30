@@ -51,6 +51,14 @@ export interface EditorPanelOptions {
      *  causing its width to shrink so the canvas doesn't render underneath the panel. */
     canvasContainer: HTMLElement;
     callbacks: EditorCallbacks;
+    /** Fired when the user clicks the inspect button in the editor header. The host owns
+     *  selectMode state and should call back into EditorPanel.setSelectMode() to keep the
+     *  button's active class in sync. */
+    onToggleSelect: () => void;
+    /** Fired whenever the panel closes (manual close button, document switch via
+     *  setDocumentXml(null), player hide()). The host uses this to exit select mode so the
+     *  canvas doesn't keep driving highlights against a hidden editor. */
+    onClose?: () => void;
     /** Bridge for user-facing feedback ("Changes applied", validation errors, etc.). PAGXPlayer
      *  wires this to its unified status pill so editor feedback lives in the same visual slot
      *  as load / reload status - keeping messages horizontally aligned, avoiding overlap, and
@@ -73,6 +81,14 @@ export interface EditorPanelOptions {
      *  drop its own sticky "Applying..." pill when a mid-flight document swap makes the
      *  Apply's own result no longer relevant. */
     dismiss: (token: number) => void;
+
+    /** Optional incremental fast path for Apply. Given the previous baseline XML and the newly
+     *  edited XML, the player attempts to apply the change in place (setNodeChannel) without a full
+     *  reparse. Returns true when it fully handled the edit (Apply then skips onApply and promotes
+     *  the new text to baseline); returns false for any structural or non-incrementable edit, in
+     *  which case Apply falls back to the full onApply pipeline. When omitted, every Apply uses the
+     *  full pipeline. */
+    incrementalApply?: (oldXml: string, newXml: string) => boolean;
 }
 
 /** Injects the editor stylesheet exactly once per document. Idempotent. */
@@ -132,6 +148,9 @@ export class EditorPanel {
         options?: { sticky?: boolean },
     ) => number;
     private readonly dismiss: (token: number) => void;
+    private readonly onToggleSelect: () => void;
+    private readonly onClose: (() => void) | null;
+    private readonly incrementalApply: ((oldXml: string, newXml: string) => boolean) | null;
 
     private panel!: HTMLElement;
     private resizer!: HTMLElement;
@@ -158,6 +177,9 @@ export class EditorPanel {
     // callbacks (double-click on Apply firing two loadPAGX pipelines against the same view)
     // and keeps the buttons visibly disabled so users get feedback that work is in flight.
     private busy = false;
+    private pendingHoverCb: ((line: number) => void) | null = null;
+    private pendingDblClickCb: ((line: number) => void) | null = null;
+    private pendingCursorCb: ((line: number) => void) | null = null;
     private readonly boundKeydown: (event: KeyboardEvent) => void;
     private readonly boundResize: () => void;
 
@@ -167,6 +189,9 @@ export class EditorPanel {
         this.callbacks = opts.callbacks;
         this.notify = opts.notify;
         this.dismiss = opts.dismiss;
+        this.onToggleSelect = opts.onToggleSelect;
+        this.onClose = opts.onClose ?? null;
+        this.incrementalApply = opts.incrementalApply ?? null;
         ensureEditorStylesInjected();
         this.buildDom();
         this.boundKeydown = this.handleKeydown.bind(this);
@@ -216,6 +241,15 @@ export class EditorPanel {
             const host = this.panel.querySelector('.editor-host');
             if (host instanceof HTMLElement) {
                 this.editor = new SourceEditor(host);
+                if (this.pendingHoverCb !== null) {
+                    this.editor.onHoverLine(this.pendingHoverCb);
+                }
+                if (this.pendingDblClickCb !== null) {
+                    this.editor.onDblClickLine(this.pendingDblClickCb);
+                }
+                if (this.pendingCursorCb !== null) {
+                    this.editor.onCursorLine(this.pendingCursorCb);
+                }
             }
         }
         if (this.editor !== null && this.currentXmlText !== null) {
@@ -233,6 +267,7 @@ export class EditorPanel {
     public close(): void {
         this.panel.classList.remove('visible');
         this.canvasContainer.classList.remove('with-editor');
+        this.onClose?.();
     }
 
     public toggle(): void {
@@ -241,6 +276,74 @@ export class EditorPanel {
         } else {
             this.open();
         }
+    }
+
+    /** Grey transient hover highlight of a node's source span. No-op when the editor is closed. */
+    public highlightHover(startLine: number, endLine: number): void {
+        this.editor?.highlightHover(startLine, endLine);
+    }
+
+    public clearHover(): void {
+        this.editor?.clearHover();
+    }
+
+    /** Blue sticky selection highlight of a node's source span. */
+    public highlightSelect(startLine: number, endLine: number): void {
+        this.editor?.highlightSelect(startLine, endLine);
+    }
+
+    public clearSelect(): void {
+        this.editor?.clearSelect();
+    }
+
+    public clearHighlight(): void {
+        this.editor?.clearHighlight();
+    }
+
+    public scrollToLine(line: number, align: 'start' | 'nearest' = 'start'): void {
+        this.editor?.scrollToLine(line, align);
+    }
+
+    /** Unlock the given 1-based inclusive line span for editing (the enclosing node's span). */
+    public enterEditRange(startLine: number, endLine: number): void {
+        this.editor?.enterEditRange(startLine, endLine);
+    }
+
+    /** Re-scope the already-unlocked editable span to a new line range (edit follows caret). */
+    public updateEditRange(startLine: number, endLine: number): void {
+        this.editor?.updateEditRange(startLine, endLine);
+    }
+
+    /** Reflects the host's selectMode state on the inspect button (active class + aria-pressed).
+     *  Called by the player whenever selectMode changes. */
+    public setSelectMode(active: boolean): void {
+        const btn = this.panel.querySelector('.editor-select-btn');
+        if (btn) {
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    /** Register an editor line-hover callback for the editor->canvas overlay highlight direction.
+     *  Survives editor recreation (open/close): the callback is re-applied each time the editor is
+     *  rebuilt. Pass null to remove. */
+    public onHoverLine(cb: ((line: number) => void) | null): void {
+        this.pendingHoverCb = cb;
+        this.editor?.onHoverLine(cb);
+    }
+
+    /** Register an editor double-click line callback (host resolves the editable span). Survives
+     *  editor recreation. Pass null to remove. */
+    public onDblClickLine(cb: ((line: number) => void) | null): void {
+        this.pendingDblClickCb = cb;
+        this.editor?.onDblClickLine(cb);
+    }
+
+    /** Register an editor caret-line callback for the "edit follows caret" re-scoping. Survives
+     *  editor recreation. Pass null to remove. */
+    public onCursorLine(cb: ((line: number) => void) | null): void {
+        this.pendingCursorCb = cb;
+        this.editor?.onCursorLine(cb);
     }
 
     /** Detach global listeners and remove the panel from the DOM. Any layout side-effects the
@@ -274,6 +377,14 @@ export class EditorPanel {
         this.panel.innerHTML = `
             <div class="editor-resizer"></div>
             <div class="editor-header">
+                <button class="editor-select-btn" id="select-btn" title="Inspect (hover canvas to highlight XML)" aria-label="Toggle inspect" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 8V5a1 1 0 0 1 1-1h3"/>
+                        <path d="M16 4h3a1 1 0 0 1 1 1v3"/>
+                        <path d="M4 14v5a1 1 0 0 0 1 1h4"/>
+                        <path d="M13.5 12.5l6.5 2.4-2.8 1.2-1.2 2.8-2.5-6.4z"/>
+                    </svg>
+                </button>
                 <span class="editor-title">Source Editor</span>
                 <button class="editor-close-btn" title="Close" aria-label="Close">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -299,6 +410,11 @@ export class EditorPanel {
 
         const closeBtn = this.panel.querySelector('.editor-close-btn');
         closeBtn?.addEventListener('click', () => this.close());
+        const selectBtn = this.panel.querySelector('.editor-select-btn');
+        selectBtn?.addEventListener('click', () => {
+            this.onToggleSelect();
+            selectBtn.blur();
+        });
 
         this.discardBtn = this.panel.querySelector('.editor-btn.discard') as HTMLButtonElement;
         this.discardBtn.addEventListener('click', () => this.handleDiscard());
@@ -425,10 +541,38 @@ export class EditorPanel {
             return;
         }
         const xmlText = this.editor.getContent();
+        // Nothing changed since the last applied/loaded text: skip the whole pipeline so Apply is a
+        // no-op (no reparse, no incremental write, no baseline churn).
+        if (this.currentXmlText !== null && this.currentXmlText === xmlText) {
+            this.report('No changes to apply', 'info');
+            return;
+        }
         const validationError = validateXml(xmlText);
         if (validationError !== '') {
             this.report(validationError, 'error');
             return;
+        }
+        // Incremental fast path: a pure attribute-value edit is applied in place (setNodeChannel)
+        // and skips the full reparse/rebuild entirely. Structural or non-incrementable edits return
+        // false and fall through to the full onApply pipeline below. The update is synchronous and
+        // instant, so there is no "Applying..." pill or busy window; on success the edited text
+        // becomes the new baseline just like a full apply.
+        if (
+            this.incrementalApply !== null &&
+            this.currentXmlText !== null &&
+            this.currentXmlText !== xmlText
+        ) {
+            let handled = false;
+            try {
+                handled = this.incrementalApply(this.currentXmlText, xmlText);
+            } catch {
+                handled = false;
+            }
+            if (handled) {
+                this.currentXmlText = xmlText;
+                this.report('Changes applied', 'success');
+                return;
+            }
         }
         // Sticky "Applying..." keeps showing until the host promise settles - a long parse +
         // build on a big pagx (seconds) would otherwise leave the pill blank. The button row

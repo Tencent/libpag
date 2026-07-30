@@ -99,6 +99,7 @@ class PAGXDocument : public Node {
   T* makeNode(const std::string& id = "") {
     auto node = std::unique_ptr<T>(new T());
     auto* result = node.get();
+    result->index = static_cast<int>(nodes.size());
     registerNode(result, id);
     nodeSet.insert(result);
     nodes.push_back(std::move(node));
@@ -317,6 +318,20 @@ class PAGXDocument : public Node {
                    std::vector<Layer*>* changedOut);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
+
+  // Incremental subtree re-layout for a pure set of edited Layer nodes. Instead of resetting every
+  // node's cached layout (as applyLayout does), it resets only each edited Layer and its ancestor
+  // chain up to the (composition or document) root, then re-runs the normal top-down layout pass:
+  // unchanged subtrees hit the per-node measure/constraint memo and are skipped, while target-size
+  // changes still cascade to descendants and repositioned siblings through that same memo. Requires
+  // the document to be already laid out and every dirty node to be a Layer owned by this document
+  // (content-node edits collapse to a Layer and lose the precise measure dependency needed to
+  // invalidate their subtree, so they are not handled here). Returns false — leaving the document
+  // untouched — when it cannot apply incrementally (not yet laid out, a non-Layer or foreign dirty
+  // node, or the reset set exceeds kMaxIncrementalLayoutLayers); the caller must then fall back to
+  // a full applyLayout. On success, changedOut (when non-null) receives every Layer whose
+  // layoutBounds changed, exactly like applyLayout.
+  bool applyLayoutIncremental(const std::vector<Node*>& dirtyNodes, std::vector<Layer*>* changedOut);
 
   void registerNode(Node* node, const std::string& id);
 

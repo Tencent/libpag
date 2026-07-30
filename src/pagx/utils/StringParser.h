@@ -228,6 +228,15 @@ bool IsValidSelectorModeString(const std::string& str);
 //==============================================================================
 std::string ColorToHexString(const Color& color, bool withAlpha = false);
 
+/**
+ * Parses a PAGX color attribute string into a Color. Accepts the three formats permitted by the
+ * PAGX schema: hex (`#RGB`, `#RRGGBB`, `#RRGGBBAA`, sRGB), functional sRGB (`srgb(r, g, b[, a])`),
+ * and Display P3 (`p3(r, g, b[, a])`). On success returns the parsed color and sets `*outValid` to
+ * true; on malformed input returns a default-constructed Color and sets `*outValid` to false.
+ * `outValid` may be null.
+ */
+Color ParseColor(const std::string& str, bool* outValid = nullptr);
+
 //==============================================================================
 // Matrix
 //==============================================================================

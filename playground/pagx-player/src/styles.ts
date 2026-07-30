@@ -122,6 +122,14 @@ const CSS = `
     background: rgba(255, 255, 255, 0.2);
 }
 
+.pagx-player-toolbar .toolbar-btn.active {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.pagx-player-toolbar .toolbar-btn.active svg {
+    color: #fff;
+}
+
 .pagx-player-toolbar .toolbar-btn.hidden {
     display: none;
 }
@@ -308,6 +316,26 @@ const CSS = `
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Selection overlay: an axis-aligned rect drawn over the canvas to mirror the hovered/selected
+   layer. pointer-events:none (also set inline) so it never steals hover/click from the canvas.
+   z-index sits above the canvas (1) but below the toolbar (175) and status pill (200). */
+.pagx-select-overlay {
+    position: absolute;
+    z-index: 50;
+    display: none;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.pagx-select-overlay.is-hover {
+    background: rgba(68, 142, 249, 0.28);
+}
+
+.pagx-select-overlay.is-selected {
+    background: rgba(68, 142, 249, 0.32);
+    border: 1px solid rgba(68, 142, 249, 0.95);
 }
 
 /* Transient status pill anchored above the canvas area. position: absolute relative to the

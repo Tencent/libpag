@@ -90,6 +90,29 @@ class PAGXView {
   void setLoop(bool loop);
   bool isLoop() const;
 
+  // --- Selection (phase 1, read-only canvas<->editor queries) ---
+
+  // Returns the node index of the top-most layer under the surface point, or -1 if none.
+  int hitTest(float surfaceX, float surfaceY);
+
+  // One-shot export of every node's source span and incrementable channel list, for the editor
+  // to map lines<->index and (phase 2) decide which attr edits can go incremental. Call after
+  // buildLayers(); rebuild on full reload.
+  emscripten::val getNodeSourceMap() const;
+
+  // Returns the current-frame surface bounds {x,y,w,h} of the layer built from nodes[index],
+  // or null if index is out of range or has no runtime layer. For overlay box drawing.
+  emscripten::val getNodeBounds(int index) const;
+
+  // --- Incremental edit (phase 2, source-editor attribute edits) ---
+
+  // Sets the given channel on nodes[index] from its raw PAGX attribute string and refreshes the
+  // scene in place (reusing Layer handles; layout re-run only when the channel requires it). This
+  // is the fast path for a pure attribute-value edit; structural edits fall back to a full reload.
+  // Returns false when the index is invalid, the channel is unknown for the node type, or the
+  // string cannot be parsed into the channel's type (caller should then do a full reparse).
+  bool setNodeChannel(int index, const std::string& channel, const std::string& value);
+
  private:
   void updateContentTransform();
   void applyDisplayTransform();

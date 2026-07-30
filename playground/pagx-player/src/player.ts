@@ -22,7 +22,7 @@
 // load(); everything else - keyboard shortcuts, size responsiveness, playback UI - is owned by
 // the player.
 
-import type { PlayerModule, PlayerView } from './pagx-view-types';
+import type { NodeSourceEntry, PlayerModule, PlayerView } from './pagx-view-types';
 import type {
     BackgroundColor,
     EditorCallbacks,
@@ -52,6 +52,97 @@ const CANVAS_ID = 'pagx-canvas';
  *  pagx documents with alpha. */
 const DEFAULT_BACKGROUND: BackgroundColor = { r: 0, g: 0, b: 0, a: 0 };
 
+/** One incremental channel write derived from a source-editor edit: set channel on nodes[index]
+ *  to the raw attribute string value. */
+interface ChannelEdit {
+    index: number;
+    channel: string;
+    value: string;
+}
+
+/** Parses a node's source-span fragment and returns its root element, or null when the fragment is
+ *  not a single well-formed element (malformed XML, or extra content around the root). */
+function parseSpanElement(span: string): Element | null {
+    const doc = new DOMParser().parseFromString(span, 'application/xml');
+    if (doc.querySelector('parsererror') !== null) {
+        return null;
+    }
+    return doc.documentElement;
+}
+
+/** Returns an element's own attributes as a name->value map (values are XML-decoded, matching the
+ *  importer, which reads decoded attribute values too). */
+function attributeMap(element: Element): Record<string, string> {
+    const map: Record<string, string> = {};
+    for (let i = 0; i < element.attributes.length; i++) {
+        const attr = element.attributes.item(i);
+        if (attr !== null) {
+            map[attr.name] = attr.value;
+        }
+    }
+    return map;
+}
+
+/** Result of classifying one node's span: either the incremental channel writes, or a human-
+ *  readable reason the edit cannot go incremental (surfaced via console.debug for diagnosing why an
+ *  Apply fell back to a full reparse). */
+type NodeSpanClassification = { edits: ChannelEdit[] } | { reason: string };
+
+/** Classifies the change to one node's source span into per-attribute channel writes, or a reason
+ *  it cannot go incremental. Only pure own-attribute value changes on whitelisted channels qualify:
+ *  the tag name and attribute key set must be unchanged, every changed attribute must be an
+ *  incrementable channel, and — crucially — after applying those value changes to the old element
+ *  it must serialize identically to the new one. That exact-match check guarantees no other
+ *  difference (child element, text content, attribute reordering, or a change inside embedded
+ *  non-node content like an <svg> subtree) is silently dropped: any residual difference forces a
+ *  full reparse. */
+function classifyNodeSpan(
+    oldSpan: string,
+    newSpan: string,
+    channels: string[],
+): NodeSpanClassification {
+    const oldElement = parseSpanElement(oldSpan);
+    const newElement = parseSpanElement(newSpan);
+    if (oldElement === null || newElement === null) {
+        return { reason: 'node span is not a single well-formed element (unparseable fragment)' };
+    }
+    if (oldElement.tagName !== newElement.tagName) {
+        return { reason: `tag name changed (${oldElement.tagName} -> ${newElement.tagName})` };
+    }
+    const oldAttrs = attributeMap(oldElement);
+    const newAttrs = attributeMap(newElement);
+    const oldKeys = Object.keys(oldAttrs);
+    const newKeys = Object.keys(newAttrs);
+    if (oldKeys.length !== newKeys.length) {
+        return { reason: `attribute added or removed on <${oldElement.tagName}>` };
+    }
+    const edits: ChannelEdit[] = [];
+    for (const key of newKeys) {
+        if (!(key in oldAttrs)) {
+            return { reason: `attribute renamed on <${oldElement.tagName}> (new key "${key}")` };
+        }
+        if (oldAttrs[key] === newAttrs[key]) {
+            continue;
+        }
+        if (!channels.includes(key)) {
+            return {
+                reason: `attribute "${key}" on <${oldElement.tagName}> is not an incrementable channel (composite or unsupported)`,
+            };
+        }
+        edits.push({ index: -1, channel: key, value: newAttrs[key] });
+    }
+    for (const edit of edits) {
+        oldElement.setAttribute(edit.channel, edit.value);
+    }
+    const serializer = new XMLSerializer();
+    if (serializer.serializeToString(oldElement) !== serializer.serializeToString(newElement)) {
+        return {
+            reason: `<${oldElement.tagName}> span differs beyond the edited attributes (child/text/embedded content changed)`,
+        };
+    }
+    return { edits };
+}
+
 export class PAGXPlayer extends EventTarget {
     private readonly options: PAGXPlayerOptions;
     private readonly gesture: GestureManager;
@@ -72,6 +163,24 @@ export class PAGXPlayer extends EventTarget {
     // screen. See showStatus / hideStatus for the full story.
     private statusTokenSeq = 0;
     private currentStatusToken = 0;
+
+    // --- Selection mode (phase 1: canvas<->editor highlighting) ---
+    private selectMode = false;
+    private hoverIndex = -1;
+    // Node index the editor is hovering (editor->canvas direction). Independent of selectMode:
+    // hovering an editor line always highlights the corresponding node on the canvas.
+    private editorHoverIndex = -1;
+    private selectedIndex = -1;
+    private sourceMap: NodeSourceEntry[] = [];
+    private overlay: HTMLDivElement | null = null;
+    // The bounds-bearing node the overlay currently paints (resolved from the hover/select target
+    // by climbing to the owning Layer for internal elements), and which visual state to render.
+    // Cached by refreshOverlay so the per-frame follow-loop skips the ancestry walk.
+    private overlayBoundsIndex = -1;
+    private overlayKind: 'hover' | 'select' = 'hover';
+    private overlayRaf = 0;
+    private hoverRaf = 0;
+    private detachHover: (() => void) | null = null;
 
     // Concurrency + lifetime guards. Every load() captures loadGeneration on entry and
     // re-reads it after each await; a mismatch means a newer load() (or destroy() / non-BFCache
@@ -180,6 +289,14 @@ export class PAGXPlayer extends EventTarget {
                 parent: this.root,
                 canvasContainer: this.root,
                 callbacks: options.editorCallbacks!,
+                onToggleSelect: () => this.toggleSelectMode(),
+                onClose: () => {
+                    // Exit select mode whenever the editor closes (manual close, document switch,
+                    // hide) so the canvas stops driving highlights against a hidden editor.
+                    if (this.selectMode) {
+                        this.toggleSelectMode();
+                    }
+                },
                 notify: (message, kind, notifyOptions) => {
                     // Sticky messages ("Applying...", "Saving...") don't auto-hide; the editor
                     // will call notify() again with the resolved result and that replaces the
@@ -192,14 +309,30 @@ export class PAGXPlayer extends EventTarget {
                     });
                 },
                 dismiss: (token) => this.hideStatus(token),
+                incrementalApply: (oldXml, newXml) => this.tryIncrementalApply(oldXml, newXml),
             });
+        }
+        // Wire editor->canvas interactions. Hover highlights the node on the canvas + mirrors the
+        // grey highlight on the editor line; double-click unlocks the enclosing node's span for
+        // editing. Registered once here; EditorPanel re-applies both across editor rebuilds.
+        if (this.editor) {
+            this.editor.onHoverLine((line) => this.onEditorHover(line));
+            this.editor.onDblClickLine((line) => this.onEditorDblClick(line));
+            this.editor.onCursorLine((line) => this.onEditorCursor(line));
         }
 
         // Gesture manager (view accessor closure keeps working across reloads)
         this.gesture = new GestureManager(() => this.view);
-        this.detachCanvasEvents = bindCanvasEvents(this.canvas, this.gesture, () => {
-            this.playbackBar.togglePlayback();
+        this.detachCanvasEvents = bindCanvasEvents(this.canvas, this.gesture, (x, y) => {
+            if (this.selectMode) {
+                this.confirmSelection(x, y);
+            } else {
+                this.playbackBar.togglePlayback();
+            }
         });
+        // Hover tracking for selection mode. Bound separately from bindCanvasEvents (which owns
+        // tap/drag/wheel) so select-mode hover never interferes with playback gestures.
+        this.detachHover = this.bindHover();
 
         // Lifecycle listeners
         this.onVisibilityChange = () => {
@@ -392,6 +525,15 @@ export class PAGXPlayer extends EventTarget {
             }
             this.editor?.setDocumentXml(xmlText ?? null);
 
+            // Refresh the source map (node index -> source span) for selection highlighting.
+            // Rebuilt on every load since a new document renumbers nodes.
+            this.sourceMap = view.getNodeSourceMap();
+            this.hoverIndex = -1;
+            this.editorHoverIndex = -1;
+            this.selectedIndex = -1;
+            this.editor?.clearHighlight();
+            this.refreshOverlay();
+
             const detail: LoadedEventDetail = {
                 duration: view.durationMicros(),
                 frameRate: view.frameRate(),
@@ -458,6 +600,422 @@ export class PAGXPlayer extends EventTarget {
     /** Restore identity transform (zoom 1.0, offset 0,0). Also fired by the toolbar Reset button. */
     public resetView(): void {
         this.gesture.resetTransform();
+    }
+
+    /** Toggle inspect (selection) mode. When on, canvas hover/click drive editor line
+     *  highlighting instead of toggling playback. Auto-opens the editor so the canvas<->XML
+     *  hover highlight is visible (DevTools-like). */
+    public toggleSelectMode(): void {
+        if (this.selectMode) {
+            this.exitSelectMode();
+        } else {
+            this.selectMode = true;
+            this.editor?.setSelectMode(true);
+            this.editor?.open();
+            this.canvas.style.cursor = 'crosshair';
+            this.refreshOverlay();
+        }
+    }
+
+    /** Leaves inspect mode: stops canvas-driven hover hit-testing and clears the transient grey
+     *  hover highlight. The blue selection (from a canvas click or editor double-click) and
+     *  editor-hover highlighting are independent and stay live. */
+    private exitSelectMode(): void {
+        if (!this.selectMode) {
+            return;
+        }
+        this.selectMode = false;
+        this.editor?.setSelectMode(false);
+        this.canvas.style.cursor = '';
+        this.hoverIndex = -1;
+        this.syncEditorHover();
+        this.refreshOverlay();
+    }
+
+    // --- Selection (phase 1) private helpers ---
+
+    /** Binds a mousemove listener (rAF-throttled) for select-mode hover hit-testing. Returns a
+     *  cleanup function. */
+    private bindHover(): () => void {
+        const handler = (event: MouseEvent) => {
+            if (!this.selectMode || this.gesture.isCurrentlyDragging()) {
+                return;
+            }
+            const cx = event.clientX;
+            const cy = event.clientY;
+            if (this.hoverRaf !== 0) {
+                cancelAnimationFrame(this.hoverRaf);
+            }
+            this.hoverRaf = requestAnimationFrame(() => {
+                this.hoverRaf = 0;
+                this.handleHover(cx, cy);
+            });
+        };
+        this.canvas.addEventListener('mousemove', handler);
+        return () => this.canvas.removeEventListener('mousemove', handler);
+    }
+
+    private handleHover(clientX: number, clientY: number): void {
+        if (!this.view || !this.selectMode) {
+            return;
+        }
+        const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
+        const idx = this.view.hitTest(surfaceX, surfaceY);
+        if (idx !== this.hoverIndex) {
+            this.hoverIndex = idx;
+            this.refreshOverlay();
+            this.syncEditorHover('start');
+        }
+    }
+
+    /** Selects the node under the click point (inspect-mode click). Hit-tests the live click
+     *  coordinates rather than relying on the cached hover index, which may be stale or unset when
+     *  the pointer barely moved before the click (the rAF-throttled hover may not have run). */
+    private confirmSelection(clientX: number, clientY: number): void {
+        if (!this.view) {
+            return;
+        }
+        const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
+        const idx = this.view.hitTest(surfaceX, surfaceY);
+        // Missed the geometry (clicked empty canvas): keep the inspector armed so the user can
+        // try again rather than silently dropping out of inspect mode.
+        if (idx < 0) {
+            return;
+        }
+        this.selectedIndex = idx;
+        // DevTools-style: picking a layer deactivates the inspector. exitSelectMode() clears the
+        // transient hover and repaints the overlay from the now-set selection, so only the sticky
+        // blue outline remains; it stays highlighted on the canvas and mirrored in the editor
+        // until the user's next action.
+        this.exitSelectMode();
+        this.syncEditorSelect('start');
+    }
+
+    /** Editor line hover -> canvas overlay + grey editor-line highlight (editor->canvas direction).
+     *  Always active while the editor is open, independent of selectMode. line <= 0 clears. */
+    private onEditorHover(line: number): void {
+        const idx = line > 0 ? this.findNodeIndexForLine(line) : -1;
+        if (idx === this.editorHoverIndex) {
+            return;
+        }
+        this.editorHoverIndex = idx;
+        this.refreshOverlay();
+        this.syncEditorHover();
+    }
+
+    /** Editor double-click -> select the enclosing node (blue) and unlock its source span for
+     *  editing. */
+    private onEditorDblClick(line: number): void {
+        const idx = this.findNodeIndexForLine(line);
+        if (idx < 0) {
+            return;
+        }
+        this.selectedIndex = idx;
+        const entry = this.sourceMap[idx];
+        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
+        this.editor?.enterEditRange(entry.startLine, end);
+        this.refreshOverlay();
+        this.syncEditorSelect();
+    }
+
+    /** Editor caret moved (while a span is unlocked for editing) -> re-scope the editable span
+     *  and blue selection to the node the caret now sits in. Fired only in edit mode (the editor
+     *  gates the callback on the unlocked range), so browsing/read-only caret moves never reach
+     *  here. No-op while the caret stays inside the current node's span. */
+    private onEditorCursor(line: number): void {
+        const idx = this.findNodeIndexForLine(line);
+        if (idx < 0 || idx === this.selectedIndex) {
+            return;
+        }
+        this.selectedIndex = idx;
+        const entry = this.sourceMap[idx];
+        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
+        this.editor?.updateEditRange(entry.startLine, end);
+        this.syncEditorSelect();
+        this.refreshOverlay();
+    }
+
+    /** Returns the index of the innermost node whose [startLine, endLine] span contains the given
+     *  1-based line, or -1 if none. endLine < 0 (programmatic nodes) falls back to a single-line
+     *  match at startLine. */
+    private findNodeIndexForLine(line: number): number {
+        let bestIndex = -1;
+        let bestSpan = Number.POSITIVE_INFINITY;
+        for (const entry of this.sourceMap) {
+            const start = entry.startLine;
+            if (start <= 0 || start > line) {
+                continue;
+            }
+            const end = entry.endLine > 0 ? entry.endLine : start;
+            if (line > end) {
+                continue;
+            }
+            const span = end - start;
+            if (span < bestSpan) {
+                bestSpan = span;
+                bestIndex = entry.index;
+            }
+        }
+        return bestIndex;
+    }
+
+    /** Attempts to apply the edit from oldXml to newXml incrementally, in place, via setNodeChannel
+     *  instead of a full reparse+rebuild. Returns true only when the whole edit is a set of pure
+     *  attribute-value changes on incrementable channels; false otherwise, signalling the editor to
+     *  fall back to the full onApply pipeline. Failing (even part-way) is safe: the fallback reparse
+     *  of newXml is the authoritative final state regardless of any channel writes already applied
+     *  here. */
+    private tryIncrementalApply(oldXml: string, newXml: string): boolean {
+        if (!this.view || this.sourceMap.length === 0) {
+            return false;
+        }
+        const edits = this.classifyEdits(oldXml, newXml);
+        if (edits === null) {
+            return false;
+        }
+        if (edits.length === 0) {
+            return true;
+        }
+        for (const edit of edits) {
+            if (!this.view.setNodeChannel(edit.index, edit.channel, edit.value)) {
+                console.debug(
+                    `[pagx] full reparse: engine rejected setNodeChannel #${edit.index}.${edit.channel}="${edit.value}" (unknown channel or unparseable value)`,
+                );
+                return false;
+            }
+        }
+        this.view.draw();
+        const summary = edits
+            .map((edit) => `#${edit.index}.${edit.channel}="${edit.value}"`)
+            .join(', ');
+        console.log(`[pagx] incremental subtree update applied: ${summary}`);
+        return true;
+    }
+
+    /** Classifies a text edit into a flat list of incremental channel writes, or null when it
+     *  cannot go incremental. First-version constraints (each a null-return): the line count
+     *  changed (would shift the cached source spans), a changed line lies outside any node, or a
+     *  node's own change is not a pure whitelisted-channel value edit (see classifyNodeSpan). */
+    private classifyEdits(oldXml: string, newXml: string): ChannelEdit[] | null {
+        const oldLines = oldXml.split('\n');
+        const newLines = newXml.split('\n');
+        if (oldLines.length !== newLines.length) {
+            console.debug(
+                `[pagx] full reparse: line count changed (${oldLines.length} -> ${newLines.length})`,
+            );
+            return null;
+        }
+        const affected = new Set<number>();
+        for (let i = 0; i < oldLines.length; i++) {
+            if (oldLines[i] === newLines[i]) {
+                continue;
+            }
+            const idx = this.findNodeIndexForLine(i + 1);
+            if (idx < 0) {
+                console.debug(`[pagx] full reparse: changed line ${i + 1} lies outside any node`);
+                return null;
+            }
+            affected.add(idx);
+        }
+        const edits: ChannelEdit[] = [];
+        for (const idx of affected) {
+            const entry = this.sourceMap[idx];
+            const start = entry.startLine;
+            const end = entry.endLine > 0 ? entry.endLine : start;
+            if (start <= 0) {
+                console.debug(`[pagx] full reparse: node #${idx} has no source span`);
+                return null;
+            }
+            const oldSpan = oldLines.slice(start - 1, end).join('\n');
+            const newSpan = newLines.slice(start - 1, end).join('\n');
+            const result = classifyNodeSpan(oldSpan, newSpan, entry.channels);
+            if ('reason' in result) {
+                console.debug(`[pagx] full reparse: node #${idx} - ${result.reason}`);
+                return null;
+            }
+            for (const nodeEdit of result.edits) {
+                edits.push({ index: idx, channel: nodeEdit.channel, value: nodeEdit.value });
+            }
+        }
+        return edits;
+    }
+
+    /** The transient hover target: editor-hover wins over canvas-hover (mouse can only be in one). */
+    private hoverTarget(): number {
+        return this.editorHoverIndex >= 0 ? this.editorHoverIndex : this.hoverIndex;
+    }
+
+    /** Mirrors the transient hover target onto the editor as the grey hover line highlight. */
+    private syncEditorHover(align: 'none' | 'nearest' | 'start' = 'none'): void {
+        const idx = this.hoverTarget();
+        if (idx < 0 || idx >= this.sourceMap.length || this.sourceMap[idx].startLine <= 0) {
+            this.editor?.clearHover();
+            return;
+        }
+        const entry = this.sourceMap[idx];
+        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
+        this.editor?.highlightHover(entry.startLine, end);
+        if (align !== 'none') {
+            this.editor?.scrollToLine(entry.startLine, align);
+        }
+    }
+
+    /** Mirrors the sticky selection onto the editor as the blue select line highlight. */
+    private syncEditorSelect(align: 'none' | 'nearest' | 'start' = 'none'): void {
+        const idx = this.selectedIndex;
+        if (idx < 0 || idx >= this.sourceMap.length || this.sourceMap[idx].startLine <= 0) {
+            this.editor?.clearSelect();
+            return;
+        }
+        const entry = this.sourceMap[idx];
+        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
+        this.editor?.highlightSelect(entry.startLine, end);
+        if (align !== 'none') {
+            this.editor?.scrollToLine(entry.startLine, align);
+        }
+    }
+
+    private clientToSurface(clientX: number, clientY: number): { surfaceX: number; surfaceY: number } {
+        const rect = this.canvas.getBoundingClientRect();
+        // hitTest takes surface (backing-store) coordinates; canvas.width is the backing width so
+        // this naturally absorbs DPR.
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        return {
+            surfaceX: (clientX - rect.left) * scaleX,
+            surfaceY: (clientY - rect.top) * scaleY,
+        };
+    }
+
+    private ensureOverlay(): void {
+        if (this.overlay !== null) {
+            return;
+        }
+        const overlay = document.createElement('div');
+        overlay.className = 'pagx-select-overlay';
+        overlay.style.pointerEvents = 'none';
+        this.root.appendChild(overlay);
+        this.overlay = overlay;
+    }
+
+    /** Overlay target: a transient hover (grey) takes priority over the sticky selection (blue),
+     *  so hovering temporarily previews another node then reverts to the selection on mouse-out.
+     *  Returns the node index and which visual state to render. */
+    private currentOverlayTarget(): { index: number; kind: 'hover' | 'select' } {
+        const hover = this.hoverTarget();
+        if (hover >= 0) {
+            return { index: hover, kind: 'hover' };
+        }
+        return { index: this.selectedIndex, kind: 'select' };
+    }
+
+    /** Returns the index of the innermost source node that strictly encloses the given node's
+     *  span, or -1 if none. Used to climb from a Layer-internal element (Fill/Rectangle/... which
+     *  has no independent canvas outline) up to the Layer that owns it. */
+    private enclosingNodeIndex(index: number): number {
+        const child = this.sourceMap[index];
+        if (!child || child.startLine <= 0) {
+            return -1;
+        }
+        const childStart = child.startLine;
+        const childEnd = child.endLine > 0 ? child.endLine : childStart;
+        let bestIndex = -1;
+        let bestSpan = Number.POSITIVE_INFINITY;
+        for (const entry of this.sourceMap) {
+            if (entry.index === index || entry.startLine <= 0) {
+                continue;
+            }
+            const start = entry.startLine;
+            const end = entry.endLine > 0 ? entry.endLine : start;
+            const encloses = start <= childStart && end >= childEnd && (start < childStart || end > childEnd);
+            if (!encloses) {
+                continue;
+            }
+            const span = end - start;
+            if (span < bestSpan) {
+                bestSpan = span;
+                bestIndex = entry.index;
+            }
+        }
+        return bestIndex;
+    }
+
+    /** Resolves the node whose bounds the overlay should paint. A node with its own bounds (a
+     *  Layer) resolves to itself; a Layer-internal element resolves to the nearest ancestor that
+     *  does have bounds - i.e. its owning Layer - so hovering/selecting an internal row still
+     *  outlines the visible Layer. Returns -1 when nothing in the ancestry has bounds. */
+    private resolveBoundsIndex(index: number): number {
+        if (index < 0 || !this.view) {
+            return -1;
+        }
+        let cursor = index;
+        let guard = 0;
+        while (cursor >= 0 && guard++ < 64) {
+            if (this.view.getNodeBounds(cursor) !== null) {
+                return cursor;
+            }
+            cursor = this.enclosingNodeIndex(cursor);
+        }
+        return -1;
+    }
+
+    /** Repaints the overlay and starts/stops the follow-loop based on whether any highlight target
+     *  exists. Decoupled from selectMode so editor-hover highlighting works with inspect off. The
+     *  bounds-bearing index is resolved once here (climbing to the owning Layer for internal
+     *  elements) and cached so the per-frame follow-loop doesn't repeat the ancestry walk. */
+    private refreshOverlay(): void {
+        const raw = this.currentOverlayTarget();
+        this.overlayBoundsIndex = raw.index >= 0 ? this.resolveBoundsIndex(raw.index) : -1;
+        this.overlayKind = raw.kind;
+        if (this.overlayBoundsIndex >= 0) {
+            this.startOverlayLoop();
+        } else {
+            this.stopOverlayLoop();
+        }
+        this.updateOverlay();
+    }
+
+    private updateOverlay(): void {
+        this.ensureOverlay();
+        const overlay = this.overlay!;
+        if (this.overlayBoundsIndex < 0 || !this.view) {
+            overlay.style.display = 'none';
+            return;
+        }
+        const bounds = this.view.getNodeBounds(this.overlayBoundsIndex);
+        if (bounds === null) {
+            overlay.style.display = 'none';
+            return;
+        }
+        const rect = this.canvas.getBoundingClientRect();
+        // Surface (backing) -> CSS pixels.
+        const scaleX = rect.width / this.canvas.width;
+        const scaleY = rect.height / this.canvas.height;
+        overlay.style.display = 'block';
+        overlay.style.left = bounds.x * scaleX + 'px';
+        overlay.style.top = bounds.y * scaleY + 'px';
+        overlay.style.width = bounds.w * scaleX + 'px';
+        overlay.style.height = bounds.h * scaleY + 'px';
+        overlay.classList.toggle('is-selected', this.overlayKind === 'select');
+        overlay.classList.toggle('is-hover', this.overlayKind === 'hover');
+    }
+
+    private startOverlayLoop(): void {
+        if (this.overlayRaf !== 0) {
+            return;
+        }
+        const tick = () => {
+            this.updateOverlay();
+            this.overlayRaf = requestAnimationFrame(tick);
+        };
+        this.overlayRaf = requestAnimationFrame(tick);
+    }
+
+    private stopOverlayLoop(): void {
+        if (this.overlayRaf !== 0) {
+            cancelAnimationFrame(this.overlayRaf);
+            this.overlayRaf = 0;
+        }
     }
 
     public play(): void {
@@ -601,6 +1159,17 @@ export class PAGXPlayer extends EventTarget {
         this.loadGeneration++;
         this.detachCanvasEvents?.();
         this.detachCanvasEvents = null;
+        this.detachHover?.();
+        this.detachHover = null;
+        this.stopOverlayLoop();
+        if (this.hoverRaf !== 0) {
+            cancelAnimationFrame(this.hoverRaf);
+            this.hoverRaf = 0;
+        }
+        if (this.overlay !== null) {
+            this.overlay.remove();
+            this.overlay = null;
+        }
         this.resizeObserver?.disconnect();
         this.resizeObserver = null;
         document.removeEventListener('visibilitychange', this.onVisibilityChange);

@@ -116,6 +116,7 @@ void PAGScene::buildRuntimeTree() {
   *rootComp->binding = std::move(buildResult.binding);
   rootComp->document = document.get();
   _rootComposition = rootComp;
+  nodeToLayer.clear();
   std::unordered_set<const Composition*> visited = {};
   _rootComposition->buildChildren(document->layers, visited);
   displayList->root()->addChild(rootComp->runtimeLayer);
@@ -690,6 +691,20 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
   return FromTGFX(surfaceBounds);
+}
+
+Rect PAGScene::getGlobalBoundsForNode(const Layer* node) const {
+  if (node == nullptr) {
+    return {};
+  }
+  auto it = nodeToLayer.find(node);
+  if (it == nodeToLayer.end() || it->second == nullptr) {
+    return {};
+  }
+  // PAGLayer inherits enable_shared_from_this; nodeToLayer holds a raw pointer valid for as long
+  // as the PAGLayer remains in the composition's children (syncChildren keeps it in sync).
+  auto pagLayer = it->second->shared_from_this();
+  return getGlobalBounds(pagLayer);
 }
 
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {

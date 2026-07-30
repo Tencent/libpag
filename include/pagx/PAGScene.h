@@ -40,6 +40,7 @@ namespace pagx {
 
 class Animation;
 class Node;
+class Layer;
 class PAGSurface;
 class PAGViewModel;
 class PAGXDocument;
@@ -190,6 +191,14 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
+  /**
+   * Returns the surface-space bounds of the runtime layer built from the given source Layer node,
+   * or an empty rectangle if no runtime layer maps to it (e.g. the node has no runtime layer in
+   * this scene). Used by hosts that hold a source node index (e.g. an editor selection) and need
+   * the on-screen rect without first resolving it to a PAGLayer handle.
+   */
+  Rect getGlobalBoundsForNode(const Layer* node) const;
+
  private:
   PAGScene();
 
@@ -264,6 +273,13 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
+
+  // Maps source Layer nodes to their runtime PAGLayer for index-based bounds lookup
+  // (getGlobalBoundsForNode). Populated by PAGComposition::BuildChildLayer and synced in
+  // syncChildren. Property-only edits go through RefreshLayerInPlace which does NOT replace the
+  // PAGLayer, so this map stays valid across incremental attribute edits; only structural changes
+  // (handled by a full runtime-tree rebuild in buildRuntimeTree) clear and repopulate it.
+  std::unordered_map<const Layer*, PAGLayer*> nodeToLayer = {};
 
   friend class PAGXDocument;
   friend class PAGAnimation;

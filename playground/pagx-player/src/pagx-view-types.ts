@@ -51,8 +51,36 @@ export interface PlayerView {
     setLoop(loop: boolean): void;
     isLoop(): boolean;
 
+    // Selection (phase 1, read-only canvas<->editor queries)
+    hitTest(surfaceX: number, surfaceY: number): number;
+    getNodeSourceMap(): NodeSourceEntry[];
+    getNodeBounds(index: number): NodeBounds | null;
+
+    // Incremental edit (phase 2, source-editor attribute edits). Sets a channel on nodes[index]
+    // from its raw PAGX attribute string and refreshes the scene in place. Returns false when the
+    // edit cannot go incremental (invalid index, unknown channel, or unparseable value), signalling
+    // the caller to fall back to a full reparse.
+    setNodeChannel(index: number, channel: string, value: string): boolean;
+
     // Lifetime
     destroy(): void;
+}
+
+/** One node's source span and incrementable channels, exported by getNodeSourceMap. */
+export interface NodeSourceEntry {
+    index: number;
+    startLine: number;   // 1-based source line of the start tag; -1 = unavailable
+    endLine: number;     // 1-based source line of the end tag; -1 = unavailable
+    nodeType: number;    // NodeType enum int (see NodeType.h)
+    channels: string[];  // incrementable channel names (phase-2 reuse)
+}
+
+/** Surface-space bounds of a layer, returned by getNodeBounds. */
+export interface NodeBounds {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
 }
 
 /** Static shape of the wasm module returned by the host-supplied `moduleFactory`. The player

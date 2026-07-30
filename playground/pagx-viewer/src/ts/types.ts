@@ -179,6 +179,35 @@ export interface _PAGXView {
   _isLoop(): boolean;
 
   /**
+   * Returns the node index of the top-most layer under the surface point, or -1 if none.
+   * Surface coordinates are backing-store pixels (canvas.width space, includes DPR).
+   */
+  _hitTest(surfaceX: number, surfaceY: number): number;
+
+  /**
+   * Exports every node's source span and incrementable channel list as a JS array of
+   * { index, startLine, endLine, nodeType, channels }. Rebuilt by the host after each load.
+   * Returns a plain JS value (emscripten::val), no manual delete() needed.
+   */
+  _getNodeSourceMap(): any;
+
+  /**
+   * Returns the current-frame surface bounds { x, y, w, h } of the layer built from
+   * nodes[index], or null if index is out of range or has no runtime layer.
+   */
+  _getNodeBounds(index: number): any;
+
+  /**
+   * Sets a channel on nodes[index] from its raw PAGX attribute string and refreshes the scene in
+   * place. Returns false when the index is invalid, the channel is unknown for the node type, or
+   * the string cannot be parsed (the caller should fall back to a full reparse).
+   * @param index Node index from the source map
+   * @param channel Channel name (e.g. "alpha", "color", "position.x")
+   * @param value Value in PAGX attribute string form
+   */
+  _setNodeChannel(index: number, channel: string, value: string): boolean;
+
+  /**
    * Releases the native resources. Must be called when done.
    */
   delete(): void;

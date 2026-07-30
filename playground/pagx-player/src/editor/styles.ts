@@ -81,6 +81,9 @@ export const EDITOR_STYLES = `
     font-size: 13px;
     font-weight: 500;
     user-select: none;
+    /* Push the close button to the far right while keeping the inspect button + title grouped on
+       the left. Overrides justify-content: space-between on .editor-header. */
+    margin-right: auto;
 }
 
 #editor-panel .editor-close-btn {
@@ -99,6 +102,32 @@ export const EDITOR_STYLES = `
 
 #editor-panel .editor-close-btn:hover {
     background: #3C3C3C;
+}
+
+/* Inspect (selection) toggle inside the editor header. DevTools-style: active state mirrors
+   selectMode so the user can see at a glance whether canvas hover drives XML highlighting. */
+#editor-panel .editor-select-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #CCCCCC;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0;
+    margin-right: 4px;
+}
+
+#editor-panel .editor-select-btn:hover {
+    background: #3C3C3C;
+}
+
+#editor-panel .editor-select-btn.active {
+    background: rgba(68, 142, 249, 0.3);
+    color: #fff;
 }
 
 #editor-panel .editor-host {
@@ -147,6 +176,43 @@ export const EDITOR_STYLES = `
 
 #editor-panel .editor-host .cm-editor .cm-selectionMatch-selected {
     background-color: rgba(68, 142, 249, 0.3);
+}
+
+/* Node-span highlights mirrored from the canvas selection state. Two layers, matching the DevTools
+   convention: transient grey hover and sticky blue selection. The .cm-select-line rule is declared
+   after .cm-hover-line so that when both cover the same line the blue selection wins. */
+#editor-panel .editor-host .cm-editor .cm-hover-line {
+    background-color: rgba(140, 140, 140, 0.28);
+}
+
+#editor-panel .editor-host .cm-editor .cm-select-line {
+    background-color: rgba(68, 142, 249, 0.22);
+    box-shadow: inset 2px 0 0 rgba(68, 142, 249, 0.9);
+}
+
+/* Active editable span (after double-click). Stronger blue fill plus a SINGLE outer border ring
+   around the whole multi-line block (not one box per line): every line carries the left/right
+   edges, the first line adds the top edge and the last line adds the bottom edge. Declared after
+   .cm-select-line so it wins when both apply to the same line. box-shadow does not merge across
+   rules, so each boundary combination lists its full set of inset edges. */
+#editor-panel .editor-host .cm-editor .cm-edit-line {
+    background-color: rgba(68, 142, 249, 0.3);
+    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
+}
+
+#editor-panel .editor-host .cm-editor .cm-edit-line.cm-edit-line-first:not(.cm-edit-line-last) {
+    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95),
+        inset 0 1px 0 rgba(68, 142, 249, 0.95);
+}
+
+#editor-panel .editor-host .cm-editor .cm-edit-line.cm-edit-line-last:not(.cm-edit-line-first) {
+    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95),
+        inset 0 -1px 0 rgba(68, 142, 249, 0.95);
+}
+
+#editor-panel .editor-host .cm-editor .cm-edit-line.cm-edit-line-first.cm-edit-line-last {
+    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95),
+        inset 0 1px 0 rgba(68, 142, 249, 0.95), inset 0 -1px 0 rgba(68, 142, 249, 0.95);
 }
 
 /* Editor feedback ("Changes applied", validation errors, etc.) now flows through the player's

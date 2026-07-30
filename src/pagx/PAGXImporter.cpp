@@ -118,7 +118,6 @@ static bool GetBoolAttribute(const DOMNode* node, const std::string& name,
 static Point ParsePoint(const std::string& str, bool* outValid = nullptr);
 static Size ParseSize(const std::string& str, bool* outValid = nullptr);
 static Rect ParseRect(const std::string& str, bool* outValid = nullptr);
-static Color ParseColor(const std::string& str, bool* outValid = nullptr);
 static Point GetPointAttribute(const DOMNode* node, const char* name, Point defaultValue,
                                PAGXDocument* doc);
 static Size GetSizeAttribute(const DOMNode* node, const char* name, Size defaultValue,
@@ -290,12 +289,14 @@ static T* makeNodeFromXML(const DOMNode* xmlNode, PAGXDocument* doc) {
   if (existing) {
     ParseCustomData(xmlNode, existing);
     existing->sourceLine = xmlNode->line;
+    existing->endLine = xmlNode->endLine;
     return static_cast<T*>(existing);
   }
   auto* node = doc->makeNode<T>(id);
   if (node) {
     ParseCustomData(xmlNode, node);
     node->sourceLine = xmlNode->line;
+    node->endLine = xmlNode->endLine;
   }
   return node;
 }
@@ -2704,140 +2705,6 @@ static Rect ParseRect(const std::string& str, bool* outValid) {
     *outValid = valid;
   }
   return rect;
-}
-
-namespace {
-int parseHexDigit(char c) {
-  if (c >= '0' && c <= '9') {
-    return c - '0';
-  }
-  if (c >= 'a' && c <= 'f') {
-    return c - 'a' + 10;
-  }
-  if (c >= 'A' && c <= 'F') {
-    return c - 'A' + 10;
-  }
-  return -1;
-}
-}  // namespace
-
-static Color ParseColor(const std::string& str, bool* outValid) {
-  if (str.empty()) {
-    if (outValid) {
-      *outValid = false;
-    }
-    return {};
-  }
-  // Hex format: #RGB, #RRGGBB, #RRGGBBAA (sRGB)
-  if (str[0] == '#') {
-    Color color = {};
-    color.colorSpace = ColorSpace::SRGB;
-    if (str.size() == 4) {
-      int r = parseHexDigit(str[1]);
-      int g = parseHexDigit(str[2]);
-      int b = parseHexDigit(str[3]);
-      if (r < 0 || g < 0 || b < 0) {
-        if (outValid) {
-          *outValid = false;
-        }
-        return {};
-      }
-      color.red = static_cast<float>(r * 17) / 255.0f;
-      color.green = static_cast<float>(g * 17) / 255.0f;
-      color.blue = static_cast<float>(b * 17) / 255.0f;
-      color.alpha = 1.0f;
-      if (outValid) {
-        *outValid = true;
-      }
-      return color;
-    }
-    if (str.size() == 7 || str.size() == 9) {
-      int r1 = parseHexDigit(str[1]);
-      int r2 = parseHexDigit(str[2]);
-      int g1 = parseHexDigit(str[3]);
-      int g2 = parseHexDigit(str[4]);
-      int b1 = parseHexDigit(str[5]);
-      int b2 = parseHexDigit(str[6]);
-      if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) {
-        if (outValid) {
-          *outValid = false;
-        }
-        return {};
-      }
-      int r = r1 * 16 + r2;
-      int g = g1 * 16 + g2;
-      int b = b1 * 16 + b2;
-      color.red = static_cast<float>(r) / 255.0f;
-      color.green = static_cast<float>(g) / 255.0f;
-      color.blue = static_cast<float>(b) / 255.0f;
-      if (str.size() == 9) {
-        int a1 = parseHexDigit(str[7]);
-        int a2 = parseHexDigit(str[8]);
-        if (a1 < 0 || a2 < 0) {
-          if (outValid) {
-            *outValid = false;
-          }
-          return {};
-        }
-        color.alpha = static_cast<float>(a1 * 16 + a2) / 255.0f;
-      } else {
-        color.alpha = 1.0f;
-      }
-      if (outValid) {
-        *outValid = true;
-      }
-      return color;
-    }
-  }
-  // sRGB float format: srgb(r, g, b) or srgb(r, g, b, a)
-  // Display P3 format: p3(r, g, b) or p3(r, g, b, a)
-  struct FunctionalColorFormat {
-    const char* prefix;
-    size_t prefixLen;
-    ColorSpace colorSpace;
-  };
-  static const FunctionalColorFormat formats[] = {
-      {"srgb(", 5, ColorSpace::SRGB},
-      {"p3(", 3, ColorSpace::DisplayP3},
-  };
-  for (const auto& fmt : formats) {
-    if (str.compare(0, fmt.prefixLen, fmt.prefix) != 0) {
-      continue;
-    }
-    const char* ptr = str.c_str() + fmt.prefixLen;
-    const char* strEnd = str.c_str() + str.size();
-    char* endPtr = nullptr;
-    float components[4] = {};
-    int count = 0;
-    for (; count < 4 && ptr < strEnd && *ptr != ')'; ++count) {
-      ptr = SkipWhitespaceAndComma(ptr, strEnd);
-      if (ptr >= strEnd || *ptr == ')') {
-        break;
-      }
-      components[count] = strtof(ptr, &endPtr);
-      if (endPtr == ptr) {
-        break;
-      }
-      ptr = endPtr;
-    }
-    if (count < 3) {
-      continue;
-    }
-    Color color = {};
-    color.red = components[0];
-    color.green = components[1];
-    color.blue = components[2];
-    color.alpha = count >= 4 ? components[3] : 1.0f;
-    color.colorSpace = fmt.colorSpace;
-    if (outValid) {
-      *outValid = true;
-    }
-    return color;
-  }
-  if (outValid) {
-    *outValid = false;
-  }
-  return {};
 }
 
 template <typename T, typename Parser>

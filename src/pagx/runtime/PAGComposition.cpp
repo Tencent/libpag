@@ -330,6 +330,9 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     if (slot != nullptr && childComposition->runtimeLayer != nullptr) {
       slot->addChild(childComposition->runtimeLayer);
     }
+    if (scene != nullptr) {
+      scene->nodeToLayer[layer] = childComposition.get();
+    }
     return childComposition;
   }
   auto layerRuntime = binding->get<tgfx::Layer>(layer);
@@ -341,6 +344,9 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     return nullptr;
   }
   auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
+  if (scene != nullptr) {
+    scene->nodeToLayer[layer] = child.get();
+  }
   if (!layer->children.empty()) {
     BuildChildren(binding, layer->children, child->children, scene, visited);
     for (auto& nestedChild : child->children) {
@@ -396,6 +402,9 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
       slot->removeFromParent();
     }
     binding->remove(child->node);
+    if (scene != nullptr) {
+      scene->nodeToLayer.erase(child->node);
+    }
   }
   children = std::move(newChildren);
   // Reorder this parent's direct tgfx children to match the document order. addChild on a layer

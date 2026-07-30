@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cstdint>
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Data.h"
@@ -127,6 +128,84 @@ std::vector<std::string> PAGXView::getExternalFilePaths() const {
     return {};
   }
   return document->getExternalFilePaths();
+}
+
+int PAGXView::hitTest(float surfaceX, float surfaceY) {
+  if (scene == nullptr) {
+    return -1;
+  }
+  auto layers = scene->getLayersUnderPoint(surfaceX, surfaceY);
+  if (layers.empty()) {
+    return -1;
+  }
+  // getLayersUnderPoint returns top-most first; the first hit is what the user clicked.
+  const Layer* node = layers[0]->getNode();
+  return node != nullptr ? node->index : -1;
+}
+
+emscripten::val PAGXView::getNodeSourceMap() const {
+  auto array = emscripten::val::array();
+  if (document == nullptr) {
+    return array;
+  }
+  for (const auto& up : document->nodes) {
+    Node* n = up.get();
+    auto entry = emscripten::val::object();
+    entry.set("index", n->index);
+    entry.set("startLine", n->sourceLine);
+    entry.set("endLine", n->endLine);
+    entry.set("nodeType", static_cast<int>(n->nodeType()));
+    auto channels = emscripten::val::array();
+    for (const auto& c : ListChannels(n->nodeType())) {
+      channels.call<void>("push", c);
+    }
+    entry.set("channels", channels);
+    array.call<void>("push", entry);
+  }
+  return array;
+}
+
+emscripten::val PAGXView::getNodeBounds(int index) const {
+  if (document == nullptr || index < 0 || index >= static_cast<int>(document->nodes.size())) {
+    return emscripten::val::null();
+  }
+  Node* n = document->nodes[index].get();
+  // hitTest granularity is Layer-level, so bounds are only meaningful for Layer nodes.
+  if (n->nodeType() != NodeType::Layer) {
+    return emscripten::val::null();
+  }
+  if (scene == nullptr) {
+    return emscripten::val::null();
+  }
+  auto rect = scene->getGlobalBoundsForNode(static_cast<Layer*>(n));
+  if (rect.isEmpty()) {
+    return emscripten::val::null();
+  }
+  auto obj = emscripten::val::object();
+  obj.set("x", rect.x);
+  obj.set("y", rect.y);
+  obj.set("w", rect.width);
+  obj.set("h", rect.height);
+  return obj;
+}
+
+bool PAGXView::setNodeChannel(int index, const std::string& channel, const std::string& value) {
+  if (document == nullptr || index < 0 || index >= static_cast<int>(document->nodes.size())) {
+    return false;
+  }
+  Node* node = document->nodes[index].get();
+  if (node == nullptr || !ChannelExists(node->nodeType(), channel)) {
+    return false;
+  }
+  if (!SetNodeChannelFromString(node, channel, value)) {
+    return false;
+  }
+  // RequiresLayout tells whether the edit only shows up after a layout pass; a render-only refresh
+  // (layoutChanged=false) is the cheap path for edits that cannot move geometry (alpha/color/...).
+  bool layoutChanged = RequiresLayout(node->nodeType(), channel);
+  document->notifyChange({node}, layoutChanged);
+  presentImmediately = true;
+  return true;
 }
 
 bool PAGXView::loadFileData(const std::string& filePath, const val& fileData) {
