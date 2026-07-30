@@ -137,7 +137,7 @@ function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget 
       isError: true,
     };
   }
-  const { session, reused } = createOrGetSession(path.resolve(file));
+  const { session, reused } = createOrGetSession(resolved);
   const baseUrl = getServerBaseUrl ? getServerBaseUrl() : '';
   const url = baseUrl ? `${baseUrl}/session/${session.id}/` : `/session/${session.id}/`;
   const summary = session.documentSummary;
