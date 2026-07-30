@@ -239,12 +239,12 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
       if (baselineOffset != _embeddedBaselineOffsets.end()) {
         geom.posY = renderPos.y + embeddedBaseline - baselineOffset->second;
       } else {
-        geom.posY =
-            renderPos.y + textBounds.y + embeddedBaseline - lines->front().baselineY;
+        geom.posY = renderPos.y + textBounds.y + embeddedBaseline - lines->front().baselineY;
       }
       geom.posX = renderPos.x + (glyphBounds.width > 0 ? glyphBounds.x : textBounds.x);
       geom.estWidth = glyphBounds.width > 0 ? glyphBounds.width : textBounds.width;
       geom.estHeight = textBounds.height;
+      geom.frameUsesLineBox = true;
     } else if (glyphBounds.width > 0 && glyphBounds.height > 0) {
       // No layout-computed perTextBounds (embedded glyph runs skip the layout
       // pass, so getTextBounds is empty), or the TextBox uses automatic line height. Derive the
@@ -256,6 +256,15 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
       geom.posY = renderPos.y + glyphBounds.y;
       geom.estWidth = glyphBounds.width;
       geom.estHeight = glyphBounds.height;
+      // ComputeGlyphRunTextBounds falls back to glyph ink when no authored
+      // bounds exist. Only a real authored height is a line box in which
+      // paragraphAlign should be re-applied by PowerPoint.
+      for (const auto* run : text->glyphRuns) {
+        if (run != nullptr && run->bounds.height > 0) {
+          geom.frameUsesLineBox = true;
+          break;
+        }
+      }
     } else if (textBounds.width > 0 && textBounds.height > 0) {
       geom.posX = renderPos.x + firstRun->x + textBounds.x;
       geom.posY = renderPos.y + firstRun->y + textBounds.y;
@@ -314,7 +323,8 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
 }
 
 void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
-                                      const char* wrap, bool suppressBoxLayout) {
+                                      const char* wrap, bool suppressBoxLayout,
+                                      bool includeParagraphAnchor) {
   int id = _ctx->nextShapeId();
   out.openElement("p:sp").closeElementStart();
   out.openElement("p:nvSpPr").closeElementStart();
@@ -363,7 +373,7 @@ void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const Te
       .addRequiredAttribute("tIns", tIns)
       .addRequiredAttribute("rIns", rIns)
       .addRequiredAttribute("bIns", bIns);
-  AddBodyPrAttrsForTextBox(out, textBox, suppressBoxLayout);
+  AddBodyPrAttrsForTextBox(out, textBox, includeParagraphAnchor, !suppressBoxLayout);
   out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
 }
@@ -380,7 +390,8 @@ void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
   bool justifyAlign = textBox && textBox->textAlign == TextAlign::Justify;
   const char* wrap =
       useLineLayout ? (justifyAlign ? "square" : "none") : (geom.hasTextBox ? "square" : "none");
-  emitTextShapeEnvelope(out, xf, textBox, wrap, geom.originFromGlyphRun);
+  emitTextShapeEnvelope(out, xf, textBox, wrap, geom.originFromGlyphRun,
+                        !geom.originFromGlyphRun || geom.frameUsesLineBox);
 }
 
 void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,

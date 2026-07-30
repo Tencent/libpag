@@ -492,12 +492,13 @@ inline void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t 
 // Adds the TextBox-derived attributes to a currently-open <a:bodyPr>: vertical
 // writing mode, paragraph anchoring, and the vertical-mode anchorCtr override
 // for TextAlign::Center. Returns true when the box uses vertical writing mode.
-// When `suppressAnchor` is true, only the writing-mode `vert` attribute is
-// emitted (glyph orientation), while the paragraph anchor and anchorCtr — which
-// place the text block within the frame — are skipped. Callers that anchor the
-// frame to the exact glyph pen origin pass true so the block is not re-offset.
+// The two alignment axes can be controlled independently because a native-text
+// frame reconstructed from GlyphRuns may still represent an authored line box
+// (and therefore need paragraphAlign within that box), while its inline-axis
+// position is already baked into the glyph pen origin.
 inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box,
-                                     bool suppressAnchor = false) {
+                                     bool includeParagraphAnchor = true,
+                                     bool includeInlineAnchor = true) {
   if (box == nullptr) {
     return false;
   }
@@ -508,19 +509,18 @@ inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box,
   if (isVertical) {
     out.addRequiredAttribute("vert", "eaVert");
   }
-  if (suppressAnchor) {
-    return isVertical;
-  }
   // OOXML's "anchor" describes alignment along the block-flow axis, which
   // matches paragraphAlign in both writing modes:
   //   - Horizontal: block axis is top->bottom (Near=top, Far=bottom).
   //   - Vertical (eaVert): block axis is right->left (Near=right column,
   //     Far=left column). PowerPoint maps t/ctr/b to start/center/end of
   //     that axis, so the same enum->string mapping applies.
-  if (box->paragraphAlign == ParagraphAlign::Middle) {
-    out.addRequiredAttribute("anchor", "ctr");
-  } else if (box->paragraphAlign == ParagraphAlign::Far) {
-    out.addRequiredAttribute("anchor", "b");
+  if (includeParagraphAnchor) {
+    if (box->paragraphAlign == ParagraphAlign::Middle) {
+      out.addRequiredAttribute("anchor", "ctr");
+    } else if (box->paragraphAlign == ParagraphAlign::Far) {
+      out.addRequiredAttribute("anchor", "b");
+    }
   }
   // In vertical writing mode the bodyPr@anchor controls placement perpendicular
   // to the text-flow axis (i.e. horizontal placement of the column block), so
@@ -529,7 +529,7 @@ inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box,
   // column. anchorCtr="1" toggles the "center on the perpendicular axis" flag,
   // which in vertical mode produces the desired vertical centering of the text
   // within its column.
-  if (isVertical && box->textAlign == TextAlign::Center) {
+  if (includeInlineAnchor && isVertical && box->textAlign == TextAlign::Center) {
     out.addRequiredAttribute("anchorCtr", "1");
   }
   return isVertical;
@@ -788,6 +788,11 @@ class PPTWriter {
     // caller must NOT re-apply it as an OOXML algn or the text is centered
     // twice.
     bool originFromGlyphRun = false;
+    // True when posY/estHeight describe a real PAGX line box rather than an
+    // ink-bounds or font-size fallback. PowerPoint must still apply the
+    // TextBox's paragraphAlign inside such a frame (for example anchor="ctr"
+    // for a vertically centered 22px run in an authored 40px line box).
+    bool frameUsesLineBox = false;
   };
 
   NativeTextGeometry computeNativeTextGeometry(const Text* text, Text* mutableText,
@@ -921,14 +926,15 @@ class PPTWriter {
   // supplies the decomposed Xform, the in-scope TextBox (for bodyPr paragraph
   // attributes), and the pre-computed wrap value ("square" vs "none"). Leaves
   // <p:txBody> open so the caller can stream <a:p> children into it.
-  // When `suppressBoxLayout` is true the TextBox's padding insets and paragraph
-  // anchor are dropped (the frame is already positioned at the exact glyph pen
-  // origin, so re-applying them would offset the text a second time); the
-  // vertical writing mode is still honoured because it drives glyph orientation
-  // rather than placement. Used by the glyphRun-origin native fallback so it
-  // matches the authoritative writeTextAsPath path, which ignores the box.
+  // When `suppressBoxLayout` is true the TextBox's padding insets and inline
+  // anchor are dropped because they are already baked into the glyph pen
+  // origin. `includeParagraphAnchor` remains independently selectable: frames
+  // reconstructed from authored line-box bounds still need block-axis
+  // alignment within that frame. Vertical writing mode is always honoured
+  // because it drives glyph orientation rather than placement.
   void emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
-                             const char* wrap, bool suppressBoxLayout = false);
+                             const char* wrap, bool suppressBoxLayout = false,
+                             bool includeParagraphAnchor = true);
 
   // p:pic helpers (declared after Xform)
   void beginPicture(XMLBuilder& out, const char* name);

@@ -63,6 +63,9 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/ppt/PPTWriter.h"
+#include "pagx/ppt/PPTWriterContext.h"
+#include "pagx/xml/XMLBuilder.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
@@ -1488,6 +1491,73 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRuns) {
   pagx::PPTExportOptions options;
   options.ignoreGlyphRuns = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "text_ignore_glyph_runs", options));
+}
+
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesLineBoxVerticalAlignment) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 500;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  glyph->path->moveTo(100, -700);
+  glyph->path->lineTo(400, -700);
+  glyph->path->lineTo(400, 0);
+  glyph->path->lineTo(100, 0);
+  glyph->path->close();
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Q1 2025";
+  text->fontFamily = "Arial";
+  text->fontSize = 22.0f;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 22.0f;
+  run->glyphs = {1, 1, 1, 1, 1, 1, 1};
+  run->x = 21.5f;
+  run->y = 28.0f;
+  run->bounds = pagx::Rect::MakeXYWH(0, 0, 120, 40);
+  text->glyphRuns.push_back(run);
+
+  group->elements.push_back(text);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.1f, 0.3f, 0.9f, 1.0f};
+  fill->color = solid;
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 120;
+  textBox->height = 40;
+  textBox->textAlign = pagx::TextAlign::Center;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_ignore_glyph_runs_linebox_alignment", options));
+
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\" lIns=\"0\" tIns=\"0\" rIns=\"0\" "
+                      "bIns=\"0\" anchor=\"ctr\"/>"),
+            std::string::npos);
+  // Horizontal textAlign is already encoded by run->x, so centering must not
+  // also be applied on a:pPr.
+  EXPECT_EQ(body.find("<a:pPr algn=\"ctr\""), std::string::npos);
 }
 
 PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
