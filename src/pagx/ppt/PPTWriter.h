@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/LayoutContext.h"
@@ -713,8 +714,13 @@ class PPTWriter {
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
   ModifierResolver _resolver;
+  // Fixed-line-height modifier TextBoxes can split one laid-out block across sibling Text nodes.
+  // Cache the first line's embedded baseline offset from its authored line-box top so every
+  // sibling can recover its own line-box top from the pre-shaped baseline.
+  std::unordered_map<const TextBox*, float> _embeddedBaselineOffsets = {};
 
   const LayerBuildResult& ensureBuildResult();
+  static bool firstEmbeddedBaselineY(const Text& text, float* baselineY);
 
   // One geometry instance captured during the scope walk in writeElements.
   // The transform is baked at collection time so that later painters can emit

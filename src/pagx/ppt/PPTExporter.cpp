@@ -442,6 +442,37 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
   if (localTextBox == nullptr) {
     localTextBox = parentTextBox;
   }
+  // A modifier-only TextBox may lay out several Text nodes as one fixed-line-height block, while
+  // the embedded file stores the whole block bounds only on the first Text's first GlyphRun.
+  // Capture that first line's baseline offset before painters emit any sibling. Later native-text
+  // shapes can then derive line-box tops from their embedded baselines without depending on the
+  // fallback font metrics used to re-shape editable text.
+  if (_ignoreGlyphRuns && localTextBox != nullptr &&
+      localTextBox->writingMode == WritingMode::Horizontal && localTextBox->lineHeight > 0 &&
+      _embeddedBaselineOffsets.count(localTextBox) == 0) {
+    // Inspect only Text nodes in this exact vector scope. Nested Group/TextBox scopes run this
+    // same pre-scan recursively with their own effective modifier, so a nested override cannot
+    // accidentally seed the parent TextBox's baseline cache.
+    for (const auto* element : elements) {
+      if (element->nodeType() != NodeType::Text) {
+        continue;
+      }
+      const auto* text = static_cast<const Text*>(element);
+      float baselineY = 0.0f;
+      if (!firstEmbeddedBaselineY(*text, &baselineY)) {
+        continue;
+      }
+      for (const auto* run : text->glyphRuns) {
+        if (run != nullptr && run->bounds.height > 0) {
+          _embeddedBaselineOffsets[localTextBox] = baselineY - run->bounds.y;
+          break;
+        }
+      }
+      if (_embeddedBaselineOffsets.count(localTextBox) > 0) {
+        break;
+      }
+    }
+  }
 
   for (auto* element : elements) {
     auto type = element->nodeType();

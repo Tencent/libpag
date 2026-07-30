@@ -54,6 +54,25 @@ void WriteRunTypeface(XMLBuilder& out, const std::string& typeface) {
 
 }  // namespace
 
+// Returns the baseline of the first rendered glyph in the embedded run coordinate system.
+// GlyphRun::positions stores offsets relative to run->y, so this remains valid for both the
+// common one-baseline run and a run whose later glyphs move onto subsequent lines.
+bool PPTWriter::firstEmbeddedBaselineY(const Text& text, float* baselineY) {
+  for (const auto* run : text.glyphRuns) {
+    if (run == nullptr) {
+      continue;
+    }
+    for (size_t i = 0; i < run->glyphs.size(); ++i) {
+      if (run->glyphs[i] == 0) {
+        continue;
+      }
+      *baselineY = run->y + (i < run->positions.size() ? run->positions[i].y : 0.0f);
+      return true;
+    }
+  }
+  return false;
+}
+
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& m, float alpha,
                                 const std::vector<LayerFilter*>& /*filters*/,
@@ -193,33 +212,64 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
     geom.originFromGlyphRun = true;
     auto renderPos = text->renderPosition();
     auto textBounds = precomputed->getTextBounds(mutableText);
-    if (textBounds.width > 0 && textBounds.height > 0) {
+    auto glyphBounds = ComputeGlyphRunTextBounds(*text);
+    auto* lines = precomputed->getTextLines(mutableText);
+    float embeddedBaseline = 0.0f;
+    bool hasRuntimeLineBox =
+        fs.textBox != nullptr && fs.textBox->writingMode == WritingMode::Horizontal &&
+        fs.textBox->lineHeight > 0 && textBounds.width > 0 && textBounds.height > 0 &&
+        lines != nullptr && !lines->empty() && firstEmbeddedBaselineY(*text, &embeddedBaseline);
+    if (hasRuntimeLineBox) {
+      // The editable-text path deliberately re-shapes Text::text to recover per-Text line-box
+      // bounds and line metadata that the embedded-layout fast path does not provide. Keep the
+      // embedded advance span for X (it is the authoritative pre-shaped placement).
+      //
+      // For a fixed-line-height modifier TextBox, layout may split one block across sibling Text
+      // nodes. Their embedded baselines share the first line's baseline-to-line-box-top offset,
+      // cached before the scope is emitted. Recovering Y from that offset is independent of the
+      // runtime fallback font's metrics:
+      //
+      //   frameTop = embeddedBaseline - firstLineBaselineOffset
+      //
+      // If no sibling reference carries authored bounds, fall back to aligning the freshly shaped
+      // runtime baseline. Either path prevents a block-level GlyphRun::bounds (for example
+      // 0,0,440,108 on the first Text of a three-line block) from becoming that Text's own
+      // 108px-high PowerPoint frame.
+      auto baselineOffset = _embeddedBaselineOffsets.find(fs.textBox);
+      if (baselineOffset != _embeddedBaselineOffsets.end()) {
+        geom.posY = renderPos.y + embeddedBaseline - baselineOffset->second;
+      } else {
+        geom.posY =
+            renderPos.y + textBounds.y + embeddedBaseline - lines->front().baselineY;
+      }
+      geom.posX = renderPos.x + (glyphBounds.width > 0 ? glyphBounds.x : textBounds.x);
+      geom.estWidth = glyphBounds.width > 0 ? glyphBounds.width : textBounds.width;
+      geom.estHeight = textBounds.height;
+    } else if (glyphBounds.width > 0 && glyphBounds.height > 0) {
+      // No layout-computed perTextBounds (embedded glyph runs skip the layout
+      // pass, so getTextBounds is empty), or the TextBox uses automatic line height. Derive the
+      // box directly from the pre-shaped runs: advance-width span + authored linebox/ink height,
+      // in the Text's local space. Keeping this path for automatic line height avoids changing
+      // the geometry of ordinary single-line titles merely because editable export re-shaped
+      // their readable content.
+      geom.posX = renderPos.x + glyphBounds.x;
+      geom.posY = renderPos.y + glyphBounds.y;
+      geom.estWidth = glyphBounds.width;
+      geom.estHeight = glyphBounds.height;
+    } else if (textBounds.width > 0 && textBounds.height > 0) {
       geom.posX = renderPos.x + firstRun->x + textBounds.x;
       geom.posY = renderPos.y + firstRun->y + textBounds.y;
       geom.estWidth = textBounds.width;
       geom.estHeight = textBounds.height;
     } else {
-      // No layout-computed perTextBounds (embedded glyph runs skip the layout
-      // pass, so getTextBounds is empty). Derive the box directly from the
-      // pre-shaped runs: advance-width span + authored linebox height, in the
-      // Text's local space (pen positions already include firstRun->x, so we
-      // only add renderPosition here — no separate firstRun->x term).
-      auto glyphBounds = ComputeGlyphRunTextBounds(*text);
-      if (glyphBounds.width > 0 && glyphBounds.height > 0) {
-        geom.posX = renderPos.x + glyphBounds.x;
-        geom.posY = renderPos.y + glyphBounds.y;
-        geom.estWidth = glyphBounds.width;
-        geom.estHeight = glyphBounds.height;
-      } else {
-        // Last-resort estimate when the runs carry no usable glyph metrics
-        // (e.g. font glyph list unavailable): fall back to a font-size guess.
-        float effectiveFontSize = text->renderFontSize();
-        geom.estWidth =
-            static_cast<float>(CountUTF8Characters(text->text)) * effectiveFontSize * 0.6f;
-        geom.estHeight = effectiveFontSize * 1.4f;
-        geom.posX = renderPos.x + firstRun->x;
-        geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
-      }
+      // Last-resort estimate when the runs carry no usable glyph metrics
+      // (e.g. font glyph list unavailable): fall back to a font-size guess.
+      float effectiveFontSize = text->renderFontSize();
+      geom.estWidth =
+          static_cast<float>(CountUTF8Characters(text->text)) * effectiveFontSize * 0.6f;
+      geom.estHeight = effectiveFontSize * 1.4f;
+      geom.posX = renderPos.x + firstRun->x;
+      geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
     }
     return geom;
   }
@@ -425,8 +475,12 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   TextLayoutResult localResult;
   if (!precomputed) {
     auto params = hasTextBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
-    localResult =
-        TextLayout::Layout({{mutableText, MakeGlyphParams(mutableText)}}, params, _layoutContext);
+    // --ppt-ignore-glyphruns requests editable native text. Re-shape the readable Text content
+    // even when GlyphRuns are present so the native frame gets real per-Text line-box/baseline
+    // metadata; computeNativeTextGeometry still uses the embedded advances and pen origin for
+    // authoritative placement.
+    localResult = TextLayout::Layout({{mutableText, MakeGlyphParams(mutableText)}}, params,
+                                     _layoutContext, !_ignoreGlyphRuns);
     precomputed = &localResult;
   }
   auto* lines = precomputed->getTextLines(mutableText);
@@ -878,8 +932,8 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     mutableTexts.push_back(const_cast<Text*>(run.text));
   }
   auto params = MakeTextBoxParams(box);
-  auto layoutResult =
-      TextLayout::Layout(TextLayout::MakeElements(mutableTexts), params, _layoutContext);
+  auto layoutResult = TextLayout::Layout(TextLayout::MakeElements(mutableTexts), params,
+                                         _layoutContext, !_ignoreGlyphRuns);
 
   float boxWidth = EffectiveTextBoxWidth(box);
   float boxHeight = EffectiveTextBoxHeight(box);
