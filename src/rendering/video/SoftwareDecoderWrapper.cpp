@@ -87,7 +87,7 @@ static std::shared_ptr<tgfx::ImageBuffer> MakeHardwareBufferFrame(const YUVBuffe
   int ret =
       ConvertI420ToRGBA(videoFormat.colorSpace, frame->data[0], frame->lineSize[0], frame->data[1],
                         frame->lineSize[1], frame->data[2], frame->lineSize[2], dst,
-                        static_cast<int>(info.rowBytes), videoFormat.width, videoFormat.height);
+                        static_cast<int>(info.rowBytes()), videoFormat.width, videoFormat.height);
   tgfx::HardwareBufferUnlock(hardwareBuffer);
   if (ret != 0) {
     tgfx::HardwareBufferRelease(hardwareBuffer);
