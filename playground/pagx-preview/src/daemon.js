@@ -18,7 +18,7 @@
 
 // Detached server helpers.
 //
-// A `pagx-preview <file>` invocation is expected to return the shell prompt immediately after the
+// A `pagx preview <file>` invocation is expected to return the shell prompt immediately after the
 // server is reachable, so the user can keep issuing commands. We achieve this by re-executing
 // this script with `--__server` (an internal-only flag) as a detached child process whose stdio
 // is redirected to ~/.pagx/preview.log. The parent process waits until the lock file appears
@@ -64,7 +64,7 @@ function openLogFd() {
 /**
  * Runs the actual preview server in the current process. Used by:
  *  - The detached child spawned by spawnDaemon() below.
- *  - `pagx-preview --foreground` for debugging.
+ *  - `pagx preview --foreground` for debugging.
  */
 export async function runServer({ entryFile, port, host, fontsDir }) {
   let server;
@@ -121,7 +121,7 @@ export async function runServer({ entryFile, port, host, fontsDir }) {
 }
 
 /**
- * Runs pagx-preview as a self-bootstrapping stdio MCP server (`pagx-preview --mcp`). This is the
+ * Runs pagx-preview as a self-bootstrapping stdio MCP server (`pagx preview --mcp`). This is the
  * entry an MCP client (CodeBuddy) spawns on demand via a `command` config, so the user never has
  * to start a server manually.
  *

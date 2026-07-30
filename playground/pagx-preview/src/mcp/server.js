@@ -60,7 +60,7 @@ export function createMcpServer(opts) {
 
 /**
  * Connects a single long-lived MCP Server to a stdio transport. This is the self-bootstrapping
- * entry point: an MCP client (CodeBuddy) spawns `pagx-preview --mcp` on demand and speaks MCP over
+ * entry point: an MCP client (CodeBuddy) spawns `pagx preview --mcp` on demand and speaks MCP over
  * stdin/stdout, so the user never has to start a server manually. The caller owns the in-process
  * preview HTTP server whose session maps are shared here.
  *
@@ -80,7 +80,7 @@ export async function connectStdioMcpServer(opts) {
  *
  * The endpoint is POST /mcp (Streamable HTTP transport). CodeBuddy connects by adding:
  *   { "mcpServers": { "pagx-preview": { "type": "http", "url": "http://127.0.0.1:<port>/mcp" } } }
- * to its mcp.json. Use `pagx-preview --port 7300 <file>` to pin a port for MCP config stability.
+ * to its mcp.json. Use `pagx preview --port 7300 <file>` to pin a port for MCP config stability.
  *
  * Each POST /mcp request creates a fresh Server + Transport pair. The MCP SDK's Server.connect()
  * binds the Server to a single Transport for its lifetime, so reusing a Server across requests

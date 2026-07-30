@@ -128,21 +128,9 @@ function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget 
     };
   }
   const resolved = path.resolve(file);
-  // Reject paths that escape the working directory to prevent information probing of
-  // arbitrary system files (e.g. /etc/passwd). The tool is local-only so cwd is a
-  // natural trust boundary — users preview files within their project.
-  if (!resolved.startsWith(process.cwd() + path.sep) && resolved !== process.cwd()) {
-    return {
-      content: [{ type: 'text', text: 'file path must be within the current working directory' }],
-      isError: true,
-    };
-  }
-  if (resolved.includes('..')) {
-    return {
-      content: [{ type: 'text', text: 'file path must not contain ".."' }],
-      isError: true,
-    };
-  }
+  // Accept any absolute path so users can preview a .pagx anywhere (Desktop, Downloads,
+  // etc.), matching the plain `pagx preview <file>` command. The session layer still guards
+  // resource references inside the file against directory traversal (see session.js).
   if (!fs.existsSync(resolved)) {
     return {
       content: [{ type: 'text', text: 'file not found' }],

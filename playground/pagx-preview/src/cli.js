@@ -56,7 +56,7 @@ function parseArgs(argv) {
     fonts: null,
     foreground: false,
     // Run as a stdio MCP server instead of an HTTP preview daemon. Self-bootstrapping entry used
-    // by MCP clients (CodeBuddy) that spawn pagx-preview on demand.
+    // by MCP clients (CodeBuddy) that spawn `pagx preview --mcp` on demand.
     mcp: false,
     // Internal-only: instructs cli.js to run the server directly in this process instead of
     // spawning a daemon. Used by spawnDaemon() when it re-execs itself.
@@ -178,7 +178,7 @@ export async function run(argv) {
 
   // Stdio MCP mode: keep this process in the foreground speaking MCP over stdin/stdout. No file
   // argument is required — files are opened lazily through the preview_pagx tool. Handled before
-  // the file-required checks below so `pagx-preview --mcp` works with no positional argument.
+  // the file-required checks below so `pagx preview --mcp` works with no positional argument.
   if (args.mcp) {
     await runStdioServer({ port: args.port, host: args.host, fontsDir: args.fonts });
     return;

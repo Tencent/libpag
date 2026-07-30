@@ -71,6 +71,8 @@ pagx preview stop
 
 ### 各平台配置
 
+（请注意 开发调试和发布版本的mcp配置有所区别，详情请看 开发-本地打包测试-4）
+
 #### CodeBuddy IDE
 
 在 `~/.codebuddy/mcp.json` 中添加：
@@ -218,7 +220,10 @@ pagx-preview --help
 pagx-preview /path/to/file.pagx      # 打开浏览器预览
 
 # 4. 验证 MCP 服务
-#    在 MCP 客户端（CodeBuddy / Claude Desktop）中指向已安装的命令：
+#    注意：本节针对的是**独立** pagx-preview 命令，其 MCP json 与终端用户（发布形态）不同：
+#      - 独立开发/测试： { "command": "pagx-preview", "args": ["--mcp"] }
+#      - 终端用户（@libpag/pagx）： { "command": "pagx", "args": ["preview", "--mcp"] }（见上文「各平台配置」）
+#    在 MCP 客户端（CodeBuddy / Claude Desktop）中指向已安装的独立命令：
 #      { "mcpServers": { "pagx-preview": { "command": "pagx-preview", "args": ["--mcp"] } } }
 #    然后让助手预览一个 .pagx 文件。也可直接冒烟测试 stdio 启动：
 pagx-preview --mcp < /dev/null       # 应正常启动、stdout 无输出并挂起等待
@@ -231,71 +236,8 @@ rm -rf ~/.pagx                       # 清除缓存的字体、日志和进程�
 
 ### 发布到 npm
 
-```bash
-# 1. 先在 package.json 中更新版本号（遵循 semver；alpha/beta 用预发布号，如 0.1.0-alpha.2）
-npm publish --dry-run        # 不推送，仅检查将要发布的文件列表
 
-# 2. 发布。预发布版本要指定 dist-tag，避免成为默认的 "latest"（否则
-#    `npm install @libpag/pagx-preview` 会直接装到它）
-npm login                    # 若未登录
-npm publish --tag alpha      # prepack 会自动跑 prebuild(--release) + check-artifacts
-
-# 3. 某个版本稳定后，再把它提升为 latest
-npm dist-tag add @libpag/pagx-preview@<version> latest
-```
-
-`prepack`（在 `package.json` 中声明）会运行 `scripts/prebuild.js --build --release` 和
-`scripts/check-artifacts.js`，确保 tarball 一定带上 viewer wasm、glue 文件和播放图标；否则发布
-会直接报错中止。
-
-### 验证已发布版本
-
-`npm publish` 成功后，确认 registry 实际提供的内容符合预期：
-
-```bash
-# 1. 检查版本号和 dist-tag 是否已落到 registry
-npm view @libpag/pagx-preview dist-tags
-npm view @libpag/pagx-preview@alpha version
-
-# 2. 不安装，直接查看将下发的文件列表（不应出现 *.map / *.wasm.symbols）
-npm pack @libpag/pagx-preview@alpha --dry-run
-
-# 3. 按 registry 实际内容安装。预发布版本必须带 tag（或显式版本号）——
-#    直接 `npm i -g @libpag/pagx-preview` 仍会解析到 "latest"
-npm install -g @libpag/pagx-preview@alpha
-
-# 4. 冒烟测试已安装的命令
-pagx-preview --help
-pagx-preview /path/to/file.pagx      # 浏览器预览正常渲染 + 实时重载
-pagx-preview --mcp < /dev/null       # MCP stdio 服务正常启动、stdout 无输出并挂起等待
-```
-
-### 内部试用发布（腾讯源）
-
-正式/公开的包是官方 npm 上的 `@libpag/pagx-preview`（与同家族的 `@libpag/pagx` 对齐）。在公开
-发布*之前*，可以先发一个一次性构建到腾讯源给内部试用。腾讯源只接受 `@tencent` scope，所以要
-在发布这条命令里**临时**改包名——**不要提交这个改动**，仓库里始终保留 `@libpag` 作为正式/公开
-身份。
-
-```bash
-# 1. 仅为本次发布临时改 scope
-npm pkg set name=@tencent/pagx-preview
-
-# 2. 带 alpha tag 发到腾讯源
-npm publish --tag alpha --registry https://mirrors.tencent.com/npm/
-
-# 3. 改回正式包名，确保不会被提交进 git
-npm pkg set name=@libpag/pagx-preview
-```
-
-同事安装试用版：
-
-```bash
-npm install -g @tencent/pagx-preview@alpha --registry https://mirrors.tencent.com/npm/
-```
-
-工具验证稳定后，再把正式的 `@libpag/pagx-preview` 发到公开源（见上文）。注意 `@libpag/pagx` 已经
-把 `pagx preview ...` 转发给本工具，因此终端用户无需单独安装本包即可通过主 CLI 使用。
+> 当前分发方式：本工具随 `@libpag/pagx` 以 `pagx preview` 子命令提供，终端用户无需单独安装本包。
 
 ## 目录结构
 
