@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page 2 - 执行摘要</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+.bg-noise {
+  background-color: #DFDDDA;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+* { font-family: 'Plus Jakarta Sans', sans-serif; }
+.arrow-icon { stroke-width: 1.5px; fill: none; stroke: #111111; }
+</style>
+</head>
+<body>
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden m-auto">
+  <!-- Page Title -->
+  <div class="absolute top-[50px] left-[48px]">
+    <h1 class="text-[48px] font-semibold tracking-[-0.01em] leading-[1.2]">执行摘要</h1>
+  </div>
+
+  <!-- Horizontal Divider -->
+  <div class="absolute left-[48px] right-[48px] top-[130px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- Main Text Block -->
+  <div class="absolute top-[160px] left-[48px] w-[680px]">
+    <p class="text-[15px]/[1.7] font-normal opacity-85 mb-[24px]">
+      2026年5月18日，腾讯云自研的AI设计智能体平台<strong>Ardot正式开启公测</strong>，定位为AI驱动的产设研协作平台，覆盖从视觉设计、代码交付到团队协作的软件设计全流程。
+    </p>
+    <p class="text-[15px]/[1.7] font-normal opacity-85 mb-[28px]">
+      底层基于腾讯混元大模型与优图视觉算法，由开发CodeBuddy的同一团队打造。
+    </p>
+
+    <!-- Core Differentiation Box -->
+    <div class="border border-[#111111]/30 p-[20px] mt-[16px]">
+      <div class="flex items-start gap-[12px]">
+        <svg class="w-[22px] h-[22px] mt-[2px] shrink-0" viewBox="0 0 24 24"><path class="arrow-icon" d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+        <div>
+          <p class="text-[13px] font-medium uppercase tracking-wider mb-[6px] opacity-70">核心差异化</p>
+          <p class="text-[15px]/[1.65] font-medium">不是"生成图片"，而是"生成资产"</p>
+          <p class="text-[13px]/[1.6] mt-[4px] opacity-70">输出可编辑、可复用、可交付的结构化设计资产</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side Stats -->
+  <div class="absolute top-[170px] left-[770px] w-[420px]">
+    <!-- Stat 1 -->
+    <div class="border-b border-[#111111]/15 pb-[20px] mb-[20px]">
+      <div class="flex items-center gap-[10px] mb-[6px]">
+        <i class="ph ph-chart-line-up text-[18px]"></i>
+        <span class="text-[12px] uppercase tracking-wider opacity-60">Global Market CAGR</span>
+      </div>
+      <p class="text-[52px] font-semibold leading-[1] tracking-tight">22.25<span class="text-[28px]">%</span></p>
+      <p class="text-[13px] mt-[4px] opacity-60">2025 - 2035 复合年增长率</p>
+    </div>
+
+    <!-- Stat 2 -->
+    <div class="border-b border-[#111111]/15 pb-[20px] mb-[20px]">
+      <div class="flex items-center gap-[10px] mb-[6px]">
+        <i class="ph ph-globe text-[18px]"></i>
+        <span class="text-[12px] uppercase tracking-wider opacity-60">2035 Market Size</span>
+      </div>
+      <p class="text-[44px] font-semibold leading-[1] tracking-tight">159.9<span class="text-[22px] ml-[4px] opacity-70">亿美元</span></p>
+      <p class="text-[13px] mt-[4px] opacity-60">全球UI/UX设计工具市场预测</p>
+    </div>
+
+    <!-- Stat 3 -->
+    <div class="pb-[8px]">
+      <div class="flex items-center gap-[10px] mb-[6px]">
+        <i class="ph ph-users text-[18px]"></i>
+        <span class="text-[12px] uppercase tracking-wider opacity-60">Competitors Analyzed</span>
+      </div>
+      <p class="text-[44px] font-semibold leading-[1] tracking-tight">6<span class="text-[22px] ml-[4px] opacity-70">家</span></p>
+      <p class="text-[13px] mt-[4px] opacity-60">Figma / Sketch / MasterGo / 即时设计 / Pixso / 墨刀</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

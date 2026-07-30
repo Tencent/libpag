@@ -525,6 +525,11 @@ elseif (ANDROID)
         list(APPEND PAG_INCLUDES vendor/ffavc/include)
     endif ()
 
+    # libyuv provides SIMD-accelerated I420 to RGBA conversion used by SoftwareDecoderWrapper on
+    # Android to bypass glTexSubImage2D uploads. See issue #3540.
+    list(APPEND PAG_STATIC_VENDORS libyuv)
+    list(APPEND PAG_INCLUDES third_party/libyuv/include)
+
     # optimizes the output size
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/android/libpag/export.def")
     list(APPEND PAG_COMPILE_OPTIONS -ffunction-sections -fdata-sections -Os -fno-exceptions -fno-rtti)
@@ -884,6 +889,20 @@ if (PAG_BUILD_CLI)
         endif ()
     endif ()
     target_link_libraries(pagx-cli pag ${PAG_SHARED_LIBS} ${CLI_EXTRA_LIBS})
+
+    # HTML browser-fidelity eval target. Not a gtest binary: it drives the
+    # snapshot -> import -> render -> compare pipeline (tools/html-snapshot/eval)
+    # over every corpus under resources/html/ and emits per-corpus reports.
+    # Report-only (no pass/fail gate). Requires Node.js + a headless Chromium,
+    # and network access for the websites/generated corpora. Build & run with:
+    #   cmake --build <build-dir> --target HTMLTest
+    add_custom_target(HTMLTest
+            COMMAND ${CMAKE_COMMAND} -E env PAGX_BIN=$<TARGET_FILE:pagx-cli>
+            bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_html_eval.sh
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Running HTML browser-fidelity eval over resources/html corpora")
 endif ()
 
 if (PAG_BUILD_TESTS)

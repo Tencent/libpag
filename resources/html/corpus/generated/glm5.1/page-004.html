@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>猫经济崛起</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide bg-[#F5F0E8]">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="star-decor text-[24px]">*</span>
+      <span class="text-[16px] font-[500] text-[#111827]">猫经济崛起</span>
+    </div>
+    <span class="text-[14px] text-[#6B7280]">第 04 页</span>
+  </div>
+
+  <!-- 标题 -->
+  <div class="pt-[88px] px-[48px]">
+    <div class="flex items-end gap-[32px]">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#111827]" style="transform: skewX(-5deg);">
+          从追赶到超越
+        </h1>
+      </div>
+      <div class="text-[16px] text-[#4B5563] pb-[8px]">猫增速5.2% vs 犬3.2%</div>
+    </div>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="flex px-[48px] mt-[24px] gap-[40px]">
+    <!-- 图表 -->
+    <div class="flex-1">
+      <div id="chart-dogcat" style="width: 700px; height: 380px;"></div>
+    </div>
+    <!-- 要点 -->
+    <div class="w-[400px] flex flex-col justify-center gap-[16px]">
+      <div class="flex items-center gap-[12px] bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <i class="ph ph-cat text-[#2563EB] text-[28px]"></i>
+        <div>
+          <div class="text-[32px] font-[700] text-[#111827]">7289<span class="text-[16px] font-[400] text-[#4B5563]">万只</span></div>
+          <div class="text-[13px] text-[#4B5563]">猫数量 | 增速1.9%</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-[12px] bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <i class="ph ph-dog text-[#1E40AF] text-[28px]"></i>
+        <div>
+          <div class="text-[32px] font-[700] text-[#111827]">5343<span class="text-[16px] font-[400] text-[#4B5563]">万只</span></div>
+          <div class="text-[13px] text-[#4B5563]">犬数量 | 增速1.6%</div>
+        </div>
+      </div>
+      <div class="bg-[#FFFFFF] border-[1px] border-[#D1D5DB] rounded-[8px] p-[16px]">
+        <div class="text-[14px] text-[#4B5563] mb-[8px]">单只年均消费</div>
+        <div class="flex gap-[24px]">
+          <div>
+            <span class="text-[24px] font-[700] text-[#2563EB]">3006</span>
+            <span class="text-[12px] text-[#4B5563]">元/犬</span>
+          </div>
+          <div>
+            <span class="text-[24px] font-[700] text-[#60A5FA]">2085</span>
+            <span class="text-[12px] text-[#4B5563]">元/猫</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#6B7280]">中国宠物经济趋势洞察</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+
+<script>
+  var chart = echarts.init(document.getElementById('chart-dogcat'));
+  chart.setOption({
+    animation: false,
+    grid: { left: 70, right: 30, top: 40, bottom: 40 },
+    legend: {
+      data: ['2024年', '2025年'],
+      textStyle: { color: '#4B5563', fontSize: 13 },
+      top: 0
+    },
+    xAxis: {
+      type: 'category',
+      data: ['犬', '猫'],
+      axisLabel: { color: '#111827', fontSize: 15, fontWeight: 700 },
+      axisLine: { lineStyle: { color: '#D1D5DB' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#6B7280', fontSize: 12 },
+      splitLine: { lineStyle: { color: '#E5E7EB' } },
+      axisLine: { show: false }
+    },
+    series: [
+      {
+        name: '2024年',
+        type: 'bar',
+        barWidth: 50,
+        data: [1557, 1445],
+        itemStyle: { color: '#1E40AF' },
+        label: { show: true, position: 'top', color: '#1E40AF', fontSize: 13, fontWeight: 600, formatter: '{c}' }
+      },
+      {
+        name: '2025年',
+        type: 'bar',
+        barWidth: 50,
+        data: [1606, 1520],
+        itemStyle: { color: '#2563EB' },
+        label: { show: true, position: 'top', color: '#2563EB', fontSize: 13, fontWeight: 600, formatter: '{c}' }
+      }
+    ]
+  });
+</script>
+</body>
+</html>

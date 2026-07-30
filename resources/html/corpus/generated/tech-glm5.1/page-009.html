@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>行业核心趋势</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .geometric-ring {
+      border: 1px solid #111111;
+      border-radius: 50%;
+      position: absolute;
+    }
+    .grid-line {
+      position: absolute;
+      background: rgba(17,17,17,0.06);
+    }
+    .trend-card {
+      border-bottom: 1px solid rgba(17,17,17,0.2);
+      padding: 14px 0;
+    }
+    .trend-card:last-child {
+      border-bottom: none;
+    }
+    .trend-number {
+      font-size: 40px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      opacity: 0.08;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- Grid lines -->
+    <div class="grid-line" style="top:0; left:640px; width:1px; height:720px;"></div>
+    <div class="grid-line" style="top:100px; left:0; width:1280px; height:1px;"></div>
+
+    <!-- Geometric ring decorations -->
+    <div class="geometric-ring" style="top:-35px; right:-35px; width:130px; height:130px;"></div>
+    <div class="geometric-ring" style="bottom:50px; left:-20px; width:70px; height:70px;"></div>
+
+    <!-- Header (zone-1) -->
+    <div style="position:absolute; top:30px; left:60px; width:1160px; height:60px;">
+      <p style="font-size:14px; font-weight:400; opacity:0.5; margin:0 0 4px 0;">09</p>
+      <h1 style="font-size:56px; font-weight:600; letter-spacing:-0.025em; margin:0; line-height:1.1;">行业核心趋势</h1>
+    </div>
+
+    <!-- Subtitle -->
+    <div style="position:absolute; top:80px; left:60px; width:1160px;">
+      <p style="font-size:20px; font-weight:500; opacity:0.6; margin:0;">2026年五大行业趋势方向</p>
+    </div>
+
+    <!-- Trend cards (zone-2 to zone-6) -->
+    <div style="position:absolute; top:110px; left:60px; width:1160px; height:540px;">
+
+      <!-- Trend 1 -->
+      <div class="trend-card" style="position:absolute; top:0; left:0; width:1160px; height:100px; display:flex; align-items:center; gap:20px;">
+        <span class="trend-number">01</span>
+        <div style="width:44px; height:44px; border:1px solid rgba(17,17,17,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i class="ph ph-magic-wand" style="font-size:22px;"></i>
+        </div>
+        <div style="flex:1;">
+          <h3 style="font-size:20px; font-weight:500; margin:0 0 2px 0;">从手工绘制到AI辅助创作</h3>
+          <p style="font-size:16px; font-weight:400; line-height:1.5; opacity:0.6; margin:0;">AI根据描述自动生成页面草稿，自动做版式优化与排版建议</p>
+        </div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.3)" stroke-width="1.5" style="flex-shrink:0;">
+          <path d="M7 7l10 10M17 7v10H7"/>
+        </svg>
+      </div>
+
+      <!-- Trend 2 -->
+      <div class="trend-card" style="position:absolute; top:110px; left:0; width:1160px; height:100px; display:flex; align-items:center; gap:20px;">
+        <span class="trend-number">02</span>
+        <div style="width:44px; height:44px; border:1px solid rgba(17,17,17,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i class="ph ph-users-three" style="font-size:22px;"></i>
+        </div>
+        <div style="flex:1;">
+          <h3 style="font-size:20px; font-weight:500; margin:0 0 2px 0;">从孤立工作到协同设计+协作产出</h3>
+          <p style="font-size:16px; font-weight:400; line-height:1.5; opacity:0.6; margin:0;">云端协作工具持续主导市场，多人实时协作成为标准能力</p>
+        </div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.3)" stroke-width="1.5" style="flex-shrink:0;">
+          <path d="M7 7l10 10M17 7v10H7"/>
+        </svg>
+      </div>
+
+      <!-- Trend 3 -->
+      <div class="trend-card" style="position:absolute; top:220px; left:0; width:1160px; height:100px; display:flex; align-items:center; gap:20px;">
+        <span class="trend-number">03</span>
+        <div style="width:44px; height:44px; border:1px solid rgba(17,17,17,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i class="ph ph-tree-structure" style="font-size:22px;"></i>
+        </div>
+        <div style="flex:1;">
+          <h3 style="font-size:20px; font-weight:500; margin:0 0 2px 0;">从孤立工具链到整合式设计生态</h3>
+          <p style="font-size:16px; font-weight:400; line-height:1.5; opacity:0.6; margin:0;">一站式视觉到文档到交付设计生态正在形成</p>
+        </div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.3)" stroke-width="1.5" style="flex-shrink:0;">
+          <path d="M7 7l10 10M17 7v10H7"/>
+        </svg>
+      </div>
+
+      <!-- Trend 4 -->
+      <div class="trend-card" style="position:absolute; top:330px; left:0; width:1160px; height:100px; display:flex; align-items:center; gap:20px;">
+        <span class="trend-number">04</span>
+        <div style="width:44px; height:44px; border:1px solid rgba(17,17,17,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i class="ph ph-stack-simple" style="font-size:22px;"></i>
+        </div>
+        <div style="flex:1;">
+          <h3 style="font-size:20px; font-weight:500; margin:0 0 2px 0;">AI驱动的结构性生成</h3>
+          <p style="font-size:16px; font-weight:400; line-height:1.5; opacity:0.6; margin:0;">AI理解层级和结构，从描述自动输出模块组合方案</p>
+        </div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.3)" stroke-width="1.5" style="flex-shrink:0;">
+          <path d="M7 7l10 10M17 7v10H7"/>
+        </svg>
+      </div>
+
+      <!-- Trend 5 -->
+      <div class="trend-card" style="position:absolute; top:440px; left:0; width:1160px; height:100px; display:flex; align-items:center; gap:20px;">
+        <span class="trend-number">05</span>
+        <div style="width:44px; height:44px; border:1px solid rgba(17,17,17,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <i class="ph ph-file-text" style="font-size:22px;"></i>
+        </div>
+        <div style="flex:1;">
+          <h3 style="font-size:20px; font-weight:500; margin:0 0 2px 0;">设计与协作文档融合</h3>
+          <p style="font-size:16px; font-weight:400; line-height:1.5; opacity:0.6; margin:0;">设计逻辑、交互说明与开发交付说明的自动生成</p>
+        </div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(17,17,17,0.3)" stroke-width="1.5" style="flex-shrink:0;">
+          <path d="M7 7l10 10M17 7v10H7"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Highlight bar (zone-7) -->
+    <div style="position:absolute; top:660px; left:60px; width:1160px; height:30px; display:flex; align-items:center; border-top:1px solid rgba(17,17,17,0.2); padding-top:4px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="margin-right:8px; flex-shrink:0;">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <p style="font-size:14px; font-weight:500; margin:0;">从工具辅助到智能协同，设计范式正在重塑</p>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute; bottom:16px; left:60px; right:60px; display:flex; justify-content:space-between;">
+      <p style="font-size:14px; font-weight:400; opacity:0.4; margin:0;">腾讯Ardot设计平台 - 分析与竞品分析报告</p>
+      <p style="font-size:14px; font-weight:400; opacity:0.4; margin:0;">09</p>
+    </div>
+  </div>
+</body>
+</html>

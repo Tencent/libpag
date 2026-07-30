@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    body { margin: 0; padding: 0; overflow: hidden; }
+    .slide {
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+      font-family: 'Noto Sans SC', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="slide">
+    <!-- 背景水印 -->
+    <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] whitespace-nowrap select-none z-0" style="top: 80px; left: 50px;">HEARTBEAT</div>
+
+    <!-- 页眉 -->
+    <div class="absolute top-[32px] right-[48px] z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+    </div>
+
+    <!-- 标题区域 -->
+    <div class="absolute z-20" style="top: 40px; left: 0; width: 1280px; height: 70px;">
+      <div class="flex flex-col items-center justify-center h-full gap-[8px]">
+        <div class="text-[16px] font-[300] text-[#FFFFFF]/60 tracking-[0.1em] uppercase">Heartbeat / Cron</div>
+        <h1 class="text-[36px] font-[300] text-[#FFFFFF] leading-[1.1]">第5层：主动行为层</h1>
+      </div>
+    </div>
+
+    <!-- 正文区域 (Z-BODY: x=120, y=140, w=1040, h=500) -->
+    <div class="absolute z-20" style="top: 140px; left: 120px; width: 1040px; height: 500px;">
+      <div class="flex flex-col gap-[20px] h-full">
+
+        <!-- 说明文字 -->
+        <div class="text-center mb-[8px]">
+          <div class="text-[16px] font-[400] text-[#82D0A4]">让 AI 从被动响应变为主动出击</div>
+        </div>
+
+        <!-- 主动行为列表 -->
+        <div class="space-y-[16px]">
+
+          <!-- 每30分钟 -->
+          <div class="bg-[#1E332A] rounded-[12px] p-[20px] border-[1px] border-[#FFFFFF]/10 flex items-center gap-[20px]">
+            <div class="w-[80px] h-[80px] rounded-full bg-[#82D0A4]/10 flex items-center justify-center shrink-0">
+              <i class="ph ph-clock text-[32px] text-[#82D0A4]"></i>
+            </div>
+            <div class="flex-1">
+              <div class="text-[13px] text-[#82D0A4] mb-[4px]">每 30 分钟</div>
+              <div class="text-[16px] font-[400] text-[#FFFFFF]/80">检查紧急邮件 / 消息</div>
+            </div>
+          </div>
+
+          <!-- 每天早上8:00 -->
+          <div class="bg-[#1E332A] rounded-[12px] p-[20px] border-[1px] border-[#FFFFFF]/10 flex items-center gap-[20px]">
+            <div class="w-[80px] h-[80px] rounded-full bg-[#82D0A4]/10 flex items-center justify-center shrink-0">
+              <i class="ph ph-sun text-[32px] text-[#82D0A4]"></i>
+            </div>
+            <div class="flex-1">
+              <div class="text-[13px] text-[#82D0A4] mb-[4px]">每天早上 8:00</div>
+              <div class="text-[16px] font-[400] text-[#FFFFFF]/80">推送今日待办和日程提醒</div>
+            </div>
+          </div>
+
+          <!-- 每天晚上21:00 -->
+          <div class="bg-[#1E332A] rounded-[12px] p-[20px] border-[1px] border-[#FFFFFF]/10 flex items-center gap-[20px]">
+            <div class="w-[80px] h-[80px] rounded-full bg-[#82D0A4]/10 flex items-center justify-center shrink-0">
+              <i class="ph ph-moon text-[32px] text-[#82D0A4]"></i>
+            </div>
+            <div class="flex-1">
+              <div class="text-[13px] text-[#82D0A4] mb-[4px]">每天晚上 21:00</div>
+              <div class="text-[16px] font-[400] text-[#FFFFFF]/80">采集今日 AI 热点，推送摘要</div>
+            </div>
+          </div>
+
+          <!-- 每周一9:00 -->
+          <div class="bg-[#1E332A] rounded-[12px] p-[20px] border-[1px] border-[#FFFFFF]/10 flex items-center gap-[20px]">
+            <div class="w-[80px] h-[80px] rounded-full bg-[#82D0A4]/10 flex items-center justify-center shrink-0">
+              <i class="ph ph-calendar-check text-[32px] text-[#82D0A4]"></i>
+            </div>
+            <div class="flex-1">
+              <div class="text-[13px] text-[#82D0A4] mb-[4px]">每周一 9:00</div>
+              <div class="text-[16px] font-[400] text-[#FFFFFF]/80">生成上周工作周报</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 关键洞察 -->
+        <div class="bg-[#82D0A4]/10 rounded-[8px] p-[14px] border-[1px] border-[#82D0A4]/20 text-center">
+          <div class="text-[14px] text-[#FFFFFF]/70 leading-[1.6]">终极形态：<span class="text-[#82D0A4]">AI 不再是你问它答，而是它替你盯着世界，有事主动来找你</span></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center z-50">
+      <span class="text-[14px] font-[400] text-[#FFFFFF]">萌芽·生长</span>
+      <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+    </div>
+  </div>
+</body>
+</html>

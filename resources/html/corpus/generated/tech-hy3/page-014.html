@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>竞品综合对比矩阵</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    table { border-collapse: collapse; }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid -->
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-table text-[20px]"></i>
+      <span class="text-[14px]/[20px]">竞品对比 · 综合矩阵</span>
+    </div>
+
+    <!-- Page Title -->
+    <div class="absolute top-[60px] left-[80px] z-[10]">
+      <h1 class="text-[56px] font-[600] leading-[1.2] tracking-[-0.01em]">竞品综合对比矩阵</h1>
+      <div class="w-[80px] h-[2px] bg-[#111111] mt-[12px]"></div>
+    </div>
+
+    <!-- Full-width Table -->
+    <div class="absolute top-[190px] left-[30px] right-[30px] z-[10] overflow-hidden">
+      <table class="w-full text-[13px]/[20px]">
+        <thead>
+          <tr class="border-b-[1px] border-[#111111]/20">
+            <th class="text-left py-[8px] px-[10px] font-[600] w-[140px]">维度</th>
+            <th class="text-center py-[8px] px-[6px] font-[600] w-[170px]">Ardot</th>
+            <th class="text-center py-[8px] px-[6px] font-[600] w-[170px]">Figma</th>
+            <th class="text-center py-[8px] px-[6px] font-[600] w-[170px]">Sketch</th>
+            <th class="text-center py-[8px] px-[6px] font-[600] w-[170px]">MasterGo</th>
+            <th class="text-center py-[8px] px-[6px] font-[600] w-[170px]">即时设计</th>
+            <th class="text-center py-[8px] px-[6px] font-[600] w-[170px]">Pixso</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">AI生成设计稿</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">2/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+          </tr>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">可编辑输出</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+          </tr>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">实时协作</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">2/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+          </tr>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">代码交付</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+          </tr>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">设计系统</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+          </tr>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">插件生态</td>
+            <td class="text-center py-[7px] px-[6px]">2/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+          </tr>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">跨平台</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">2/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+          </tr>
+          <tr class="border-b-[1px] border-[#111111]/10">
+            <td class="py-[7px] px-[10px] font-[500]">数据安全/合规</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+          </tr>
+          <tr>
+            <td class="py-[7px] px-[10px] font-[500]">价格优势</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">3/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+            <td class="text-center py-[7px] px-[6px]">5/5</td>
+            <td class="text-center py-[7px] px-[6px]">4/5</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="text-[12px]/[18px] text-[#111111]/50 mt-[12px] text-right">1/5 代表评分等级，5/5 为最高</p>
+    </div>
+
+    <!-- Bottom border -->
+    <div class="absolute bottom-[40px] left-[80px] right-[80px] h-[1px] bg-[#111111]/20 z-[10]"></div>
+  </div>
+</body>
+</html>

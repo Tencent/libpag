@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "8d2e61f1444dca69a93ad52459afcabf3c118ca7",
+        "commit": "73b38395f205bd095cef6f1ab144f2083ace033d",
         "dir": "third_party/tgfx"
       },
       {
@@ -49,6 +49,11 @@
         "url": "https://github.com/GNOME/libxml2.git",
         "commit": "3d840e17858de03a09fba8b202e3a89267d5795a",
         "dir": "third_party/libxml2"
+      },
+      {
+        "url": "https://chromium.googlesource.com/libyuv/libyuv",
+        "commit": "644251f252a84bf8ce91ff0aca86a9b16b069ab8",
+        "dir": "third_party/libyuv"
       },
       {
         "url": "https://github.com/google/woff2.git",

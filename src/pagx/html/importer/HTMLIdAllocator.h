@@ -50,8 +50,9 @@ class HTMLIdAllocator {
   std::string consume(const std::shared_ptr<DOMNode>& element);
 
   /**
-   * Copies the element's id (when present) onto `layer->id`. No-op when either is null or
-   * when the element has no id attribute.
+   * Copies the element's id (when present) onto `layer->id` and its `name` attribute (when present)
+   * onto `layer->name`. No-op when either argument is null; each field is left untouched when the
+   * corresponding attribute is absent or empty.
    */
   void assign(Layer* layer, const std::shared_ptr<DOMNode>& element);
 

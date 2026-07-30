@@ -1,0 +1,4553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPT Presentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/style.css">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f5f5f5; padding: 40px 20px; min-height: 100vh; overflow-x: auto; }
+    .slide-wrapper {
+      --available-width: min(1280px, calc(100vw - 40px));
+      --slide-scale: calc(var(--available-width) / 1280);
+      position: relative; width: var(--available-width); height: calc(720px * var(--slide-scale));
+      margin: 0 auto 40px auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden;
+    }
+    .slide-wrapper:last-child { margin-bottom: 0; }
+    .slide-number { position: absolute; top: -30px; left: 0; background: #7C3AED; color: white; padding: 4px 12px; border-radius: 4px 4px 0 0; font-size: 12px; font-weight: 600; z-index: 10; }
+    .slide { width: 1280px; height: 720px; background: white; position: relative; overflow: hidden; transform-origin: top left; transform: scale(var(--slide-scale)); }
+    @media print { body { background: white; padding: 0; margin: 0; } .slide-wrapper { page-break-after: always; page-break-inside: avoid; box-shadow: none; margin: 0; border-radius: 0; width: 100%; height: 100vh; overflow: hidden; } .slide-wrapper:last-child { page-break-after: auto; } .slide-number { display: none; } .slide { width: 100%; height: 100%; transform: none; } }
+    .slide-page-1 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-1 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-1 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-1 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-1 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-1 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-1 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-1 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-1 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-1 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-1 .slide .ff-sans, .slide-page-1 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-1 .slide .ff-geometric, .slide-page-1 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-1 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-1 .slide .ff-condensed, .slide-page-1 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-1 .slide .ff-serif, .slide-page-1 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-1 .slide .ff-editorial, .slide-page-1 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-1 .slide .ff-mono, .slide-page-1 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-1 .slide .ff-cjk-emphasis, .slide-page-1 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-1 .slide.absolute, .slide-page-1 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-1 .slide.top-\[48px\], .slide-page-1 .slide .top-\[48px\] {
+top: 48px !important;
+}
+
+.slide-page-1 .slide.left-\[64px\], .slide-page-1 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-1 .slide.right-\[64px\], .slide-page-1 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-1 .slide.flex, .slide-page-1 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-1 .slide.items-center, .slide-page-1 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-1 .slide.justify-between, .slide-page-1 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-1 .slide.px-\[20px\], .slide-page-1 .slide .px-\[20px\] {
+padding-left: 20px !important;
+padding-right: 20px !important;
+}
+
+.slide-page-1 .slide.py-\[8px\], .slide-page-1 .slide .py-\[8px\] {
+padding-top: 8px !important;
+padding-bottom: 8px !important;
+}
+
+.slide-page-1 .slide.text-\[13px\], .slide-page-1 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-1 .slide.text-\[\#888888\], .slide-page-1 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-1 .slide.tracking-\[0\.08em\], .slide-page-1 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-1 .slide.text-\[14px\], .slide-page-1 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-1 .slide.text-\[\#AAAAAA\], .slide-page-1 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-1 .slide.flex-col, .slide-page-1 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-1 .slide.justify-center, .slide-page-1 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-1 .slide.px-\[64px\], .slide-page-1 .slide .px-\[64px\] {
+padding-left: 64px !important;
+padding-right: 64px !important;
+}
+
+.slide-page-1 .slide.w-\[100px\], .slide-page-1 .slide .w-\[100px\] {
+width: 100px !important;
+}
+
+.slide-page-1 .slide.h-\[100px\], .slide-page-1 .slide .h-\[100px\] {
+height: 100px !important;
+}
+
+.slide-page-1 .slide.mb-\[48px\], .slide-page-1 .slide .mb-\[48px\] {
+margin-bottom: 48px !important;
+}
+
+.slide-page-1 .slide.text-\[\#008B8B\], .slide-page-1 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-1 .slide.text-\[42px\], .slide-page-1 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-1 .slide.max-w-\[960px\], .slide-page-1 .slide .max-w-\[960px\] {
+max-width: 960px !important;
+}
+
+.slide-page-1 .slide.text-center, .slide-page-1 .slide .text-center {
+text-align: center !important;
+}
+
+.slide-page-1 .slide.text-\[64px\], .slide-page-1 .slide .text-\[64px\] {
+font-size: 64px !important;
+}
+
+.slide-page-1 .slide.leading-\[1\.12\], .slide-page-1 .slide .leading-\[1\.12\] {
+line-height: 1.12 !important;
+}
+
+.slide-page-1 .slide.text-\[\#333333\], .slide-page-1 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-1 .slide.mt-\[32px\], .slide-page-1 .slide .mt-\[32px\] {
+margin-top: 32px !important;
+}
+
+.slide-page-1 .slide.gap-\[16px\], .slide-page-1 .slide .gap-\[16px\] {
+gap: 16px !important;
+}
+
+.slide-page-1 .slide.h-\[1px\], .slide-page-1 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-1 .slide.w-\[60px\], .slide-page-1 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-1 .slide.bg-\[\#008B8B\], .slide-page-1 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-1 .slide.text-\[24px\], .slide-page-1 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-1 .slide.text-\[\#555555\], .slide-page-1 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-1 .slide.tracking-\[0\.1em\], .slide-page-1 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-1 .slide.bottom-\[48px\], .slide-page-1 .slide .bottom-\[48px\] {
+bottom: 48px !important;
+}
+
+.slide-page-1 .slide.gap-\[12px\], .slide-page-1 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-1 .slide.w-\[8px\], .slide-page-1 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-1 .slide.h-\[8px\], .slide-page-1 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-1 .slide.rounded-full, .slide-page-1 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-1 .slide.text-\[12px\], .slide-page-1 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-1 .slide.tracking-\[0\.05em\], .slide-page-1 .slide .tracking-\[0\.05em\] {
+letter-spacing: 0.05em !important;
+}
+
+.slide-page-1 .slide.w-\[10px\], .slide-page-1 .slide .w-\[10px\] {
+width: 10px !important;
+}
+
+.slide-page-1 .slide.h-\[10px\], .slide-page-1 .slide .h-\[10px\] {
+height: 10px !important;
+}
+
+.slide-page-1 .slide.w-\[300px\], .slide-page-1 .slide .w-\[300px\] {
+width: 300px !important;
+}
+
+.slide-page-1 .slide.h-\[300px\], .slide-page-1 .slide .h-\[300px\] {
+height: 300px !important;
+}
+
+.slide-page-1 .slide.w-\[400px\], .slide-page-1 .slide .w-\[400px\] {
+width: 400px !important;
+}
+
+.slide-page-1 .slide.h-\[400px\], .slide-page-1 .slide .h-\[400px\] {
+height: 400px !important;
+}
+.slide-page-2 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-2 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-2 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-2 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-2 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-2 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-2 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-2 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-2 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-2 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-2 .slide .ff-sans, .slide-page-2 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-2 .slide .ff-geometric, .slide-page-2 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-2 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-2 .slide .ff-condensed, .slide-page-2 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-2 .slide .ff-serif, .slide-page-2 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-2 .slide .ff-editorial, .slide-page-2 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-2 .slide .ff-mono, .slide-page-2 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-2 .slide .ff-cjk-emphasis, .slide-page-2 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-list] {
+--pptai-catalog-columns: 1;
+  --pptai-catalog-gap: 22px;
+  --pptai-catalog-item-max: 180px;
+  --pptai-catalog-badge-width: auto;
+  --pptai-catalog-badge-height: auto;
+  --pptai-catalog-title-size: inherit;
+  --pptai-catalog-detail-size: inherit;
+  --pptai-catalog-detail-max: none;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: repeat(var(--pptai-catalog-columns), minmax(0, 1fr)) !important;
+  gap: var(--pptai-catalog-gap) !important;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-mode="spacious"], .slide-page-2 .slide [data-pptai-catalog-list="spacious"] {
+--pptai-catalog-columns: 1;
+  --pptai-catalog-gap: 22px;
+  --pptai-catalog-item-max: 180px;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-mode="compact"], .slide-page-2 .slide [data-pptai-catalog-list="compact"] {
+--pptai-catalog-columns: 1;
+  --pptai-catalog-gap: 14px;
+  --pptai-catalog-item-max: 104px;
+  --pptai-catalog-badge-width: 88px;
+  --pptai-catalog-badge-height: 84px;
+  --pptai-catalog-title-size: 20px;
+  --pptai-catalog-detail-size: 14px;
+  --pptai-catalog-detail-max: 42px;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-mode="two-column"], .slide-page-2 .slide [data-pptai-catalog-list="two-column"] {
+--pptai-catalog-columns: 2;
+  --pptai-catalog-gap: 16px;
+  --pptai-catalog-item-max: 112px;
+  --pptai-catalog-badge-width: 78px;
+  --pptai-catalog-badge-height: 76px;
+  --pptai-catalog-title-size: 18px;
+  --pptai-catalog-detail-size: 13px;
+  --pptai-catalog-detail-max: 38px;
+  column-gap: 40px !important;
+  row-gap: var(--pptai-catalog-gap) !important;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-list][data-pptai-catalog-mode] {
+display: grid !important;
+  grid-template-columns: repeat(var(--pptai-catalog-columns), minmax(0, 1fr)) !important;
+  gap: var(--pptai-catalog-gap) !important;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-list][data-pptai-catalog-mode="two-column"] {
+column-gap: 40px !important;
+  row-gap: var(--pptai-catalog-gap) !important;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-item] {
+min-width: 0;
+  min-height: 0;
+  max-height: var(--pptai-catalog-item-max) !important;
+  overflow: hidden !important;
+  box-sizing: border-box;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-badge] {
+max-width: var(--pptai-catalog-badge-width);
+  max-height: var(--pptai-catalog-badge-height);
+  flex-shrink: 0;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-title] {
+font-size: var(--pptai-catalog-title-size);
+  line-height: 1.22;
+}
+
+.slide-page-2 .slide [data-pptai-catalog-detail] {
+font-size: var(--pptai-catalog-detail-size);
+  line-height: 1.45;
+  max-height: var(--pptai-catalog-detail-max);
+  overflow: hidden;
+}
+
+.slide-page-2 .slide.absolute, .slide-page-2 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-2 .slide.top-\[32px\], .slide-page-2 .slide .top-\[32px\] {
+top: 32px !important;
+}
+
+.slide-page-2 .slide.left-\[64px\], .slide-page-2 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-2 .slide.right-\[64px\], .slide-page-2 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-2 .slide.flex, .slide-page-2 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-2 .slide.items-center, .slide-page-2 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-2 .slide.justify-between, .slide-page-2 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-2 .slide.px-\[16px\], .slide-page-2 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-2 .slide.py-\[6px\], .slide-page-2 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-2 .slide.text-\[13px\], .slide-page-2 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-2 .slide.text-\[\#888888\], .slide-page-2 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-2 .slide.tracking-\[0\.08em\], .slide-page-2 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-2 .slide.text-\[12px\], .slide-page-2 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-2 .slide.text-\[\#AAAAAA\], .slide-page-2 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-2 .slide.top-\[96px\], .slide-page-2 .slide .top-\[96px\] {
+top: 96px !important;
+}
+
+.slide-page-2 .slide.text-\[42px\], .slide-page-2 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-2 .slide.leading-\[1\.2\], .slide-page-2 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-2 .slide.text-\[\#333333\], .slide-page-2 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-2 .slide.w-\[48px\], .slide-page-2 .slide .w-\[48px\] {
+width: 48px !important;
+}
+
+.slide-page-2 .slide.h-\[4px\], .slide-page-2 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-2 .slide.bg-\[\#008B8B\], .slide-page-2 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-2 .slide.mt-\[16px\], .slide-page-2 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-2 .slide.rounded-full, .slide-page-2 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-2 .slide.top-\[180px\], .slide-page-2 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-2 .slide.h-\[440px\], .slide-page-2 .slide .h-\[440px\] {
+height: 440px !important;
+}
+
+.slide-page-2 .slide.grid, .slide-page-2 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-2 .slide.grid-cols-2, .slide-page-2 .slide .grid-cols-2 {
+grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.slide-page-2 .slide.gap-\[32px\], .slide-page-2 .slide .gap-\[32px\] {
+gap: 32px !important;
+}
+
+.slide-page-2 .slide.h-full, .slide-page-2 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-2 .slide.p-\[32px\], .slide-page-2 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-2 .slide.flex-col, .slide-page-2 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-2 .slide.items-start, .slide-page-2 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-2 .slide.w-\[56px\], .slide-page-2 .slide .w-\[56px\] {
+width: 56px !important;
+}
+
+.slide-page-2 .slide.h-\[56px\], .slide-page-2 .slide .h-\[56px\] {
+height: 56px !important;
+}
+
+.slide-page-2 .slide.justify-center, .slide-page-2 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-2 .slide.text-\[\#008B8B\], .slide-page-2 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-2 .slide.text-\[24px\], .slide-page-2 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-2 .slide.text-\[32px\], .slide-page-2 .slide .text-\[32px\] {
+font-size: 32px !important;
+}
+
+.slide-page-2 .slide.mt-\[24px\], .slide-page-2 .slide .mt-\[24px\] {
+margin-top: 24px !important;
+}
+
+.slide-page-2 .slide.text-\[20px\], .slide-page-2 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-2 .slide.mb-\[12px\], .slide-page-2 .slide .mb-\[12px\] {
+margin-bottom: 12px !important;
+}
+
+.slide-page-2 .slide.text-\[15px\], .slide-page-2 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-2 .slide.text-\[\#555555\], .slide-page-2 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-2 .slide.leading-\[1\.6\], .slide-page-2 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-2 .slide.bottom-\[32px\], .slide-page-2 .slide .bottom-\[32px\] {
+bottom: 32px !important;
+}
+
+.slide-page-2 .slide.gap-\[8px\], .slide-page-2 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-2 .slide.w-\[8px\], .slide-page-2 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-2 .slide.h-\[8px\], .slide-page-2 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-2 .slide.rounded-\[9999px\], .slide-page-2 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+.slide-page-3 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-3 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-3 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-3 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-3 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-3 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-3 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-3 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-3 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-3 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-3 .slide .ff-sans, .slide-page-3 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-3 .slide .ff-geometric, .slide-page-3 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-3 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-3 .slide .ff-condensed, .slide-page-3 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-3 .slide .ff-serif, .slide-page-3 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-3 .slide .ff-editorial, .slide-page-3 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-3 .slide .ff-mono, .slide-page-3 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-3 .slide .ff-cjk-emphasis, .slide-page-3 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-3 .slide.absolute, .slide-page-3 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-3 .slide.top-\[24px\], .slide-page-3 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-3 .slide.left-\[64px\], .slide-page-3 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-3 .slide.right-\[64px\], .slide-page-3 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-3 .slide.flex, .slide-page-3 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-3 .slide.items-center, .slide-page-3 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-3 .slide.justify-between, .slide-page-3 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-3 .slide.px-\[16px\], .slide-page-3 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-3 .slide.py-\[6px\], .slide-page-3 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-3 .slide.text-\[13px\], .slide-page-3 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-3 .slide.text-\[\#888888\], .slide-page-3 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-3 .slide.tracking-\[0\.08em\], .slide-page-3 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-3 .slide.text-\[12px\], .slide-page-3 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-3 .slide.text-\[\#AAAAAA\], .slide-page-3 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-3 .slide.top-\[80px\], .slide-page-3 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-3 .slide.text-\[42px\], .slide-page-3 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-3 .slide.leading-\[1\.2\], .slide-page-3 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-3 .slide.text-\[\#333333\], .slide-page-3 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-3 .slide.w-\[60px\], .slide-page-3 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-3 .slide.h-\[4px\], .slide-page-3 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-3 .slide.bg-\[\#008B8B\], .slide-page-3 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-3 .slide.mt-\[16px\], .slide-page-3 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-3 .slide.rounded-full, .slide-page-3 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-3 .slide.top-\[180px\], .slide-page-3 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-3 .slide.bottom-\[80px\], .slide-page-3 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-3 .slide.w-\[320px\], .slide-page-3 .slide .w-\[320px\] {
+width: 320px !important;
+}
+
+.slide-page-3 .slide.flex-col, .slide-page-3 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-3 .slide.p-\[24px\], .slide-page-3 .slide .p-\[24px\] {
+padding: 24px !important;
+}
+
+.slide-page-3 .slide.flex-1, .slide-page-3 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-3 .slide.justify-center, .slide-page-3 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-3 .slide.text-\[14px\], .slide-page-3 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-3 .slide.mb-\[12px\], .slide-page-3 .slide .mb-\[12px\] {
+margin-bottom: 12px !important;
+}
+
+.slide-page-3 .slide.tracking-\[0\.05em\], .slide-page-3 .slide .tracking-\[0\.05em\] {
+letter-spacing: 0.05em !important;
+}
+
+.slide-page-3 .slide.uppercase, .slide-page-3 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-3 .slide.text-\[20px\], .slide-page-3 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-3 .slide.leading-\[1\.5\], .slide-page-3 .slide .leading-\[1\.5\] {
+line-height: 1.5 !important;
+}
+
+.slide-page-3 .slide.w-\[10px\], .slide-page-3 .slide .w-\[10px\] {
+width: 10px !important;
+}
+
+.slide-page-3 .slide.h-\[10px\], .slide-page-3 .slide .h-\[10px\] {
+height: 10px !important;
+}
+
+.slide-page-3 .slide.bg-\[\#E0E5EC\], .slide-page-3 .slide .bg-\[\#E0E5EC\] {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-3 .slide.grid, .slide-page-3 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-3 .slide.grid-cols-1, .slide-page-3 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-3 .slide.items-start, .slide-page-3 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-3 .slide.w-\[56px\], .slide-page-3 .slide .w-\[56px\] {
+width: 56px !important;
+}
+
+.slide-page-3 .slide.h-\[56px\], .slide-page-3 .slide .h-\[56px\] {
+height: 56px !important;
+}
+
+.slide-page-3 .slide.text-\[\#008B8B\], .slide-page-3 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-3 .slide.text-\[24px\], .slide-page-3 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-3 .slide.mb-\[8px\], .slide-page-3 .slide .mb-\[8px\] {
+margin-bottom: 8px !important;
+}
+
+.slide-page-3 .slide.text-\[15px\], .slide-page-3 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-3 .slide.text-\[\#555555\], .slide-page-3 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-3 .slide.leading-\[1\.7\], .slide-page-3 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-3 .slide.bottom-\[24px\], .slide-page-3 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-3 .slide.gap-\[8px\], .slide-page-3 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-3 .slide.w-\[8px\], .slide-page-3 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-3 .slide.h-\[8px\], .slide-page-3 .slide .h-\[8px\] {
+height: 8px !important;
+}
+.slide-page-4 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-4 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-4 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-4 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-4 .slide .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-4 .slide .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-4 .slide .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-4 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-4 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-4 .slide .ff-sans, .slide-page-4 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-4 .slide .ff-geometric, .slide-page-4 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-4 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-4 .slide .ff-condensed, .slide-page-4 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-4 .slide .ff-serif, .slide-page-4 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-4 .slide .ff-editorial, .slide-page-4 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-4 .slide .ff-mono, .slide-page-4 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-4 .slide .ff-cjk-emphasis, .slide-page-4 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-4 .slide.absolute, .slide-page-4 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-4 .slide.top-\[24px\], .slide-page-4 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-4 .slide.left-\[64px\], .slide-page-4 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-4 .slide.right-\[64px\], .slide-page-4 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-4 .slide.flex, .slide-page-4 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-4 .slide.items-center, .slide-page-4 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-4 .slide.justify-between, .slide-page-4 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-4 .slide.text-\[13px\], .slide-page-4 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-4 .slide.text-\[\#888888\], .slide-page-4 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-4 .slide.tracking-\[0\.08em\], .slide-page-4 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-4 .slide.text-\[12px\], .slide-page-4 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-4 .slide.text-\[\#AAAAAA\], .slide-page-4 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-4 .slide.top-\[80px\], .slide-page-4 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-4 .slide.text-\[42px\], .slide-page-4 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-4 .slide.leading-\[1\.2\], .slide-page-4 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-4 .slide.text-\[\#333333\], .slide-page-4 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-4 .slide.top-\[160px\], .slide-page-4 .slide .top-\[160px\] {
+top: 160px !important;
+}
+
+.slide-page-4 .slide.flex-1, .slide-page-4 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-4 .slide.p-\[32px\], .slide-page-4 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-4 .slide.flex-col, .slide-page-4 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-4 .slide.justify-center, .slide-page-4 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-4 .slide.text-\[\#008B8B\], .slide-page-4 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-4 .slide.text-\[18px\], .slide-page-4 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-4 .slide.text-\[16px\], .slide-page-4 .slide .text-\[16px\] {
+font-size: 16px !important;
+}
+
+.slide-page-4 .slide.p-\[24px\], .slide-page-4 .slide .p-\[24px\] {
+padding: 24px !important;
+}
+
+.slide-page-4 .slide.w-\[32px\], .slide-page-4 .slide .w-\[32px\] {
+width: 32px !important;
+}
+
+.slide-page-4 .slide.h-\[32px\], .slide-page-4 .slide .h-\[32px\] {
+height: 32px !important;
+}
+
+.slide-page-4 .slide.text-\[15px\], .slide-page-4 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-4 .slide.text-\[\#555555\], .slide-page-4 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-4 .slide.leading-\[1\.7\], .slide-page-4 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-4 .slide.bottom-\[24px\], .slide-page-4 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-4 .slide.gap-\[8px\], .slide-page-4 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-4 .slide.w-\[8px\], .slide-page-4 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-4 .slide.h-\[8px\], .slide-page-4 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-4 .slide.rounded-\[9999px\], .slide-page-4 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+.slide-page-5 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-5 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-5 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-5 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-5 .slide .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-5 .slide .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-5 .slide .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-5 .slide .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-5 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-5 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-5 .slide .ff-sans, .slide-page-5 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-5 .slide .ff-geometric, .slide-page-5 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-5 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-5 .slide .ff-condensed, .slide-page-5 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-5 .slide .ff-serif, .slide-page-5 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-5 .slide .ff-editorial, .slide-page-5 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-5 .slide .ff-mono, .slide-page-5 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-5 .slide .ff-cjk-emphasis, .slide-page-5 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-5 .slide.absolute, .slide-page-5 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-5 .slide.top-\[24px\], .slide-page-5 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-5 .slide.left-\[64px\], .slide-page-5 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-5 .slide.right-\[64px\], .slide-page-5 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-5 .slide.flex, .slide-page-5 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-5 .slide.items-center, .slide-page-5 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-5 .slide.justify-between, .slide-page-5 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-5 .slide.text-\[13px\], .slide-page-5 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-5 .slide.text-\[\#888888\], .slide-page-5 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-5 .slide.tracking-\[0\.08em\], .slide-page-5 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-5 .slide.px-\[16px\], .slide-page-5 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-5 .slide.py-\[6px\], .slide-page-5 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-5 .slide.inline-flex, .slide-page-5 .slide .inline-flex {
+display: inline-flex !important;
+}
+
+.slide-page-5 .slide.text-\[12px\], .slide-page-5 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-5 .slide.top-\[80px\], .slide-page-5 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-5 .slide.text-\[42px\], .slide-page-5 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-5 .slide.leading-\[1\.2\], .slide-page-5 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-5 .slide.text-\[\#333333\], .slide-page-5 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-5 .slide.top-\[160px\], .slide-page-5 .slide .top-\[160px\] {
+top: 160px !important;
+}
+
+.slide-page-5 .slide.flex-1, .slide-page-5 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-5 .slide.p-\[32px\], .slide-page-5 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-5 .slide.flex-col, .slide-page-5 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-5 .slide.justify-center, .slide-page-5 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-5 .slide.text-\[\#008B8B\], .slide-page-5 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-5 .slide.text-\[18px\], .slide-page-5 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-5 .slide.text-\[16px\], .slide-page-5 .slide .text-\[16px\] {
+font-size: 16px !important;
+}
+
+.slide-page-5 .slide.w-\[440px\], .slide-page-5 .slide .w-\[440px\] {
+width: 440px !important;
+}
+
+.slide-page-5 .slide.p-\[24px\], .slide-page-5 .slide .p-\[24px\] {
+padding: 24px !important;
+}
+
+.slide-page-5 .slide.w-\[32px\], .slide-page-5 .slide .w-\[32px\] {
+width: 32px !important;
+}
+
+.slide-page-5 .slide.h-\[32px\], .slide-page-5 .slide .h-\[32px\] {
+height: 32px !important;
+}
+
+.slide-page-5 .slide.text-\[15px\], .slide-page-5 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-5 .slide.text-\[\#555555\], .slide-page-5 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-5 .slide.leading-\[1\.7\], .slide-page-5 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-5 .slide.bottom-\[24px\], .slide-page-5 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-5 .slide.text-\[\#AAAAAA\], .slide-page-5 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-5 .slide.gap-\[8px\], .slide-page-5 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-5 .slide.w-\[8px\], .slide-page-5 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-5 .slide.h-\[8px\], .slide-page-5 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-5 .slide.rounded-\[9999px\], .slide-page-5 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+.slide-page-6 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-6 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-6 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-6 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-6 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-6 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-6 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-6 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-6 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-6 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-6 .slide .ff-sans, .slide-page-6 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-6 .slide .ff-geometric, .slide-page-6 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-6 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-6 .slide .ff-condensed, .slide-page-6 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-6 .slide .ff-serif, .slide-page-6 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-6 .slide .ff-editorial, .slide-page-6 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-6 .slide .ff-mono, .slide-page-6 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-6 .slide .ff-cjk-emphasis, .slide-page-6 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-6 .slide.absolute, .slide-page-6 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-6 .slide.top-\[24px\], .slide-page-6 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-6 .slide.left-\[64px\], .slide-page-6 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-6 .slide.right-\[64px\], .slide-page-6 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-6 .slide.flex, .slide-page-6 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-6 .slide.items-center, .slide-page-6 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-6 .slide.justify-between, .slide-page-6 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-6 .slide.px-\[16px\], .slide-page-6 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-6 .slide.py-\[6px\], .slide-page-6 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-6 .slide.text-\[13px\], .slide-page-6 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-6 .slide.text-\[\#888888\], .slide-page-6 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-6 .slide.tracking-\[0\.08em\], .slide-page-6 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-6 .slide.text-\[12px\], .slide-page-6 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-6 .slide.text-\[\#AAAAAA\], .slide-page-6 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-6 .slide.top-\[80px\], .slide-page-6 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-6 .slide.text-\[42px\], .slide-page-6 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-6 .slide.leading-\[1\.2\], .slide-page-6 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-6 .slide.text-\[\#333333\], .slide-page-6 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-6 .slide.w-\[60px\], .slide-page-6 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-6 .slide.h-\[4px\], .slide-page-6 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-6 .slide.bg-\[\#008B8B\], .slide-page-6 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-6 .slide.mt-\[16px\], .slide-page-6 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-6 .slide.rounded-full, .slide-page-6 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-6 .slide.top-\[180px\], .slide-page-6 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-6 .slide.bottom-\[80px\], .slide-page-6 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-6 .slide.grid, .slide-page-6 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-6 .slide.grid-cols-3, .slide-page-6 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-6 .slide.gap-\[24px\], .slide-page-6 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-6 .slide.w-full, .slide-page-6 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-6 .slide.h-full, .slide-page-6 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-6 .slide.p-\[32px\], .slide-page-6 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-6 .slide.flex-col, .slide-page-6 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-6 .slide.w-\[56px\], .slide-page-6 .slide .w-\[56px\] {
+width: 56px !important;
+}
+
+.slide-page-6 .slide.h-\[56px\], .slide-page-6 .slide .h-\[56px\] {
+height: 56px !important;
+}
+
+.slide-page-6 .slide.justify-center, .slide-page-6 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-6 .slide.mb-\[24px\], .slide-page-6 .slide .mb-\[24px\] {
+margin-bottom: 24px !important;
+}
+
+.slide-page-6 .slide.text-\[\#008B8B\], .slide-page-6 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-6 .slide.text-\[28px\], .slide-page-6 .slide .text-\[28px\] {
+font-size: 28px !important;
+}
+
+.slide-page-6 .slide.text-\[20px\], .slide-page-6 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-6 .slide.mb-\[16px\], .slide-page-6 .slide .mb-\[16px\] {
+margin-bottom: 16px !important;
+}
+
+.slide-page-6 .slide.flex-1, .slide-page-6 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-6 .slide.overflow-hidden, .slide-page-6 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-6 .slide.text-\[15px\], .slide-page-6 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-6 .slide.text-\[\#555555\], .slide-page-6 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-6 .slide.leading-\[1\.7\], .slide-page-6 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-6 .slide.tracking-\[0\.05em\], .slide-page-6 .slide .tracking-\[0\.05em\] {
+letter-spacing: 0.05em !important;
+}
+
+.slide-page-6 .slide.text-\[14px\], .slide-page-6 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-6 .slide.bottom-\[24px\], .slide-page-6 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-6 .slide.gap-\[8px\], .slide-page-6 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-6 .slide.w-\[8px\], .slide-page-6 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-6 .slide.h-\[8px\], .slide-page-6 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-6 .slide.rounded-\[9999px\], .slide-page-6 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+
+.slide-page-6 .slide.w-\[120px\], .slide-page-6 .slide .w-\[120px\] {
+width: 120px !important;
+}
+
+.slide-page-6 .slide.h-\[120px\], .slide-page-6 .slide .h-\[120px\] {
+height: 120px !important;
+}
+
+.slide-page-6 .slide.left-\[10\%\], .slide-page-6 .slide .left-\[10\%\] {
+left: 10% !important;
+}
+
+.slide-page-6 .slide.w-\[80px\], .slide-page-6 .slide .w-\[80px\] {
+width: 80px !important;
+}
+
+.slide-page-6 .slide.h-\[80px\], .slide-page-6 .slide .h-\[80px\] {
+height: 80px !important;
+}
+.slide-page-7 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-7 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-7 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-7 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-7 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-7 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-7 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-7 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-7 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-7 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-7 .slide .ff-sans, .slide-page-7 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-7 .slide .ff-geometric, .slide-page-7 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-7 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-7 .slide .ff-condensed, .slide-page-7 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-7 .slide .ff-serif, .slide-page-7 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-7 .slide .ff-editorial, .slide-page-7 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-7 .slide .ff-mono, .slide-page-7 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-7 .slide .ff-cjk-emphasis, .slide-page-7 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-7 .slide.absolute, .slide-page-7 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-7 .slide.top-\[24px\], .slide-page-7 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-7 .slide.left-\[64px\], .slide-page-7 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-7 .slide.right-\[64px\], .slide-page-7 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-7 .slide.flex, .slide-page-7 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-7 .slide.items-center, .slide-page-7 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-7 .slide.justify-between, .slide-page-7 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-7 .slide.px-\[16px\], .slide-page-7 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-7 .slide.py-\[6px\], .slide-page-7 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-7 .slide.text-\[13px\], .slide-page-7 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-7 .slide.text-\[\#888888\], .slide-page-7 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-7 .slide.tracking-\[0\.08em\], .slide-page-7 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-7 .slide.text-\[12px\], .slide-page-7 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-7 .slide.text-\[\#AAAAAA\], .slide-page-7 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-7 .slide.top-\[80px\], .slide-page-7 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-7 .slide.text-\[42px\], .slide-page-7 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-7 .slide.leading-\[1\.2\], .slide-page-7 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-7 .slide.text-\[\#333333\], .slide-page-7 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-7 .slide.w-\[60px\], .slide-page-7 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-7 .slide.h-\[4px\], .slide-page-7 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-7 .slide.bg-\[\#008B8B\], .slide-page-7 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-7 .slide.mt-\[16px\], .slide-page-7 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-7 .slide.rounded-full, .slide-page-7 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-7 .slide.top-\[200px\], .slide-page-7 .slide .top-\[200px\] {
+top: 200px !important;
+}
+
+.slide-page-7 .slide.bottom-\[80px\], .slide-page-7 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-7 .slide.w-\[320px\], .slide-page-7 .slide .w-\[320px\] {
+width: 320px !important;
+}
+
+.slide-page-7 .slide.flex-col, .slide-page-7 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-7 .slide.p-\[24px\], .slide-page-7 .slide .p-\[24px\] {
+padding: 24px !important;
+}
+
+.slide-page-7 .slide.flex-1, .slide-page-7 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-7 .slide.justify-center, .slide-page-7 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-7 .slide.text-\[\#008B8B\], .slide-page-7 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-7 .slide.text-\[14px\], .slide-page-7 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-7 .slide.tracking-\[0\.1em\], .slide-page-7 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-7 .slide.mb-\[12px\], .slide-page-7 .slide .mb-\[12px\] {
+margin-bottom: 12px !important;
+}
+
+.slide-page-7 .slide.uppercase, .slide-page-7 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-7 .slide.text-\[16px\], .slide-page-7 .slide .text-\[16px\] {
+font-size: 16px !important;
+}
+
+.slide-page-7 .slide.text-\[\#555555\], .slide-page-7 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-7 .slide.leading-\[1\.8\], .slide-page-7 .slide .leading-\[1\.8\] {
+line-height: 1.8 !important;
+}
+
+.slide-page-7 .slide.w-\[10px\], .slide-page-7 .slide .w-\[10px\] {
+width: 10px !important;
+}
+
+.slide-page-7 .slide.h-\[10px\], .slide-page-7 .slide .h-\[10px\] {
+height: 10px !important;
+}
+
+.slide-page-7 .slide.bg-\[\#E0E5EC\], .slide-page-7 .slide .bg-\[\#E0E5EC\] {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-7 .slide.grid, .slide-page-7 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-7 .slide.grid-cols-1, .slide-page-7 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-7 .slide.items-start, .slide-page-7 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-7 .slide.w-\[56px\], .slide-page-7 .slide .w-\[56px\] {
+width: 56px !important;
+}
+
+.slide-page-7 .slide.h-\[56px\], .slide-page-7 .slide .h-\[56px\] {
+height: 56px !important;
+}
+
+.slide-page-7 .slide.text-\[24px\], .slide-page-7 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-7 .slide.text-\[20px\], .slide-page-7 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-7 .slide.mb-\[8px\], .slide-page-7 .slide .mb-\[8px\] {
+margin-bottom: 8px !important;
+}
+
+.slide-page-7 .slide.text-\[15px\], .slide-page-7 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-7 .slide.leading-\[1\.7\], .slide-page-7 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-7 .slide.bottom-\[24px\], .slide-page-7 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-7 .slide.gap-\[8px\], .slide-page-7 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-7 .slide.w-\[8px\], .slide-page-7 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-7 .slide.h-\[8px\], .slide-page-7 .slide .h-\[8px\] {
+height: 8px !important;
+}
+.slide-page-8 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-8 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-8 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-8 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-8 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-8 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-8 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-8 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-8 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-8 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-8 .slide .ff-sans, .slide-page-8 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-8 .slide .ff-geometric, .slide-page-8 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-8 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-8 .slide .ff-condensed, .slide-page-8 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-8 .slide .ff-serif, .slide-page-8 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-8 .slide .ff-editorial, .slide-page-8 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-8 .slide .ff-mono, .slide-page-8 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-8 .slide .ff-cjk-emphasis, .slide-page-8 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-8 .slide.absolute, .slide-page-8 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-8 .slide.top-\[24px\], .slide-page-8 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-8 .slide.left-\[64px\], .slide-page-8 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-8 .slide.right-\[64px\], .slide-page-8 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-8 .slide.flex, .slide-page-8 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-8 .slide.items-center, .slide-page-8 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-8 .slide.justify-between, .slide-page-8 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-8 .slide.px-\[16px\], .slide-page-8 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-8 .slide.py-\[6px\], .slide-page-8 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-8 .slide.text-\[13px\], .slide-page-8 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-8 .slide.text-\[\#888888\], .slide-page-8 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-8 .slide.tracking-\[0\.08em\], .slide-page-8 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-8 .slide.text-\[12px\], .slide-page-8 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-8 .slide.text-\[\#AAAAAA\], .slide-page-8 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-8 .slide.top-\[80px\], .slide-page-8 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-8 .slide.text-\[42px\], .slide-page-8 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-8 .slide.leading-\[1\.2\], .slide-page-8 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-8 .slide.text-\[\#333333\], .slide-page-8 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-8 .slide.w-\[60px\], .slide-page-8 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-8 .slide.h-\[4px\], .slide-page-8 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-8 .slide.bg-\[\#008B8B\], .slide-page-8 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-8 .slide.mt-\[16px\], .slide-page-8 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-8 .slide.rounded-full, .slide-page-8 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-8 .slide.top-\[170px\], .slide-page-8 .slide .top-\[170px\] {
+top: 170px !important;
+}
+
+.slide-page-8 .slide.bottom-\[80px\], .slide-page-8 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-8 .slide.w-\[320px\], .slide-page-8 .slide .w-\[320px\] {
+width: 320px !important;
+}
+
+.slide-page-8 .slide.flex-col, .slide-page-8 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-8 .slide.p-\[32px\], .slide-page-8 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-8 .slide.justify-center, .slide-page-8 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-8 .slide.h-full, .slide-page-8 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-8 .slide.text-\[\#008B8B\], .slide-page-8 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-8 .slide.text-\[14px\], .slide-page-8 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-8 .slide.tracking-\[0\.1em\], .slide-page-8 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-8 .slide.mb-\[12px\], .slide-page-8 .slide .mb-\[12px\] {
+margin-bottom: 12px !important;
+}
+
+.slide-page-8 .slide.uppercase, .slide-page-8 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-8 .slide.text-\[22px\], .slide-page-8 .slide .text-\[22px\] {
+font-size: 22px !important;
+}
+
+.slide-page-8 .slide.leading-\[1\.4\], .slide-page-8 .slide .leading-\[1\.4\] {
+line-height: 1.4 !important;
+}
+
+.slide-page-8 .slide.mb-\[20px\], .slide-page-8 .slide .mb-\[20px\] {
+margin-bottom: 20px !important;
+}
+
+.slide-page-8 .slide.text-\[15px\], .slide-page-8 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-8 .slide.text-\[\#555555\], .slide-page-8 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-8 .slide.leading-\[1\.8\], .slide-page-8 .slide .leading-\[1\.8\] {
+line-height: 1.8 !important;
+}
+
+.slide-page-8 .slide.flex-1, .slide-page-8 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-8 .slide.grid, .slide-page-8 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-8 .slide.grid-cols-1, .slide-page-8 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-8 .slide.p-\[24px\], .slide-page-8 .slide .p-\[24px\] {
+padding: 24px !important;
+}
+
+.slide-page-8 .slide.items-start, .slide-page-8 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-8 .slide.w-\[56px\], .slide-page-8 .slide .w-\[56px\] {
+width: 56px !important;
+}
+
+.slide-page-8 .slide.h-\[56px\], .slide-page-8 .slide .h-\[56px\] {
+height: 56px !important;
+}
+
+.slide-page-8 .slide.text-\[28px\], .slide-page-8 .slide .text-\[28px\] {
+font-size: 28px !important;
+}
+
+.slide-page-8 .slide.mb-\[8px\], .slide-page-8 .slide .mb-\[8px\] {
+margin-bottom: 8px !important;
+}
+
+.slide-page-8 .slide.text-\[20px\], .slide-page-8 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-8 .slide.text-\[24px\], .slide-page-8 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-8 .slide.leading-\[1\.6\], .slide-page-8 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-8 .slide.bottom-\[24px\], .slide-page-8 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-8 .slide.gap-\[8px\], .slide-page-8 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-8 .slide.w-\[8px\], .slide-page-8 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-8 .slide.h-\[8px\], .slide-page-8 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-8 .slide.rounded-\[9999px\], .slide-page-8 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+
+.slide-page-8 .slide.w-\[120px\], .slide-page-8 .slide .w-\[120px\] {
+width: 120px !important;
+}
+
+.slide-page-8 .slide.h-\[120px\], .slide-page-8 .slide .h-\[120px\] {
+height: 120px !important;
+}
+
+.slide-page-8 .slide.bottom-\[100px\], .slide-page-8 .slide .bottom-\[100px\] {
+bottom: 100px !important;
+}
+
+.slide-page-8 .slide.right-\[100px\], .slide-page-8 .slide .right-\[100px\] {
+right: 100px !important;
+}
+
+.slide-page-8 .slide.w-\[12px\], .slide-page-8 .slide .w-\[12px\] {
+width: 12px !important;
+}
+
+.slide-page-8 .slide.h-\[12px\], .slide-page-8 .slide .h-\[12px\] {
+height: 12px !important;
+}
+
+.slide-page-8 .slide.bottom-\[120px\], .slide-page-8 .slide .bottom-\[120px\] {
+bottom: 120px !important;
+}
+
+.slide-page-8 .slide.right-\[120px\], .slide-page-8 .slide .right-\[120px\] {
+right: 120px !important;
+}
+.slide-page-9 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-9 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-9 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-9 .slide {
+width: 1280px; height: 720px;
+      overflow: hidden; position: relative; margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-9 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-9 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-9 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-9 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-9 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-9 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-9 .slide .ff-sans, .slide-page-9 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-9 .slide .ff-geometric, .slide-page-9 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-9 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-9 .slide .ff-condensed, .slide-page-9 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-9 .slide .ff-serif, .slide-page-9 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-9 .slide .ff-editorial, .slide-page-9 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-9 .slide .ff-mono, .slide-page-9 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-9 .slide .ff-cjk-emphasis, .slide-page-9 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-9 .slide.absolute, .slide-page-9 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-9 .slide.top-\[24px\], .slide-page-9 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-9 .slide.left-\[64px\], .slide-page-9 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-9 .slide.right-\[64px\], .slide-page-9 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-9 .slide.flex, .slide-page-9 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-9 .slide.items-center, .slide-page-9 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-9 .slide.justify-between, .slide-page-9 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-9 .slide.px-\[16px\], .slide-page-9 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-9 .slide.py-\[6px\], .slide-page-9 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-9 .slide.text-\[13px\], .slide-page-9 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-9 .slide.text-\[\#888888\], .slide-page-9 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-9 .slide.tracking-\[0\.08em\], .slide-page-9 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-9 .slide.text-\[12px\], .slide-page-9 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-9 .slide.text-\[\#AAAAAA\], .slide-page-9 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-9 .slide.top-\[80px\], .slide-page-9 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-9 .slide.text-\[42px\], .slide-page-9 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-9 .slide.leading-\[1\.2\], .slide-page-9 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-9 .slide.text-\[\#333333\], .slide-page-9 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-9 .slide.w-\[60px\], .slide-page-9 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-9 .slide.h-\[4px\], .slide-page-9 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-9 .slide.bg-\[\#008B8B\], .slide-page-9 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-9 .slide.mt-\[16px\], .slide-page-9 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-9 .slide.rounded-full, .slide-page-9 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-9 .slide.top-\[180px\], .slide-page-9 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-9 .slide.bottom-\[80px\], .slide-page-9 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-9 .slide.flex-1, .slide-page-9 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-9 .slide.flex-col, .slide-page-9 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-9 .slide.p-\[32px\], .slide-page-9 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-9 .slide.items-start, .slide-page-9 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-9 .slide.h-\[130px\], .slide-page-9 .slide .h-\[130px\] {
+height: 130px !important;
+}
+
+.slide-page-9 .slide.w-\[56px\], .slide-page-9 .slide .w-\[56px\] {
+width: 56px !important;
+}
+
+.slide-page-9 .slide.h-\[56px\], .slide-page-9 .slide .h-\[56px\] {
+height: 56px !important;
+}
+
+.slide-page-9 .slide.justify-center, .slide-page-9 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-9 .slide.text-\[\#008B8B\], .slide-page-9 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-9 .slide.text-\[28px\], .slide-page-9 .slide .text-\[28px\] {
+font-size: 28px !important;
+}
+
+.slide-page-9 .slide.text-\[20px\], .slide-page-9 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-9 .slide.mb-\[8px\], .slide-page-9 .slide .mb-\[8px\] {
+margin-bottom: 8px !important;
+}
+
+.slide-page-9 .slide.text-\[15px\], .slide-page-9 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-9 .slide.text-\[\#555555\], .slide-page-9 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-9 .slide.leading-\[1\.7\], .slide-page-9 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-9 .slide.w-\[320px\], .slide-page-9 .slide .w-\[320px\] {
+width: 320px !important;
+}
+
+.slide-page-9 .slide.text-center, .slide-page-9 .slide .text-center {
+text-align: center !important;
+}
+
+.slide-page-9 .slide.text-\[14px\], .slide-page-9 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-9 .slide.tracking-\[0\.1em\], .slide-page-9 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-9 .slide.uppercase, .slide-page-9 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-9 .slide.text-\[24px\], .slide-page-9 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-9 .slide.w-full, .slide-page-9 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-9 .slide.bottom-\[24px\], .slide-page-9 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-9 .slide.gap-\[8px\], .slide-page-9 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-9 .slide.w-\[8px\], .slide-page-9 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-9 .slide.h-\[8px\], .slide-page-9 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-9 .slide.rounded-\[9999px\], .slide-page-9 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+
+.slide-page-9 .slide.w-\[120px\], .slide-page-9 .slide .w-\[120px\] {
+width: 120px !important;
+}
+
+.slide-page-9 .slide.h-\[120px\], .slide-page-9 .slide .h-\[120px\] {
+height: 120px !important;
+}
+
+.slide-page-9 .slide.left-\[10\%\], .slide-page-9 .slide .left-\[10\%\] {
+left: 10% !important;
+}
+
+.slide-page-9 .slide.w-\[80px\], .slide-page-9 .slide .w-\[80px\] {
+width: 80px !important;
+}
+
+.slide-page-9 .slide.h-\[80px\], .slide-page-9 .slide .h-\[80px\] {
+height: 80px !important;
+}
+.slide-page-10 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-10 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-10 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-10 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-10 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-10 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-10 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-10 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-10 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-10 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-10 .slide .ff-sans, .slide-page-10 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-10 .slide .ff-geometric, .slide-page-10 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-10 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-10 .slide .ff-condensed, .slide-page-10 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-10 .slide .ff-serif, .slide-page-10 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-10 .slide .ff-editorial, .slide-page-10 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-10 .slide .ff-mono, .slide-page-10 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-10 .slide .ff-cjk-emphasis, .slide-page-10 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-10 .slide.absolute, .slide-page-10 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-10 .slide.top-\[24px\], .slide-page-10 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-10 .slide.left-\[64px\], .slide-page-10 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-10 .slide.right-\[64px\], .slide-page-10 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-10 .slide.flex, .slide-page-10 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-10 .slide.items-center, .slide-page-10 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-10 .slide.justify-between, .slide-page-10 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-10 .slide.px-\[16px\], .slide-page-10 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-10 .slide.py-\[6px\], .slide-page-10 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-10 .slide.text-\[13px\], .slide-page-10 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-10 .slide.text-\[\#888888\], .slide-page-10 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-10 .slide.tracking-\[0\.08em\], .slide-page-10 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-10 .slide.text-\[12px\], .slide-page-10 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-10 .slide.text-\[\#AAAAAA\], .slide-page-10 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-10 .slide.top-\[80px\], .slide-page-10 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-10 .slide.text-\[42px\], .slide-page-10 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-10 .slide.leading-\[1\.2\], .slide-page-10 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-10 .slide.text-\[\#333333\], .slide-page-10 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-10 .slide.w-\[60px\], .slide-page-10 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-10 .slide.h-\[4px\], .slide-page-10 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-10 .slide.bg-\[\#008B8B\], .slide-page-10 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-10 .slide.mt-\[16px\], .slide-page-10 .slide .mt-\[16px\] {
+margin-top: 16px !important;
+}
+
+.slide-page-10 .slide.rounded-full, .slide-page-10 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-10 .slide.top-\[200px\], .slide-page-10 .slide .top-\[200px\] {
+top: 200px !important;
+}
+
+.slide-page-10 .slide.bottom-\[80px\], .slide-page-10 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-10 .slide.w-\[320px\], .slide-page-10 .slide .w-\[320px\] {
+width: 320px !important;
+}
+
+.slide-page-10 .slide.flex-col, .slide-page-10 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-10 .slide.p-\[32px\], .slide-page-10 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-10 .slide.flex-1, .slide-page-10 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-10 .slide.justify-center, .slide-page-10 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-10 .slide.text-\[\#008B8B\], .slide-page-10 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-10 .slide.text-\[14px\], .slide-page-10 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-10 .slide.tracking-\[0\.1em\], .slide-page-10 .slide .tracking-\[0\.1em\] {
+letter-spacing: 0.1em !important;
+}
+
+.slide-page-10 .slide.mb-\[12px\], .slide-page-10 .slide .mb-\[12px\] {
+margin-bottom: 12px !important;
+}
+
+.slide-page-10 .slide.uppercase, .slide-page-10 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-10 .slide.text-\[22px\], .slide-page-10 .slide .text-\[22px\] {
+font-size: 22px !important;
+}
+
+.slide-page-10 .slide.leading-\[1\.4\], .slide-page-10 .slide .leading-\[1\.4\] {
+line-height: 1.4 !important;
+}
+
+.slide-page-10 .slide.bg-\[\#E0E5EC\], .slide-page-10 .slide .bg-\[\#E0E5EC\] {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-10 .slide.grid, .slide-page-10 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-10 .slide.grid-cols-1, .slide-page-10 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-10 .slide.p-\[24px\], .slide-page-10 .slide .p-\[24px\] {
+padding: 24px !important;
+}
+
+.slide-page-10 .slide.w-\[64px\], .slide-page-10 .slide .w-\[64px\] {
+width: 64px !important;
+}
+
+.slide-page-10 .slide.h-\[64px\], .slide-page-10 .slide .h-\[64px\] {
+height: 64px !important;
+}
+
+.slide-page-10 .slide.text-\[28px\], .slide-page-10 .slide .text-\[28px\] {
+font-size: 28px !important;
+}
+
+.slide-page-10 .slide.text-\[20px\], .slide-page-10 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-10 .slide.text-\[24px\], .slide-page-10 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-10 .slide.text-\[15px\], .slide-page-10 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-10 .slide.text-\[\#555555\], .slide-page-10 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-10 .slide.leading-\[1\.6\], .slide-page-10 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-10 .slide.bottom-\[24px\], .slide-page-10 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-10 .slide.gap-\[8px\], .slide-page-10 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-10 .slide.w-\[8px\], .slide-page-10 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-10 .slide.h-\[8px\], .slide-page-10 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-10 .slide.rounded-\[9999px\], .slide-page-10 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+.slide-page-11 .slide {
+background-color: #E0E5EC !important;
+}
+
+.slide-page-11 .slide {
+font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+}
+
+.slide-page-11 .slide {
+margin: 0; padding: 0;
+}
+
+.slide-page-11 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      margin: 0;
+      background-color: #E0E5EC;
+      font-family: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+      color: #333333;
+}
+
+.slide-page-11 .slide /* 新拟态 - 凸起效果 */ .neu-convex {
+background: #E0E5EC;
+      box-shadow: -9px -9px 16px rgba(255,255,255,0.8),
+                  9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-11 .slide /* 新拟态 - 凹陷效果 */ .neu-concave {
+background: #E0E5EC;
+      box-shadow: inset -9px -9px 16px rgba(255,255,255,0.8),
+                  inset 9px 9px 16px rgba(0,0,0,0.2);
+      border-radius: 16px;
+}
+
+.slide-page-11 .slide /* 新拟态 - 图标环 */ .neu-icon-ring {
+background: linear-gradient(145deg, #E0E5EC, #D1D9E6);
+      box-shadow: -6px -6px 12px rgba(255,255,255,0.8),
+                  6px 6px 12px rgba(0,0,0,0.15);
+      border-radius: 50%;
+}
+
+.slide-page-11 .slide /* 新拟态 - 凹陷胶囊 */ .neu-capsule {
+background: #E0E5EC;
+      box-shadow: inset -4px -4px 8px rgba(255,255,255,0.6),
+                  inset 4px 4px 8px rgba(0,0,0,0.12);
+      border-radius: 9999px;
+}
+
+.slide-page-11 .slide {
+--font-neutral-sans: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-geometric-sans: Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-condensed-display: Arial Narrow, Arial Black, Arial, Microsoft YaHei, sans-serif;
+    --font-tech-display: Trebuchet MS, Arial, Microsoft YaHei, PingFang SC, sans-serif;
+    --font-editorial-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-serif: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-cjk-emphasis: Arial, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Heiti SC, sans-serif;
+    --font-mono: Courier New, Consolas, Menlo, monospace;
+}
+
+.slide-page-11 .slide {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-11 .slide .ff-sans, .slide-page-11 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-11 .slide .ff-geometric, .slide-page-11 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-11 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-11 .slide .ff-condensed, .slide-page-11 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-11 .slide .ff-serif, .slide-page-11 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-11 .slide .ff-editorial, .slide-page-11 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-11 .slide .ff-mono, .slide-page-11 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-11 .slide .ff-cjk-emphasis, .slide-page-11 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-11 .slide.absolute, .slide-page-11 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-11 .slide.top-\[24px\], .slide-page-11 .slide .top-\[24px\] {
+top: 24px !important;
+}
+
+.slide-page-11 .slide.left-\[64px\], .slide-page-11 .slide .left-\[64px\] {
+left: 64px !important;
+}
+
+.slide-page-11 .slide.right-\[64px\], .slide-page-11 .slide .right-\[64px\] {
+right: 64px !important;
+}
+
+.slide-page-11 .slide.flex, .slide-page-11 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-11 .slide.items-center, .slide-page-11 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-11 .slide.justify-between, .slide-page-11 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-11 .slide.text-\[13px\], .slide-page-11 .slide .text-\[13px\] {
+font-size: 13px !important;
+}
+
+.slide-page-11 .slide.text-\[\#888888\], .slide-page-11 .slide .text-\[\#888888\] {
+color: #888888 !important;
+}
+
+.slide-page-11 .slide.tracking-\[0\.08em\], .slide-page-11 .slide .tracking-\[0\.08em\] {
+letter-spacing: 0.08em !important;
+}
+
+.slide-page-11 .slide.px-\[16px\], .slide-page-11 .slide .px-\[16px\] {
+padding-left: 16px !important;
+padding-right: 16px !important;
+}
+
+.slide-page-11 .slide.py-\[6px\], .slide-page-11 .slide .py-\[6px\] {
+padding-top: 6px !important;
+padding-bottom: 6px !important;
+}
+
+.slide-page-11 .slide.inline-flex, .slide-page-11 .slide .inline-flex {
+display: inline-flex !important;
+}
+
+.slide-page-11 .slide.text-\[12px\], .slide-page-11 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-11 .slide.top-\[80px\], .slide-page-11 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-11 .slide.flex-col, .slide-page-11 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-11 .slide.text-center, .slide-page-11 .slide .text-center {
+text-align: center !important;
+}
+
+.slide-page-11 .slide.text-\[42px\], .slide-page-11 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-11 .slide.leading-\[1\.2\], .slide-page-11 .slide .leading-\[1\.2\] {
+line-height: 1.2 !important;
+}
+
+.slide-page-11 .slide.text-\[\#333333\], .slide-page-11 .slide .text-\[\#333333\] {
+color: #333333 !important;
+}
+
+.slide-page-11 .slide.w-\[60px\], .slide-page-11 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-11 .slide.h-\[4px\], .slide-page-11 .slide .h-\[4px\] {
+height: 4px !important;
+}
+
+.slide-page-11 .slide.bg-\[\#008B8B\], .slide-page-11 .slide .bg-\[\#008B8B\] {
+background-color: #008B8B !important;
+}
+
+.slide-page-11 .slide.rounded-full, .slide-page-11 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-11 .slide.mt-\[24px\], .slide-page-11 .slide .mt-\[24px\] {
+margin-top: 24px !important;
+}
+
+.slide-page-11 .slide.top-\[200px\], .slide-page-11 .slide .top-\[200px\] {
+top: 200px !important;
+}
+
+.slide-page-11 .slide.bottom-\[80px\], .slide-page-11 .slide .bottom-\[80px\] {
+bottom: 80px !important;
+}
+
+.slide-page-11 .slide.flex-1, .slide-page-11 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-11 .slide.p-\[32px\], .slide-page-11 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-11 .slide.w-\[56px\], .slide-page-11 .slide .w-\[56px\] {
+width: 56px !important;
+}
+
+.slide-page-11 .slide.h-\[56px\], .slide-page-11 .slide .h-\[56px\] {
+height: 56px !important;
+}
+
+.slide-page-11 .slide.justify-center, .slide-page-11 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-11 .slide.mb-\[24px\], .slide-page-11 .slide .mb-\[24px\] {
+margin-bottom: 24px !important;
+}
+
+.slide-page-11 .slide.text-\[\#008B8B\], .slide-page-11 .slide .text-\[\#008B8B\] {
+color: #008B8B !important;
+}
+
+.slide-page-11 .slide.text-\[28px\], .slide-page-11 .slide .text-\[28px\] {
+font-size: 28px !important;
+}
+
+.slide-page-11 .slide.text-\[20px\], .slide-page-11 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-11 .slide.mb-\[16px\], .slide-page-11 .slide .mb-\[16px\] {
+margin-bottom: 16px !important;
+}
+
+.slide-page-11 .slide.text-\[15px\], .slide-page-11 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-11 .slide.text-\[\#555555\], .slide-page-11 .slide .text-\[\#555555\] {
+color: #555555 !important;
+}
+
+.slide-page-11 .slide.leading-\[1\.7\], .slide-page-11 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-11 .slide.overflow-hidden, .slide-page-11 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-11 .slide.bottom-\[24px\], .slide-page-11 .slide .bottom-\[24px\] {
+bottom: 24px !important;
+}
+
+.slide-page-11 .slide.text-\[\#AAAAAA\], .slide-page-11 .slide .text-\[\#AAAAAA\] {
+color: #AAAAAA !important;
+}
+
+.slide-page-11 .slide.gap-\[8px\], .slide-page-11 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-11 .slide.w-\[8px\], .slide-page-11 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-11 .slide.h-\[8px\], .slide-page-11 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-11 .slide.rounded-\[9999px\], .slide-page-11 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+
+.slide-page-11 .slide.w-\[120px\], .slide-page-11 .slide .w-\[120px\] {
+width: 120px !important;
+}
+
+.slide-page-11 .slide.h-\[120px\], .slide-page-11 .slide .h-\[120px\] {
+height: 120px !important;
+}
+
+.slide-page-11 .slide.w-\[200px\], .slide-page-11 .slide .w-\[200px\] {
+width: 200px !important;
+}
+
+.slide-page-11 .slide.h-\[200px\], .slide-page-11 .slide .h-\[200px\] {
+height: 200px !important;
+}
+  </style>
+</head>
+<body>
+
+    <div class="slide-wrapper slide-page-1">
+      <div class="slide-number">1</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[48px] left-[64px] right-[64px] flex items-center justify-between">
+      <div class="neu-capsule px-[20px] py-[8px]">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">市场研究报告</span>
+      </div>
+      <div class="text-[14px] font-[400] text-[#AAAAAA]">2025年度展望</div>
+    </div>
+
+    <!-- Main Hero Area -->
+    <div class="absolute inset-0 flex flex-col items-center justify-center px-[64px]">
+      <!-- Decorative Icon Ring -->
+      <div class="neu-icon-ring w-[100px] h-[100px] flex items-center justify-center mb-[48px]">
+        <i class="ph ph-trend-up text-[#008B8B] text-[42px]"></i>
+      </div>
+
+      <!-- Title Container -->
+      <div class="max-w-[960px] text-center">
+        <h1 class="text-[64px] font-[900] leading-[1.12] text-[#333333] tracking-tight" style="text-wrap: balance; word-break: keep-all;">
+          2025期货市场<br>趋势展望
+        </h1>
+        
+        <!-- Subtitle/Support Strip -->
+        <div class="mt-[32px] flex items-center justify-center gap-[16px]">
+          <div class="h-[1px] w-[60px] bg-[#008B8B] opacity-30"></div>
+          <p class="text-[24px] font-[400] text-[#555555] tracking-[0.1em]">
+            Strategic Market Analysis & Forecast
+          </p>
+          <div class="h-[1px] w-[60px] bg-[#008B8B] opacity-30"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[48px] left-[64px] right-[64px] flex items-center justify-between">
+      <div class="flex items-center gap-[12px]">
+        <div class="w-[8px] h-[8px] rounded-full bg-[#008B8B]"></div>
+        <div class="text-[12px] font-[500] text-[#888888] tracking-[0.05em]">CONFIDENTIAL / 内部资料</div>
+      </div>
+      
+      <!-- Decorative Dots -->
+      <div class="flex gap-[12px]">
+        <div class="w-[10px] h-[10px] rounded-full neu-convex"></div>
+        <div class="w-[10px] h-[10px] rounded-full neu-convex"></div>
+        <div class="w-[10px] h-[10px] rounded-full bg-[#008B8B]"></div>
+      </div>
+    </div>
+
+    <!-- Background Decorative Elements (Low Opacity) -->
+    <div class="absolute top-0 right-0 w-[300px] h-[300px] rounded-full neu-convex opacity-40"></div>
+    <div class="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full neu-concave opacity-30"></div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-2">
+      <div class="slide-number">2</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[32px] left-[64px] right-[64px] flex items-center justify-between">
+      <div class="neu-capsule px-[16px] py-[6px] flex items-center">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">大宗商品研究报告</span>
+      </div>
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">2025年度战略分析</div>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[96px] left-[64px]">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight">
+        目录
+      </h1>
+      <div class="w-[48px] h-[4px] bg-[#008B8B] mt-[16px] rounded-full"></div>
+    </div>
+
+    <!-- Main Content Area: 2x2 Grid -->
+    <div class="absolute top-[180px] left-[64px] right-[64px] h-[440px]">
+      <div 
+        data-pptai-catalog-list 
+        data-pptai-catalog-mode="compact" 
+        class="grid grid-cols-2 gap-[32px] h-full"
+      >
+        <!-- Item 1 -->
+        <div data-pptai-catalog-item class="neu-convex p-[32px] flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center">
+              <i class="ph ph-globe text-[#008B8B] text-[24px]"></i>
+            </div>
+            <div data-pptai-catalog-badge class="text-[32px] font-[700] text-[#008B8B] opacity-40">01</div>
+          </div>
+          <div class="mt-[24px]">
+            <div data-pptai-catalog-title class="text-[20px] font-[600] text-[#333333] mb-[12px] leading-tight">
+              宏观环境：流动性重构与定价权博弈
+            </div>
+            <div data-pptai-catalog-detail class="text-[15px] text-[#555555] leading-[1.6] ">
+              分析2025年美联储货币政策转向、全球流动性宽松周期及美元指数波动对大宗商品金融属性的系统性影响。
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 2 -->
+        <div data-pptai-catalog-item class="neu-convex p-[32px] flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center">
+              <i class="ph ph-chart-bar text-[#008B8B] text-[24px]"></i>
+            </div>
+            <div data-pptai-catalog-badge class="text-[32px] font-[700] text-[#008B8B] opacity-40">02</div>
+          </div>
+          <div class="mt-[24px]">
+            <div data-pptai-catalog-title class="text-[20px] font-[600] text-[#333333] mb-[12px] leading-tight">
+              市场格局：规模扩张与品种创新
+            </div>
+            <div data-pptai-catalog-detail class="text-[15px] text-[#555555] leading-[1.6] ">
+              梳理中国期货市场成交量稳居全球前列的发展态势，解析2025年预计突破95亿手的交易规模及结构变化。
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 3 -->
+        <div data-pptai-catalog-item class="neu-convex p-[32px] flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center">
+              <i class="ph ph-cpu text-[#008B8B] text-[24px]"></i>
+            </div>
+            <div data-pptai-catalog-badge class="text-[32px] font-[700] text-[#008B8B] opacity-40">03</div>
+          </div>
+          <div class="mt-[24px]">
+            <div data-pptai-catalog-title class="text-[20px] font-[600] text-[#333333] mb-[12px] leading-tight">
+              品种分化：能源金属与产业链重构
+            </div>
+            <div data-pptai-catalog-detail class="text-[15px] text-[#555555] leading-[1.6] ">
+              研判全球经济增长分化背景下工业金属需求的结构性变化，聚焦新能源产业链上游供需格局重构。
+            </div>
+          </div>
+        </div>
+
+        <!-- Item 4 -->
+        <div data-pptai-catalog-item class="neu-convex p-[32px] flex flex-col justify-between">
+          <div class="flex items-start justify-between">
+            <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center">
+              <i class="ph ph-leaf text-[#008B8B] text-[24px]"></i>
+            </div>
+            <div data-pptai-catalog-badge class="text-[32px] font-[700] text-[#008B8B] opacity-40">04</div>
+          </div>
+          <div class="mt-[24px]">
+            <div data-pptai-catalog-title class="text-[20px] font-[600] text-[#333333] mb-[12px] leading-tight">
+              绿色金融：新能源金属与碳市场体系
+            </div>
+            <div data-pptai-catalog-detail class="text-[15px] text-[#555555] leading-[1.6] ">
+              探讨双碳目标下碳期货、绿电期货等绿色金融工具的创新进展，解析ESG因素如何深度融入定价逻辑。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[32px] left-[64px] right-[64px] flex items-center justify-between">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">02 / 30</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px] bg-[#008B8B]"></div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-3">
+      <div class="slide-number">3</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="neu-capsule px-[16px] py-[6px] flex items-center">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">宏观环境分析</span>
+      </div>
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">第 1 章</div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[80px] left-[64px] right-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 宏观环境：全球流动性重构与定价权博弈 </h1>
+      <div class="w-[60px] h-[4px] bg-[#008B8B] mt-[16px] rounded-full"></div>
+    </div>
+
+    <!-- Main Fixed Area -->
+    <div class="absolute top-[180px] left-[64px] right-[64px] bottom-[80px] z-10" 
+         style="height: 440px; display: flex; gap: 24px; box-sizing: border-box;">
+      
+      <!-- Left Narrative Column (Editorial Sidebar Style) -->
+      <div class="w-[320px] flex flex-col gap-6">
+        <div class="neu-concave p-[24px] flex-1 flex flex-col justify-center">
+          <div class="text-[14px] text-[#888888] font-[500] mb-[12px] tracking-[0.05em] uppercase">Analysis Focus</div>
+          <div class="text-[20px] font-[600] text-[#333333] leading-[1.5]">
+            聚焦2025年全球货币政策转向，探讨流动性重构对资产定价权的影响。
+          </div>
+        </div>
+        
+        <!-- Decorative Dots -->
+        <div class="flex gap-2 px-2">
+          <div class="w-[10px] h-[10px] rounded-full bg-[#008B8B] shadow-sm"></div>
+          <div class="w-[10px] h-[10px] rounded-full bg-[#E0E5EC] neu-convex"></div>
+          <div class="w-[10px] h-[10px] rounded-full bg-[#E0E5EC] neu-convex"></div>
+        </div>
+      </div>
+
+      <!-- Right Content Grid (3-Card Layout) -->
+      <div class="flex-1 grid grid-cols-1 gap-6" style="grid-template-rows: repeat(3, 1fr);">
+        
+        <!-- Card 1 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-arrows-clockwise text-[#008B8B] text-[24px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">货币政策转向与流动性重构</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              2025年美联储预计进入降息周期，全年降息75-100BP，年末联邦基金利率目标区间预计降至3.75%-4.00%。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-globe text-[#008B8B] text-[24px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">美元周期与定价权博弈</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              美元指数预计在98-105区间震荡。人民币国际化加速，INE境外参与度有望突破25%，挑战传统美元定价体系。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-chart-line-up text-[#008B8B] text-[24px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">通胀水平与利率预期</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              美国核心PCE预计从2.8%回落至2.3%，但仍高于2%目标；中国CPI预计温和回升至1.5%-2.0%。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 03 / 30</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-full" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-full" style="background: #008B8B;"></div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-4">
+      <div class="slide-number">4</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">中国期货市场分析报告</div>
+      <div class="text-[12px] text-[#AAAAAA]">第 2 章</div>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[80px] left-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] whitespace-nowrap" style="white-space:nowrap;"> 市场格局：中国期货市场规模扩张与结构优化 </h1>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[160px] left-[64px] right-[64px] z-10" style="height: 460px; display: flex; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Chart Section -->
+      <div class="flex-1 neu-concave p-[32px] flex flex-col" style="width: 620px; height: 100%;">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="neu-icon-ring w-8 h-8 flex items-center justify-center">
+            <i class="ph ph-chart-line-up text-[#008B8B] text-[18px]"></i>
+          </div>
+          <span class="text-[16px] font-[600] text-[#333333]">规模增长趋势可视化</span>
+        </div>
+        <div id="chart_p4_1" style="width:100%; height: 340px; min-height: 260px; max-height: 360px;"></div>
+      </div>
+
+      <!-- Right: Insights Section -->
+      <div class="flex-1 flex flex-col gap-6" style="width: 520px; height: 100%;">
+        <!-- Insight Card 1 -->
+        <div class="neu-convex p-[24px] flex-1 flex flex-col justify-center">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="neu-icon-ring w-[32px] h-[32px] flex items-center justify-center">
+              <i class="ph ph-trend-up text-[#008B8B] text-[16px]"></i>
+            </div>
+            <h3 class="text-[18px] font-[600] text-[#333333]">成交量稳居全球前列</h3>
+          </div>
+          <p class="text-[15px] text-[#555555] leading-[1.7]">
+            2024年中国期货市场累计成交量约85亿手、成交额约580万亿元，预计2025年突破95亿手。
+          </p>
+        </div>
+
+        <!-- Insight Card 2 -->
+        <div class="neu-convex p-[24px] flex-1 flex flex-col justify-center">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="neu-icon-ring w-[32px] h-[32px] flex items-center justify-center">
+              <i class="ph ph-cube text-[#008B8B] text-[16px]"></i>
+            </div>
+            <h3 class="text-[18px] font-[600] text-[#333333]">品种创新加速扩容</h3>
+          </div>
+          <p class="text-[15px] text-[#555555] leading-[1.7]">
+            2025年预计推出多晶硅、稀土等品种，总数有望突破140个，覆盖新能源与高端制造产业。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA]">PAGE 04</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #008B8B;"></div>
+      </div>
+    </div>
+
+    <!-- ECharts Script -->
+    
+    
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-5">
+      <div class="slide-number">5</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">能源金属地缘溢价与产业链重构</div>
+      <div class="neu-capsule px-[16px] py-[6px] inline-flex">
+        <span class="text-[12px] text-[#888888] font-[500] tracking-[0.08em]">第 3 章</span>
+      </div>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[80px] left-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 品种分化：能源金属地缘溢价与产业链重构 </h1>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="absolute top-[160px] left-[64px] right-[64px] z-10" style="height: 460px; display: flex; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Chart Section -->
+      <div class="flex-1 neu-concave p-[32px] flex flex-col" style="min-width: 0;">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="neu-icon-ring w-8 h-8 flex items-center justify-center">
+            <i class="ph ph-chart-line-up text-[#008B8B] text-[18px]"></i>
+          </div>
+          <span class="text-[16px] font-[600] text-[#333333]">核心数据可视化</span>
+        </div>
+        <div id="chart_p5_1" style="width:100%; height: 340px; min-height: 260px; max-height: 360px;"></div>
+      </div>
+
+      <!-- Right: Insights Section -->
+      <div class="w-[440px] flex flex-col gap-6">
+        <!-- Insight Card 1 -->
+        <div class="neu-convex p-[24px] flex flex-col h-0 flex-1">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="neu-icon-ring w-[32px] h-[32px] flex items-center justify-center">
+              <i class="ph ph-globe text-[#008B8B] text-[16px]"></i>
+            </div>
+            <h3 class="text-[18px] font-[600] text-[#333333]">原油：地缘冲突支撑风险溢价</h3>
+          </div>
+          <p class="text-[15px] text-[#555555] leading-[1.7]">
+            布伦特原油预计维持75-90美元/桶区间震荡，中东地缘冲突持续叠加OPEC+减产协议支撑风险溢价，金融属性增强背景下投机持仓占比或提升至35%以上。
+          </p>
+        </div>
+
+        <!-- Insight Card 2 -->
+        <div class="neu-convex p-[24px] flex flex-col h-0 flex-1">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="neu-icon-ring w-[32px] h-[32px] flex items-center justify-center">
+              <i class="ph ph-cpu text-[#008B8B] text-[16px]"></i>
+            </div>
+            <h3 class="text-[18px] font-[600] text-[#333333]">铜：AI与电网投资驱动缺口</h3>
+          </div>
+          <p class="text-[15px] text-[#555555] leading-[1.7]">
+            AI数据中心建设与全球电网投资扩张驱动精铜需求结构性增长，预计2025年出现15-20万吨级供需缺口，新能源产业链用铜强度提升叠加库存周期见底。
+          </p>
+        </div>
+
+        <!-- Insight Card 3 (Compressed to fit) -->
+        <div class="neu-convex p-[24px] flex flex-col h-0 flex-1">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="neu-icon-ring w-[32px] h-[32px] flex items-center justify-center">
+              <i class="ph ph-arrows-clockwise text-[#008B8B] text-[16px]"></i>
+            </div>
+            <h3 class="text-[18px] font-[600] text-[#333333]">电池金属：供应链重构波动</h3>
+          </div>
+          <p class="text-[15px] text-[#555555] leading-[1.7]">
+            锂、镍、钴波动率维持35%以上高位，印尼镍矿政策收紧与南美锂盐湖产能错配，地理重构加剧价格不确定性，库存去化周期延长压制价格弹性。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 05 / 30</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #008B8B;"></div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-6">
+      <div class="slide-number">6</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="neu-capsule px-[16px] py-[6px] flex items-center">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">绿色金融与碳市场</span>
+      </div>
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">第 4 章</div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[80px] left-[64px] right-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 绿色金融：新能源金属品种体系与碳市场完善 </h1>
+      <div class="w-[60px] h-[4px] bg-[#008B8B] mt-[16px] rounded-full"></div>
+    </div>
+
+    <!-- Main Fixed Area -->
+    <div class="absolute top-[180px] left-[64px] right-[64px] bottom-[80px] z-10" 
+         style="height: 440px; display: flex; gap: 24px; box-sizing: border-box;">
+      
+      <!-- Content Grid: 3-Column Layout for the 3 body items -->
+      <div class="grid grid-cols-3 gap-[24px] w-full h-full">
+        
+        <!-- Card 1: 多晶硅 -->
+        <div class="neu-convex p-[32px] flex flex-col h-full" style="box-sizing: border-box;">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center mb-[24px]">
+            <i class="ph ph-cpu text-[#008B8B] text-[28px]"></i>
+          </div>
+          <h3 class="text-[20px] font-[600] text-[#333333] mb-[16px] leading-tight">
+            多晶硅期货补齐光伏全产业链
+          </h3>
+          <div class="flex-1 overflow-hidden">
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              预计2025年推出多晶硅期货，与已上市的工业硅期货形成协同，构建覆盖“硅料→硅片→电池→组件”的完整光伏期货品种体系，为新能源产业提供全周期风险管理工具。
+            </p>
+          </div>
+          <div class="mt-8 pt-4">
+            <div class="text-[12px] font-[500] text-[#008B8B] tracking-[0.05em] flex items-center gap-2">
+              <i class="ph ph-target text-[14px]"></i> 产业链闭环
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: 碳市场 -->
+        <div class="neu-convex p-[32px] flex flex-col h-full" style="box-sizing: border-box;">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center mb-[24px]">
+            <i class="ph ph-globe text-[#008B8B] text-[28px]"></i>
+          </div>
+          <h3 class="text-[20px] font-[600] text-[#333333] mb-[16px] leading-tight">
+            全国碳市场扩容至重工业领域
+          </h3>
+          <div class="flex-1 overflow-hidden">
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              预计从电力行业扩容至水泥、钢铁、电解铝等高耗能行业，覆盖排放量占比将从目前的40%提升至60%以上，通过碳配额远期、碳期货等工具完善碳定价机制。
+            </p>
+          </div>
+          <div class="mt-8 pt-4">
+            <div class="text-[12px] font-[500] text-[#008B8B] tracking-[0.05em] flex items-center gap-2">
+              <i class="ph ph-shield-check text-[14px]"></i> 覆盖率提升
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: 碳酸锂 -->
+        <div class="neu-convex p-[32px] flex flex-col h-full" style="box-sizing: border-box;">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center mb-[24px]">
+            <i class="ph ph-chart-line-up text-[#008B8B] text-[28px]"></i>
+          </div>
+          <h3 class="text-[20px] font-[600] text-[#333333] mb-[16px] leading-tight">
+            碳酸锂期货产业客户占比提升
+          </h3>
+          <div class="flex-1 overflow-hidden">
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              随着新能源产业链企业套保意识增强，产业客户持仓占比预计从28%提升至40%，现货企业参与深度显著改善，期货价格发现功能进一步凸显。
+            </p>
+          </div>
+          <div class="mt-8 pt-4">
+            <div class="text-[12px] font-[500] text-[#008B8B] tracking-[0.05em] flex items-center gap-2">
+              <i class="ph ph-users text-[14px]"></i> 参与度深化
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 06</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #008B8B;"></div>
+      </div>
+    </div>
+
+    <!-- Decorative Elements -->
+    <div class="absolute top-0 right-0 w-[120px] h-[120px] neu-convex opacity-40 rounded-full" style="box-shadow: -15px -15px 30px rgba(255,255,255,0.8), 15px 15px 30px rgba(0,0,0,0.1);"></div>
+    <div class="absolute bottom-0 left-[10%] w-[80px] h-[80px] neu-convex opacity-30 rounded-full" style="box-shadow: -10px -10px 20px rgba(255,255,255,0.8), 10px 10px 20px rgba(0,0,0,0.1);"></div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-7">
+      <div class="slide-number">7</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="neu-capsule px-[16px] py-[6px] flex items-center">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">金融期货深化方向</span>
+      </div>
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">第 5 章</div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[80px] left-[64px] right-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 金融期货：利率风险管理与权益对冲工具深化 </h1>
+      <div class="w-[60px] h-[4px] bg-[#008B8B] mt-[16px] rounded-full"></div>
+    </div>
+
+    <!-- Main Fixed Area -->
+    <div class="absolute top-[200px] left-[64px] right-[64px] bottom-[80px] z-10" 
+         style="height: 440px; display: flex; gap: 32px; box-sizing: border-box;">
+      
+      <!-- Left Narrative Column (Editorial Sidebar Style) -->
+      <div class="w-[320px] flex flex-col gap-6">
+        <div class="neu-concave p-[24px] flex-1 flex flex-col justify-center">
+          <div class="text-[#008B8B] text-[14px] font-[600] tracking-[0.1em] mb-[12px] uppercase">Strategic Focus</div>
+          <p class="text-[16px] text-[#555555] leading-[1.8] font-[400]">
+            聚焦超长期利率风险管理工具的深度发展，通过提升衍生品定价效率与扩容机构参与，构建更稳健的金融对冲体系。
+          </p>
+        </div>
+        
+        <!-- Decorative Dots -->
+        <div class="flex gap-3 px-4">
+          <div class="w-[10px] h-[10px] rounded-full neu-convex bg-[#008B8B]"></div>
+          <div class="w-[10px] h-[10px] rounded-full neu-convex bg-[#E0E5EC]"></div>
+          <div class="w-[10px] h-[10px] rounded-full neu-convex bg-[#E0E5EC]"></div>
+        </div>
+      </div>
+
+      <!-- Right Content Grid (Cards) -->
+      <div class="flex-1 grid grid-cols-1 gap-6" style="grid-template-rows: repeat(3, 1fr);">
+        
+        <!-- Card 1 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-chart-line-up text-[#008B8B] text-[24px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">30年期国债期货成交突破</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              日均成交量预计突破8万手，较2024年实现显著增长。作为超长期利率风险管理核心工具，其深度发展将有效完善国债收益率曲线定价体系。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-trend-up text-[#008B8B] text-[24px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">股指期货贴水率收窄</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              年化贴水率预计从8%-10%区间收窄至4%-6%，反映市场多空力量趋于均衡及衍生品定价效率提升。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-users text-[#008B8B] text-[24px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">保险资金参与扩容</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              保险资金参与国债期货交易的机构数量预计扩容至20-30家，持仓规模持续增长，增强市场流动性与稳定性。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 07</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-full neu-convex bg-[#E0E5EC]"></div>
+        <div class="w-[8px] h-[8px] rounded-full bg-[#008B8B]"></div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-8">
+      <div class="slide-number">8</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="neu-capsule px-[16px] py-[6px] flex items-center">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">技术革新与数字化转型</span>
+      </div>
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">第 6 章</div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[80px] left-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 技术革新：AI交易占比突破与区块链交割落 </h1>
+      <div class="w-[60px] h-[4px] bg-[#008B8B] mt-[16px] rounded-full"></div>
+    </div>
+
+    <!-- Main Fixed Area -->
+    <div class="absolute top-[170px] left-[64px] right-[64px] bottom-[80px] z-10" 
+         style="height: 440px; display: flex; gap: 32px; box-sizing: border-box;">
+      
+      <!-- Left Narrative Column (Editorial Sidebar Style) -->
+      <div class="w-[320px] flex flex-col gap-6">
+        <div class="neu-concave p-[32px] flex flex-col justify-center h-full">
+          <div class="text-[#008B8B] text-[14px] font-[600] tracking-[0.1em] mb-[12px] uppercase">Strategic Focus</div>
+          <div class="text-[22px] font-[700] text-[#333333] leading-[1.4] mb-[20px]">
+            构建以AI为核心的<br/>智能交易生态体系
+          </div>
+          <p class="text-[15px] text-[#555555] leading-[1.8]">
+            通过算法升级、监管数字化与基础设施现代化，实现从“人工驱动”向“技术驱动”的根本性转变。
+          </p>
+        </div>
+      </div>
+
+      <!-- Right Content Grid (3-Card Layout) -->
+      <div class="flex-1 grid grid-cols-1 gap-6" style="grid-template-rows: repeat(3, 1fr);">
+        
+        <!-- Card 1 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-brain text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between mb-[8px]">
+              <h3 class="text-[20px] font-[600] text-[#333333]">程序化交易占比突破45%</h3>
+              <span class="text-[#008B8B] font-[700] text-[24px]">45%</span>
+            </div>
+            <p class="text-[15px] text-[#555555] leading-[1.6]">
+              量化策略与高频交易深度融合，预计2025年程序化交易占总成交量比例将突破45%，算法订单执行效率显著提升，市场流动性结构发生根本性改变。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-shield-check text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">穿透式监管2.0系统上线</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.6]">
+              通过大数据与人工智能技术构建异常交易识别模型，实时监控能力覆盖全市场参与者，有效防范操纵市场、对敲等违规行为，维护市场公平秩序。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="neu-convex p-[24px] flex items-start gap-6">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-cpu text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between mb-[8px]">
+              <h3 class="text-[20px] font-[600] text-[#333333]">IT投入占营收比提升至8%</h3>
+              <span class="text-[#008B8B] font-[700] text-[24px]">8%</span>
+            </div>
+            <p class="text-[15px] text-[#555555] leading-[1.6]">
+              头部期货公司科技战略升级，约90%的业务流程实现数字化改造，交易系统延迟降至微秒级，风控系统实现毫秒级响应，基础设施达国际先进水平。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 08 / 30</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #008B8B;"></div>
+      </div>
+    </div>
+
+    <!-- Decorative Elements -->
+    <div class="absolute top-0 right-0 w-[120px] h-[120px] rounded-full opacity-30" 
+         style="background: radial-gradient(circle, #66CDAA 0%, transparent 70%);"></div>
+    <div class="absolute bottom-[100px] right-[100px] w-[12px] h-[12px] rounded-full neu-convex"></div>
+    <div class="absolute bottom-[120px] right-[120px] w-[8px] h-[8px] rounded-full neu-convex"></div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-9">
+      <div class="slide-number">9</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="neu-capsule px-[16px] py-[6px] flex items-center">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">风险防控体系</span>
+      </div>
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">第 7 章</div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[80px] left-[64px] right-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 风险防控：穿透式监管2.0与地缘供应链冲击 </h1>
+      <div class="w-[60px] h-[4px] bg-[#008B8B] mt-[16px] rounded-full"></div>
+    </div>
+
+    <!-- Main Fixed Area -->
+    <div class="absolute top-[180px] left-[64px] right-[64px] bottom-[80px] z-10" 
+         style="height: 440px; display: flex; gap: 32px; box-sizing: border-box;">
+      
+      <!-- Left Narrative Column (Editorial Split) -->
+      <div class="flex-1 flex flex-col gap-6">
+        <!-- Card 1 -->
+        <div class="neu-convex p-[32px] flex gap-6 items-start h-[130px]">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-shield-check text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">穿透式监管2.0全面升级</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              建立客户身份识别、资金来源审查与交易行为监测的全链条数字化监管体系，实现从“形式合规”向“实质合规”转变，有效识别复杂交易结构中的最终受益人与实际控制关系。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="neu-convex p-[32px] flex gap-6 items-start h-[130px]">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-arrows-clockwise text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">VaR动态保证金制度</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              引入风险价值（VaR）模型构建动态保证金管理机制，当标的资产20日历史波动率突破预设阈值时自动触发保证金水平调整，通过逆周期调节降低高波动行情下的杠杆累积风险。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="neu-convex p-[32px] flex gap-6 items-start h-[130px]">
+          <div class="neu-icon-ring w-[56px] h-[56px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-globe text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-[20px] font-[600] text-[#333333] mb-[8px]">关键矿产供应链冲击</h3>
+            <p class="text-[15px] text-[#555555] leading-[1.7]">
+              全球关键矿产“去风险化”战略导致铜、锂、镍等新能源核心原材料供应链重构，地缘政治因素加剧资源国出口限制与物流中断风险，相关品种价格波动率显著上升。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Sidebar (Visual Balance) -->
+      <div class="w-[320px] flex flex-col gap-6">
+        <div class="neu-concave p-[32px] flex-1 flex flex-col justify-center items-center text-center">
+          <div class="text-[14px] font-[500] text-[#888888] tracking-[0.1em] uppercase mb-4">Risk Control Focus</div>
+          <div class="text-[24px] font-[700] text-[#008B8B] leading-tight">
+            数字化监管<br>+ 动态风险对冲<br>+ 供应链韧性
+          </div>
+          <div class="mt-6 w-full h-px bg-gray-300 opacity-30"></div>
+          <div class="mt-6 text-[13px] text-[#555555] leading-relaxed italic">
+            “构建从微观交易穿透到宏观地缘预警的系统性防御矩阵”
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 09</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #008B8B;"></div>
+      </div>
+    </div>
+
+    <!-- Decorative Elements -->
+    <div class="absolute top-0 right-0 w-[120px] h-[120px] neu-convex opacity-40 rounded-full"></div>
+    <div class="absolute bottom-0 left-[10%] w-[80px] h-[80px] neu-convex opacity-30 rounded-full"></div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-10">
+      <div class="slide-number">10</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="neu-capsule px-[16px] py-[6px] flex items-center">
+        <span class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">特定品种国际化与投资者结构优化</span>
+      </div>
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">第 8 章</div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[80px] left-[64px] right-[64px] z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 双向开放：特定品种国际化与投资者结构优化 </h1>
+      <div class="w-[60px] h-[4px] bg-[#008B8B] mt-[16px] rounded-full"></div>
+    </div>
+
+    <!-- Main Fixed Area -->
+    <div class="absolute top-[200px] left-[64px] right-[64px] bottom-[80px] z-10" 
+         style="height: 440px; display: flex; gap: 32px; box-sizing: border-box;">
+      
+      <!-- Left Narrative Column (Editorial Sidebar Style) -->
+      <div class="w-[320px] flex flex-col gap-6">
+        <div class="neu-concave p-[32px] flex-1 flex flex-col justify-center">
+          <div class="text-[#008B8B] text-[14px] font-[600] tracking-[0.1em] mb-[12px] uppercase">Strategic Goal</div>
+          <div class="text-[22px] font-[700] text-[#333333] leading-[1.4]">
+            通过人民币结算提升与产业客户渗透，构建全球大宗商品定价新格局
+          </div>
+          <div class="mt-6 flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full bg-[#008B8B]"></div>
+            <span class="text-[14px] text-[#888888]">双向开放战略支柱</span>
+          </div>
+        </div>
+        
+        <!-- Decorative Dots -->
+        <div class="flex gap-3 px-4">
+          <div class="w-3 h-3 rounded-full neu-convex bg-[#E0E5EC]"></div>
+          <div class="w-3 h-3 rounded-full bg-[#008B8B]"></div>
+          <div class="w-3 h-3 rounded-full neu-convex bg-[#E0E5EC]"></div>
+        </div>
+      </div>
+
+      <!-- Right Content Grid -->
+      <div class="flex-1 grid grid-cols-1 gap-6" style="grid-template-rows: repeat(3, 1fr);">
+        
+        <!-- Card 1: 人民币结算 -->
+        <div class="neu-convex p-[24px] flex items-center gap-6">
+          <div class="neu-icon-ring w-[64px] h-[64px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-currency-circle-dollar text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-baseline justify-between mb-1">
+              <h3 class="text-[20px] font-[600] text-[#333333]">人民币结算占比提升</h3>
+              <span class="text-[24px] font-[700] text-[#008B8B]">75% → 85%</span>
+            </div>
+            <p class="text-[15px] text-[#555555] leading-[1.6]">
+              原油期货人民币结算占比预计提升至85%，标志着人民币在大宗商品定价中的地位持续巩固。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 2: 产业客户 -->
+        <div class="neu-convex p-[24px] flex items-center gap-6">
+          <div class="neu-icon-ring w-[64px] h-[64px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-users text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-baseline justify-between mb-1">
+              <h3 class="text-[20px] font-[600] text-[#333333]">产业客户套保渗透率</h3>
+              <span class="text-[24px] font-[700] text-[#008B8B]">18% → 25%</span>
+            </div>
+            <p class="text-[15px] text-[#555555] leading-[1.6]">
+              央企及大型实体企业参与衍生品市场的深度和广度显著增加，套保渗透率预计提升至25%。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3: 商品ETF -->
+        <div class="neu-convex p-[24px] flex items-center gap-6">
+          <div class="neu-icon-ring w-[64px] h-[64px] flex-shrink-0 flex items-center justify-center">
+            <i class="ph ph-stack text-[#008B8B] text-[28px]"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-baseline justify-between mb-1">
+              <h3 class="text-[20px] font-[600] text-[#333333]">商品ETF扩容</h3>
+              <span class="text-[24px] font-[700] text-[#008B8B]">50+ 只 / 1000亿</span>
+            </div>
+            <p class="text-[15px] text-[#555555] leading-[1.6]">
+              预计2025年上市50只以上商品ETF，总规模突破1000亿元，优化机构与零售客户资产配置工具。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 10 / 30</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px] neu-convex" style="background: #E0E5EC;"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #008B8B;"></div>
+      </div>
+    </div>
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-11">
+      <div class="slide-number">11</div>
+      <div class="slide" style="background-color:#E0E5EC;">
+    <!-- Header Band -->
+    <div class="absolute top-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[13px] font-[500] text-[#888888] tracking-[0.08em]">现代化期货市场生态体系</div>
+      <div class="neu-capsule px-[16px] py-[6px] inline-flex">
+        <span class="text-[12px] text-[#888888] font-[500] tracking-[0.08em]">战略展望 2025</span>
+      </div>
+    </div>
+
+    <!-- Title Band -->
+    <div class="absolute top-[80px] left-0 right-0 flex flex-col items-center text-center z-10">
+      <h1 class="text-[42px] font-[700] leading-[1.2] text-[#333333] tracking-tight" style="white-space:nowrap;"> 展望：构建现代化期货市场生态体系 </h1>
+      <div class="w-[60px] h-[4px] bg-[#008B8B] rounded-full mt-[24px]"></div>
+    </div>
+
+    <!-- Main Fixed Area -->
+    <div class="absolute top-[200px] left-[64px] right-[64px] bottom-[80px] z-10" 
+         style="height: 400px; display: flex; gap: 24px; box-sizing: border-box;">
+      
+      <!-- Card 1 -->
+      <div class="neu-convex flex-1 p-[32px] flex flex-col" style="min-width: 0;">
+        <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center mb-[24px]">
+          <i class="ph ph-globe text-[#008B8B] text-[28px]"></i>
+        </div>
+        <h3 class="text-[20px] font-[600] text-[#333333] mb-[16px] leading-tight">
+          全球流动性宽松与<br/>人民币国际化双轮驱动
+        </h3>
+        <p class="text-[15px] text-[#555555] leading-[1.7] overflow-hidden">
+          2025年美联储预计进入降息周期（全年降息75-100BP），全球流动性宽松将推升大宗商品金融属性，黄金等品种投机性持仓占比或提升至35%以上。
+        </p>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="neu-convex flex-1 p-[32px] flex flex-col" style="min-width: 0;">
+        <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center mb-[24px]">
+          <i class="ph ph-cpu text-[#008B8B] text-[28px]"></i>
+        </div>
+        <h3 class="text-[20px] font-[600] text-[#333333] mb-[16px] leading-tight">
+          新能源新材料品种扩容<br/>服务战略性新兴产业
+        </h3>
+        <p class="text-[15px] text-[#555555] leading-[1.7] overflow-hidden">
+          2025年预计推出多晶硅、稀土、航运指数（欧线）等期货期权品种，总品种数有望突破140个，全面覆盖新能源、高端制造等战略性新兴产业。
+        </p>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="neu-convex flex-1 p-[32px] flex flex-col" style="min-width: 0;">
+        <div class="neu-icon-ring w-[56px] h-[56px] flex items-center justify-center mb-[24px]">
+          <i class="ph ph-users text-[#008B8B] text-[28px]"></i>
+        </div>
+        <h3 class="text-[20px] font-[600] text-[#333333] mb-[16px] leading-tight">
+          机构化国际化专业化深化<br/>构建现代化交易体系
+        </h3>
+        <p class="text-[15px] text-[#555555] leading-[1.7] overflow-hidden">
+          随着QFII/RQFII制度优化和跨境监管合作深化，境外机构投资者参与度持续提升，市场机构化、国际化、专业化程度显著增强。
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Footer Band -->
+    <div class="absolute bottom-[24px] left-[64px] right-[64px] flex items-center justify-between z-20">
+      <div class="text-[12px] text-[#AAAAAA] font-[400]">PAGE 11 / 30</div>
+      <div class="flex gap-[8px]">
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #E0E5EC; box-shadow: -2px -2px 4px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.15);"></div>
+        <div class="w-[8px] h-[8px] rounded-[9999px]" style="background: #008B8B;"></div>
+      </div>
+    </div>
+
+    <!-- Background Decor -->
+    <div class="absolute top-0 right-0 w-[120px] h-[120px] rounded-full opacity-40" 
+         style="background: radial-gradient(circle, #D1D9E6 0%, transparent 70%);"></div>
+    <div class="absolute bottom-0 left-0 w-[200px] h-[200px] rounded-full opacity-30" 
+         style="background: radial-gradient(circle, #D1D9E6 0%, transparent 70%);"></div>
+  </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+      var chart_p4_1 = echarts.init(document.getElementById('chart_p4_1'));
+      chart_p4_1.setOption(Object.assign({
+        "animation": false,
+        "backgroundColor": "transparent",
+        "color": ["#008B8B", "#20B2AA", "#5F9EA0", "#66CDAA"],
+        "textStyle": { "color": "#555555", "fontFamily": "Noto Sans SC" },
+        "tooltip": { 
+          "trigger": "axis", 
+          "backgroundColor": "rgba(224, 229, 236, 0.9)", 
+          "borderColor": "#CCCCCC", 
+          "textStyle": { "color": "#333333" } 
+        },
+        "grid": { "top": 40, "right": 30, "bottom": 60, "left": 60, "containLabel": true },
+        "xAxis": { 
+          "type": "category", 
+          "axisLine": { "lineStyle": { "color": "#CCCCCC" } }, 
+          "axisTick": { "lineStyle": { "color": "#CCCCCC" } }, 
+          "axisLabel": { "color": "#888888", "interval": 0, "fontSize": 11 } 
+        },
+        "yAxis": { 
+          "type": "value", 
+          "axisLine": { "show": false }, 
+          "axisTick": { "show": false }, 
+          "axisLabel": { "color": "#888888" }, 
+          "splitLine": { "lineStyle": { "color": "rgba(0,0,0,0.05)" } } 
+        }
+      }, {
+        title: { 
+          text: '核心规模数据可视化 (单位: 亿)', 
+          left: 'center', 
+          top: 0, 
+          textStyle: { color: '#333333', fontSize: 14, fontWeight: 600 } 
+        },
+        xAxis: { 
+          data: ["2025预计成交量", "保证金规模", "累计成交量", "成交额"] 
+        },
+        series: [{
+          name: '数值',
+          type: 'bar',
+          barWidth: '40%',
+          data: [95, 1.8, 85, 580],
+          itemStyle: {
+            borderRadius: [4, 4, 0, 0]
+          },
+          label: {
+            show: true,
+            position: 'top',
+            color: '#008B8B',
+            fontWeight: 'bold',
+            formatter: function(params) {
+              const labels = ["95亿", "1.8万亿", "85亿", "580万亿"];
+              return labels[params.dataIndex];
+            }
+          }
+        }]
+      }));
+    
+
+
+    var chart_p5_1 = echarts.init(document.getElementById('chart_p5_1'));
+    chart_p5_1.setOption(Object.assign({
+      "animation": false,
+      "backgroundColor": "transparent",
+      "color": ["#008B8B", "#20B2AA", "#5F9EA0", "#66CDAA"],
+      "textStyle": { "color": "#555555", "fontFamily": "Noto Sans SC" },
+      "tooltip": { 
+        "trigger": "axis", 
+        "backgroundColor": "rgba(224, 229, 236, 0.9)", 
+        "borderColor": "#CCCCCC", 
+        "textStyle": { "color": "#333333" },
+        "borderWidth": 1
+      },
+      "grid": { "top": 40, "right": 30, "bottom": 60, "left": 60, "containLabel": true },
+      "xAxis": { 
+        "type": "category", 
+        "axisLine": { "lineStyle": { "color": "#CCCCCC" } }, 
+        "axisTick": { "lineStyle": { "color": "#CCCCCC" } }, 
+        "axisLabel": { "color": "#888888", "interval": 0, "fontSize": 11, "rotate": 15 }, 
+        "splitLine": { "show": false } 
+      },
+      "yAxis": { 
+        "type": "value",
+        "axisLine": { "show": false }, 
+        "axisTick": { "show": false }, 
+        "axisLabel": { "color": "#888888" }, 
+        "splitLine": { "lineStyle": { "color": "rgba(0,0,0,0.05)" } },
+        "axisLabel": {
+          "formatter": "{value}%",
+          "color": "#888888"
+        }
+      }
+    }, {
+      "title": { 
+        "text": '品种分化：能源金属地缘溢价与产业链重构｜核心数据可视化', 
+        "left": 'center', 
+        "top": 0, 
+        "textStyle": { "color": "#333333", "fontSize": 14, "fontWeight": 600 } 
+      },
+      "xAxis": { 
+        "data": ["地缘冲突风险溢价", "冲突风险溢价(15%)", "电池金属波动率", "企业套保参与度", "农产品波动率", "基差贸易占比"] 
+      },
+      "series": [{
+        "name": "数值 (%)",
+        "type": "bar",
+        "barWidth": "40%",
+        "data": [15, 20, 35, 50, 30, 60],
+        "itemStyle": {
+          "borderRadius": [4, 4, 0, 0]
+        }
+      }]
+    }));
+  
+
+});
+</script>
+</body>
+</html>

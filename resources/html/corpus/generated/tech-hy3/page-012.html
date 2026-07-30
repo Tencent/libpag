@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>竞品分析：Sketch & MasterGo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body>
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+    <!-- Hairline Grid -->
+    <div class="absolute left-[50%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[25%] h-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px] z-[10]">
+      <i class="ph ph-compare text-[20px]"></i>
+      <span class="text-[14px]/[20px]">竞品分析 · Sketch & MasterGo</span>
+    </div>
+
+    <!-- Page Title -->
+    <div class="absolute top-[60px] left-[80px] z-[10]">
+      <h1 class="text-[56px] font-[600] leading-[1.2] tracking-[-0.01em]">竞品分析：Sketch & MasterGo</h1>
+      <div class="w-[80px] h-[2px] bg-[#111111] mt-[12px]"></div>
+    </div>
+
+    <!-- Left: Sketch -->
+    <div class="absolute top-[200px] left-[80px] w-[520px] z-[10]">
+      <div class="flex items-center gap-[10px] mb-[14px]">
+        <i class="ph ph-apple-logo text-[18px]"></i>
+        <h2 class="text-[18px] font-[600]">Sketch（Mac生态标杆）</h2>
+      </div>
+      <p class="text-[13px]/[20px] leading-[1.625] text-[#111111]/60 mb-[16px]">Mac生态下的矢量设计王者，长期被视为视觉设计标杆</p>
+      <div class="mb-[18px]">
+        <p class="text-[13px]/[20px] font-[600] mb-[8px]">优势</p>
+        <div class="space-y-[8px]">
+          <div class="flex items-start gap-[8px]"><i class="ph ph-check text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">0.1px级锚点微调，布尔运算精准度极高</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-check text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">轻量资源占用，本地性能最优</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-check text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">插件扩展性极强，生态成熟</p></div>
+        </div>
+      </div>
+      <div>
+        <p class="text-[13px]/[20px] font-[600] mb-[8px]">劣势</p>
+        <div class="space-y-[8px]">
+          <div class="flex items-start gap-[8px]"><i class="ph ph-x text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">仅支持macOS，Windows用户无法使用</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-x text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">团队协作需额外成本，实时协作能力弱</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-x text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">AI功能相对落后</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: MasterGo -->
+    <div class="absolute top-[200px] left-[680px] w-[520px] z-[10]">
+      <div class="flex items-center gap-[10px] mb-[14px]">
+        <i class="ph ph-buildings text-[18px]"></i>
+        <h2 class="text-[18px] font-[600]">MasterGo（莫高设计）</h2>
+      </div>
+      <p class="text-[13px]/[20px] leading-[1.625] text-[#111111]/60 mb-[16px]">AI时代的数字界面生产平台，蓝湖出品，获大量国内企业客户认可</p>
+      <div class="mb-[18px]">
+        <p class="text-[13px]/[20px] font-[600] mb-[8px]">优势</p>
+        <div class="space-y-[8px]">
+          <div class="flex items-start gap-[8px]"><i class="ph ph-check text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">实时协作能力强，适合团队级UI设计项目</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-check text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">设计稿可秒转高可用代码</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-check text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">企业级解决方案完善，私有化部署成熟</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-check text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">服务企业：中国电信、新东方、科大讯飞、小鹏汽车等</p></div>
+        </div>
+      </div>
+      <div>
+        <p class="text-[13px]/[20px] font-[600] mb-[8px]">劣势</p>
+        <div class="space-y-[8px]">
+          <div class="flex items-start gap-[8px]"><i class="ph ph-x text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">相比Figma，插件生态仍处于发展阶段</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-x text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">初创版仅支持创建3个文件，超出需付费</p></div>
+          <div class="flex items-start gap-[8px]"><i class="ph ph-x text-[14px] mt-[3px] shrink-0"></i><p class="text-[13px]/[20px]">缺少白板功能</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom border -->
+    <div class="absolute bottom-[40px] left-[80px] right-[80px] h-[1px] bg-[#111111]/20 z-[10]"></div>
+  </div>
+</body>
+</html>

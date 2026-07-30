@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>第2层：关系认知 — 它了解谁</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+*, *::before, *::after { animation: none !important; transition: none !important; }
+body { margin: 0; padding: 0; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body>
+<div class="slide" style="width:1280px;height:720px;overflow:hidden;position:relative;background:linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);">
+  <!-- Watermark -->
+  <div class="absolute z-0 text-[300px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="left:50%;top:55%;transform:translate(-50%,-50%);">MEMORY</div>
+  <!-- Header -->
+  <div class="absolute z-20" style="top:40px;left:120px;width:1040px;">
+    <div class="text-[14px] font-[300] text-[#FFFFFF]/40 tracking-[0.15em] uppercase mb-[8px]">Layer 2: Relationship + Memory</div>
+    <h2 class="text-[36px] font-[300] text-[#FFFFFF] leading-tight">第2层：关系认知 — 它了解谁</h2>
+    <div class="w-[48px] h-[1px] bg-[#FFFFFF]/20 mt-[16px]"></div>
+  </div>
+  <!-- Venn Circles -->
+  <!-- Circle 1: USER.md -->
+  <div class="absolute z-10 flex items-center justify-center border-[1px] border-dashed border-[#FFFFFF]/20 rounded-full" style="left:120px;top:160px;width:320px;height:320px;">
+    <div class="text-center">
+      <i class="ph ph-user-circle text-[28px] text-[#82D0A4] mb-[8px]"></i>
+      <div class="text-[20px] font-[400] text-[#FFFFFF] mb-[6px]">USER.md</div>
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/40 uppercase tracking-[0.05em]">用户画像</div>
+      <div class="mt-[10px] text-[11px] font-[400] text-[#FFFFFF]/30 leading-[1.5] px-[20px]">基本信息 / 工作偏好<br>当前状态 / 个人特点</div>
+    </div>
+  </div>
+  <!-- Circle 2: Long-term Memory -->
+  <div class="absolute z-10 flex items-center justify-center border-[1px] border-dashed border-[#FFFFFF]/20 rounded-full" style="left:400px;top:160px;width:320px;height:320px;">
+    <div class="text-center">
+      <i class="ph ph-notebook text-[28px] text-[#82D0A4] mb-[8px]"></i>
+      <div class="text-[20px] font-[400] text-[#FFFFFF] mb-[6px]">MEMORY.md</div>
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/40 uppercase tracking-[0.05em]">长期记忆</div>
+      <div class="mt-[10px] text-[11px] font-[400] text-[#FFFFFF]/30 leading-[1.5] px-[20px]">核心偏好 / 重要决策<br>工作规范 / 踩过的坑</div>
+    </div>
+  </div>
+  <!-- Circle 3: Daily Memory -->
+  <div class="absolute z-10 flex items-center justify-center border-[1px] border-dashed border-[#FFFFFF]/20 rounded-full" style="left:680px;top:160px;width:320px;height:320px;">
+    <div class="text-center">
+      <i class="ph ph-calendar text-[28px] text-[#82D0A4] mb-[8px]"></i>
+      <div class="text-[20px] font-[400] text-[#FFFFFF] mb-[6px]">Daily Log</div>
+      <div class="text-[12px] font-[300] text-[#FFFFFF]/40 uppercase tracking-[0.05em]">每日记忆</div>
+      <div class="mt-[10px] text-[11px] font-[400] text-[#FFFFFF]/30 leading-[1.5] px-[20px]">今天做了什么<br>学到了什么 / 待跟进</div>
+    </div>
+  </div>
+  <!-- Mechanism Bar -->
+  <div class="absolute z-20" style="top:520px;left:120px;width:1040px;">
+    <div class="text-[12px] font-[300] text-[#FFFFFF]/30 tracking-[0.08em] uppercase mb-[12px]">Growth Mechanism</div>
+    <div class="flex gap-[24px]">
+      <div class="flex-1 border border-[#FFFFFF]/10 rounded-[6px] px-[20px] py-[14px]">
+        <div class="text-[14px] font-[400] text-[#FFFFFF]/80 mb-[4px]">只追加不修改</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40">新记忆追加到末尾，防止遗忘</div>
+      </div>
+      <div class="flex-1 border border-[#FFFFFF]/10 rounded-[6px] px-[20px] py-[14px]">
+        <div class="text-[14px] font-[400] text-[#FFFFFF]/80 mb-[4px]">执行前必读</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40">确保行为一致性</div>
+      </div>
+      <div class="flex-1 border border-[#FFFFFF]/10 rounded-[6px] px-[20px] py-[14px]">
+        <div class="text-[14px] font-[400] text-[#FFFFFF]/80 mb-[4px]">错误比成功重要</div>
+        <div class="text-[12px] font-[300] text-[#FFFFFF]/40">犯错立刻写入，下次不再犯</div>
+      </div>
+    </div>
+  </div>
+  <!-- Data point -->
+  <div class="absolute z-20 flex items-center gap-[16px]" style="top:610px;left:120px;">
+    <div class="text-[12px] font-[300] text-[#FFFFFF]/30 tracking-[0.05em] uppercase">Practice Data</div>
+    <div class="text-[14px] font-[400] text-[#82D0A4]">14 天 1157 条消息</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">|</div>
+    <div class="text-[14px] font-[400] text-[#82D0A4]">40+ 技能</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">|</div>
+    <div class="text-[14px] font-[400] text-[#FFFFFF]/50">调教大于写代码</div>
+  </div>
+  <!-- Footer -->
+  <div class="absolute z-50 flex flex-col items-center justify-center" style="bottom:48px;left:0;right:0;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/70">ima</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/30 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

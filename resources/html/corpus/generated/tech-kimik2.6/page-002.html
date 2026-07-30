@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>执行摘要</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .arrow-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">02 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">执行摘要</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 内容区 -->
+  <div class="absolute top-[180px] left-[80px] w-[1120px] flex flex-col gap-[28px]">
+    <!-- Item 1 -->
+    <div class="flex items-start gap-[16px]">
+      <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[4px]">Ardot正式公测</h3>
+        <p class="text-[16px]/[26px] leading-[1.625] text-[#111111]/80">2026年5月18日，Ardot定位为AI驱动的产设研协作平台，覆盖从视觉设计、代码交付到团队协作的全流程</p>
+      </div>
+    </div>
+    <!-- Item 2 -->
+    <div class="flex items-start gap-[16px]">
+      <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[4px]">全球市场高速增长</h3>
+        <p class="text-[16px]/[26px] leading-[1.625] text-[#111111]/80">2025年UI/UX设计工具市场规模21.4亿美元，预计2035年达159.9亿美元，CAGR高达22.25%</p>
+      </div>
+    </div>
+    <!-- Item 3 -->
+    <div class="flex items-start gap-[16px]">
+      <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[4px]">资产化思维差异化</h3>
+        <p class="text-[16px]/[26px] leading-[1.625] text-[#111111]/80">Ardot核心差异化在于资产化思维——不是生成图片，而是生成可编辑、可复用、可交付的结构化设计资产</p>
+      </div>
+    </div>
+    <!-- Item 4 -->
+    <div class="flex items-start gap-[16px]">
+      <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[4px]">MCP协议前瞻性布局</h3>
+        <p class="text-[16px]/[26px] leading-[1.625] text-[#111111]/80">在MCP协议加持下，Ardot实现从设计到代码的零损耗流转，极具前瞻性</p>
+      </div>
+    </div>
+    <!-- Item 5 -->
+    <div class="flex items-start gap-[16px]">
+      <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[4px]">多维度全面分析</h3>
+        <p class="text-[16px]/[26px] leading-[1.625] text-[#111111]/80">本报告从产品功能、技术架构、市场定位等多维度进行全面分析，并与6大主要竞品横向对比</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

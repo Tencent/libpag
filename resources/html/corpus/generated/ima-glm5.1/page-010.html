@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>养成系完整生命周期</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; }
+.slide {
+  width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0;
+  background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+  font-family: 'Noto Sans SC', sans-serif; color: #FFFFFF;
+}
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Watermark -->
+  <div class="absolute text-[300px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="z-index:0; top: 160px; left: 150px;">EVOLUTION</div>
+
+  <!-- Page Header -->
+  <div class="absolute top-[32px] right-[48px]" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- Section Title -->
+  <div class="absolute" style="z-index:20; top: 50px; left: 80px;">
+    <div class="text-[12px] font-[500] tracking-[0.15em] text-[#82D0A4] mb-[8px]">COMPLETE LIFECYCLE</div>
+    <h1 class="text-[32px] font-[300] text-[#FFFFFF]">养成系完整生命周期</h1>
+  </div>
+
+  <!-- Four Stages -->
+  <div class="absolute flex gap-[16px]" style="z-index:20; top: 150px; left: 60px; width: 1160px;">
+    <!-- Stage 1: Adopt -->
+    <div class="flex-1 border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[16px] p-[20px] flex flex-col items-center">
+      <div class="w-[48px] h-[48px] rounded-full border-[1px] border-[#FFFFFF]/30 flex items-center justify-center mb-[12px]">
+        <i class="ph ph-egg text-[22px] text-[#FFFFFF]/50"></i>
+      </div>
+      <div class="text-[20px] font-[400] text-[#FFFFFF] mb-[4px]">领养</div>
+      <div class="text-[12px] text-[#FFFFFF]/40 mb-[16px]">Day 0</div>
+      <div class="w-[100%] h-[1px] bg-[#FFFFFF]/10 mb-[12px]"></div>
+      <div class="flex flex-col gap-[6px] w-full">
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">记忆量</span>
+          <span class="text-[#FFFFFF]/50">0</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">技能数</span>
+          <span class="text-[#FFFFFF]/50">基础包</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">了解你</span>
+          <span class="text-[#FFFFFF]/50">0%</span>
+        </div>
+      </div>
+      <div class="w-[100%] h-[1px] bg-[#FFFFFF]/10 my-[10px]"></div>
+      <div class="text-[11px] text-[#FFFFFF]/30 text-center">取名字 · 选形象 · 初始化</div>
+    </div>
+
+    <!-- Stage 2: Train -->
+    <div class="flex-1 border-[1px] border-dashed border-[#FFFFFF]/20 rounded-[16px] p-[20px] flex flex-col items-center">
+      <div class="w-[48px] h-[48px] rounded-full border-[1px] border-[#82D0A4]/40 flex items-center justify-center mb-[12px]">
+        <i class="ph ph-shrimp text-[22px] text-[#82D0A4]/60"></i>
+      </div>
+      <div class="text-[20px] font-[400] text-[#FFFFFF] mb-[4px]">调教</div>
+      <div class="text-[12px] text-[#FFFFFF]/40 mb-[16px]">Day 1-7</div>
+      <div class="w-[100%] h-[1px] bg-[#FFFFFF]/10 mb-[12px]"></div>
+      <div class="flex flex-col gap-[6px] w-full">
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">记忆量</span>
+          <span class="text-[#FFFFFF]/50">少</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">技能数</span>
+          <span class="text-[#82D0A4]/70">5-10</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">了解你</span>
+          <span class="text-[#82D0A4]/70">30%</span>
+        </div>
+      </div>
+      <div class="w-[100%] h-[1px] bg-[#FFFFFF]/10 my-[10px]"></div>
+      <div class="text-[11px] text-[#FFFFFF]/30 text-center">定义性格 · 告诉偏好 · 纠正错误</div>
+    </div>
+
+    <!-- Stage 3: Evolve -->
+    <div class="flex-1 border-[1px] border-[#82D0A4]/30 rounded-[16px] p-[20px] flex flex-col items-center bg-[#82D0A4]/[0.03]">
+      <div class="w-[48px] h-[48px] rounded-full border-[1px] border-[#82D0A4]/60 flex items-center justify-center mb-[12px]">
+        <i class="ph ph-crown-simple text-[22px] text-[#82D0A4]"></i>
+      </div>
+      <div class="text-[20px] font-[400] text-[#FFFFFF] mb-[4px]">进化</div>
+      <div class="text-[12px] text-[#82D0A4]/60 mb-[16px]">Day 7-30</div>
+      <div class="w-[100%] h-[1px] bg-[#82D0A4]/20 mb-[12px]"></div>
+      <div class="flex flex-col gap-[6px] w-full">
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">记忆量</span>
+          <span class="text-[#82D0A4]/70">中等</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">技能数</span>
+          <span class="text-[#82D0A4]">20-40</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">了解你</span>
+          <span class="text-[#82D0A4]">70%</span>
+        </div>
+      </div>
+      <div class="w-[100%] h-[1px] bg-[#82D0A4]/20 my-[10px]"></div>
+      <div class="text-[11px] text-[#FFFFFF]/40 text-center">安装技能 · 训练工作流 · 积累记忆</div>
+    </div>
+
+    <!-- Stage 4: Coexist -->
+    <div class="flex-1 border-[1px] border-[#82D0A4]/50 rounded-[16px] p-[20px] flex flex-col items-center bg-[#82D0A4]/[0.06]">
+      <div class="w-[48px] h-[48px] rounded-full border-[1px] border-[#82D0A4] flex items-center justify-center mb-[12px]">
+        <i class="ph ph-handshake text-[22px] text-[#82D0A4]"></i>
+      </div>
+      <div class="text-[20px] font-[400] text-[#82D0A4] mb-[4px]">共生</div>
+      <div class="text-[12px] text-[#82D0A4]/60 mb-[16px]">Day 30+</div>
+      <div class="w-[100%] h-[1px] bg-[#82D0A4]/20 mb-[12px]"></div>
+      <div class="flex flex-col gap-[6px] w-full">
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">记忆量</span>
+          <span class="text-[#82D0A4]">丰富</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">技能数</span>
+          <span class="text-[#82D0A4] font-[500]">40+</span>
+        </div>
+        <div class="flex justify-between text-[12px]">
+          <span class="text-[#FFFFFF]/40">了解你</span>
+          <span class="text-[#82D0A4] font-[500]">95%</span>
+        </div>
+      </div>
+      <div class="w-[100%] h-[1px] bg-[#82D0A4]/20 my-[10px]"></div>
+      <div class="text-[11px] text-[#82D0A4]/60 text-center">自动运转 · 主动推送 · 不可替代</div>
+    </div>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="absolute" style="z-index:20; top: 580px; left: 80px; width: 1120px;">
+    <div class="flex items-center justify-between mb-[8px]">
+      <span class="text-[11px] text-[#FFFFFF]/30">了解程度</span>
+      <span class="text-[11px] text-[#82D0A4]">95%</span>
+    </div>
+    <div class="w-[100%] h-[6px] rounded-full bg-[#FFFFFF]/10 overflow-hidden">
+      <div class="h-[100%] rounded-full" style="width: 95%; background: linear-gradient(90deg, rgba(130,208,164,0.3) 0%, #82D0A4 100%);"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">领养·调教·进化·共生</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>市场全景</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  .slide { width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0; font-family: 'Noto Sans SC', sans-serif; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .gradient-dark { background: linear-gradient(135deg, #000000 0%, #0A1628 50%, #1E3A5F 100%); }
+  .star-decor { color: #2563EB; font-weight: bold; }
+  .italic-heading { font-style: italic; transform: skewX(-5deg); }
+</style>
+</head>
+<body>
+<div class="slide gradient-dark">
+  <!-- 页眉 -->
+  <div class="absolute top-[0px] left-[0px] right-[0px] h-[72px] flex items-center justify-between px-[48px] pt-[8px]">
+    <div class="flex items-center gap-[12px]">
+      <span class="text-[#2563EB] text-[24px] font-[700]">*</span>
+      <span class="text-[14px] font-[500] text-[#FFFFFF]/40 tracking-[0.15em]">市场全景</span>
+    </div>
+    <div class="flex items-center gap-[24px]">
+      <span class="text-[11px] tracking-[0.1em] text-[#FFFFFF]/35">中国宠物经济趋势洞察</span>
+      <span class="text-[13px] font-[600] text-[#FFFFFF]/50">03</span>
+    </div>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="pt-[88px] px-[48px]">
+    <div class="flex items-end gap-[32px]">
+      <div class="italic-heading">
+        <h1 class="text-[48px] font-[900] italic leading-[1.25] text-[#F5F5DC]" style="transform: skewX(-5deg);">
+          3100亿时代来临
+        </h1>
+      </div>
+      <div class="text-[16px] text-[#F5F5DC]/50 pb-[8px]">十年CAGR 13.3%，增长引擎切换中</div>
+    </div>
+    <div class="w-[96px] h-[4px] bg-[#2563EB] mt-[16px]"></div>
+  </div>
+
+  <!-- 主体内容：图表+要点 -->
+  <div class="flex px-[48px] mt-[24px] gap-[40px]">
+    <!-- 图表区 -->
+    <div class="flex-1">
+      <div id="chart-market" style="width: 700px; height: 400px;"></div>
+    </div>
+    <!-- 要点区 -->
+    <div class="w-[400px] flex flex-col justify-center gap-[20px]">
+      <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] p-[20px]">
+        <div class="text-[48px] font-[700] text-[#2563EB]">3126</div>
+        <div class="text-[14px] text-[#F5F5DC]/60">亿元 | 2025年市场规模</div>
+      </div>
+      <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] p-[20px]">
+        <div class="text-[48px] font-[700] text-[#60A5FA]">4050</div>
+        <div class="text-[14px] text-[#F5F5DC]/60">亿元 | 2028年预测</div>
+      </div>
+      <div class="bg-[#FFFFFF]/5 border-[1px] border-[#FFFFFF]/10 rounded-[8px] p-[16px]">
+        <div class="flex items-center gap-[8px]">
+          <i class="ph ph-trend-up text-[#2563EB] text-[20px]"></i>
+          <span class="text-[14px] text-[#F5F5DC]/60">全产业链规模已达</span>
+        </div>
+        <div class="text-[24px] font-[700] text-[#F5F5DC] mt-[4px]">8114亿元</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="absolute bottom-[32px] left-[48px] flex items-center gap-[12px]">
+    <i class="ph ph-fish text-[#2563EB] text-[24px]"></i>
+    <span class="text-[14px] text-[#F5F5DC]/30">数据来源：派读宠物白皮书</span>
+  </div>
+  <div class="absolute bottom-[32px] right-[48px] grid grid-cols-3 gap-[4px]">
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/20"></div>
+    <div class="w-[16px] h-[16px] bg-[#2563EB]/40"></div>
+  </div>
+</div>
+
+<script>
+  var chart = echarts.init(document.getElementById('chart-market'));
+  chart.setOption({
+    animation: false,
+    grid: { left: 60, right: 30, top: 30, bottom: 40 },
+    xAxis: {
+      type: 'category',
+      data: ['2015', '2019', '2023', '2024', '2025', '2028E'],
+      axisLabel: { color: 'rgba(245,245,220,0.6)', fontSize: 13 },
+      axisLine: { lineStyle: { color: 'rgba(245,245,220,0.15)' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: 'rgba(245,245,220,0.5)', fontSize: 12, formatter: '{value}' },
+      splitLine: { lineStyle: { color: 'rgba(245,245,220,0.08)' } },
+      axisLine: { show: false }
+    },
+    series: [{
+      type: 'bar',
+      barWidth: 48,
+      data: [
+        { value: 978, itemStyle: { color: '#2563EB' } },
+        { value: 2024, itemStyle: { color: '#2563EB' } },
+        { value: 2793, itemStyle: { color: '#2563EB' } },
+        { value: 3002, itemStyle: { color: '#2563EB' } },
+        { value: 3126, itemStyle: { color: '#2563EB' } },
+        { value: 4050, itemStyle: { color: '#60A5FA' } }
+      ],
+      label: {
+        show: true,
+        position: 'top',
+        color: 'rgba(245,245,220,0.7)',
+        fontSize: 13,
+        fontWeight: 500,
+        formatter: '{c}'
+      }
+    }]
+  });
+</script>
+</body>
+</html>

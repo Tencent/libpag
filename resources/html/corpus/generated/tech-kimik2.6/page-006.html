@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI协同设计能力</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">06 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">AI协同设计能力</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 三栏内容 -->
+  <!-- 左栏 -->
+  <div class="absolute top-[180px] left-[80px] w-[330px]">
+    <div class="mb-[24px]">
+      <i class="ph ph-text-t text-[32px] mb-[12px] block"></i>
+      <h3 class="text-[20px] font-[600] mb-[8px]">文生UI</h3>
+      <p class="text-[14px]/[22px] leading-[1.625] text-[#111111]/80">用自然语言描述需求，AI自动生成布局与组件，快速搭建起稿结构</p>
+    </div>
+    <div class="mt-[32px]">
+      <i class="ph ph-paint-brush text-[32px] mb-[12px] block"></i>
+      <h3 class="text-[20px] font-[600] mb-[8px]">文/图生图</h3>
+      <p class="text-[14px]/[22px] leading-[1.625] text-[#111111]/80">快速生成插画、配图、运营海报等视觉素材，满足多样化设计需求</p>
+    </div>
+  </div>
+
+  <!-- 竖线1 -->
+  <div class="absolute top-[180px] left-[430px] w-[1px] h-[480px] bg-[#111111]/20"></div>
+
+  <!-- 中栏 -->
+  <div class="absolute top-[180px] left-[460px] w-[330px]">
+    <div class="mb-[24px]">
+      <i class="ph ph-image text-[32px] mb-[12px] block"></i>
+      <h3 class="text-[20px] font-[600] mb-[8px]">图片秒变设计稿</h3>
+      <p class="text-[14px]/[22px] leading-[1.625] text-[#111111]/80">上传图片，智能分层，转为可编辑设计稿，还原度极高</p>
+    </div>
+    <div class="mt-[32px]">
+      <i class="ph ph-shapes text-[32px] mb-[12px] block"></i>
+      <h3 class="text-[20px] font-[600] mb-[8px]">批量生成矢量图标</h3>
+      <p class="text-[14px]/[22px] leading-[1.625] text-[#111111]/80">一键生成整套风格统一的矢量图标，保持设计一致性</p>
+    </div>
+  </div>
+
+  <!-- 竖线2 -->
+  <div class="absolute top-[180px] left-[810px] w-[1px] h-[480px] bg-[#111111]/20"></div>
+
+  <!-- 右栏 -->
+  <div class="absolute top-[180px] left-[840px] w-[330px]">
+    <div class="mb-[24px]">
+      <i class="ph ph-magic-wand text-[32px] mb-[12px] block"></i>
+      <h3 class="text-[20px] font-[600] mb-[8px]">AI助手</h3>
+      <p class="text-[14px]/[22px] leading-[1.625] text-[#111111]/80">智能重命名、生成图片、链接转UI、AI搜索，协作每个设计环节</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

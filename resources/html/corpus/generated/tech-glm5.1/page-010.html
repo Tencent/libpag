@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>竞品分析：Figma vs Sketch</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus_Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .bg-noise {
+      background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    }
+    .geometric-ring {
+      border: 1px solid #111111;
+      border-radius: 50%;
+      position: absolute;
+    }
+    .grid-line {
+      position: absolute;
+      background: rgba(17,17,17,0.06);
+    }
+    .tag {
+      display: inline-block;
+      border: 1px solid rgba(17,17,17,0.2);
+      border-radius: 4px;
+      padding: 2px 10px;
+      font-size: 13px;
+      font-weight: 400;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+    .tag-green {
+      background: rgba(17,17,17,0.04);
+      border-color: rgba(17,17,17,0.15);
+    }
+    .tag-red {
+      background: rgba(17,17,17,0.04);
+      border-color: rgba(17,17,17,0.15);
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#DFDDDA;">
+  <div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <!-- Grid lines -->
+    <div class="grid-line" style="top:0; left:640px; width:1px; height:720px;"></div>
+    <div class="grid-line" style="top:100px; left:0; width:1280px; height:1px;"></div>
+
+    <!-- Geometric ring decorations -->
+    <div class="geometric-ring" style="top:-40px; right:-40px; width:140px; height:140px;"></div>
+    <div class="geometric-ring" style="bottom:60px; left:-30px; width:90px; height:90px;"></div>
+
+    <!-- Header (zone-1) -->
+    <div style="position:absolute; top:30px; left:60px; width:1160px; height:60px;">
+      <p style="font-size:14px; font-weight:400; opacity:0.5; margin:0 0 4px 0;">10</p>
+      <h1 style="font-size:56px; font-weight:600; letter-spacing:-0.025em; margin:0; line-height:1.1;">竞品分析：Figma vs Sketch</h1>
+    </div>
+
+    <!-- VS divider -->
+    <div style="position:absolute; top:300px; left:630px; z-index:10;">
+      <div style="width:40px; height:40px; border:1px solid rgba(17,17,17,0.3); border-radius:50%; display:flex; align-items:center; justify-content:center; background:#DFDDDA;">
+        <span style="font-size:14px; font-weight:600; opacity:0.4;">VS</span>
+      </div>
+    </div>
+
+    <!-- Left column - Figma (zone-2) -->
+    <div style="position:absolute; top:110px; left:60px; width:560px; height:520px;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <div style="width:44px; height:44px; border:1px solid rgba(17,17,17,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center;">
+          <i class="ph ph-columns" style="font-size:22px;"></i>
+        </div>
+        <div>
+          <h2 style="font-size:28px; font-weight:600; letter-spacing:-0.025em; margin:0;">Figma</h2>
+          <p style="font-size:14px; font-weight:400; opacity:0.5; margin:0;">全球设计协作领导者</p>
+        </div>
+      </div>
+
+      <!-- Key metric -->
+      <div style="padding:14px 18px; border:1px solid rgba(17,17,17,0.15); border-radius:6px; margin-bottom:16px; display:flex; align-items:baseline; gap:8px;">
+        <span style="font-size:32px; font-weight:600; letter-spacing:-0.025em;">13.66</span>
+        <span style="font-size:14px; font-weight:400; opacity:0.5;">亿美元</span>
+        <span style="font-size:14px; font-weight:500; margin-left:auto;">2026年营收指引</span>
+      </div>
+
+      <div style="display:flex; gap:16px; margin-bottom:16px;">
+        <div style="padding:10px 14px; border:1px solid rgba(17,17,17,0.1); border-radius:6px; flex:1; text-align:center;">
+          <p style="font-size:24px; font-weight:600; margin:0; letter-spacing:-0.025em;">80-90%</p>
+          <p style="font-size:12px; font-weight:400; opacity:0.5; margin:2px 0 0 0;">市占率</p>
+        </div>
+        <div style="padding:10px 14px; border:1px solid rgba(17,17,17,0.1); border-radius:6px; flex:1; text-align:center;">
+          <p style="font-size:24px; font-weight:600; margin:0; letter-spacing:-0.025em;">54万</p>
+          <p style="font-size:12px; font-weight:400; opacity:0.5; margin:2px 0 0 0;">付费客户</p>
+        </div>
+        <div style="padding:10px 14px; border:1px solid rgba(17,17,17,0.1); border-radius:6px; flex:1; text-align:center;">
+          <p style="font-size:24px; font-weight:600; margin:0; letter-spacing:-0.025em;">131%</p>
+          <p style="font-size:12px; font-weight:400; opacity:0.5; margin:2px 0 0 0;">净收入留存</p>
+        </div>
+      </div>
+
+      <!-- Advantages -->
+      <div style="margin-bottom:14px;">
+        <p style="font-size:14px; font-weight:500; margin:0 0 8px 0; display:flex; align-items:center; gap:6px;">
+          <i class="ph ph-arrow-up-right" style="font-size:16px; opacity:0.5;"></i> 优势
+        </p>
+        <div>
+          <span class="tag tag-green">实时多人在线编辑</span>
+          <span class="tag tag-green">组件库/变体系统极强</span>
+          <span class="tag tag-green">插件生态极丰富</span>
+          <span class="tag tag-green">AI功能全面</span>
+          <span class="tag tag-green">大客户留存率131%</span>
+        </div>
+      </div>
+
+      <!-- Disadvantages -->
+      <div>
+        <p style="font-size:14px; font-weight:500; margin:0 0 8px 0; display:flex; align-items:center; gap:6px;">
+          <i class="ph ph-warning-circle" style="font-size:16px; opacity:0.5;"></i> 劣势
+        </p>
+        <div>
+          <span class="tag tag-red">网络依赖性强国内访问受限</span>
+          <span class="tag tag-red">高级功能$12/人/月起</span>
+          <span class="tag tag-red">数据存储海外合规风险</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column - Sketch (zone-3) -->
+    <div style="position:absolute; top:110px; left:660px; width:560px; height:520px;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+        <div style="width:44px; height:44px; border:1px solid rgba(17,17,17,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center;">
+          <i class="ph ph-apple-logo" style="font-size:22px;"></i>
+        </div>
+        <div>
+          <h2 style="font-size:28px; font-weight:600; letter-spacing:-0.025em; margin:0;">Sketch</h2>
+          <p style="font-size:14px; font-weight:400; opacity:0.5; margin:0;">Mac生态矢量设计王者</p>
+        </div>
+      </div>
+
+      <!-- Positioning -->
+      <div style="padding:14px 18px; border:1px solid rgba(17,17,17,0.15); border-radius:6px; margin-bottom:16px;">
+        <p style="font-size:16px; font-weight:400; line-height:1.6; margin:0;">Mac生态下的矢量设计王者，以精准控制和轻量体验著称</p>
+      </div>
+
+      <!-- Key features -->
+      <div style="display:flex; gap:12px; margin-bottom:16px;">
+        <div style="padding:12px 14px; border:1px solid rgba(17,17,17,0.1); border-radius:6px; flex:1; text-align:center;">
+          <i class="ph ph-vector-three" style="font-size:24px; opacity:0.6;"></i>
+          <p style="font-size:13px; font-weight:500; margin:6px 0 0 0;">0.1px锚点微调</p>
+        </div>
+        <div style="padding:12px 14px; border:1px solid rgba(17,17,17,0.1); border-radius:6px; flex:1; text-align:center;">
+          <i class="ph ph-feather" style="font-size:24px; opacity:0.6;"></i>
+          <p style="font-size:13px; font-weight:500; margin:6px 0 0 0;">轻量资源占用</p>
+        </div>
+        <div style="padding:12px 14px; border:1px solid rgba(17,17,17,0.1); border-radius:6px; flex:1; text-align:center;">
+          <i class="ph ph-plug" style="font-size:24px; opacity:0.6;"></i>
+          <p style="font-size:13px; font-weight:500; margin:6px 0 0 0;">插件扩展性极强</p>
+        </div>
+      </div>
+
+      <!-- Advantages -->
+      <div style="margin-bottom:14px;">
+        <p style="font-size:14px; font-weight:500; margin:0 0 8px 0; display:flex; align-items:center; gap:6px;">
+          <i class="ph ph-arrow-up-right" style="font-size:16px; opacity:0.5;"></i> 优势
+        </p>
+        <div>
+          <span class="tag tag-green">0.1px级锚点微调</span>
+          <span class="tag tag-green">轻量资源占用</span>
+          <span class="tag tag-green">插件扩展性极强</span>
+          <span class="tag tag-green">Mac原生体验</span>
+        </div>
+      </div>
+
+      <!-- Disadvantages -->
+      <div>
+        <p style="font-size:14px; font-weight:500; margin:0 0 8px 0; display:flex; align-items:center; gap:6px;">
+          <i class="ph ph-warning-circle" style="font-size:16px; opacity:0.5;"></i> 劣势
+        </p>
+        <div>
+          <span class="tag tag-red">仅支持macOS</span>
+          <span class="tag tag-red">团队协作需额外成本</span>
+          <span class="tag tag-red">AI功能相对落后</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Highlight bar (zone-4) -->
+    <div style="position:absolute; top:660px; left:60px; width:1160px; height:30px; display:flex; align-items:center; border-top:1px solid rgba(17,17,17,0.2); padding-top:4px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" style="margin-right:8px; flex-shrink:0;">
+        <path d="M7 7l10 10M17 7v10H7"/>
+      </svg>
+      <p style="font-size:14px; font-weight:500; margin:0;">Figma全球称王，但国内合规与访问是关键痛点</p>
+    </div>
+
+    <!-- Footer -->
+    <div style="position:absolute; bottom:16px; left:60px; right:60px; display:flex; justify-content:space-between;">
+      <p style="font-size:14px; font-weight:400; opacity:0.4; margin:0;">腾讯Ardot设计平台 - 分析与竞品分析报告</p>
+      <p style="font-size:14px; font-weight:400; opacity:0.4; margin:0;">10</p>
+    </div>
+  </div>
+</body>
+</html>

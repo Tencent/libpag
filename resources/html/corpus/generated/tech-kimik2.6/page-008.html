@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设计到开发：零损耗交付</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .arrow-icon { width: 20px; height: 20px; flex-shrink: 0; margin-top: 3px; }
+</style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-8">
+<div class="w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-['Plus_Jakarta_Sans']">
+  <!-- 页眉 -->
+  <div class="absolute top-[40px] left-[48px] flex items-center gap-[8px]">
+    <i class="ph ph-pen-nib text-[20px]"></i>
+    <span class="text-[14px]/[20px] font-[500]">Ardot Analysis</span>
+  </div>
+  <div class="absolute top-[40px] right-[48px]">
+    <span class="text-[14px]/[20px]">08 / 15</span>
+  </div>
+
+  <!-- 标题区 -->
+  <div class="absolute top-[60px] left-[80px] w-[1120px]">
+    <h2 class="text-[56px] font-[600] tracking-[-0.025em]">设计到开发：零损耗交付</h2>
+  </div>
+
+  <!-- 分割线 -->
+  <div class="absolute top-[150px] left-[0px] right-[0px] h-[1px] bg-[#111111]/20"></div>
+
+  <!-- 内容区 -->
+  <div class="absolute top-[180px] left-[80px] w-[1120px] flex flex-col gap-[22px]">
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-ruler text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">可视化标注信息</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">尺寸、间距、样式等信息一目了然，开发者无需猜测设计意图</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-stack text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">组件选项查看</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">可以查看所有可能的组件变体，并提供相应的代码，减少沟通成本</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-copy text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">快速复制代码</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">涵盖CSS、iOS、Android常见代码类型，一键复制即可使用</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-terminal text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">MCP一键转代码</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">基于模型上下文协议，设计稿可直接导入CodeBuddy、Cursor、Claude Code等IDE</p>
+      </div>
+    </div>
+    <div class="flex items-start gap-[16px]">
+      <i class="ph ph-arrows-left-right text-[24px] mt-[2px]"></i>
+      <div>
+        <h3 class="text-[18px]/[28px] font-[500] mb-[2px]">设计到代码的无缝流转</h3>
+        <p class="text-[14px]/[22px] text-[#111111]/60">实现从设计到代码的零损耗流转，显著缩短设计到开发的周期</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部强调区 -->
+  <div class="absolute bottom-[60px] left-[80px] w-[1120px] border-t-[1px] border-[#111111]/20 pt-[16px]">
+    <p class="text-[16px]/[24px] font-[500]">MCP协议：实现设计与代码的无缝连接，是当前市场上极具前瞻性的布局</p>
+  </div>
+</div>
+</body>
+</html>

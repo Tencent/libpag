@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=720, initial-scale=1.0">
+<title>执行摘要</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .geo-circle {
+    border: 1px solid #111111;
+    border-radius: 50%;
+  }
+  .hairline-grid {
+    border: 1px solid rgba(17,17,17,0.2);
+  }
+  .bullet-arrow {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body class="bg-noise">
+<div class="relative w-[1280px] h-[720px] overflow-hidden">
+
+  <!-- Decorative geometric circle -->
+  <div class="absolute geo-circle" style="top: -80px; right: -80px; width: 320px; height: 320px; opacity: 0.15;"></div>
+
+  <!-- Hairline Grid Lines -->
+  <div class="absolute" style="top: 110px; left: 48px; width: 1184px; height: 1px; background: rgba(17,17,17,0.15);"></div>
+
+  <!-- Header Zone -->
+  <div class="absolute" style="top: 40px; left: 48px; width: 1184px; height: 60px;">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="ph-duotone ph-chart-line-up" style="font-size: 28px; color: #111111;"></i>
+        <h1 class="font-semibold" style="font-size: 56px; letter-spacing: -0.01em; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif;">执行摘要</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-[2px]" style="background: #111111; opacity: 0.3;"></div>
+        <span style="font-size: 12px; color: #111111; opacity: 0.4; font-family: 'Plus Jakarta Sans', sans-serif;">02</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Body Zone -->
+  <div class="absolute" style="top: 130px; left: 48px; width: 560px; height: 520px;">
+    <div class="flex flex-col gap-6 h-full">
+      <!-- Body text block 1 -->
+      <div class="flex flex-col gap-4">
+        <p style="font-size: 14px; line-height: 1.7; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif;">
+          <span style="font-weight: 600; color: #111111;">2026年5月18日</span>，腾讯云自研的AI设计智能体平台Ardot正式开启公测。作为腾讯设计推出的下一代智能设计工具，Ardot旨在通过AI技术重新定义设计工作流程，提升产设研团队的协作效率。
+        </p>
+        <p style="font-size: 14px; line-height: 1.7; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif; opacity: 0.8;">
+          Ardot定位为<span style="font-weight: 500;">AI驱动的产设研协作平台</span>，集成文生UI、图片转设计稿、AI助手、设计系统管理等核心能力，致力于打造可编辑、可复用、可交付的团队资产体系。
+        </p>
+        <p style="font-size: 14px; line-height: 1.7; color: #111111; font-family: 'Plus Jakarta Sans', sans-serif; opacity: 0.8;">
+          本报告从产品功能、技术架构、市场定位等多维度对Ardot进行全面分析，并与主流竞品进行深入对比，为产品战略决策提供参考依据。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="absolute" style="top: 130px; left: 624px; width: 1px; height: 520px; background: rgba(17,17,17,0.2);"></div>
+
+  <!-- Right Body Zone -->
+  <div class="absolute" style="top: 130px; left: 648px; width: 584px; height: 520px;">
+    <div class="flex flex-col gap-6 h-full">
+      <!-- Section Title -->
+      <div class="flex items-center gap-2 pb-2" style="border-bottom: 1px solid rgba(17,17,17,0.15);">
+        <i class="ph ph-chart-bar" style="font-size: 18px; color: #111111;"></i>
+        <span class="font-semibold" style="font-size: 16px; color: #111111; letter-spacing: -0.01em;">市场背景</span>
+      </div>
+
+      <!-- Bullet Points -->
+      <div class="flex flex-col gap-4">
+        <!-- Item 1 -->
+        <div class="flex items-start gap-3">
+          <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+            <path d="M7 7l10 10M17 7v10H7"/>
+          </svg>
+          <div class="flex flex-col gap-1">
+            <span class="font-semibold" style="font-size: 22px; color: #111111; line-height: 1.2;">$21.4亿</span>
+            <span style="font-size: 13px; color: #111111; opacity: 0.6;">2025年全球AI设计工具市场规模</span>
+          </div>
+        </div>
+        <!-- Item 2 -->
+        <div class="flex items-start gap-3">
+          <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+            <path d="M7 7l10 10M17 7v10H7"/>
+          </svg>
+          <div class="flex flex-col gap-1">
+            <span class="font-semibold" style="font-size: 22px; color: #111111; line-height: 1.2;">$159.9亿</span>
+            <span style="font-size: 13px; color: #111111; opacity: 0.6;">预计2035年市场规模</span>
+          </div>
+        </div>
+        <!-- Item 3 -->
+        <div class="flex items-start gap-3">
+          <svg class="bullet-arrow" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5" style="margin-top: 2px;">
+            <path d="M7 7l10 10M17 7v10H7"/>
+          </svg>
+          <div class="flex flex-col gap-1">
+            <span class="font-semibold" style="font-size: 22px; color: #111111; line-height: 1.2;">22.25%</span>
+            <span style="font-size: 13px; color: #111111; opacity: 0.6;">复合年增长率 (CAGR)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Decorative separator -->
+      <div style="width: 40px; height: 1px; background: #111111; opacity: 0.3; margin-top: 8px;"></div>
+
+      <!-- Key Insight -->
+      <div style="background: rgba(17,17,17,0.06); padding: 16px 20px; border-left: 2px solid #111111; border-radius: 0 4px 4px 0;">
+        <p style="font-size: 13px; line-height: 1.6; color: #111111; opacity: 0.8;">
+          Ardot凭借腾讯混元大模型与优图视觉算法的技术支撑，在企业级AI设计工具赛道中具备独特竞争优势。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page Number -->
+  <div class="absolute" style="bottom: 20px; right: 48px;">
+    <span style="color: #111111; opacity: 0.4; font-size: 12px; font-family: 'Plus Jakarta Sans', sans-serif;">02</span>
+  </div>
+
+</div>
+</body>
+</html>

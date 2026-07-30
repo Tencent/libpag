@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>竞品分析：Pixso与墨刀</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  .bg-noise {
+    background-color: #DFDDDA;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .list-arrow svg { display: inline-block; width: 14px; height: 14px; margin-right: 10px; flex-shrink: 0; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="bg-noise w-[1280px] h-[720px] relative overflow-hidden">
+  <!-- Header -->
+  <div class="absolute" style="top:40px;left:48px;width:1184px;height:60px;">
+    <h1 class="text-[56px] font-semibold tracking-[-0.01em]" style="color:#111111;line-height:1.15;">竞品分析：Pixso与墨刀</h1>
+  </div>
+
+  <!-- Left Body: Pixso -->
+  <div class="absolute" style="top:130px;left:48px;width:560px;height:520px;">
+    <div class="flex items-center mb-6">
+      <div class="flex items-center justify-center w-10 h-10 rounded-full" style="border:1px solid #111111;">
+        <i class="ph ph-palette text-[20px]" style="color:#111111;"></i>
+      </div>
+      <h2 class="text-[24px] font-semibold ml-4" style="color:#111111;">Pixso - 博思云创</h2>
+    </div>
+    <div class="space-y-5">
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:#111111;">高级设计功能最完整</span>
+      </div>
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:#111111;">国内首款完整变量系统</span>
+      </div>
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:#111111;">AI功能一站式集成</span>
+      </div>
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:rgba(17,17,17,0.6);">劣势：知名度较低、国际化有限</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="absolute" style="top:130px;left:624px;width:1px;height:520px;background:rgba(17,17,17,0.2);"></div>
+
+  <!-- Right Body: 墨刀 -->
+  <div class="absolute" style="top:130px;left:648px;width:584px;height:520px;">
+    <div class="flex items-center mb-6">
+      <div class="flex items-center justify-center w-10 h-10 rounded-full" style="border:1px solid #111111;">
+        <i class="ph ph-cursor-click text-[20px]" style="color:#111111;"></i>
+      </div>
+      <h2 class="text-[24px] font-semibold ml-4" style="color:#111111;">墨刀</h2>
+    </div>
+    <div class="space-y-5">
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:#111111;">原型交互能力极强</span>
+      </div>
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:#111111;">墨刀AI Agent生成PRD</span>
+      </div>
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:#111111;">中文界面+行业模板库</span>
+      </div>
+      <div class="flex list-arrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.5"><path d="M7 7l10 10M17 7v10H7"/></svg>
+        <span class="text-[16px] leading-[1.6]" style="color:rgba(17,17,17,0.6);">劣势：偏向原型交互</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

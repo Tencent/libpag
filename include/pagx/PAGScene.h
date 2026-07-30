@@ -266,8 +266,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
   friend class PAGXDocument;
-  friend class PAGAnimation;
-  friend class PAGStateMachine;
+  friend class PAGTimeline;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;

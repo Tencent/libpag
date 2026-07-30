@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hello, Astronaut</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body { height: 100%; background: #0e0a3a; margin: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; overflow: hidden; }
+
+  /* 星星闪烁 */
+  @keyframes twinkle { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: .25; transform: scale(.7);} }
+  .twinkle { animation: twinkle 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+
+  /* 流星 */
+  @keyframes shoot {
+    0%   { transform: translate(0,0); opacity: 0; }
+    10%  { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { transform: translate(-160px, 60px); opacity: 0; }
+  }
+  .shoot { animation: shoot 5s linear infinite; }
+
+  /* 飘浮 */
+  @keyframes float-y { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-6px);} }
+  .float-y { animation: float-y 4s ease-in-out infinite; }
+
+  @keyframes float-y2 { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3px);} }
+  .float-y2 { animation: float-y2 3s ease-in-out infinite; }
+
+  /* 挥手 */
+  @keyframes wave { 0%,100% { transform: rotate(-6deg);} 50% { transform: rotate(8deg);} }
+  .wave { animation: wave 1.6s ease-in-out infinite; transform-origin: 100% 100%; transform-box: fill-box; }
+
+  /* UFO 光束闪烁 */
+  @keyframes beam-pulse { 0%,100% { opacity: .55;} 50% { opacity: .9;} }
+  .beam-pulse { animation: beam-pulse 2.2s ease-in-out infinite; }
+
+  /* 草丛轻微摇摆 */
+  @keyframes sway { 0%,100% { transform: rotate(-1.5deg);} 50% { transform: rotate(1.5deg);} }
+  .sway { animation: sway 4.5s ease-in-out infinite; transform-origin: bottom center; transform-box: fill-box; }
+  .sway2 { animation: sway 5.5s ease-in-out infinite reverse; transform-origin: bottom center; transform-box: fill-box; }
+
+  /* 信号波 */
+  @keyframes ping {
+    0%   { transform: scale(.4); opacity: .9; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .ping { animation: ping 2s cubic-bezier(0,0,.2,1) infinite; transform-origin: center; transform-box: fill-box; }
+
+  /* HUD 屏幕呼吸 */
+  @keyframes hud-glow { 0%,100% { opacity: .9;} 50% { opacity: 1;} }
+  .hud-glow { animation: hud-glow 2.5s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useMemo } = React;
+
+// ========= 工具：随机星 =========
+function randStars(count, w, h, maxR = 1.6, seed = 1) {
+  // 简单 LCG 让结果稳定
+  let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const stars = [];
+  for (let i = 0; i < count; i++) {
+    stars.push({
+      cx: rnd() * w,
+      cy: rnd() * h,
+      r: 0.4 + rnd() * maxR,
+      d: 1 + rnd() * 3,
+      delay: rnd() * 3,
+    });
+  }
+  return stars;
+}
+
+// ========= 闪光大星 =========
+function Sparkle({ x, y, size = 14, opacity = 1 }) {
+  const s = size;
+  return (
+    <g transform={`translate(${x} ${y})`} className="twinkle" style={{ opacity }}>
+      <path d={`M 0 ${-s} L ${s*0.18} ${-s*0.18} L ${s} 0 L ${s*0.18} ${s*0.18} L 0 ${s} L ${-s*0.18} ${s*0.18} L ${-s} 0 L ${-s*0.18} ${-s*0.18} Z`}
+        fill="white" />
+      <circle r={s * 0.18} fill="white"/>
+    </g>
+  );
+}
+
+// ========= 土星 =========
+function Saturn({ x, y }) {
+  return (
+    <g transform={`translate(${x} ${y})`} className="float-y">
+      <defs>
+        <radialGradient id="planetGrad" cx="35%" cy="35%" r="80%">
+          <stop offset="0%" stopColor="#ff8a3a"/>
+          <stop offset="55%" stopColor="#ee4522"/>
+          <stop offset="100%" stopColor="#a02410"/>
+        </radialGradient>
+      </defs>
+      {/* 后半环 */}
+      <ellipse cx="0" cy="0" rx="105" ry="22" fill="none" stroke="#c44a1f" strokeWidth="6" opacity="0.85"/>
+      {/* 行星 */}
+      <circle r="62" fill="url(#planetGrad)"/>
+      <ellipse cx="-18" cy="-18" rx="22" ry="16" fill="#ff9f55" opacity="0.45"/>
+      {/* 前半环 (用 path 半弧，遮住前面) */}
+      <path d="M -105 0 A 105 22 0 0 0 105 0" fill="none" stroke="#ff7a2f" strokeWidth="6" opacity="0.95"/>
+      <path d="M -98 -2 A 98 18 0 0 0 98 -2" fill="none" stroke="#ffb070" strokeWidth="2" opacity="0.7"/>
+    </g>
+  );
+}
+
+// ========= 紫色小行星 =========
+function PurplePlanet({ x, y, r = 14 }) {
+  return (
+    <g transform={`translate(${x} ${y})`} className="float-y2">
+      <defs>
+        <radialGradient id="pp" cx="35%" cy="35%" r="80%">
+          <stop offset="0%" stopColor="#a78bfa"/>
+          <stop offset="100%" stopColor="#5b3acf"/>
+        </radialGradient>
+      </defs>
+      <circle r={r} fill="url(#pp)"/>
+      <circle cx={-r*0.3} cy={-r*0.3} r={r*0.3} fill="#c4b5fd" opacity="0.5"/>
+    </g>
+  );
+}
+
+// ========= 左侧大蓝星球 (半圆) =========
+function BluePlanet() {
+  return (
+    <g>
+      <defs>
+        <radialGradient id="bp" cx="35%" cy="35%" r="90%">
+          <stop offset="0%" stopColor="#3b82f6"/>
+          <stop offset="60%" stopColor="#1e3a8a"/>
+          <stop offset="100%" stopColor="#0c1e5a"/>
+        </radialGradient>
+      </defs>
+      <circle cx="-30" cy="430" r="220" fill="url(#bp)"/>
+      <ellipse cx="-90" cy="380" rx="60" ry="20" fill="#60a5fa" opacity="0.35"/>
+    </g>
+  );
+}
+
+// ========= 远山 (剪影分层) =========
+function Mountains() {
+  return (
+    <g>
+      {/* 远山-深紫 */}
+      <path d="M 0 510 L 120 430 L 200 460 L 320 400 L 420 470 L 540 410 L 660 460 L 780 410 L 900 470 L 1020 420 L 1080 450 L 1080 560 L 0 560 Z"
+            fill="#2a1c5e"/>
+      {/* 中山-紫 */}
+      <path d="M 0 540 L 80 480 L 180 520 L 280 470 L 380 510 L 500 470 L 620 520 L 740 480 L 860 520 L 980 480 L 1080 510 L 1080 580 L 0 580 Z"
+            fill="#241858"/>
+    </g>
+  );
+}
+
+// ========= 草地基底 =========
+function Ground() {
+  return (
+    <g>
+      {/* 远地平面 */}
+      <path d="M 0 555 Q 540 525 1080 555 L 1080 720 L 0 720 Z" fill="#1d1349"/>
+      {/* 中地平面（更深） */}
+      <path d="M 0 590 Q 300 570 540 585 Q 760 600 1080 575 L 1080 720 L 0 720 Z" fill="#15103a"/>
+      {/* 圆形小坑 */}
+      <ellipse cx="320" cy="560" rx="34" ry="6" fill="#0e0a30"/>
+      <ellipse cx="320" cy="558" rx="30" ry="4" fill="#1a1248"/>
+    </g>
+  );
+}
+
+// ========= UFO =========
+function UFO({ x, y }) {
+  return (
+    <g transform={`translate(${x} ${y})`} className="float-y">
+      {/* 光束 */}
+      <g className="beam-pulse">
+        <path d="M -34 18 L 34 18 L 18 130 L -18 130 Z" fill="url(#beamGrad)" opacity="0.85"/>
+      </g>
+      <defs>
+        <linearGradient id="beamGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.9"/>
+          <stop offset="100%" stopColor="#7dd3fc" stopOpacity="0"/>
+        </linearGradient>
+        <linearGradient id="ufoBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#e2e8f0"/>
+          <stop offset="100%" stopColor="#94a3b8"/>
+        </linearGradient>
+        <radialGradient id="dome" cx="40%" cy="30%" r="80%">
+          <stop offset="0%" stopColor="#bae6fd"/>
+          <stop offset="100%" stopColor="#0284c7"/>
+        </radialGradient>
+      </defs>
+      {/* 身体椭圆 */}
+      <ellipse cx="0" cy="14" rx="50" ry="14" fill="url(#ufoBody)"/>
+      <ellipse cx="0" cy="10" rx="50" ry="10" fill="#cbd5e1"/>
+      {/* 圆顶 */}
+      <path d="M -28 4 A 28 22 0 0 1 28 4 L 28 6 L -28 6 Z" fill="url(#dome)"/>
+      {/* 底部灯 */}
+      <circle cx="-28" cy="18" r="3" fill="#fbbf24"/>
+      <circle cx="0"   cy="20" r="3" fill="#fbbf24"/>
+      <circle cx="28"  cy="18" r="3" fill="#fbbf24"/>
+    </g>
+  );
+}
+
+// ========= 卫星 =========
+function Satellite({ x, y }) {
+  return (
+    <g transform={`translate(${x} ${y})`} className="float-y2">
+      {/* 太阳能板 */}
+      <rect x="-22" y="-3" width="14" height="6" fill="#475569" stroke="#94a3b8" strokeWidth="0.5"/>
+      <rect x="8" y="-3" width="14" height="6" fill="#475569" stroke="#94a3b8" strokeWidth="0.5"/>
+      <line x1="-15" y1="-3" x2="-15" y2="3" stroke="#94a3b8" strokeWidth="0.5"/>
+      <line x1="15" y1="-3" x2="15" y2="3" stroke="#94a3b8" strokeWidth="0.5"/>
+      {/* 主体 */}
+      <rect x="-7" y="-4" width="14" height="8" fill="#cbd5e1" rx="1"/>
+      <circle cx="0" cy="0" r="2" fill="#fbbf24"/>
+    </g>
+  );
+}
+
+// ========= HUD 屏幕 =========
+function HudScreen({ x, y }) {
+  return (
+    <g transform={`translate(${x} ${y})`} className="hud-glow">
+      <defs>
+        <linearGradient id="hudFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#1e3a8a" stopOpacity="0.85"/>
+          <stop offset="100%" stopColor="#312e81" stopOpacity="0.7"/>
+        </linearGradient>
+      </defs>
+      {/* 三角指示 */}
+      <path d="M 60 18 L 70 8 L 70 28 Z" fill="#60a5fa" opacity="0.85"/>
+      {/* 屏幕 */}
+      <rect x="0" y="0" width="60" height="38" rx="4" fill="url(#hudFill)" stroke="#60a5fa" strokeWidth="1.2"/>
+      {/* 屏幕内容线条 */}
+      <line x1="6" y1="9" x2="40" y2="9" stroke="#93c5fd" strokeWidth="1.2"/>
+      <line x1="6" y1="15" x2="32" y2="15" stroke="#60a5fa" strokeWidth="1" opacity="0.8"/>
+      <line x1="6" y1="21" x2="46" y2="21" stroke="#60a5fa" strokeWidth="1" opacity="0.7"/>
+      <line x1="6" y1="27" x2="28" y2="27" stroke="#60a5fa" strokeWidth="1" opacity="0.6"/>
+      <circle cx="50" cy="29" r="2.5" fill="#fbbf24"/>
+    </g>
+  );
+}
+
+// ========= 宇航员 =========
+function Astronaut({ x, y }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <defs>
+        <linearGradient id="suit" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f1f5f9"/>
+          <stop offset="100%" stopColor="#94a3b8"/>
+        </linearGradient>
+        <linearGradient id="suitDark" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#cbd5e1"/>
+          <stop offset="100%" stopColor="#64748b"/>
+        </linearGradient>
+        <radialGradient id="visor" cx="40%" cy="35%" r="80%">
+          <stop offset="0%" stopColor="#1e3a8a"/>
+          <stop offset="80%" stopColor="#0b1733"/>
+          <stop offset="100%" stopColor="#020617"/>
+        </radialGradient>
+      </defs>
+
+      {/* 阴影 */}
+      <ellipse cx="0" cy="158" rx="38" ry="5" fill="#000" opacity="0.35"/>
+
+      {/* 左腿 */}
+      <path d="M -16 96 Q -18 130 -20 154 L -8 156 Q -6 130 -4 100 Z" fill="url(#suit)"/>
+      <rect x="-22" y="150" width="18" height="8" rx="2" fill="#1f2937"/>
+      {/* 右腿 */}
+      <path d="M 4 100 Q 6 130 8 154 L 20 156 Q 18 130 16 96 Z" fill="url(#suit)"/>
+      <rect x="2" y="150" width="18" height="8" rx="2" fill="#1f2937"/>
+
+      {/* 身体 (胸甲) */}
+      <path d="M -28 50 Q -32 95 -22 102 L 22 102 Q 32 95 28 50 Z" fill="url(#suit)"/>
+      {/* 胸前控制面板 */}
+      <rect x="-9" y="62" width="18" height="20" rx="2" fill="#334155"/>
+      <rect x="-7" y="64" width="6" height="6" fill="#ef4444"/>
+      <rect x="1" y="64" width="6" height="6" fill="#3b82f6"/>
+      <rect x="-7" y="72" width="6" height="6" fill="#fbbf24"/>
+      <rect x="1" y="72" width="6" height="6" fill="#22c55e"/>
+      {/* 腰带 */}
+      <rect x="-26" y="92" width="52" height="8" fill="#475569"/>
+      <circle cx="0" cy="96" r="2.5" fill="#fbbf24"/>
+
+      {/* 左手臂 (举起挥手) */}
+      <g>
+        <g className="wave">
+          <path d="M -28 52 Q -54 36 -56 6 L -42 0 Q -38 28 -22 50 Z" fill="url(#suit)"/>
+          {/* 手套 */}
+          <circle cx="-49" cy="-2" r="9" fill="#e2e8f0"/>
+          <circle cx="-49" cy="-2" r="9" fill="none" stroke="#64748b" strokeWidth="1"/>
+        </g>
+      </g>
+
+      {/* 右手臂 (拿设备) */}
+      <path d="M 28 52 Q 44 70 44 92 L 32 96 Q 28 78 22 60 Z" fill="url(#suit)"/>
+      <circle cx="40" cy="96" r="8" fill="#e2e8f0" stroke="#64748b" strokeWidth="1"/>
+      {/* 手中设备 (探测器) */}
+      <rect x="34" y="60" width="14" height="38" rx="2" fill="#475569"/>
+      <rect x="36" y="64" width="10" height="8" fill="#22d3ee"/>
+      <circle cx="41" cy="80" r="2" fill="#fbbf24"/>
+      <rect x="38" y="86" width="6" height="2" fill="#94a3b8"/>
+      {/* 设备顶部天线 */}
+      <line x1="41" y1="60" x2="41" y2="48" stroke="#94a3b8" strokeWidth="1.4"/>
+      <circle cx="41" cy="46" r="2" fill="#ef4444"/>
+
+      {/* 头盔 */}
+      <circle cx="0" cy="30" r="28" fill="url(#suit)"/>
+      {/* 头盔顶部反光 */}
+      <ellipse cx="-8" cy="14" rx="10" ry="4" fill="#ffffff" opacity="0.5"/>
+      {/* 面罩 */}
+      <ellipse cx="0" cy="32" rx="20" ry="18" fill="url(#visor)"/>
+      <ellipse cx="-7" cy="24" rx="6" ry="4" fill="#60a5fa" opacity="0.55"/>
+      <ellipse cx="6" cy="38" rx="3" ry="2" fill="#93c5fd" opacity="0.5"/>
+      {/* 头盔下方颈圈 */}
+      <rect x="-14" y="50" width="28" height="6" fill="#475569"/>
+      {/* 头盔侧耳 */}
+      <circle cx="-28" cy="32" r="4" fill="#475569"/>
+      <circle cx="28" cy="32" r="4" fill="#475569"/>
+
+      {/* 背包顶部 */}
+      <rect x="-22" y="40" width="44" height="6" fill="#64748b" opacity="0.6"/>
+    </g>
+  );
+}
+
+// ========= 草丛/外星植物 =========
+function Grass({ x, color = "#10b981", h = 80 }) {
+  return (
+    <g transform={`translate(${x} 0)`} className="sway">
+      <path d={`M 0 720 Q -3 ${720 - h*0.6} -8 ${720 - h}`} stroke={color} strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d={`M 0 720 Q 0 ${720 - h*0.7} 0 ${720 - h*1.05}`} stroke={color} strokeWidth="3" fill="none" strokeLinecap="round"/>
+      <path d={`M 0 720 Q 4 ${720 - h*0.6} 9 ${720 - h*0.9}`} stroke={color} strokeWidth="3" fill="none" strokeLinecap="round"/>
+    </g>
+  );
+}
+
+// 蘑菇/外星花
+function AlienFlower({ x, y, c1 = "#22d3ee", c2 = "#06b6d4" }) {
+  return (
+    <g transform={`translate(${x} ${y})`} className="float-y2">
+      <line x1="0" y1="0" x2="0" y2="20" stroke="#16a34a" strokeWidth="2"/>
+      <ellipse cx="0" cy="-2" rx="6" ry="8" fill={c1}/>
+      <ellipse cx="0" cy="-4" rx="3" ry="4" fill={c2} opacity="0.7"/>
+    </g>
+  );
+}
+
+// 紫色尖晶石
+function PurpleCrystal({ x, y, h = 60 }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <path d={`M 0 0 L -8 ${-h*0.55} L 0 ${-h} L 8 ${-h*0.55} Z`} fill="#7c3aed"/>
+      <path d={`M 0 0 L 0 ${-h} L 8 ${-h*0.55} Z`} fill="#a78bfa"/>
+    </g>
+  );
+}
+
+// 蘑菇粉红
+function PinkMushroom({ x, y, s = 1 }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(${s})`}>
+      <rect x="-3" y="0" width="6" height="14" fill="#fce7f3" rx="2"/>
+      <ellipse cx="0" cy="0" rx="14" ry="10" fill="#ec4899"/>
+      <ellipse cx="-4" cy="-4" rx="3" ry="2" fill="#fbcfe8"/>
+    </g>
+  );
+}
+
+// 小外星生物 (类章鱼)
+function AlienCreature({ x, y, color = "#a855f7" }) {
+  return (
+    <g transform={`translate(${x} ${y})`} className="float-y2">
+      <ellipse cx="0" cy="0" rx="11" ry="9" fill={color}/>
+      <circle cx="-3" cy="-2" r="2.5" fill="#fff"/>
+      <circle cx="4" cy="-2" r="2.5" fill="#fff"/>
+      <circle cx="-3" cy="-2" r="1.2" fill="#000"/>
+      <circle cx="4" cy="-2" r="1.2" fill="#000"/>
+      {/* 触角 */}
+      <line x1="-7" y1="-9" x2="-9" y2="-13" stroke={color} strokeWidth="1.5"/>
+      <line x1="7" y1="-9" x2="9" y2="-13" stroke={color} strokeWidth="1.5"/>
+      <circle cx="-9" cy="-14" r="1.5" fill={color}/>
+      <circle cx="9" cy="-14" r="1.5" fill={color}/>
+      {/* 触手 */}
+      <path d="M -8 6 Q -10 12 -6 14" stroke={color} strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+      <path d="M 0 8 Q 0 14 2 16" stroke={color} strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+      <path d="M 8 6 Q 10 12 6 14" stroke={color} strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+    </g>
+  );
+}
+
+// 信号塔 (小)
+function SignalTower({ x, y }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <line x1="0" y1="0" x2="0" y2="14" stroke="#22d3ee" strokeWidth="1.5"/>
+      <circle cx="0" cy="0" r="3" fill="#22d3ee"/>
+      <circle cx="0" cy="0" r="6" fill="none" stroke="#22d3ee" strokeWidth="1" className="ping"/>
+      <circle cx="0" cy="0" r="6" fill="none" stroke="#22d3ee" strokeWidth="1" className="ping" style={{ animationDelay: '0.7s' }}/>
+    </g>
+  );
+}
+
+// ========= 总插画 =========
+function Scene() {
+  const stars = useMemo(() => randStars(140, 1080, 460, 1.4, 7), []);
+  // 草丛位置
+  const grassPositions = useMemo(() => {
+    const arr = [];
+    for (let i = 0; i < 40; i++) {
+      arr.push({ x: 10 + i * 28 + (i % 3) * 4, h: 70 + (i * 17 % 60), c: i % 4 === 0 ? '#34d399' : '#10b981' });
+    }
+    return arr;
+  }, []);
+
+  return (
+    <svg viewBox="0 0 1080 720" className="w-screen h-screen block" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0b0a3a"/>
+          <stop offset="50%" stopColor="#1a1259"/>
+          <stop offset="100%" stopColor="#241867"/>
+        </linearGradient>
+        <radialGradient id="vignette" cx="50%" cy="55%" r="75%">
+          <stop offset="60%" stopColor="#000" stopOpacity="0"/>
+          <stop offset="100%" stopColor="#000" stopOpacity="0.5"/>
+        </radialGradient>
+      </defs>
+
+      {/* 天空 */}
+      <rect width="1080" height="720" fill="url(#sky)"/>
+
+      {/* 星星 */}
+      <g>
+        {stars.map((s, i) => (
+          <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill="#ffffff"
+                  className="twinkle"
+                  style={{ animationDuration: `${s.d}s`, animationDelay: `${s.delay}s` }}/>
+        ))}
+      </g>
+
+      {/* 大闪光星 */}
+      <Sparkle x={195} y={88} size={14}/>
+      <Sparkle x={723} y={62} size={10}/>
+      <Sparkle x={865} y={235} size={8}/>
+      <Sparkle x={62} y={210} size={9} opacity={0.85}/>
+      <Sparkle x={415} y={185} size={7} opacity={0.85}/>
+      <Sparkle x={510} y={140} size={6} opacity={0.7}/>
+      <Sparkle x={605} y={250} size={6} opacity={0.7}/>
+
+      {/* 流星 */}
+      <g className="shoot" style={{ transformOrigin: 'center' }}>
+        <line x1="700" y1="100" x2="780" y2="70" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" opacity="0.85"/>
+      </g>
+      <g className="shoot" style={{ animationDelay: '2.5s' }}>
+        <line x1="430" y1="150" x2="500" y2="125" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" opacity="0.7"/>
+      </g>
+
+      {/* 紫色小行星 */}
+      <PurplePlanet x={385} y={92} r={16}/>
+
+      {/* 土星 */}
+      <Saturn x={895} y={130}/>
+
+      {/* 远星点 */}
+      <circle cx="940" cy="345" r="2.5" fill="#fbbf24" opacity="0.85" className="twinkle" style={{ animationDelay: '1s' }}/>
+
+      {/* 卫星 */}
+      <Satellite x={970} y={355}/>
+
+      {/* 左侧大蓝星球 */}
+      <BluePlanet />
+
+      {/* 远山 */}
+      <Mountains />
+
+      {/* UFO */}
+      <UFO x={245} y={285}/>
+
+      {/* 地面 */}
+      <Ground />
+
+      {/* HUD 屏幕（在宇航员侧旁） */}
+      <HudScreen x={418} y={335}/>
+
+      {/* 紫晶簇 */}
+      <PurpleCrystal x={148} y={555} h={70}/>
+      <PurpleCrystal x={158} y={555} h={50}/>
+      <PurpleCrystal x={918} y={520} h={62}/>
+      <PurpleCrystal x={928} y={520} h={80}/>
+      <PurpleCrystal x={938} y={520} h={55}/>
+
+      {/* 信号塔 */}
+      <SignalTower x={715} y={520}/>
+
+      {/* 外星生物 */}
+      <AlienCreature x={808} y={510} color="#c084fc"/>
+      <AlienCreature x={290} y={545} color="#22d3ee"/>
+
+      {/* 蘑菇 */}
+      <PinkMushroom x={45} y={605} s={1.1}/>
+      <PinkMushroom x={1010} y={585} s={1.05}/>
+      <PinkMushroom x={130} y={620} s={0.9}/>
+
+      {/* 外星花 */}
+      <AlienFlower x={210} y={555} c1="#22d3ee" c2="#67e8f9"/>
+      <AlienFlower x={355} y={552} c1="#22c55e" c2="#86efac"/>
+      <AlienFlower x={672} y={530} c1="#22c55e" c2="#86efac"/>
+      <AlienFlower x={862} y={540} c1="#22c55e" c2="#86efac"/>
+
+      {/* 前景草丛 (右侧 sway2) */}
+      <g>
+        {grassPositions.map((g, i) => (
+          <g key={i} className={i % 2 === 0 ? "sway" : "sway2"} style={{ animationDelay: `${i * 0.1}s` }}>
+            <Grass x={g.x} h={g.h} color={g.c}/>
+          </g>
+        ))}
+      </g>
+
+      {/* 前景花苞（基于草丛之上） */}
+      <g>
+        <AlienFlower x={120} y={665} c1="#fbbf24" c2="#fef08a"/>
+        <AlienFlower x={245} y={650} c1="#a855f7" c2="#d8b4fe"/>
+        <AlienFlower x={385} y={660} c1="#22d3ee" c2="#67e8f9"/>
+        <AlienFlower x={520} y={650} c1="#ec4899" c2="#fbcfe8"/>
+        <AlienFlower x={680} y={660} c1="#34d399" c2="#86efac"/>
+        <AlienFlower x={815} y={650} c1="#a855f7" c2="#d8b4fe"/>
+        <AlienFlower x={945} y={660} c1="#22d3ee" c2="#67e8f9"/>
+      </g>
+
+      {/* 宇航员 */}
+      <Astronaut x={540} y={400}/>
+
+      {/* 暗角 */}
+      <rect width="1080" height="720" fill="url(#vignette)"/>
+    </svg>
+  );
+}
+
+function App() {
+  return (
+    <div className="w-screen h-screen overflow-hidden bg-[#0e0a3a]">
+      <Scene />
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>

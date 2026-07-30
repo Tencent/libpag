@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>能力扩展层</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" rel="stylesheet">
+<style>
+body { margin: 0; padding: 0; }
+.slide {
+  width: 1280px; height: 720px; overflow: hidden; position: relative; margin: 0;
+  background: linear-gradient(180deg, #051014 0%, #102322 42%, #233C39 100%);
+  font-family: 'Noto Sans SC', sans-serif; color: #FFFFFF;
+}
+*, *::before, *::after { animation: none !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <!-- Watermark -->
+  <div class="absolute text-[400px] font-[900] text-[#FFFFFF]/[0.02] leading-none whitespace-nowrap select-none" style="z-index:0; top: 120px; left: 300px;">SKILLS</div>
+
+  <!-- Page Header -->
+  <div class="absolute top-[32px] right-[48px]" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]/40 tracking-[0.05em]">ima</span>
+  </div>
+
+  <!-- Section Title -->
+  <div class="absolute" style="z-index:20; top: 50px; left: 80px;">
+    <div class="text-[12px] font-[500] tracking-[0.15em] text-[#82D0A4] mb-[8px]">LAYER 4 — CAPABILITY EXPANSION</div>
+    <h1 class="text-[32px] font-[300] text-[#FFFFFF]">能力扩展层 <span class="text-[16px] text-[#FFFFFF]/40 ml-[12px]">SKILLS — 它能做什么</span></h1>
+  </div>
+
+  <!-- Top Row: 3 Cards -->
+  <div class="absolute flex gap-[20px]" style="z-index:20; top: 140px; left: 80px; width: 1120px;">
+    <!-- Card 1: Creative -->
+    <div class="flex-1 bg-[#FFFFFF] rounded-[12px] p-[24px]" style="height: 180px;">
+      <div class="flex items-center gap-[8px] mb-[12px]">
+        <i class="ph ph-paint-brush text-[20px] text-[#14231D]/40"></i>
+        <span class="text-[16px] font-[500] text-[#14231D]">创作类</span>
+      </div>
+      <div class="text-[13px] text-[#14231D]/60 leading-[1.6]">图像生成 · 视频剪辑<br>文案撰写 · 音乐创作</div>
+    </div>
+    <!-- Card 2: Social Media -->
+    <div class="flex-1 bg-[#FFFFFF] rounded-[12px] p-[24px]" style="height: 180px;">
+      <div class="flex items-center gap-[8px] mb-[12px]">
+        <i class="ph ph-share-network text-[20px] text-[#14231D]/40"></i>
+        <span class="text-[16px] font-[500] text-[#14231D]">社交媒体类</span>
+      </div>
+      <div class="text-[13px] text-[#14231D]/60 leading-[1.6]">公众号发布 · Twitter/X<br>小红书 · LinkedIn</div>
+    </div>
+    <!-- Card 3: Knowledge Management - HIGHLIGHTED -->
+    <div class="flex-1 bg-[#FFFFFF] rounded-[12px] p-[24px] border-[2px] border-[#82D0A4]" style="height: 180px;">
+      <div class="flex items-center gap-[8px] mb-[8px]">
+        <i class="ph ph-book-open text-[20px] text-[#82D0A4]"></i>
+        <span class="text-[16px] font-[500] text-[#14231D]">知识管理类</span>
+        <span class="text-[10px] font-[500] text-[#FFFFFF] bg-[#82D0A4] rounded-full px-[8px] py-[2px] ml-[4px]">IMA 特色</span>
+      </div>
+      <div class="text-[13px] text-[#14231D]/60 leading-[1.6]">笔记读写 · 知识库检索<br>知识卡片生成 · 内容归档</div>
+    </div>
+  </div>
+
+  <!-- Bottom Row: 2 Cards -->
+  <div class="absolute flex gap-[20px]" style="z-index:20; top: 350px; left: 80px; width: 1120px;">
+    <!-- Card 4: Tool Integration -->
+    <div class="bg-[#FFFFFF] rounded-[12px] p-[24px]" style="width: 540px; height: 160px;">
+      <div class="flex items-center gap-[8px] mb-[12px]">
+        <i class="ph ph-plug text-[20px] text-[#14231D]/40"></i>
+        <span class="text-[16px] font-[500] text-[#14231D]">工具集成类</span>
+      </div>
+      <div class="text-[13px] text-[#14231D]/60 leading-[1.6]">Notion / Figma / Shopify · 邮件管理 · 日程管理 · 文件管理</div>
+    </div>
+    <!-- Card 5: Industry Specific -->
+    <div class="bg-[#FFFFFF] rounded-[12px] p-[24px]" style="width: 540px; height: 160px;">
+      <div class="flex items-center gap-[8px] mb-[12px]">
+        <i class="ph ph-buildings text-[20px] text-[#14231D]/40"></i>
+        <span class="text-[16px] font-[500] text-[#14231D]">行业专属类</span>
+      </div>
+      <div class="text-[13px] text-[#14231D]/60 leading-[1.6]">电商运营 · 教育培训 · 3D建模 / 动画</div>
+    </div>
+  </div>
+
+  <!-- Unique Advantage -->
+  <div class="absolute flex items-center justify-center" style="z-index:20; top: 540px; left: 80px; width: 1120px;">
+    <div class="bg-[#82D0A4]/[0.08] border-[1px] border-[#82D0A4]/20 rounded-[12px] px-[32px] py-[16px] text-center" style="width: 1000px;">
+      <i class="ph ph-star text-[16px] text-[#82D0A4] mr-[8px]"></i>
+      <span class="text-[14px] text-[#FFFFFF]/70">IMA 独特优势：ima Skills 能直接操作 IMA 知识库——搜笔记、读笔记、写笔记。龙虾不只是帮你聊天，而是帮你<span class="text-[#82D0A4] font-[500]">管理第二大脑</span></span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="absolute bottom-[48px] left-0 right-0 flex flex-col items-center justify-center" style="z-index:50;">
+    <span class="text-[14px] font-[400] text-[#FFFFFF]">能力·扩展</span>
+    <div class="w-[24px] h-[1px] bg-[#FFFFFF]/50 mt-[8px]"></div>
+  </div>
+</div>
+</body>
+</html>

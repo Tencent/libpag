@@ -1,0 +1,4572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPT Presentation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web/style/webfont/style.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/style/css/folly.css">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f5f5f5; padding: 40px 20px; min-height: 100vh; overflow-x: auto; }
+    .slide-wrapper {
+      --available-width: min(1280px, calc(100vw - 40px));
+      --slide-scale: calc(var(--available-width) / 1280);
+      position: relative; width: var(--available-width); height: calc(720px * var(--slide-scale));
+      margin: 0 auto 40px auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden;
+    }
+    .slide-wrapper:last-child { margin-bottom: 0; }
+    .slide-number { position: absolute; top: -30px; left: 0; background: #7C3AED; color: white; padding: 4px 12px; border-radius: 4px 4px 0 0; font-size: 12px; font-weight: 600; z-index: 10; }
+    .slide { width: 1280px; height: 720px; background: white; position: relative; overflow: hidden; transform-origin: top left; transform: scale(var(--slide-scale)); }
+    @media print { body { background: white; padding: 0; margin: 0; } .slide-wrapper { page-break-after: always; page-break-inside: avoid; box-shadow: none; margin: 0; border-radius: 0; width: 100%; height: 100vh; overflow: hidden; } .slide-wrapper:last-child { page-break-after: auto; } .slide-number { display: none; } .slide { width: 100%; height: 100%; transform: none; } }
+    .slide-page-1 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-1 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-1 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+}
+
+.slide-page-1 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-1 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-1 .slide .ff-sans, .slide-page-1 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-1 .slide .ff-geometric, .slide-page-1 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-1 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-1 .slide .ff-condensed, .slide-page-1 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-1 .slide .ff-serif, .slide-page-1 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-1 .slide .ff-editorial, .slide-page-1 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-1 .slide .ff-mono, .slide-page-1 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-1 .slide .ff-cjk-emphasis, .slide-page-1 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-1 .slide.text-\[\#111111\], .slide-page-1 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-1 .slide.absolute, .slide-page-1 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-1 .slide.left-\[33\%\], .slide-page-1 .slide .left-\[33\%\] {
+left: 33% !important;
+}
+
+.slide-page-1 .slide.top-\[0px\], .slide-page-1 .slide .top-\[0px\] {
+top: 0px !important;
+}
+
+.slide-page-1 .slide.bottom-\[0px\], .slide-page-1 .slide .bottom-\[0px\] {
+bottom: 0px !important;
+}
+
+.slide-page-1 .slide.w-\[1px\], .slide-page-1 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-1 .slide.bg-\[\#111111\]\/20, .slide-page-1 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-1 .slide.left-\[0px\], .slide-page-1 .slide .left-\[0px\] {
+left: 0px !important;
+}
+
+.slide-page-1 .slide.right-\[0px\], .slide-page-1 .slide .right-\[0px\] {
+right: 0px !important;
+}
+
+.slide-page-1 .slide.top-\[25\%\], .slide-page-1 .slide .top-\[25\%\] {
+top: 25% !important;
+}
+
+.slide-page-1 .slide.h-\[1px\], .slide-page-1 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-1 .slide.top-\[40px\], .slide-page-1 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-1 .slide.left-\[60px\], .slide-page-1 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-1 .slide.flex, .slide-page-1 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-1 .slide.items-center, .slide-page-1 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-1 .slide.gap-\[8px\], .slide-page-1 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-1 .slide.w-\[24px\], .slide-page-1 .slide .w-\[24px\] {
+width: 24px !important;
+}
+
+.slide-page-1 .slide.h-\[24px\], .slide-page-1 .slide .h-\[24px\] {
+height: 24px !important;
+}
+
+.slide-page-1 .slide.text-\[14px\], .slide-page-1 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-1 .slide.tracking-\[0\.05em\], .slide-page-1 .slide .tracking-\[0\.05em\] {
+letter-spacing: 0.05em !important;
+}
+
+.slide-page-1 .slide.uppercase, .slide-page-1 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-1 .slide.right-\[60px\], .slide-page-1 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-1 .slide.-right-\[10\%\], .slide-page-1 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-1 .slide.top-\[10\%\], .slide-page-1 .slide .top-\[10\%\] {
+top: 10% !important;
+}
+
+.slide-page-1 .slide.w-\[800px\], .slide-page-1 .slide .w-\[800px\] {
+width: 800px !important;
+}
+
+.slide-page-1 .slide.h-\[800px\], .slide-page-1 .slide .h-\[800px\] {
+height: 800px !important;
+}
+
+.slide-page-1 .slide.rounded-\[9999px\], .slide-page-1 .slide .rounded-\[9999px\] {
+border-radius: 9999px !important;
+}
+
+.slide-page-1 .slide.border-\[1px\], .slide-page-1 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-1 .slide.border-\[\#111111\], .slide-page-1 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-1 .slide.-right-\[5\%\], .slide-page-1 .slide .-right-\[5\%\] {
+right: -5% !important;
+}
+
+.slide-page-1 .slide.top-\[15\%\], .slide-page-1 .slide .top-\[15\%\] {
+top: 15% !important;
+}
+
+.slide-page-1 .slide.w-\[600px\], .slide-page-1 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-1 .slide.h-\[600px\], .slide-page-1 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-1 .slide.relative, .slide-page-1 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-1 .slide.h-full, .slide-page-1 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-1 .slide.flex-col, .slide-page-1 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-1 .slide.justify-center, .slide-page-1 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-1 .slide.px-\[60px\], .slide-page-1 .slide .px-\[60px\] {
+padding-left: 60px !important;
+padding-right: 60px !important;
+}
+
+.slide-page-1 .slide.max-w-\[960px\], .slide-page-1 .slide .max-w-\[960px\] {
+max-width: 960px !important;
+}
+
+.slide-page-1 .slide.text-\[60px\], .slide-page-1 .slide .text-\[60px\] {
+font-size: 60px !important;
+}
+
+.slide-page-1 .slide.leading-\[1\.12\], .slide-page-1 .slide .leading-\[1\.12\] {
+line-height: 1.12 !important;
+}
+
+.slide-page-1 .slide.tracking-\[-0\.02em\], .slide-page-1 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-1 .slide.mb-\[32px\], .slide-page-1 .slide .mb-\[32px\] {
+margin-bottom: 32px !important;
+}
+
+.slide-page-1 .slide.gap-\[20px\], .slide-page-1 .slide .gap-\[20px\] {
+gap: 20px !important;
+}
+
+.slide-page-1 .slide.w-full, .slide-page-1 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-1 .slide.w-\[60px\], .slide-page-1 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-1 .slide.bg-\[\#111111\], .slide-page-1 .slide .bg-\[\#111111\] {
+background-color: #111111 !important;
+}
+
+.slide-page-1 .slide.text-\[24px\], .slide-page-1 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-1 .slide.text-\[\#111111\]\/80, .slide-page-1 .slide .text-\[\#111111\]\/80 {
+color: rgba(17, 17, 17, 0.8) !important;
+}
+
+.slide-page-1 .slide.tracking-\[-0\.01em\], .slide-page-1 .slide .tracking-\[-0\.01em\] {
+letter-spacing: -0.01em !important;
+}
+
+.slide-page-1 .slide.bottom-\[60px\], .slide-page-1 .slide .bottom-\[60px\] {
+bottom: 60px !important;
+}
+
+.slide-page-1 .slide.justify-between, .slide-page-1 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-1 .slide.items-end, .slide-page-1 .slide .items-end {
+align-items: flex-end !important;
+}
+
+.slide-page-1 .slide.gap-\[12px\], .slide-page-1 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-1 .slide.w-\[40px\], .slide-page-1 .slide .w-\[40px\] {
+width: 40px !important;
+}
+
+.slide-page-1 .slide.h-\[40px\], .slide-page-1 .slide .h-\[40px\] {
+height: 40px !important;
+}
+
+.slide-page-1 .slide.rounded-full, .slide-page-1 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-1 .slide.text-\[20px\], .slide-page-1 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-1 .slide.text-\[12px\], .slide-page-1 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-1 .slide.text-\[16px\], .slide-page-1 .slide .text-\[16px\] {
+font-size: 16px !important;
+}
+
+.slide-page-1 .slide.text-right, .slide-page-1 .slide .text-right {
+text-align: right !important;
+}
+
+.slide-page-1 .slide.justify-end, .slide-page-1 .slide .justify-end {
+justify-content: flex-end !important;
+}
+
+.slide-page-1 .slide.mb-\[4px\], .slide-page-1 .slide .mb-\[4px\] {
+margin-bottom: 4px !important;
+}
+
+.slide-page-1 .slide.h-\[12px\], .slide-page-1 .slide .h-\[12px\] {
+height: 12px !important;
+}
+
+.slide-page-1 .slide.bg-\[\#111111\]\/30, .slide-page-1 .slide .bg-\[\#111111\]\/30 {
+background-color: rgba(17, 17, 17, 0.3) !important;
+}
+.slide-page-2 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-2 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-2 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-2 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-2 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-2 .slide .ff-sans, .slide-page-2 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-2 .slide .ff-geometric, .slide-page-2 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-2 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-2 .slide .ff-condensed, .slide-page-2 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-2 .slide .ff-serif, .slide-page-2 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-2 .slide .ff-editorial, .slide-page-2 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-2 .slide .ff-mono, .slide-page-2 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-2 .slide .ff-cjk-emphasis, .slide-page-2 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-2 .slide.text-\[\#111111\], .slide-page-2 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-2 .slide.absolute, .slide-page-2 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-2 .slide.top-\[40px\], .slide-page-2 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-2 .slide.left-\[48px\], .slide-page-2 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-2 .slide.right-\[48px\], .slide-page-2 .slide .right-\[48px\] {
+right: 48px !important;
+}
+
+.slide-page-2 .slide.flex, .slide-page-2 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-2 .slide.justify-between, .slide-page-2 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-2 .slide.items-center, .slide-page-2 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-2 .slide.gap-\[8px\], .slide-page-2 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-2 .slide.w-\[24px\], .slide-page-2 .slide .w-\[24px\] {
+width: 24px !important;
+}
+
+.slide-page-2 .slide.h-\[24px\], .slide-page-2 .slide .h-\[24px\] {
+height: 24px !important;
+}
+
+.slide-page-2 .slide.border-\[1\.5px\], .slide-page-2 .slide .border-\[1\.5px\] {
+border-width: 1.5px !important;
+border-style: solid !important;
+}
+
+.slide-page-2 .slide.border-\[\#111111\], .slide-page-2 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-2 .slide.rounded-full, .slide-page-2 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-2 .slide.justify-center, .slide-page-2 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-2 .slide.w-\[8px\], .slide-page-2 .slide .w-\[8px\] {
+width: 8px !important;
+}
+
+.slide-page-2 .slide.h-\[8px\], .slide-page-2 .slide .h-\[8px\] {
+height: 8px !important;
+}
+
+.slide-page-2 .slide.bg-\[\#111111\], .slide-page-2 .slide .bg-\[\#111111\] {
+background-color: #111111 !important;
+}
+
+.slide-page-2 .slide.text-\[14px\], .slide-page-2 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-2 .slide.tracking-\[0\.05em\], .slide-page-2 .slide .tracking-\[0\.05em\] {
+letter-spacing: 0.05em !important;
+}
+
+.slide-page-2 .slide.uppercase, .slide-page-2 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-2 .slide.top-\[120px\], .slide-page-2 .slide .top-\[120px\] {
+top: 120px !important;
+}
+
+.slide-page-2 .slide.bottom-\[60px\], .slide-page-2 .slide .bottom-\[60px\] {
+bottom: 60px !important;
+}
+
+.slide-page-2 .slide.w-\[1px\], .slide-page-2 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-2 .slide.bg-\[\#111111\]\/20, .slide-page-2 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-2 .slide.h-\[1px\], .slide-page-2 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-2 .slide.left-\[50\%\], .slide-page-2 .slide .left-\[50\%\] {
+left: 50% !important;
+}
+
+.slide-page-2 .slide.top-\[420px\], .slide-page-2 .slide .top-\[420px\] {
+top: 420px !important;
+}
+
+.slide-page-2 .slide.-right-\[100px\], .slide-page-2 .slide .-right-\[100px\] {
+right: -100px !important;
+}
+
+.slide-page-2 .slide.-bottom-\[100px\], .slide-page-2 .slide .-bottom-\[100px\] {
+bottom: -100px !important;
+}
+
+.slide-page-2 .slide.w-\[400px\], .slide-page-2 .slide .w-\[400px\] {
+width: 400px !important;
+}
+
+.slide-page-2 .slide.h-\[400px\], .slide-page-2 .slide .h-\[400px\] {
+height: 400px !important;
+}
+
+.slide-page-2 .slide.border-\[1px\], .slide-page-2 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-2 .slide.border-\[\#111111\]\/20, .slide-page-2 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-2 .slide.-right-\[60px\], .slide-page-2 .slide .-right-\[60px\] {
+right: -60px !important;
+}
+
+.slide-page-2 .slide.-bottom-\[60px\], .slide-page-2 .slide .-bottom-\[60px\] {
+bottom: -60px !important;
+}
+
+.slide-page-2 .slide.w-\[320px\], .slide-page-2 .slide .w-\[320px\] {
+width: 320px !important;
+}
+
+.slide-page-2 .slide.h-\[320px\], .slide-page-2 .slide .h-\[320px\] {
+height: 320px !important;
+}
+
+.slide-page-2 .slide.border-\[\#111111\]\/40, .slide-page-2 .slide .border-\[\#111111\]\/40 {
+border-color: rgba(17, 17, 17, 0.4) !important;
+}
+
+.slide-page-2 .slide.relative, .slide-page-2 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-2 .slide.px-\[48px\], .slide-page-2 .slide .px-\[48px\] {
+padding-left: 48px !important;
+padding-right: 48px !important;
+}
+
+.slide-page-2 .slide.pt-\[120px\], .slide-page-2 .slide .pt-\[120px\] {
+padding-top: 120px !important;
+}
+
+.slide-page-2 .slide.mb-\[60px\], .slide-page-2 .slide .mb-\[60px\] {
+margin-bottom: 60px !important;
+}
+
+.slide-page-2 .slide.text-\[56px\], .slide-page-2 .slide .text-\[56px\] {
+font-size: 56px !important;
+}
+
+.slide-page-2 .slide.tracking-\[-0\.025em\], .slide-page-2 .slide .tracking-\[-0\.025em\] {
+letter-spacing: -0.025em !important;
+}
+
+.slide-page-2 .slide.mt-\[12px\], .slide-page-2 .slide .mt-\[12px\] {
+margin-top: 12px !important;
+}
+
+.slide-page-2 .slide.w-\[60px\], .slide-page-2 .slide .w-\[60px\] {
+width: 60px !important;
+}
+
+.slide-page-2 .slide.h-\[3px\], .slide-page-2 .slide .h-\[3px\] {
+height: 3px !important;
+}
+
+.slide-page-2 .slide.grid, .slide-page-2 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-2 .slide.grid-cols-2, .slide-page-2 .slide .grid-cols-2 {
+grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.slide-page-2 .slide.gap-y-\[48px\], .slide-page-2 .slide .gap-y-\[48px\] {
+row-gap: 48px !important;
+}
+
+.slide-page-2 .slide.gap-x-\[64px\], .slide-page-2 .slide .gap-x-\[64px\] {
+column-gap: 64px !important;
+}
+
+.slide-page-2 .slide.max-w-\[1100px\], .slide-page-2 .slide .max-w-\[1100px\] {
+max-width: 1100px !important;
+}
+
+.slide-page-2 .slide.gap-\[24px\], .slide-page-2 .slide .gap-\[24px\] {
+gap: 24px !important;
+}
+
+.slide-page-2 .slide.shrink-0, .slide-page-2 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-2 .slide.w-\[48px\], .slide-page-2 .slide .w-\[48px\] {
+width: 48px !important;
+}
+
+.slide-page-2 .slide.h-\[48px\], .slide-page-2 .slide .h-\[48px\] {
+height: 48px !important;
+}
+
+.slide-page-2 .slide.text-\[18px\], .slide-page-2 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-2 .slide.text-\[22px\], .slide-page-2 .slide .text-\[22px\] {
+font-size: 22px !important;
+}
+
+.slide-page-2 .slide.mb-\[12px\], .slide-page-2 .slide .mb-\[12px\] {
+margin-bottom: 12px !important;
+}
+
+.slide-page-2 .slide.text-\[15px\], .slide-page-2 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-2 .slide.leading-\[1\.6\], .slide-page-2 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-2 .slide.text-\[\#111111\]\/80, .slide-page-2 .slide .text-\[\#111111\]\/80 {
+color: rgba(17, 17, 17, 0.8) !important;
+}
+
+.slide-page-2 .slide.bottom-\[40px\], .slide-page-2 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-2 .slide.items-end, .slide-page-2 .slide .items-end {
+align-items: flex-end !important;
+}
+
+.slide-page-2 .slide.gap-\[12px\], .slide-page-2 .slide .gap-\[12px\] {
+gap: 12px !important;
+}
+
+.slide-page-2 .slide.text-\[20px\], .slide-page-2 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+.slide-page-3 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-3 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-3 .slide .font-jakarta {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-3 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-3 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-3 .slide .ff-sans, .slide-page-3 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-3 .slide .ff-geometric, .slide-page-3 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-3 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-3 .slide .ff-condensed, .slide-page-3 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-3 .slide .ff-serif, .slide-page-3 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-3 .slide .ff-editorial, .slide-page-3 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-3 .slide .ff-mono, .slide-page-3 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-3 .slide .ff-cjk-emphasis, .slide-page-3 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-3 .slide.w-\[1280px\], .slide-page-3 .slide .w-\[1280px\] {
+width: 1280px !important;
+}
+
+.slide-page-3 .slide.h-\[720px\], .slide-page-3 .slide .h-\[720px\] {
+height: 720px !important;
+}
+
+.slide-page-3 .slide.text-\[\#111111\], .slide-page-3 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-3 .slide.relative, .slide-page-3 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-3 .slide.overflow-hidden, .slide-page-3 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-3 .slide.absolute, .slide-page-3 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-3 .slide.left-\[40px\], .slide-page-3 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-3 .slide.top-\[0px\], .slide-page-3 .slide .top-\[0px\] {
+top: 0px !important;
+}
+
+.slide-page-3 .slide.bottom-\[0px\], .slide-page-3 .slide .bottom-\[0px\] {
+bottom: 0px !important;
+}
+
+.slide-page-3 .slide.w-\[1px\], .slide-page-3 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-3 .slide.bg-\[\#111111\]\/20, .slide-page-3 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-3 .slide.left-\[0px\], .slide-page-3 .slide .left-\[0px\] {
+left: 0px !important;
+}
+
+.slide-page-3 .slide.right-\[0px\], .slide-page-3 .slide .right-\[0px\] {
+right: 0px !important;
+}
+
+.slide-page-3 .slide.top-\[140px\], .slide-page-3 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-3 .slide.h-\[1px\], .slide-page-3 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-3 .slide.-right-\[10\%\], .slide-page-3 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-3 .slide.-bottom-\[10\%\], .slide-page-3 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-3 .slide.w-\[600px\], .slide-page-3 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-3 .slide.h-\[600px\], .slide-page-3 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-3 .slide.rounded-full, .slide-page-3 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-3 .slide.border-\[1px\], .slide-page-3 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-3 .slide.border-\[\#111111\]\/30, .slide-page-3 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-3 .slide.top-\[40px\], .slide-page-3 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-3 .slide.left-\[60px\], .slide-page-3 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-3 .slide.flex, .slide-page-3 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-3 .slide.items-center, .slide-page-3 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-3 .slide.gap-\[8px\], .slide-page-3 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-3 .slide.w-\[20px\], .slide-page-3 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-3 .slide.h-\[20px\], .slide-page-3 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-3 .slide.text-\[14px\], .slide-page-3 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-3 .slide.uppercase, .slide-page-3 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-3 .slide.right-\[60px\], .slide-page-3 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-3 .slide.top-\[70px\], .slide-page-3 .slide .top-\[70px\] {
+top: 70px !important;
+}
+
+.slide-page-3 .slide.w-\[1120px\], .slide-page-3 .slide .w-\[1120px\] {
+width: 1120px !important;
+}
+
+.slide-page-3 .slide.text-\[48px\], .slide-page-3 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-3 .slide.tracking-\[-0\.02em\], .slide-page-3 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-3 .slide.border, .slide-page-3 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-3 .slide.border-\[\#111111\]\/20, .slide-page-3 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-3 .slide.flex-col, .slide-page-3 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-3 .slide.justify-center, .slide-page-3 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-3 .slide.items-start, .slide-page-3 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-3 .slide.border-\[\#111111\], .slide-page-3 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-3 .slide.shrink-0, .slide-page-3 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-3 .slide.text-\[18px\], .slide-page-3 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-3 .slide.text-\[15px\], .slide-page-3 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-3 .slide.leading-\[1\.6\], .slide-page-3 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-3 .slide.bottom-\[40px\], .slide-page-3 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-3 .slide.justify-between, .slide-page-3 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-3 .slide.border-t, .slide-page-3 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-3 .slide.border-\[\#111111\]\/10, .slide-page-3 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-3 .slide.text-\[12px\], .slide-page-3 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+.slide-page-4 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-4 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-4 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-4 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-4 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-4 .slide .ff-sans, .slide-page-4 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-4 .slide .ff-geometric, .slide-page-4 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-4 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-4 .slide .ff-condensed, .slide-page-4 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-4 .slide .ff-serif, .slide-page-4 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-4 .slide .ff-editorial, .slide-page-4 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-4 .slide .ff-mono, .slide-page-4 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-4 .slide .ff-cjk-emphasis, .slide-page-4 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-4 .slide.text-\[\#111111\], .slide-page-4 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-4 .slide.absolute, .slide-page-4 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-4 .slide.left-\[40px\], .slide-page-4 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-4 .slide.w-\[1px\], .slide-page-4 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-4 .slide.bg-\[\#111111\]\/20, .slide-page-4 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-4 .slide.top-\[140px\], .slide-page-4 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-4 .slide.h-\[1px\], .slide-page-4 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-4 .slide.-right-\[10\%\], .slide-page-4 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-4 .slide.-bottom-\[10\%\], .slide-page-4 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-4 .slide.w-\[600px\], .slide-page-4 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-4 .slide.h-\[600px\], .slide-page-4 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-4 .slide.rounded-full, .slide-page-4 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-4 .slide.border-\[1px\], .slide-page-4 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-4 .slide.border-\[\#111111\]\/30, .slide-page-4 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-4 .slide.top-\[40px\], .slide-page-4 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-4 .slide.left-\[60px\], .slide-page-4 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-4 .slide.flex, .slide-page-4 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-4 .slide.items-center, .slide-page-4 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-4 .slide.gap-\[8px\], .slide-page-4 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-4 .slide.w-\[20px\], .slide-page-4 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-4 .slide.h-\[20px\], .slide-page-4 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-4 .slide.text-\[14px\], .slide-page-4 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-4 .slide.uppercase, .slide-page-4 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-4 .slide.top-\[70px\], .slide-page-4 .slide .top-\[70px\] {
+top: 70px !important;
+}
+
+.slide-page-4 .slide.right-\[60px\], .slide-page-4 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-4 .slide.text-\[42px\], .slide-page-4 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-4 .slide.tracking-\[-0\.02em\], .slide-page-4 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-4 .slide.top-\[160px\], .slide-page-4 .slide .top-\[160px\] {
+top: 160px !important;
+}
+
+.slide-page-4 .slide.grid, .slide-page-4 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-4 .slide.grid-cols-3, .slide-page-4 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-4 .slide.gap-\[32px\], .slide-page-4 .slide .gap-\[32px\] {
+gap: 32px !important;
+}
+
+.slide-page-4 .slide.w-full, .slide-page-4 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-4 .slide.flex-col, .slide-page-4 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-4 .slide.items-start, .slide-page-4 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-4 .slide.text-\[28px\], .slide-page-4 .slide .text-\[28px\] {
+font-size: 28px !important;
+}
+
+.slide-page-4 .slide.shrink-0, .slide-page-4 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-4 .slide.text-\[20px\], .slide-page-4 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-4 .slide.text-\[\#111111\]\/60, .slide-page-4 .slide .text-\[\#111111\]\/60 {
+color: rgba(17, 17, 17, 0.6) !important;
+}
+
+.slide-page-4 .slide.w-\[16px\], .slide-page-4 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-4 .slide.h-\[16px\], .slide-page-4 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-4 .slide.bottom-\[40px\], .slide-page-4 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-4 .slide.justify-between, .slide-page-4 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-4 .slide.border-t, .slide-page-4 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-4 .slide.border-\[\#111111\]\/10, .slide-page-4 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-4 .slide.text-\[12px\], .slide-page-4 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+.slide-page-5 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-5 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-5 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-5 .slide .hairline-grid {
+position: absolute;
+      background-color: rgba(17, 17, 17, 0.2);
+}
+
+.slide-page-5 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-5 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-5 .slide .ff-sans, .slide-page-5 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-5 .slide .ff-geometric, .slide-page-5 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-5 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-5 .slide .ff-condensed, .slide-page-5 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-5 .slide .ff-serif, .slide-page-5 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-5 .slide .ff-editorial, .slide-page-5 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-5 .slide .ff-mono, .slide-page-5 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-5 .slide .ff-cjk-emphasis, .slide-page-5 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-5 .slide.text-\[\#111111\], .slide-page-5 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-5 .slide.absolute, .slide-page-5 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-5 .slide.left-\[40px\], .slide-page-5 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-5 .slide.w-\[1px\], .slide-page-5 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-5 .slide.bg-\[\#111111\]\/20, .slide-page-5 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-5 .slide.top-\[140px\], .slide-page-5 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-5 .slide.h-\[1px\], .slide-page-5 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-5 .slide.-right-\[10\%\], .slide-page-5 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-5 .slide.-bottom-\[10\%\], .slide-page-5 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-5 .slide.w-\[600px\], .slide-page-5 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-5 .slide.h-\[600px\], .slide-page-5 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-5 .slide.rounded-full, .slide-page-5 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-5 .slide.border-\[1px\], .slide-page-5 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-5 .slide.border-\[\#111111\]\/30, .slide-page-5 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-5 .slide.top-\[40px\], .slide-page-5 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-5 .slide.left-\[60px\], .slide-page-5 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-5 .slide.flex, .slide-page-5 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-5 .slide.items-center, .slide-page-5 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-5 .slide.gap-\[8px\], .slide-page-5 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-5 .slide.w-\[20px\], .slide-page-5 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-5 .slide.h-\[20px\], .slide-page-5 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-5 .slide.text-\[14px\], .slide-page-5 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-5 .slide.uppercase, .slide-page-5 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-5 .slide.right-\[60px\], .slide-page-5 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-5 .slide.top-\[80px\], .slide-page-5 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-5 .slide.text-\[42px\], .slide-page-5 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-5 .slide.tracking-\[-0\.02em\], .slide-page-5 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-5 .slide.bg-\[\#111111\], .slide-page-5 .slide .bg-\[\#111111\] {
+background-color: #111111 !important;
+}
+
+.slide-page-5 .slide.top-\[180px\], .slide-page-5 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-5 .slide.flex-1, .slide-page-5 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-5 .slide.flex-col, .slide-page-5 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-5 .slide.border, .slide-page-5 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-5 .slide.border-\[\#111111\]\/20, .slide-page-5 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-5 .slide.relative, .slide-page-5 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-5 .slide.overflow-hidden, .slide-page-5 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-5 .slide.text-\[24px\], .slide-page-5 .slide .text-\[24px\] {
+font-size: 24px !important;
+}
+
+.slide-page-5 .slide.text-\[18px\], .slide-page-5 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-5 .slide.text-\[56px\], .slide-page-5 .slide .text-\[56px\] {
+font-size: 56px !important;
+}
+
+.slide-page-5 .slide.text-\[15px\], .slide-page-5 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-5 .slide.leading-\[1\.6\], .slide-page-5 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-5 .slide.border-t, .slide-page-5 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-5 .slide.border-r, .slide-page-5 .slide .border-r {
+border-right-width: 1px !important;
+border-right-style: solid !important;
+}
+
+.slide-page-5 .slide.border-\[\#111111\]\/10, .slide-page-5 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-5 .slide.bottom-\[40px\], .slide-page-5 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-5 .slide.justify-between, .slide-page-5 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-5 .slide.text-\[12px\], .slide-page-5 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+.slide-page-6 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-6 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-6 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-6 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-6 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-6 .slide .ff-sans, .slide-page-6 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-6 .slide .ff-geometric, .slide-page-6 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-6 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-6 .slide .ff-condensed, .slide-page-6 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-6 .slide .ff-serif, .slide-page-6 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-6 .slide .ff-editorial, .slide-page-6 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-6 .slide .ff-mono, .slide-page-6 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-6 .slide .ff-cjk-emphasis, .slide-page-6 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-6 .slide.text-\[\#111111\], .slide-page-6 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-6 .slide.absolute, .slide-page-6 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-6 .slide.left-\[40px\], .slide-page-6 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-6 .slide.w-\[1px\], .slide-page-6 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-6 .slide.bg-\[\#111111\]\/20, .slide-page-6 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-6 .slide.top-\[140px\], .slide-page-6 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-6 .slide.h-\[1px\], .slide-page-6 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-6 .slide.-right-\[10\%\], .slide-page-6 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-6 .slide.-bottom-\[10\%\], .slide-page-6 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-6 .slide.w-\[600px\], .slide-page-6 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-6 .slide.h-\[600px\], .slide-page-6 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-6 .slide.rounded-full, .slide-page-6 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-6 .slide.border-\[1px\], .slide-page-6 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-6 .slide.border-\[\#111111\]\/30, .slide-page-6 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-6 .slide.top-\[40px\], .slide-page-6 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-6 .slide.left-\[60px\], .slide-page-6 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-6 .slide.flex, .slide-page-6 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-6 .slide.items-center, .slide-page-6 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-6 .slide.gap-\[8px\], .slide-page-6 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-6 .slide.w-\[20px\], .slide-page-6 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-6 .slide.h-\[20px\], .slide-page-6 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-6 .slide.text-\[14px\], .slide-page-6 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-6 .slide.uppercase, .slide-page-6 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-6 .slide.top-\[80px\], .slide-page-6 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-6 .slide.right-\[60px\], .slide-page-6 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-6 .slide.text-\[42px\], .slide-page-6 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-6 .slide.tracking-\[-0\.02em\], .slide-page-6 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-6 .slide.border, .slide-page-6 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-6 .slide.border-\[\#111111\]\/20, .slide-page-6 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-6 .slide.shrink-0, .slide-page-6 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-6 .slide.w-\[40px\], .slide-page-6 .slide .w-\[40px\] {
+width: 40px !important;
+}
+
+.slide-page-6 .slide.h-\[40px\], .slide-page-6 .slide .h-\[40px\] {
+height: 40px !important;
+}
+
+.slide-page-6 .slide.justify-center, .slide-page-6 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-6 .slide.border-\[\#111111\], .slide-page-6 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-6 .slide.text-\[20px\], .slide-page-6 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-6 .slide.flex-col, .slide-page-6 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-6 .slide.text-\[18px\], .slide-page-6 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-6 .slide.leading-\[1\.6\], .slide-page-6 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-6 .slide.relative, .slide-page-6 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-6 .slide.bottom-\[40px\], .slide-page-6 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-6 .slide.justify-between, .slide-page-6 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-6 .slide.border-t, .slide-page-6 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-6 .slide.border-\[\#111111\]\/10, .slide-page-6 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-6 .slide.text-\[12px\], .slide-page-6 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+.slide-page-7 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-7 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-7 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-7 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-7 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-7 .slide .ff-sans, .slide-page-7 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-7 .slide .ff-geometric, .slide-page-7 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-7 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-7 .slide .ff-condensed, .slide-page-7 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-7 .slide .ff-serif, .slide-page-7 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-7 .slide .ff-editorial, .slide-page-7 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-7 .slide .ff-mono, .slide-page-7 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-7 .slide .ff-cjk-emphasis, .slide-page-7 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-7 .slide.text-\[\#111111\], .slide-page-7 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-7 .slide.absolute, .slide-page-7 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-7 .slide.left-\[40px\], .slide-page-7 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-7 .slide.w-\[1px\], .slide-page-7 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-7 .slide.bg-\[\#111111\]\/20, .slide-page-7 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-7 .slide.top-\[140px\], .slide-page-7 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-7 .slide.h-\[1px\], .slide-page-7 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-7 .slide.-right-\[10\%\], .slide-page-7 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-7 .slide.-bottom-\[10\%\], .slide-page-7 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-7 .slide.w-\[600px\], .slide-page-7 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-7 .slide.h-\[600px\], .slide-page-7 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-7 .slide.rounded-full, .slide-page-7 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-7 .slide.border-\[1px\], .slide-page-7 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-7 .slide.border-\[\#111111\]\/30, .slide-page-7 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-7 .slide.top-\[40px\], .slide-page-7 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-7 .slide.left-\[60px\], .slide-page-7 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-7 .slide.flex, .slide-page-7 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-7 .slide.items-center, .slide-page-7 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-7 .slide.gap-\[8px\], .slide-page-7 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-7 .slide.w-\[20px\], .slide-page-7 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-7 .slide.h-\[20px\], .slide-page-7 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-7 .slide.text-\[14px\], .slide-page-7 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-7 .slide.uppercase, .slide-page-7 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-7 .slide.top-\[80px\], .slide-page-7 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-7 .slide.right-\[60px\], .slide-page-7 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-7 .slide.text-\[48px\], .slide-page-7 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-7 .slide.tracking-\[-0\.02em\], .slide-page-7 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-7 .slide.top-\[180px\], .slide-page-7 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-7 .slide.grid, .slide-page-7 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-7 .slide.grid-cols-3, .slide-page-7 .slide .grid-cols-3 {
+grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.slide-page-7 .slide.gap-\[32px\], .slide-page-7 .slide .gap-\[32px\] {
+gap: 32px !important;
+}
+
+.slide-page-7 .slide.w-full, .slide-page-7 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-7 .slide.h-full, .slide-page-7 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-7 .slide.flex-col, .slide-page-7 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-7 .slide.border, .slide-page-7 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-7 .slide.border-\[\#111111\]\/20, .slide-page-7 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-7 .slide.p-\[32px\], .slide-page-7 .slide .p-\[32px\] {
+padding: 32px !important;
+}
+
+.slide-page-7 .slide.justify-between, .slide-page-7 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-7 .slide.w-\[40px\], .slide-page-7 .slide .w-\[40px\] {
+width: 40px !important;
+}
+
+.slide-page-7 .slide.h-\[40px\], .slide-page-7 .slide .h-\[40px\] {
+height: 40px !important;
+}
+
+.slide-page-7 .slide.mb-\[24px\], .slide-page-7 .slide .mb-\[24px\] {
+margin-bottom: 24px !important;
+}
+
+.slide-page-7 .slide.justify-center, .slide-page-7 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-7 .slide.border-\[\#111111\], .slide-page-7 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-7 .slide.text-\[20px\], .slide-page-7 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-7 .slide.text-\[22px\], .slide-page-7 .slide .text-\[22px\] {
+font-size: 22px !important;
+}
+
+.slide-page-7 .slide.leading-\[1\.4\], .slide-page-7 .slide .leading-\[1\.4\] {
+line-height: 1.4 !important;
+}
+
+.slide-page-7 .slide.text-\[\#111111\]\/40, .slide-page-7 .slide .text-\[\#111111\]\/40 {
+color: rgba(17, 17, 17, 0.4) !important;
+}
+
+.slide-page-7 .slide.w-\[16px\], .slide-page-7 .slide .w-\[16px\] {
+width: 16px !important;
+}
+
+.slide-page-7 .slide.h-\[16px\], .slide-page-7 .slide .h-\[16px\] {
+height: 16px !important;
+}
+
+.slide-page-7 .slide.text-\[12px\], .slide-page-7 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-7 .slide.bottom-\[40px\], .slide-page-7 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-7 .slide.border-t, .slide-page-7 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-7 .slide.border-\[\#111111\]\/10, .slide-page-7 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-7 .slide.h-\[10px\], .slide-page-7 .slide .h-\[10px\] {
+height: 10px !important;
+}
+.slide-page-8 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-8 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-8 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-8 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-8 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-8 .slide .ff-sans, .slide-page-8 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-8 .slide .ff-geometric, .slide-page-8 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-8 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-8 .slide .ff-condensed, .slide-page-8 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-8 .slide .ff-serif, .slide-page-8 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-8 .slide .ff-editorial, .slide-page-8 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-8 .slide .ff-mono, .slide-page-8 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-8 .slide .ff-cjk-emphasis, .slide-page-8 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-8 .slide.text-\[\#111111\], .slide-page-8 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-8 .slide.absolute, .slide-page-8 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-8 .slide.left-\[40px\], .slide-page-8 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-8 .slide.w-\[1px\], .slide-page-8 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-8 .slide.bg-\[\#111111\]\/20, .slide-page-8 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-8 .slide.top-\[140px\], .slide-page-8 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-8 .slide.h-\[1px\], .slide-page-8 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-8 .slide.-right-\[10\%\], .slide-page-8 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-8 .slide.-bottom-\[10\%\], .slide-page-8 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-8 .slide.w-\[600px\], .slide-page-8 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-8 .slide.h-\[600px\], .slide-page-8 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-8 .slide.rounded-full, .slide-page-8 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-8 .slide.border-\[1px\], .slide-page-8 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-8 .slide.border-\[\#111111\]\/30, .slide-page-8 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-8 .slide.top-\[40px\], .slide-page-8 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-8 .slide.left-\[60px\], .slide-page-8 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-8 .slide.flex, .slide-page-8 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-8 .slide.items-center, .slide-page-8 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-8 .slide.gap-\[8px\], .slide-page-8 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-8 .slide.w-\[20px\], .slide-page-8 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-8 .slide.h-\[20px\], .slide-page-8 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-8 .slide.text-\[14px\], .slide-page-8 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-8 .slide.uppercase, .slide-page-8 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-8 .slide.top-\[70px\], .slide-page-8 .slide .top-\[70px\] {
+top: 70px !important;
+}
+
+.slide-page-8 .slide.right-\[60px\], .slide-page-8 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-8 .slide.text-\[42px\], .slide-page-8 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-8 .slide.tracking-\[-0\.02em\], .slide-page-8 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-8 .slide.top-\[160px\], .slide-page-8 .slide .top-\[160px\] {
+top: 160px !important;
+}
+
+.slide-page-8 .slide.bottom-\[120px\], .slide-page-8 .slide .bottom-\[120px\] {
+bottom: 120px !important;
+}
+
+.slide-page-8 .slide.flex-col, .slide-page-8 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-8 .slide.h-full, .slide-page-8 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-8 .slide.border-l, .slide-page-8 .slide .border-l {
+border-left-width: 1px !important;
+border-left-style: solid !important;
+}
+
+.slide-page-8 .slide.border-\[\#111111\]\/20, .slide-page-8 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-8 .slide.border, .slide-page-8 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-8 .slide.border-\[\#111111\], .slide-page-8 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-8 .slide.justify-center, .slide-page-8 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-8 .slide.text-\[20px\], .slide-page-8 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-8 .slide.text-\[15px\], .slide-page-8 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-8 .slide.leading-\[1\.6\], .slide-page-8 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-8 .slide.text-\[\#111111\]\/80, .slide-page-8 .slide .text-\[\#111111\]\/80 {
+color: rgba(17, 17, 17, 0.8) !important;
+}
+
+.slide-page-8 .slide.bottom-\[40px\], .slide-page-8 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-8 .slide.justify-between, .slide-page-8 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-8 .slide.border-t, .slide-page-8 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-8 .slide.border-\[\#111111\]\/10, .slide-page-8 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-8 .slide.text-\[12px\], .slide-page-8 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+.slide-page-9 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-9 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-9 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-9 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-9 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-9 .slide .ff-sans, .slide-page-9 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-9 .slide .ff-geometric, .slide-page-9 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-9 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-9 .slide .ff-condensed, .slide-page-9 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-9 .slide .ff-serif, .slide-page-9 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-9 .slide .ff-editorial, .slide-page-9 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-9 .slide .ff-mono, .slide-page-9 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-9 .slide .ff-cjk-emphasis, .slide-page-9 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-9 .slide.text-\[\#111111\], .slide-page-9 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-9 .slide.absolute, .slide-page-9 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-9 .slide.left-\[40px\], .slide-page-9 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-9 .slide.w-\[1px\], .slide-page-9 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-9 .slide.bg-\[\#111111\]\/20, .slide-page-9 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-9 .slide.top-\[140px\], .slide-page-9 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-9 .slide.h-\[1px\], .slide-page-9 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-9 .slide.-right-\[10\%\], .slide-page-9 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-9 .slide.-bottom-\[10\%\], .slide-page-9 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-9 .slide.w-\[600px\], .slide-page-9 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-9 .slide.h-\[600px\], .slide-page-9 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-9 .slide.rounded-full, .slide-page-9 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-9 .slide.border-\[1px\], .slide-page-9 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-9 .slide.border-\[\#111111\]\/30, .slide-page-9 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-9 .slide.top-\[40px\], .slide-page-9 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-9 .slide.left-\[60px\], .slide-page-9 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-9 .slide.flex, .slide-page-9 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-9 .slide.items-center, .slide-page-9 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-9 .slide.gap-\[8px\], .slide-page-9 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-9 .slide.w-\[20px\], .slide-page-9 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-9 .slide.h-\[20px\], .slide-page-9 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-9 .slide.text-\[14px\], .slide-page-9 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-9 .slide.uppercase, .slide-page-9 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-9 .slide.top-\[70px\], .slide-page-9 .slide .top-\[70px\] {
+top: 70px !important;
+}
+
+.slide-page-9 .slide.text-\[48px\], .slide-page-9 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-9 .slide.tracking-\[-0\.02em\], .slide-page-9 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-9 .slide.top-\[160px\], .slide-page-9 .slide .top-\[160px\] {
+top: 160px !important;
+}
+
+.slide-page-9 .slide.right-\[60px\], .slide-page-9 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-9 .slide.flex-col, .slide-page-9 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-9 .slide.justify-center, .slide-page-9 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-9 .slide.relative, .slide-page-9 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-9 .slide.border, .slide-page-9 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-9 .slide.border-\[\#111111\]\/20, .slide-page-9 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-9 .slide.text-\[12px\], .slide-page-9 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-9 .slide.grid, .slide-page-9 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-9 .slide.grid-cols-1, .slide-page-9 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-9 .slide.border-\[\#111111\]\/10, .slide-page-9 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-9 .slide.shrink-0, .slide-page-9 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-9 .slide.border-\[\#111111\], .slide-page-9 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-9 .slide.text-\[20px\], .slide-page-9 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-9 .slide.overflow-hidden, .slide-page-9 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-9 .slide.text-\[18px\], .slide-page-9 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-9 .slide.text-\[16px\], .slide-page-9 .slide .text-\[16px\] {
+font-size: 16px !important;
+}
+
+.slide-page-9 .slide.leading-\[1\.5\], .slide-page-9 .slide .leading-\[1\.5\] {
+line-height: 1.5 !important;
+}
+
+.slide-page-9 .slide.bottom-\[40px\], .slide-page-9 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-9 .slide.justify-between, .slide-page-9 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-9 .slide.border-t, .slide-page-9 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+.slide-page-10 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-10 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-10 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-10 .slide .hairline-grid {
+position: absolute;
+      background-color: rgba(17, 17, 17, 0.2);
+}
+
+.slide-page-10 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-10 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-10 .slide .ff-sans, .slide-page-10 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-10 .slide .ff-geometric, .slide-page-10 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-10 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-10 .slide .ff-condensed, .slide-page-10 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-10 .slide .ff-serif, .slide-page-10 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-10 .slide .ff-editorial, .slide-page-10 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-10 .slide .ff-mono, .slide-page-10 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-10 .slide .ff-cjk-emphasis, .slide-page-10 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-10 .slide.text-\[\#111111\], .slide-page-10 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-10 .slide.absolute, .slide-page-10 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-10 .slide.left-\[40px\], .slide-page-10 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-10 .slide.w-\[1px\], .slide-page-10 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-10 .slide.top-\[140px\], .slide-page-10 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-10 .slide.h-\[1px\], .slide-page-10 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-10 .slide.-right-\[10\%\], .slide-page-10 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-10 .slide.-bottom-\[10\%\], .slide-page-10 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-10 .slide.w-\[600px\], .slide-page-10 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-10 .slide.h-\[600px\], .slide-page-10 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-10 .slide.rounded-full, .slide-page-10 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-10 .slide.border-\[1px\], .slide-page-10 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-10 .slide.border-\[\#111111\]\/30, .slide-page-10 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-10 .slide.top-\[40px\], .slide-page-10 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-10 .slide.left-\[60px\], .slide-page-10 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-10 .slide.flex, .slide-page-10 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-10 .slide.items-center, .slide-page-10 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-10 .slide.gap-\[8px\], .slide-page-10 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-10 .slide.w-\[20px\], .slide-page-10 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-10 .slide.h-\[20px\], .slide-page-10 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-10 .slide.text-\[14px\], .slide-page-10 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-10 .slide.uppercase, .slide-page-10 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-10 .slide.top-\[80px\], .slide-page-10 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-10 .slide.right-\[60px\], .slide-page-10 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-10 .slide.text-\[42px\], .slide-page-10 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-10 .slide.tracking-\[-0\.02em\], .slide-page-10 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-10 .slide.bg-\[\#111111\], .slide-page-10 .slide .bg-\[\#111111\] {
+background-color: #111111 !important;
+}
+
+.slide-page-10 .slide.top-\[200px\], .slide-page-10 .slide .top-\[200px\] {
+top: 200px !important;
+}
+
+.slide-page-10 .slide.bottom-\[120px\], .slide-page-10 .slide .bottom-\[120px\] {
+bottom: 120px !important;
+}
+
+.slide-page-10 .slide.flex-col, .slide-page-10 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-10 .slide.h-full, .slide-page-10 .slide .h-full {
+height: 100% !important;
+}
+
+.slide-page-10 .slide.border, .slide-page-10 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-10 .slide.border-\[\#111111\]\/20, .slide-page-10 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-10 .slide.relative, .slide-page-10 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-10 .slide.overflow-hidden, .slide-page-10 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-10 .slide.text-\[48px\], .slide-page-10 .slide .text-\[48px\] {
+font-size: 48px !important;
+}
+
+.slide-page-10 .slide.border-\[\#111111\], .slide-page-10 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-10 .slide.justify-center, .slide-page-10 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-10 .slide.shrink-0, .slide-page-10 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-10 .slide.text-\[12px\], .slide-page-10 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+
+.slide-page-10 .slide.text-\[20px\], .slide-page-10 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-10 .slide.text-\[15px\], .slide-page-10 .slide .text-\[15px\] {
+font-size: 15px !important;
+}
+
+.slide-page-10 .slide.leading-\[1\.7\], .slide-page-10 .slide .leading-\[1\.7\] {
+line-height: 1.7 !important;
+}
+
+.slide-page-10 .slide.bottom-\[40px\], .slide-page-10 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-10 .slide.justify-between, .slide-page-10 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-10 .slide.border-t, .slide-page-10 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-10 .slide.border-\[\#111111\]\/10, .slide-page-10 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+.slide-page-11 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-11 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-11 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-11 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-11 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-11 .slide .ff-sans, .slide-page-11 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-11 .slide .ff-geometric, .slide-page-11 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-11 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-11 .slide .ff-condensed, .slide-page-11 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-11 .slide .ff-serif, .slide-page-11 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-11 .slide .ff-editorial, .slide-page-11 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-11 .slide .ff-mono, .slide-page-11 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-11 .slide .ff-cjk-emphasis, .slide-page-11 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-11 .slide.text-\[\#111111\], .slide-page-11 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-11 .slide.absolute, .slide-page-11 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-11 .slide.left-\[40px\], .slide-page-11 .slide .left-\[40px\] {
+left: 40px !important;
+}
+
+.slide-page-11 .slide.top-\[0px\], .slide-page-11 .slide .top-\[0px\] {
+top: 0px !important;
+}
+
+.slide-page-11 .slide.bottom-\[0px\], .slide-page-11 .slide .bottom-\[0px\] {
+bottom: 0px !important;
+}
+
+.slide-page-11 .slide.w-\[1px\], .slide-page-11 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-11 .slide.bg-\[\#111111\]\/20, .slide-page-11 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-11 .slide.left-\[0px\], .slide-page-11 .slide .left-\[0px\] {
+left: 0px !important;
+}
+
+.slide-page-11 .slide.right-\[0px\], .slide-page-11 .slide .right-\[0px\] {
+right: 0px !important;
+}
+
+.slide-page-11 .slide.top-\[140px\], .slide-page-11 .slide .top-\[140px\] {
+top: 140px !important;
+}
+
+.slide-page-11 .slide.h-\[1px\], .slide-page-11 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-11 .slide.-right-\[10\%\], .slide-page-11 .slide .-right-\[10\%\] {
+right: -10% !important;
+}
+
+.slide-page-11 .slide.-bottom-\[10\%\], .slide-page-11 .slide .-bottom-\[10\%\] {
+bottom: -10% !important;
+}
+
+.slide-page-11 .slide.w-\[600px\], .slide-page-11 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-11 .slide.h-\[600px\], .slide-page-11 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-11 .slide.rounded-full, .slide-page-11 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-11 .slide.border-\[1px\], .slide-page-11 .slide .border-\[1px\] {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-11 .slide.border-\[\#111111\]\/30, .slide-page-11 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-11 .slide.top-\[40px\], .slide-page-11 .slide .top-\[40px\] {
+top: 40px !important;
+}
+
+.slide-page-11 .slide.left-\[60px\], .slide-page-11 .slide .left-\[60px\] {
+left: 60px !important;
+}
+
+.slide-page-11 .slide.flex, .slide-page-11 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-11 .slide.items-center, .slide-page-11 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-11 .slide.gap-\[8px\], .slide-page-11 .slide .gap-\[8px\] {
+gap: 8px !important;
+}
+
+.slide-page-11 .slide.w-\[20px\], .slide-page-11 .slide .w-\[20px\] {
+width: 20px !important;
+}
+
+.slide-page-11 .slide.h-\[20px\], .slide-page-11 .slide .h-\[20px\] {
+height: 20px !important;
+}
+
+.slide-page-11 .slide.text-\[14px\], .slide-page-11 .slide .text-\[14px\] {
+font-size: 14px !important;
+}
+
+.slide-page-11 .slide.uppercase, .slide-page-11 .slide .uppercase {
+text-transform: uppercase !important;
+}
+
+.slide-page-11 .slide.top-\[80px\], .slide-page-11 .slide .top-\[80px\] {
+top: 80px !important;
+}
+
+.slide-page-11 .slide.right-\[60px\], .slide-page-11 .slide .right-\[60px\] {
+right: 60px !important;
+}
+
+.slide-page-11 .slide.text-\[42px\], .slide-page-11 .slide .text-\[42px\] {
+font-size: 42px !important;
+}
+
+.slide-page-11 .slide.tracking-\[-0\.02em\], .slide-page-11 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-11 .slide.top-\[160px\], .slide-page-11 .slide .top-\[160px\] {
+top: 160px !important;
+}
+
+.slide-page-11 .slide.bottom-\[120px\], .slide-page-11 .slide .bottom-\[120px\] {
+bottom: 120px !important;
+}
+
+.slide-page-11 .slide.flex-col, .slide-page-11 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-11 .slide.justify-center, .slide-page-11 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-11 .slide.border, .slide-page-11 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-11 .slide.border-\[\#111111\]\/10, .slide-page-11 .slide .border-\[\#111111\]\/10 {
+border-color: rgba(17, 17, 17, 0.1) !important;
+}
+
+.slide-page-11 .slide.relative, .slide-page-11 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-11 .slide.w-full, .slide-page-11 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-11 .slide.bg-\[\#111111\], .slide-page-11 .slide .bg-\[\#111111\] {
+background-color: #111111 !important;
+}
+
+.slide-page-11 .slide.grid, .slide-page-11 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-11 .slide.grid-cols-1, .slide-page-11 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-11 .slide.overflow-hidden, .slide-page-11 .slide .overflow-hidden {
+overflow: hidden !important;
+}
+
+.slide-page-11 .slide.border-\[\#111111\], .slide-page-11 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-11 .slide.bg-\[\#111111\]\/5, .slide-page-11 .slide .bg-\[\#111111\]\/5 {
+background-color: rgba(17, 17, 17, 0.05) !important;
+}
+
+.slide-page-11 .slide.shrink-0, .slide-page-11 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-11 .slide.border-\[\#111111\]\/20, .slide-page-11 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-11 .slide.text-\[20px\], .slide-page-11 .slide .text-\[20px\] {
+font-size: 20px !important;
+}
+
+.slide-page-11 .slide.text-\[18px\], .slide-page-11 .slide .text-\[18px\] {
+font-size: 18px !important;
+}
+
+.slide-page-11 .slide.leading-\[1\.6\], .slide-page-11 .slide .leading-\[1\.6\] {
+line-height: 1.6 !important;
+}
+
+.slide-page-11 .slide.bottom-\[40px\], .slide-page-11 .slide .bottom-\[40px\] {
+bottom: 40px !important;
+}
+
+.slide-page-11 .slide.justify-between, .slide-page-11 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-11 .slide.border-t, .slide-page-11 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-11 .slide.text-\[12px\], .slide-page-11 .slide .text-\[12px\] {
+font-size: 12px !important;
+}
+.slide-page-12 .slide {
+font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-12 .slide {
+width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+}
+
+.slide-page-12 .slide .bg-noise {
+background-color: #DFDDDA;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.slide-page-12 .slide .hairline {
+border: 1px solid rgba(17, 17, 17, 0.2);
+}
+
+.slide-page-12 .slide {
+--font-neutral-sans: Arial, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Heiti SC", sans-serif;
+    --font-geometric-sans: Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-condensed-display: "Arial Narrow", "Arial Black", Arial, "Microsoft YaHei", sans-serif;
+    --font-tech-display: "Trebuchet MS", Arial, "Microsoft YaHei", "PingFang SC", sans-serif;
+    --font-editorial-serif: Georgia, "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-serif: "Times New Roman", SimSun, "Songti SC", STSong, serif;
+    --font-cjk-emphasis: KaiTi, "Kaiti SC", STKaiti, serif;
+    --font-mono: "Courier New", Consolas, Menlo, monospace;
+}
+
+.slide-page-12 .slide {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-12 .slide .ff-sans, .slide-page-12 .slide .font-sans {
+font-family: var(--font-neutral-sans) !important;
+}
+
+.slide-page-12 .slide .ff-geometric, .slide-page-12 .slide .font-geometric {
+font-family: var(--font-geometric-sans) !important;
+}
+
+.slide-page-12 .slide .ff-display {
+font-family: var(--font-tech-display) !important;
+}
+
+.slide-page-12 .slide .ff-condensed, .slide-page-12 .slide .font-condensed {
+font-family: var(--font-condensed-display) !important;
+}
+
+.slide-page-12 .slide .ff-serif, .slide-page-12 .slide .font-serif {
+font-family: var(--font-cjk-serif) !important;
+}
+
+.slide-page-12 .slide .ff-editorial, .slide-page-12 .slide .font-editorial {
+font-family: var(--font-editorial-serif) !important;
+}
+
+.slide-page-12 .slide .ff-mono, .slide-page-12 .slide .font-mono {
+font-family: var(--font-mono) !important;
+}
+
+.slide-page-12 .slide .ff-cjk-emphasis, .slide-page-12 .slide .font-cjk-emphasis {
+font-family: var(--font-cjk-emphasis) !important; font-style: normal !important;
+}
+
+.slide-page-12 .slide.flex, .slide-page-12 .slide .flex {
+display: flex !important;
+}
+
+.slide-page-12 .slide.flex-col, .slide-page-12 .slide .flex-col {
+flex-direction: column !important;
+}
+
+.slide-page-12 .slide.text-\[\#111111\], .slide-page-12 .slide .text-\[\#111111\] {
+color: #111111 !important;
+}
+
+.slide-page-12 .slide.absolute, .slide-page-12 .slide .absolute {
+position: absolute !important;
+}
+
+.slide-page-12 .slide.w-\[600px\], .slide-page-12 .slide .w-\[600px\] {
+width: 600px !important;
+}
+
+.slide-page-12 .slide.h-\[600px\], .slide-page-12 .slide .h-\[600px\] {
+height: 600px !important;
+}
+
+.slide-page-12 .slide.rounded-full, .slide-page-12 .slide .rounded-full {
+border-radius: 9999px !important;
+}
+
+.slide-page-12 .slide.border, .slide-page-12 .slide .border {
+border-width: 1px !important;
+border-style: solid !important;
+}
+
+.slide-page-12 .slide.border-\[\#111111\], .slide-page-12 .slide .border-\[\#111111\] {
+border-color: #111111 !important;
+}
+
+.slide-page-12 .slide.w-\[800px\], .slide-page-12 .slide .w-\[800px\] {
+width: 800px !important;
+}
+
+.slide-page-12 .slide.h-\[800px\], .slide-page-12 .slide .h-\[800px\] {
+height: 800px !important;
+}
+
+.slide-page-12 .slide.border-\[\#111111\]\/30, .slide-page-12 .slide .border-\[\#111111\]\/30 {
+border-color: rgba(17, 17, 17, 0.3) !important;
+}
+
+.slide-page-12 .slide.top-\[180px\], .slide-page-12 .slide .top-\[180px\] {
+top: 180px !important;
+}
+
+.slide-page-12 .slide.h-\[1px\], .slide-page-12 .slide .h-\[1px\] {
+height: 1px !important;
+}
+
+.slide-page-12 .slide.bg-\[\#111111\]\/20, .slide-page-12 .slide .bg-\[\#111111\]\/20 {
+background-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-12 .slide.left-\[48px\], .slide-page-12 .slide .left-\[48px\] {
+left: 48px !important;
+}
+
+.slide-page-12 .slide.w-\[1px\], .slide-page-12 .slide .w-\[1px\] {
+width: 1px !important;
+}
+
+.slide-page-12 .slide.left-\[33\%\], .slide-page-12 .slide .left-\[33\%\] {
+left: 33% !important;
+}
+
+.slide-page-12 .slide.shrink-0, .slide-page-12 .slide .shrink-0 {
+flex-shrink: 0 !important;
+}
+
+.slide-page-12 .slide.justify-between, .slide-page-12 .slide .justify-between {
+justify-content: space-between !important;
+}
+
+.slide-page-12 .slide.items-center, .slide-page-12 .slide .items-center {
+align-items: center !important;
+}
+
+.slide-page-12 .slide.relative, .slide-page-12 .slide .relative {
+position: relative !important;
+}
+
+.slide-page-12 .slide.justify-center, .slide-page-12 .slide .justify-center {
+justify-content: center !important;
+}
+
+.slide-page-12 .slide.bg-\[\#111111\], .slide-page-12 .slide .bg-\[\#111111\] {
+background-color: #111111 !important;
+}
+
+.slide-page-12 .slide.flex-1, .slide-page-12 .slide .flex-1 {
+flex: 1 1 0% !important;
+}
+
+.slide-page-12 .slide.grid, .slide-page-12 .slide .grid {
+display: grid !important;
+}
+
+.slide-page-12 .slide.grid-cols-\[33\%_67\%\], .slide-page-12 .slide .grid-cols-\[33\%_67\%\] {
+grid-template-columns: 33% 67% !important;
+}
+
+.slide-page-12 .slide.items-stretch, .slide-page-12 .slide .items-stretch {
+align-items: stretch !important;
+}
+
+.slide-page-12 .slide.text-\[56px\], .slide-page-12 .slide .text-\[56px\] {
+font-size: 56px !important;
+}
+
+.slide-page-12 .slide.leading-\[1\.1\], .slide-page-12 .slide .leading-\[1\.1\] {
+line-height: 1.1 !important;
+}
+
+.slide-page-12 .slide.tracking-\[-0\.02em\], .slide-page-12 .slide .tracking-\[-0\.02em\] {
+letter-spacing: -0.02em !important;
+}
+
+.slide-page-12 .slide.grid-cols-1, .slide-page-12 .slide .grid-cols-1 {
+grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+.slide-page-12 .slide.items-start, .slide-page-12 .slide .items-start {
+align-items: flex-start !important;
+}
+
+.slide-page-12 .slide.border-\[\#111111\]\/20, .slide-page-12 .slide .border-\[\#111111\]\/20 {
+border-color: rgba(17, 17, 17, 0.2) !important;
+}
+
+.slide-page-12 .slide.w-full, .slide-page-12 .slide .w-full {
+width: 100% !important;
+}
+
+.slide-page-12 .slide.border-t, .slide-page-12 .slide .border-t {
+border-top-width: 1px !important;
+border-top-style: solid !important;
+}
+
+.slide-page-12 .slide.bg-\[\#DFDDDA\]\/80, .slide-page-12 .slide .bg-\[\#DFDDDA\]\/80 {
+background-color: rgba(223, 221, 218, 0.8) !important;
+}
+  </style>
+</head>
+<body>
+
+    <div class="slide-wrapper slide-page-1">
+      <div class="slide-number">1</div>
+      <div class="slide bg-noise text-[#111111] font-['Plus_Jakarta_Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif]">
+    
+    <!-- 标志性极细网格线 -->
+    <div class="absolute left-[33%] top-[0px] bottom-[0px] w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[0px] right-[0px] top-[25%] h-[1px] bg-[#111111]/20"></div>
+    
+    <!-- 页眉装饰 -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-10">
+      <svg class="w-[24px] h-[24px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-[0.05em] uppercase opacity-80">Industry Insight Report</span>
+    </div>
+    
+    <div class="absolute top-[40px] right-[60px] z-10">
+      <span class="text-[14px] tracking-[0.05em] opacity-80">2024 TRENDS</span>
+    </div>
+
+    <!-- 巨大装饰圆环 -->
+    <div class="absolute -right-[10%] top-[10%] w-[800px] h-[800px] rounded-[9999px] border-[1px] border-[#111111] pointer-events-none opacity-40"></div>
+    <div class="absolute -right-[5%] top-[15%] w-[600px] h-[600px] rounded-[9999px] border-[1px] border-[#111111] pointer-events-none opacity-20"></div>
+
+    <!-- 主内容区 -->
+    <div class="relative z-10 h-full flex flex-col justify-center px-[60px]">
+      <div class="max-w-[960px]">
+        <!-- 主标题：按语义手动拆行 -->
+        <h1 class="text-[60px] font-[600] leading-[1.12] tracking-[-0.02em] text-[#111111] text-wrap-balance word-break-keep-all overflow-wrap-normal mb-[32px]">
+          智宠未来：<br>科技赋能宠物经济新趋势
+        </h1>
+        
+        <!-- 副标题/装饰线 -->
+        <div class="flex items-center gap-[20px] w-full">
+          <div class="h-[1px] w-[60px] bg-[#111111]"></div>
+          <p class="text-[24px] font-[500] text-[#111111]/80 tracking-[-0.01em]">
+            Exploring the intersection of AI, IoT, and Pet Care
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部信息区 -->
+    <div class="absolute bottom-[60px] left-[60px] right-[60px] flex justify-between items-end z-10">
+      <div class="flex items-center gap-[12px]">
+        <div class="w-[40px] h-[40px] rounded-full border-[1px] border-[#111111] flex items-center justify-center">
+          <i class="ph ph-brain text-[20px]"></i>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-[12px] uppercase tracking-wider opacity-60">Analysis by</span>
+          <span class="text-[16px] font-[500]">Strategic Research Team</span>
+        </div>
+      </div>
+      
+      <div class="text-right">
+        <div class="flex items-center justify-end gap-[8px] mb-[4px]">
+          <span class="text-[14px] opacity-60">Confidential</span>
+          <div class="w-[1px] h-[12px] bg-[#111111]/30"></div>
+          <span class="text-[14px] opacity-60">Internal Use Only</span>
+        </div>
+        <span class="text-[16px] font-[500] tracking-tight">Pet Economy 2024</span>
+      </div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-2">
+      <div class="slide-number">2</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- Header Section -->
+    <div class="absolute top-[40px] left-[48px] right-[48px] flex justify-between items-center z-10">
+      <div class="flex items-center gap-[8px]">
+        <div class="w-[24px] h-[24px] border-[1.5px] border-[#111111] rounded-full flex items-center justify-center">
+          <div class="w-[8px] h-[8px] bg-[#111111] rounded-full"></div>
+        </div>
+        <span class="text-[14px] font-[400] tracking-[0.05em] uppercase opacity-80">Investment Roadmap</span>
+      </div>
+      <div class="text-[14px] font-[400] opacity-80">
+        Slide 02 / Catalog
+      </div>
+    </div>
+
+    <!-- Background Decorative Elements -->
+    <!-- Hairline Grid -->
+    <div class="absolute left-[48px] top-[120px] bottom-[60px] w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[48px] right-[48px] top-[120px] h-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[50%] top-[120px] bottom-[60px] w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[48px] right-[48px] top-[420px] h-[1px] bg-[#111111]/20"></div>
+    
+    <!-- Geometric Circle Decoration -->
+    <div class="absolute -right-[100px] -bottom-[100px] w-[400px] h-[400px] rounded-full border-[1px] border-[#111111]/20 pointer-events-none"></div>
+    <div class="absolute -right-[60px] -bottom-[60px] w-[320px] h-[320px] rounded-full border-[1px] border-[#111111]/40 pointer-events-none"></div>
+
+    <!-- Main Content Area -->
+    <div class="relative z-10 px-[48px] pt-[120px]">
+      <!-- Page Title -->
+      <div class="mb-[60px]">
+        <h1 class="text-[56px] font-[600] leading-none tracking-[-0.025em] text-[#111111]">
+          目录
+        </h1>
+        <div class="mt-[12px] w-[60px] h-[3px] bg-[#111111]"></div>
+      </div>
+
+      <!-- 2x2 Grid Layout -->
+      <div class="grid grid-cols-2 gap-y-[48px] gap-x-[64px] max-w-[1100px]">
+        
+        <!-- Item 01 -->
+        <div class="flex gap-[24px]">
+          <div class="shrink-0 w-[48px] h-[48px] border-[1px] border-[#111111] flex items-center justify-center rounded-full">
+            <span class="text-[18px] font-[600]">01</span>
+          </div>
+          <div>
+            <h3 class="text-[22px] font-[600] mb-[12px] leading-tight">市场动能：万亿级赛道的高增长逻辑</h3>
+            <p class="text-[15px] leading-[1.6] text-[#111111]/80 font-[400]">
+              解析全球及中国宠物经济市场规模突破万亿级的增长轨迹，剖析宠物数量结构性变化与单只宠物年均消费提升背后的核心驱动力，揭示渗透率差距带来的巨大市场潜力与投资机会。
+            </p>
+          </div>
+        </div>
+
+        <!-- Item 02 -->
+        <div class="flex gap-[24px]">
+          <div class="shrink-0 w-[48px] h-[48px] border-[1px] border-[#111111] flex items-center justify-center rounded-full">
+            <span class="text-[18px] font-[600]">02</span>
+          </div>
+          <div>
+            <h3 class="text-[22px] font-[600] mb-[12px] leading-tight">科技渗透：从硬件到服务的全链路数字化</h3>
+            <p class="text-[15px] leading-[1.6] text-[#111111]/80 font-[400]">
+              深入探讨智能宠物硬件与IoT生态的爆发式增长，涵盖智能喂食器、饮水机、猫砂盆等刚需品类的技术迭代路径，以及AI视觉识别与全屋智能互联如何重构现代养宠体验与商业模式。
+            </p>
+          </div>
+        </div>
+
+        <!-- Item 03 -->
+        <div class="flex gap-[24px]">
+          <div class="shrink-0 w-[48px] h-[48px] border-[1px] border-[#111111] flex items-center justify-center rounded-full">
+            <span class="text-[18px] font-[600]">03</span>
+          </div>
+          <div>
+            <h3 class="text-[22px] font-[600] mb-[12px] leading-tight">未来图景：具身智能与数字孪生</h3>
+            <p class="text-[15px] leading-[1.6] text-[#111111]/80 font-[400]">
+              展望宠物科技前沿趋势，探索具身智能机器人在宠物陪伴与智能照护中的创新应用场景，以及数字孪生技术如何构建虚拟宠物生态系统，开启人宠交互的元宇宙新纪元。
+            </p>
+          </div>
+        </div>
+
+        <!-- Item 04 -->
+        <div class="flex gap-[24px]">
+          <div class="shrink-0 w-[48px] h-[48px] border-[1px] border-[#111111] flex items-center justify-center rounded-full">
+            <span class="text-[18px] font-[600]">04</span>
+          </div>
+          <div>
+            <h3 class="text-[22px] font-[600] mb-[12px] leading-tight">价值展望：数据资产与可持续发展</h3>
+            <p class="text-[15px] leading-[1.6] text-[#111111]/80 font-[400]">
+              评估宠物经济数据资产的商业价值与变现路径，分析硬件即服务（HaaS）模式的盈利创新机制，探讨行业在可持续发展与ESG框架下的长期价值创造与社会责任实践。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer Section -->
+    <div class="absolute bottom-[40px] left-[48px] right-[48px] flex justify-between items-end z-10">
+      <div class="flex items-center gap-[12px]">
+        <i class="ph ph-cube text-[20px]"></i>
+        <span class="text-[14px] font-[500] tracking-wider uppercase">PetTech Future Vision</span>
+      </div>
+      <div class="text-[14px] font-[400] opacity-60">
+        © 2024 Confidential Presentation
+      </div>
+    </div>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-3">
+      <div class="slide-number">3</div>
+      <div class="slide w-[1280px] h-[720px] bg-noise text-[#111111] relative overflow-hidden font-jakarta">
+    
+    <!-- Background Decorative Elements -->
+    <div class="absolute left-[40px] top-[0px] bottom-[0px] w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[0px] right-[0px] top-[140px] h-[1px] bg-[#111111]/20"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none"></div>
+
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span class="text-[14px] font-semibold tracking-wider uppercase opacity-80">Market Analysis</span>
+    </div>
+    <div class="absolute top-[40px] right-[60px] z-20">
+      <span class="text-[14px] font-semibold opacity-80">PAGE 03</span>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[70px] left-[60px] w-[1120px] z-10">
+      <h1 class="text-[48px] font-semibold leading-tight tracking-[-0.02em] text-[#111111]">
+        市场概览：中国宠物经济迈入智能时代
+      </h1>
+    </div>
+
+    <!-- Main Content Area -->
+    <main style="position: absolute; top: 160px; left: 60px; right: 60px; bottom: 80px; display: flex; flex-direction: column; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Top Chart Section -->
+      <div style="height: 300px; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 40px; align-items: center;">
+        <div class="relative p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm" style="height: 280px;">
+          <div id="chart_p3_1" style="width: 100%; height: 200px; min-height: 180px; max-height: 220px;"></div>
+        </div>
+        <div class="flex flex-col justify-center gap-6">
+          <div class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-full border border-[#111111] flex items-center justify-center shrink-0">
+              <span class="text-xs font-bold">01</span>
+            </div>
+            <div>
+              <p class="text-[18px] font-semibold mb-1">双轨增长模型</p>
+              <p class="text-[15px] leading-relaxed opacity-70">市场规模与智能渗透率呈现高度正相关，科技驱动成为第二增长曲线。</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-4">
+            <div class="w-8 h-8 rounded-full border border-[#111111] flex items-center justify-center shrink-0">
+              <span class="text-xs font-bold">02</span>
+            </div>
+            <div>
+              <p class="text-[18px] font-semibold mb-1">渗透率加速</p>
+              <p class="text-[15px] leading-relaxed opacity-70">智能用品支出占比从 3.2% 跃升至 12.8%，消费结构发生根本性迁移。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Insights Grid -->
+      <div style="flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; align-items: stretch;">
+        <!-- Card 1 -->
+        <div class="p-6 border border-[#111111]/20 flex flex-col gap-3 bg-white/20" style="min-height: 0;">
+          <div class="flex items-center gap-2 text-[#111111]">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 6l-9.5 9.5-5-5L1 18"/></svg>
+            <h3 class="text-[18px] font-semibold">市场规模突破与增长动能</h3>
+          </div>
+          <p class="text-[15px] leading-[1.6] opacity-80">
+            2023年规模达2793亿元，预计2025年突破3500亿元，年复合增长率15%-18%，远超全球平均增速6.1%。
+          </p>
+        </div>
+        <!-- Card 2 -->
+        <div class="p-6 border border-[#111111]/20 flex flex-col gap-3 bg-white/20" style="min-height: 0;">
+          <div class="flex items-center gap-2 text-[#111111]">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <h3 class="text-[18px] font-semibold">结构变革与"猫经济"崛起</h3>
+          </div>
+          <p class="text-[15px] leading-[1.6] opacity-80">
+            城镇宠物猫数量6980万只首次超过犬类，成为科技产品创新主战场，养宠家庭突破8700万户。
+          </p>
+        </div>
+        <!-- Card 3 -->
+        <div class="p-6 border border-[#111111]/20 flex flex-col gap-3 bg-white/20" style="min-height: 0;">
+          <div class="flex items-center gap-2 text-[#111111]">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <h3 class="text-[18px] font-semibold">智能消费跃升与科技渗透</h3>
+          </div>
+          <p class="text-[15px] leading-[1.6] opacity-80">
+            智能用品客单价从156元提升至298元，硬件市场规模达180亿元，科技渗透率持续加速。
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="text-[12px] opacity-50">© 2024 PetTech Intelligence Report</div>
+    </footer>
+
+    
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-4">
+      <div class="slide-number">4</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- [四角装饰 & 标志性网格] -->
+    <div class="absolute left-[40px] top-0 bottom-0 w-[1px] bg-[#111111]/20" style="left: 40px; top: 0; bottom: 0; width: 1px; background-color: rgba(17,17,17,0.2);"></div>
+    <div class="absolute left-0 right-0 top-[140px] h-[1px] bg-[#111111]/20" style="left: 0; right: 0; top: 140px; height: 1px; background-color: rgba(17,17,17,0.2);"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none" style="position: absolute; right: -10%; bottom: -10%; width: 600px; height: 600px; border-radius: 50%; border: 1px solid rgba(17,17,17,0.3);"></div>
+
+    <!-- [页眉] -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20" style="position: absolute; top: 40px; left: 60px; z-index: 20;">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest opacity-60 uppercase">PetTech Intelligence</span>
+    </div>
+
+    <!-- [标题区域] -->
+    <div class="absolute top-[70px] left-[60px] right-[60px] z-10" style="position: absolute; top: 70px; left: 60px; right: 60px; z-index: 10;">
+      <h1 class="text-[42px] font-[600] leading-tight tracking-[-0.02em] text-[#111111]" style="font-size: 42px; font-weight: 600; letter-spacing: -0.02em;">
+        消费跃迁：从基础喂养到科技消费
+      </h1>
+    </div>
+
+    <!-- [主内容区域] -->
+    <main class="absolute top-[160px] left-[60px] right-[60px] z-10" style="position: absolute; top: 160px; left: 60px; right: 60px; height: 400px; display: flex; gap: 32px; box-sizing: border-box;">
+      
+      <!-- 模块化卡片布局 -->
+      <div class="grid grid-cols-3 gap-[32px] w-full" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; width: 100%;">
+        
+        <!-- Card 1 -->
+        <div class="flex flex-col group" style="display: flex; flex-direction: column;">
+          <div class="w-full h-[1px] bg-[#111111]/20 mb-6" style="height: 1px; background-color: rgba(17,17,17,0.2);"></div>
+          <div class="flex items-start gap-4 mb-4">
+            <i class="ph ph-currency-circle-dollar text-[28px] mt-1 shrink-0"></i>
+            <h3 class="text-[20px] font-[500] leading-tight text-[#111111]" style="font-size: 20px; font-weight: 600;">
+              单只宠物年均消费：犬2875元/猫…
+            </h3>
+          </div>
+          <div class="flex items-center gap-2 text-[#111111]/60">
+            <svg class="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span class="text-[14px]">消费结构向高端化转移</span>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="flex flex-col group" style="display: flex; flex-direction: column;">
+          <div class="w-full h-[1px] bg-[#111111]/20 mb-6" style="height: 1px; background-color: rgba(17,17,17,0.2);"></div>
+          <div class="flex items-start gap-4 mb-4">
+            <i class="ph ph-users text-[28px] mt-1 shrink-0"></i>
+            <h3 class="text-[20px] font-[500] leading-tight text-[#111111]" style="font-size: 20px; font-weight: 600;">
+              90后/00后养宠人群占比68%，…
+            </h3>
+          </div>
+          <div class="flex items-center gap-2 text-[#111111]/60">
+            <svg class="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span class="text-[14px]">年轻一代驱动科技消费</span>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="flex flex-col group" style="display: flex; flex-direction: column;">
+          <div class="w-full h-[1px] bg-[#111111]/20 mb-6" style="height: 1px; background-color: rgba(17,17,17,0.2);"></div>
+          <div class="flex items-start gap-4 mb-4">
+            <i class="ph ph-cpu text-[28px] mt-1 shrink-0"></i>
+            <h3 class="text-[20px] font-[500] leading-tight text-[#111111]" style="font-size: 20px; font-weight: 600;">
+              智能设备故障率降至4.5%，OTA…
+            </h3>
+          </div>
+          <div class="flex items-center gap-2 text-[#111111]/60">
+            <svg class="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M7 7l10 10M17 7v10H7"/>
+            </svg>
+            <span class="text-[14px]">技术成熟度提升用户信任</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- [页脚 - 锁定位置] -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4" style="position: absolute; bottom: 40px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(17,17,17,0.1); padding-top: 16px;">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase" style="font-size: 12px; letter-spacing: 0.1em; opacity: 0.5; text-transform: uppercase;">
+        Confidential & Proprietary
+      </div>
+      <div class="flex items-center gap-6">
+        <div class="text-[12px] opacity-50" style="font-size: 12px; opacity: 0.5;">
+          © 2024 PetTech Intelligence Report
+        </div>
+        <div class="text-[12px] font-semibold" style="font-size: 12px; font-weight: 600;">
+          PAGE 04
+        </div>
+      </div>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-5">
+      <div class="slide-number">5</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- Background Decorations (Inherited from Template & Anchor) -->
+    <div class="absolute left-[40px] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[140px] h-[1px] bg-[#111111]/20"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none"></div>
+    
+    <!-- Header Area -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest uppercase opacity-70">IoT Ecosystem Analysis</span>
+    </div>
+    <div class="absolute top-[40px] right-[60px] text-[14px] opacity-70">
+      Page 05
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[80px] left-[60px] right-[60px] z-10">
+      <h1 class="text-[42px] font-semibold leading-tight tracking-[-0.02em] text-[#111111]" style="font-size: 42px;">
+        硬件革命：IoT生态重构养宠基础设施
+      </h1>
+      <div class="mt-4 w-20 h-1 bg-[#111111]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <!-- Fixed height to prevent overflow: 720 - 140(top) - 120(bottom safety) = 460px -->
+    <main class="absolute top-[180px] left-[60px] right-[60px] z-10" style="height: 420px; display: flex; gap: 24px;">
+      
+      <!-- Card 1: Market Scale -->
+      <div class="flex-1 flex flex-col p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm relative overflow-hidden" style="min-height: 0;">
+        <div class="flex items-center gap-3 mb-6">
+          <i class="ph ph-chart-bar text-[24px]"></i>
+          <span class="text-[18px] font-semibold">市场规模与品类爆发</span>
+        </div>
+        <div class="mt-8">
+          <div class="text-[56px] font-bold leading-none tracking-tighter mb-3">180<span class="text-[24px] ml-1">亿元</span></div>
+          <p class="text-[15px] leading-[1.6] opacity-80">
+            2023年中国智能宠物硬件市场规模达180亿元，智能喂食器、饮水机、猫砂盆构成三大刚需品类。
+          </p>
+        </div>
+        <!-- Decorative corner element -->
+        <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-[#111111]/10"></div>
+      </div>
+
+      <!-- Card 2: AI Vision -->
+      <div class="flex-1 flex flex-col p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm relative overflow-hidden" style="min-height: 0;">
+        <div class="flex items-center gap-3 mb-6">
+          <i class="ph ph-brain text-[24px]"></i>
+          <span class="text-[18px] font-semibold">AI视觉识别与健康管理</span>
+        </div>
+        <div class="mt-8">
+          <div class="text-[56px] font-bold leading-none tracking-tighter mb-3">&lt;3<span class="text-[24px] ml-1">%</span></div>
+          <p class="text-[15px] leading-[1.6] opacity-80">
+            高端设备集成猫脸/狗脸识别算法，个体区分误差率低于3%，精准记录排泄频率、体重与活动轨迹。
+          </p>
+        </div>
+        <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-[#111111]/10"></div>
+      </div>
+
+      <!-- Card 3: Smart Ecosystem -->
+      <div class="flex-1 flex flex-col p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm relative overflow-hidden" style="min-height: 0;">
+        <div class="flex items-center gap-3 mb-6">
+          <i class="ph ph-share-network text-[24px]"></i>
+          <span class="text-[18px] font-semibold">全屋智能互联生态</span>
+        </div>
+        <div class="mt-8">
+          <div class="text-[56px] font-bold leading-none tracking-tighter mb-3">91<span class="text-[24px] ml-1">%</span></div>
+          <p class="text-[15px] leading-[1.6] opacity-80">
+            设备支持APP远程控制，接入HomeKit、米家等主流生态，实现喂食、饮水、排泄全链路自动化管理。
+          </p>
+        </div>
+        <div class="absolute top-0 right-0 w-12 h-12 border-t border-r border-[#111111]/10"></div>
+      </div>
+
+    </main>
+
+    <!-- Footer (Position Locked as per Anchor) -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="text-[12px] opacity-50">© 2024 PetTech Intelligence Report</div>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-6">
+      <div class="slide-number">6</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- Background Decorations (Inherited from Template & Anchor) -->
+    <div class="absolute left-[40px] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-0 right-0 top-[140px] h-[1px] bg-[#111111]/20"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none"></div>
+    
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest uppercase opacity-60">PetTech Intelligence Report</span>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[80px] left-[60px] right-[60px] z-10">
+      <h1 class="text-[42px] font-[600] leading-tight tracking-[-0.02em] text-[#111111]">
+        医疗突破：AI诊断与基因技术商业化
+      </h1>
+    </div>
+
+    <!-- Main Content Area -->
+    <main style="position: absolute; top: 180px; left: 60px; right: 60px; height: 420px; display: grid; grid-template-columns: 1fr 540px; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Insight Cards (3 items) -->
+      <div style="display: flex; flex-direction: column; gap: 20px; height: 100%; overflow: hidden;">
+        
+        <!-- Card 1 -->
+        <div class="flex gap-4 p-5 border border-[#111111]/20 bg-white/30 backdrop-blur-sm" style="height: 130px;">
+          <div class="shrink-0 w-[40px] h-[40px] flex items-center justify-center border border-[#111111] rounded-full">
+            <i class="ph ph-brain text-[20px]"></i>
+          </div>
+          <div class="flex flex-col justify-center">
+            <h3 class="text-[18px] font-[600] mb-1">AI影像诊断系统</h3>
+            <p class="text-[14px] leading-[1.6] opacity-80">基于深度学习的皮肤病变识别准确率达94.2%，骨折X光片自动识别技术已投入临床使用，大幅提升诊断效率。</p>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="flex gap-4 p-5 border border-[#111111]/20 bg-white/30 backdrop-blur-sm" style="height: 130px;">
+          <div class="shrink-0 w-[40px] h-[40px] flex items-center justify-center border border-[#111111] rounded-full">
+            <i class="ph ph-cpu text-[20px]"></i>
+          </div>
+          <div class="flex flex-col justify-center">
+            <h3 class="text-[18px] font-[600] mb-1">基因检测成本突破</h3>
+            <p class="text-[14px] leading-[1.6] opacity-80">检测价格从2000元降至300-500元，降幅达75%以上，推动基因筛查从高端服务走向大众化。</p>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="flex gap-4 p-5 border border-[#111111]/20 bg-white/30 backdrop-blur-sm" style="height: 130px;">
+          <div class="shrink-0 w-[40px] h-[40px] flex items-center justify-center border border-[#111111] rounded-full">
+            <i class="ph ph-stack text-[20px]"></i>
+          </div>
+          <div class="flex flex-col justify-center">
+            <h3 class="text-[18px] font-[600] mb-1">大数据疾病预测</h3>
+            <p class="text-[14px] leading-[1.6] opacity-80">积累超500万例电子病历，通过机器学习构建预测模型，推动宠物医疗从治疗向预防转型。</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right: Chart Area -->
+      <div class="relative border border-[#111111]/20 bg-white/20 p-6 flex flex-col justify-center" style="height: 100%;">
+        
+      </div>
+
+    </main>
+
+    <!-- Footer (Position Locked) -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="text-[12px] opacity-50">PAGE 6</div>
+    </footer>
+
+    <!-- Phosphor Icons Script -->
+    
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-7">
+      <div class="slide-number">7</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- Background Decorative Elements (Inherited from Template & Anchor) -->
+    <div class="absolute left-[40px] top-0 bottom-0 w-[1px] bg-[#111111]/20" style="position: absolute; left: 40px; top: 0; bottom: 0; width: 1px; background-color: rgba(17,17,17,0.2);"></div>
+    <div class="absolute left-0 right-0 top-[140px] h-[1px] bg-[#111111]/20" style="position: absolute; left: 0; right: 0; top: 140px; height: 1px; background-color: rgba(17,17,17,0.2);"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none" style="position: absolute; right: -10%; bottom: -10%; width: 600px; height: 600px; border-radius: 50%; border: 1px solid rgba(17,17,17,0.3);"></div>
+
+    <!-- Header Area -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest uppercase opacity-60">Service Digitalization</span>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[80px] left-[60px] right-[60px] z-10">
+      <h1 class="text-[48px] font-[600] leading-tight tracking-[-0.02em] text-[#111111]" style="font-size: 48px; font-weight: 600; letter-spacing: -0.02em;">
+        服务数字化：O2O闭环与元宇宙社交
+      </h1>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="absolute top-[180px] left-[60px] right-[60px] z-10" style="height: 380px; display: flex; gap: 32px; box-sizing: border-box;">
+      
+      <!-- Grid Layout for Body Items -->
+      <div class="grid grid-cols-3 gap-[32px] w-full h-full">
+        
+        <!-- Card 1 -->
+        <div class="flex flex-col group" style="height: 100%; position: relative;">
+          <div class="w-full h-full border border-[#111111]/20 p-[32px] flex flex-col justify-between bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/30">
+            <div>
+              <div class="w-[40px] h-[40px] mb-[24px] flex items-center justify-center border border-[#111111] rounded-full">
+                <i class="ph ph-target text-[20px]"></i>
+              </div>
+              <h3 class="text-[22px] font-[500] leading-[1.4] tracking-tight text-[#111111]" style="font-size: 22px; font-weight: 600;">
+                O2O服务履约率98.5%，注册宠…
+              </h3>
+            </div>
+            <div class="flex items-center gap-2 text-[#111111]/40">
+              <svg class="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M7 7l10 10M17 7v10H7"/>
+              </svg>
+              <span class="text-[12px] uppercase tracking-widest">Performance</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="flex flex-col group" style="height: 100%; position: relative;">
+          <div class="w-full h-full border border-[#111111]/20 p-[32px] flex flex-col justify-between bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/30">
+            <div>
+              <div class="w-[40px] h-[40px] mb-[24px] flex items-center justify-center border border-[#111111] rounded-full">
+                <i class="ph ph-chart-line-up text-[20px]"></i>
+              </div>
+              <h3 class="text-[22px] font-[500] leading-[1.4] tracking-tight text-[#111111]" style="font-size: 22px; font-weight: 600;">
+                宠物直播GMV增长280%，智能用…
+              </h3>
+            </div>
+            <div class="flex items-center gap-2 text-[#111111]/40">
+              <svg class="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M7 7l10 10M17 7v10H7"/>
+              </svg>
+              <span class="text-[12px] uppercase tracking-widest">Growth</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="flex flex-col group" style="height: 100%; position: relative;">
+          <div class="w-full h-full border border-[#111111]/20 p-[32px] flex flex-col justify-between bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/30">
+            <div>
+              <div class="w-[40px] h-[40px] mb-[24px] flex items-center justify-center border border-[#111111] rounded-full">
+                <i class="ph ph-brain text-[20px]"></i>
+              </div>
+              <h3 class="text-[22px] font-[500] leading-[1.4] tracking-tight text-[#111111]" style="font-size: 22px; font-weight: 600;">
+                AI鼻纹识别准确率99.7%，解决…
+              </h3>
+            </div>
+            <div class="flex items-center gap-2 text-[#111111]/40">
+              <svg class="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M7 7l10 10M17 7v10H7"/>
+              </svg>
+              <span class="text-[12px] uppercase tracking-widest">Technology</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer (Position Locked from Anchor) -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4" style="position: absolute; bottom: 40px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(17,17,17,0.1); padding-top: 16px;">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="flex items-center gap-4">
+        <span class="text-[12px] opacity-50">PAGE 7</span>
+        <div class="w-[1px] h-[10px] bg-[#111111]/20"></div>
+        <span class="text-[12px] opacity-50">PetTech Intelligence Report</span>
+      </div>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-8">
+      <div class="slide-number">8</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- [Background Decorations] -->
+    <!-- Vertical Hairline Grid -->
+    <div class="absolute left-[40px] top-0 bottom-0 w-[1px] bg-[#111111]/20" style="position: absolute; left: 40px; top: 0; bottom: 0; width: 1px; background-color: rgba(17,17,17,0.2);"></div>
+    <!-- Horizontal Hairline Grid -->
+    <div class="absolute left-0 right-0 top-[140px] h-[1px] bg-[#111111]/20" style="position: absolute; left: 0; right: 0; top: 140px; height: 1px; background-color: rgba(17,17,17,0.2);"></div>
+    <!-- Geometric Circle Decoration -->
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none" style="position: absolute; right: -10%; bottom: -10%; width: 600px; height: 600px; border-radius: 50%; border: 1px solid rgba(17,17,17,0.3);"></div>
+
+    <!-- [Header] -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20" style="position: absolute; top: 40px; left: 60px; z-index: 20;">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest uppercase opacity-60">PetTech Intelligence</span>
+    </div>
+
+    <!-- [Title Section] -->
+    <div class="absolute top-[70px] left-[60px] right-[60px] z-10" style="position: absolute; top: 70px; left: 60px; right: 60px; z-index: 10;">
+      <h1 class="text-[42px] font-[600] leading-tight tracking-[-0.02em] text-[#111111]" style="font-size: 42px; font-weight: 600; letter-spacing: -0.02em;">
+        食品进化：精准营养与生物技术
+      </h1>
+    </div>
+
+    <!-- [Main Content Area] -->
+    <!-- Fixed height main area to prevent overflow, bottom safe area 120px -->
+    <main class="absolute top-[160px] left-[60px] right-[60px] bottom-[120px] z-10" 
+          style="position: absolute; top: 160px; left: 60px; right: 60px; bottom: 120px; z-index: 10; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; box-sizing: border-box;">
+      
+      <!-- Card 1: AI Nutritionist -->
+      <div class="flex flex-col h-full border-l border-[#111111]/20 pl-6 py-2" style="border-left: 1px solid rgba(17,17,17,0.2);">
+        <div class="mb-6">
+          <div class="w-10 h-10 rounded-full border border-[#111111] flex items-center justify-center mb-4">
+            <i class="ph ph-brain text-[20px]"></i>
+          </div>
+          <h3 class="text-[20px] font-[600] mb-3 leading-tight" style="font-size: 20px; font-weight: 600;">
+            AI营养师：从通用粮到精准定制
+          </h3>
+          <p class="text-[15px] leading-[1.6] text-[#111111]/80" style="font-size: 15px; line-height: 1.6;">
+            基于宠物体检数据（血液指标、体重、年龄、基因图谱）构建算法模型，自动生成个性化食谱方案，覆盖鲜粮配比与冻干营养组合，实现从“通用型主粮”向“精准营养干预”的范式转变。
+          </p>
+        </div>
+        <!-- Visual Arrow Indicator -->
+        <div class="mt-8 opacity-30">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M7 7l10 10M17 7v10H7"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Card 2: Lab-grown Meat -->
+      <div class="flex flex-col h-full border-l border-[#111111]/20 pl-6 py-2" style="border-left: 1px solid rgba(17,17,17,0.2);">
+        <div class="mb-6">
+          <div class="w-10 h-10 rounded-full border border-[#111111] flex items-center justify-center mb-4">
+            <i class="ph ph-cpu text-[20px]"></i>
+          </div>
+          <h3 class="text-[20px] font-[600] mb-3 leading-tight" style="font-size: 20px; font-weight: 600;">
+            细胞培养肉：可持续蛋白革命
+          </h3>
+          <p class="text-[15px] leading-[1.6] text-[#111111]/80" style="font-size: 15px; line-height: 1.6;">
+            采用实验室细胞培育技术替代传统畜牧业，显著降低生产过程中的碳排放、水资源消耗与土地使用量达90%，预计2025年实现规模化量产。
+          </p>
+        </div>
+        <div class="mt-8 opacity-30">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M7 7l10 10M17 7v10H7"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Card 3: Blockchain Traceability -->
+      <div class="flex flex-col h-full border-l border-[#111111]/20 pl-6 py-2" style="border-left: 1px solid rgba(17,17,17,0.2);">
+        <div class="mb-6">
+          <div class="w-10 h-10 rounded-full border border-[#111111] flex items-center justify-center mb-4">
+            <i class="ph ph-share-network text-[20px]"></i>
+          </div>
+          <h3 class="text-[20px] font-[600] mb-3 leading-tight" style="font-size: 20px; font-weight: 600;">
+            区块链溯源：透明工厂与信任重构
+          </h3>
+          <p class="text-[15px] leading-[1.6] text-[#111111]/80" style="font-size: 15px; line-height: 1.6;">
+            运用分布式账本技术实现原料采购、生产加工、物流仓储全流程上链存证，配合透明工厂24小时直播增强品牌信任背书。
+          </p>
+        </div>
+        <div class="mt-8 opacity-30">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M7 7l10 10M17 7v10H7"/>
+          </svg>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- [Footer] - Position Locked -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4" 
+            style="position: absolute; bottom: 40px; left: 60px; right: 60px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(17,17,17,0.1); padding-top: 16px;">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="text-[12px] opacity-50 flex items-center gap-4">
+        <span>PAGE 8</span>
+        <span class="w-px h-3 bg-[#111111]/20"></span>
+        <span>© 2024 PetTech Intelligence Report</span>
+      </div>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-9">
+      <div class="slide-number">9</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- Background Decorations (Inherited from Template & Anchor) -->
+    <div class="absolute left-[40px] top-0 bottom-0 w-[1px] bg-[#111111]/20 z-0"></div>
+    <div class="absolute left-0 right-0 top-[140px] h-[1px] bg-[#111111]/20 z-0"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none z-0"></div>
+    
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest uppercase opacity-60">Future Landscapes</span>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[70px] left-[60px] z-10">
+      <h1 class="text-[48px] font-[600] leading-tight tracking-[-0.02em] text-[#111111]" style="font-size: 48px;">
+        未来图景：具身智能与数字孪生
+      </h1>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="absolute top-[160px] left-[60px] right-[60px] z-10" style="height: 440px; display: grid; grid-template-cols: 1fr 1fr; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Chart Section -->
+      <div class="flex flex-col justify-center" style="height: 100%;">
+        <div class="relative p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm" style="height: 320px; width: 100%;">
+          <div id="chart_p9_1" style="width:100%; height: 200px; min-height: 180px; max-height: 220px;"></div>
+          <div class="absolute bottom-4 right-6 text-[12px] opacity-40 italic">Data Source: Market Intelligence Analysis</div>
+        </div>
+      </div>
+
+      <!-- Right: Insights Section (Grid of Cards) -->
+      <div class="grid grid-cols-1 gap-4" style="height: 100%;">
+        <!-- Card 1 -->
+        <div class="flex gap-4 p-4 border border-[#111111]/10 bg-white/20" style="height: 130px;">
+          <div class="shrink-0 w-12 h-12 rounded-full border border-[#111111] flex items-center justify-center">
+            <i class="ph ph-brain text-[20px]"></i>
+          </div>
+          <div class="flex flex-col justify-center overflow-hidden">
+            <div class="flex items-baseline gap-2 mb-1">
+              <span class="text-[18px] font-[600]">陪伴机器人与情感计算</span>
+              <span class="text-[16px] font-[700] text-[#111111]">25亿元</span>
+            </div>
+            <p class="text-[14px] leading-[1.5] opacity-80 ">
+              集成情感计算技术实现宠物情绪实时识别与反馈，从被动玩具向主动情感交互进化。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="flex gap-4 p-4 border border-[#111111]/10 bg-white/20" style="height: 130px;">
+          <div class="shrink-0 w-12 h-12 rounded-full border border-[#111111] flex items-center justify-center">
+            <i class="ph ph-cpu text-[20px]"></i>
+          </div>
+          <div class="flex flex-col justify-center overflow-hidden">
+            <div class="flex items-baseline gap-2 mb-1">
+              <span class="text-[18px] font-[600]">脑机接口技术突破</span>
+              <span class="text-[16px] font-[700] text-[#111111]">76% 准确率</span>
+            </div>
+            <p class="text-[14px] leading-[1.5] opacity-80 ">
+              通过非侵入式神经信号采集与解码，建立人宠双向意图沟通通道，解决失能动物交互。
+            </p>
+          </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="flex gap-4 p-4 border border-[#111111]/10 bg-white/20" style="height: 130px;">
+          <div class="shrink-0 w-12 h-12 rounded-full border border-[#111111] flex items-center justify-center">
+            <i class="ph ph-stack text-[20px]"></i>
+          </div>
+          <div class="flex flex-col justify-center overflow-hidden">
+            <div class="flex items-baseline gap-2 mb-1">
+              <span class="text-[18px] font-[600]">数据资产化价值重构</span>
+              <span class="text-[16px] font-[700] text-[#111111]">50万+ 点/年</span>
+            </div>
+            <p class="text-[14px] leading-[1.5] opacity-80 ">
+              涵盖生理指标与行为模式，催生健康保险、精准营销等新业态，保障数据合规流通。
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer (Position Locked) -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4 z-20">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="text-[12px] opacity-50">PAGE 9</div>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-10">
+      <div class="slide-number">10</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- Background Decorations -->
+    <div class="absolute left-[40px] top-0 bottom-0 w-[1px] hairline-grid"></div>
+    <div class="absolute left-0 right-0 top-[140px] h-[1px] hairline-grid"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none"></div>
+    
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest uppercase opacity-60">ESG & Sustainability</span>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[80px] left-[60px] right-[60px] z-10">
+      <h1 class="text-[42px] font-[600] leading-tight tracking-[-0.02em] text-[#111111]" style="font-size: 42px;">
+        ESG与可持续：科技赋能循环经济
+      </h1>
+      <div class="mt-4 w-20 h-1 bg-[#111111]"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="absolute top-[200px] left-[60px] right-[60px] bottom-[120px] z-10" 
+          style="height: 380px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; box-sizing: border-box;">
+      
+      <!-- Card 1 -->
+      <div class="flex flex-col h-full p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-3 opacity-10">
+          <i class="ph ph-cube text-[48px]"></i>
+        </div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-full border border-[#111111] flex items-center justify-center shrink-0">
+            <span class="text-[12px] font-bold">01</span>
+          </div>
+          <h3 class="text-[20px] font-[600] leading-tight">可降解材料替代加速</h3>
+        </div>
+        <p class="text-[15px] leading-[1.7] opacity-80" style="font-size: 15px;">
+          生物基猫砂、竹纤维玩具等环保可降解用品市场占比已提升至30%以上，通过材料科技创新替代传统塑料与化学粘合剂，从源头减少微塑料污染与土壤负担，推动宠物消费向可持续方向结构性转型。
+        </p>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="flex flex-col h-full p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-3 opacity-10">
+          <i class="ph ph-users text-[48px]"></i>
+        </div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-full border border-[#111111] flex items-center justify-center shrink-0">
+            <span class="text-[12px] font-bold">02</span>
+          </div>
+          <h3 class="text-[20px] font-[600] leading-tight">绿色溢价消费共识形成</h3>
+        </div>
+        <p class="text-[15px] leading-[1.7] opacity-80" style="font-size: 15px;">
+          Z世代养宠人群展现出强烈的环保责任意识，67%的年轻消费者愿意为具备环保认证的宠物用品支付高达20%的价格溢价，这一消费倾向正反向驱动供应链向低碳生产模式加速重构与升级。
+        </p>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="flex flex-col h-full p-6 border border-[#111111]/20 bg-white/30 backdrop-blur-sm relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-3 opacity-10">
+          <i class="ph ph-arrows-clockwise text-[48px]"></i>
+        </div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-8 h-8 rounded-full border border-[#111111] flex items-center justify-center shrink-0">
+            <span class="text-[12px] font-bold">03</span>
+          </div>
+          <h3 class="text-[20px] font-[600] leading-tight">循环经济降碳成效显著</h3>
+        </div>
+        <p class="text-[15px] leading-[1.7] opacity-80" style="font-size: 15px;">
+          通过智能回收系统、生物降解材料研发与生产流程数字化优化，科技驱动的循环经济模式可将宠物产业整体环境负担降低90%，实现经济效益与生态效益的双重突破，构建产业长期价值护城河。
+        </p>
+      </div>
+
+    </main>
+
+    <!-- Footer (Position Locked) -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="flex items-center gap-6">
+        <div class="text-[12px] opacity-50">© 2024 PetTech Intelligence Report</div>
+        <div class="text-[12px] font-semibold">PAGE 10</div>
+      </div>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-11">
+      <div class="slide-number">11</div>
+      <div class="slide bg-noise text-[#111111]">
+    
+    <!-- Background Decorations (Inherited from Anchor) -->
+    <div class="absolute left-[40px] top-[0px] bottom-[0px] w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[0px] right-[0px] top-[140px] h-[1px] bg-[#111111]/20"></div>
+    <div class="absolute -right-[10%] -bottom-[10%] w-[600px] h-[600px] rounded-full border-[1px] border-[#111111]/30 pointer-events-none"></div>
+    
+    <!-- Header -->
+    <div class="absolute top-[40px] left-[60px] flex items-center gap-[8px] z-20">
+      <svg class="w-[20px] h-[20px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+      <span class="text-[14px] tracking-widest opacity-60 uppercase">PetTech Intelligence Report</span>
+    </div>
+
+    <!-- Title Section -->
+    <div class="absolute top-[80px] left-[60px] right-[60px] z-10">
+      <h1 class="text-[42px] font-[600] leading-tight tracking-[-0.02em] text-[#111111]" style="font-size: 42px;">
+        战略价值：数据资产与投资逻辑
+      </h1>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="absolute top-[160px] left-[60px] right-[60px] bottom-[120px] z-10" 
+          style="height: 440px; display: grid; grid-template-columns: 580px 1fr; gap: 40px; box-sizing: border-box;">
+      
+      <!-- Left: Chart Section -->
+      <div class="flex flex-col justify-center bg-white/30 border border-[#111111]/10 p-6 rounded-sm relative">
+        <div class="absolute top-0 left-0 w-full h-1 bg-[#111111]"></div>
+        <div id="chart_p11_1" style="width:100%; height: 200px; min-height: 180px; max-height: 220px;"></div>
+      </div>
+
+      <!-- Right: Insights Section (Modular Grid) -->
+      <div class="grid grid-cols-1 gap-6 overflow-hidden">
+        <!-- Insight Card 1 -->
+        <div class="flex gap-4 p-4 border-l-2 border-[#111111] bg-[#111111]/5">
+          <div class="shrink-0 w-12 h-12 flex items-center justify-center rounded-full border border-[#111111]/20">
+            <i class="ph ph-chart-bar text-[20px]"></i>
+          </div>
+          <div>
+            <h3 class="text-[18px] font-[600] mb-1">硬件市场规模与增长动能</h3>
+            <p class="text-[14px] leading-[1.6] opacity-80">2023年中国智能宠物硬件市场规模已达<span class="font-bold text-[#111111]">180亿元</span>，智能喂食器、饮水机、猫砂盆构成三大刚需品类。</p>
+          </div>
+        </div>
+
+        <!-- Insight Card 2 -->
+        <div class="flex gap-4 p-4 border-l-2 border-[#111111] bg-[#111111]/5">
+          <div class="shrink-0 w-12 h-12 flex items-center justify-center rounded-full border border-[#111111]/20">
+            <i class="ph ph-arrows-clockwise text-[20px]"></i>
+          </div>
+          <div>
+            <h3 class="text-[18px] font-[600] mb-1">商业模式转型：HaaS 模式</h3>
+            <p class="text-[14px] leading-[1.6] opacity-80">从单一硬件销售向“硬件即服务”转型，通过设备收集健康数据，提供订阅制报告与远程兽医咨询。</p>
+          </div>
+        </div>
+
+        <!-- Insight Card 3 -->
+        <div class="flex gap-4 p-4 border-l-2 border-[#111111] bg-[#111111]/5">
+          <div class="shrink-0 w-12 h-12 flex items-center justify-center rounded-full border border-[#111111]/20">
+            <i class="ph ph-shield-check text-[20px]"></i>
+          </div>
+          <div>
+            <h3 class="text-[18px] font-[600] mb-1">数据资产化构建护城河</h3>
+            <p class="text-[14px] leading-[1.6] opacity-80">AI视觉识别实现疾病预警准确率达<span class="font-bold text-[#111111]">92%</span>，小佩宠物APP日活用户超300万，构建核心壁垒。</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer (Position Locked) -->
+    <footer class="absolute bottom-[40px] left-[60px] right-[60px] flex justify-between items-center border-t border-[#111111]/10 pt-4">
+      <div class="text-[12px] tracking-widest opacity-50 uppercase">Confidential & Proprietary</div>
+      <div class="text-[12px] opacity-50">PAGE 11 / CHAPTER 9</div>
+    </footer>
+
+  </div>
+    </div>
+
+    <div class="slide-wrapper slide-page-12">
+      <div class="slide-number">12</div>
+      <div class="slide bg-noise flex flex-col text-[#111111]">
+    
+    <!-- Background Decorative Elements -->
+    <!-- Large Geometric Circle -->
+    <div class="absolute -right-20 -bottom-20 w-[600px] h-[600px] rounded-full border border-[#111111] pointer-events-none"></div>
+    <div class="absolute -right-40 -bottom-40 w-[800px] h-[800px] rounded-full border border-[#111111]/30 pointer-events-none"></div>
+    
+    <!-- Hairline Grid System -->
+    <div class="absolute left-0 right-0 top-[180px] h-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[48px] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+    <div class="absolute left-[33%] top-0 bottom-0 w-[1px] bg-[#111111]/20"></div>
+
+    <!-- Header -->
+    <header class="shrink-0 pt-6 px-12 flex justify-between items-center relative z-10">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 border border-[#111111] flex items-center justify-center">
+          <div class="w-2 h-2 bg-[#111111] rounded-full"></div>
+        </div>
+        <span class="text-sm font-semibold tracking-tight">SMART PET ECOSYSTEM 2024</span>
+      </div>
+      <div class="text-sm font-semibold opacity-60">CONFIDENTIAL / STRATEGY</div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 px-12 py-8 flex flex-col justify-center relative z-10">
+      <div class="grid grid-cols-[33%_67%] gap-4 items-stretch">
+        
+        <!-- Left Column: Main Title -->
+        <div class="flex flex-col justify-center">
+          <h1 class="text-[56px] font-semibold leading-[1.1] tracking-[-0.02em] mb-8">
+            智宠未来，<br/>科技让陪伴<br/>更长久
+          </h1>
+          <div class="flex items-center gap-3 text-lg font-semibold opacity-80">
+            <i class="ph ph-target text-2xl"></i>
+            <span>定义下一代宠物智能生活</span>
+          </div>
+        </div>
+
+        <!-- Right Column: Key Points -->
+        <div class="grid grid-cols-1 gap-3">
+          <!-- Point 1 -->
+          <div class="flex items-start gap-3 p-6 border border-[#111111]/20 bg-white/10 backdrop-blur-sm">
+            <div class="shrink-0 w-12 h-12 rounded-full border border-[#111111] flex items-center justify-center">
+              <i class="ph ph-chart-line-up text-lg"></i>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold mb-2">万亿级市场蓝海与结构性增长机遇</h3>
+              <p class="text-base opacity-70 leading-relaxed">捕捉宠物经济从规模扩张向质量升级的结构性拐点，挖掘高净值人群的深层消费潜力。</p>
+            </div>
+          </div>
+
+          <!-- Point 2 -->
+          <div class="flex items-start gap-3 p-6 border border-[#111111]/20 bg-white/10 backdrop-blur-sm">
+            <div class="shrink-0 w-12 h-12 rounded-full border border-[#111111] flex items-center justify-center">
+              <i class="ph ph-cpu text-lg"></i>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold mb-2">智能科技重构养宠体验与商业生态</h3>
+              <p class="text-base opacity-70 leading-relaxed">通过AIoT与大数据分析，将碎片化的养宠场景转化为闭环的数字化服务生态。</p>
+            </div>
+          </div>
+
+          <!-- Point 3 -->
+          <div class="flex items-start gap-3 p-6 border border-[#111111]/20 bg-white/10 backdrop-blur-sm">
+            <div class="shrink-0 w-12 h-12 rounded-full border border-[#111111] flex items-center justify-center">
+              <i class="ph ph-brain text-lg"></i>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold mb-2">从工具理性到情感价值的范式跃迁</h3>
+              <p class="text-base opacity-70 leading-relaxed">超越单纯的功能性替代，构建基于情感共鸣的科技陪伴，实现商业价值与人文关怀的统一。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="absolute bottom-0 w-full h-20 px-12 flex items-center justify-between z-10 border-t border-[#111111]/20 bg-[#DFDDDA]/80 backdrop-blur-md">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 text-xs font-semibold opacity-60">
+          <i class="ph ph-globe"></i>
+          <span>WWW.SMARTPET.TECH</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-semibold opacity-60">
+          <i class="ph ph-share-network"></i>
+          <span>INVESTOR RELATIONS</span>
+        </div>
+      </div>
+      <div class="text-sm font-semibold tracking-widest">
+        THANK YOU FOR YOUR ATTENTION
+      </div>
+    </footer>
+
+  </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+      var chart_p3_1 = echarts.init(document.getElementById('chart_p3_1'));
+      chart_p3_1.setOption({
+        animation: false,
+        backgroundColor: 'transparent',
+        color: ['#111111', '#A3A3A3'],
+        textStyle: { fontFamily: '"Times New Roman", SimSun, "Songti SC", STSong, serif', color: '#111111' },
+        tooltip: { trigger: 'axis', backgroundColor: '#DFDDDA', borderColor: '#111111', textStyle: { color: '#111111' } },
+        legend: { bottom: 0, left: 'center', itemWidth: 12, itemHeight: 12, textStyle: { fontSize: 12 } },
+        grid: { top: 30, right: 50, bottom: 40, left: 50, containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: ["2020", "2021", "2023", "2025E", "2028E"],
+          axisLine: { lineStyle: { color: 'rgba(17,17,17,0.2)' } },
+          axisTick: { show: false },
+          axisLabel: { color: '#111111', fontSize: 12 }
+        },
+        yAxis: [
+          {
+            type: 'value',
+            name: '规模(亿元)',
+            nameTextStyle: { color: '#111111', fontSize: 12, padding: [0, 0, 0, -30] },
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: '#111111', fontSize: 11 },
+            splitLine: { lineStyle: { color: 'rgba(17,17,17,0.1)' } }
+          },
+          {
+            type: 'value',
+            name: '占比(%)',
+            nameTextStyle: { color: '#111111', fontSize: 12 },
+            axisLine: { show: false },
+            axisTick: { show: false },
+            axisLabel: { color: '#111111', fontSize: 11 },
+            splitLine: { show: false }
+          }
+        ],
+        series: [
+          {
+            name: '市场规模(亿元)',
+            type: 'line',
+            data: [2065, 2490, 2793, 3500, 5000],
+            yAxisIndex: 0,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { width: 3 },
+            itemStyle: { color: '#111111' }
+          },
+          {
+            name: '智能用品支出占比(%)',
+            type: 'line',
+            data: [3.2, 6.5, 12.8, 18, 25],
+            yAxisIndex: 1,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { width: 2, type: 'dashed' },
+            itemStyle: { color: '#A3A3A3' }
+          }
+        ]
+      });
+    
+
+
+    var chart_p9_1 = echarts.init(document.getElementById('chart_p9_1'));
+    
+    // Custom theme for the minimalist warm gray style
+    const minimalistTheme = {
+      color: ['#111111', '#A3A3A3', '#E5E5E5'],
+      backgroundColor: 'transparent',
+      textStyle: {
+        fontFamily: '"Times New Roman", SimSun, "Songti SC", STSong, serif',
+        color: '#111111'
+      },
+      title: {
+        textStyle: { color: '#111111', fontWeight: 500, fontSize: 14 }
+      },
+      grid: {
+        top: 40,
+        right: 20,
+        bottom: 30,
+        left: 50,
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        axisLine: { lineStyle: { color: 'rgba(17,17,17,0.2)' } },
+        axisTick: { show: false },
+        axisLabel: { color: '#111111', fontSize: 11, margin: 12 },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#111111', fontSize: 11 },
+        splitLine: { lineStyle: { color: 'rgba(17,17,17,0.1)' } }
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: '#111111',
+        textStyle: { color: '#DFDDDA' },
+        borderColor: '#111111'
+      }
+    };
+
+    chart_p9_1.setOption(Object.assign(minimalistTheme, {
+      title: { 
+        text: '核心数据趋势可视化', 
+        left: 'center', 
+        top: 0 
+      },
+      xAxis: { 
+        data: ['市场规模', '识别准确率', '年均数据点', '市场规模(24)', '识别准确率(24)'] 
+      },
+      series: [{
+        name: 'Value',
+        type: 'line',
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 8,
+        itemStyle: { color: '#111111' },
+        lineStyle: { width: 2, color: '#111111' },
+        data: [25, 76, 50, 25, 76]
+      }]
+    }));
+  
+
+
+    var chart_p11_1 = echarts.init(document.getElementById('chart_p11_1'));
+    
+    // Data processing for the chart
+    const categories = ["2023融资", "AI医疗占", "智能硬件占", "用户LTV", "转化率", "市场规模", "2020渗透", "2023渗透"];
+    const values = [45, 35, 40, 4200, 28, 180, 5, 23];
+    const labels = ["45亿", "35%", "40%", "4200元", "28%", "180亿", "5%", "23%"];
+
+    chart_p11_1.setOption(Object.assign({
+      "animation": false,
+      "backgroundColor": "transparent",
+      "color": ["#111111"],
+      "textStyle": {
+        "color": "#111111",
+        "fontFamily": "Plus Jakarta Sans, sans-serif"
+      },
+      "tooltip": {
+        "trigger": "axis",
+        "backgroundColor": "#111111",
+        "textStyle": { "color": "#DFDDDA" }
+      },
+      "grid": {
+        "top": 40,
+        "right": 30,
+        "bottom": 40,
+        "left": 50,
+        "containLabel": true
+      },
+      "xAxis": {
+        "type": "category",
+        "axisLine": { "lineStyle": { "color": "rgba(17,17,17,0.2)" } },
+        "axisTick": { "show": false },
+        "axisLabel": { "color": "#111111", "fontSize": 11 }
+      },
+      "yAxis": {
+        "type": "value",
+        "axisLine": { "show": false },
+        "axisTick": { "show": false },
+        "axisLabel": { "show": false },
+        "splitLine": { "lineStyle": { "color": "rgba(17,17,17,0.1)" } }
+      }
+    }, {
+      title: { 
+        text: '核心数据可视化：战略价值维度', 
+        left: 'center', 
+        top: 0, 
+        textStyle: { color: '#111111', fontSize: 14, fontWeight: 600 } 
+      },
+      xAxis: { 
+        data: categories 
+      },
+      series: [{
+        name: 'Value',
+        type: 'bar',
+        barWidth: '40%',
+        data: values,
+        label: {
+          show: true,
+          position: 'top',
+          formatter: (params) => labels[params.dataIndex],
+          color: '#111111',
+          fontSize: 11
+        },
+        itemStyle: {
+          color: '#111111',
+          borderRadius: [2, 2, 0, 0]
+        }
+      }]
+    }));
+  
+
+});
+</script>
+</body>
+</html>

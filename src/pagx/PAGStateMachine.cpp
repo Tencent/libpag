@@ -82,7 +82,7 @@ PAGStateMachine::~PAGStateMachine() = default;
 
 PAGStateMachine::PAGStateMachine(StateMachine* sm, RuntimeBinding* b, PAGXDocument* ctx,
                                  std::weak_ptr<PAGScene> owner)
-    : owner(std::move(owner)), stateMachine(sm), binding(b), contextDoc(ctx) {
+    : PAGTimeline(b, ctx, std::move(owner)), stateMachine(sm) {
   if (stateMachine == nullptr) {
     return;
   }
