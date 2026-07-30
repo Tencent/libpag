@@ -29,8 +29,11 @@
 #include "pagx/SVGExporter.h"
 #include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -4365,6 +4368,975 @@ PAGX_TEST(PAGXSVGTest, SVGExport_CrossParentMaskEmitsWarningButKeepsDef) {
   // leave the SVG without `<mask id=...>` and the owner without its `mask=` attribute.
   EXPECT_NE(svg.find("id=\"crossParentMask_a\""), std::string::npos);
   EXPECT_NE(svg.find("mask=\"url(#crossParentMask_a)\""), std::string::npos);
+}
+
+/**
+ * Test SVG import: a <rect> with an <animate> on opacity produces a PAGX Animation with one
+ * AnimationObject targeting the layer's alpha channel, driven by two Linear keyframes.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateOpacity) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"100\" height=\"100\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" from=\"1\" to=\"0\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->duration, 60);
+  EXPECT_FLOAT_EQ(anim->frameRate, 60.0f);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  EXPECT_EQ(obj->target, "r");
+  ASSERT_EQ(obj->channels.size(), 1u);
+  auto* channel = obj->channels[0];
+  EXPECT_EQ(channel->name, "alpha");
+  EXPECT_EQ(channel->valueType(), pagx::ChannelValueType::Float);
+  auto* floatChannel = static_cast<pagx::TypedChannel<float>*>(channel);
+  ASSERT_EQ(floatChannel->keyframes.size(), 2u);
+  EXPECT_EQ(floatChannel->keyframes[0].time, 0);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[0].value, 1.0f);
+  EXPECT_EQ(floatChannel->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Linear);
+  EXPECT_EQ(floatChannel->keyframes[1].time, 60);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[1].value, 0.0f);
+}
+
+/**
+ * Test SVG import: <animate> on fill color produces a Color-typed channel with three keyframes
+ * parsed from the values list.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateFill) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"100\" height=\"100\" fill=\"red\">"
+      "<animate attributeName=\"fill\" values=\"red;green;blue\" dur=\"3s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  auto* channel = obj->channels[0];
+  EXPECT_EQ(channel->name, "color");
+  EXPECT_EQ(channel->valueType(), pagx::ChannelValueType::Color);
+  auto* colorChannel = static_cast<pagx::TypedChannel<pagx::Color>*>(channel);
+  ASSERT_EQ(colorChannel->keyframes.size(), 3u);
+  EXPECT_EQ(colorChannel->keyframes[0].time, 0);
+  EXPECT_EQ(colorChannel->keyframes[1].time, 90);
+  EXPECT_EQ(colorChannel->keyframes[2].time, 180);
+}
+
+/**
+ * Test SVG import: <set> element produces a single Hold keyframe at the begin time.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SetElement) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"100\" height=\"100\" fill=\"red\" opacity=\"1\">"
+      "<set attributeName=\"opacity\" to=\"0.5\" begin=\"1s\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  auto* channel = obj->channels[0];
+  EXPECT_EQ(channel->name, "alpha");
+  auto* floatChannel = static_cast<pagx::TypedChannel<float>*>(channel);
+  // Two keyframes: frame 0 holds base value (opacity=1.0) before begin=1s, frame 60 sets 0.5.
+  ASSERT_EQ(floatChannel->keyframes.size(), 2u);
+  EXPECT_EQ(floatChannel->keyframes[0].time, 0);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[0].value, 1.0f);
+  EXPECT_EQ(floatChannel->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Hold);
+  EXPECT_EQ(floatChannel->keyframes[1].time, 60);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[1].value, 0.5f);
+  EXPECT_EQ(floatChannel->keyframes[1].interpolation, pagx::KeyframeInterpolationType::Hold);
+}
+
+/**
+ * Test SVG import: <animate> with calcMode="discrete" produces Hold interpolation.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_Discrete) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"100\" height=\"100\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"0;1\" calcMode=\"discrete\" dur=\"2s\" "
+      "fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  auto* channel = obj->channels[0];
+  auto* floatChannel = static_cast<pagx::TypedChannel<float>*>(channel);
+  ASSERT_EQ(floatChannel->keyframes.size(), 2u);
+  EXPECT_EQ(floatChannel->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Hold);
+}
+
+/**
+ * Test SVG import: <animate> with calcMode="spline" and keySplines produces Bezier interpolation
+ * with matching bezier handles.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_KeySplines) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"100\" height=\"100\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"0;1;0\" keyTimes=\"0;0.5;1\" "
+      "calcMode=\"spline\" keySplines=\"0.42 0 0.58 1; 0.42 0 0.58 1\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  auto* channel = obj->channels[0];
+  auto* floatChannel = static_cast<pagx::TypedChannel<float>*>(channel);
+  ASSERT_EQ(floatChannel->keyframes.size(), 3u);
+  EXPECT_EQ(floatChannel->keyframes[0].interpolation, pagx::KeyframeInterpolationType::Bezier);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[0].bezierOut.x, 0.42f);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[0].bezierOut.y, 0.0f);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[1].bezierIn.x, 0.58f);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[1].bezierIn.y, 1.0f);
+}
+
+/**
+ * Test SVG import: repeatCount="indefinite" sets the Animation loop mode to Loop.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_RepeatCountIndefinite) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"100\" height=\"100\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" from=\"1\" to=\"0\" dur=\"1s\" fill=\"freeze\" "
+      "repeatCount=\"indefinite\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+}
+
+/**
+ * Test SVG import: <animateTransform type="rotate"> creates a Group and drives its rotation
+ * channel. The AnimationObject targets the Group (not the Layer).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "from=\"0\" to=\"360\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->duration, 120);
+  // Expect two AnimationObjects: one for the Layer (empty, no <animate>/<set>), one for the Group.
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* groupObj = anim->objects[0];
+  // target should be the anim_group id, not the rect id.
+  EXPECT_NE(groupObj->target, "r");
+  EXPECT_EQ(groupObj->channels.size(), 1u);
+  auto* channel = groupObj->channels[0];
+  EXPECT_EQ(channel->name, "rotation");
+  auto* floatChannel = static_cast<pagx::TypedChannel<float>*>(channel);
+  ASSERT_EQ(floatChannel->keyframes.size(), 2u);
+  EXPECT_EQ(floatChannel->keyframes[0].time, 0);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[0].value, 0.0f);
+  EXPECT_EQ(floatChannel->keyframes[1].time, 120);
+  EXPECT_FLOAT_EQ(floatChannel->keyframes[1].value, 360.0f);
+}
+
+/**
+ * Test SVG import: <animateTransform type="translate"> produces position.x and position.y
+ * channels on the Group.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformTranslate) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"translate\" "
+      "from=\"0,0\" to=\"100,50\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* groupObj = anim->objects[0];
+  ASSERT_EQ(groupObj->channels.size(), 2u);
+  EXPECT_EQ(groupObj->channels[0]->name, "position.x");
+  EXPECT_EQ(groupObj->channels[1]->name, "position.y");
+  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
+  auto* chY = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[1]);
+  ASSERT_EQ(chX->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(chX->keyframes[0].value, 0.0f);
+  EXPECT_FLOAT_EQ(chX->keyframes[1].value, 100.0f);
+  EXPECT_FLOAT_EQ(chY->keyframes[0].value, 0.0f);
+  EXPECT_FLOAT_EQ(chY->keyframes[1].value, 50.0f);
+}
+
+/**
+ * Test SVG import: <animateTransform type="scale"> produces scale.x and scale.y channels.
+ * Single-value scale treats sy=sx.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformScale) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"scale\" "
+      "from=\"1,1\" to=\"2,3\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* groupObj = anim->objects[0];
+  ASSERT_EQ(groupObj->channels.size(), 2u);
+  EXPECT_EQ(groupObj->channels[0]->name, "scale.x");
+  EXPECT_EQ(groupObj->channels[1]->name, "scale.y");
+  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
+  auto* chY = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[1]);
+  ASSERT_EQ(chX->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(chX->keyframes[1].value, 2.0f);
+  EXPECT_FLOAT_EQ(chY->keyframes[1].value, 3.0f);
+}
+
+/**
+ * Test SVG import: <animateTransform type="skewX"> produces a skew channel and sets skewAxis=0
+ * on the Group.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformSkewX) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"skewX\" "
+      "from=\"0\" to=\"45\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* groupObj = anim->objects[0];
+  ASSERT_EQ(groupObj->channels.size(), 1u);
+  EXPECT_EQ(groupObj->channels[0]->name, "skew");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 45.0f);
+}
+
+/**
+ * Test SVG import: <animateTransform type="rotate"> with "angle cx cy" three-parameter form
+ * sets the Group's anchor so rotation pivots around (cx, cy).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateWithCenter) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "from=\"0 25 25\" to=\"360 25 25\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* groupObj = anim->objects[0];
+  ASSERT_EQ(groupObj->channels.size(), 1u);
+  // Verify the Group's anchor was set to (25, 25). Find the Group by target id.
+  auto* groupNode = doc->findNode<pagx::Group>(groupObj->target);
+  ASSERT_NE(groupNode, nullptr);
+  EXPECT_FLOAT_EQ(groupNode->anchor.x, 25.0f);
+  EXPECT_FLOAT_EQ(groupNode->anchor.y, 25.0f);
+}
+
+/**
+ * Test SVG import: an element with both <animate> (targeting Layer) and <animateTransform>
+ * (targeting Group) produces two AnimationObjects.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateAndAnimateTransformCoexist) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" from=\"1\" to=\"0\" dur=\"1s\" fill=\"freeze\"/>"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "from=\"0\" to=\"360\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // Two objects: one targeting the Layer (alpha), one targeting the Group (rotation).
+  ASSERT_EQ(anim->objects.size(), 2u);
+  EXPECT_EQ(anim->duration, 120);  // max(60, 120)
+}
+
+/**
+ * Test SVG import: <animateMotion> with a path attribute samples the path and drives the Group's
+ * position.x/y channels.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionPath) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<rect id=\"r\" width=\"20\" height=\"20\" fill=\"red\">"
+      "<animateMotion path=\"M0,0 L100,0 L100,100\" dur=\"3s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->duration, 180);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* groupObj = anim->objects[0];
+  ASSERT_EQ(groupObj->channels.size(), 2u);
+  EXPECT_EQ(groupObj->channels[0]->name, "position.x");
+  EXPECT_EQ(groupObj->channels[1]->name, "position.y");
+  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
+  auto* chY = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[1]);
+  EXPECT_EQ(chX->keyframes.size(), chY->keyframes.size());
+  EXPECT_GE(chX->keyframes.size(), 2u);
+  // First sample should be at (0, 0).
+  EXPECT_FLOAT_EQ(chX->keyframes.front().value, 0.0f);
+  EXPECT_FLOAT_EQ(chY->keyframes.front().value, 0.0f);
+  // Last sample should be at (100, 100).
+  EXPECT_FLOAT_EQ(chX->keyframes.back().value, 100.0f);
+  EXPECT_FLOAT_EQ(chY->keyframes.back().value, 100.0f);
+}
+
+/**
+ * Test SVG import: <animateMotion> with rotate="auto" produces an additional rotation channel
+ * whose values follow the path tangent angle.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionRotateAuto) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<rect id=\"r\" width=\"20\" height=\"20\" fill=\"red\">"
+      "<animateMotion path=\"M0,0 L100,0\" rotate=\"auto\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* groupObj = anim->objects[0];
+  // Three channels: position.x, position.y, rotation.
+  ASSERT_EQ(groupObj->channels.size(), 3u);
+  EXPECT_EQ(groupObj->channels[2]->name, "rotation");
+  auto* chR = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[2]);
+  ASSERT_GE(chR->keyframes.size(), 2u);
+  // Path goes right (0,0 → 100,0), so tangent angle is 0 degrees.
+  EXPECT_FLOAT_EQ(chR->keyframes.front().value, 0.0f);
+  EXPECT_FLOAT_EQ(chR->keyframes.back().value, 0.0f);
+}
+
+/**
+ * Test SVG import: <animateMotion> with <mpath> child references a <path> in defs.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionMpath) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<defs><path id=\"motionPath\" d=\"M0,0 L50,50\"/></defs>"
+      "<rect id=\"r\" width=\"20\" height=\"20\" fill=\"red\">"
+      "<animateMotion dur=\"1s\" fill=\"freeze\"><mpath href=\"#motionPath\"/></animateMotion>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* groupObj = anim->objects[0];
+  ASSERT_EQ(groupObj->channels.size(), 2u);
+  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
+  EXPECT_FLOAT_EQ(chX->keyframes.front().value, 0.0f);
+  EXPECT_FLOAT_EQ(chX->keyframes.back().value, 50.0f);
+}
+
+/**
+ * Test SVG import: repeatCount=3 expands the keyframe sequence to 3 repetitions, tripling the
+ * effective duration.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_RepeatCount3) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" from=\"1\" to=\"0\" dur=\"1s\" fill=\"freeze\" "
+      "repeatCount=\"3\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // 3 repetitions of 60 frames each = 180 total.
+  EXPECT_EQ(anim->duration, 180);
+  auto* obj = anim->objects[0];
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // 2 keyframes per repetition * 3 = 6 total.
+  EXPECT_EQ(ch->keyframes.size(), 6u);
+  // First keyframe at time 0, second at 60, third at 60, fourth at 120, etc.
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  EXPECT_EQ(ch->keyframes[1].time, 60);
+  EXPECT_EQ(ch->keyframes[2].time, 60);
+  EXPECT_EQ(ch->keyframes[3].time, 120);
+}
+
+/**
+ * Test SVG import: accumulate="sum" with repeatCount offsets each repetition's values by the
+ * per-cycle delta.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AccumulateSum) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<rect id=\"r\" width=\"20\" height=\"20\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" from=\"0\" to=\"0.5\" dur=\"1s\" fill=\"freeze\" "
+      "repeatCount=\"3\" accumulate=\"sum\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(anim->objects[0]->channels[0]);
+  // Cycle 0: 0 → 0.5; cycle 1: 0.5 → 1.0; cycle 2: 1.0 → 1.5.
+  // Check first keyframe of each cycle.
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.0f);  // cycle 0 start
+  EXPECT_FLOAT_EQ(ch->keyframes[2].value, 0.5f);  // cycle 1 start
+  EXPECT_FLOAT_EQ(ch->keyframes[4].value, 1.0f);  // cycle 2 start
+}
+
+/**
+ * Test SVG import: calcMode="paced" recomputes keyTimes proportional to value distance.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_CalcModePaced) {
+  // values: 0 → 100 → 101. With paced, the first segment (0→100, distance 100) takes most of
+  // the time, and the second (100→101, distance 1) takes very little.
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<rect id=\"r\" width=\"20\" height=\"20\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"0;100;101\" "
+      "calcMode=\"paced\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(anim->objects[0]->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  // Total distance = 100 + 1 = 101. First segment: 100/101 ≈ 0.99, second: 1/101 ≈ 0.01.
+  // Frame times: 0, ~59, 60.
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  EXPECT_GT(ch->keyframes[1].time, 50);  // Most of the duration in the first segment.
+  EXPECT_EQ(ch->keyframes[2].time, 60);
+}
+
+/**
+ * Test SVG import: a complex SVG with multiple animated elements verifies the Animation structure
+ * is complete, all targets resolve, and the duration covers the longest animation.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ComplexAnimatedDoc) {
+  std::string svg =
+      "<svg width=\"300\" height=\"200\">"
+      "<rect id=\"r1\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" from=\"1\" to=\"0\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect>"
+      "<circle id=\"c1\" cx=\"150\" cy=\"100\" r=\"30\" fill=\"blue\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "from=\"0\" to=\"360\" dur=\"3s\" fill=\"freeze\"/>"
+      "</circle>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // Duration = max(120, 180) = 180.
+  EXPECT_EQ(anim->duration, 180);
+  // Two elements with animations: rect (Layer alpha) + circle (Group rotation).
+  // The rect produces one Layer-level AnimationObject; the circle produces one Group-level.
+  EXPECT_GE(anim->objects.size(), 2u);
+  // Verify all targets are resolvable.
+  for (auto* obj : anim->objects) {
+    auto* node = doc->findNode(obj->target);
+    EXPECT_NE(node, nullptr);
+  }
+}
+
+/**
+ * Test SVG import: two <animate> on opacity with additive="sum" are precomputed into a single
+ * channel whose values are the sum of both animations at each keyframe time.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AdditiveSum) {
+  // Base: 1.0 → 0.0 over 1s. Additive: 0.0 → 0.5 over 1s.
+  // Merged: 1.0 → 0.5 (base + additive at each end).
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" from=\"1\" to=\"0\" dur=\"1s\" fill=\"freeze\"/>"
+      "<animate attributeName=\"opacity\" from=\"0\" to=\"0.5\" dur=\"1s\" fill=\"freeze\" "
+      "additive=\"sum\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  // Both channels target "alpha" and should be merged into one.
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "alpha");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  // 1.0 (base) + 0.0 (additive) = 1.0
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 1.0f);
+  EXPECT_EQ(ch->keyframes[1].time, 60);
+  // 0.0 (base) + 0.5 (additive) = 0.5
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 0.5f);
+}
+
+/**
+ * Test SVG import: two <animate> on opacity with additive="sum" and different keyframe counts
+ * produces a merged channel with the union of all keyframe times.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AdditiveSumDifferentTimes) {
+  // Base: 3 keyframes (0→1→0 over 2s). Additive: 2 keyframes (0→0.3 over 2s).
+  // Merged should have 3 keyframes (union of times).
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"0;1;0\" dur=\"2s\" fill=\"freeze\"/>"
+      "<animate attributeName=\"opacity\" values=\"0;0.3\" dur=\"2s\" fill=\"freeze\" "
+      "additive=\"sum\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // Union of {0, 60, 120} and {0, 120} = {0, 60, 120}
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  // At time 0: 0 + 0 = 0
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.0f);
+  // At time 60: 1 + 0.15 (linear interpolation of additive at midpoint) = 1.15
+  EXPECT_NEAR(ch->keyframes[1].value, 1.15f, 0.01f);
+  // At time 120: 0 + 0.3 = 0.3
+  EXPECT_NEAR(ch->keyframes[2].value, 0.3f, 0.01f);
+}
+
+// =============================================================================
+// Animation SVG file import tests
+// Loads each generated SVG animation file from resources/svg/animation/ and
+// verifies that SMIL elements are correctly converted to PAGX Animation nodes.
+// =============================================================================
+
+/**
+ * Loads every SVG animation file and verifies that import succeeds, at least one Animation node
+ * is produced, every AnimationObject target resolves to a real node, and the animation duration
+ * is positive. This is a smoke test that catches structural regressions across all file types.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimationFilesBasic) {
+  std::string animDir = ProjectPath::Absolute("resources/svg/animation");
+  std::vector<std::string> svgFiles = {};
+
+  for (const auto& entry : std::filesystem::directory_iterator(animDir)) {
+    if (entry.path().extension() == ".svg") {
+      svgFiles.push_back(entry.path().string());
+    }
+  }
+  std::sort(svgFiles.begin(), svgFiles.end());
+  ASSERT_FALSE(svgFiles.empty()) << "No SVG animation files found in " << animDir;
+
+  for (const auto& svgPath : svgFiles) {
+    std::string baseName = std::filesystem::path(svgPath).stem().string();
+    auto doc = pagx::SVGImporter::Parse(svgPath);
+    ASSERT_NE(doc, nullptr) << "Failed to import " << baseName;
+    ASSERT_FALSE(doc->animations.empty()) << baseName << " produced no Animation nodes";
+    auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+    EXPECT_GT(anim->duration, 0) << baseName << " has zero duration";
+    EXPECT_FLOAT_EQ(anim->frameRate, 60.0f) << baseName << " has wrong frame rate";
+    ASSERT_FALSE(anim->objects.empty()) << baseName << " has no AnimationObjects";
+    for (auto* obj : anim->objects) {
+      auto* node = doc->findNode(obj->target);
+      EXPECT_NE(node, nullptr) << baseName << " target '" << obj->target << "' unresolved";
+      EXPECT_FALSE(obj->channels.empty())
+          << baseName << " target '" << obj->target << "' has no channels";
+    }
+  }
+}
+
+/**
+ * loading_spinner.svg: animateTransform rotate with repeatCount=indefinite.
+ * Verifies LoopMode::Loop and rotation channel with 3-parameter rotate form (angle cx cy).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_LoadingSpinner) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/loading_spinner.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  // Group target (animateTransform drives the Group).
+  auto* groupNode = doc->findNode<pagx::Group>(obj->target);
+  ASSERT_NE(groupNode, nullptr);
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "rotation");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  // rotate from="0 50 50" to="360 50 50": anchor should be set to (50, 50).
+  EXPECT_FLOAT_EQ(groupNode->anchor.x, 50.0f);
+  EXPECT_FLOAT_EQ(groupNode->anchor.y, 50.0f);
+  // Default fill=remove adds a base value keyframe at endFrame+1.
+  // Check first and last animation keyframes.
+  EXPECT_FLOAT_EQ(ch->keyframes.front().value, 0.0f);
+  // Find the keyframe with value 360 (the animation end value, not the base value).
+  bool has360 = false;
+  for (const auto& key : ch->keyframes) {
+    if (std::abs(key.value - 360.0f) < 0.1f) {
+      has360 = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(has360);
+}
+
+/**
+ * pulse_heartbeat.svg: two circles with multiple <animate> elements.
+ * Verifies multi-element animation with opacity and r (radius) channels.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_PulseHeartbeat) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/pulse_heartbeat.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  // Two animated elements, each with its own AnimationObject.
+  EXPECT_GE(anim->objects.size(), 2u);
+  // The inner circle animates opacity (Layer alpha) and the outer circle animates r + opacity.
+  // Verify at least one channel is "alpha" and one is "size.width" or "size.height".
+  bool hasAlpha = false;
+  bool hasSize = false;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->name == "alpha") hasAlpha = true;
+      if (ch->name == "size.width" || ch->name == "size.height") hasSize = true;
+    }
+  }
+  EXPECT_TRUE(hasAlpha);
+  EXPECT_TRUE(hasSize);
+}
+
+/**
+ * motion_path_curve.svg: animateMotion with mpath and rotate="auto".
+ * Verifies path sampling produces position.x/y and rotation channels.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_MotionPathCurve) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/motion_path_curve.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  // Three channels: position.x, position.y, rotation (rotate="auto").
+  ASSERT_EQ(obj->channels.size(), 3u);
+  EXPECT_EQ(obj->channels[0]->name, "position.x");
+  EXPECT_EQ(obj->channels[1]->name, "position.y");
+  EXPECT_EQ(obj->channels[2]->name, "rotation");
+  // Verify sampled positions: first ~ (10, 30). The last animation keyframe should be near
+  // (190, 30). Note: keyframes.back() may be a fill=remove base value keyframe (position 0,0),
+  // so we check the second-to-last keyframe for the animation end value.
+  auto* chX = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  auto* chY = static_cast<pagx::TypedChannel<float>*>(obj->channels[1]);
+  EXPECT_NEAR(chX->keyframes.front().value, 10.0f, 1.0f);
+  EXPECT_NEAR(chY->keyframes.front().value, 30.0f, 5.0f);
+  // Find the last non-base-value keyframe (largest value, should be near path end).
+  float lastAnimX = 0.0f;
+  for (const auto& key : chX->keyframes) {
+    if (key.value > lastAnimX) lastAnimX = key.value;
+  }
+  EXPECT_NEAR(lastAnimX, 190.0f, 5.0f);
+}
+
+/**
+ * staggered_fade_in.svg: 5 rects with begin offsets and fill="freeze".
+ * Verifies begin offset produces base value Hold keyframe at frame 0, and fill=freeze
+ * does not add a trailing base value keyframe.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_StaggeredFadeIn) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/staggered_fade_in.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // 5 animated elements.
+  EXPECT_GE(anim->objects.size(), 5u);
+  // Each has an "alpha" channel with fill=freeze (no trailing base value keyframe).
+  // The first rect begins at 0s, so no begin-offset keyframe. Others begin later.
+  // Check the second rect (begin=0.3s): should have base value keyframe at frame 0.
+  bool foundBeginOffset = false;
+  for (auto* obj : anim->objects) {
+    auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+    if (ch->keyframes.front().time == 0 && ch->keyframes.front().value == 0.0f) {
+      foundBeginOffset = true;
+    }
+    // fill=freeze: last keyframe should be the animation end value (1.0), not base value (0).
+    EXPECT_FLOAT_EQ(ch->keyframes.back().value, 1.0f);
+  }
+  EXPECT_TRUE(foundBeginOffset);
+}
+
+/**
+ * additive_transform.svg: two animateTransform on the same element with additive="sum".
+ * Verifies the two transform channels are merged into one per channel name.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_AdditiveTransform) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/additive_transform.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // Two AnimationObjects: one for Layer (alpha from <animate>), one for Group (rotation +
+  // scale from <animateTransform>).
+  ASSERT_EQ(anim->objects.size(), 2u);
+  // Verify channel names across both objects.
+  bool hasAlpha = false;
+  bool hasRotation = false;
+  bool hasScaleX = false;
+  bool hasScaleY = false;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->name == "alpha") hasAlpha = true;
+      if (ch->name == "rotation") hasRotation = true;
+      if (ch->name == "scale.x") hasScaleX = true;
+      if (ch->name == "scale.y") hasScaleY = true;
+    }
+  }
+  EXPECT_TRUE(hasAlpha);
+  EXPECT_TRUE(hasRotation);
+  EXPECT_TRUE(hasScaleX);
+  EXPECT_TRUE(hasScaleY);
+}
+
+/**
+ * paced_squish.svg: calcMode="paced" on width/height/x/y.
+ * Verifies paced keyTimes are computed by value distance (not uniform).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_PacedSquish) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/paced_squish.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  // 4 animate elements: width, height, x, y.
+  EXPECT_GE(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_FALSE(obj->channels.empty());
+  // Each channel should have 3 keyframes (values="80;40;80") + fill=remove base value.
+  for (auto* ch : obj->channels) {
+    auto* floatCh = static_cast<pagx::TypedChannel<float>*>(ch);
+    EXPECT_GE(floatCh->keyframes.size(), 3u);
+  }
+}
+
+/**
+ * orbit_system.svg: 3 circles with animateMotion + mpath + negative begin offsets.
+ * Verifies multiple motion paths with different begin times.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_OrbitSystem) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/orbit_system.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  // 3 animated circles, each with position.x and position.y channels.
+  EXPECT_GE(anim->objects.size(), 3u);
+  for (auto* obj : anim->objects) {
+    ASSERT_GE(obj->channels.size(), 2u);
+    EXPECT_EQ(obj->channels[0]->name, "position.x");
+    EXPECT_EQ(obj->channels[1]->name, "position.y");
+  }
+}
+
+/**
+ * set_sequence.svg: 3 circles with <set> and increasing begin offsets.
+ * Verifies <set> produces Hold keyframes with base value at frame 0 (begin offset).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_SetSequence) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/set_sequence.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // 3 animated circles.
+  EXPECT_GE(anim->objects.size(), 3u);
+  // Each <set> has begin > 0, so base value keyframe at frame 0 + set value keyframe.
+  // <set> without dur is treated as freeze (permanent).
+  for (auto* obj : anim->objects) {
+    ASSERT_EQ(obj->channels.size(), 1u);
+    auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+    EXPECT_EQ(ch->name, "alpha");
+    // 2 keyframes: frame 0 (base value 0.3) + begin frame (set value 1.0).
+    ASSERT_EQ(ch->keyframes.size(), 2u);
+    EXPECT_EQ(ch->keyframes[0].time, 0);
+    EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.3f);
+    EXPECT_EQ(ch->keyframes[1].interpolation, pagx::KeyframeInterpolationType::Hold);
+    EXPECT_FLOAT_EQ(ch->keyframes[1].value, 1.0f);
+  }
+}
+
+/**
+ * color_cycle.svg: animate fill with 5-color values list.
+ * Verifies Color-typed channel with multiple keyframes.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_ColorCycle) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/color_cycle.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  // Target is a Fill node, channel is "color".
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "color");
+  EXPECT_EQ(obj->channels[0]->valueType(), pagx::ChannelValueType::Color);
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Color>*>(obj->channels[0]);
+  // 5 keyframes from values list + fill=remove base value = 6 total.
+  EXPECT_GE(ch->keyframes.size(), 5u);
+}
+
+/**
+ * compound_rotate_fade.svg: same element with animateTransform rotate + animate opacity.
+ * Verifies Layer-level (alpha) and Group-level (rotation) AnimationObjects are both created.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_CompoundRotateFade) {
+  auto doc = pagx::SVGImporter::Parse(
+      ProjectPath::Absolute("resources/svg/animation/compound_rotate_fade.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  // Two AnimationObjects: one for Layer (alpha), one for Group (rotation).
+  ASSERT_EQ(anim->objects.size(), 2u);
+  bool hasAlphaChannel = false;
+  bool hasRotationChannel = false;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->name == "alpha") hasAlphaChannel = true;
+      if (ch->name == "rotation") hasRotationChannel = true;
+    }
+  }
+  EXPECT_TRUE(hasAlphaChannel);
+  EXPECT_TRUE(hasRotationChannel);
+}
+
+/**
+ * draw_stroke.svg: animate stroke-dashoffset with fill="freeze".
+ * Verifies Stroke channel animation and freeze semantics (no trailing base value keyframe).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_DrawStroke) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/draw_stroke.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // fill=freeze: LoopMode::Once (not Loop).
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Once);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "dashOffset");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // 2 keyframes (from/to) + fill=freeze (no trailing base value).
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 314.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 0.0f);
+}
+
+/**
+ * scale_bounce.svg: animateTransform scale with 5-value keyframes.
+ * Verifies scale.x and scale.y channels with multi-keyframe values.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_ScaleBounce) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/scale_bounce.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  // Two channels: scale.x and scale.y.
+  ASSERT_EQ(obj->channels.size(), 2u);
+  EXPECT_EQ(obj->channels[0]->name, "scale.x");
+  EXPECT_EQ(obj->channels[1]->name, "scale.y");
+  auto* chX = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // 5 keyframes from values + fill=remove base value = 6 total.
+  EXPECT_GE(chX->keyframes.size(), 5u);
+}
+
+/**
+ * skew_swing.svg: animateTransform skewX and skewY on separate elements.
+ * Verifies skew channel and skewAxis setting on Group.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_File_SkewSwing) {
+  auto doc =
+      pagx::SVGImporter::Parse(ProjectPath::Absolute("resources/svg/animation/skew_swing.svg"));
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  // Two animated elements (skewX and skewY).
+  EXPECT_GE(anim->objects.size(), 2u);
+  bool hasSkew = false;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->name == "skew") {
+        hasSkew = true;
+        auto* groupNode = doc->findNode<pagx::Group>(obj->target);
+        ASSERT_NE(groupNode, nullptr);
+        // skewAxis should be 0 (skewX) or 90 (skewY).
+        EXPECT_TRUE(groupNode->skewAxis == 0.0f || groupNode->skewAxis == 90.0f);
+      }
+    }
+  }
+  EXPECT_TRUE(hasSkew);
+}
+
+/**
+ * Test SVG import: <animate attributeName="rx"> on a <rect> drives Rectangle.roundness (a pixel
+ * value), not Ellipse.size. Verifies the rx/ry routing fix: rx/ry route by content node type so
+ * <rect rx> is no longer dropped by the ellipse branch, and the value is NOT scaled by *2.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateRectRoundness) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect id=\"r\" x=\"10\" y=\"10\" width=\"50\" height=\"50\" rx=\"0\" fill=\"red\">"
+      "<animate attributeName=\"rx\" from=\"0\" to=\"20\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  // Target is the rect's Rectangle content node, not the Layer id "r".
+  EXPECT_NE(obj->target, "r");
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "roundness");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.0f);
+  EXPECT_EQ(ch->keyframes[1].time, 120);
+  // roundness is a pixel value, must NOT be scaled by *2.
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 20.0f);
+}
+
+/**
+ * Test SVG import: <animate attributeName="rx"> on an <ellipse> still drives Ellipse.size.width
+ * with the radius-to-diameter *2 scaling, after the rx/ry routing fix.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateEllipseRadius) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<ellipse id=\"e\" cx=\"50\" cy=\"50\" rx=\"20\" ry=\"10\" fill=\"red\">"
+      "<animate attributeName=\"rx\" from=\"20\" to=\"40\" dur=\"2s\" fill=\"freeze\"/>"
+      "</ellipse></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "size.width");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  // radius 20 -> diameter 40, radius 40 -> diameter 80.
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 40.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 80.0f);
 }
 
 }  // namespace pag
