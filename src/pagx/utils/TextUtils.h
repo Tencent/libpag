@@ -132,9 +132,11 @@ void ComputeGlyphPathsAndImages(const Text& text, float textPosX, float textPosY
  * prefers the first GlyphRun's authored `bounds.height` (the linebox height written by the layout
  * pass) and falls back to the union of glyph path ink heights when no authored bounds are present.
  * Returns an empty Rect when the text carries no positioned glyphs. This mirrors the advance-width +
- * linebox-height
- * semantics that TextLayout uses to populate perTextBounds, so native-text export (which cannot
- * re-run layout on embedded glyph runs) reproduces the same box the interactive renderer lays out.
+ * linebox-height semantics that TextLayout uses to populate perTextBounds, so native-text export
+ * (which cannot re-run layout on embedded glyph runs) reproduces the same box the interactive
+ * renderer lays out. Bitmap-only glyphs without authored bounds retain their horizontal advance
+ * span and return a zero height, allowing callers to combine the authoritative X position with a
+ * separately shaped editable-text line box.
  */
 Rect ComputeGlyphRunTextBounds(const Text& text);
 

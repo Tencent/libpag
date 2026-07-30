@@ -24,6 +24,7 @@
 #include <vector>
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
@@ -52,6 +53,52 @@ void WriteRunTypeface(XMLBuilder& out, const std::string& typeface) {
   out.openElement("a:cs").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
 }
 
+bool HasEmbeddedBitmapGlyphs(const Text* text) {
+  for (const auto* run : text->glyphRuns) {
+    if (run == nullptr || run->font == nullptr) {
+      continue;
+    }
+    for (auto glyphID : run->glyphs) {
+      if (glyphID == 0) {
+        continue;
+      }
+      size_t glyphIndex = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndex < run->font->glyphs.size()) {
+        auto* glyph = run->font->glyphs[glyphIndex];
+        if (glyph != nullptr && glyph->image != nullptr) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+bool ComputeLayoutInkBounds(const TextLayoutResult& layout, Text* text, tgfx::Rect* bounds) {
+  const auto* runs = layout.getGlyphRuns(text);
+  if (runs == nullptr) {
+    return false;
+  }
+  bool hasBounds = false;
+  for (const auto& run : *runs) {
+    size_t count = std::min(run.glyphs.size(), run.positions.size());
+    for (size_t i = 0; i < count; ++i) {
+      auto glyphBounds = run.font.getBounds(run.glyphs[i]);
+      if (glyphBounds.isEmpty()) {
+        continue;
+      }
+      glyphBounds.offset(run.positions[i]);
+      if (hasBounds) {
+        bounds->join(glyphBounds);
+      } else {
+        *bounds = glyphBounds;
+        hasBounds = true;
+      }
+    }
+  }
+  return hasBounds;
+}
+
 }  // namespace
 
 // Returns the baseline of the first rendered glyph in the embedded run coordinate system.
@@ -71,6 +118,59 @@ bool PPTWriter::firstEmbeddedBaselineY(const Text& text, float* baselineY) {
     }
   }
   return false;
+}
+
+void PPTWriter::prepareEditableTextOpticalOffsets(const std::vector<Element*>& elements,
+                                                  const TextBox* textBox) {
+  if (!_preparedEditableTextBoxes.insert(textBox).second ||
+      textBox->writingMode != WritingMode::Horizontal) {
+    return;
+  }
+
+  std::vector<Text*> texts;
+  TextLayout::CollectTextElements(elements, texts);
+  if (texts.size() < 2) {
+    return;
+  }
+  auto layout = TextLayout::Layout(TextLayout::MakeElements(texts), MakeTextBoxParams(textBox),
+                                   _layoutContext, false);
+
+  struct OpticalEntry {
+    Text* text = nullptr;
+    float baselineY = 0.0f;
+    tgfx::Rect inkBounds = {};
+    bool bitmap = false;
+  };
+  std::vector<OpticalEntry> entries;
+  entries.reserve(texts.size());
+  for (auto* text : texts) {
+    const auto* lines = layout.getTextLines(text);
+    if (lines == nullptr || lines->size() != 1) {
+      continue;
+    }
+    tgfx::Rect inkBounds = {};
+    if (!ComputeLayoutInkBounds(layout, text, &inkBounds)) {
+      continue;
+    }
+    entries.push_back({text, lines->front().baselineY, inkBounds, HasEmbeddedBitmapGlyphs(text)});
+  }
+
+  constexpr float baselineEpsilon = 0.5f;
+  for (const auto& target : entries) {
+    if (!target.bitmap) {
+      continue;
+    }
+    for (const auto& reference : entries) {
+      if (reference.bitmap ||
+          std::fabs(reference.baselineY - target.baselineY) >= baselineEpsilon) {
+        continue;
+      }
+      float offsetY = reference.inkBounds.centerY() - target.inkBounds.centerY();
+      float maxOffset = target.text->renderFontSize() * 0.2f;
+      _editableOpticalOffsets[target.text] = std::clamp(offsetY, -maxOffset, maxOffset);
+      break;
+    }
+  }
 }
 
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
@@ -266,9 +366,21 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
         }
       }
     } else if (textBounds.width > 0 && textBounds.height > 0) {
-      geom.posX = renderPos.x + firstRun->x + textBounds.x;
-      geom.posY = renderPos.y + firstRun->y + textBounds.y;
-      geom.estWidth = textBounds.width;
+      // Bitmap glyphs commonly have no authored run bounds and no vector
+      // outline from which ComputeGlyphRunTextBounds can derive a height. The
+      // horizontal advance span is still authoritative (for example an emoji
+      // fallback run may begin at positions[0].x = 160), while the freshly
+      // shaped editable text supplies a usable line box. Align that line box
+      // to the embedded baseline instead of treating GlyphRun::y as its top.
+      float embeddedBaseline = 0.0f;
+      bool hasEmbeddedBaseline =
+          lines != nullptr && !lines->empty() && firstEmbeddedBaselineY(*text, &embeddedBaseline);
+      geom.posX =
+          renderPos.x + (glyphBounds.width > 0 ? glyphBounds.x : firstRun->x + textBounds.x);
+      geom.posY = hasEmbeddedBaseline
+                      ? renderPos.y + textBounds.y + embeddedBaseline - lines->front().baselineY
+                      : renderPos.y + firstRun->y + textBounds.y;
+      geom.estWidth = glyphBounds.width > 0 ? glyphBounds.width : textBounds.width;
       geom.estHeight = textBounds.height;
     } else {
       // Last-resort estimate when the runs carry no usable glyph metrics
@@ -279,6 +391,10 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
       geom.estHeight = effectiveFontSize * 1.4f;
       geom.posX = renderPos.x + firstRun->x;
       geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
+    }
+    auto opticalOffset = _editableOpticalOffsets.find(text);
+    if (opticalOffset != _editableOpticalOffsets.end()) {
+      geom.posY += opticalOffset->second;
     }
     return geom;
   }

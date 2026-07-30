@@ -1560,6 +1560,61 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesLineBoxVerticalAlignment) {
   EXPECT_EQ(body.find("<a:pPr algn=\"ctr\""), std::string::npos);
 }
 
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesBitmapGlyphPosition) {
+  auto doc = pagx::PAGXDocument::Make(500, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 160;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 160;
+  // Match an embedded emoji glyph: it has bitmap content but no vector
+  // outline, and its owning GlyphRun carries no authored bounds.
+  glyph->image = doc->makeNode<pagx::Image>();
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "🤣";
+  text->fontFamily = "Arial";
+  text->fontSize = 32.0f;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 32.0f;
+  run->glyphs = {1};
+  run->y = 31.0f;
+  run->positions = {{160.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+
+  group->elements.push_back(text);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 440.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  // positions[0].x = 160px must become the shape's left edge. The old fallback
+  // discarded it and emitted x="0", placing the emoji at the start of the line.
+  EXPECT_NE(body.find("<a:off x=\"1524000\""), std::string::npos);
+}
+
 PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
   auto doc = pagx::PAGXDocument::Make(500, 400);
   auto* layer = doc->makeNode<pagx::Layer>();

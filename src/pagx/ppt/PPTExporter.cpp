@@ -442,6 +442,9 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
   if (localTextBox == nullptr) {
     localTextBox = parentTextBox;
   }
+  if (_ignoreGlyphRuns && localTextBox != nullptr) {
+    prepareEditableTextOpticalOffsets(elements, localTextBox);
+  }
   // A modifier-only TextBox may lay out several Text nodes as one fixed-line-height block, while
   // the embedded file stores the whole block bounds only on the first Text's first GlyphRun.
   // Capture that first line's baseline offset before painters emit any sibling. Later native-text

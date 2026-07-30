@@ -321,7 +321,11 @@ Rect ComputeGlyphRunTextBounds(const Text& text) {
     }
   }
   if (bottom <= top) {
-    return {};
+    // Bitmap glyphs may carry neither authored GlyphRun bounds nor vector
+    // outlines. Keep their authoritative horizontal pen span even though the
+    // vertical extent is unknown so editable-text exporters can still recover
+    // an inline run's absolute X position from positions[].
+    return Rect::MakeXYWH(minX, 0.0f, width, 0.0f);
   }
   return Rect::MakeXYWH(minX, top, width, bottom - top);
 }
