@@ -71,6 +71,63 @@ bool CanSkipShapeAfterPicture(bool imageWritten, const FillStrokeInfo& fs,
   return imageWritten && !fs.stroke && filters.empty() && styles.empty();
 }
 
+struct EditableTextScope {
+  size_t textCount = 0;
+  bool hasPainter = false;
+  LayerPlacement placement = LayerPlacement::Background;
+};
+
+// A modifier-only TextBox can be emitted as one native PowerPoint rich-text shape when the
+// surrounding scope contains only untransformed Text/style groups. Keeping all runs in the same
+// a:p lets PowerPoint apply one baseline and choose its own platform emoji fallback consistently.
+// Mixed geometry, transformed groups, nested TextBoxes, and mixed painter placements keep using
+// the ordinary per-geometry walk because collapsing those cases would change z-order or transforms.
+bool AnalyzeEditableTextScope(const std::vector<Element*>& elements, const TextBox* textBox,
+                              EditableTextScope* scope) {
+  for (const auto* element : elements) {
+    switch (element->nodeType()) {
+      case NodeType::Text: {
+        const auto* text = static_cast<const Text*>(element);
+        if (!text->text.empty()) {
+          scope->textCount++;
+        }
+        break;
+      }
+      case NodeType::Fill:
+      case NodeType::Stroke: {
+        LayerPlacement placement = element->nodeType() == NodeType::Fill
+                                       ? static_cast<const Fill*>(element)->placement
+                                       : static_cast<const Stroke*>(element)->placement;
+        if (scope->hasPainter && placement != scope->placement) {
+          return false;
+        }
+        scope->hasPainter = true;
+        scope->placement = placement;
+        break;
+      }
+      case NodeType::Group: {
+        const auto* group = static_cast<const Group*>(element);
+        if (group->alpha != 1.0f || !BuildGroupMatrix(group).isIdentity() ||
+            FindModifierTextBox(group->elements) != nullptr ||
+            !AnalyzeEditableTextScope(group->elements, textBox, scope)) {
+          return false;
+        }
+        break;
+      }
+      case NodeType::TextBox: {
+        const auto* current = static_cast<const TextBox*>(element);
+        if (current != textBox || !current->elements.empty()) {
+          return false;
+        }
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 // ── Transform decomposition ────────────────────────────────────────────────
@@ -439,11 +496,19 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
   // legacy CollectFillStroke().textBox behaviour, then fall back to the
   // parent's TextBox so Text inside a Group still inherits an outer one.
   const TextBox* localTextBox = FindModifierTextBox(elements);
+  if (_ignoreGlyphRuns && localTextBox != nullptr) {
+    EditableTextScope editableScope;
+    if (AnalyzeEditableTextScope(elements, localTextBox, &editableScope) &&
+        editableScope.textCount >= 2 && editableScope.hasPainter) {
+      if (editableScope.placement == targetPlacement) {
+        auto textBoxMatrix = transform * BuildGroupMatrix(localTextBox);
+        writeTextBoxGroup(out, localTextBox, elements, textBoxMatrix, alpha, filters, styles);
+      }
+      return;
+    }
+  }
   if (localTextBox == nullptr) {
     localTextBox = parentTextBox;
-  }
-  if (_ignoreGlyphRuns && localTextBox != nullptr) {
-    prepareEditableTextOpticalOffsets(elements, localTextBox);
   }
   // A modifier-only TextBox may lay out several Text nodes as one fixed-line-height block, while
   // the embedded file stores the whole block bounds only on the first Text's first GlyphRun.

@@ -1615,6 +1615,153 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesBitmapGlyphPosition) {
   EXPECT_NE(body.find("<a:off x=\"1524000\""), std::string::npos);
 }
 
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsCombinesModifierTextBoxRuns) {
+  auto doc = pagx::PAGXDocument::Make(500, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* vectorFont = doc->makeNode<pagx::Font>();
+  vectorFont->unitsPerEm = 160;
+  auto* vectorGlyph = doc->makeNode<pagx::Glyph>();
+  vectorGlyph->advance = 160;
+  vectorGlyph->path = doc->makeNode<pagx::PathData>();
+  vectorGlyph->path->moveTo(0, -140);
+  vectorGlyph->path->lineTo(140, -140);
+  vectorGlyph->path->lineTo(140, 0);
+  vectorGlyph->path->lineTo(0, 0);
+  vectorGlyph->path->close();
+  vectorFont->glyphs.push_back(vectorGlyph);
+
+  auto* title = doc->makeNode<pagx::Text>();
+  title->text = "云原生架构";
+  title->fontFamily = "Inter";
+  title->fontStyle = "SemiBold";
+  title->fontSize = 32.0f;
+  auto* titleRun = doc->makeNode<pagx::GlyphRun>();
+  titleRun->font = vectorFont;
+  titleRun->fontSize = 32.0f;
+  titleRun->glyphs = {1, 1, 1, 1, 1};
+  titleRun->y = 31.0f;
+  titleRun->positions = {{0.0f, 0.0f}, {32.0f, 0.0f}, {64.0f, 0.0f}, {96.0f, 0.0f}, {128.0f, 0.0f}};
+  title->glyphRuns.push_back(titleRun);
+
+  auto* bitmapFont = doc->makeNode<pagx::Font>();
+  bitmapFont->unitsPerEm = 160;
+  auto* bitmapGlyph = doc->makeNode<pagx::Glyph>();
+  bitmapGlyph->advance = 160;
+  bitmapGlyph->offset = {0.0f, -160.0f};
+  bitmapGlyph->image = doc->makeNode<pagx::Image>();
+  bitmapGlyph->image->filePath = "emoji:1F923";
+  bitmapFont->glyphs.push_back(bitmapGlyph);
+
+  auto* emoji = doc->makeNode<pagx::Text>();
+  emoji->text = "🤣";
+  emoji->fontFamily = "Inter";
+  emoji->fontStyle = "SemiBold";
+  emoji->fontSize = 32.0f;
+  auto* emojiRun = doc->makeNode<pagx::GlyphRun>();
+  emojiRun->font = bitmapFont;
+  emojiRun->fontSize = 32.0f;
+  emojiRun->glyphs = {1};
+  emojiRun->y = 31.0f;
+  emojiRun->positions = {{160.0f, 0.0f}};
+  emoji->glyphRuns.push_back(emojiRun);
+
+  auto addTextGroup = [&](pagx::Text* text) {
+    auto* group = doc->makeNode<pagx::Group>();
+    group->elements.push_back(text);
+    auto* fill = doc->makeNode<pagx::Fill>();
+    auto* solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    layer->contents.push_back(group);
+    return group;
+  };
+  auto* titleGroup = addTextGroup(title);
+  addTextGroup(emoji);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 440.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  auto firstShape = body.find("<p:sp>");
+  ASSERT_NE(firstShape, std::string::npos);
+  EXPECT_EQ(body.find("<p:sp>", firstShape + 1), std::string::npos);
+  auto titleText = body.find("<a:t>云原生架构</a:t>");
+  auto emojiText = body.find("<a:t>🤣</a:t>");
+  ASSERT_NE(titleText, std::string::npos);
+  ASSERT_NE(emojiText, std::string::npos);
+  EXPECT_LT(titleText, emojiText);
+  EXPECT_LT(emojiText, body.find("</a:p>", emojiText));
+  auto titleRunStart = body.rfind("<a:r>", titleText);
+  auto emojiRunStart = body.rfind("<a:r>", emojiText);
+  ASSERT_NE(titleRunStart, std::string::npos);
+  ASSERT_NE(emojiRunStart, std::string::npos);
+  auto titleProperties = body.substr(titleRunStart, titleText - titleRunStart);
+  auto emojiProperties = body.substr(emojiRunStart, emojiText - emojiRunStart);
+  EXPECT_EQ(titleProperties.find("baseline="), std::string::npos);
+  EXPECT_NE(titleProperties.find("sz=\"2400\""), std::string::npos);
+  EXPECT_NE(emojiProperties.find("baseline=\"-10000\""), std::string::npos);
+  EXPECT_NE(emojiProperties.find("sz=\"4000\""), std::string::npos);
+
+  // An emoji on another line must not be shifted merely because the TextBox contains normal text.
+  emoji->text = "\n🤣";
+  pagx::PPTWriterContext separateLineWriterContext;
+  pagx::PPTWriter separateLineWriter(&separateLineWriterContext, doc.get(), options,
+                                     &layoutContext);
+  pagx::XMLBuilder separateLineXML;
+  separateLineWriter.writeDocument(separateLineXML);
+  auto separateLineBody = separateLineXML.release();
+  auto separateLineEmojiText = separateLineBody.find("<a:t>🤣</a:t>");
+  ASSERT_NE(separateLineEmojiText, std::string::npos);
+  auto separateLineEmojiRun = separateLineBody.rfind("<a:r>", separateLineEmojiText);
+  ASSERT_NE(separateLineEmojiRun, std::string::npos);
+  EXPECT_EQ(
+      separateLineBody.substr(separateLineEmojiRun, separateLineEmojiText - separateLineEmojiRun)
+          .find("baseline="),
+      std::string::npos);
+  emoji->text = "🤣";
+
+  // Bitmap glyphs that are not explicit emoji resources must retain their authored style.
+  bitmapGlyph->image->filePath = "icon.png";
+  pagx::PPTWriterContext bitmapIconWriterContext;
+  pagx::PPTWriter bitmapIconWriter(&bitmapIconWriterContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder bitmapIconXML;
+  bitmapIconWriter.writeDocument(bitmapIconXML);
+  auto bitmapIconBody = bitmapIconXML.release();
+  auto bitmapIconText = bitmapIconBody.find("<a:t>🤣</a:t>");
+  ASSERT_NE(bitmapIconText, std::string::npos);
+  auto bitmapIconRun = bitmapIconBody.rfind("<a:r>", bitmapIconText);
+  ASSERT_NE(bitmapIconRun, std::string::npos);
+  EXPECT_EQ(bitmapIconBody.substr(bitmapIconRun, bitmapIconText - bitmapIconRun).find("baseline="),
+            std::string::npos);
+  bitmapGlyph->image->filePath = "emoji:1F923";
+
+  // A transformed child is not safe to flatten into the TextBox transform. Verify that the
+  // exporter keeps the original per-geometry path instead of applying the rich-text optimization.
+  titleGroup->rotation = 1.0f;
+  pagx::PPTWriterContext fallbackWriterContext;
+  pagx::PPTWriter fallbackWriter(&fallbackWriterContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder fallbackXML;
+  fallbackWriter.writeDocument(fallbackXML);
+  auto fallbackBody = fallbackXML.release();
+  auto fallbackFirstShape = fallbackBody.find("<p:sp>");
+  ASSERT_NE(fallbackFirstShape, std::string::npos);
+  EXPECT_NE(fallbackBody.find("<p:sp>", fallbackFirstShape + 1), std::string::npos);
+}
+
 PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
   auto doc = pagx::PAGXDocument::Make(500, 400);
   auto* layer = doc->makeNode<pagx::Layer>();

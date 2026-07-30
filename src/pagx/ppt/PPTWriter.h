@@ -24,7 +24,6 @@
 #include <cstdio>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/LayoutContext.h"
@@ -338,6 +337,7 @@ struct PPTRunStyle {
   const char* algn = nullptr;
   int fontSize = 0;
   int64_t letterSpc = 0;
+  int baseline = 0;
   bool hasBold = false;
   bool hasItalic = false;
   bool hasLetterSpacing = false;
@@ -719,17 +719,9 @@ class PPTWriter {
   // Cache the first line's embedded baseline offset from its authored line-box top so every
   // sibling can recover its own line-box top from the pre-shaped baseline.
   std::unordered_map<const TextBox*, float> _embeddedBaselineOffsets = {};
-  // Editable native text uses the system font selected by PowerPoint, whose emoji ink box can sit
-  // noticeably higher than adjacent CJK ink even when both runs share a typographic baseline.
-  // Cache a small per-Text optical Y correction derived from the freshly shaped sibling runs so
-  // bitmap-glyph fallbacks remain visually centered with the surrounding text.
-  std::unordered_map<const Text*, float> _editableOpticalOffsets = {};
-  std::unordered_set<const TextBox*> _preparedEditableTextBoxes = {};
 
   const LayerBuildResult& ensureBuildResult();
   static bool firstEmbeddedBaselineY(const Text& text, float* baselineY);
-  void prepareEditableTextOpticalOffsets(const std::vector<Element*>& elements,
-                                         const TextBox* textBox);
 
   // One geometry instance captured during the scope walk in writeElements.
   // The transform is baked at collection time so that later painters can emit

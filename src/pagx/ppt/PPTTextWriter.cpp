@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Composition.h"
@@ -53,50 +54,39 @@ void WriteRunTypeface(XMLBuilder& out, const std::string& typeface) {
   out.openElement("a:cs").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
 }
 
-bool HasEmbeddedBitmapGlyphs(const Text* text) {
+bool IsEmojiImagePath(const std::string& filePath) {
+  auto marker = filePath.find("emoji:");
+  return marker != std::string::npos &&
+         (marker == 0 || filePath[marker - 1] == '/' || filePath[marker - 1] == '\\');
+}
+
+// PAGX represents color emoji glyphs with an "emoji:<codepoint>" image source. Importing a PAGX
+// file may resolve that pseudo-path against the document directory, so IsEmojiImagePath accepts
+// the marker at the beginning of a path component. Requiring every authored glyph to carry that
+// marker prevents ordinary bitmap fonts and icon glyphs from receiving emoji-only adjustments.
+bool HasOnlyEmbeddedEmojiGlyphs(const Text* text) {
+  bool hasEmojiGlyph = false;
   for (const auto* run : text->glyphRuns) {
     if (run == nullptr || run->font == nullptr) {
-      continue;
+      return false;
     }
     for (auto glyphID : run->glyphs) {
       if (glyphID == 0) {
-        continue;
+        return false;
       }
       size_t glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex < run->font->glyphs.size()) {
-        auto* glyph = run->font->glyphs[glyphIndex];
-        if (glyph != nullptr && glyph->image != nullptr) {
-          return true;
-        }
+      if (glyphIndex >= run->font->glyphs.size()) {
+        return false;
       }
+      const auto* glyph = run->font->glyphs[glyphIndex];
+      if (glyph == nullptr || glyph->image == nullptr ||
+          !IsEmojiImagePath(glyph->image->filePath)) {
+        return false;
+      }
+      hasEmojiGlyph = true;
     }
   }
-  return false;
-}
-
-bool ComputeLayoutInkBounds(const TextLayoutResult& layout, Text* text, tgfx::Rect* bounds) {
-  const auto* runs = layout.getGlyphRuns(text);
-  if (runs == nullptr) {
-    return false;
-  }
-  bool hasBounds = false;
-  for (const auto& run : *runs) {
-    size_t count = std::min(run.glyphs.size(), run.positions.size());
-    for (size_t i = 0; i < count; ++i) {
-      auto glyphBounds = run.font.getBounds(run.glyphs[i]);
-      if (glyphBounds.isEmpty()) {
-        continue;
-      }
-      glyphBounds.offset(run.positions[i]);
-      if (hasBounds) {
-        bounds->join(glyphBounds);
-      } else {
-        *bounds = glyphBounds;
-        hasBounds = true;
-      }
-    }
-  }
-  return hasBounds;
+  return hasEmojiGlyph;
 }
 
 }  // namespace
@@ -118,59 +108,6 @@ bool PPTWriter::firstEmbeddedBaselineY(const Text& text, float* baselineY) {
     }
   }
   return false;
-}
-
-void PPTWriter::prepareEditableTextOpticalOffsets(const std::vector<Element*>& elements,
-                                                  const TextBox* textBox) {
-  if (!_preparedEditableTextBoxes.insert(textBox).second ||
-      textBox->writingMode != WritingMode::Horizontal) {
-    return;
-  }
-
-  std::vector<Text*> texts;
-  TextLayout::CollectTextElements(elements, texts);
-  if (texts.size() < 2) {
-    return;
-  }
-  auto layout = TextLayout::Layout(TextLayout::MakeElements(texts), MakeTextBoxParams(textBox),
-                                   _layoutContext, false);
-
-  struct OpticalEntry {
-    Text* text = nullptr;
-    float baselineY = 0.0f;
-    tgfx::Rect inkBounds = {};
-    bool bitmap = false;
-  };
-  std::vector<OpticalEntry> entries;
-  entries.reserve(texts.size());
-  for (auto* text : texts) {
-    const auto* lines = layout.getTextLines(text);
-    if (lines == nullptr || lines->size() != 1) {
-      continue;
-    }
-    tgfx::Rect inkBounds = {};
-    if (!ComputeLayoutInkBounds(layout, text, &inkBounds)) {
-      continue;
-    }
-    entries.push_back({text, lines->front().baselineY, inkBounds, HasEmbeddedBitmapGlyphs(text)});
-  }
-
-  constexpr float baselineEpsilon = 0.5f;
-  for (const auto& target : entries) {
-    if (!target.bitmap) {
-      continue;
-    }
-    for (const auto& reference : entries) {
-      if (reference.bitmap ||
-          std::fabs(reference.baselineY - target.baselineY) >= baselineEpsilon) {
-        continue;
-      }
-      float offsetY = reference.inkBounds.centerY() - target.inkBounds.centerY();
-      float maxOffset = target.text->renderFontSize() * 0.2f;
-      _editableOpticalOffsets[target.text] = std::clamp(offsetY, -maxOffset, maxOffset);
-      break;
-    }
-  }
 }
 
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
@@ -391,10 +328,6 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
       geom.estHeight = effectiveFontSize * 1.4f;
       geom.posX = renderPos.x + firstRun->x;
       geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
-    }
-    auto opticalOffset = _editableOpticalOffsets.find(text);
-    if (opticalOffset != _editableOpticalOffsets.end()) {
-      geom.posY += opticalOffset->second;
     }
     return geom;
   }
@@ -717,6 +650,9 @@ void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
   }
   if (style.hasLetterSpacing) {
     out.addRequiredAttribute("spc", style.letterSpc);
+  }
+  if (style.baseline != 0) {
+    out.addRequiredAttribute("baseline", style.baseline);
   }
   out.closeElementStart();
   // OOXML rPr child order is: a:ln, then EG_FillProperties, then a:effectLst,
@@ -1150,8 +1086,59 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   // Alignment lives on a:pPr (not a:rPr) so we leave style.algn at nullptr here.
   std::vector<PPTRunStyle> runStyles;
   runStyles.reserve(runs.size());
-  for (const auto& run : runs) {
-    runStyles.push_back(BuildRunStyle(run.text, run.fill, run.stroke, alpha));
+  std::vector<bool> emojiRuns(runs.size(), false);
+  std::vector<bool> adjustEmojiRuns(runs.size(), false);
+  for (size_t i = 0; i < runs.size(); ++i) {
+    emojiRuns[i] = HasOnlyEmbeddedEmojiGlyphs(runs[i].text);
+  }
+  // A run style cannot vary between lines, so only adjust an emoji run that contributes exactly
+  // one laid-out line and has ordinary text on that same baseline. This avoids moving standalone
+  // emoji lines merely because an unrelated line elsewhere in the TextBox contains normal text.
+  if (_ignoreGlyphRuns && !isVertical && useLineLayout) {
+    constexpr float baselineEpsilon = 0.5f;
+    for (size_t runIndex = 0; runIndex < runs.size(); ++runIndex) {
+      if (!emojiRuns[runIndex]) {
+        continue;
+      }
+      const LineEntry* emojiLine = nullptr;
+      bool hasMultipleLines = false;
+      for (const auto& line : lineEntries) {
+        if (line.runIndex != runIndex) {
+          continue;
+        }
+        if (emojiLine != nullptr) {
+          hasMultipleLines = true;
+          break;
+        }
+        emojiLine = &line;
+      }
+      if (emojiLine == nullptr || hasMultipleLines) {
+        continue;
+      }
+      for (const auto& siblingLine : lineEntries) {
+        if (!emojiRuns[siblingLine.runIndex] &&
+            std::fabs(siblingLine.baselineY - emojiLine->baselineY) < baselineEpsilon) {
+          adjustEmojiRuns[runIndex] = true;
+          break;
+        }
+      }
+    }
+  }
+  // DrawingML exposes run-level vertical positioning only through baseline, which PowerPoint
+  // renders as subscript and therefore at 60% of the declared font size. Increase the declared
+  // size by the inverse factor so the visible emoji retains the authored size while a small
+  // negative baseline optically aligns it with adjacent text.
+  constexpr int emojiBaseline = -10000;
+  constexpr double powerPointSubscriptScale = 0.6;
+  for (size_t i = 0; i < runs.size(); ++i) {
+    const auto& run = runs[i];
+    auto style = BuildRunStyle(run.text, run.fill, run.stroke, alpha);
+    if (adjustEmojiRuns[i]) {
+      style.baseline = emojiBaseline;
+      style.fontSize = static_cast<int>(
+          std::lround(static_cast<double>(style.fontSize) / powerPointSubscriptScale));
+    }
+    runStyles.push_back(std::move(style));
   }
 
   // Locate the first run whose text contains a `\t` and use its renderFontSize
