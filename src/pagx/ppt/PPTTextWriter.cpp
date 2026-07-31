@@ -852,8 +852,7 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
   // fallback even when PAGX line metadata is available. This keeps Web/WASM
   // output usable when its font environment computes fewer line breaks than
   // the environment that authored the PAGX file.
-  float inlineExtent =
-      isVertical ? EffectiveTextBoxHeight(box) : EffectiveTextBoxWidth(box);
+  float inlineExtent = isVertical ? EffectiveTextBoxHeight(box) : EffectiveTextBoxWidth(box);
   bool hasInlineExtent = !std::isnan(inlineExtent) && inlineExtent > 0;
   const char* wrap = hasInlineExtent ? "square" : "none";
   emitTextShapeEnvelope(out, xf, box, wrap);
