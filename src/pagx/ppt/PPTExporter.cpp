@@ -1075,7 +1075,9 @@ struct SlideBuild {
 };
 
 // Serializes every document into its own slide. Returns an empty vector when the
-// input is invalid (empty list or a nullptr entry) so callers can bail out. Each
+// input is invalid (empty list, nullptr entry, unresolved import, or a newly
+// reported layout error) so callers can bail out. A structurally valid document
+// with no visible content is intentionally retained as a blank slide. Each
 // slide's media numbering is offset by the running image total so all slides can
 // share the single ppt/media/ directory without file-name collisions.
 std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
@@ -1087,11 +1089,18 @@ std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
   slides.reserve(documents.size());
   int imageBase = 0;
   for (auto* doc : documents) {
-    if (doc == nullptr) {
+    if (doc == nullptr || doc->hasUnresolvedImports()) {
       return {};
     }
+    auto errorCount = doc->errors.size();
     if (!doc->isLayoutApplied()) {
       doc->applyLayout();
+    }
+    // applyLayout reports structural failures (for example, a cyclic external
+    // composition) through the document's error list. Do not silently turn the
+    // failed document into an empty slide while returning success for the deck.
+    if (!doc->isLayoutApplied() || doc->errors.size() != errorCount) {
+      return {};
     }
     SlideBuild slide;
     slide.context = std::make_unique<PPTWriterContext>(imageBase);

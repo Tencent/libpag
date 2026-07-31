@@ -115,7 +115,9 @@ struct PPTExportOptions {
  * PPTExporter converts one or more PAGXDocuments into PPTX (PowerPoint) format. Each PAGXDocument
  * becomes one slide, in the order supplied; all layers of a document are placed in its slide. The
  * presentation slide size is taken from the first document — PPTX stores a single slide size for
- * the whole deck, so documents with a different width/height are laid out against that size.
+ * the whole deck. Later documents keep their native coordinates; content outside the first
+ * document's canvas is clipped rather than scaled. A structurally valid document with no visible
+ * content intentionally produces a blank slide.
  */
 class PPTExporter {
  public:
@@ -126,11 +128,12 @@ class PPTExporter {
    * document produces one slide in the order given; a single-element list yields a one-slide deck.
    * @param documents the PAGXDocuments to export, one slide per entry. Pointers are non-const
    *        because internal layout computation may cache intermediate results. Must not be empty
-   *        and must not contain nullptr entries.
+   *        or contain nullptr entries or unresolved imports.
    * @param filePath the output file path. The file will be created or overwritten.
    * @param options export options controlling text rendering and mask handling.
-   * @return true if the PPTX file was written successfully, false if the document list was empty /
-   *         contained a nullptr, the file could not be created, or a write error occurred.
+   * @return true if the PPTX file was written successfully, false if the document list was
+   *         invalid, layout reported an error, the file could not be created, or a write error
+   *         occurred.
    */
   static bool ToFile(const std::vector<PAGXDocument*>& documents, const std::string& filePath,
                      const Options& options = {});
@@ -142,10 +145,10 @@ class PPTExporter {
    * the order given; a single-element list yields a one-slide deck.
    * @param documents the PAGXDocuments to export, one slide per entry. Pointers are non-const
    *        because internal layout computation may cache intermediate results. Must not be empty
-   *        and must not contain nullptr entries.
+   *        or contain nullptr entries or unresolved imports.
    * @param options export options controlling text rendering and mask handling.
    * @return a Data object holding the complete PPTX (OOXML .zip) payload, or nullptr if the
-   *         document list was empty / contained a nullptr, or the documents could not be
+   *         document list was invalid, layout reported an error, or the documents could not be
    *         serialized.
    */
   static std::shared_ptr<Data> ToData(const std::vector<PAGXDocument*>& documents,

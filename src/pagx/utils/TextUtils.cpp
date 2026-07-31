@@ -251,7 +251,7 @@ Rect ComputeGlyphRunTextBounds(const Text& text) {
   float maxX = std::numeric_limits<float>::lowest();
   bool hasGlyph = false;
   for (const auto* run : text.glyphRuns) {
-    if (!run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
+    if (run == nullptr || !run->font || run->font->unitsPerEm <= 0 || run->glyphs.empty()) {
       continue;
     }
     float scale = run->fontSize / static_cast<float>(run->font->unitsPerEm);
@@ -294,6 +294,9 @@ Rect ComputeGlyphRunTextBounds(const Text& text) {
   float top = std::numeric_limits<float>::max();
   float bottom = std::numeric_limits<float>::lowest();
   for (const auto* run : text.glyphRuns) {
+    if (run == nullptr) {
+      continue;
+    }
     if (run->bounds.height > 0) {
       top = run->bounds.y;
       bottom = run->bounds.y + run->bounds.height;

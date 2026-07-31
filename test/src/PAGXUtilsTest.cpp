@@ -1210,6 +1210,32 @@ PAGX_TEST(PAGXUtilsTest, ComputeGlyphRunTextBounds_UnionsMultipleRuns) {
   EXPECT_FLOAT_EQ(bounds.height, 12.0f);
 }
 
+// Null GlyphRun entries can occur in hand-authored in-memory documents. They
+// must be ignored by both the horizontal span and vertical extent passes.
+PAGX_TEST(PAGXUtilsTest, ComputeGlyphRunTextBounds_SkipsNullRuns) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto text = doc->makeNode<pagx::Text>();
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 1000.0f;
+  font->glyphs.push_back(glyph);
+
+  auto run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 10.0f;
+  run->glyphs = {1};
+  run->x = 5.0f;
+  run->bounds = pagx::Rect::MakeXYWH(0.0f, 2.0f, 20.0f, 12.0f);
+  text->glyphRuns = {nullptr, run, nullptr};
+
+  auto bounds = pagx::ComputeGlyphRunTextBounds(*text);
+  EXPECT_FLOAT_EQ(bounds.x, 5.0f);
+  EXPECT_FLOAT_EQ(bounds.width, 10.0f);
+  EXPECT_FLOAT_EQ(bounds.y, 2.0f);
+  EXPECT_FLOAT_EQ(bounds.height, 12.0f);
+}
+
 // ---------------------------------------------------------------------------
 // GetPNGDimensionsFromPath (data URI variant)
 // ---------------------------------------------------------------------------

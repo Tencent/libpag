@@ -129,6 +129,16 @@ std::string GenerateRootRels() {
 std::string GeneratePresentation(float w, float h, size_t slideCount) {
   int64_t cx = PxToEMU(w);
   int64_t cy = PxToEMU(h);
+  // PxToEMU maps non-finite values to zero, while non-positive document dimensions
+  // convert to zero or a negative value. Give each invalid axis the minimum legal
+  // OOXML extent before the aspect-preserving clamp below; dividing by zero there
+  // would otherwise produce infinity and make the subsequent integer cast undefined.
+  if (cx <= 0) {
+    cx = MIN_SLIDE_SIZE_EMU;
+  }
+  if (cy <= 0) {
+    cy = MIN_SLIDE_SIZE_EMU;
+  }
   if (cx > MAX_SLIDE_SIZE_EMU || cy > MAX_SLIDE_SIZE_EMU) {
     double scale = std::min(static_cast<double>(MAX_SLIDE_SIZE_EMU) / static_cast<double>(cx),
                             static_cast<double>(MAX_SLIDE_SIZE_EMU) / static_cast<double>(cy));

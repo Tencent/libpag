@@ -63,6 +63,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/ppt/PPTBoilerplate.h"
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/utils/TextUtils.h"
@@ -6643,6 +6644,29 @@ PAGX_TEST(PAGXPPTTest, MultiPage_NullEntryFails) {
   EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
 }
 
+PAGX_TEST(PAGXPPTTest, MultiPage_UnresolvedImportFailsWholeExport) {
+  auto page1 = MakeSimplePPTDoc();
+  auto page2 = MakeSimplePPTDoc();
+  page2->layers.front()->importDirective.source = "missing.svg";
+  auto page3 = MakeSimplePPTDoc();
+
+  EXPECT_EQ(pagx::PPTExporter::ToData({page1.get(), page2.get(), page3.get()}), nullptr);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_LayoutErrorFailsWholeExport) {
+  auto page1 = MakeSimplePPTDoc();
+  auto page2 = pagx::PAGXDocument::Make(400, 300);
+  auto* cyclicLayer = page2->makeNode<pagx::Layer>();
+  cyclicLayer->externalDoc = page2;
+  page2->layers.push_back(cyclicLayer);
+  auto page3 = MakeSimplePPTDoc();
+
+  EXPECT_EQ(pagx::PPTExporter::ToData({page1.get(), page2.get(), page3.get()}), nullptr);
+  EXPECT_FALSE(page2->errors.empty());
+  // Break the shared_ptr cycle created specifically for this regression case.
+  cyclicLayer->externalDoc.reset();
+}
+
 // Slides may declare different canvas sizes; the deck adopts the first document's
 // size and still produces a valid archive with a slide per document.
 PAGX_TEST(PAGXPPTTest, MultiPage_MixedDocumentSizes) {
@@ -6656,6 +6680,19 @@ PAGX_TEST(PAGXPPTTest, MultiPage_MixedDocumentSizes) {
 
   std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
   EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+
+  auto presentation = pagx::GeneratePresentation(page1->width, page1->height, docs.size());
+  EXPECT_NE(presentation.find("<p:sldSz cx=\"7620000\" cy=\"5715000\"/>"), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, ZeroSizedDocumentUsesMinimumSlideSize) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  auto presentation = pagx::GeneratePresentation(doc->width, doc->height, 1);
+  EXPECT_NE(presentation.find("<p:sldSz cx=\"914400\" cy=\"914400\"/>"), std::string::npos);
 }
 
 }  // namespace pag
