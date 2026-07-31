@@ -567,14 +567,19 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     @Override
     protected void onAttachedToWindow() {
-        isAttachedToWindow = true;
+        synchronized (renderLock) {
+            isAttachedToWindow = true;
+        }
         super.onAttachedToWindow();
         checkVisible();
     }
 
     @Override
     protected void onDetachedFromWindow() {
-        isAttachedToWindow = false;
+        synchronized (renderLock) {
+            isAttachedToWindow = false;
+        }
+        checkVisible();
         super.onDetachedFromWindow();
         synchronized (renderLock) {
             if (pagSurface != null) {
@@ -582,7 +587,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                 pagSurface = null;
             }
         }
-        checkVisible();
     }
 
 
@@ -602,12 +606,21 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private boolean isVisible = false;
 
     private void checkVisible() {
-        boolean visible = isAttachedToWindow && isShown();
-        if (isVisible == visible) {
-            return;
+        boolean attached;
+        synchronized (renderLock) {
+            attached = isAttachedToWindow;
         }
-        isVisible = visible;
-        if (isVisible) {
+        // isShown() must be called outside renderLock because it may trigger view hierarchy
+        // callbacks that re-enter PAGView methods; holding renderLock across the call risks
+        // reentrant deadlock with async render on the worker thread.
+        boolean visible = attached && isShown();
+        synchronized (renderLock) {
+            if (isVisible == visible) {
+                return;
+            }
+            isVisible = visible;
+        }
+        if (visible) {
             animator.setDuration(pagPlayer.duration());
             animator.update();
         } else {
@@ -674,17 +687,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     public void onAnimationUpdate(PAGAnimator animator) {
-        pagPlayer.setProgress(animator.progress());
-        synchronized (PAGView.this) {
+        boolean changed;
+        synchronized (renderLock) {
             if (!isAttachedToWindow) {
                 return;
             }
-        }
-        if (isVisible) {
-            animator.setDuration(pagPlayer.duration());
-        }
-        boolean changed;
-        synchronized (renderLock) {
+            pagPlayer.setProgress(animator.progress());
+            if (isVisible) {
+                animator.setDuration(pagPlayer.duration());
+            }
             changed = flush();
         }
         if (changed) {

@@ -154,6 +154,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   if (status != AMEDIA_OK) {
     LOGE("HardwareDecoder: Error on configuring videoDecoder.\n");
     ANativeWindow_release(nativeWindow);
+    nativeWindow = nullptr;
     AMediaCodec_delete(videoDecoder);
     videoDecoder = nullptr;
     return false;
@@ -163,6 +164,7 @@ bool HardwareDecoder::initDecoder(const VideoFormat& format) {
   if (status != AMEDIA_OK) {
     LOGE("HardwareDecoder: Error on starting videoDecoder.\n");
     ANativeWindow_release(nativeWindow);
+    nativeWindow = nullptr;
     AMediaCodec_delete(videoDecoder);
     videoDecoder = nullptr;
     return false;
