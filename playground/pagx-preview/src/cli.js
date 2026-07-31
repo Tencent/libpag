@@ -105,12 +105,17 @@ function parseArgs(argv) {
 }
 
 function openBrowser(url) {
+  const onError = (err) => {
+    if (err) {
+      process.stderr.write(`pagx preview: failed to open browser: ${err.message}\n`);
+    }
+  };
   if (process.platform === 'darwin') {
-    execFile('open', [url]);
+    execFile('open', [url], onError);
   } else if (process.platform === 'win32') {
-    execFile('cmd', ['/c', 'start', '', url]);
+    execFile('cmd', ['/c', 'start', '', url], onError);
   } else {
-    execFile('xdg-open', [url]);
+    execFile('xdg-open', [url], onError);
   }
 }
 

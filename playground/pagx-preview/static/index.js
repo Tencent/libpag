@@ -385,11 +385,9 @@ async function loadPAGXFromBytes(pagxBuf, { silent = false } = {}) {
         `[pagx-preview] resources=${externalPaths.length} (cache hits=${cacheHitsThisLoad})`
       );
       // Upload a document summary so the MCP get_document tool can answer AI queries without a
-      // client round-trip. nodeCount is not exposed by the viewer yet; we send 0 and let the
-      // MCP tool report "0 nodes" rather than blocking. A future viewer API can populate it.
+      // client round-trip.
       if (view) {
         const summary = {
-          nodeCount: 0,
           width: view.contentWidth(),
           height: view.contentHeight(),
           duration: view.durationMicros(),

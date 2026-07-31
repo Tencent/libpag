@@ -132,7 +132,6 @@ async function uploadDocumentSummary(view) {
     const width = view.contentWidth();
     const height = view.contentHeight();
     const summary = {
-      nodeCount: 0,
       width,
       height,
       duration,
