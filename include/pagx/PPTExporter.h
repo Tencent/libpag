@@ -47,7 +47,9 @@ struct PPTExportOptions {
    * as custom paths, because native a:r runs cannot express arbitrary glyph IDs / per-glyph offsets
    * / anchors / rotations. Enabling this flag discards the GlyphRun geometry and falls back to
    * native, editable PowerPoint text instead, at the cost of exact glyph-level fidelity. Text nodes
-   * that have no GlyphRun data are unaffected. The default value is false.
+   * that have no GlyphRun data are unaffected. This is the direct opposite of convertTextToPath, so
+   * setting both leaves convertTextToPath in effect and this flag is ignored. The default value is
+   * false.
    */
   bool ignoreGlyphRuns = false;
 

@@ -995,6 +995,13 @@ long ZCALLBACK MemZipSeek(voidpf, voidpf stream, uLong offset, int origin) {
     default:
       return -1;
   }
+  // minizip only ever seeks within the bytes it has already written (back to a
+  // local header to patch its CRC / sizes, then forward to the end again).
+  // Rejecting anything beyond that turns an unexpected seek into a reported
+  // failure instead of a silently zero-filled, corrupt archive.
+  if (offset > buffer->data.size() - base) {
+    return -1;
+  }
   buffer->position = base + offset;
   return 0;
 }

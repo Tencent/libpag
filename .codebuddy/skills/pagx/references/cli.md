@@ -490,6 +490,7 @@ pagx export --input a.pagx --input b.pagx --output deck.pptx  # multi-slide deck
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported  # keep unsupported features editable
+pagx export --input icon.pagx --output out.pptx --ppt-ignore-glyphruns  # editable text instead of glyph paths
 pagx export --input icon.pagx --output out.html  # PAGX to HTML
 ```
 
@@ -499,6 +500,7 @@ pagx export --input icon.pagx --output out.html  # PAGX to HTML
 | `--output <file>` | Output file (default: `<first input>.<format>`) |
 | `--format <format>` | Output format (`svg`, `pptx`, or `html`; inferred from output extension). Required if output has no extension |
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
+| `--ppt-ignore-glyphruns` | Ignore the GlyphRun geometry carried by Text nodes and emit native, editable PowerPoint text derived from the `text` attribute instead. By default a Text that carries GlyphRun data is written as custom glyph paths, because `a:r` runs cannot express arbitrary glyph IDs, per-glyph offsets, anchors, or rotations; this flag trades that glyph-level fidelity for text the reader can still edit. Text nodes without GlyphRun data are unaffected. Opposite of `--text-to-path` — if both are passed, `--text-to-path` wins |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, wide-gamut color, and `BackgroundBlurStyle`. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes and `BackgroundBlurStyle` the backdrop beneath the layer is baked into the PNG too, so the blend/frosted-glass composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |

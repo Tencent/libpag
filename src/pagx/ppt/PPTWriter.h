@@ -665,11 +665,16 @@ class PPTWriter {
     uint32_t byteEnd = 0;
   };
 
+  // convertTextToPath and ignoreGlyphRuns are direct opposites — one asks for glyph outlines, the
+  // other for editable runs — so resolve the conflict once here instead of letting whichever
+  // branch happens to be checked first decide. convertTextToPath wins because it is the stronger
+  // request: it guarantees the slide renders identically without depending on the reader's fonts.
   PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options,
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
-        _ignoreGlyphRuns(options.ignoreGlyphRuns), _bridgeContours(options.bridgeContours),
-        _resolveModifiers(options.resolveModifiers), _bakeUnsupported(options.bakeUnsupported),
+        _ignoreGlyphRuns(options.ignoreGlyphRuns && !options.convertTextToPath),
+        _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
+        _bakeUnsupported(options.bakeUnsupported),
         _rasterScale(std::clamp(options.rasterScale, 0.01f, 4.0f)), _layoutContext(layoutContext),
         _resolver(doc) {
   }
@@ -782,7 +787,6 @@ class PPTWriter {
     float posY = 0;
     float estWidth = 0;
     float estHeight = 0;
-    bool hasTextBox = false;
     // True when posX/posY were taken from the GlyphRun pen origin (glyphRun-
     // carrying Text rendered as native fallback). In that case the modifier
     // TextBox's horizontal alignment is already baked into the origin, so the

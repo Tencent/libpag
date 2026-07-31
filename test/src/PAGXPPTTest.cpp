@@ -65,6 +65,7 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
+#include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
@@ -1491,6 +1492,31 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRuns) {
   pagx::PPTExportOptions options;
   options.ignoreGlyphRuns = true;
   ASSERT_TRUE(ExportAndVerify(*doc, "text_ignore_glyph_runs", options));
+
+  auto writeBody = [&](const pagx::PPTExportOptions& opts) {
+    pagx::PPTWriterContext writerContext;
+    pagx::FontConfig fontConfig;
+    pagx::LayoutContext layoutContext(&fontConfig);
+    pagx::PPTWriter writer(&writerContext, doc.get(), opts, &layoutContext);
+    pagx::XMLBuilder xml;
+    writer.writeDocument(xml);
+    return xml.release();
+  };
+  // The flag replaces the glyph outlines with an editable run carrying the readable text.
+  auto editableBody = writeBody(options);
+  EXPECT_NE(editableBody.find("<a:t>A</a:t>"), std::string::npos);
+  EXPECT_EQ(editableBody.find("a:custGeom"), std::string::npos);
+
+  // convertTextToPath asks for the opposite and is the stronger guarantee (the slide renders the
+  // same without the reader's fonts), so it wins when both are set instead of one flag silently
+  // cancelling the other depending on which branch is evaluated first.
+  pagx::PPTExportOptions conflictingOptions;
+  conflictingOptions.ignoreGlyphRuns = true;
+  conflictingOptions.convertTextToPath = true;
+  pagx::PPTExportOptions pathOnlyOptions;
+  pathOnlyOptions.convertTextToPath = true;
+  EXPECT_EQ(writeBody(conflictingOptions), writeBody(pathOnlyOptions));
+  EXPECT_EQ(writeBody(conflictingOptions).find("<a:t>A</a:t>"), std::string::npos);
 }
 
 PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesLineBoxVerticalAlignment) {
@@ -5967,6 +5993,41 @@ PAGX_TEST(PAGXPPTTest, TextBoxJustifyTextAlign) {
   layer->contents.push_back(tb);
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "textbox_justify"));
+}
+
+// Justify needs a bounded text area: with wrap="none" PowerPoint has no target line width to
+// distribute the extra space across and silently falls back to start alignment. A modifier TextBox
+// is a bare typography carrier with no resolved layout box, so it has no authored inline extent to
+// wrap against — the exporter must still turn wrapping on for the justified paragraph.
+PAGX_TEST(PAGXPPTTest, TextBoxJustifyAutoInlineExtentKeepsWrap) {
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Justified text content here.";
+  text->fontFamily = "Arial";
+  text->fontSize = 16;
+  text->position = {40, 100};
+  layer->contents.push_back(text);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->textAlign = pagx::TextAlign::Justify;
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  ASSERT_TRUE(std::isnan(pagx::EffectiveTextBoxWidth(tb)))
+      << "the box must stay auto-sized for this test to cover the justify fallback";
+
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), {}, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_NE(body.find("algn=\"just\""), std::string::npos);
 }
 
 PAGX_TEST(PAGXPPTTest, TextBoxParagraphAlignMiddle) {

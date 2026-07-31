@@ -1563,6 +1563,30 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_SingleInputOneSlide) {
   EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
 }
 
+// --ppt-ignore-glyphruns swaps the pre-shaped glyph paths for editable a:t runs, so the readable
+// text ends up in the slide XML. --text-to-path is its opposite and wins when both are given.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_IgnoreGlyphRuns) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto editablePath = TempDir() + "/ExportPPTX_IgnoreGlyphRuns.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output",
+                                            editablePath, "--ppt-ignore-glyphruns"});
+  EXPECT_EQ(ret, 0);
+  ASSERT_TRUE(std::filesystem::exists(editablePath));
+  EXPECT_GT(std::filesystem::file_size(editablePath), 0u);
+
+  auto pathsPath = TempDir() + "/ExportPPTX_IgnoreGlyphRunsWithTextToPath.pptx";
+  ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", pathsPath,
+                                       "--ppt-ignore-glyphruns", "--text-to-path"});
+  EXPECT_EQ(ret, 0);
+  ASSERT_TRUE(std::filesystem::exists(pathsPath));
+  // Combining the two flags must behave exactly like --text-to-path alone.
+  auto textToPathOnlyPath = TempDir() + "/ExportPPTX_TextToPathOnly.pptx";
+  ret = CallRun(pagx::cli::RunExport,
+                {"export", "--input", inputPath, "--output", textToPathOnlyPath, "--text-to-path"});
+  EXPECT_EQ(ret, 0);
+  EXPECT_EQ(ReadFile(pathsPath), ReadFile(textToPathOnlyPath));
+}
+
 // If one of several inputs fails to load, the whole export aborts with an error
 // rather than silently dropping the bad slide.
 CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputsOneMissing) {
