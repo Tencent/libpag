@@ -643,10 +643,10 @@ bool IsRadialExtentKeyword(const std::string& token) {
 // edges.
 float CircleExtentRadiusPx(const std::string& keyword, float cxPx, float cyPx, float boxWidth,
                            float boxHeight) {
-  float left = cxPx;
-  float right = boxWidth - cxPx;
-  float top = cyPx;
-  float bottom = boxHeight - cyPx;
+  float left = std::abs(cxPx);
+  float right = std::abs(boxWidth - cxPx);
+  float top = std::abs(cyPx);
+  float bottom = std::abs(boxHeight - cyPx);
   float dx = std::max(left, right);
   float dy = std::max(top, bottom);
   if (keyword == "closest-side") {
@@ -961,10 +961,11 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
     }
   }
 
-  // A circle keeps one uniform radius; an ellipse (explicit, or the shapeless default) stretches
-  // per axis. Detected up front because extent-keyword and omitted sizes resolve the radius from
-  // the center, which the position pass below establishes first.
-  bool isCircle = explicitCircle || (!explicitEllipse && sizeTokens.size() == 1);
+  // A single explicit length implies a circle. An extent keyword without a shape still uses CSS's
+  // default ellipse, so it must not enter the circle-only pixel-radius path below.
+  bool implicitCircle =
+      !explicitEllipse && sizeTokens.size() == 1 && !IsRadialExtentKeyword(sizeTokens[0]);
+  bool isCircle = explicitCircle || implicitCircle;
 
   // Position: `at <x> <y>`. Axis-locked keywords (left/right -> x, top/bottom -> y) are assigned
   // first so author order is irrelevant (`at top left` == `at left top`); the remaining `center`
@@ -1156,7 +1157,8 @@ bool HTMLValueParser::finaliseGradientStops(GradientStops& stops) {
   // interpolates unpremultiplied, where a keyword `transparent` carries black RGB and would drag
   // the ramp toward grey/black. Rewrite each fully transparent stop's RGB to that of its nearest
   // opaque neighbour (alpha kept at 0) so the unpremultiplied interpolation matches CSS. A stop
-  // between two opaque colours prefers the earlier neighbour, matching the premultiplied midpoint.
+  // between two opaque colours prefers the earlier neighbour to avoid tinting the visible,
+  // higher-alpha side of the fade.
   for (size_t i = 0; i < stops.size(); ++i) {
     if (stops[i].second.alpha > 0.0f) continue;
     size_t donor = stops.size();

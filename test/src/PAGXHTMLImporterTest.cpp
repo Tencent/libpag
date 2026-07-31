@@ -1199,6 +1199,27 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleExtentKeywordsUseDistanceFrom
   }
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleClosestSideOutsideBoxUsesPositiveDistance) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:400px">
+      <div style="width:400px;height:200px;background-image:radial-gradient(
+        circle closest-side at -80px -138px, #FFFFFF 0%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // The center is outside the box, but closest-side is still the positive geometric distance to
+  // the nearest edge: min(80, 480, 138, 338) = 80px.
+  EXPECT_FALSE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, -80.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, -138.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 80.0f, 0.01f));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleExtentOnSquareBoxKeepsNormalised) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:200px">
@@ -1327,8 +1348,9 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedOverflowClipUsesContourMaskForNonImageChil
   // `border-radius: 50%` inscribes an ellipse, so the mask geometry is an Ellipse.
   auto* ellipse = FindElementOfType<pagx::Ellipse>(wrapper->mask);
   EXPECT_NE(ellipse, nullptr);
-  // The mask is an invisible, layout-excluded child that shares the container's coordinate space.
-  EXPECT_FALSE(wrapper->mask->visible);
+  // The mask stays visible at the PAGX level so the renderer can resolve it; mask ownership
+  // suppresses normal drawing. It is excluded only from layout.
+  EXPECT_TRUE(wrapper->mask->visible);
   EXPECT_FALSE(wrapper->mask->includeInLayout);
 }
 
@@ -8125,7 +8147,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundDataImageExplicitSizeUsesNativeDimensio
 
 // CSS `mask-image: url(data:image/svg+xml,...)` with `mask-mode: alpha` rebuilds an alpha mask
 // layer (the inverse of HTMLWriter::writeMaskCSS). The ellipse geometry round-trips and the mask
-// layer is attached invisibly and excluded from layout.
+// layer stays renderer-visible for mask lookup and is excluded from layout.
 PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:110px;height:110px">
@@ -8138,7 +8160,7 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   auto* masked = doc->layers.front()->children.front();
   ASSERT_NE(masked->mask, nullptr);
   EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
-  EXPECT_FALSE(masked->mask->visible);
+  EXPECT_TRUE(masked->mask->visible);
   EXPECT_FALSE(masked->mask->includeInLayout);
   auto* ellipse = FindElementOfType<pagx::Ellipse>(masked->mask);
   ASSERT_NE(ellipse, nullptr);

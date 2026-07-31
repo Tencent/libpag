@@ -124,6 +124,20 @@ static int ParseResolveOptions(int argc, char* argv[], ResolveOptions* options) 
 // Resolve logic
 //--------------------------------------------------------------------------------------------------
 
+// A Group's position/scale/rotation fields can represent a matrix whose axes remain orthogonal.
+// Compare the normalized axis dot product so the result does not depend on the matrix scale.
+// Degenerate axes are kept as Layers because the decomposition below cannot recover their rotation.
+static bool CanDowngradeMatrixToGroup(const Matrix& matrix) {
+  float xLength = std::hypot(matrix.a, matrix.b);
+  float yLength = std::hypot(matrix.c, matrix.d);
+  if (pag::FloatNearlyZero(xLength) || pag::FloatNearlyZero(yLength)) {
+    return false;
+  }
+  float normalizedDot =
+      (matrix.a / xLength) * (matrix.c / yLength) + (matrix.b / xLength) * (matrix.d / yLength);
+  return pag::FloatNearlyZero(normalizedDot);
+}
+
 static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
                             const ImportFormatOptions& formatOptions, PAGXDocument* doc) {
   bool hasImportSource = !layer->importDirective.source.empty();
@@ -208,7 +222,8 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   } else if (elementLayers.size() > 1) {
     canDowngradeAll = true;
     for (auto* el : elementLayers) {
-      if (!el->children.empty() || HasLayerOnlyFeatures(el)) {
+      if (!el->children.empty() || HasLayerOnlyFeatures(el) ||
+          !CanDowngradeMatrixToGroup(el->matrix)) {
         canDowngradeAll = false;
         break;
       }
@@ -223,19 +238,18 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
     // Wrap every element layer uniformly in its own Group so sibling shapes stay at the same
     // depth (peer Groups), preserving the source hierarchy. Flattening only the first layer's
     // contents while wrapping the rest would break that symmetry and is unnecessary — a trailing
-    // painter is isolated by its enclosing Group either way. This mirrors the uniform handling in
-    // PAGXOptimizer::DowngradeShellChildren.
+    // painter is isolated by its enclosing Group either way. Structurally, this uses the same
+    // all-siblings Group strategy as PAGXOptimizer::DowngradeShellChildren, while also supporting
+    // transformable non-identity matrices here.
     for (auto* elemLayer : elementLayers) {
-      auto m = elemLayer->matrix;
-      bool hasSkew = !pag::FloatNearlyEqual(m.a * m.c + m.b * m.d, 0.0f);
-      if (hasSkew) {
-        // Matrix contains skew which cannot be represented by Group's
-        // position/scale/rotation. Keep it as a Layer instead of downgrading.
-        layer->children.push_back(elemLayer);
+      if (elemLayer->contents.empty() && elemLayer->customData.empty()) {
         continue;
       }
+      auto m = elemLayer->matrix;
       auto* group = doc->makeNode<Group>();
       group->elements = std::move(elemLayer->contents);
+      group->customData = std::move(elemLayer->customData);
+      group->sourceLine = elemLayer->sourceLine;
       if (!elemLayer->matrix.isIdentity()) {
         group->position = {m.tx, m.ty};
         if (m.a != 1 || m.b != 0 || m.c != 0 || m.d != 1) {
