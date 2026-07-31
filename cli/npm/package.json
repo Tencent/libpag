@@ -30,8 +30,9 @@
   "scripts": {
     "build:html-snapshot": "node scripts/build-html-snapshot.js",
     "check:binaries": "node scripts/check-binaries.js",
+    "check:preview": "node scripts/check-preview.js",
     "prepack": "node scripts/build-html-snapshot.js",
-    "prepublishOnly": "node scripts/check-binaries.js"
+    "prepublishOnly": "node scripts/check-binaries.js && node scripts/check-preview.js"
   },
   "os": [
     "darwin",

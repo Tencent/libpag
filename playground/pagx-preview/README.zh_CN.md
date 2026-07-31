@@ -59,15 +59,14 @@ pagx preview stop
 
 | 工具 | 说明 |
 |------|------|
-| `preview_pagx` | **默认预览。** 加载文件并返回 session URL，供在 IDE webview 面板或浏览器中打开；不渲染内联 widget。 |
-| `preview_pagx_widget` | **内联小窗预览。** 直接在对话中渲染动画（对话内小窗）。仅当用户明确要求内联 /「小窗」预览时使用。 |
+| `preview_pagx` | 加载文件并返回 session URL，供在 IDE webview 面板或浏览器中打开。 |
 | `reload_file` | 强制从磁盘重新加载文件（文件变更会自动重载，这是手动触发）。 |
-| `get_document` | 获取文档信息（尺寸、时长等）。 |
+| `get_document` | 获取文档信息（尺寸、时长）。 |
 
-`preview_pagx` 作为默认工具，因为内联 widget 在各桌面端宿主中的渲染并不可靠（见
-[已知兼容性问题](#已知兼容性问题)）。只有 `preview_pagx_widget` 才携带 MCP Apps UI 资源
-（`ui://pagx-preview/main`），让支持的宿主挂载内联 iframe；`preview_pagx` 刻意不带它，因此永远
-不会触发有问题的 widget。
+所有预览都通过 `preview_pagx`，它返回 session URL 供在 IDE webview 面板或浏览器中打开。内联 MCP
+Apps widget 在各桌面端宿主中的渲染并不可靠（见 [已知兼容性问题](#已知兼容性问题)），因此暂不暴露内联
+widget 工具；widget 资源（`ui://pagx-preview/main`）在代码中仍保留但不对外声明，待宿主支持成熟后可
+重新启用。
 
 ### 各平台配置
 
@@ -123,7 +122,7 @@ Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ### 已知兼容性问题
 
-内联 widget（`preview_pagx_widget`）已在官方 [ext-apps basic-host](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) 参考宿主中验证通过，但各桌面端宿主对内联 MCP Apps 的支持情况不一：
+内联 widget 已在官方 [ext-apps basic-host](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) 参考宿主中验证通过，但各桌面端宿主对内联 MCP Apps 的支持情况不一：
 
 | 宿主 | 内联 widget 状态 |
 |------|------|
@@ -131,9 +130,9 @@ Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 | CodeBuddy IDE | 暂不支持 MCP Apps 内联 widget |
 | VS Code Copilot | 在 Simple Browser（编辑器标签）中打开，而非内联 widget |
 
-因此 `preview_pagx`（在 IDE webview 面板 / 浏览器中打开）为默认工具，`preview_pagx_widget` 为
-可选。所有情况下，session URL（`http://127.0.0.1:<端口>/session/<id>/`）都能提供带实时重载的完整
-预览。
+由于内联渲染在主流宿主上无法可靠工作，暂不暴露内联 widget 工具。预览统一通过 `preview_pagx`（在 IDE
+webview 面板 / 浏览器中打开）。所有情况下，session URL（`http://127.0.0.1:<端口>/session/<id>/`）都能
+提供带实时重载的完整预览。
 
 ## 开发
 

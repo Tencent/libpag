@@ -78,7 +78,14 @@ if (process.argv[2] === 'preview') {
     process.exit(1);
   }
   const { spawn } = require('child_process');
-  const child = spawn('node', [previewEntry, ...process.argv.slice(3)], { stdio: 'inherit' });
+  // Use process.execPath (the Node binary currently running this wrapper) rather than the string
+  // 'node': under nvm/Volta/asdf, on Windows without node on PATH, or when launched from a packaged
+  // runtime, a bare 'node' may not resolve. process.execPath is always the correct interpreter.
+  const child = spawn(process.execPath, [previewEntry, ...process.argv.slice(3)], { stdio: 'inherit' });
+  child.on('error', (err) => {
+    console.error('pagx: failed to start preview: ' + err.message);
+    process.exit(1);
+  });
   child.on('exit', (code) => process.exit(code != null ? code : 1));
   return;
 }

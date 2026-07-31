@@ -86,6 +86,24 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
   const viewerInfo = readViewerInfo();
 
   const app = express();
+
+  // DNS-rebinding guard. The server binds to 127.0.0.1, but that alone does not stop a malicious
+  // web page from rebinding its own hostname to 127.0.0.1 and then reaching us through the
+  // victim's browser. Pinning the Host header to loopback names means such cross-origin requests
+  // (which carry the attacker's domain in Host) are rejected before touching any session state or
+  // the filesystem. Legitimate clients (the preview tab and the CLI) always use a loopback host.
+  const ALLOWED_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
+  app.use((req, res, next) => {
+    const host = req.headers.host || '';
+    // Strip the optional :port; the port is OS-assigned and not security-relevant here.
+    const hostname = host.replace(/:\d+$/, '');
+    if (!ALLOWED_HOSTS.has(hostname)) {
+      res.status(403).json({ error: 'forbidden host' });
+      return;
+    }
+    next();
+  });
+
   app.use(express.json({ limit: '4mb' }));
 
   // MCP Apps hosts (Claude Desktop, CodeBuddy, etc.) load the widget HTML inside a cross-origin
@@ -127,11 +145,45 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
 
   let idleCallback = null;
   let idleTimer = null;
+  // Per-session idle timers: when a single file's last tab closes, its session (and thus its URL)
+  // is reclaimed after IDLE_SHUTDOWN_MS independently of other still-open files. Keyed by session
+  // id. This is what makes closing one file's tab invalidate only that file's URL.
+  const sessionIdleTimers = new Map();
 
   function totalSseCount() {
     let n = 0;
     for (const c of sseCountBySession.values()) n += c;
     return n;
+  }
+
+  function cancelSessionIdle(id) {
+    const timer = sessionIdleTimers.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      sessionIdleTimers.delete(id);
+    }
+  }
+
+  // Schedules reclamation of a single session once its last tab has closed. After the grace period
+  // it re-checks the count so a reconnect within the window keeps the session (and its URL) alive.
+  //
+  // Gated on idleCallback: only the daemon (command-line) mode registers onIdle, so only there does
+  // a session's URL expire when its tab closes. MCP mode deliberately owns session lifetime through
+  // the client (see daemon.js), so reclaiming a session out from under it would break a later
+  // reload_file / get_document call that still holds the sessionId.
+  function scheduleSessionIdle(id) {
+    if (!idleCallback) return;
+    if (sessionIdleTimers.has(id)) return;
+    const timer = setTimeout(() => {
+      sessionIdleTimers.delete(id);
+      if ((sseCountBySession.get(id) || 0) > 0) return;
+      const session = sessions.get(id);
+      if (!session) return;
+      sessions.delete(id);
+      Promise.resolve(session.close()).catch(() => {});
+    }, IDLE_SHUTDOWN_MS);
+    timer.unref?.();
+    sessionIdleTimers.set(id, timer);
   }
 
   function scheduleIdleCheck() {
@@ -171,6 +223,18 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
     res.json({ ok: true, sessions: sessions.size });
   });
 
+  // Cross-site write guard. Shared by every endpoint that mutates disk or session state. The only
+  // legitimate browser caller of these endpoints is the same-origin preview page (static/index.js
+  // fetches relative URLs, so Sec-Fetch-Site is `same-origin`); the Node CLI sends no fetch
+  // metadata at all (`none`). Anything else — an Origin header from another site, or a
+  // cross-site / same-site / cross-origin Sec-Fetch-Site — is a cross-site attempt and is refused.
+  // Combined with the Host allow-list above this closes the DNS-rebinding write path (e.g. forging
+  // PUT /session/:id/pagx to overwrite the file the user is previewing).
+  function isCrossSiteWrite(req) {
+    const site = req.get('Sec-Fetch-Site');
+    return Boolean(req.get('Origin')) || Boolean(site && site !== 'same-origin' && site !== 'none');
+  }
+
   // Session index for CLI reuse. POST creates or returns an existing session for a filesystem
   // path; a session id of "drop" indicates a one-shot ephemeral upload from the browser drop
   // handler (see the /session/drop endpoint below).
@@ -180,8 +244,7 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
     // iframe only POST to /session/:id/{resources,document}. Any request carrying browser
     // fetch-metadata is therefore a cross-site attempt to inject an arbitrary path and read the
     // file back via GET /session/:id/pagx, so reject it. The Node CLI sends neither header.
-    const site = req.get('Sec-Fetch-Site');
-    if (req.get('Origin') || (site && site !== 'same-origin' && site !== 'none')) {
+    if (isCrossSiteWrite(req)) {
       res.status(403).json({ error: 'forbidden' });
       return;
     }
@@ -223,6 +286,10 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
   const DROP_SESSION_MAX = 100;
   const dropSessions = new Map();
   app.post('/session/drop', express.raw({ type: '*/*', limit: '32mb' }), (req, res) => {
+    if (isCrossSiteWrite(req)) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
     if (!req.body || req.body.length === 0) {
       res.status(400).json({ error: 'empty body' });
       return;
@@ -279,6 +346,10 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
     '/session/:id/pagx',
     express.raw({ type: '*/*', limit: '32mb' }),
     async (req, res) => {
+      if (isCrossSiteWrite(req)) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
       if (dropSessions.has(req.params.id)) {
         res.status(400).json({ error: 'save is not available for dropped files' });
         return;
@@ -342,6 +413,10 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
   // Browser reports the PAGX's external file list once the document is parsed. The server uses
   // the list to extend its filesystem watch, so edits to referenced images also trigger reload.
   app.post('/session/:id/resources', (req, res) => {
+    if (isCrossSiteWrite(req)) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
     const session = sessions.get(req.params.id);
     if (!session) {
       // Drop sessions ignore this endpoint silently: they never watch anything.
@@ -359,7 +434,14 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
 
   // Client uploads a document summary (node list, dimensions, duration) after a successful load.
   // The MCP get_document tool reads this cache to answer AI queries without a client round-trip.
+  // The uploader is the same-origin preview page (static/index.js). NOTE: if the inline MCP widget
+  // is ever re-enabled, its iframe uploads cross-origin and would be rejected here — that only
+  // costs the get_document cache (rendering is unaffected), so revisit this guard at that time.
   app.post('/session/:id/document', (req, res) => {
+    if (isCrossSiteWrite(req)) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
     const session = sessions.get(req.params.id);
     if (!session) {
       res.status(404).json({ error: 'unknown session' });
@@ -399,6 +481,7 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
     sseResponses.add(res);
     sseCountBySession.set(id, (sseCountBySession.get(id) || 0) + 1);
     cancelIdleCheck();
+    cancelSessionIdle(id);
 
     let unsubscribe = () => {};
     if (session) {
@@ -418,6 +501,9 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
       const remaining = (sseCountBySession.get(id) || 1) - 1;
       if (remaining <= 0) {
         sseCountBySession.delete(id);
+        // Reclaim just this file's session after the grace period; other open files keep theirs.
+        // drop sessions are memory-only (not in `sessions`) and are capped/cleared elsewhere.
+        if (sessions.has(id)) scheduleSessionIdle(id);
       } else {
         sseCountBySession.set(id, remaining);
       }
@@ -485,10 +571,11 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
   });
 
   // MCP Apps endpoint. CodeBuddy (or any MCP client) connects to /mcp via Streamable HTTP
-  // transport. The MCP server exposes 4 tools (preview_pagx, preview_pagx_widget,
-  // reload_file, get_document) and 1 HTML resource (ui://pagx-preview/main) so that the host
-  // can render a pagx widget directly inside the conversation flow. The MCP server shares the
-  // same express app, port, and session state as the rest of pagx-preview.
+  // transport. The MCP server exposes 3 tools (preview_pagx, reload_file, get_document). The
+  // inline widget resource (ui://pagx-preview/main) still exists but is intentionally not listed
+  // for now (see buildResourceHandlers in mcp/tools.js), so the reliable path is opening the
+  // returned url in a webview / browser. The MCP server shares the same express app, port, and
+  // session state as the rest of pagx-preview.
   //
   // serverBaseUrl is assigned after app.listen resolves the actual port. readResource reads it
   // lazily (via getServerBaseUrl) to inject <base> into the widget HTML, so the widget's relative
@@ -576,6 +663,10 @@ export async function startServer({ entryFile = null, port = 0, host = '127.0.0.
         async close() {
           cancelIdleCheck();
           idleCallback = null;
+          for (const timer of sessionIdleTimers.values()) {
+            clearTimeout(timer);
+          }
+          sessionIdleTimers.clear();
           // Terminate any live SSE streams first so their sockets become drainable.
           for (const res of sseResponses) {
             try {

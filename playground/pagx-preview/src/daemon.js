@@ -163,6 +163,10 @@ export async function runStdioServer({ port, host, fontsDir }) {
   const shutdown = async () => {
     if (shuttingDown) process.exit(1);
     shuttingDown = true;
+    // Guarantee the process (and thus its port) is released even if mcp.close() or
+    // server.close() hangs on a stuck socket, mirroring the daemon's force-exit safety net.
+    const forceTimer = setTimeout(() => process.exit(1), 3000);
+    forceTimer.unref();
     try {
       await mcp.close();
     } catch (_) {

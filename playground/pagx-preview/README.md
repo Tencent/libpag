@@ -59,12 +59,11 @@ When started with `--mcp`, the process communicates over stdin/stdout using the 
 
 | Tool | Description |
 |------|-------------|
-| `preview_pagx` | **Default preview.** Loads the file and returns a session URL to open in an IDE webview panel or a browser; does not render an inline widget. |
-| `preview_pagx_widget` | **Inline widget preview.** Renders the animation directly in the conversation (a small in-chat window). Use only when the user explicitly asks for an inline / small-window preview. |
+| `preview_pagx` | Loads the file and returns a session URL to open in an IDE webview panel or a browser. |
 | `reload_file` | Force a reload of the file from disk (file changes auto-reload; this is a manual trigger). |
-| `get_document` | Return document information (dimensions, duration, etc.). |
+| `get_document` | Return document information (dimensions, duration). |
 
-`preview_pagx` is the default tool because inline widget rendering is unreliable across desktop hosts (see [Known compatibility issues](#known-compatibility-issues)). Only `preview_pagx_widget` carries the MCP Apps UI resource (`ui://pagx-preview/main`) that lets a supporting host mount the inline iframe; `preview_pagx` deliberately omits it and therefore never triggers the problematic widget.
+All previewing goes through `preview_pagx`, which returns a session URL to open in an IDE webview panel or a browser. Inline MCP Apps widget rendering is unreliable across desktop hosts (see [Known compatibility issues](#known-compatibility-issues)), so the inline widget tool is not exposed for now; the widget resource (`ui://pagx-preview/main`) still exists in the code but is not advertised and can be re-enabled once host support matures.
 
 ### Platform deployment
 
@@ -120,7 +119,7 @@ Note: Copilot uses HTTP transport; start the server manually first (`pagx previe
 
 ### Known compatibility issues
 
-The inline widget (`preview_pagx_widget`) has been verified in the official [ext-apps basic-host](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) reference host, but inline MCP Apps support varies across desktop hosts:
+The inline widget has been verified in the official [ext-apps basic-host](https://github.com/modelcontextprotocol/ext-apps/tree/main/examples/basic-host) reference host, but inline MCP Apps support varies across desktop hosts:
 
 | Host | Inline widget status |
 |------|------|
@@ -128,7 +127,7 @@ The inline widget (`preview_pagx_widget`) has been verified in the official [ext
 | CodeBuddy IDE | MCP Apps inline widgets are not yet supported |
 | VS Code Copilot | Opens in Simple Browser (editor tab), not an inline widget |
 
-Therefore `preview_pagx` (open in an IDE webview panel / browser) is the default tool and `preview_pagx_widget` is optional. In all cases the session URL (`http://127.0.0.1:<port>/session/<id>/`) provides a fully functional preview with live reload.
+Because inline rendering does not work reliably on the major hosts, the inline widget tool is not exposed for now. Previewing goes through `preview_pagx` (open in an IDE webview panel / browser). In all cases the session URL (`http://127.0.0.1:<port>/session/<id>/`) provides a fully functional preview with live reload.
 
 ## Development
 

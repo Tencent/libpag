@@ -33,7 +33,7 @@ const TOOLS = [
   {
     name: 'preview_pagx',
     description:
-      'Preview a pagx file (default preview tool). Use it whenever the user asks to "preview", "open", or "view" a pagx file. It loads the file and returns a session url. IMPORTANT: after this tool returns, you MUST immediately open the returned url yourself by calling your own webview / browser preview capability (e.g. a preview_url / open-in-webview / open-in-browser action) so the animation is actually shown to the user. Do NOT just print the url as text and stop — that leaves the user with nothing to look at. Only fall back to pasting the url as plain text if you genuinely have no tool available to open a url. Returns session info including sessionId for use with reload_file / get_document. Do NOT use this for inline widget preview — use preview_pagx_widget only when the user explicitly asks for an inline / small-window ("小窗") preview.',
+      'Preview a pagx file. Use it whenever the user asks to "preview", "open", or "view" a pagx file. It loads the file and returns a session url. IMPORTANT: after this tool returns, you MUST immediately open the returned url yourself by calling your own webview / browser preview capability (e.g. a preview_url / open-in-webview / open-in-browser action) so the animation is actually shown to the user. Do NOT just print the url as text and stop — that leaves the user with nothing to look at. Only fall back to pasting the url as plain text if you genuinely have no tool available to open a url. Returns session info including sessionId for use with reload_file / get_document.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -42,23 +42,7 @@ const TOOLS = [
       required: ['file'],
     },
     // Intentionally NO _meta.ui here: this tool must not trigger an inline widget iframe in hosts
-    // that support MCP Apps. It is the default "open in a webview panel / browser" path.
-  },
-  {
-    name: 'preview_pagx_widget',
-    description:
-      'Preview a pagx file as an inline widget rendered directly in the conversation (a small in-chat window). Use this ONLY when the user explicitly asks for an inline / small-window preview ("小窗预览"). For a normal preview, use preview_pagx instead. Returns session info including sessionId for use with reload_file / get_document.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        file: { type: 'string', description: 'Absolute path to the .pagx file to preview.' },
-      },
-      required: ['file'],
-    },
-    // MCP Apps: associate this tool with the UI resource so the host renders the widget inline.
-    // Both nested and flat keys are required — Claude Desktop reads the flat key "ui/resourceUri"
-    // to decide whether to mount an iframe. The nested form is for other hosts.
-    _meta: { ui: { resourceUri: UI_URI }, 'ui/resourceUri': UI_URI },
+    // that support MCP Apps. It is the "open in a webview panel / browser" path.
   },
   {
     name: 'reload_file',
@@ -100,10 +84,7 @@ export function buildToolHandlers({ sessions, createOrGetSession, getServerBaseU
       const { name, arguments: args } = req.params;
 
       if (name === 'preview_pagx') {
-        return handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget: false });
-      }
-      if (name === 'preview_pagx_widget') {
-        return handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget: true });
+        return handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl });
       }
       if (name === 'reload_file') {
         return handleReloadFile(args, { sessions });
@@ -119,7 +100,7 @@ export function buildToolHandlers({ sessions, createOrGetSession, getServerBaseU
   };
 }
 
-function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget = false }) {
+function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl }) {
   const file = args?.file;
   if (!file) {
     return {
@@ -141,18 +122,14 @@ function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget 
   const baseUrl = getServerBaseUrl ? getServerBaseUrl() : '';
   const url = baseUrl ? `${baseUrl}/session/${session.id}/` : `/session/${session.id}/`;
   const summary = session.documentSummary;
-  // The summary is uploaded by the client (widget or browser tab) only after it finishes
-  // rendering, so on the first call it is usually still null. Report "rendering" instead of a
-  // misleading "0 nodes, 0.0s"; get_document can be polled once the preview appears.
+  // The summary is uploaded by the client (browser tab) only after it finishes rendering, so on
+  // the first call it is usually still null. Report "rendering" instead of misleading zeros;
+  // get_document can be polled once the preview appears.
   const stats = summary
-    ? `${summary.nodeCount} nodes, ${(summary.duration / 1000000).toFixed(1)}s duration`
+    ? `${summary.width}x${summary.height}, ${(summary.duration / 1000000).toFixed(1)}s duration`
     : 'rendering (document summary available after the preview finishes loading)';
   const reusedNote = reused ? ' (reusing existing session)' : '';
-  // Two distinct presentations: the widget tool renders inline (with a browser/webview fallback),
-  // while the default tool has no inline UI and must be surfaced via an IDE webview panel.
-  const text = widget
-    ? `Previewing ${path.basename(file)}${reusedNote} as an inline widget — ${stats}.\n\nIf the inline widget does not appear above, open this url in a webview / browser instead: ${url}`
-    : `Previewing ${path.basename(file)}${reusedNote} — ${stats}.\n\nACTION REQUIRED: open ${url} right now by calling your webview / browser preview tool so the user can actually see the animation. Do NOT just show this url as text — open it. Only if you have no tool to open a url, paste it for the user to open manually.`;
+  const text = `Previewing ${path.basename(file)}${reusedNote} — ${stats}.\n\nACTION REQUIRED: open ${url} right now by calling your webview / browser preview tool so the user can actually see the animation. Do NOT just show this url as text — open it. Only if you have no tool to open a url, paste it for the user to open manually.`;
   return {
     content: [{ type: 'text', text }],
     structuredContent: {
@@ -160,7 +137,8 @@ function handlePreviewPagx(args, { createOrGetSession, getServerBaseUrl, widget 
       file: session.entryFile,
       fileName: path.basename(session.entryFile),
       url,
-      nodeCount: summary?.nodeCount ?? 0,
+      width: summary?.width ?? 0,
+      height: summary?.height ?? 0,
       duration: summary?.duration ?? 0,
       reused,
     },
@@ -229,7 +207,7 @@ function handleGetDocument(args, { sessions, getServerBaseUrl }) {
     content: [
       {
         type: 'text',
-        text: `${summary.nodeCount} nodes, ${summary.width}x${summary.height}, ${(summary.duration / 1000000).toFixed(1)}s`,
+        text: `${summary.width}x${summary.height}, ${(summary.duration / 1000000).toFixed(1)}s`,
       },
     ],
     structuredContent: summary,
@@ -243,16 +221,13 @@ function handleGetDocument(args, { sessions, getServerBaseUrl }) {
 export function buildResourceHandlers({ staticDir, generatedDir, getServerBaseUrl }) {
   return {
     async listResources() {
-      return {
-        resources: [
-          {
-            uri: UI_URI,
-            name: 'pagx-preview-widget',
-            mimeType: UI_MIME,
-            description: 'Interactive pagx preview widget',
-          },
-        ],
-      };
+      // The inline widget is intentionally not exposed for now: MCP Apps inline rendering is not
+      // reliably supported across the major hosts (Claude Desktop / CodeBuddy IDE / VS Code
+      // Copilot), so advertising the widget resource only invites hosts to mount an iframe that
+      // will not render. The webview/browser path (preview_pagx) is the reliable route. The widget
+      // infrastructure (UI_URI + readResource below) is kept intact so it can be re-enabled by
+      // simply listing the resource again once host support matures.
+      return { resources: [] };
     },
 
     async readResource(req) {
