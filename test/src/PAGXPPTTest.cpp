@@ -1791,6 +1791,83 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsCombinesModifierTextBoxRuns) {
   EXPECT_NE(fallbackBody.find("<p:sp>", fallbackFirstShape + 1), std::string::npos);
 }
 
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsAutoTextBoxUsesEmbeddedBounds) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 500;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  glyph->path->moveTo(0, -800);
+  glyph->path->lineTo(500, -800);
+  glyph->path->lineTo(500, 0);
+  glyph->path->lineTo(0, 0);
+  glyph->path->close();
+  font->glyphs.push_back(glyph);
+
+  auto* firstLine = doc->makeNode<pagx::Text>();
+  // Deliberately use readable content whose runtime fallback estimate is much wider than the
+  // authored block. This reproduces Web/WASM builds where the requested typeface is unavailable.
+  firstLine->text = "MMMMMMMM\n";
+  firstLine->fontFamily = "Unavailable Test Font";
+  firstLine->fontSize = 52.0f;
+  auto* firstRun = doc->makeNode<pagx::GlyphRun>();
+  firstRun->font = font;
+  firstRun->fontSize = 52.0f;
+  firstRun->glyphs = {1, 1, 1, 1, 1, 1, 1, 1};
+  firstRun->y = 48.0f;
+  firstRun->bounds = pagx::Rect::MakeXYWH(0, 0, 161, 116);
+  firstLine->glyphRuns.push_back(firstRun);
+
+  auto* secondLine = doc->makeNode<pagx::Text>();
+  secondLine->text = "亿";
+  secondLine->fontFamily = "Unavailable Test Font";
+  secondLine->fontSize = 52.0f;
+  auto* secondRun = doc->makeNode<pagx::GlyphRun>();
+  secondRun->font = font;
+  secondRun->fontSize = 52.0f;
+  secondRun->glyphs = {1};
+  secondRun->x = 54.0f;
+  secondRun->y = 106.0f;
+  secondLine->glyphRuns.push_back(secondRun);
+
+  layer->contents.push_back(firstLine);
+  layer->contents.push_back(secondLine);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1.0f, 0.8f, 0.3f, 1.0f};
+  fill->color = color;
+  layer->contents.push_back(fill);
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->textAlign = pagx::TextAlign::Center;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
+  textBox->lineHeight = 58.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  ASSERT_TRUE(std::isnan(pagx::EffectiveTextBoxWidth(textBox)));
+  ASSERT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(textBox)));
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  // The native text remains editable, but its auto-sized frame must use the embedded 161x116
+  // authoring bounds instead of the platform-dependent runtime fallback width.
+  EXPECT_NE(body.find("<a:ext cx=\"1533525\" cy=\"1104900\"/>"), std::string::npos);
+  EXPECT_NE(body.find("<a:t>MMMMMMMM</a:t>"), std::string::npos);
+  EXPECT_NE(body.find("<a:t>亿</a:t>"), std::string::npos);
+}
+
 PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
   auto doc = pagx::PAGXDocument::Make(500, 400);
   auto* layer = doc->makeNode<pagx::Layer>();

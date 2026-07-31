@@ -1021,19 +1021,37 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     mutableTexts.push_back(const_cast<Text*>(run.text));
   }
   auto params = MakeTextBoxParams(box);
-  auto layoutResult = TextLayout::Layout(TextLayout::MakeElements(mutableTexts), params,
-                                         _layoutContext, !_ignoreGlyphRuns);
+  auto textElements = TextLayout::MakeElements(mutableTexts);
+  auto layoutResult = TextLayout::Layout(textElements, params, _layoutContext, !_ignoreGlyphRuns);
 
+  // Editable export re-shapes Text::text to recover line and baseline metadata, but that fresh
+  // layout is environment-dependent. In Web/WASM a missing typeface may fall back to the
+  // character-count estimate (0.6 * fontSize per character), making an auto-sized centered frame
+  // wider than the authored text and shifting every visible line. GlyphRun::bounds stores the
+  // authoring layout's block bounds, so keep those dimensions for the PowerPoint envelope while
+  // still using the fresh result above for line entries and editable runs.
+  Rect embeddedBounds = {};
+  bool allHaveEmbeddedGlyphRuns = _ignoreGlyphRuns;
+  for (const auto& run : runs) {
+    if (run.text->glyphRuns.empty()) {
+      allHaveEmbeddedGlyphRuns = false;
+      break;
+    }
+  }
+  if (allHaveEmbeddedGlyphRuns) {
+    embeddedBounds = TextLayout::Layout(textElements, params, _layoutContext, true).bounds;
+  }
   float boxWidth = EffectiveTextBoxWidth(box);
   float boxHeight = EffectiveTextBoxHeight(box);
   bool hasBoxWidth = !std::isnan(boxWidth) && boxWidth > 0;
-  float estWidth = hasBoxWidth ? boxWidth : layoutResult.bounds.width;
+  float autoWidth = embeddedBounds.width > 0 ? embeddedBounds.width : layoutResult.bounds.width;
+  float estWidth = hasBoxWidth ? boxWidth : autoWidth;
   if (estWidth <= 0) {
     estWidth = static_cast<float>(CountUTF8Characters(runs.front().text->text)) *
                runs.front().text->renderFontSize() * 0.6f;
   }
-  float estHeight =
-      (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : layoutResult.bounds.height;
+  float autoHeight = embeddedBounds.height > 0 ? embeddedBounds.height : layoutResult.bounds.height;
+  float estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : autoHeight;
   if (estHeight <= 0) {
     estHeight = runs.front().text->renderFontSize() * 1.4f;
   }
