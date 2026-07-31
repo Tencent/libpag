@@ -428,17 +428,22 @@ void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const Te
 }
 
 void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
-                                         const NativeTextGeometry& geom, const TextBox* textBox,
-                                         bool useLineLayout) {
+                                         const NativeTextGeometry& geom, const TextBox* textBox) {
   auto xf = DecomposeXform(geom.posX, geom.posY, geom.estWidth, geom.estHeight, m);
-  // Justify alignment requires PowerPoint to know a target line width; with
-  // wrap="none" the text is unbounded so PPT silently falls back to start
-  // alignment. Use wrap="square" in that case so PPT can justify within the
-  // shape's text area (our PAGX-determined visual lines should fit, so PPT
-  // shouldn't introduce additional wraps).
-  bool justifyAlign = textBox && textBox->textAlign == TextAlign::Justify;
-  const char* wrap =
-      useLineLayout ? (justifyAlign ? "square" : "none") : (geom.hasTextBox ? "square" : "none");
+  // A fixed inline extent is an authored wrapping boundary. Keep native
+  // PowerPoint wrapping enabled even when PAGX supplied line metadata and we
+  // also emit soft breaks: Web/WASM may shape with a different or unavailable
+  // fallback font and report one oversized line, while PowerPoint can still
+  // wrap that line against the authored TextBox extent. Auto-sized and
+  // zero-extent anchor boxes remain unbounded.
+  bool hasInlineExtent = geom.hasTextBox;
+  if (textBox != nullptr) {
+    float inlineExtent = textBox->writingMode == WritingMode::Vertical
+                             ? EffectiveTextBoxHeight(textBox)
+                             : EffectiveTextBoxWidth(textBox);
+    hasInlineExtent = !std::isnan(inlineExtent) && inlineExtent > 0;
+  }
+  const char* wrap = hasInlineExtent ? "square" : "none";
   emitTextShapeEnvelope(out, xf, textBox, wrap, geom.originFromGlyphRun,
                         !geom.originFromGlyphRun || geom.frameUsesLineBox);
 }
@@ -554,7 +559,7 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   // has no line info; fall back to PowerPoint-driven wrapping in that case.
   bool useLineLayout = (lines != nullptr) && !lines->empty();
 
-  emitNativeTextShapeFrame(out, m, geom, fs.textBox, useLineLayout);
+  emitNativeTextShapeFrame(out, m, geom, fs.textBox);
 
   // Paragraph base direction by UBA P2/P3. Emitted via pPr@rtl so PowerPoint
   // runs BiDi with the correct base direction and reproduces the same visual
@@ -796,8 +801,7 @@ void PPTWriter::ParagraphEmitter::emitLineBreak(const PPTRunStyle& style) {
 }
 
 void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const Matrix& transform,
-                                      float estWidth, float estHeight, bool useLineLayout,
-                                      bool hasBoxWidth) {
+                                      float estWidth, float estHeight) {
   // `transform` already incorporates BuildGroupMatrix(box) (applied by the
   // caller in writeElements), so the local origin here is (0, 0). Adding
   // box->position again would double-offset the shape, pushing the text-box
@@ -844,14 +848,14 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
     }
   }
   auto xf = DecomposeXform(anchorOffsetX, anchorOffsetY, estWidth, estHeight, transform);
-  // Justify alignment requires PowerPoint to know a target line width; with
-  // wrap="none" the text is unbounded so PPT silently falls back to start
-  // alignment. Use wrap="square" in that case so PPT can justify within the
-  // shape's text area. Our PAGX-determined visual lines should already fit
-  // within the shape, so PPT shouldn't introduce additional wraps.
-  bool justifyAlign = box->textAlign == TextAlign::Justify;
-  const char* wrap =
-      useLineLayout ? (justifyAlign ? "square" : "none") : (hasBoxWidth ? "square" : "none");
+  // Preserve the authored inline wrapping boundary as a native PowerPoint
+  // fallback even when PAGX line metadata is available. This keeps Web/WASM
+  // output usable when its font environment computes fewer line breaks than
+  // the environment that authored the PAGX file.
+  float inlineExtent =
+      isVertical ? EffectiveTextBoxHeight(box) : EffectiveTextBoxWidth(box);
+  bool hasInlineExtent = !std::isnan(inlineExtent) && inlineExtent > 0;
+  const char* wrap = hasInlineExtent ? "square" : "none";
   emitTextShapeEnvelope(out, xf, box, wrap);
 }
 
@@ -1041,7 +1045,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     useLineLayout = false;
   }
 
-  emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight, useLineLayout, hasBoxWidth);
+  emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight);
 
   // Paragraph base direction by UBA P2/P3. A TextBox carries a single pPr so
   // all runs share one base direction; concatenating the run text in source

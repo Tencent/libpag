@@ -1552,7 +1552,9 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesLineBoxVerticalAlignment) {
   writer.writeDocument(xml);
   auto body = xml.release();
 
-  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\" lIns=\"0\" tIns=\"0\" rIns=\"0\" "
+  // A fixed-width TextBox keeps PowerPoint auto-wrap enabled as a cross-platform
+  // fallback even when the exporter also has authoritative PAGX line metadata.
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\" lIns=\"0\" tIns=\"0\" rIns=\"0\" "
                       "bIns=\"0\" anchor=\"ctr\"/>"),
             std::string::npos);
   // Horizontal textAlign is already encoded by run->x, so centering must not
@@ -1699,6 +1701,7 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsCombinesModifierTextBoxRuns) {
   auto firstShape = body.find("<p:sp>");
   ASSERT_NE(firstShape, std::string::npos);
   EXPECT_EQ(body.find("<p:sp>", firstShape + 1), std::string::npos);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
   auto titleText = body.find("<a:t>云原生架构</a:t>");
   auto emojiText = body.find("<a:t>🤣</a:t>");
   ASSERT_NE(titleText, std::string::npos);
