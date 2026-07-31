@@ -56,9 +56,16 @@ std::string HTMLIdAllocator::consume(const std::shared_ptr<DOMNode>& element) {
 }
 
 void HTMLIdAllocator::assign(Layer* layer, const std::shared_ptr<DOMNode>& element) {
-  if (layer == nullptr) return;
+  if (layer == nullptr || element == nullptr) return;
   std::string id = consume(element);
   if (!id.empty()) layer->id = id;
+  // The author-supplied `name` attribute is forwarded verbatim as the layer's display name,
+  // mirroring how `id` maps onto `layer->id`. Attribute names are lowercased before conversion,
+  // so an exact "name" lookup is sufficient.
+  auto* nameAttr = element->findAttribute("name");
+  if (nameAttr != nullptr && !nameAttr->empty()) {
+    layer->name = *nameAttr;
+  }
 }
 
 std::string HTMLIdAllocator::generateUnique(const std::string& prefix) {

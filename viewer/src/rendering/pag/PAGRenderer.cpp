@@ -17,10 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pag/PAGRenderer.h"
+#include <algorithm>
 
 namespace pag {
 
 PAGRenderer::PAGRenderer(PAGViewModel* viewModel) : viewModel(viewModel) {
+}
+
+void PAGRenderer::setDrawable(GPUDrawable* drawable) {
+  this->drawable = drawable;
 }
 
 bool PAGRenderer::isReady() const {
@@ -30,9 +35,41 @@ bool PAGRenderer::isReady() const {
 
 void PAGRenderer::updateSize() {
   auto pagSurface = viewModel->getPAGPlayer()->getSurface();
-  if (pagSurface != nullptr) {
-    pagSurface->updateSize();
+  if (pagSurface == nullptr || drawable == nullptr) {
+    return;
   }
+  auto oldWidth = static_cast<double>(drawable->width());
+  auto oldHeight = static_cast<double>(drawable->height());
+  pagSurface->updateSize();
+  auto newWidth = static_cast<double>(drawable->width());
+  auto newHeight = static_cast<double>(drawable->height());
+  if (oldWidth != newWidth || oldHeight != newHeight) {
+    viewModel->adjustForSurfaceResize(oldWidth, oldHeight, newWidth, newHeight,
+                                      static_cast<double>(viewModel->getWidth()),
+                                      static_cast<double>(viewModel->getHeight()));
+  }
+}
+
+void PAGRenderer::applyDisplayTransform() {
+  if (drawable == nullptr || drawable->width() <= 0 || drawable->height() <= 0 ||
+      viewModel->getWidth() <= 0 || viewModel->getHeight() <= 0) {
+    return;
+  }
+  auto surfaceWidth = static_cast<float>(drawable->width());
+  auto surfaceHeight = static_cast<float>(drawable->height());
+  auto contentWidth = static_cast<float>(viewModel->getWidth());
+  auto contentHeight = static_cast<float>(viewModel->getHeight());
+  auto contentScale = std::min(surfaceWidth / contentWidth, surfaceHeight / contentHeight);
+  auto contentOffsetX = (surfaceWidth - contentWidth * contentScale) * 0.5f;
+  auto contentOffsetY = (surfaceHeight - contentHeight * contentScale) * 0.5f;
+  auto transform = viewModel->getViewTransform();
+  auto zoomScale = static_cast<float>(transform.zoomScale);
+  auto matrix = Matrix::MakeAll(contentScale * zoomScale, 0.0f,
+                                contentOffsetX * zoomScale + static_cast<float>(transform.offsetX),
+                                0.0f, contentScale * zoomScale,
+                                contentOffsetY * zoomScale + static_cast<float>(transform.offsetY),
+                                0.0f, 0.0f, 1.0f);
+  viewModel->getPAGPlayer()->setMatrix(matrix);
 }
 
 IContentRenderer::RenderMetrics PAGRenderer::flush() {
@@ -45,6 +82,7 @@ IContentRenderer::RenderMetrics PAGRenderer::flush() {
   if (file == nullptr) {
     return metrics;
   }
+  applyDisplayTransform();
   player->flush();
   double progress = file->getProgress();
   auto totalFrames =

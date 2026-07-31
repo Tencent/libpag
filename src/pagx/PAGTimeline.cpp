@@ -16,32 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "pagx/PAGTimeline.h"
+#include "pagx/PAGScene.h"
 
-#include "platform/qt/GPUDrawable.h"
-#include "rendering/IContentRenderer.h"
-#include "rendering/pag/PAGViewModel.h"
+namespace pagx {
 
-namespace pag {
+RuntimeBinding* PAGTimeline::effectiveBinding() const {
+  if (binding != nullptr) {
+    return binding;
+  }
+  auto scene = owner.lock();
+  return scene != nullptr ? scene->mutableBinding() : nullptr;
+}
 
-/**
- * Renderer implementation for PAG format content. Executes PAGPlayer flush and collects
- * per-frame timing metrics.
- */
-class PAGRenderer : public IContentRenderer {
- public:
-  explicit PAGRenderer(PAGViewModel* viewModel);
-
-  RenderMetrics flush() override;
-  void updateSize() override;
-  bool isReady() const override;
-  void setDrawable(GPUDrawable* drawable) override;
-
- private:
-  void applyDisplayTransform();
-
-  PAGViewModel* viewModel = nullptr;
-  GPUDrawable* drawable = nullptr;
-};
-
-}  // namespace pag
+}  // namespace pagx
