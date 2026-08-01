@@ -1,0 +1,8 @@
+# Never ship source maps or wasm debug symbols in the published package — they only bloat the
+# tarball (the player map alone is 2MB+). This is a safety net on top of prebuild.js, which
+# already skips copying maps on release builds.
+*.map
+*.wasm.symbols
+
+# Local packing output.
+*.tgz

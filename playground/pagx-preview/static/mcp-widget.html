@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!--
+  MCP Apps widget for pagx-preview. Loaded by CodeBuddy (or any MCP Apps host) inside a sandbox
+  iframe when the model calls the `preview_pagx` tool. This is a stripped-down version of
+  static/index.html: no toolbar, no status pill, no editor — just the pagx canvas + SSE listener.
+
+  IMPORTANT: This HTML must NOT contain any inline <script> blocks. The host's sandbox CSP
+  (generated from _meta.ui.csp) blocks inline scripts. All JavaScript lives in the external
+  module /static/mcp-widget.js, which is allowed via _meta.ui.csp.resourceDomains.
+
+  Lifecycle:
+  1. host injects this HTML into a sandbox iframe
+ 2. ext-apps App.connect() establishes postMessage bridge with host
+  3. app.ontoolresult fires with { file, sessionId } from preview_pagx's structuredContent
+  4. widget fetches /session/:id/pagx, loads it via PAGXPlayer
+  5. widget opens SSE stream to /session/:id/events for patch / reload events
+  6. patch events → player.applyPatch(ops) (<10ms incremental update)
+  7. reload events → player.load(refetched bytes) (full reload fallback)
+
+  The widget also uploads a document summary (node list, dimensions, duration) to
+  /session/:id/document so the MCP get_document tool can answer AI queries.
+-->
+<html>
+<head>
+  <meta charset="utf-8" />
+  <!-- CSP is controlled by the host via HTTP headers (from _meta.ui.csp fields) or injected
+       by the server's readResource handler (replacing this tag). Intentionally permissive here
+       so it does not conflict with the host's authoritative CSP. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src * 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data:;
+                 script-src * 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data:;
+                 connect-src * blob: data:;
+                 img-src * data: blob:;
+                 style-src * 'unsafe-inline';
+                 worker-src * blob:;">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: light-dark(#1a1a1a, #1a1a1a);
+      --fg: light-dark(#e0e0e0, #e0e0e0);
+    }
+    html[data-theme="light"] { color-scheme: light; --bg: #2a2a2a; --fg: #e0e0e0; }
+    html[data-theme="dark"]  { color-scheme: dark;  --bg: #1a1a1a; --fg: #e0e0e0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #pagx-container {
+      width: 100%;
+      height: 100%;
+    }
+    #status {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      font-size: 11px;
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    #error {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      text-align: center;
+      max-width: 90%;
+      display: none;
+    }
+    /* Visible fallback shown until the external module script runs. If the script fails to
+       load (CSP, network), this text remains visible instead of a blank widget. */
+    #loading-fallback {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div id="pagx-container"></div>
+  <div id="loading-fallback">Loading pagx preview...</div>
+  <div id="status"></div>
+  <div id="error"></div>
+
+  <!-- External ES module: CSP allows it via _meta.ui.csp.resourceDomains. No inline scripts
+       anywhere in this HTML — the host sandbox CSP blocks inline scripts. -->
+  <script type="module" src="/static/mcp-widget.js"></script>
+</body>
+</html>
