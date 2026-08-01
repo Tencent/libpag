@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/LayoutContext.h"
@@ -336,6 +337,7 @@ struct PPTRunStyle {
   const char* algn = nullptr;
   int fontSize = 0;
   int64_t letterSpc = 0;
+  int baseline = 0;
   bool hasBold = false;
   bool hasItalic = false;
   bool hasLetterSpacing = false;
@@ -491,7 +493,13 @@ inline void WriteParagraphProperties(XMLBuilder& out, const char* algn, int64_t 
 // Adds the TextBox-derived attributes to a currently-open <a:bodyPr>: vertical
 // writing mode, paragraph anchoring, and the vertical-mode anchorCtr override
 // for TextAlign::Center. Returns true when the box uses vertical writing mode.
-inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box) {
+// The two alignment axes can be controlled independently because a native-text
+// frame reconstructed from GlyphRuns may still represent an authored line box
+// (and therefore need paragraphAlign within that box), while its inline-axis
+// position is already baked into the glyph pen origin.
+inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box,
+                                     bool includeParagraphAnchor = true,
+                                     bool includeInlineAnchor = true) {
   if (box == nullptr) {
     return false;
   }
@@ -508,10 +516,12 @@ inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box) {
   //   - Vertical (eaVert): block axis is right->left (Near=right column,
   //     Far=left column). PowerPoint maps t/ctr/b to start/center/end of
   //     that axis, so the same enum->string mapping applies.
-  if (box->paragraphAlign == ParagraphAlign::Middle) {
-    out.addRequiredAttribute("anchor", "ctr");
-  } else if (box->paragraphAlign == ParagraphAlign::Far) {
-    out.addRequiredAttribute("anchor", "b");
+  if (includeParagraphAnchor) {
+    if (box->paragraphAlign == ParagraphAlign::Middle) {
+      out.addRequiredAttribute("anchor", "ctr");
+    } else if (box->paragraphAlign == ParagraphAlign::Far) {
+      out.addRequiredAttribute("anchor", "b");
+    }
   }
   // In vertical writing mode the bodyPr@anchor controls placement perpendicular
   // to the text-flow axis (i.e. horizontal placement of the column block), so
@@ -520,7 +530,7 @@ inline bool AddBodyPrAttrsForTextBox(XMLBuilder& out, const TextBox* box) {
   // column. anchorCtr="1" toggles the "center on the perpendicular axis" flag,
   // which in vertical mode produces the desired vertical centering of the text
   // within its column.
-  if (isVertical && box->textAlign == TextAlign::Center) {
+  if (includeInlineAnchor && isVertical && box->textAlign == TextAlign::Center) {
     out.addRequiredAttribute("anchorCtr", "1");
   }
   return isVertical;
@@ -655,9 +665,14 @@ class PPTWriter {
     uint32_t byteEnd = 0;
   };
 
+  // convertTextToPath and ignoreGlyphRuns are direct opposites — one asks for glyph outlines, the
+  // other for editable runs — so resolve the conflict once here instead of letting whichever
+  // branch happens to be checked first decide. convertTextToPath wins because it is the stronger
+  // request: it guarantees the slide renders identically without depending on the reader's fonts.
   PPTWriter(PPTWriterContext* ctx, PAGXDocument* doc, const PPTExporter::Options& options,
             LayoutContext* layoutContext)
       : _ctx(ctx), _doc(doc), _convertTextToPath(options.convertTextToPath),
+        _ignoreGlyphRuns(options.ignoreGlyphRuns && !options.convertTextToPath),
         _bridgeContours(options.bridgeContours), _resolveModifiers(options.resolveModifiers),
         _bakeUnsupported(options.bakeUnsupported),
         _rasterScale(std::clamp(options.rasterScale, 0.01f, 4.0f)), _layoutContext(layoutContext),
@@ -690,6 +705,7 @@ class PPTWriter {
   PPTWriterContext* _ctx = nullptr;
   PAGXDocument* _doc = nullptr;
   bool _convertTextToPath = false;
+  bool _ignoreGlyphRuns = false;
   bool _bridgeContours = false;
   bool _resolveModifiers = true;
   bool _bakeUnsupported = true;
@@ -704,8 +720,13 @@ class PPTWriter {
   LayerBuildResult _buildResult = {};
   bool _buildResultReady = false;
   ModifierResolver _resolver;
+  // Fixed-line-height modifier TextBoxes can split one laid-out block across sibling Text nodes.
+  // Cache the first line's embedded baseline offset from its authored line-box top so every
+  // sibling can recover its own line-box top from the pre-shaped baseline.
+  std::unordered_map<const TextBox*, float> _embeddedBaselineOffsets = {};
 
   const LayerBuildResult& ensureBuildResult();
+  static bool firstEmbeddedBaselineY(const Text& text, float* baselineY);
 
   // One geometry instance captured during the scope walk in writeElements.
   // The transform is baked at collection time so that later painters can emit
@@ -766,14 +787,24 @@ class PPTWriter {
     float posY = 0;
     float estWidth = 0;
     float estHeight = 0;
-    bool hasTextBox = false;
+    // True when posX/posY were taken from the GlyphRun pen origin (glyphRun-
+    // carrying Text rendered as native fallback). In that case the modifier
+    // TextBox's horizontal alignment is already baked into the origin, so the
+    // caller must NOT re-apply it as an OOXML algn or the text is centered
+    // twice.
+    bool originFromGlyphRun = false;
+    // True when posY/estHeight describe a real PAGX line box rather than an
+    // ink-bounds or font-size fallback. PowerPoint must still apply the
+    // TextBox's paragraphAlign inside such a frame (for example anchor="ctr"
+    // for a vertically centered 22px run in an authored 40px line box).
+    bool frameUsesLineBox = false;
   };
 
   NativeTextGeometry computeNativeTextGeometry(const Text* text, Text* mutableText,
                                                const FillStrokeInfo& fs,
                                                const TextLayoutResult* precomputed);
   void emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m, const NativeTextGeometry& geom,
-                                const TextBox* textBox, bool useLineLayout);
+                                const TextBox* textBox);
   void emitNativeTextBody(XMLBuilder& out, const Text* text,
                           const std::vector<TextLayoutLineInfo>* lines, const PPTRunStyle& style,
                           int64_t lnSpcPts, bool rtl, bool useLineLayout, int64_t defTabSzEMU,
@@ -828,7 +859,7 @@ class PPTWriter {
   };
 
   void emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const Matrix& transform,
-                             float estWidth, float estHeight, bool useLineLayout, bool hasBoxWidth);
+                             float estWidth, float estHeight);
   void emitTextBoxBody(const std::vector<RichTextRun>& runs,
                        const std::vector<PPTRunStyle>& runStyles,
                        std::vector<LineEntry>& lineEntries, bool useLineLayout,
@@ -900,8 +931,15 @@ class PPTWriter {
   // supplies the decomposed Xform, the in-scope TextBox (for bodyPr paragraph
   // attributes), and the pre-computed wrap value ("square" vs "none"). Leaves
   // <p:txBody> open so the caller can stream <a:p> children into it.
+  // When `suppressBoxLayout` is true the TextBox's padding insets and inline
+  // anchor are dropped because they are already baked into the glyph pen
+  // origin. `includeParagraphAnchor` remains independently selectable: frames
+  // reconstructed from authored line-box bounds still need block-axis
+  // alignment within that frame. Vertical writing mode is always honoured
+  // because it drives glyph orientation rather than placement.
   void emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
-                             const char* wrap);
+                             const char* wrap, bool suppressBoxLayout = false,
+                             bool includeParagraphAnchor = true);
 
   // p:pic helpers (declared after Xform)
   void beginPicture(XMLBuilder& out, const char* name);

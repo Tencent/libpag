@@ -39,6 +39,17 @@ struct ImageEntry {
 
 class PPTWriterContext {
  public:
+  PPTWriterContext() = default;
+
+  // `imageIndexBase` offsets the media file numbering so that media emitted by
+  // this context (image{N}.png / .jpeg) never collides with media emitted by an
+  // earlier slide's context. Every slide in a multi-slide deck writes into the
+  // shared ppt/media/ directory, so the caller passes the running total of
+  // images produced by previous slides. Relationship IDs stay per-context (each
+  // slide has its own slideN.xml.rels namespace) so they are not offset.
+  explicit PPTWriterContext(int imageIndexBase) : _imageIndexBase(imageIndexBase) {
+  }
+
   int nextShapeId() {
     return _shapeId++;
   }
@@ -87,7 +98,7 @@ class PPTWriterContext {
   // addRawImage (pre-encoded PNG blobs with no source Image, e.g. layer bakes /
   // tiled-pattern bakes).
   std::string registerImage(const Image* image, std::shared_ptr<tgfx::Data> data, bool jpeg) {
-    int idx = static_cast<int>(_images.size()) + 1;
+    int idx = _imageIndexBase + static_cast<int>(_images.size()) + 1;
     std::string relId = "rId" + std::to_string(_nextRelId++);
     const char* ext = jpeg ? "jpeg" : "png";
     std::string mediaPath = "ppt/media/image" + std::to_string(idx) + "." + ext;
@@ -100,6 +111,8 @@ class PPTWriterContext {
   int _shapeId = 2;
   // Relationship ID rId1 is reserved for the slideLayout reference.
   int _nextRelId = 2;
+  // Running offset applied to media file numbering so slides don't collide.
+  int _imageIndexBase = 0;
   bool _hasJPEG = false;
   bool _hasPNG = false;
   std::vector<ImageEntry> _images;
