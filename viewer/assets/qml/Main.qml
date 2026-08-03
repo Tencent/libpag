@@ -29,6 +29,12 @@ PAGWindow {
 
     property int windowTitleBarHeight: isWindows ? 32 : 22
 
+    // Minimum window height while the side edit panel is open, so the panel stays usable.
+    property int minWindowHeightWithEditPanel: 650
+
+    // Window height before the side panel opened, restored when the panel closes (-1 = none).
+    property int heightBeforePanelOpen: -1
+
     property var contentView: mainForm.contentView
     property var connectedContentView: null
 
@@ -161,7 +167,13 @@ PAGWindow {
         // the file and the aspect-fit rendering leaves blank margins on the left and right.
         let height = computeContentWindowHeight(preferredSize.height);
         if (mainForm.rightItemLoader.status === Loader.Ready) {
-            width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
+            // The side panel is open: keep the window tall enough for the panel and fit the
+            // canvas width to the file aspect ratio so the canvas fills the area without
+            // letterboxing.
+            height = Math.max(height, minWindowHeightWithEditPanel);
+            let canvasHeight = height - windowTitleBarHeight - controlForm.height;
+            width = computePanelWindowWidth(preferredSize, canvasHeight,
+                                            mainForm.rightItemLoader.width);
         }
         let x = Math.max(0, oldX - ((width - oldWidth) / 2));
         let y = Math.max(50, oldY - ((height - oldHeight) / 2));
@@ -477,22 +489,29 @@ PAGWindow {
             if (viewWindow.visibility === Window.FullScreen) {
                 mainForm.centerItem.width = viewWindow.width - widthChange;
             } else {
-                // The canvas width is unchanged after widening (the added width is occupied by
-                // the panel), so resize the window height so the canvas height matches the file
-                // aspect ratio and the rendered image is not letterboxed.
-                let canvasWidth = mainForm.centerItem.width;
-                viewWindow.width = viewWindow.width + widthChange + mainForm.splitHandleWidth;
+                // Remember the height before the panel resizes the window so closing the panel
+                // can restore it.
+                if (heightBeforePanelOpen < 0) {
+                    heightBeforePanelOpen = viewWindow.height;
+                }
+                // Raise the window to the panel minimum height so the edit panel stays usable.
+                if (viewWindow.height < minWindowHeightWithEditPanel) {
+                    viewWindow.height = minWindowHeightWithEditPanel;
+                }
                 if (contentView) {
                     let preferredSize = contentView.viewModel.preferredSize;
                     if (preferredSize.width > 0 && preferredSize.height > 0) {
-                        let targetHeight = computeContentWindowHeight(
-                            canvasWidth * preferredSize.height / preferredSize.width);
-                        // Avoid abruptly overriding a manually resized window; only correct the
-                        // height when the current height deviates noticeably.
-                        if (Math.abs(viewWindow.height - targetHeight) > 40) {
-                            viewWindow.height = targetHeight;
-                        }
+                        // Size the canvas width from the file aspect ratio so the canvas fills
+                        // the area below the title bar and control bar without letterboxing,
+                        // then widen the window by the panel width.
+                        let canvasHeight = viewWindow.height - windowTitleBarHeight - controlForm.height;
+                        viewWindow.width = computePanelWindowWidth(preferredSize, canvasHeight,
+                                                                  widthChange);
+                    } else {
+                        viewWindow.width = viewWindow.width + widthChange + mainForm.splitHandleWidth;
                     }
+                } else {
+                    viewWindow.width = viewWindow.width + widthChange + mainForm.splitHandleWidth;
                 }
             }
         } else {
@@ -503,6 +522,11 @@ PAGWindow {
                 viewWindow.width = viewWindow.minimumWidth;
             } else {
                 viewWindow.width = viewWindow.width + widthChange - mainForm.splitHandleWidth;
+            }
+            // Restore the window height captured before the panel opened.
+            if (heightBeforePanelOpen >= 0) {
+                viewWindow.height = heightBeforePanelOpen;
+                heightBeforePanelOpen = -1;
             }
         }
     }
@@ -522,6 +546,14 @@ PAGWindow {
     function computeContentWindowHeight(canvasHeight) {
         return Math.max(viewWindow.minimumHeight,
                         canvasHeight + windowTitleBarHeight + controlForm.height);
+    }
+
+    // Returns the window width that fits a canvas of the given height at the file aspect ratio,
+    // plus the side panel width and the split handle.
+    function computePanelWindowWidth(preferredSize, canvasHeight, widthChange) {
+        return Math.max(viewWindow.minimumWidth,
+                        canvasHeight * preferredSize.width / preferredSize.height + widthChange +
+                            mainForm.splitHandleWidth);
     }
 
     function updateAvailable(hasNewVersion) {

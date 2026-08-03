@@ -52,7 +52,9 @@ void PAGViewer::openFile(QString path) {
     // (PAGView vs PAGXView) automatically in MainForm.loadFile(), so a PAGX file can reuse
     // a fresh PAG window instead of forcing a new one. This also prevents duplicate windows
     // when macOS delivers the same file via both the launch arguments and a FileOpen event.
-    if (fileInWindow.isEmpty()) {
+    // Skip windows whose QML is not ready yet, otherwise PAGWindow::openFile() would silently
+    // drop the request.
+    if (fileInWindow.isEmpty() && win->getEngine() != nullptr) {
       window = win;
       break;
     }
