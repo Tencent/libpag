@@ -71,7 +71,7 @@ const banner = `/*!
  *   materializeDecorativePseudoElements()   -> Promise<void>
  *   collectIconFontTargets()                -> Promise<target[]>
  *   applyIconFontSvgs(target_svg_pairs)     -> void
- *   collectFontFaceMap()                    -> Promise<{family:{url,format}}>
+ *   collectFontFaceMap()                    -> Promise<{family:[{url,format,weight,style}, ...]}>
  *
  * The \`*IconFont*\` hooks let a node-side resolver (or a custom in-browser
  * font-parsing pass) replace webfont glyph pseudos with inline <svg>; see

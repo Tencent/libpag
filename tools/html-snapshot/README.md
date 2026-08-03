@@ -146,7 +146,9 @@ Tabler, …) deliver their glyphs through `@font-face` plus
 walks every PUA pseudo whose `font-family` resolves to a registered
 `@font-face` rule, downloads the font file (WOFF2 → `wawoff2` → TTF →
 `opentype.js`), extracts the glyph as a vector path, and emits it as an
-inline `<svg><path fill="currentColor"/></svg>`. The resulting PAGX:
+inline `<svg><path fill="currentColor"/></svg>`. Families with multiple
+physical faces are matched by computed `font-weight` and `font-style` (for
+example Font Awesome Free Regular/400 versus Solid/900). The resulting PAGX:
 
 - no longer depends on the icon font being installed on the rendering
   machine (the legacy path emits `<Text fontFamily="Phosphor"/>` which

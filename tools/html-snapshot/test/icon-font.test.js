@@ -8,6 +8,9 @@ const {
   formatRank,
   parseSrcList,
   parseFontFaceFromText,
+  normalizeFontFaceWeight,
+  normalizeFontFaceStyle,
+  selectFontFace,
   isPuaCodepoint,
   roundTo,
   fetchFontBytes,
@@ -131,6 +134,23 @@ describe('parseFontFaceFromText', () => {
     expect(out[0].family).toBe('Phosphor');
     expect(out[0].url).toBe('https://cdn.example/phosphor.woff2');
     expect(out[0].format).toBe('woff2');
+    expect(out[0].weight).toBe('400');
+    expect(out[0].style).toBe('normal');
+  });
+
+  test('extracts font weight and style descriptors', () => {
+    const css = `
+      @font-face {
+        font-family: "Font Awesome 6 Free";
+        font-style: normal;
+        font-weight: 900;
+        src: url(fa-solid-900.woff2) format("woff2");
+      }`;
+    expect(parseFontFaceFromText(css, 'https://cdn.example/css/all.css')[0]).toMatchObject({
+      weight: '900',
+      style: 'normal',
+      url: 'https://cdn.example/css/fa-solid-900.woff2',
+    });
   });
 
   test('ignores @font-face inside CSS comments', () => {
@@ -141,6 +161,34 @@ describe('parseFontFaceFromText', () => {
   test('skips blocks missing font-family or src', () => {
     const css = `@font-face { font-family: "NoSrc"; }`;
     expect(parseFontFaceFromText(css, 'https://cdn/sheet.css')).toEqual([]);
+  });
+});
+
+describe('selectFontFace', () => {
+  const faces = [
+    { family: 'Icons', url: 'regular.woff2', format: 'woff2', weight: 'normal', style: 'normal' },
+    { family: 'Icons', url: 'solid.woff2', format: 'woff2', weight: '900', style: 'normal' },
+    { family: 'Icons', url: 'italic.woff2', format: 'woff2', weight: '400', style: 'italic' },
+  ];
+
+  test('normalises CSS weight/style keywords', () => {
+    expect(normalizeFontFaceWeight('normal')).toBe('400');
+    expect(normalizeFontFaceWeight('bold')).toBe('700');
+    expect(normalizeFontFaceStyle('oblique 10deg')).toBe('oblique');
+  });
+
+  test('selects the face nearest to the computed weight', () => {
+    expect(selectFontFace(faces, '900', 'normal').url).toBe('solid.woff2');
+    expect(selectFontFace(faces, '400', 'normal').url).toBe('regular.woff2');
+  });
+
+  test('prefers a matching style over a closer mismatched style', () => {
+    expect(selectFontFace(faces, '500', 'italic').url).toBe('italic.woff2');
+  });
+
+  test('supports variable-font weight ranges', () => {
+    const variable = [{ family: 'Icons', url: 'variable.woff2', format: 'woff2', weight: '100 900', style: 'normal' }];
+    expect(selectFontFace(variable, '725', 'normal').url).toBe('variable.woff2');
   });
 });
 
