@@ -31,6 +31,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -2992,8 +2993,8 @@ PAG_TEST(PAGXHTMLImporterTest, HeadingDefaultFontSizes) {
     ASSERT_NE(text, nullptr) << r.tag;
     EXPECT_FLOAT_EQ(text->fontSize, r.size) << r.tag;
     // Headings default to font-weight:bold, which is written as a real-face "Bold" style label so
-    // the renderer resolves the authored heavy face (falling back to host faux emboldening only for
-    // a missing face). No faux flag is baked into the Text node.
+    // the renderer resolves the authored heavy face. If that face is missing, TextLayout adds faux
+    // emboldening after lookup; no faux flag is baked into the Text node.
     EXPECT_EQ(text->fontStyle, "Bold") << r.tag;
     EXPECT_FALSE(text->fauxBold) << r.tag;
     EXPECT_FALSE(text->fauxItalic) << r.tag;
@@ -3016,6 +3017,39 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToBold) {
   EXPECT_FALSE(text->fauxItalic);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceUsesRuntimeFauxBold) {
+  constexpr const char* family = "HTML Missing Bold Test";
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'HTML Missing Bold Test';font-weight:700">Heavy</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  ASSERT_EQ(text->fontFamily, family);
+  ASSERT_EQ(text->fontStyle, "Bold");
+  ASSERT_FALSE(text->fauxBold);
+
+  // Register only a Regular face under the requested family. Font lookup therefore falls back to
+  // that face, and TextLayout must preserve the authored weight by enabling runtime faux bold on
+  // the glyph run without changing the imported Text node.
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0, family,
+                          "Regular");
+  doc->applyLayout(&fontConfig);
+
+  ASSERT_NE(text->glyphData, nullptr);
+  ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+  for (const auto& run : text->glyphData->layoutRuns) {
+    auto typeface = run.font.getTypeface();
+    ASSERT_NE(typeface, nullptr);
+    EXPECT_EQ(typeface->fontStyle(), "Regular");
+    EXPECT_TRUE(run.font.isFauxBold());
+  }
+  EXPECT_FALSE(text->fauxBold);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -3025,7 +3059,8 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // Medium (weight < 600) cannot be synthesised, so it stays a real-face style label with no faux.
+  // Medium stays a real-face style label so font lookup can select it precisely. The importer does
+  // not bake a faux flag; TextLayout decides at runtime whether the resolved face is too light.
   EXPECT_EQ(text->fontStyle, "Medium");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);

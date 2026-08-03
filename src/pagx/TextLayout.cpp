@@ -25,6 +25,7 @@
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/utils/CSSFontStyle.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/BidiResolver.h"
 #include "renderer/LineBreaker.h"
@@ -382,6 +383,18 @@ class TextLayoutContext {
                  float textScale = 1.0f) {
     auto primaryTypeface = findTypeface(glyph.fontFamily, glyph.fontStyle);
 
+    // Keep the requested weight as a real face label so an installed Bold / SemiBold / Black face
+    // can be selected precisely. If lookup falls back to a lighter face (or finds no primary face),
+    // synthesize the missing weight at layout time. The faux flag then propagates to per-character
+    // fallback fonts in TextShaper as well.
+    bool fauxBold = glyph.fauxBold;
+    if (!fauxBold) {
+      int requestedWeight = ParseFontStyleName(glyph.fontStyle).weight;
+      int resolvedWeight =
+          primaryTypeface == nullptr ? 400 : ParseFontStyleName(primaryTypeface->fontStyle()).weight;
+      fauxBold = resolvedWeight < requestedWeight;
+    }
+
     // When the primary typeface is not found, find a fallback typeface for font metrics used by
     // special characters (newline, tab) that do not go through per-character glyph fallback.
     auto metricsTypeface = primaryTypeface;
@@ -391,10 +404,10 @@ class TextLayoutContext {
 
     float effectiveFontSize = glyph.fontSize * textScale;
     tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
-    primaryFont.setFauxBold(glyph.fauxBold);
+    primaryFont.setFauxBold(fauxBold);
     primaryFont.setFauxItalic(glyph.fauxItalic);
     tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
-    metricsFont.setFauxBold(glyph.fauxBold);
+    metricsFont.setFauxBold(fauxBold);
     metricsFont.setFauxItalic(glyph.fauxItalic);
     float currentX = 0;
     const std::string& content = glyph.text;

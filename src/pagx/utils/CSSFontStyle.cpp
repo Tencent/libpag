@@ -135,9 +135,9 @@ FontStyleSynthesis ResolveFontStyleSynthesis(const std::string& cssFontWeight,
   FontStyleSynthesis out;
   int numericWeight = CssFontWeightToNumeric(cssFontWeight);
   // The weight axis is always carried as a real-face style label (Bold / SemiBold / Black / etc.),
-  // not synthesised: this lets the renderer resolve the authored heavy face when it is installed or
-  // embedded, and only fall back to faux emboldening (applied by the render host on a missing face)
-  // without collapsing SemiBold / Bold / Black into one indistinguishable step.
+  // not pre-synthesised: this lets TextLayout resolve the authored heavy face when it is installed
+  // or embedded, then apply faux emboldening only if the resolved face is lighter than requested.
+  // This preserves distinct face selection without losing weight when a face is missing.
   out.fauxBold = false;
   const char* weightKeyword = WeightKeywordForRoundedHundreds(numericWeight);
   if (weightKeyword) {

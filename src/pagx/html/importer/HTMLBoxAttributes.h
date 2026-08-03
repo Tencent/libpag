@@ -78,9 +78,10 @@ struct HTMLInheritedStyle {
   // Synthetic slant the renderer must emboss on top of the resolved face. Set by
   // `resolveInheritedStyle` for italic/oblique requests, whose axis is dropped from `fontStyleName`
   // (see `ResolveFontStyleSynthesis`) and carried through to `Text::fauxItalic` so the authored
-  // slant survives even when the styled italic face is not installed on the render host. The weight
-  // axis is never synthesised (it stays in `fontStyleName` as a real-face keyword), so `fauxBold`
-  // is always false here.
+  // slant survives even when the styled italic face is not installed on the render host. The
+  // importer never pre-synthesises the weight axis: it stays in `fontStyleName` as a real-face
+  // keyword, so `fauxBold` is false here. TextLayout may add faux bold later if font lookup resolves
+  // a face that is lighter than requested.
   bool fauxBold = false;
   bool fauxItalic = false;
   std::string letterSpacing = {};

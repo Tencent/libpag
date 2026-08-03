@@ -42,9 +42,10 @@ std::string ResolveFontStyleName(const std::string& cssFontWeight, const std::st
 // The weight axis is always emitted as a real-face style label (Bold / SemiBold / Black / etc. per
 // the numeric weight rounded to the nearest hundred; 400 leaves the weight portion empty), never as
 // a faux flag. This lets the renderer resolve the authored heavy face when it is installed or
-// embedded (preserving the distinction between SemiBold, Bold and Black) and only fall back to host
-// faux emboldening for a genuinely missing face, instead of always synthesising a single fixed step
-// on a Regular base.
+// embedded (preserving the distinction between SemiBold, Bold and Black). During layout, the
+// resolved face's actual weight is compared with this requested label and faux emboldening is added
+// only when the resolved face is lighter, instead of always synthesising a single fixed step on a
+// Regular base.
 //
 // Italic stays a synthetic axis (`fauxItalic`): an oblique slant can be synthesised on top of any
 // upright face, so it survives even when the styled italic face is unavailable.

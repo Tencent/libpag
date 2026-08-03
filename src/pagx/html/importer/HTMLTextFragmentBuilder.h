@@ -61,8 +61,9 @@ class HTMLTextFragmentBuilder {
     std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Black" / ""
     // Synthetic slant baked in from the CSS request (see `ResolveFontStyleSynthesis`). Surfaces as
     // `Text::fauxItalic` so an authored oblique slant survives a missing styled italic face on the
-    // render host. The weight axis is never synthesised (it stays in `fontStyleName`), so
-    // `fauxBold` is always false.
+    // render host. The importer does not pre-synthesise the weight axis (it stays in
+    // `fontStyleName`), so `fauxBold` is false here; TextLayout may add it after resolving a lighter
+    // face at runtime.
     bool fauxBold = false;
     bool fauxItalic = false;
     float fontSize = HTML_DEFAULT_FONT_SIZE;

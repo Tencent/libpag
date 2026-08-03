@@ -548,8 +548,8 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   // resolves plus the synthetic (faux) italic axis the renderer embosses on top. The weight axis
   // is always written as a real-face keyword (Bold / SemiBold / Black) so the renderer resolves the
   // authored heavy face when it is installed or embedded and preserves the SemiBold / Bold / Black
-  // distinction, falling back to host faux emboldening only for a missing face. Italic stays a faux
-  // flag so an oblique slant survives when the styled italic face is unavailable.
+  // distinction. TextLayout adds faux emboldening only when font lookup resolves a lighter face.
+  // Italic stays a faux flag so an oblique slant survives when the styled italic face is unavailable.
   FontStyleSynthesis fontSynthesis = ResolveFontStyleSynthesis(out.fontWeight, out.fontStyle);
   out.fontStyleName = fontSynthesis.fontStyleName;
   out.fauxBold = fontSynthesis.fauxBold;
