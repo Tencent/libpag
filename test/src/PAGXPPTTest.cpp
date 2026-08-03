@@ -23,10 +23,12 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -1547,6 +1549,8 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesLineBoxVerticalAlignment) {
   run->glyphs = {1, 1, 1, 1, 1, 1, 1};
   run->x = 21.5f;
   run->y = 28.0f;
+  run->positions = {{0.0f, 0.0f},  {16.0f, 0.0f}, {32.0f, 0.0f}, {48.0f, 0.0f},
+                    {64.0f, 0.0f}, {80.0f, 0.0f}, {96.0f, 0.0f}};
   run->bounds = pagx::Rect::MakeXYWH(0, 0, 120, 40);
   text->glyphRuns.push_back(run);
 
@@ -1579,9 +1583,9 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesLineBoxVerticalAlignment) {
   writer.writeDocument(xml);
   auto body = xml.release();
 
-  // A fixed-width TextBox keeps PowerPoint auto-wrap enabled as a cross-platform
-  // fallback even when the exporter also has authoritative PAGX line metadata.
-  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\" lIns=\"0\" tIns=\"0\" rIns=\"0\" "
+  // Complete single-baseline GlyphRun positions disable PowerPoint's metric-dependent second
+  // wrapping pass.
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\" lIns=\"0\" tIns=\"0\" rIns=\"0\" "
                       "bIns=\"0\" anchor=\"ctr\"/>"),
             std::string::npos);
   // Horizontal textAlign is already encoded by run->x, so centering must not
@@ -1728,7 +1732,7 @@ PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsCombinesModifierTextBoxRuns) {
   auto firstShape = body.find("<p:sp>");
   ASSERT_NE(firstShape, std::string::npos);
   EXPECT_EQ(body.find("<p:sp>", firstShape + 1), std::string::npos);
-  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
   auto titleText = body.find("<a:t>云原生架构</a:t>");
   auto emojiText = body.find("<a:t>🤣</a:t>");
   ASSERT_NE(titleText, std::string::npos);
@@ -3918,6 +3922,37 @@ static pagx::Fill* MakeSolidFill(pagx::PAGXDocument* doc, pagx::Color color) {
   return fill;
 }
 
+static pagx::GlyphRun* MakeEmbeddedGlyphRun(pagx::PAGXDocument* doc,
+                                            const std::vector<pagx::Point>& positions,
+                                            const pagx::Rect& bounds, float baseline,
+                                            float fontSize) {
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = fontSize;
+  run->glyphs.assign(positions.size(), 1);
+  run->y = baseline;
+  run->positions = positions;
+  run->bounds = bounds;
+  return run;
+}
+
+static std::string WritePPTDocumentXML(pagx::PAGXDocument* doc,
+                                       const pagx::PPTExportOptions& options) {
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc, options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  return xml.release();
+}
+
 PAGX_TEST(PAGXPPTTest, PolystarStarShape) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -4853,6 +4888,163 @@ PAGX_TEST(PAGXPPTTest, TextBoxContainerSingleText) {
   layer->contents.push_back(textBox);
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "textbox_container_single"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxEmbeddedSingleLineDisablesAutoWrap) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {40, 40};
+  textBox->width = 120;
+  textBox->height = 60;
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "ABCD";
+  text->fontFamily = "Arial";
+  text->fontSize = 32;
+  text->letterSpacing = 8;
+
+  // Embedded text normally takes the bounds-only TextLayout path. Complete glyph positions prove
+  // that this authored text has one horizontal baseline, so native PPT export can safely suppress
+  // PowerPoint's independent wrapping pass.
+  auto* glyphRun =
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {30.0f, 0.0f}, {60.0f, 0.0f}, {90.0f, 0.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 120, 40), 36.0f, text->fontSize);
+  text->glyphRuns.push_back(glyphRun);
+
+  pagx::TextLayoutParams params = {};
+  params.boxWidth = textBox->width;
+  params.boxHeight = textBox->height;
+  pagx::LayoutContext layoutContext(nullptr);
+  auto textElements = pagx::TextLayout::MakeElements({text});
+  auto embeddedLayout = pagx::TextLayout::Layout(textElements, params, &layoutContext);
+  EXPECT_EQ(embeddedLayout.getTextLines(text), nullptr);
+  auto editableLayout = pagx::TextLayout::Layout(textElements, params, &layoutContext, false);
+  auto* editableLines = editableLayout.getTextLines(text);
+  ASSERT_NE(editableLines, nullptr);
+  ASSERT_EQ(editableLines->size(), 1u);
+  EXPECT_EQ(editableLines->front().byteStart, 0u);
+  EXPECT_EQ(editableLines->front().byteEnd, text->text.size());
+
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:t>ABCD</a:t>"), std::string::npos);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_embedded_editable_lines", options));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxEmbeddedSingleLineRejectsHostInferredBreaks) {
+  auto doc = pagx::PAGXDocument::Make(400, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {40, 40};
+  textBox->width = 100;
+  textBox->height = 180;
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "石破天惊";
+  text->fontFamily = "Noto Serif SC";
+  text->fontStyle = "Black";
+  text->fontSize = 72;
+  text->letterSpacing = 8;
+  text->glyphRuns.push_back(
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {80.0f, 0.0f}, {160.0f, 0.0f}, {240.0f, 0.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 320, 103), 83.0f, text->fontSize));
+
+  pagx::TextLayoutParams params = {};
+  params.boxWidth = textBox->width;
+  params.boxHeight = textBox->height;
+  pagx::LayoutContext layoutContext(nullptr);
+  auto editableLayout = pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params,
+                                                 &layoutContext, false);
+  auto* editableLines = editableLayout.getTextLines(text);
+  ASSERT_NE(editableLines, nullptr);
+  ASSERT_GT(editableLines->size(), 1u);
+
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+  EXPECT_NE(body.find("<a:t>石破天惊</a:t>"), std::string::npos);
+  EXPECT_EQ(body.find("<a:br"), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, ModifierTextBoxEmbeddedSingleLineDisablesAutoWrap) {
+  auto doc = pagx::PAGXDocument::Make(1200, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "石破天惊";
+  text->fontFamily = "Noto Serif SC";
+  text->fontStyle = "Black";
+  text->fontSize = 72;
+  text->letterSpacing = 8;
+  text->glyphRuns.push_back(
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {80.0f, 0.0f}, {160.0f, 0.0f}, {240.0f, 0.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 940, 103), 83.0f, text->fontSize));
+  group->elements.push_back(text);
+  group->elements.push_back(MakeSolidFill(doc.get(), {0.1f, 0.1f, 0.1f, 1.0f}));
+  layer->contents.push_back(group);
+
+  // This sibling TextBox is a modifier for the preceding Text group, matching the imported PAGX
+  // structure that exposed the 石破天惊 3+1 line split in PowerPoint/LibreOffice.
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 940;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+  EXPECT_NE(body.find("<a:t>石破天惊</a:t>"), std::string::npos);
+  EXPECT_EQ(body.find("<a:br"), std::string::npos);
+  ASSERT_TRUE(ExportAndVerify(*doc, "modifier_textbox_embedded_single_line", options));
+}
+
+PAGX_TEST(PAGXPPTTest, ModifierTextBoxEmbeddedMultipleLinesKeepsBoundedWrapFallback) {
+  auto doc = pagx::PAGXDocument::Make(1200, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "石破天惊";
+  text->fontFamily = "Noto Serif SC";
+  text->fontSize = 72;
+  text->glyphRuns.push_back(
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {80.0f, 0.0f}, {0.0f, 96.0f}, {80.0f, 96.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 940, 206), 83.0f, text->fontSize));
+  group->elements.push_back(text);
+  group->elements.push_back(MakeSolidFill(doc.get(), {0.1f, 0.1f, 0.1f, 1.0f}));
+  layer->contents.push_back(group);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 940;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
 }
 
 PAGX_TEST(PAGXPPTTest, TextBoxContainerMultipleTexts) {

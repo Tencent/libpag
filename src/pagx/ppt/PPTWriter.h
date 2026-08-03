@@ -804,7 +804,7 @@ class PPTWriter {
                                                const FillStrokeInfo& fs,
                                                const TextLayoutResult* precomputed);
   void emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m, const NativeTextGeometry& geom,
-                                const TextBox* textBox);
+                                const TextBox* textBox, bool disableAutoWrap);
   void emitNativeTextBody(XMLBuilder& out, const Text* text,
                           const std::vector<TextLayoutLineInfo>* lines, const PPTRunStyle& style,
                           int64_t lnSpcPts, bool rtl, bool useLineLayout, int64_t defTabSzEMU,
@@ -859,7 +859,7 @@ class PPTWriter {
   };
 
   void emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const Matrix& transform,
-                             float estWidth, float estHeight);
+                             float estWidth, float estHeight, bool disableAutoWrap);
   void emitTextBoxBody(const std::vector<RichTextRun>& runs,
                        const std::vector<PPTRunStyle>& runStyles,
                        std::vector<LineEntry>& lineEntries, bool useLineLayout,
