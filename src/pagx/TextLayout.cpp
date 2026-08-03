@@ -390,8 +390,9 @@ class TextLayoutContext {
     bool fauxBold = glyph.fauxBold;
     if (!fauxBold) {
       int requestedWeight = ParseFontStyleName(glyph.fontStyle).weight;
-      int resolvedWeight =
-          primaryTypeface == nullptr ? 400 : ParseFontStyleName(primaryTypeface->fontStyle()).weight;
+      int resolvedWeight = primaryTypeface == nullptr
+                               ? 400
+                               : ParseFontStyleName(primaryTypeface->fontStyle()).weight;
       fauxBold = resolvedWeight < requestedWeight;
     }
 
