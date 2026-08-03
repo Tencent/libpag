@@ -168,9 +168,15 @@ PAGWindow {
             // canvas width to the file aspect ratio so the canvas fills the area without
             // letterboxing.
             height = Math.max(height, minWindowHeightWithEditPanel);
-            let canvasHeight = height - windowTitleBarHeight - controlForm.height;
-            width = computePanelWindowWidth(preferredSize, canvasHeight,
-                                            mainForm.rightItemLoader.width);
+            if (preferredSize.width > 0 && preferredSize.height > 0) {
+                let canvasHeight = height - windowTitleBarHeight - controlForm.height;
+                width = computePanelWindowWidth(preferredSize, canvasHeight,
+                                                mainForm.rightItemLoader.width);
+            } else {
+                // preferredSize can be {0,0} before the GPU drawable/window is attached;
+                // avoid dividing by zero and just widen by the panel and split handle.
+                width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
+            }
         }
         let x = Math.max(0, oldX - ((width - oldWidth) / 2));
         let y = Math.max(50, oldY - ((height - oldHeight) / 2));
