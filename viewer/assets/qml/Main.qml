@@ -158,7 +158,11 @@ PAGWindow {
         let oldHeight = viewWindow.height;
         let preferredSize = contentView.viewModel.preferredSize;
         let width = Math.max(viewWindow.minimumWidth, preferredSize.width);
-        let height = Math.max(viewWindow.minimumHeight, preferredSize.height + controlForm.height);
+        // The window height must include the title bar and the control bar so that the content
+        // canvas below them exactly matches preferredSize. Otherwise the canvas is shorter than
+        // the file and the aspect-fit rendering leaves blank margins on the left and right.
+        let height = Math.max(viewWindow.minimumHeight,
+                              preferredSize.height + windowTitleBarHeight + controlForm.height);
         if (mainForm.rightItemLoader.status === Loader.Ready) {
             width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
         }
