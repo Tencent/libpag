@@ -48,10 +48,11 @@ void PAGViewer::openFile(QString path) {
       window = win;
       break;
     }
-    // PAGX files always open in a new window because they require a different QML view
-    // component (PAGXView vs PAGView), and reusing an empty PAG window would need a Loader
-    // switch that is simpler handled by creating a fresh window.
-    if (!isPagx && fileInWindow.isEmpty()) {
+    // Reuse an empty window for any file type. The QML layer switches the view component
+    // (PAGView vs PAGXView) automatically in MainForm.loadFile(), so a PAGX file can reuse
+    // a fresh PAG window instead of forcing a new one. This also prevents duplicate windows
+    // when macOS delivers the same file via both the launch arguments and a FileOpen event.
+    if (fileInWindow.isEmpty()) {
       window = win;
       break;
     }
