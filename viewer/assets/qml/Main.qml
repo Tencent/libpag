@@ -32,9 +32,6 @@ PAGWindow {
     // Minimum window height while the side edit panel is open, so the panel stays usable.
     property int minWindowHeightWithEditPanel: 650
 
-    // Window height before the side panel opened, restored when the panel closes (-1 = none).
-    property int heightBeforePanelOpen: -1
-
     property var contentView: mainForm.contentView
     property var connectedContentView: null
 
@@ -489,12 +486,9 @@ PAGWindow {
             if (viewWindow.visibility === Window.FullScreen) {
                 mainForm.centerItem.width = viewWindow.width - widthChange;
             } else {
-                // Remember the height before the panel resizes the window so closing the panel
-                // can restore it.
-                if (heightBeforePanelOpen < 0) {
-                    heightBeforePanelOpen = viewWindow.height;
-                }
                 // Raise the window to the panel minimum height so the edit panel stays usable.
+                // The height is kept when the panel closes: restoring the pre-panel height would
+                // shrink the window even though the user did not ask for a resize.
                 if (viewWindow.height < minWindowHeightWithEditPanel) {
                     viewWindow.height = minWindowHeightWithEditPanel;
                 }
@@ -522,11 +516,6 @@ PAGWindow {
                 viewWindow.width = viewWindow.minimumWidth;
             } else {
                 viewWindow.width = viewWindow.width + widthChange - mainForm.splitHandleWidth;
-            }
-            // Restore the window height captured before the panel opened.
-            if (heightBeforePanelOpen >= 0) {
-                viewWindow.height = heightBeforePanelOpen;
-                heightBeforePanelOpen = -1;
             }
         }
     }
