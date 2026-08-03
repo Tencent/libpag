@@ -29,8 +29,6 @@ PAGWindow {
 
     property int windowTitleBarHeight: isWindows ? 32 : 22
 
-    property int minWindowHeightWithEditPanel: 650
-
     property var contentView: mainForm.contentView
     property var connectedContentView: null
 
@@ -480,10 +478,9 @@ PAGWindow {
             if (viewWindow.visibility === Window.FullScreen) {
                 mainForm.centerItem.width = viewWindow.width - widthChange;
             } else {
+                // Only widen the window for the panel; keep the height unchanged so the content
+                // canvas keeps its aspect ratio and the rendered image is not letterboxed.
                 viewWindow.width = viewWindow.width + widthChange + mainForm.splitHandleWidth;
-            }
-            if (viewWindow.height < minWindowHeightWithEditPanel) {
-                viewWindow.height = minWindowHeightWithEditPanel;
             }
         } else {
             let widthChange = -1 * mainForm.rightItemLoader.width;
@@ -500,12 +497,28 @@ PAGWindow {
     function resizeContentView() {
         if (!contentView)
             return;
-        let windowWidth = mainForm.centerItem.width;
-        let windowHeight = mainForm.centerItem.height - mainForm.controlForm.height;
-        mainForm.contentViewLoader.item.width = windowWidth;
-        mainForm.contentViewLoader.item.height = windowHeight;
-        mainForm.contentViewLoader.item.x = 0;
-        mainForm.contentViewLoader.item.y = 0;
+        let areaWidth = mainForm.centerItem.width;
+        let areaHeight = mainForm.centerItem.height - mainForm.controlForm.height;
+        let preferredSize = contentView.viewModel.preferredSize;
+        let canvasWidth = areaWidth;
+        let canvasHeight = areaHeight;
+        let canvasX = 0;
+        let canvasY = 0;
+        if (preferredSize.width > 0 && preferredSize.height > 0) {
+            // Keep the canvas at the file aspect ratio and center it inside the content area.
+            // Stretching the canvas to fill the area would distort the aspect ratio and leave
+            // blank margins around the rendered content whenever the window is resized or the
+            // side panel is toggled.
+            let scale = Math.min(areaWidth / preferredSize.width, areaHeight / preferredSize.height);
+            canvasWidth = preferredSize.width * scale;
+            canvasHeight = preferredSize.height * scale;
+            canvasX = (areaWidth - canvasWidth) / 2;
+            canvasY = (areaHeight - canvasHeight) / 2;
+        }
+        mainForm.contentViewLoader.item.width = canvasWidth;
+        mainForm.contentViewLoader.item.height = canvasHeight;
+        mainForm.contentViewLoader.item.x = canvasX;
+        mainForm.contentViewLoader.item.y = canvasY;
     }
 
     function updateAvailable(hasNewVersion) {
