@@ -18,12 +18,15 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
 
 class FontConfig;
+class Data;
 
 /**
  * Export options for PPTExporter.
@@ -36,6 +39,19 @@ struct PPTExportOptions {
    * native text when glyph outline data is unavailable. The default value is false.
    */
   bool convertTextToPath = false;
+
+  /**
+   * Whether to ignore the GlyphRun elements carried by a Text node and always render it as native
+   * PPTX text runs derived from the Text's `text` attribute. When a Text carries GlyphRun data the
+   * exporter normally treats those pre-shaped glyphs as the authoritative geometry and emits them
+   * as custom paths, because native a:r runs cannot express arbitrary glyph IDs / per-glyph offsets
+   * / anchors / rotations. Enabling this flag discards the GlyphRun geometry and falls back to
+   * native, editable PowerPoint text instead, at the cost of exact glyph-level fidelity. Text nodes
+   * that have no GlyphRun data are unaffected. This is the direct opposite of convertTextToPath, so
+   * setting both leaves convertTextToPath in effect and this flag is ignored. The default value is
+   * false.
+   */
+  bool ignoreGlyphRuns = false;
 
   /**
    * Whether to bridge nested contours within a single path element. When enabled, contours that
@@ -96,24 +112,47 @@ struct PPTExportOptions {
 };
 
 /**
- * PPTExporter converts a PAGXDocument into PPTX (PowerPoint) format.
- * All PAGX layers are placed in a single slide.
+ * PPTExporter converts one or more PAGXDocuments into PPTX (PowerPoint) format. Each PAGXDocument
+ * becomes one slide, in the order supplied; all layers of a document are placed in its slide. The
+ * presentation slide size is taken from the first document — PPTX stores a single slide size for
+ * the whole deck. Later documents keep their native coordinates; content outside the first
+ * document's canvas is clipped rather than scaled. A structurally valid document with no visible
+ * content intentionally produces a blank slide.
  */
 class PPTExporter {
  public:
   using Options = PPTExportOptions;
 
   /**
-   * Exports a PAGXDocument to a PPTX file at the specified path.
-   * @param document the PAGXDocument to export. Passed as non-const because internal layout
-   *        computation may cache intermediate results.
+   * Exports a sequence of PAGXDocuments to a multi-slide PPTX file at the specified path. Each
+   * document produces one slide in the order given; a single-element list yields a one-slide deck.
+   * @param documents the PAGXDocuments to export, one slide per entry. Pointers are non-const
+   *        because internal layout computation may cache intermediate results. Must not be empty
+   *        or contain nullptr entries or unresolved imports.
    * @param filePath the output file path. The file will be created or overwritten.
    * @param options export options controlling text rendering and mask handling.
-   * @return true if the PPTX file was written successfully, false if the file could not be created
-   *         or a write error occurred.
+   * @return true if the PPTX file was written successfully, false if the document list was
+   *         invalid, layout reported an error, the file could not be created, or a write error
+   *         occurred.
    */
-  static bool ToFile(PAGXDocument& document, const std::string& filePath,
+  static bool ToFile(const std::vector<PAGXDocument*>& documents, const std::string& filePath,
                      const Options& options = {});
+
+  /**
+   * Exports a sequence of PAGXDocuments to an in-memory multi-slide PPTX buffer without writing to
+   * disk. This lets the caller decide what to do with the bytes — persist them to a file, upload
+   * them over the network, hand them to another library, etc. Each document produces one slide in
+   * the order given; a single-element list yields a one-slide deck.
+   * @param documents the PAGXDocuments to export, one slide per entry. Pointers are non-const
+   *        because internal layout computation may cache intermediate results. Must not be empty
+   *        or contain nullptr entries or unresolved imports.
+   * @param options export options controlling text rendering and mask handling.
+   * @return a Data object holding the complete PPTX (OOXML .zip) payload, or nullptr if the
+   *         document list was invalid, layout reported an error, or the documents could not be
+   *         serialized.
+   */
+  static std::shared_ptr<Data> ToData(const std::vector<PAGXDocument*>& documents,
+                                      const Options& options = {});
 };
 
 }  // namespace pagx

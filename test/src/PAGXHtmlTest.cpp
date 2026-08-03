@@ -760,6 +760,37 @@ CLI_TEST(PAGXHtmlTest, ClipAndMask) {
       << "Inline SVG elements should not have xmlns in HTML5";
 }
 
+// Regression: a mask layer authored as an INVISIBLE CHILD of the layer it masks
+// (the pattern the PAGX / HTML importer produces — the mask="@id" target is a
+// descendant of the masked layer) must feed only the CSS mask / <clipPath> def,
+// never be emitted again as a visible child div. Otherwise the mask's own fill
+// (here a solid white rect) paints over the masked content as an opaque patch —
+// the "white cover layer" seen in exported website decks.
+CLI_TEST(PAGXHtmlTest, MaskAsChildNotEmittedAsContent) {
+  // The masked layer references @coverMask; coverMask is its own child Layer with a
+  // full-size white fill. Only its clip/mask def should reach the output.
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer mask=\"@coverMask\" maskType=\"contour\">"
+      "    <Rectangle width=\"180\" height=\"180\"/>"
+      "    <Fill color=\"#3399EE\"/>"
+      "    <Layer id=\"coverMask\" width=\"100%\" height=\"100%\" includeInLayout=\"false\">"
+      "      <Rectangle width=\"100%\" height=\"100%\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // The mask must still drive a clip/mask (the def is present).
+  EXPECT_TRUE(html.find("clip-path") != std::string::npos ||
+              html.find("mask-image") != std::string::npos)
+      << "the contour mask must still produce a clip-path / mask-image";
+  // The mask layer must NOT be emitted as a visible element in the body.
+  EXPECT_EQ(html.find("id=\"coverMask\""), std::string::npos)
+      << "the mask layer must not appear as visible content";
+}
+
 CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;

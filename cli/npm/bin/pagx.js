@@ -68,6 +68,49 @@ if (!process.env.PAGX_HTML_SNAPSHOT_BIN) {
   }
 }
 
+// Intercept the preview sub-command and delegate to pagx-preview (a Node.js-based
+// HTTP server + MCP service). The preview module lives under preview/ at the package
+// root so it can be bundled and published alongside the native binary.
+if (process.argv[2] === 'preview') {
+  const previewEntry = path.join(__dirname, '..', 'preview', 'src', 'cli.js');
+  if (!fs.existsSync(previewEntry)) {
+    console.error('pagx: preview command not available. Preview module not found.');
+    process.exit(1);
+  }
+  const { spawn } = require('child_process');
+  // Use process.execPath (the Node binary currently running this wrapper) rather than the string
+  // 'node': under nvm/Volta/asdf, on Windows without node on PATH, or when launched from a packaged
+  // runtime, a bare 'node' may not resolve. process.execPath is always the correct interpreter.
+  const child = spawn(process.execPath, [previewEntry, ...process.argv.slice(3)], { stdio: 'inherit' });
+  child.on('error', (err) => {
+    console.error('pagx: failed to start preview: ' + err.message);
+    process.exit(1);
+  });
+  child.on('exit', (code) => process.exit(code != null ? code : 1));
+  return;
+}
+
+// Inject the preview sub-command into the native binary's --help output. The native binary is
+// unaware of preview (it lives in the Node.js wrapper), so we run its help, then splice a preview
+// line under the "Commands:" header. Any future native command changes flow through untouched;
+// only the preview line is maintained here.
+if ((process.argv[2] === '--help' || process.argv[2] === '-h') && process.argv.length === 3) {
+  const { spawnSync } = require('child_process');
+  const result = spawnSync(binPath, ['--help'], { encoding: 'utf8' });
+  const lines = result.stdout.split('\n');
+  const output = lines
+    .map((line) => {
+      if (line.trim() === 'Commands:') {
+        return line + '\n  preview        Preview a PAGX file in the browser with live reload';
+      }
+      return line;
+    })
+    .join('\n');
+  process.stdout.write(output);
+  if (result.stderr) process.stderr.write(result.stderr);
+  process.exit(result.status || 0);
+}
+
 try {
   execFileSync(binPath, process.argv.slice(2), { stdio: "inherit" });
 } catch (e) {
