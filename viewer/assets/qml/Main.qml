@@ -159,8 +159,7 @@ PAGWindow {
         // The window height must include the title bar and the control bar so that the content
         // canvas below them exactly matches preferredSize. Otherwise the canvas is shorter than
         // the file and the aspect-fit rendering leaves blank margins on the left and right.
-        let height = Math.max(viewWindow.minimumHeight,
-                              preferredSize.height + windowTitleBarHeight + controlForm.height);
+        let height = computeContentWindowHeight(preferredSize.height);
         if (mainForm.rightItemLoader.status === Loader.Ready) {
             width += mainForm.rightItemLoader.width + mainForm.splitHandleWidth;
         }
@@ -483,12 +482,17 @@ PAGWindow {
                 // aspect ratio and the rendered image is not letterboxed.
                 let canvasWidth = mainForm.centerItem.width;
                 viewWindow.width = viewWindow.width + widthChange + mainForm.splitHandleWidth;
-                let preferredSize = contentView.viewModel.preferredSize;
-                if (preferredSize.width > 0 && preferredSize.height > 0) {
-                    let targetCanvasHeight = canvasWidth * preferredSize.height / preferredSize.width;
-                    viewWindow.height = Math.max(viewWindow.minimumHeight,
-                                                 targetCanvasHeight + windowTitleBarHeight +
-                                                     controlForm.height);
+                if (contentView) {
+                    let preferredSize = contentView.viewModel.preferredSize;
+                    if (preferredSize.width > 0 && preferredSize.height > 0) {
+                        let targetHeight = computeContentWindowHeight(
+                            canvasWidth * preferredSize.height / preferredSize.width);
+                        // Avoid abruptly overriding a manually resized window; only correct the
+                        // height when the current height deviates noticeably.
+                        if (Math.abs(viewWindow.height - targetHeight) > 40) {
+                            viewWindow.height = targetHeight;
+                        }
+                    }
                 }
             }
         } else {
@@ -512,6 +516,12 @@ PAGWindow {
         mainForm.contentViewLoader.item.height = windowHeight;
         mainForm.contentViewLoader.item.x = 0;
         mainForm.contentViewLoader.item.y = 0;
+    }
+
+    // Returns the window height that makes the content canvas of the given height exactly fit.
+    function computeContentWindowHeight(canvasHeight) {
+        return Math.max(viewWindow.minimumHeight,
+                        canvasHeight + windowTitleBarHeight + controlForm.height);
     }
 
     function updateAvailable(hasNewVersion) {

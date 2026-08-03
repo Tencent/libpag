@@ -870,7 +870,11 @@ SplitView {
                 PAGRectangle {
                     id: performance
                     color: "#16161D"
-                    height: isSourceEditorActive ? 0 : Math.min(profilerForm.contentHeight, parent.height - tabBar.height - 40)
+                    // Reserve at least 120px for the editing area above, so the profiler never
+                    // squeezes it to an unusable size when the window is short. The profiler
+                    // scrolls internally, so no data is lost.
+                    height: isSourceEditorActive ? 0 : Math.min(profilerForm.contentHeight,
+                                                                Math.max(0, parent.height - tabBar.height - 40 - 120))
                     visible: !isSourceEditorActive
                     clip: true
                     anchors.right: parent.right
