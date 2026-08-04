@@ -571,19 +571,26 @@ PAGWindow {
         }
 
         // Minimum width clamp: keep the ratio by reverse-deriving the height, so the clamp does
-        // not reintroduce top/bottom letterboxing for narrow-tall files.
+        // not reintroduce top/bottom letterboxing for narrow-tall files. The reverse-derived
+        // height is still bounded by the screen: when the minimum width and the screen height
+        // cannot both hold at the file ratio, we accept the screen bound (some letterboxing)
+        // rather than let the window run off-screen.
         if (winW < viewWindow.minimumWidth) {
             winW = viewWindow.minimumWidth;
             canvasWidth = winW - panelWidth - windowPadding;
             canvasHeight = canvasWidth / ratio;
             winH = canvasHeight + chromeHeight + contentHeightPadding;
+            winH = Math.min(winH, availH);
         }
-        // Minimum height clamp: reverse-derive the width for the same reason.
+        // Minimum height clamp: reverse-derive the width for the same reason, and likewise bound
+        // the reverse-derived width by the screen so the window never exceeds it (dropping the
+        // ratio only when the minimum height and the screen width cannot both hold).
         if (winH < viewWindow.minimumHeight) {
             winH = viewWindow.minimumHeight;
             canvasHeight = winH - chromeHeight - contentHeightPadding;
             canvasWidth = canvasHeight * ratio;
             winW = canvasWidth + panelWidth + windowPadding;
+            winW = Math.min(winW, availW);
         }
 
         return {
