@@ -134,27 +134,23 @@ export class PAGViewController {
   }
 
   /**
-   * Pauses the animation without changing the play intention recorded by play() and pause().
-   * It is used by the visible area change handling to stop off-screen animations.
+   * Notifies the controller whether the view is currently visible. When it becomes invisible, a
+   * playing animation is paused to save power; when it becomes visible again, playback is resumed
+   * only if the caller has requested playing via play(). The play intention set by play()/pause()
+   * is preserved across visibility changes.
    */
-  pauseForInvisible() {
-    this.jView.pause();
-  }
-
-  /**
-   * Plays the animation without changing the play intention recorded by play() and pause().
-   * It is used by the visible area change handling to resume animations paused for invisibility.
-   */
-  playForVisible() {
-    this.jView?.play();
-  }
-
-  /**
-   * Indicates whether the caller intends to play the animation, which is not affected by the
-   * temporary pause triggered by the visible area change handling.
-   */
-  isUserWantsPlaying(): boolean {
-    return this.userWantsPlaying;
+  setVisible(visible: boolean) {
+    if (!visible) {
+      if (this.jView.isPlaying() && !this.pausedForInvisible) {
+        this.pausedForInvisible = true;
+        this.jView.pause();
+      }
+    } else if (this.pausedForInvisible) {
+      this.pausedForInvisible = false;
+      if (this.userWantsPlaying) {
+        this.jView?.play();
+      }
+    }
   }
 
   /**
@@ -485,4 +481,5 @@ export class PAGViewController {
   private jView: JPAGView = new JPAGView();
   private view: WeakRef<ESObject> | null = null;
   private userWantsPlaying: boolean = false;
+  private pausedForInvisible: boolean = false;
 }

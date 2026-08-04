@@ -21,8 +21,6 @@ import { PAGViewController } from './PAGViewController';
 @ComponentV2
 export struct PAGViewV2 {
   @Require @Param controller: PAGViewController;
-  // Whether playback was paused by this component because it went off-screen; only these pauses are resumed when it becomes visible again.
-  private pausedForInvisible: boolean = false;
 
   build() {
     XComponent({
@@ -53,17 +51,9 @@ export struct PAGViewV2 {
 
   private onVisibleAreaChanged(isExpanding: boolean, currentRatio: number): void {
     if (currentRatio <= 0.0) {
-      if (this.controller.isPlaying() && !this.pausedForInvisible) {
-        this.pausedForInvisible = true;
-        this.controller.pauseForInvisible();
-      }
+      this.controller.setVisible(false);
     } else if (isExpanding) {
-      if (this.pausedForInvisible) {
-        this.pausedForInvisible = false;
-        if (this.controller.isUserWantsPlaying()) {
-          this.controller.playForVisible();
-        }
-      }
+      this.controller.setVisible(true);
     }
   }
 }
