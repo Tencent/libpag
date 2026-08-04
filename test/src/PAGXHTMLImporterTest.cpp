@@ -2993,8 +2993,7 @@ PAG_TEST(PAGXHTMLImporterTest, HeadingDefaultFontSizes) {
     ASSERT_NE(text, nullptr) << r.tag;
     EXPECT_FLOAT_EQ(text->fontSize, r.size) << r.tag;
     // Headings default to font-weight:bold, which is written as a real-face "Bold" style label so
-    // the renderer resolves the authored heavy face. If that face is missing, TextLayout adds faux
-    // emboldening after lookup; no faux flag is baked into the Text node.
+    // the renderer resolves the authored heavy face; no faux flag is baked into the Text node.
     EXPECT_EQ(text->fontStyle, "Bold") << r.tag;
     EXPECT_FALSE(text->fauxBold) << r.tag;
     EXPECT_FALSE(text->fauxItalic) << r.tag;
@@ -3017,7 +3016,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToBold) {
   EXPECT_FALSE(text->fauxItalic);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceUsesRuntimeFauxBold) {
+PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceFallsBackWithoutFauxBold) {
   constexpr const char* family = "HTML Missing Bold Test";
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -3032,8 +3031,7 @@ PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceUsesRuntimeFauxBold) {
   ASSERT_FALSE(text->fauxBold);
 
   // Register only a Regular face under the requested family. Font lookup therefore falls back to
-  // that face, and TextLayout must preserve the authored weight by enabling runtime faux bold on
-  // the glyph run without changing the imported Text node.
+  // that face without synthesising the unavailable Bold weight.
   pagx::FontConfig fontConfig;
   fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0, family,
                           "Regular");
@@ -3045,7 +3043,7 @@ PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceUsesRuntimeFauxBold) {
     auto typeface = run.font.getTypeface();
     ASSERT_NE(typeface, nullptr);
     EXPECT_EQ(typeface->fontStyle(), "Regular");
-    EXPECT_TRUE(run.font.isFauxBold());
+    EXPECT_FALSE(run.font.isFauxBold());
   }
   EXPECT_FALSE(text->fauxBold);
 }
@@ -3060,7 +3058,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
   // Medium stays a real-face style label so font lookup can select it precisely. The importer does
-  // not bake a faux flag; TextLayout decides at runtime whether the resolved face is too light.
+  // not bake a faux flag when that face is unavailable.
   EXPECT_EQ(text->fontStyle, "Medium");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
