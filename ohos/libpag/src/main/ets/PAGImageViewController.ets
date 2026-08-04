@@ -203,6 +203,7 @@ export class PAGImageViewController {
    * the beginning.
    */
   play() {
+    this.userWantsPlaying = true;
     this.jImageView.play();
   }
 
@@ -218,7 +219,32 @@ export class PAGImageViewController {
    * animation from the last paused position.
    */
   pause() {
+    this.userWantsPlaying = false;
     this.jImageView.pause();
+  }
+
+  /**
+   * Pauses the animation without changing the play intention recorded by play() and pause().
+   * It is used by the visible area change handling to stop off-screen animations.
+   */
+  pauseForInvisible() {
+    this.jImageView.pause();
+  }
+
+  /**
+   * Plays the animation without changing the play intention recorded by play() and pause().
+   * It is used by the visible area change handling to resume animations paused for invisibility.
+   */
+  playForVisible() {
+    this.jImageView.play();
+  }
+
+  /**
+   * Indicates whether the caller intends to play the animation, which is not affected by the
+   * temporary pause triggered by the visible area change handling.
+   */
+  isUserWantsPlaying(): boolean {
+    return this.userWantsPlaying;
   }
 
   /**
@@ -339,6 +365,7 @@ export class PAGImageViewController {
   private listeners: Array<WeakRef<PAGImageViewListener>> = [];
   private view: WeakRef<ESObject> | null = null;
   private jImageView: JPAGImageView = new JPAGImageView();
+  private userWantsPlaying: boolean = false;
   readonly onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case PAGAnimatorState.Start:

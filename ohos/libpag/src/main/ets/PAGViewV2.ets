@@ -21,6 +21,8 @@ import { PAGViewController } from './PAGViewController';
 @ComponentV2
 export struct PAGViewV2 {
   @Require @Param controller: PAGViewController;
+  // 标记动画是否因组件不可见而被组件暂停，重新可见时只恢复组件自己暂停的播放。
+  private pausedForInvisible: boolean = false;
 
   build() {
     XComponent({
@@ -29,6 +31,7 @@ export struct PAGViewV2 {
       libraryname: "pag",
     })
       .backgroundColor(Color.Transparent)
+      .onVisibleAreaChange([0.0, 1.0], this.onVisibleAreaChanged)
       .onLoad(() => {
         this.controller.update();
       })
@@ -44,5 +47,21 @@ export struct PAGViewV2 {
 
   aboutToDisappear(): void {
     this.controller.detachFromView();
+  }
+
+  private onVisibleAreaChanged(isExpanding: boolean, currentRatio: number): void {
+    if (currentRatio <= 0.0) {
+      if (this.controller.isPlaying() && !this.pausedForInvisible) {
+        this.pausedForInvisible = true;
+        this.controller.pauseForInvisible();
+      }
+    } else if (isExpanding) {
+      if (this.pausedForInvisible) {
+        this.pausedForInvisible = false;
+        if (this.controller.isUserWantsPlaying()) {
+          this.controller.playForVisible();
+        }
+      }
+    }
   }
 }

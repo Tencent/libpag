@@ -120,6 +120,7 @@ export class PAGViewController {
    * the beginning.
    */
   play() {
+    this.userWantsPlaying = true;
     this.jView?.play();
   }
 
@@ -128,7 +129,32 @@ export class PAGViewController {
    * animation from the last paused position.
    */
   pause() {
+    this.userWantsPlaying = false;
     this.jView.pause();
+  }
+
+  /**
+   * Pauses the animation without changing the play intention recorded by play() and pause().
+   * It is used by the visible area change handling to stop off-screen animations.
+   */
+  pauseForInvisible() {
+    this.jView.pause();
+  }
+
+  /**
+   * Plays the animation without changing the play intention recorded by play() and pause().
+   * It is used by the visible area change handling to resume animations paused for invisibility.
+   */
+  playForVisible() {
+    this.jView?.play();
+  }
+
+  /**
+   * Indicates whether the caller intends to play the animation, which is not affected by the
+   * temporary pause triggered by the visible area change handling.
+   */
+  isUserWantsPlaying(): boolean {
+    return this.userWantsPlaying;
   }
 
   /**
@@ -458,4 +484,5 @@ export class PAGViewController {
   private listeners: Array<WeakRef<PAGViewListener>> = [];
   private jView: JPAGView = new JPAGView();
   private view: WeakRef<ESObject> | null = null;
+  private userWantsPlaying: boolean = false;
 }
