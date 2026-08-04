@@ -534,12 +534,12 @@ PAGWindow {
         if (!(preferredSize.width > 0) || !(preferredSize.height > 0)) {
             // preferredSize can be {0,0} before the file is loaded or the window has no screen
             // yet; avoid dividing by zero and just fall back to the minimum plus the panel.
-            let fallbackW = Math.max(viewWindow.minimumWidth, viewWindow.minimumWidth + panelWidth);
+            let fallbackW = viewWindow.minimumWidth + panelWidth;
             let fallbackH = panelOpen ? Math.max(viewWindow.minimumHeight, minWindowHeightWithEditPanel)
                 : viewWindow.minimumHeight;
             return {
-                "width": Math.min(fallbackW, availW),
-                "height": Math.min(fallbackH, availH)
+                "width": Math.round(Math.min(fallbackW, availW)),
+                "height": Math.round(Math.min(fallbackH, availH))
             };
         }
 
