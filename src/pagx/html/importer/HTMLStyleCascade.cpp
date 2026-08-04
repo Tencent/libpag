@@ -545,11 +545,12 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
     out.textFillImage = ownBgImage;
   }
   // Split the CSS font-weight / font-style request into the real-face style label PAGX Text
-  // resolves plus the synthetic (faux) axes the renderer embosses on top. Bold (weight >= 600) and
-  // italic/oblique are baked as faux flags and dropped from the label so an uninstalled web face
-  // (e.g. "Noto Sans SC Black Italic") still renders at the authored weight and slant instead of
-  // collapsing to a thin upright fallback. Lighter weights (Light / Medium) cannot be synthesised
-  // and stay in the label.
+  // resolves plus the synthetic (faux) italic axis the renderer embosses on top. The weight axis
+  // is always written as a real-face keyword (Bold / SemiBold / Black) so the renderer resolves the
+  // authored heavy face when it is installed or embedded and preserves the SemiBold / Bold / Black
+  // distinction. If that face is unavailable, normal font lookup fallback applies without faux
+  // bold. Italic stays a faux flag so an oblique slant survives when the styled italic face is
+  // unavailable.
   FontStyleSynthesis fontSynthesis = ResolveFontStyleSynthesis(out.fontWeight, out.fontStyle);
   out.fontStyleName = fontSynthesis.fontStyleName;
   out.fauxBold = fontSynthesis.fauxBold;

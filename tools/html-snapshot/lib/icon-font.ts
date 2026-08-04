@@ -104,6 +104,90 @@ interface FontFaceEntry {
   family: string;
   url: string;
   format: string;
+  weight: string;
+  style: string;
+}
+
+// Normalise the two @font-face descriptors that affect which physical face
+// Chromium selects. Computed `font-weight` is normally numeric while
+// @font-face commonly uses the `normal` / `bold` keywords, so canonicalise
+// those keywords before comparing. Variable-font ranges (for example
+// `100 900`) are deliberately kept intact for the distance matcher below.
+export function normalizeFontFaceWeight(value: string): string {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v || v === 'normal') return '400';
+  if (v === 'bold') return '700';
+  return v;
+}
+
+export function normalizeFontFaceStyle(value: string): string {
+  const v = String(value || '').trim().toLowerCase();
+  if (v.startsWith('italic')) return 'italic';
+  if (v.startsWith('oblique')) return 'oblique';
+  return 'normal';
+}
+
+// Return the CSS Fonts weight-search phase and distance for a face range. The
+// phase captures the spec's directional preference: below 400 search downward
+// first, from 400 through 500 search upward to 500 then downward, and above 500
+// search upward first. This also makes equidistant choices independent of
+// @font-face declaration order (for example 650 chooses 900 over 400).
+function fontWeightPreference(requested: number, lo: number, hi: number): [number, number] {
+  if (requested >= lo && requested <= hi) return [0, 0];
+  if (requested < 400) {
+    return hi < requested ? [1, requested - hi] : [2, lo - requested];
+  }
+  if (requested > 500) {
+    return lo > requested ? [1, lo - requested] : [2, requested - hi];
+  }
+  if (lo > requested && lo <= 500) return [1, lo - requested];
+  if (hi < requested) return [2, requested - hi];
+  return [3, lo - requested];
+}
+
+// Pick the @font-face that best matches a pseudo-element's computed style.
+// A family may expose several physical files under one name (Font Awesome's
+// "Font Awesome 6 Free" uses Regular/400 and Solid/900). Treating a family as
+// a single URL silently chooses the first declaration and makes every glyph
+// that exists only in another weight disappear.
+export function selectFontFace(
+  faces: FontFaceEntry[] | null | undefined,
+  requestedWeight: string,
+  requestedStyle: string,
+): FontFaceEntry | null {
+  if (!faces || faces.length === 0) return null;
+  const reqWeightText = normalizeFontFaceWeight(requestedWeight);
+  const reqWeightMatch = reqWeightText.match(/\d+(?:\.\d+)?/);
+  const reqWeight = reqWeightMatch ? Number(reqWeightMatch[0]) : 400;
+  const reqStyle = normalizeFontFaceStyle(requestedStyle);
+  let best: FontFaceEntry | null = null;
+  let bestPreference: [number, number, number] | null = null;
+  for (const face of faces) {
+    if (!face) continue;
+    const nums = normalizeFontFaceWeight(face.weight).match(/\d+(?:\.\d+)?/g) || [];
+    let lo = nums.length > 0 ? Number(nums[0]) : 400;
+    let hi = nums.length > 1 ? Number(nums[1]) : lo;
+    if (lo > hi) { const tmp = lo; lo = hi; hi = tmp; }
+    const [weightPhase, weightDistance] = fontWeightPreference(reqWeight, lo, hi);
+    // Style should dominate weight preference: an italic face at the exact
+    // weight is a worse match than a nearby upright face for normal text.
+    const preference: [number, number, number] = [
+      normalizeFontFaceStyle(face.style) === reqStyle ? 0 : 1,
+      weightPhase,
+      weightDistance,
+    ];
+    if (
+      bestPreference === null ||
+      preference[0] < bestPreference[0] ||
+      (preference[0] === bestPreference[0] && preference[1] < bestPreference[1]) ||
+      (preference[0] === bestPreference[0] && preference[1] === bestPreference[1] &&
+        preference[2] < bestPreference[2])
+    ) {
+      best = face;
+      bestPreference = preference;
+    }
+  }
+  return best;
 }
 
 // Parse `@font-face { ... }` blocks out of a raw CSS string. Used as a
@@ -126,7 +210,17 @@ export function parseFontFaceFromText(cssText: string, sheetBase: string): FontF
     if (!fm || !sm) continue;
     const family = fm[1].trim().replace(/^["']|["']$/g, '');
     const parsed = parseSrcList(sm[1], sheetBase);
-    if (family && parsed) out.push({ family: family, url: parsed.url, format: parsed.format });
+    const wm = body.match(/font-weight\s*:\s*([^;]+)/i);
+    const stm = body.match(/font-style\s*:\s*([^;]+)/i);
+    if (family && parsed) {
+      out.push({
+        family: family,
+        url: parsed.url,
+        format: parsed.format,
+        weight: normalizeFontFaceWeight(wm ? wm[1] : ''),
+        style: normalizeFontFaceStyle(stm ? stm[1] : ''),
+      });
+    }
   }
   return out;
 }
@@ -139,8 +233,10 @@ export function parseFontFaceFromText(cssText: string, sheetBase: string): FontF
 // `.toString()`, not the surrounding module scope).
 declare const DROP_TAGS_UPPER: Set<string>;
 
-// Walk `document.styleSheets` for `@font-face` rules and return a
-// JSON-safe `{ family: { url, format } }` map.
+// Walk `document.styleSheets` for `@font-face` rules and return a JSON-safe
+// `{ family: [{ url, format, weight, style }, ...] }` map. Keeping every face
+// is essential for families such as Font Awesome Free that use one family
+// name for both Regular/400 and Solid/900 font files.
 //
 // `cssRules` access throws `SecurityError` on cross-origin stylesheets that
 // did not opt in via `crossorigin="anonymous"` — which is most stylesheets
@@ -152,12 +248,8 @@ declare const DROP_TAGS_UPPER: Set<string>;
 // paths are silently skipped (the snapshot will keep emitting a font-named
 // span for those glyphs).
 //
-// First-write wins: a duplicate `@font-face` (e.g. weight variants sharing
-// the same family) keeps the first source — good enough for icon fonts
-// (single regular weight) and avoids round-tripping a heavier italic/bold
-// variant.
-async function collectFontFaceMap(): Promise<Record<string, ParsedSrc>> {
-  const map: Record<string, ParsedSrc> = {};
+async function collectFontFaceMap(): Promise<Record<string, FontFaceEntry[]>> {
+  const map: Record<string, FontFaceEntry[]> = {};
   const inaccessible: string[] = [];
   const sheets = document.styleSheets ? Array.from(document.styleSheets) : [];
   for (const sheet of sheets) {
@@ -179,7 +271,16 @@ async function collectFontFaceMap(): Promise<Record<string, ParsedSrc>> {
       if (!familyRaw || !srcRaw) continue;
       const family = familyRaw.replace(/^["']|["']$/g, '');
       const parsed = parseSrcList(srcRaw, sheetBase);
-      if (parsed && !map[family]) map[family] = parsed;
+      if (parsed) {
+        if (!map[family]) map[family] = [];
+        map[family].push({
+          family: family,
+          url: parsed.url,
+          format: parsed.format,
+          weight: normalizeFontFaceWeight(r.style.getPropertyValue('font-weight') || ''),
+          style: normalizeFontFaceStyle(r.style.getPropertyValue('font-style') || ''),
+        });
+      }
     }
   }
   for (const href of inaccessible) {
@@ -189,7 +290,8 @@ async function collectFontFaceMap(): Promise<Record<string, ParsedSrc>> {
       const css = await res.text();
       const entries = parseFontFaceFromText(css, href);
       for (const e of entries) {
-        if (!map[e.family]) map[e.family] = { url: e.url, format: e.format };
+        if (!map[e.family]) map[e.family] = [];
+        map[e.family].push(e);
       }
     } catch (_) { /* CORS or network — skip */ }
   }
@@ -226,9 +328,10 @@ function isIconScanSkippedTag(tag: string): boolean {
 // closure for `page.evaluate`; the standalone browser bundle does the same
 // inside its UMD/ESM factory.
 
-// Walk styleSheets and return the JSON-safe `@font-face` family→{url,format}
-// map. Async because the cross-origin CSS fallback uses `fetch`.
-async function browserCollectFontFaceMap(): Promise<Record<string, ParsedSrc>> {
+// Walk styleSheets and return the JSON-safe `@font-face`
+// family→[{url,format,weight,style}, ...] map. Async because the cross-origin
+// CSS fallback uses `fetch`.
+async function browserCollectFontFaceMap(): Promise<Record<string, FontFaceEntry[]>> {
   return await collectFontFaceMap();
 }
 
@@ -290,13 +393,16 @@ async function browserCollectIconFontTargets(): Promise<IconFontTarget[]> {
       const cp = ch.codePointAt(0)!;
       if (!isPuaCodepoint(cp)) continue;
       const fontFamilyRaw = (cs.getPropertyValue('font-family') || '').trim();
+      const fontWeight = cs.getPropertyValue('font-weight') || '';
+      const fontStyle = cs.getPropertyValue('font-style') || '';
       const families = fontFamilyRaw
         .split(',')
         .map(function (s) { return s.trim().replace(/^["']|["']$/g, ''); });
-      let entry: ParsedSrc | null = null;
+      let entry: FontFaceEntry | null = null;
       let matchedFamily = '';
       for (const fam of families) {
-        if (fontFaceMap[fam]) { entry = fontFaceMap[fam]; matchedFamily = fam; break; }
+        const matched = selectFontFace(fontFaceMap[fam], fontWeight, fontStyle);
+        if (matched) { entry = matched; matchedFamily = fam; break; }
       }
       if (!entry) continue;
       const id = '__pagx_icon_' + (counter++) + '__';
@@ -369,6 +475,9 @@ function browserApplyIconFontSvgs(results: IconFontResult[] | null | undefined):
 const ICON_FONT_HELPER_FNS: Function[] = [
   formatRank,
   parseSrcList,
+  normalizeFontFaceWeight,
+  normalizeFontFaceStyle,
+  selectFontFace,
   parseFontFaceFromText,
   collectFontFaceMap,
   isPuaCodepoint,

@@ -627,6 +627,43 @@ Color SampleRepeatingPeriod(const HTMLValueParser::GradientStops& stops, float f
   return stops.back().second;
 }
 
+// CSS radial extent keywords control how far the ending shape reaches; they carry no scalar radius
+// in the token itself (the radius is derived from the center and box). Returns true for any of the
+// four keywords so the caller can compute the corresponding px radius from the center position.
+bool IsRadialExtentKeyword(const std::string& token) {
+  return token == "closest-side" || token == "closest-corner" || token == "farthest-side" ||
+         token == "farthest-corner";
+}
+
+// Computes the px radius of a CSS `circle` ending shape for the given extent keyword, measured from
+// a center at (cxPx, cyPx) within a (0,0)-(boxWidth,boxHeight) box. An empty/unknown keyword
+// defaults to `farthest-corner`, matching CSS when the size is omitted. `closest-corner` /
+// `farthest-corner` are the Euclidean distances to the nearest / farthest box corner;
+// `closest-side` / `farthest-side` are the min / max of the perpendicular distances to the four
+// edges.
+float CircleExtentRadiusPx(const std::string& keyword, float cxPx, float cyPx, float boxWidth,
+                           float boxHeight) {
+  float left = std::abs(cxPx);
+  float right = std::abs(boxWidth - cxPx);
+  float top = std::abs(cyPx);
+  float bottom = std::abs(boxHeight - cyPx);
+  float dx = std::max(left, right);
+  float dy = std::max(top, bottom);
+  if (keyword == "closest-side") {
+    return std::min(std::min(left, right), std::min(top, bottom));
+  }
+  if (keyword == "farthest-side") {
+    return std::max(dx, dy);
+  }
+  if (keyword == "closest-corner") {
+    float nx = std::min(left, right);
+    float ny = std::min(top, bottom);
+    return std::sqrt(nx * nx + ny * ny);
+  }
+  // farthest-corner (also the default when the size is omitted).
+  return std::sqrt(dx * dx + dy * dy);
+}
+
 }  // namespace
 
 ColorSource* HTMLValueParser::parseRepeatingLinearGradientPattern(const std::string& value,
@@ -924,24 +961,11 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
     }
   }
 
-  // Radius: the exporter writes `rx = radius * boxWidth` (and an ellipse's `ry` is implied by the
-  // box height under PAGX's single-radius + fitsToGeometry model), so a length token divided by
-  // boxWidth recovers the normalised radius. A bare `<pct>%` is already box-relative. Track whether
-  // the radius came from an explicit px length so a circle on a non-square box can later switch to
-  // the fitsToGeometry=false pixel model (see below).
-  bool radiusFromPxLength = false;
-  if (!sizeTokens.empty() && boxWidth > 0) {
-    float radius = resolveRadialLength(sizeTokens[0], boxWidth);
-    if (!std::isnan(radius)) {
-      grad->radius = radius;
-      radiusFromPxLength = !sizeTokens[0].empty() && sizeTokens[0].back() != '%';
-    } else {
-      // Extent keywords (closest-side / farthest-corner / ...) have no scalar PAGX radius; keep
-      // the box-filling default and surface a diagnostic instead of silently mis-sizing.
-      _diagnostics.warn("html: radial-gradient size '" + sizeTokens[0] +
-                        "' not supported; using box-filling radius");
-    }
-  }
+  // A single explicit length implies a circle. An extent keyword without a shape still uses CSS's
+  // default ellipse, so it must not enter the circle-only pixel-radius path below.
+  bool implicitCircle =
+      !explicitEllipse && sizeTokens.size() == 1 && !IsRadialExtentKeyword(sizeTokens[0]);
+  bool isCircle = explicitCircle || implicitCircle;
 
   // Position: `at <x> <y>`. Axis-locked keywords (left/right -> x, top/bottom -> y) are assigned
   // first so author order is irrelevant (`at top left` == `at left top`); the remaining `center`
@@ -972,15 +996,58 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
   if (!std::isnan(cx)) grad->center.x = cx;
   if (!std::isnan(cy)) grad->center.y = cy;
 
-  // A CSS `circle <r>px` keeps a single uniform radius regardless of box aspect ratio. PAGX's
-  // default fitsToGeometry=true model stretches the normalised radius by box width and height
-  // independently, so on a non-square box it would render the circle as an ellipse. Switch such a
-  // circle to the fitsToGeometry=false pixel model (center/radius in the geometry's local px
-  // space, where the box spans (0,0)-(boxWidth,boxHeight)) so the radius stays isotropic. Square
-  // boxes, ellipses, and percentage/extent sizes keep the compact normalised representation.
-  bool isCircle = explicitCircle || (!explicitEllipse && sizeTokens.size() == 1);
-  if (isCircle && radiusFromPxLength && boxWidth > 0 && boxHeight > 0 &&
-      std::abs(boxWidth - boxHeight) > 0.01f) {
+  // Radius: a length token divided by boxWidth recovers the normalised radius (a bare `<pct>%` is
+  // already box-relative); track whether it came from an explicit px length so a circle on a
+  // non-square box can later switch to the fitsToGeometry=false pixel model. An extent keyword
+  // (or, for a circle, an omitted size — CSS defaults it to farthest-corner) has no scalar radius
+  // in the token, so a circle derives the px radius from its center and the box; `circleExtentPx`
+  // then routes it through the pixel model below since the value is already in px.
+  bool radiusFromPxLength = false;
+  bool circleExtentPx = false;
+  if (!sizeTokens.empty() && boxWidth > 0) {
+    float radius = resolveRadialLength(sizeTokens[0], boxWidth);
+    if (!std::isnan(radius)) {
+      grad->radius = radius;
+      radiusFromPxLength = !sizeTokens[0].empty() && sizeTokens[0].back() != '%';
+    } else if (IsRadialExtentKeyword(sizeTokens[0])) {
+      // Only an explicit `circle` maps cleanly to PAGX's single radius. An implicit shape with an
+      // extent keyword (or an explicit ellipse) is an ellipse in CSS and needs per-axis radii the
+      // model can't represent, so keep the box-filling default and surface a diagnostic.
+      if (explicitCircle && boxHeight > 0) {
+        grad->radius = CircleExtentRadiusPx(sizeTokens[0], grad->center.x * boxWidth,
+                                            grad->center.y * boxHeight, boxWidth, boxHeight);
+        circleExtentPx = true;
+      } else {
+        _diagnostics.warn("html: radial-gradient size '" + sizeTokens[0] +
+                          "' not supported; using box-filling radius");
+      }
+    } else {
+      _diagnostics.warn("html: radial-gradient size '" + sizeTokens[0] +
+                        "' not supported; using box-filling radius");
+    }
+  } else if (sizeTokens.empty() && explicitCircle && boxWidth > 0 && boxHeight > 0) {
+    // A `circle` with no size defaults to farthest-corner in CSS.
+    grad->radius = CircleExtentRadiusPx("", grad->center.x * boxWidth, grad->center.y * boxHeight,
+                                        boxWidth, boxHeight);
+    circleExtentPx = true;
+  }
+
+  // Keep a circle's single radius isotropic. The default fitsToGeometry=true model scales the
+  // normalised radius by box width and height independently, so on a non-square box it would render
+  // a circle as an ellipse; such circles switch to the fitsToGeometry=false pixel model (center /
+  // radius in the geometry's local px space, where the box spans (0,0)-(boxWidth,boxHeight)). On a
+  // square box the normalised model is already isotropic, so keep the compact representation:
+  // extent/omitted sizes carry a px radius that is normalised back by boxWidth, while an explicit
+  // px length was already normalised above. Ellipses and percentage sizes stay normalised too.
+  bool nonSquare = boxWidth > 0 && boxHeight > 0 && std::abs(boxWidth - boxHeight) > 0.01f;
+  if (circleExtentPx) {
+    if (nonSquare) {
+      grad->center = {grad->center.x * boxWidth, grad->center.y * boxHeight};
+      grad->fitsToGeometry = false;
+    } else {
+      grad->radius = grad->radius / boxWidth;
+    }
+  } else if (isCircle && radiusFromPxLength && nonSquare) {
     grad->center = {grad->center.x * boxWidth, grad->center.y * boxHeight};
     grad->radius = grad->radius * boxWidth;
     grad->fitsToGeometry = false;
@@ -1082,6 +1149,38 @@ bool HTMLValueParser::finaliseGradientStops(GradientStops& stops) {
     float nextOffset = next < stops.size() ? stops[next].first : 1.0f;
     float steps = static_cast<float>(next - (i - 1));
     stops[i].first = prevOffset + (nextOffset - prevOffset) / steps;
+  }
+
+  // CSS interpolates gradient stops in premultiplied-alpha space, so a `transparent` (or any
+  // alpha=0) stop contributes only its neighbour's colour as the alpha fades — e.g. a
+  // `rgba(220,210,255,0.4) -> transparent` ramp stays purple while vanishing. The renderer
+  // interpolates unpremultiplied, where a keyword `transparent` carries black RGB and would drag
+  // the ramp toward grey/black. Rewrite each fully transparent stop's RGB to that of its nearest
+  // opaque neighbour (alpha kept at 0) so the unpremultiplied interpolation matches CSS. A stop
+  // between two opaque colours prefers the earlier neighbour to avoid tinting the visible,
+  // higher-alpha side of the fade.
+  for (size_t i = 0; i < stops.size(); ++i) {
+    if (stops[i].second.alpha > 0.0f) continue;
+    size_t donor = stops.size();
+    for (size_t back = i; back-- > 0;) {
+      if (stops[back].second.alpha > 0.0f) {
+        donor = back;
+        break;
+      }
+    }
+    if (donor == stops.size()) {
+      for (size_t fwd = i + 1; fwd < stops.size(); ++fwd) {
+        if (stops[fwd].second.alpha > 0.0f) {
+          donor = fwd;
+          break;
+        }
+      }
+    }
+    if (donor != stops.size()) {
+      stops[i].second.red = stops[donor].second.red;
+      stops[i].second.green = stops[donor].second.green;
+      stops[i].second.blue = stops[donor].second.blue;
+    }
   }
   return true;
 }

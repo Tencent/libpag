@@ -38,6 +38,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "tgfx/core/Bitmap.h"
@@ -2770,8 +2771,9 @@ CLI_TEST(PAGXCliTest, Resolve_MissingFile) {
 }
 
 CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
-  // Verifies that resolving an inline SVG with multiple elements preserves each SVG element
-  // in a separate painter scope, preventing painter accumulation bugs.
+  // Resolving an inline SVG with two sibling paths must preserve their common source depth:
+  // each path and its painter live in a separate peer Group. Flattening only the first path while
+  // grouping the second would make the output asymmetric and can change painter accumulation.
   auto pagxPath = CopyToTemp("import_resolve_multi_layer.pagx", "resolve_multi_layer.pagx");
   auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
   EXPECT_EQ(ret, 0);
@@ -2782,17 +2784,58 @@ CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
 
   ASSERT_EQ(doc->layers.size(), 1u);
   auto* hostLayer = doc->layers[0];
-  EXPECT_FALSE(hostLayer->contents.empty());
-  size_t groupCount = 0;
+  EXPECT_TRUE(hostLayer->children.empty());
+  ASSERT_EQ(hostLayer->contents.size(), 2u);
   for (auto* element : hostLayer->contents) {
-    if (element->nodeType() == pagx::NodeType::Group) {
-      groupCount++;
-    }
+    ASSERT_EQ(element->nodeType(), pagx::NodeType::Group);
+    auto* group = static_cast<pagx::Group*>(element);
+    ASSERT_EQ(group->elements.size(), 2u);
+    EXPECT_EQ(group->elements[0]->nodeType(), pagx::NodeType::Path);
+    EXPECT_EQ(group->elements[1]->nodeType(), pagx::NodeType::Stroke);
   }
-  EXPECT_GE(groupCount, 1u);
 
   // Screenshot test: render the resolved file and compare against baseline.
   EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
+}
+
+CLI_TEST(PAGXCliTest, Resolve_SkewSiblingKeepsAllLayers) {
+  // The first sibling has both a tiny scale and a real skew. Skew detection must be
+  // scale-independent, and one non-downgradable matrix must keep every sibling in children so
+  // contents/children paint ordering cannot reverse them.
+  auto pagxPath = CopyToTemp("import_resolve_skew_siblings.pagx", "resolve_skew_siblings.pagx");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* hostLayer = doc->layers[0];
+  EXPECT_TRUE(hostLayer->contents.empty());
+  ASSERT_EQ(hostLayer->children.size(), 2u);
+  EXPECT_FALSE(hostLayer->children[0]->matrix.isIdentity());
+  EXPECT_TRUE(hostLayer->children[1]->matrix.isIdentity());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_TransformableSiblingMatricesBecomeGroups) {
+  auto pagxPath =
+      CopyToTemp("import_resolve_transformed_siblings.pagx", "resolve_transformed_siblings.pagx");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* hostLayer = doc->layers[0];
+  EXPECT_TRUE(hostLayer->children.empty());
+  ASSERT_EQ(hostLayer->contents.size(), 2u);
+  ASSERT_EQ(hostLayer->contents[0]->nodeType(), pagx::NodeType::Group);
+  auto* transformed = static_cast<pagx::Group*>(hostLayer->contents[0]);
+  EXPECT_FLOAT_EQ(transformed->position.x, 4.0f);
+  EXPECT_FLOAT_EQ(transformed->position.y, 5.0f);
+  EXPECT_FLOAT_EQ(transformed->rotation, 30.0f);
+  EXPECT_FLOAT_EQ(transformed->scale.x, 2.0f);
+  EXPECT_FLOAT_EQ(transformed->scale.y, 3.0f);
+  EXPECT_EQ(hostLayer->contents[1]->nodeType(), pagx::NodeType::Group);
 }
 
 CLI_TEST(PAGXCliTest, Resolve_DeduplicatesInlineSvgImageIds) {

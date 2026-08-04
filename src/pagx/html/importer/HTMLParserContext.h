@@ -124,7 +124,7 @@ class HTMLParserContext {
   // equivalent SVG geometry — and attaches it to `layer` as `layer->mask` / `maskType`
   // (the inverse of `HTMLWriter::writeMaskCSS` / `writeClipDef`). The mask geometry SVG is parsed
   // through `SVGImporter`, and its nodes are transplanted into `_document`. The mask layer is added
-  // as an invisible, layout-excluded child of `layer` so it shares the masked layer's local
+  // as a layout-excluded child of `layer` so it shares the masked layer's local
   // coordinate space and is reachable by the renderer's mask lookup. No-op when the box carries
   // neither a mask nor a clip-path reference. `box` supplies the masked layer's resolved size used
   // to frame a contour clip-path SVG.
