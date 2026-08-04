@@ -21,7 +21,7 @@ import { PAGViewController } from './PAGViewController';
 @ComponentV2
 export struct PAGViewV2 {
   @Require @Param controller: PAGViewController;
-  // 标记动画是否因组件不可见而被组件暂停，重新可见时只恢复组件自己暂停的播放。
+  // Whether playback was paused by this component because it went off-screen; only these pauses are resumed when it becomes visible again.
   private pausedForInvisible: boolean = false;
 
   build() {
