@@ -65,56 +65,56 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="205"/>
+        <location filename="../qml/Main.qml" line="215"/>
         <source>Settings</source>
         <translation>设置</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="234"/>
+        <location filename="../qml/Main.qml" line="244"/>
         <source>About PAGViewer</source>
         <translation>关于PAGViewer</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="265"/>
+        <location filename="../qml/Main.qml" line="275"/>
         <source>Select Save Path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="363"/>
+        <location filename="../qml/Main.qml" line="373"/>
         <source>Performance Benchmark Test</source>
         <translation>性能基准测试</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="364"/>
+        <location filename="../qml/Main.qml" line="374"/>
         <source>Performance Benchmark Test Complete</source>
         <translation>性能基准测试已完成</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="386"/>
+        <location filename="../qml/Main.qml" line="396"/>
         <source>Export failed, error code: </source>
         <translation>导出错误，错误码：</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="528"/>
+        <location filename="../qml/Main.qml" line="569"/>
         <source>Open PAG File</source>
         <translation>打开PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="615"/>
-        <location filename="../qml/Main.qml" line="640"/>
-        <location filename="../qml/Main.qml" line="663"/>
+        <location filename="../qml/Main.qml" line="656"/>
+        <location filename="../qml/Main.qml" line="681"/>
+        <location filename="../qml/Main.qml" line="704"/>
         <source>Select save path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="626"/>
-        <location filename="../qml/Main.qml" line="647"/>
-        <location filename="../qml/Main.qml" line="672"/>
+        <location filename="../qml/Main.qml" line="667"/>
+        <location filename="../qml/Main.qml" line="688"/>
+        <location filename="../qml/Main.qml" line="713"/>
         <source>Exporting</source>
         <translation>正在导出</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="690"/>
+        <location filename="../qml/Main.qml" line="731"/>
         <source>Profiling</source>
         <translation>分析</translation>
     </message>
@@ -122,77 +122,77 @@
 <context>
     <name>MainForm</name>
     <message>
-        <location filename="../qml/MainForm.qml" line="317"/>
+        <location filename="../qml/MainForm.qml" line="321"/>
         <source>Click the menu or drag-drop here to open a PAG file</source>
         <translation>点击菜单，或拖放到这里打开一个PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="377"/>
+        <location filename="../qml/MainForm.qml" line="381"/>
         <source>Edit Layer</source>
         <translation>图层编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="382"/>
+        <location filename="../qml/MainForm.qml" line="386"/>
         <source>File Structure</source>
         <translation>文件结构</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="382"/>
+        <location filename="../qml/MainForm.qml" line="386"/>
         <source>Source Editor</source>
         <translation>源码编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="450"/>
+        <location filename="../qml/MainForm.qml" line="454"/>
         <source>No layer was editable</source>
         <translation>没有可以编辑的图层</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="450"/>
+        <location filename="../qml/MainForm.qml" line="454"/>
         <source>PAGX files do not support layer editing</source>
         <translation>PAGX 文件不支持图层编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="458"/>
+        <location filename="../qml/MainForm.qml" line="462"/>
         <source>Go to Source Editor →</source>
         <translation>前往源码编辑 →</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="532"/>
+        <location filename="../qml/MainForm.qml" line="536"/>
         <source>Edit Text</source>
         <translation>文本编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="614"/>
+        <location filename="../qml/MainForm.qml" line="618"/>
         <source>Edit Image</source>
         <translation>图片编辑</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="742"/>
+        <location filename="../qml/MainForm.qml" line="746"/>
         <source>Discard</source>
         <translation>放弃</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="776"/>
+        <location filename="../qml/MainForm.qml" line="780"/>
         <source>Apply</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="816"/>
+        <location filename="../qml/MainForm.qml" line="820"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="770"/>
+        <location filename="../qml/MainForm.qml" line="774"/>
         <source>Changes discarded</source>
         <translation>修改已放弃</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="300"/>
+        <location filename="../qml/MainForm.qml" line="304"/>
         <source>Reset Zoom</source>
         <translation>重置缩放</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="807"/>
+        <location filename="../qml/MainForm.qml" line="811"/>
         <source>Changes applied</source>
         <translation>修改已应用</translation>
     </message>
@@ -201,7 +201,7 @@
         <translation type="vanished">应用修改失败</translation>
     </message>
     <message>
-        <location filename="../qml/MainForm.qml" line="849"/>
+        <location filename="../qml/MainForm.qml" line="853"/>
         <source>File saved</source>
         <translation>文件已保存</translation>
     </message>

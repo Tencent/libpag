@@ -51,6 +51,14 @@ class PAGWindow : public QObject {
   QQmlApplicationEngine* getEngine();
   bool isUseEnglish();
 
+  // Returns true once the QML window is created, i.e. openFile() will be accepted rather than
+  // silently dropped. This mirrors the early-return guard in openFile() (window == nullptr).
+  bool isReady() const;
+
+  // Returns true when the window currently holds a successfully loaded file. A window that was
+  // never loaded or whose last load failed reports false and may be reused for a new file.
+  bool hasContent() const;
+
   static QList<PAGWindow*> AllWindows;
 
  private:
@@ -59,6 +67,7 @@ class PAGWindow : public QObject {
   void updateFilePath(const QString& path);
 
   QString filePath = "";
+  bool contentLoaded = false;
   QQuickWindow* window = nullptr;
   ContentView* contentView = nullptr;
   std::unique_ptr<QTranslator> translator = nullptr;

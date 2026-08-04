@@ -15,6 +15,7 @@ PAGWindow {
     minimumHeight: height
     minimumWidth: width
     canResize: false
+    titleBarHeight: isWindows ? 32 : 22
 
     PAGRectangle {
         id: rectangle
