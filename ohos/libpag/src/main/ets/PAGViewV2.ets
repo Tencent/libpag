@@ -21,6 +21,12 @@ import { PAGViewController } from './PAGViewController';
 @ComponentV2
 export struct PAGViewV2 {
   @Require @Param controller: PAGViewController;
+  @Param pagBackground: ResourceColor = Color.Transparent;
+
+  aboutToAppear(): void {
+    this.controller.attachToView(new WeakRef(this));
+    this.controller.pause();
+  }
 
   build() {
     XComponent({
@@ -28,7 +34,19 @@ export struct PAGViewV2 {
       type: XComponentType.SURFACE,
       libraryname: "pag",
     })
-      .backgroundColor(Color.Transparent)
+      .backgroundColor(this.pagBackground)
+      .onVisibleAreaChange([0.0, 1.0], (isExpanding: boolean, currentRatio: number) => {
+        if (isExpanding && currentRatio >= 0.0) {
+          if (!this.controller.isPlaying()) {
+            this.controller.play();
+          }
+        }
+        if (!isExpanding && currentRatio <= 0.0) {
+          if (this.controller.isPlaying()) {
+            this.controller.pause();
+          }
+        }
+      })
       .onLoad(() => {
         this.controller.update();
       })
@@ -36,10 +54,6 @@ export struct PAGViewV2 {
 
   onPageShow(): void {
     this.controller.update();
-  }
-
-  aboutToAppear(): void {
-    this.controller.attachToView(new WeakRef(this));
   }
 
   aboutToDisappear(): void {

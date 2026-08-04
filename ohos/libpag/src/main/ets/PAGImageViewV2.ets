@@ -21,6 +21,7 @@ import { PAGImageViewController } from './PAGImageViewController'
 @ComponentV2
 export struct PAGImageViewV2 {
   @Require @Param controller!: PAGImageViewController;
+  @Param pagBackground: ResourceColor = Color.Transparent;
 
   build() {
     XComponent({
@@ -28,7 +29,19 @@ export struct PAGImageViewV2 {
       type: XComponentType.SURFACE,
       libraryname: "pag",
     })
-      .backgroundColor(Color.Transparent)
+      .backgroundColor(this.pagBackground)
+      .onVisibleAreaChange([0.0, 1.0], (isExpanding: boolean, currentRatio: number) => {
+        if (isExpanding && currentRatio >= 0.0) {
+          if (!this.controller.isPlaying()) {
+            this.controller.play();
+          }
+        }
+        if (!isExpanding && currentRatio <= 0.0) {
+          if (this.controller.isPlaying()) {
+            this.controller.pause();
+          }
+        }
+      })
   }
 
   onPageShow(): void {
@@ -37,6 +50,7 @@ export struct PAGImageViewV2 {
 
   aboutToAppear(): void {
     this.controller.attachToView(new WeakRef(this));
+    this.controller.pause();
   }
 
   aboutToDisappear(): void {
