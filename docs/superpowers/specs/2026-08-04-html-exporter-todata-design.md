@@ -2,7 +2,7 @@
 
 > 状态：Draft
 >
-> 目标：在 libpag 的 `pagx::HTMLExporter` 中新增纯内存导出接口 `ToData()`，返回包含 `index.html` + `assets/**` 的自闭合 ZIP buffer，不触碰输出文件系统。对照 PPTX 双路径（`PPTExporter::ToData`，libpag commit `b711563bf`）的已验证模式实现。
+> 目标：在 libpag 的 `pagx::HTMLExporter` 中新增纯内存导出接口 `ToData()`，返回包含 `index.html` + `assets/**` 的自闭合 ZIP buffer，不写入输出文件系统。对照 PPTX 双路径（`PPTExporter::ToData`，libpag commit `b711563bf`）的已验证模式实现。
 
 ## 1. 背景
 
@@ -13,8 +13,8 @@
 ## 2. 目标
 
 - 新增 `HTMLExporter::ToData()`，返回标准 ZIP buffer（`index.html` + `assets/**`）；
-- 导出过程不创建目录、不读写输出文件系统；
-- 外部图片由调用方通过 `PAGXDocument::loadFileDataMap()` 以编码字节提前注入；
+- 导出过程不创建目录、不写入输出文件系统（允许读取本地 `filePath` 图片输入文件）；
+- 外部图片由调用方通过 `PAGXDocument::loadFileDataMap()` 以编码字节提前注入，或由 libpag 从本地 `filePath` 读取；
 - 保持现有 `ToHTML()`、`ToFile()` 的接口与行为逐字节不变；
 - 复用 HTMLWriter 渲染逻辑，不复制约 1 万行 HTML 生成代码。
 
@@ -35,10 +35,14 @@
  * Exports a PAGXDocument to an in-memory ZIP archive containing a full HTML
  * document at index.html and all auxiliary resources under assets/.
  *
- * This method does not create directories, write files, or access the output
- * filesystem. External images must be provided as encoded bytes beforehand via
- * PAGXDocument::loadFileDataMap(). Images without data degrade gracefully: the
- * HTML references the raw filePath and the archive stays valid.
+ * This method returns an in-memory archive and never writes to the output
+ * filesystem: it creates no directories, writes no resource files, and leaves
+ * no temporary files behind. External images should be provided as encoded
+ * bytes beforehand via PAGXDocument::loadFileDataMap(); images still referenced
+ * by a local filePath are read from disk and embedded into the archive.
+ * References that resolve to neither bytes nor a readable file (e.g. a "hash:"
+ * URI whose download is owned by the caller) degrade gracefully: the HTML
+ * references the raw filePath and the archive stays valid.
  *
  * Returns nullptr when the archive cannot be produced. If errorMsg is non-null,
  * a human-readable description is written to *errorMsg.
@@ -158,11 +162,51 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
 | 3 | Conic PNG | `HTMLWriterShape.cpp:2430-2438` | 同上 |
 | 4 | ImagePattern PNG | `HTMLWriterShape.cpp:2534` | 同上 |
 | 5 | PlusDarker | `HTMLPlusDarkerRenderer.cpp:212` | HTML 引用 `backdropDataURL`（base64，`HTMLWriterLayer.cpp:2719`），`pd_N.png` 写盘是**死输出**；`RenderAll` 增加 ctx 参数，ToData 时跳过写盘 |
-| 6 | 外部图片 | `HTMLWriterUtils.cpp:214,224-231` | `image->data` 非空 + 有 writer → `nextId("img") + "." + magic 扩展名` 写 ZIP asset + 相对 URL；无 writer → 维持 base64；本地 `filePath` + 有 writer → **不读文件**，降级 `EscapeCSSUrl` |
+| 6 | 外部图片 | `HTMLWriterUtils.cpp:214,224-231` | 见 7.1 |
 
-URL 始终 = `staticImgUrlPrefix + relativePath`（ToHTML 为 basename 前缀，ToData 为 `assets/`）。
+### 7.1 外部图片（GetImageSrc）
 
-外部图片去重：按 `const Image*` 指针缓存已分配的 entry 名（照抄 PPTX `_imageMap` 模式，`PPTWriterContext.h:74`），同一 Image 只写一次。
+`GetImageSrc` 在 ToData 模式（`ctx->resourceWriter` 非空）下的分叉：
+
+```cpp
+std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
+  if (image->data) {                                    // 形态 A：已喂入字节
+    auto mime = DetectImageMime(image->data->bytes(), image->data->size());
+    if (!mime) return {};
+    if (ctx->resourceWriter) {
+      std::string filename = ctx->nextId("img") + "." + MimeToExt(mime);
+      ctx->writeResource(filename, bytes, size, err);   // 写 ZIP asset（assets/img0.png）
+      ctx->externalImageAssets[image] = filename;       // 去重：同 Image 只写一次
+      return ctx->staticImgUrlPrefix + filename;
+    }
+    return "data:" + std::string(mime) + ";base64," + Base64Encode(...);  // ToHTML 原逻辑
+  }
+  if (ctx->resourceWriter) {
+    // 形态 B（hash:，字节由调用方下载）：不读网络、不读文件 → 返回空 src（现状行为）
+    // 形态 C（本地 filePath）：读文件字节 → 写 ZIP asset；读不到 → 降级 EscapeCSSUrl
+    if (image->filePath.rfind("hash:", 0) == 0) return {};
+    std::vector<uint8_t> buf;
+    if (ReadFileBytes(image->filePath, &buf)) {         // 允许读输入文件（libpag 可 IO）
+      auto mime = DetectImageMime(buf.data(), buf.size());
+      if (mime) {
+        std::string filename = ctx->nextId("img") + "." + MimeToExt(mime);
+        ctx->writeResource(filename, buf.data(), buf.size(), err);
+        ctx->externalImageAssets[image] = filename;
+        return ctx->staticImgUrlPrefix + filename;
+      }
+    }
+    return EscapeCSSUrl(image->filePath);               // 读不到 → 降级
+  }
+  // ← 原 ToHTML 逻辑（copy_file / ifstream / EscapeCSSUrl），逐字节不变
+}
+```
+
+**IO 边界**：`ToData()` 允许**读取**输入（本地 `filePath` 图片文件），与 PPTX `GetImageData`（`ImageFormatUtils.cpp:274-275`）一致；禁止的是**写入**输出文件系统（不建目录、不落盘资源、不写临时文件）。"不访问文件系统"是 ardot 业务侧的调用约束（避免临时目录中转），不是 libpag API 的硬约束。
+
+形态判定：
+- **A 已喂入字节**（`data` 非空，`filePath` 被 `loadFileDataMap` 清空）→ 写 ZIP asset；
+- **B `hash:` 且无 data**（下载超时/失败，未喂入）→ 返回空 src（与现状 `HTMLWriterUtils.cpp:232-234` 行为一致）；
+- **C 本地路径且无 data**（CLI/本地导入）→ 读文件字节写 ZIP asset，读不到降级 `EscapeCSSUrl`。
 
 ## 8. 错误处理
 
@@ -175,9 +219,9 @@ URL 始终 = `staticImgUrlPrefix + relativePath`（ToHTML 为 basename 前缀，
 
 **不失败**的场景（降级，与 PPTX `PPTWriterContext.h:63-64` 一致）：
 
-- 外部图片缺字节：HTML 引用原始 `filePath`（或空 src），ZIP 仍有效返回；
+- 外部图片缺字节且为 `hash:` 引用：返回空 src（与现状 `HTMLWriterUtils.cpp:232-234` 一致），ZIP 仍有效返回；
 - 图片格式无法识别（`DetectImageMime` 返回 null）：与现有 `GetImageSrc` 行为一致（返回空，src 缺失）；
-- 本地 `filePath` 图片（ToData 不访问文件系统）：降级 `EscapeCSSUrl(filePath)`。
+- 本地 `filePath` 图片读取失败：降级 `EscapeCSSUrl(filePath)`。
 
 第一版不提供"忽略缺图继续导出"之外的开关，也不提供"缺图整体失败"选项（与业务侧 60s 下载超时兜底继续导出的约束一致）。
 
@@ -221,12 +265,12 @@ ZIP 验证方式照抄 `PAGXPPTTest`（`HasZipMagic` + buffer 内搜 entry 名�
 - 相同 Image 被多处引用时只产生一个 entry。
 
 ### 11.3 错误与降级
-- 外部图片缺失字节：`ToData()` 仍返回非空 ZIP（不失败）；
-- 缺图时 HTML 引用原始 filePath，不崩溃。
+- `hash:` 图片缺字节（未喂入）：`ToData()` 仍返回非空 ZIP（不失败），HTML 中对应 src 为空，不崩溃；
+- 本地 `filePath` 图片可被读取并写入 ZIP asset；指向不存在文件的路径降级为原样引用，不崩溃。
 
-### 11.4 无文件 I/O
+### 11.4 无输出文件 I/O
 - `ToData()` 不接受 `resourceDir`；
-- 测试执行前后，工作目录无新增资源目录或临时文件。
+- 测试执行前后，工作目录无新增资源目录或临时文件（允许读取输入图片文件，禁止写入输出文件系统）；
 
 ### 11.5 回归
 - 现有 `PAGXHtmlTest`（BatchConvertAll + 截图比较 + 字符串断言）全部通过，证明 `ToHTML` 行为不变；
@@ -239,7 +283,7 @@ ZIP 验证方式照抄 `PAGXPPTTest`（`HasZipMagic` + buffer 内搜 entry 名�
 |---|---|---|---|
 | `ToHTML()` | HTML string | `resourceDir` | 不变 |
 | `ToFile()` | bool | HTML 文件 + 资源目录 | 不变 |
-| `ToData()` | ZIP `Data` | ZIP 内 `index.html + assets/**` | 不访问输出文件系统 |
+| `ToData()` | ZIP `Data` | ZIP 内 `index.html + assets/**` | 不写入输出文件系统（可读输入图片文件） |
 
 新增声明遵循 `include/pagx/` 现有头文件的 ABI/导出宏约定。`MemZip` 抽取为纯移动，PPTX 对外行为不变。
 
