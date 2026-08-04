@@ -130,7 +130,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     /**
      * Loads a pag file from the specified path, returns false if the file does not exist or the
      * data is not a pag file. The path starts with "assets://" means that it is located in assets
-     * directory.
+     * directory. If the path is a network URL (starting with "http://" or "https://"), this method
+     * must be called on a worker thread; otherwise it throws a NetworkOnMainThreadException when the
+     * file is not in the disk cache. Use setPathAsync() to load a network file from the UI thread.
      */
     public boolean setPath(String path) {
         return setPath(path, DEFAULT_MAX_FRAMERATE);
@@ -139,7 +141,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     /**
      * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file does not exist or the
      * data is not a pag file. The path starts with "assets://" means that it is located in assets
-     * directory.
+     * directory. If the path is a network URL (starting with "http://" or "https://"), this method
+     * must be called on a worker thread; otherwise it throws a NetworkOnMainThreadException when the
+     * file is not in the disk cache. Use setPathAsync() to load a network file from the UI thread.
      */
     public boolean setPath(String path, float maxFrameRate) {
         PAGComposition composition = getCompositionFromPath(path);
@@ -148,20 +152,25 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     }
 
     /**
-     * Asynchronously Loads a pag file from the specified path.
+     * Asynchronously loads a pag file from the specified path. The path can be a network URL
+     * ("http://" or "https://") or a local path; the file is loaded on a worker thread, so this
+     * method is safe to call from the UI thread.
      */
     public void setPathAsync(String path, PAGFile.LoadListener listener) {
         setPathAsync(path, DEFAULT_MAX_FRAMERATE, listener);
     }
 
     /**
-     * Asynchronously loads a pag file from the specified path with the maxFrameRate limit.
+     * Asynchronously loads a pag file from the specified path with the maxFrameRate limit. The path
+     * can be a network URL ("http://" or "https://") or a local path; the file is loaded on a worker
+     * thread, so this method is safe to call from the UI thread.
      */
     public void setPathAsync(String path, float maxFrameRate, PAGFile.LoadListener listener) {
         NativeTask.Run(() -> {
-            // Keep a local reference to the loaded composition. The _composition field may be reset
-            // to null by the render thread in initDecoderInfo() for path-loaded views, so reading it
-            // here would race and frequently return null to the callback.
+            // Load on this worker thread so a network path never touches the main thread. Keep a
+            // local reference to the loaded composition so the callback always reports the freshly
+            // loaded file, even if a later setPath()/setComposition() replaces _composition before
+            // the callback runs.
             PAGComposition composition = getCompositionFromPath(path);
             refreshResource(path, composition, maxFrameRate);
             if (listener != null) {
@@ -503,14 +512,14 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         decoderInfo.lock();
         try {
             if (!decoderInfo.isValid()) {
-                if (_composition == null) {
-                    _composition = getCompositionFromPath(_pagFilePath);
-                }
-                if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate)) {
-                    if (_pagFilePath != null) {
-                        _composition = null;
-                    }
-                }
+                // Reuse the composition kept in memory. Reloading it from _pagFilePath when the
+                // decoder is rebuilt (after detach/reattach or a size change) would reissue
+                // PAGFile.Load() on the caller thread. These rebuilds are driven by the view
+                // lifecycle on the main thread, so a network path would throw a
+                // NetworkOnMainThreadException and a local path would block on disk I/O. The
+                // composition is loaded once by setPath()/setPathAsync()/setComposition() and is
+                // never reloaded here.
+                decoderInfo.initDecoder(_composition, width, height, _maxFrameRate);
                 if (!decoderInfo.isValid()) {
                     return;
                 }
@@ -605,9 +614,8 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         if (needResetBitmapCache) {
             bitmapCache.clear();
             if (!decoderInfo.hasPAGDecoder()) {
-                if (composition == null) {
-                    composition = getCompositionFromPath(_pagFilePath);
-                }
+                // Reuse the in-memory composition; never reload it from _pagFilePath here (see
+                // initDecoderInfo() for why reloading on this thread is unsafe).
                 decoderInfo.initDecoder(composition, width, height, _maxFrameRate);
             }
         }
