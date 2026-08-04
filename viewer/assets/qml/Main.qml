@@ -484,9 +484,9 @@ PAGWindow {
 
         let preferredSize = contentView ? contentView.viewModel.preferredSize : Qt.size(0, 0);
         if (viewWindow.visibility === Window.FullScreen) {
-            // Full screen: the window size is fixed, so fit the canvas inside the available
-            // content area at the file aspect ratio instead of resizing the window.
-            applyFullScreenCanvas(preferredSize, willOpen);
+            // Full screen: the window size is fixed, so only reserve horizontal room for the
+            // panel instead of resizing the window.
+            applyFullScreenCanvas(willOpen);
             return;
         }
         // Recompute the whole window geometry so that both dimensions stay consistent with the
@@ -497,10 +497,10 @@ PAGWindow {
         viewWindow.height = geometry.height;
     }
 
-    // Fits the canvas inside the available content area when the window size is fixed (full
-    // screen). The window cannot be resized, so the canvas itself is sized to the file aspect
-    // ratio within the area left of the panel; MainForm centers the content inside centerItem.
-    function applyFullScreenCanvas(preferredSize, panelOpen) {
+    // In full screen the window size is fixed and cannot be resized, so this only reserves
+    // horizontal room for the side panel by shrinking centerItem.width; the content view keeps
+    // aspect-fit rendering within whatever area is left.
+    function applyFullScreenCanvas(panelOpen) {
         let panelWidth = panelOpen ? Math.max(mainForm.rightItemLoader.width, mainForm.minPanelWidth)
             + mainForm.splitHandleWidth : 0;
         mainForm.centerItem.width = viewWindow.width - panelWidth;
