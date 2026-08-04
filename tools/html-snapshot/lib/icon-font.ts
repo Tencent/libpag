@@ -127,6 +127,24 @@ export function normalizeFontFaceStyle(value: string): string {
   return 'normal';
 }
 
+// Return the CSS Fonts weight-search phase and distance for a face range. The
+// phase captures the spec's directional preference: below 400 search downward
+// first, from 400 through 500 search upward to 500 then downward, and above 500
+// search upward first. This also makes equidistant choices independent of
+// @font-face declaration order (for example 650 chooses 900 over 400).
+function fontWeightPreference(requested: number, lo: number, hi: number): [number, number] {
+  if (requested >= lo && requested <= hi) return [0, 0];
+  if (requested < 400) {
+    return hi < requested ? [1, requested - hi] : [2, lo - requested];
+  }
+  if (requested > 500) {
+    return lo > requested ? [1, lo - requested] : [2, requested - hi];
+  }
+  if (lo > requested && lo <= 500) return [1, lo - requested];
+  if (hi < requested) return [2, requested - hi];
+  return [3, lo - requested];
+}
+
 // Pick the @font-face that best matches a pseudo-element's computed style.
 // A family may expose several physical files under one name (Font Awesome's
 // "Font Awesome 6 Free" uses Regular/400 and Solid/900). Treating a family as
@@ -143,21 +161,30 @@ export function selectFontFace(
   const reqWeight = reqWeightMatch ? Number(reqWeightMatch[0]) : 400;
   const reqStyle = normalizeFontFaceStyle(requestedStyle);
   let best: FontFaceEntry | null = null;
-  let bestScore = Infinity;
+  let bestPreference: [number, number, number] | null = null;
   for (const face of faces) {
     if (!face) continue;
     const nums = normalizeFontFaceWeight(face.weight).match(/\d+(?:\.\d+)?/g) || [];
     let lo = nums.length > 0 ? Number(nums[0]) : 400;
     let hi = nums.length > 1 ? Number(nums[1]) : lo;
     if (lo > hi) { const tmp = lo; lo = hi; hi = tmp; }
-    const weightDistance = reqWeight < lo ? lo - reqWeight : reqWeight > hi ? reqWeight - hi : 0;
-    // Style should dominate weight proximity: an italic face at the exact
+    const [weightPhase, weightDistance] = fontWeightPreference(reqWeight, lo, hi);
+    // Style should dominate weight preference: an italic face at the exact
     // weight is a worse match than a nearby upright face for normal text.
-    const stylePenalty = normalizeFontFaceStyle(face.style) === reqStyle ? 0 : 10_000;
-    const score = stylePenalty + weightDistance;
-    if (score < bestScore) {
+    const preference: [number, number, number] = [
+      normalizeFontFaceStyle(face.style) === reqStyle ? 0 : 1,
+      weightPhase,
+      weightDistance,
+    ];
+    if (
+      bestPreference === null ||
+      preference[0] < bestPreference[0] ||
+      (preference[0] === bestPreference[0] && preference[1] < bestPreference[1]) ||
+      (preference[0] === bestPreference[0] && preference[1] === bestPreference[1] &&
+        preference[2] < bestPreference[2])
+    ) {
       best = face;
-      bestScore = score;
+      bestPreference = preference;
     }
   }
   return best;

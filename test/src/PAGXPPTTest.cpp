@@ -912,6 +912,18 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithTextBox) {
 
   pagx::PPTExportOptions options;
   options.convertTextToPath = false;
+  doc->applyLayout();
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+  // Ordinary editable text keeps PowerPoint's bounded wrapping as a cross-platform fallback when
+  // the export host cannot reproduce the authored font metrics.
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
   ASSERT_TRUE(ExportAndVerify(*doc, "native_text_textbox", options));
 }
 
@@ -4887,6 +4899,10 @@ PAGX_TEST(PAGXPPTTest, TextBoxContainerSingleText) {
 
   layer->contents.push_back(textBox);
   doc->layers.push_back(layer);
+  doc->applyLayout();
+  auto body = WritePPTDocumentXML(doc.get(), {});
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
   ASSERT_TRUE(ExportAndVerify(*doc, "textbox_container_single"));
 }
 
@@ -5043,6 +5059,41 @@ PAGX_TEST(PAGXPPTTest, ModifierTextBoxEmbeddedMultipleLinesKeepsBoundedWrapFallb
   pagx::PPTExportOptions options;
   options.ignoreGlyphRuns = true;
   auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, ModifierTextBoxSiblingRenderPositionsRemainSeparateLines) {
+  auto doc = pagx::PAGXDocument::Make(400, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto makeText = [&](const char* content, float y) {
+    auto* text = doc->makeNode<pagx::Text>();
+    text->text = content;
+    text->position = {40.0f, y};
+    text->fontFamily = "Arial";
+    text->fontSize = 32.0f;
+    text->glyphRuns.push_back(MakeEmbeddedGlyphRun(
+        doc.get(), {{0.0f, 0.0f}}, pagx::Rect::MakeXYWH(0, 0, 32, 40), 36.0f, text->fontSize));
+    layer->contents.push_back(text);
+  };
+  makeText("A", 40.0f);
+  makeText("B", 120.0f);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {40.0f, 40.0f};
+  textBox->width = 200.0f;
+  textBox->height = 160.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  // Both runs use the same GlyphRun-local baseline, but their Text render positions place them on
+  // different visual lines. Comparing absolute baselines must retain bounded wrapping.
   EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
   EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
 }

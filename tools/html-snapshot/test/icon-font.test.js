@@ -177,7 +177,7 @@ describe('selectFontFace', () => {
     expect(normalizeFontFaceStyle('oblique 10deg')).toBe('oblique');
   });
 
-  test('selects the face nearest to the computed weight', () => {
+  test('selects exact computed weights', () => {
     expect(selectFontFace(faces, '900', 'normal').url).toBe('solid.woff2');
     expect(selectFontFace(faces, '400', 'normal').url).toBe('regular.woff2');
   });
@@ -187,8 +187,34 @@ describe('selectFontFace', () => {
   });
 
   test('supports variable-font weight ranges', () => {
-    const variable = [{ family: 'Icons', url: 'variable.woff2', format: 'woff2', weight: '100 900', style: 'normal' }];
-    expect(selectFontFace(variable, '725', 'normal').url).toBe('variable.woff2');
+    const variable = [
+      { family: 'Icons', url: 'low.woff2', format: 'woff2', weight: '100 400', style: 'normal' },
+      { family: 'Icons', url: 'high.woff2', format: 'woff2', weight: '500 900', style: 'normal' },
+      { family: 'Icons', url: 'fixed.woff2', format: 'woff2', weight: '700', style: 'normal' },
+    ];
+    expect(selectFontFace(variable, '725', 'normal').url).toBe('high.woff2');
+    expect(selectFontFace(variable, '200', 'normal').url).toBe('low.woff2');
+  });
+
+  test('uses CSS directional weight matching independent of declaration order', () => {
+    const regular = {
+      family: 'Icons', url: 'regular.woff2', format: 'woff2', weight: '400', style: 'normal',
+    };
+    const semibold = {
+      family: 'Icons', url: 'semibold.woff2', format: 'woff2', weight: '600', style: 'normal',
+    };
+    const black = {
+      family: 'Icons', url: 'black.woff2', format: 'woff2', weight: '900', style: 'normal',
+    };
+    expect(selectFontFace([regular, black], '650', 'normal').url).toBe('black.woff2');
+    expect(selectFontFace([black, regular], '650', 'normal').url).toBe('black.woff2');
+    expect(selectFontFace([semibold, regular], '500', 'normal').url).toBe('regular.woff2');
+    expect(selectFontFace([regular, semibold], '500', 'normal').url).toBe('regular.woff2');
+  });
+
+  test('falls back deterministically to weight 400 for an unknown request', () => {
+    expect(selectFontFace([faces[1], faces[0]], 'not-a-weight', 'normal').url)
+      .toBe('regular.woff2');
   });
 });
 

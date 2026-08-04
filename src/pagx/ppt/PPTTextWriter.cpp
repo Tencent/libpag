@@ -97,11 +97,11 @@ bool HasOnlyEmbeddedEmojiGlyphs(const Text* text) {
   return hasEmojiGlyph;
 }
 
-constexpr float LineCoordinateEpsilon = 0.5f;
+constexpr float LINE_COORDINATE_EPSILON = 0.5f;
 
-static void AddDistinctLineCoordinate(std::vector<float>* coordinates, float coordinate) {
+void AddDistinctLineCoordinate(std::vector<float>* coordinates, float coordinate) {
   for (float existing : *coordinates) {
-    if (std::fabs(existing - coordinate) < LineCoordinateEpsilon) {
+    if (std::fabs(existing - coordinate) < LINE_COORDINATE_EPSILON) {
       return;
     }
   }
@@ -109,13 +109,13 @@ static void AddDistinctLineCoordinate(std::vector<float>* coordinates, float coo
 }
 
 // Embedded GlyphRun positions are the authoring layout's source of truth. Horizontal glyphs on
-// the same visual line share a baseline (run->y + positions[i].y), even when FontEmbedder split
-// them into several font/bitmap runs. A single embedded baseline is especially useful because it
-// proves that the authored text is one line without requiring a glyph-to-UTF-8 cluster mapping.
-// Multi-line byte boundaries cannot be reconstructed generically from GlyphRun alone (ligatures,
-// BiDi and fallback-font splits make glyph counts differ from character counts), so callers retain
-// PowerPoint's bounded-wrap fallback for those cases.
-static bool HasSingleEmbeddedHorizontalLine(const std::vector<const Text*>& texts) {
+// the same visual line share a final baseline (text->renderPosition().y + run->y + positions[i].y),
+// even when FontEmbedder split them into several font/bitmap runs. A single embedded baseline is
+// especially useful because it proves that the authored text is one line without requiring a
+// glyph-to-UTF-8 cluster mapping. Multi-line byte boundaries cannot be reconstructed generically
+// from GlyphRun alone (ligatures, BiDi and fallback-font splits make glyph counts differ from
+// character counts), so callers retain PowerPoint's bounded-wrap fallback for those cases.
+bool HasSingleEmbeddedHorizontalLine(const std::vector<const Text*>& texts) {
   std::vector<float> baselines;
   bool hasRenderedGlyph = false;
   for (const auto* text : texts) {
@@ -134,7 +134,7 @@ static bool HasSingleEmbeddedHorizontalLine(const std::vector<const Text*>& text
         if (run->glyphs[i] == 0) {
           continue;
         }
-        float baseline = run->y + run->positions[i].y;
+        float baseline = text->renderPosition().y + run->y + run->positions[i].y;
         if (!std::isfinite(baseline)) {
           return false;
         }
@@ -153,7 +153,7 @@ static bool HasSingleEmbeddedHorizontalLine(const std::vector<const Text*>& text
   return hasRenderedGlyph && baselines.size() == 1;
 }
 
-static size_t CountNonEmptyLayoutLines(const std::vector<TextLayoutLineInfo>* lines) {
+size_t CountNonEmptyLayoutLines(const std::vector<TextLayoutLineInfo>* lines) {
   if (lines == nullptr) {
     return 0;
   }
@@ -666,11 +666,10 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   if (hasSingleEmbeddedLine && CountNonEmptyLayoutLines(lines) != 1) {
     useLineLayout = false;
   }
-  // For ordinary text, the fresh layout is the same source of truth PAGX renders. Embedded text
-  // is environment-dependent after it is made editable, so only a proven single authored line (or
-  // an explicit wordWrap=false contract) is strong enough to disable PowerPoint's bounded fallback.
-  bool disableAutoWrap = (fs.textBox != nullptr && !fs.textBox->wordWrap) ||
-                         (!hasEmbeddedGlyphRuns && useLineLayout) || hasSingleEmbeddedLine;
+  // Only an explicit wordWrap=false contract or complete embedded positions proving one authored
+  // line are strong enough to disable PowerPoint's bounded fallback. Even ordinary PAGX line
+  // metadata can be platform-dependent when the export host lacks the authored font.
+  bool disableAutoWrap = (fs.textBox != nullptr && !fs.textBox->wordWrap) || hasSingleEmbeddedLine;
 
   emitNativeTextShapeFrame(out, m, geom, fs.textBox, disableAutoWrap);
 
@@ -1212,8 +1211,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
       lineEntries.clear();
     }
   }
-  bool disableAutoWrap =
-      !box->wordWrap || (!allHaveEmbeddedGlyphRuns && useLineLayout) || hasSingleEmbeddedLine;
+  bool disableAutoWrap = !box->wordWrap || hasSingleEmbeddedLine;
 
   emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight, disableAutoWrap);
 
