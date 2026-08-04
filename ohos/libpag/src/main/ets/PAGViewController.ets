@@ -121,6 +121,9 @@ export class PAGViewController {
    */
   play() {
     this.userWantsPlaying = true;
+    // A caller-initiated play overrides the off-screen pause latch, so the visibility
+    // handling can pause the animation again if it later goes off-screen.
+    this.pausedForInvisible = false;
     this.jView?.play();
   }
 
