@@ -30,6 +30,10 @@ SplitView {
 
     property int controlFormHeight: 76
 
+    // Minimum height reserved for the editing area while the side panel is open, so the
+    // profiler never squeezes it to an unusable size when the window is short.
+    property int minEditAreaHeight: 120
+
     property alias contentViewLoader: contentViewLoader
 
     property alias dropArea: dropArea
@@ -870,7 +874,11 @@ SplitView {
                 PAGRectangle {
                     id: performance
                     color: "#16161D"
-                    height: isSourceEditorActive ? 0 : Math.min(profilerForm.contentHeight, parent.height - tabBar.height - 40)
+                    // Reserve minEditAreaHeight for the editing area above, so the profiler never
+                    // squeezes it to an unusable size when the window is short. The profiler
+                    // scrolls internally, so no data is lost.
+                    height: isSourceEditorActive ? 0 : Math.min(profilerForm.contentHeight,
+                                                                Math.max(0, parent.height - tabBar.height - 40 - minEditAreaHeight))
                     visible: !isSourceEditorActive
                     clip: true
                     anchors.right: parent.right
