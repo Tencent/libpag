@@ -31,7 +31,9 @@ export struct PAGViewV2 {
       libraryname: "pag",
     })
       .backgroundColor(Color.Transparent)
-      .onVisibleAreaChange([0.0, 1.0], this.onVisibleAreaChanged)
+      .onVisibleAreaChange([0.0, 1.0], (isExpanding: boolean, currentRatio: number) => {
+        this.onVisibleAreaChanged(isExpanding, currentRatio);
+      })
       .onLoad(() => {
         this.controller.update();
       })
