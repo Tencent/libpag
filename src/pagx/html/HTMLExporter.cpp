@@ -350,6 +350,10 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
 
 std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
                                            std::string* errorMsg) {
+  if (!document.isLayoutApplied()) {
+    document.applyLayout();
+  }
+
   HTMLZipResourceWriter zipWriter;
   HTMLWriterContext ctx;
   ctx.docWidth = document.width;
