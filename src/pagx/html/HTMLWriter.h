@@ -217,6 +217,10 @@ class HTMLWriterContext {
   std::unordered_map<std::string, std::string> externalImageCopies = {};
   std::unordered_set<std::string> externalImageClaimedNames = {};
 
+  // ToData only: Image* → assigned assets/ filename, so one Image is embedded
+  // at most once into the archive.
+  std::unordered_map<const Image*, std::string> externalImageAssets = {};
+
   // Per-plusDarker-Layer backdrop data registered by HTMLPlusDarkerRenderer before the writer
   // walks the tree. When a Layer pointer is present here, the writer emits an SVG filter that
   // composites the backdrop via feImage + feComposite arithmetic instead of the mix-blend-mode

@@ -220,7 +220,52 @@ static std::string CopyExternalImageToStaticDir(const std::string& srcPath,
   return ctx->staticImgUrlPrefix + candidate;
 }
 
+namespace {
+
+// Same byte-resolution semantics as PPTExporter's GetImageData: Image::data
+// wins, otherwise the file referenced by filePath is read from disk.
+std::shared_ptr<tgfx::Data> GetImageBytes(const Image* image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  if (image->data) {
+    return tgfx::Data::MakeWithoutCopy(image->data->bytes(), image->data->size());
+  }
+  if (!image->filePath.empty()) {
+    return tgfx::Data::MakeFromFile(image->filePath);
+  }
+  return nullptr;
+}
+
+const char* MimeToExt(const std::string& mime) {
+  if (mime == "image/jpeg") return "jpeg";
+  if (mime == "image/webp") return "webp";
+  if (mime == "image/gif") return "gif";
+  return "png";  // image/png and any unknown input
+}
+
+}  // namespace
+
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
+  if (ctx != nullptr && ctx->resourceWriter != nullptr) {
+    auto cached = ctx->externalImageAssets.find(image);
+    if (cached != ctx->externalImageAssets.end()) {
+      return ctx->staticImgUrlPrefix + cached->second;
+    }
+    auto bytes = GetImageBytes(image);
+    if (bytes && bytes->size() > 0) {
+      auto mime = DetectImageMime(bytes->bytes(), bytes->size());
+      if (mime != nullptr) {
+        std::string filename = ctx->nextId("img") + "." + MimeToExt(mime);
+        std::string error;
+        if (ctx->writeResource(filename, bytes->bytes(), bytes->size(), &error)) {
+          ctx->externalImageAssets[image] = filename;
+          return ctx->staticImgUrlPrefix + filename;
+        }
+      }
+    }
+    return {};  // No bytes readable or unrecognized format → empty src degrade
+  }
   if (image->data) {
     auto mime = DetectImageMime(image->data->bytes(), image->data->size());
     if (!mime) {
