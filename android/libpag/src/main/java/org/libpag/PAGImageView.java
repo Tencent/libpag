@@ -444,7 +444,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     }
 
 
-    int lastContentVersion = -1;
+    private volatile int lastContentVersion = -1;
 
     private PAGComposition getCompositionFromPath(String path) {
         if (path == null) {
@@ -476,6 +476,12 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
         _maxFrameRate = maxFrameRate;
         _matrix = null;
         releaseBitmap();
+        // Drop the previous file's cached frames and reset the version baseline when switching
+        // resources. A freshly loaded file starts at contentVersion 0, so the new composition may
+        // collide with the old one's version; without forcing the cache invalid here, a stale frame
+        // from the previous file could be reused when cacheAllFramesInMemory is true.
+        bitmapCache.clear();
+        lastContentVersion = -1;
         _pagFilePath = path;
         _composition = composition;
         _currentFrame = 0;
