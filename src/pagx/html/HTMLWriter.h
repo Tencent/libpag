@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include <memory>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -185,36 +186,29 @@ class HTMLWriterContext {
   // resourceDir. `staticImgDir` is the absolute filesystem path where PNG assets are written;
   // `staticImgUrlPrefix` is the relative URL prefix that the generated HTML uses to reference
   // them (derived as the directory's basename + '/'). The resourceDir is mandatory at the
-  // public API boundary, so both fields are non-empty when HTMLWriter runs.
-  //
-  // When `resourceWriter` is set (the ToData path), staticImgDir/staticImgUrlPrefix are left
-  // empty and every resource is routed into the in-memory archive through writeResource()
-  // instead of the filesystem.
+  // public API boundary, so both fields are non-empty when HTMLWriter runs in ToHTML mode.
+  // In ToData mode staticImgDir is left empty (resources go to the ZIP writer instead) while
+  // staticImgUrlPrefix stays set so writeResource can prepend it to ZIP entry names.
   std::string staticImgDir = {};
   std::string staticImgUrlPrefix = {};
-  float rasterScale = 2.0f;
 
-  // Optional in-memory resource sink. ToHTML leaves this unset so resources are written to
-  // staticImgDir on disk exactly as before; ToData sets it to an HTMLZipResourceWriter so every
-  // resource (rasterized PNGs, copied images, WOFF2 fonts, PlusDarker backdrops) lands inside
-  // the returned archive instead. All resource writes must go through writeResource(), never
-  // the filesystem directly.
-  std::shared_ptr<HTMLResourceWriter> resourceWriter = {};
+  // Resource output abstraction. null → resources are written into staticImgDir
+  // exactly as before (ToHTML); non-null → every resource is handed to the
+  // writer instead (ToData), so the in-memory archive receives the same bytes.
+  HTMLResourceWriter* resourceWriter = nullptr;
 
-  // Returns true when the context can produce resource output: either an explicit
-  // resourceWriter (ToData path) or a non-empty staticImgDir (ToHTML path). Callers use this
-  // to decide whether rasterization-based fallbacks are available.
   bool hasResourceOutput() const {
     return resourceWriter != nullptr || !staticImgDir.empty();
   }
 
-  // Writes one resource into the active output. `relativePath` is '/'-separated relative to the
-  // output root (e.g. "dgc0.png" or "fonts/font_f0.woff2"). When resourceWriter is set the
-  // bytes are forwarded to it; otherwise they are written to staticImgDir/relativePath on disk,
-  // creating parent directories as needed. Returns false on failure with errorMsg populated if
-  // non-null.
+  // Writes a resource. relativePath is relative to the resource root (ToHTML:
+  // staticImgDir; ToData: the ZIP root) and may contain '/'-separated sub
+  // directories. Falls back to the original write-to-disk behavior when
+  // resourceWriter is null.
   bool writeResource(const std::string& relativePath, const void* bytes, size_t size,
-                     std::string* errorMsg = nullptr);
+                     std::string* errorMsg);
+
+  float rasterScale = 2.0f;
 
   // Cache: source absolute file path → assigned filename inside staticImgDir. Used by
   // GetImageSrc to deduplicate identical source paths (one source copied at most once per
@@ -278,6 +272,52 @@ class HTMLWriterContext {
  private:
   int _id = 0;
 };
+
+inline bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
+                                             size_t size, std::string* errorMsg) {
+  if (resourceWriter != nullptr) {
+    // ToData: the archive entry name must equal the URL the HTML references
+    // ("assets/img0.png", "assets/fonts/font_f0.woff2" ...), so prepend
+    // staticImgUrlPrefix ("assets/"). ToHTML never reaches here (resourceWriter
+    // is null) and keeps writing to staticImgDir unchanged.
+    return resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, errorMsg);
+  }
+  // Original write-to-disk logic: staticImgDir + relativePath (subdirectories included), with
+  // create_directories before writing the file.
+  if (staticImgDir.empty()) {
+    return false;
+  }
+  std::string dir = staticImgDir;
+  std::string name = relativePath;
+  size_t slash = relativePath.find_last_of('/');
+  if (slash != std::string::npos) {
+    dir += "/" + relativePath.substr(0, slash);
+    name = relativePath.substr(slash + 1);
+  }
+  std::error_code ec;
+  std::filesystem::create_directories(dir, ec);
+  if (ec) {
+    if (errorMsg) {
+      *errorMsg = "failed to create directory: " + dir;
+    }
+    return false;
+  }
+  std::ofstream f(dir + "/" + name, std::ios::binary);
+  if (!f.is_open()) {
+    if (errorMsg) {
+      *errorMsg = "failed to open output file: " + dir + "/" + name;
+    }
+    return false;
+  }
+  f.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(size));
+  if (!f.good()) {
+    if (errorMsg) {
+      *errorMsg = "write error after opening file: " + dir + "/" + name;
+    }
+    return false;
+  }
+  return true;
+}
 
 class RecursionGuard {
  public:

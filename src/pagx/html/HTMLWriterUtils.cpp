@@ -220,46 +220,6 @@ static std::string CopyExternalImageToStaticDir(const std::string& srcPath,
   return ctx->staticImgUrlPrefix + candidate;
 }
 
-bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
-                                      size_t size, std::string* errorMsg) {
-  if (resourceWriter) {
-    // ToData path: every resource lands in the in-memory archive as a ZIP entry.
-    return resourceWriter->write(relativePath, bytes, size, errorMsg);
-  }
-  // ToHTML path: fall back to writing the bytes under staticImgDir on disk, mirroring the
-  // behaviour of the pre-abstraction call sites (create directories, then write the file).
-  if (staticImgDir.empty() || relativePath.empty()) {
-    if (errorMsg) {
-      *errorMsg = "HTMLWriterContext: no resource output configured.";
-    }
-    return false;
-  }
-  std::filesystem::path dst = std::filesystem::path(staticImgDir) / relativePath;
-  std::error_code ec;
-  std::filesystem::create_directories(dst.parent_path(), ec);
-  if (ec) {
-    if (errorMsg) {
-      *errorMsg = "HTMLWriterContext: failed to create resource directory: " + ec.message();
-    }
-    return false;
-  }
-  std::ofstream f(dst, std::ios::binary);
-  if (!f.is_open()) {
-    if (errorMsg) {
-      *errorMsg = "HTMLWriterContext: failed to open resource for writing: " + dst.string();
-    }
-    return false;
-  }
-  f.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(size));
-  if (!f) {
-    if (errorMsg) {
-      *errorMsg = "HTMLWriterContext: failed to write resource: " + dst.string();
-    }
-    return false;
-  }
-  return true;
-}
-
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
   if (image->data) {
     auto mime = DetectImageMime(image->data->bytes(), image->data->size());
