@@ -35,6 +35,7 @@ cmake --build cmake-build-debug --target PAGFullTest
 - Create: `src/pagx/utils/MemZip.h`
 - Create: `src/pagx/utils/MemZip.cpp`
 - Modify: `src/pagx/ppt/PPTExporter.cpp`（删除 `PPTExporter.cpp:934-1030` 的 `MemZipBuffer` + 7 个回调 + `MakeMemZipFileFunc`，改为 include 共享头）
+- Modify: `pagx/wechat/CMakeLists.txt`（utils glob 后 FILTER 排除 MemZip.cpp，仿 Woff2FontGenerator 先例）
 
 **Interfaces:**
 - Produces:
@@ -165,40 +166,52 @@ zlib_filefunc_def MakeMemZipFileFunc(MemZipBuffer* buffer) {
 }  // namespace pagx
 ```
 
-- [ ] **Step 3: 修改 `src/pagx/ppt/PPTExporter.cpp`**
+- [ ] **Step 3: wechat 独立构建排除 MemZip.cpp**
+
+`pagx/wechat/CMakeLists.txt` 是独立 CMake 项目（编译宏仅 `PAG_BUILD_PAGX` + `PAG_USE_HARFBUZZ`），通过 `file(GLOB_RECURSE PAGX_UTILS_SOURCES .../src/pagx/utils/*.cpp)` 自动编译 utils 全部源文件，但该构建既无 minizip include 也无 `zip.c`/`ioapi.c` 源文件。`MemZip.cpp` 一经创建，wechat 构建就会编译它并因 `zip.h` 缺失而失败。在 utils glob 后、现有 `Woff2FontGenerator.cpp` FILTER 旁加同款排除：
+
+```cmake
+# MemZip depends on minizip (zip.c/ioapi.c) which is only needed for PPT/HTML export.
+list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "MemZip\\.cpp$")
+```
+
+（wechat 构建依赖 Emscripten 工具链，不在主构建验证命令范围内；FILTER 语法与既有行一致，CMake 配置阶段即生效。）
+
+- [ ] **Step 4: 修改 `src/pagx/ppt/PPTExporter.cpp`**
 
 在文件头 include 区加入 `#include "pagx/utils/MemZip.h"`。删除 `PPTExporter.cpp:934-1030` 的整个 `namespace { ... MemZipBuffer ... MakeMemZipFileFunc ... }` 匿名 namespace 块（含 `// In-memory ZIP backend` 段注释，仅保留 `// Shared assembly` 段）。`PPTExporter.cpp:1231-1232` 的 `MemZipBuffer memBuffer; MakeMemZipFileFunc(&memBuffer)` 调用不变（符号现在来自 `pagx::`，同命名空间直接解析）。
 
-- [ ] **Step 4: 构建验证**
+- [ ] **Step 5: 构建验证**
 
 Run: `./codeformat.sh 2>/dev/null; true && cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug && cmake --build cmake-build-debug --target PAGFullTest`
 Expected: 编译通过（PPTX 引用共享 MemZip 无链接错误）
 
-- [ ] **Step 5: 运行 PPTX 回归测试**
+- [ ] **Step 6: 运行 PPTX 回归测试**
 
 Run: `./cmake-build-debug/PAGFullTest --gtest_filter="PAGXPPTTest.*"`
 Expected: 全部 PASS（尤其 `ToData*` 系列验证内存 ZIP 行为不变）
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/pagx/utils/MemZip.h src/pagx/utils/MemZip.cpp src/pagx/ppt/PPTExporter.cpp
-git commit -m "Extract shared MemZip in-memory backend and migrate PPTExporter to it."
+git add src/pagx/utils/MemZip.h src/pagx/utils/MemZip.cpp src/pagx/ppt/PPTExporter.cpp pagx/wechat/CMakeLists.txt
+git commit -m "Extract shared MemZip in-memory backend, migrate PPTExporter, and exclude it from the WeChat build."
 ```
 
 ---
 
-### Task 2: CMake 放宽 minizip/zlib 挂载条件到 HTML
+### Task 2: minizip/zlib 挂载到 PAGX，PPT 条件收窄
 
 **Files:**
-- Modify: `CMakeLists.txt:265-271`（minizip 源码挂载）
-- Modify: `CMakeLists.txt:398-401`（zlib include）
+- Modify: `CMakeLists.txt:265-271`（minizip 源码挂载从 PPT 分支上移到 PAGX 块）
+- Modify: `CMakeLists.txt:380-388`（PAGX 块内追加 zlib include）
+- Modify: `CMakeLists.txt:398-401`（PPT 块收窄为仅保留编译定义）
 
 **Interfaces:**
-- Consumes: Task 1 的 `src/pagx/utils/MemZip.h`（HTML 后续 task 依赖 minizip 链接）
-- Produces: 单独启用 `PAG_BUILD_HTML`（不开 PPT）时也能链接 minizip `zip.c`/`ioapi.c` + zlib include
+- Consumes: Task 1 的 `src/pagx/utils/MemZip.h`（HTML/PPT 共享内存 ZIP 后端）
+- Produces: 所有 `PAG_BUILD_PAGX` 构建均可链接 minizip `zip.c`/`ioapi.c` + zlib include；`PAG_BUILD_PPT` 条件仅保留 PPT 专用源码与编译定义
 
-- [ ] **Step 1: 修改 minizip 源码挂载条件**
+- [ ] **Step 1: minizip 源码挂载到 PAGX 块**
 
 `CMakeLists.txt:265-271`：
 
@@ -212,41 +225,46 @@ git commit -m "Extract shared MemZip in-memory backend and migrate PPTExporter t
     endif ()
 ```
 
-改为 `if (PAG_BUILD_PPT OR PAG_BUILD_HTML)`（把 PPT 专属的 `PAGX_PPT_SOURCES` 保留在 `PAG_BUILD_PPT` 分支内，minizip 三行提出来共用）：
+改为（PPT 分支只保留 PPT 专用源码；minizip 三行挂到 `PAG_BUILD_PAGX`，因为 `src/pagx/utils/*` 与 HTML exporter 源码均随 PAGX 编译，PAGX 是 minizip 依赖的实际锚点；`PAG_BUILD_HTML`/`PAG_BUILD_PPT`/`PAG_BUILD_CLI`/`PAG_BUILD_TESTS` 都强制 PAGX，故条件天然覆盖全部场景）：
 
 ```cmake
     if (PAG_BUILD_PPT)
         file(GLOB_RECURSE PAGX_PPT_SOURCES CONFIGURE_DEPENDS src/pagx/ppt/*.*)
         list(APPEND PAG_FILES ${PAGX_PPT_SOURCES})
     endif ()
-    if (PAG_BUILD_PPT OR PAG_BUILD_HTML)
+    if (PAG_BUILD_PAGX)
         set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
         list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
 ```
 
-- [ ] **Step 2: 修改 zlib include 条件**
+- [ ] **Step 2: zlib include 挂到 PAGX 块，PPT 块收窄为仅编译定义**
 
-`CMakeLists.txt:398-401`：
+在 `CMakeLists.txt:380-388` 的 `if (PAG_BUILD_PAGX)` 块内、`list(APPEND PAG_DEFINES PAG_BUILD_PAGX)` 之后追加一行：
+
+```cmake
+if (PAG_BUILD_PAGX)
+    list(APPEND PAG_DEFINES PAG_BUILD_PAGX)
+    list(APPEND PAG_STATIC_VENDORS expat SheenBidi)
+    list(APPEND PAG_INCLUDES third_party/SheenBidi/Headers
+            third_party/expat/expat/lib)
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
+    if (WIN32)
+        list(APPEND PAG_DEFINES XML_STATIC)
+    endif ()
+endif ()
+```
+
+`CMakeLists.txt:398-401` 的 PPT 块删除 zlib include 行，只保留编译定义：
 
 ```cmake
 if (PAG_BUILD_PPT)
     list(APPEND PAG_DEFINES PAG_BUILD_PPT)
-    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 ```
 
-改为：
-
-```cmake
-if (PAG_BUILD_PPT OR PAG_BUILD_HTML)
-    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
-endif ()
-if (PAG_BUILD_PPT)
-    list(APPEND PAG_DEFINES PAG_BUILD_PPT)
-endif ()
-```
+（zlib include 目录是 tgfx 构建产物，`PAG_BUILD_PAGX` 强制依赖 tgfx，故该目录在 PAGX 构建下必然存在。）
 
 - [ ] **Step 3: 构建验证**
 
@@ -257,7 +275,7 @@ Expected: 重新配置成功，编译通过
 
 ```bash
 git add CMakeLists.txt
-git commit -m "Mount minizip and zlib includes for HTML builds."
+git commit -m "Mount minizip and zlib includes for all PAGX builds."
 ```
 
 ---
@@ -433,14 +451,13 @@ git commit -m "Add HTMLResourceWriter abstraction with in-memory ZIP backend."
 ### Task 4: HTMLWriterContext 注入 resourceWriter / writeResource / hasResourceOutput
 
 **Files:**
-- Modify: `src/pagx/html/HTMLWriter.h:170`（`HTMLWriterContext` 类）
-- Modify: `src/pagx/html/HTMLWriter.cpp`（如 `writeResource` 需在 cpp 实现）
+- Modify: `src/pagx/html/HTMLWriter.h:170`（`HTMLWriterContext` 类；`HTMLWriter` 为 header-only，`writeResource` inline 实现于本头文件）
 
 **Interfaces:**
 - Consumes: Task 3 的 `HTMLResourceWriter`
 - Produces:
   - `HTMLWriterContext::HTMLResourceWriter* resourceWriter = nullptr;`
-  - `bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes, size_t size, std::string* errorMsg);`（无 writer 时执行原写盘逻辑，写 `staticImgDir` + relativePath，自动创建父目录）
+  - `bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes, size_t size, std::string* errorMsg);`（无 writer 时执行原写盘逻辑，写 `staticImgDir` + relativePath，自动创建父目录；有 writer 时 entry 名前加 `staticImgUrlPrefix`，保证 ZIP entry 名与 HTML 引用 URL 逐字节对应）
   - `bool HTMLWriterContext::hasResourceOutput() const { return resourceWriter != nullptr || !staticImgDir.empty(); }`
 
 - [ ] **Step 1: 在 `HTMLWriterContext` 中新增字段与方法声明**
@@ -465,15 +482,21 @@ git commit -m "Add HTMLResourceWriter abstraction with in-memory ZIP backend."
                      std::string* errorMsg);
 ```
 
-`HTMLWriter.h` 文件头需 `#include "pagx/html/HTMLResourceWriter.h"`（或前置声明 `class HTMLResourceWriter;`——因成员是指针，前置声明即可）。
+`HTMLWriter.h` 文件头需 `#include "pagx/html/HTMLResourceWriter.h"`（`writeResource` 在本头文件 inline 实现，需完整类型调用其 `write()`，前置声明不够）。
 
-- [ ] **Step 2: 在 `HTMLWriter.cpp` 实现 `writeResource`**
+同步更新 `HTMLWriter.h:182-186` 中 `staticImgDir`/`staticImgUrlPrefix` 字段上方注释：原 "The resourceDir is mandatory at the public API boundary, so both fields are non-empty when HTMLWriter runs." 在 ToData（`staticImgDir` 为空、`resourceWriter` 非空）下不再成立，补充说明 ToData 模式由 `resourceWriter` 承担资源输出。
+
+- [ ] **Step 2: 在 `HTMLWriter.h` inline 实现 `writeResource`**
 
 ```cpp
 bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
                                       size_t size, std::string* errorMsg) {
   if (resourceWriter != nullptr) {
-    return resourceWriter->write(relativePath, bytes, size, errorMsg);
+    // ToData: the archive entry name must equal the URL the HTML references
+    // ("assets/img0.png", "assets/fonts/font_f0.woff2" ...), so prepend
+    // staticImgUrlPrefix ("assets/"). ToHTML never reaches here (resourceWriter
+    // is null) and keeps writing to staticImgDir unchanged.
+    return resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, errorMsg);
   }
   // 原写盘逻辑：staticImgDir + relativePath（含子目录）拼路径，create_directories 后写文件。
   if (staticImgDir.empty()) {
@@ -512,7 +535,7 @@ bool HTMLWriterContext::writeResource(const std::string& relativePath, const voi
 }
 ```
 
-（`HTMLWriter.cpp` 头部需 `<filesystem>`/`<fstream>` include，检查是否已有。）
+（`HTMLWriter.h` 头部需新增 `<filesystem>`/`<fstream>` include。`HTMLResourceWriter` 为指针成员，Step 1 前置声明即可，但 inline 的 `writeResource` 需调用其 `write()`，故 Step 1 改为 include `pagx/html/HTMLResourceWriter.h`。）
 
 - [ ] **Step 3: 构建验证**
 
@@ -522,7 +545,7 @@ Expected: 编译通过；现有测试无行为变化（本任务只新增字段�
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/pagx/html/HTMLWriter.h src/pagx/html/HTMLWriter.cpp
+git add src/pagx/html/HTMLWriter.h
 git commit -m "Inject resource writer into HTMLWriterContext with writeResource fallback."
 ```
 
@@ -533,7 +556,7 @@ git commit -m "Inject resource writer into HTMLWriterContext with writeResource 
 **Files:**
 - Modify: `src/pagx/html/HTMLStaticImageRenderer.h`（5 个函数签名）
 - Modify: `src/pagx/html/HTMLStaticImageRenderer.cpp`（`WriteSurfaceAsPng`→`EncodeSurfaceAsPng`、`RenderTileToPng`、5 个 Render 函数）
-- Modify: `src/pagx/html/HTMLWriterShape.cpp:2375-2394`（Diamond 落地点）、`:2428-2440`（Conic）、`:2532-2551`（ImagePattern）
+- Modify: `src/pagx/html/HTMLWriterShape.cpp:2375-2394`（Diamond 落地点）、`:2428-2440`（Conic）、`:2532-2551`（ImagePattern）、`:2328-2329`（Conic 调度条件）
 
 **Interfaces:**
 - Consumes: Task 4 的 `ctx->writeResource`/`ctx->hasResourceOutput`
@@ -621,6 +644,15 @@ std::shared_ptr<tgfx::Data> EncodeSurfaceAsPng(tgfx::Surface* surface, int pxWid
 
 `renderConicCanvas` 中 `std::filesystem::create_directories`/`absPath`/`RenderConicGradientToPng(..., absPath)`/`if (!ok) return;` 改为与 Step 3 同构（`nextId("cgc")`、`RenderConicGradientToPng(x0, y0, sw, sh, cg, _ctx->rasterScale)` 拿 bytes、`writeResource(fileName, ...)`）。
 
+**同时修改 Conic 的调度条件（HTMLWriterShape.cpp:2328-2329）**：当前调度分支是
+
+```cpp
+  if (fill && fill->color && fill->color->nodeType() == NodeType::ConicGradient &&
+      !_ctx->staticImgDir.empty() && !stroke && !hasTrim) {
+```
+
+其中 `!_ctx->staticImgDir.empty()` 改为 `_ctx->hasResourceOutput()`，并同步更新该分支的注释。否则 ToData 下 `staticImgDir` 为空，Conic 永远进不了 `renderConicCanvas`，退化为 headless Chromium 下不可靠的 CSS conic-gradient 路径（见 :2330 注释），与 ToHTML 视觉不一致。（Diamond/ImagePattern 的调度点 :2311/:2316 不检查 `staticImgDir`，仅改函数入口守卫即可。）
+
 - [ ] **Step 5: 改 ImagePattern 落地点（HTMLWriterShape.cpp:2532-2551）**
 
 `renderImagePatternCanvas` 同构改造（`nextId("ipc")`、`RenderImagePatternEllipseToPng`/`RenderImagePatternToPng` 拿 bytes、`writeResource(fileName, ...)`）。
@@ -654,7 +686,11 @@ git commit -m "Return PNG bytes from static image renderers and route through wr
 
 - [ ] **Step 1: 改 `RenderAll` 签名**
 
-`HTMLPlusDarkerRenderer.h:63` 的 `RenderAll(const PAGXDocument& doc, const std::string& staticImgDir, const std::string& urlPrefix, float rasterScale, std::unordered_map<const Layer*, PlusDarkerBackdrop>& out)` 改为 `RenderAll(const PAGXDocument& doc, HTMLWriterContext* ctx, std::unordered_map<const Layer*, PlusDarkerBackdrop>& out)`。`staticImgDir`/`rasterScale` 从 `ctx` 取（`ctx->staticImgDir`、`ctx->rasterScale`）；`urlPrefix` 参数已不被使用（`backdropDataURL` 是 base64，不依赖前缀），直接删除。`HTMLPlusDarkerRenderer.h` 需 include 或前置声明 `HTMLWriterContext`。
+`HTMLPlusDarkerRenderer.h:63` 的 `RenderAll(const PAGXDocument& doc, const std::string& staticImgDir, const std::string& urlPrefix, float rasterScale, std::unordered_map<const Layer*, PlusDarkerBackdrop>& out)` 改为 `RenderAll(const PAGXDocument& doc, HTMLWriterContext* ctx, std::unordered_map<const Layer*, PlusDarkerBackdrop>& out)`。`staticImgDir`/`rasterScale` 从 `ctx` 取（`ctx->staticImgDir`、`ctx->rasterScale`）；`urlPrefix` 参数已不被使用（`backdropDataURL` 是 base64，不依赖前缀），直接删除。
+
+`HTMLPlusDarkerRenderer.h` **只能**前置声明 `class HTMLWriterContext;`——`HTMLWriter.h:28` 已 include 本头文件，再 include `HTMLWriter.h` 会构成循环依赖。
+
+注意 `rasterScale` 语义：`ctx->rasterScale` 是 clamp 后的值（`HTMLExporter` 组装 ctx 时 `std::clamp(options.rasterScale, 0.01f, 4.0f)`），而现有 ToHTML 调用点传原始 `options.rasterScale`（HTMLExporter.cpp:192）。差异仅出现在选项超范围时；`HTMLExportOptions::rasterScale` 的契约（include/pagx/HTMLExporter.h:52）本身声明超范围会被 clamp，视为修正现有实现与文档契约的不一致，默认值 2.0 及正常输入下逐字节不变。
 
 - [ ] **Step 2: 改 `HTMLPlusDarkerRenderer.cpp`**
 
@@ -668,11 +704,15 @@ git commit -m "Return PNG bytes from static image renderers and route through wr
     // only on the legacy ToHTML path so the on-disk layout stays unchanged.
     if (ctx->resourceWriter == nullptr) {
       std::string error;
-      ctx->writeResource(fileName, encoded->bytes(), encoded->size(), &error);
+      if (!ctx->writeResource(fileName, encoded->bytes(), encoded->size(), &error)) {
+        // Match the legacy behavior: a failed backdrop write drops this entry so
+        // the caller falls back to the mix-blend-mode approximation.
+        continue;
+      }
     }
 ```
 
-（`RenderCroppedBackdrop` 去掉 `outputPath` 参数，删除内部 `std::ofstream` 写盘段 line 178-186，只保留 `*outEncoded = encoded; return true;`。原 `fileName = "pd_" + std::to_string(idx) + ".png";` 与 `absPath` 拼接逻辑保留 fileName 部分、删除 absPath。）
+（`RenderCroppedBackdrop` 去掉 `outputPath` 参数，删除内部 `std::ofstream` 写盘段 line 178-186，只保留 `*outEncoded = encoded; return true;`。原 `fileName = "pd_" + std::to_string(idx) + ".png";` 与 `absPath` 拼接逻辑保留 fileName 部分、删除 absPath。`HTMLPlusDarkerRenderer.cpp` 头部需新增 `#include "pagx/html/HTMLWriter.h"`——当前只 include 自己的头（:19），访问 `ctx->staticImgDir`/`ctx->rasterScale`/`ctx->resourceWriter` 需要 `HTMLWriterContext` 完整定义。）
 
 - [ ] **Step 3: 改 `HTMLExporter.cpp` 调用点（line 192-193）**
 
@@ -781,6 +821,8 @@ const char* MimeToExt(const std::string& mime) {
 
 （`ctx` 为 null 时的守卫：函数签名是 `GetImageSrc(const Image* image, HTMLWriterContext* ctx)`，现有代码在 `image->data` 分支后直接使用 `image->filePath`，未解引用 ctx；新增分支用 `ctx != nullptr` 保护。）
 
+ToData 分支对 `hash:`/`http(s)` scheme 的 `filePath` 直接 `tgfx::Data::MakeFromFile`（无 `IsSafeImageUrl` 检查，读取失败即降级空 src）；与 ToHTML 下 `EscapeCSSUrl` 直引外部 URL 的行为不同——这是设计文档第 8 节的有意设计（ToData 是自闭合产物，ZIP 内不能引用外部 URL）。
+
 - [ ] **Step 4: 构建验证 + 回归**
 
 Run: `./codeformat.sh 2>/dev/null; true && cmake --build cmake-build-debug --target PAGFullTest && ./cmake-build-debug/PAGFullTest --gtest_filter="PAGXHtmlTest.*"`
@@ -839,7 +881,7 @@ git commit -m "Embed external images as ZIP assets in the ToData path."
                      "';src:url('" + result.relativeUrl + "') format('woff2')}\n";
 ```
 
-（`urlPrefix` 局部变量在 `ctx.staticImgUrlPrefix` 中已存在，字体段不再直接引用 `urlPrefix`/`resourceDir`。）
+（`urlPrefix` 局部变量在 `ctx.staticImgUrlPrefix` 中已存在，字体段不再直接引用 `urlPrefix`/`resourceDir`。`writeResource` 失败时 `continue` 丢弃该字体，与旧代码（文件写失败仍追加 `fontFaceRules` 并注册 `woff2Fonts`，HTML 可能引用不存在的文件）的差异仅存在于写盘失败路径；正常路径逐字节不变，且 ToData 下必须跳过未写入 ZIP entry 的字体，否则 HTML 会引用不存在的 entry。）
 
 - [ ] **Step 2: 抽 `BuildHTML` 内部函数**
 
@@ -1087,8 +1129,10 @@ PAGX_TEST(PAGXHTMLDataTest, ToData_BasicArchive) {
   EXPECT_TRUE(HasZipMagic(data.get()));
 
   std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  // Only entry *names* appear verbatim in the buffer (in local file headers / central
+  // directory); entry *content* is DEFLATE-compressed and cannot be searched as plain
+  // text. Asserting on "<!DOCTYPE html>" here would fail by construction.
   EXPECT_NE(bytes.find("index.html"), std::string::npos);
-  EXPECT_NE(bytes.find("<!DOCTYPE html>"), std::string::npos);
 }
 ```
 
@@ -1121,7 +1165,7 @@ Expected: 全部 PASS（尤其 `PAGXHtmlTest.*`、`PAGXPPTTest.*`、`PAGXHTMLDat
 - [ ] **Step 2: 确认工作区仅含本计划产生的变更**
 
 Run: `git status --short`
-Expected: 仅 `src/pagx/utils/MemZip.*`、`src/pagx/html/HTMLResourceWriter.*`、`src/pagx/html/HTMLWriter.{h,cpp}`、`src/pagx/html/HTMLWriterShape.cpp`、`src/pagx/html/HTMLWriterUtils.cpp`、`src/pagx/html/HTMLPlusDarkerRenderer.{h,cpp}`、`src/pagx/html/HTMLStaticImageRenderer.{h,cpp}`、`src/pagx/html/HTMLExporter.cpp`、`src/pagx/ppt/PPTExporter.cpp`、`include/pagx/HTMLExporter.h`、`CMakeLists.txt`、`test/src/PAGXHTMLDataTest.cpp` 的改动，无其他文件
+Expected: 仅 `src/pagx/utils/MemZip.*`、`src/pagx/html/HTMLResourceWriter.*`、`src/pagx/html/HTMLWriter.h`、`src/pagx/html/HTMLWriterShape.cpp`、`src/pagx/html/HTMLWriterUtils.cpp`、`src/pagx/html/HTMLPlusDarkerRenderer.{h,cpp}`、`src/pagx/html/HTMLStaticImageRenderer.{h,cpp}`、`src/pagx/html/HTMLExporter.cpp`、`src/pagx/ppt/PPTExporter.cpp`、`include/pagx/HTMLExporter.h`、`CMakeLists.txt`、`pagx/wechat/CMakeLists.txt`、`test/src/PAGXHTMLDataTest.cpp` 的改动，无其他文件
 
 - [ ] **Step 3: 确认设计文档待办项**
 
@@ -1134,3 +1178,14 @@ Expected: 仅 `src/pagx/utils/MemZip.*`、`src/pagx/html/HTMLResourceWriter.*`�
 - **Spec coverage**：设计文档 15 节实施步骤 1-9 对应 Task 1-11：MemZip 抽取（T1）、CMake（T2）、HTMLResourceWriter（T3）、context 注入（T4）、渲染函数+Shape 落地点（T5）、PlusDarker（T6）、外部图片（T7）、BuildHTML（T8）、ToData（T9）、测试（T10）、回归（T11）。第 5.2 节 entry 名由 nextId 生成的安全论证 → T5/T7 实现中遵循（不引入外部字符串进 entry 名）。第 9 节 ZIP 布局 → T9 的 `assets/` 前缀 + T5 扁平文件名 + T7 `img{N}.{ext}`。第 8 节错误语义 → T9 的 nullptr + T7 的降级空 src。
 - **Placeholder scan**：无 TBD/TODO；每个任务均有实际代码或命令。Task 10 的"其余用例"按 PAGXPPTTest 已有模式展开（实施时按现有测试文件的具体 helper 拼装，此为测试构造细节，非占位符）。
 - **Type consistency**：`HTMLResourceWriter::write` 签名（T3）与 `HTMLWriterContext::writeResource`（T4）、`HTMLZipResourceWriter::finish`（T3）、`ToData` 返回 `std::shared_ptr<Data>`（T9）跨任务一致；`RenderAll` 新签名（T6）与 `BuildHTML` 调用（T8）一致；`GetImageBytes`/`MimeToExt`（T7）在 `HTMLWriterUtils.cpp` 文件内定义。
+- **CMake 依赖边界（B2 决策）**：minizip 源码、minizip include、zlib include 全部挂载到 `PAG_BUILD_PAGX`（HTMLExporter 源码与 `src/pagx/utils/*` 均随 PAGX 编译，PAGX 是 minizip 依赖的实际锚点；`PAG_BUILD_HTML`/`PAG_BUILD_PPT`/`PAG_BUILD_CLI`/`PAG_BUILD_TESTS` 均强制 PAGX，条件天然覆盖全部场景）；`PAG_BUILD_PPT` 仅保留 PPT 专用源码与编译定义。`pagx/wechat` 是独立 CMake 项目（不读主 CMakeLists，编译宏仅 `PAG_BUILD_PAGX` + `PAG_USE_HARFBUZZ`），其 utils glob 自动编译 MemZip.cpp 但无 minizip 资源，已在其中加 FILTER 排除（仿 `Woff2FontGenerator.cpp` 先例）。**与设计文档第 10 节（`PPT` → `HTML OR PPT`）偏离，以本计划为准；实施时同步更新设计文档第 10 节。**
+- **审查发现修正（A/B/C 系列）**：
+  - A1 ZIP entry 名与 HTML URL 一致性：`writeResource` 的 ZIP 分支在 entry 名前加 `staticImgUrlPrefix`（ToData = "assets/"），保证 `assets/img0.png`/`assets/fonts/font_f0.woff2` 等 entry 与 HTML 引用逐字节对应；ToHTML 下 `resourceWriter` 为 null 不受影响（T4）。与设计文档第 9 节布局一致，修正了设计文档 7.1/5.3 代码中缺失前缀的不一致。
+  - A2 Conic 调度守卫：`HTMLWriterShape.cpp:2328-2329` 的 `!_ctx->staticImgDir.empty()` 改为 `_ctx->hasResourceOutput()`，否则 ToData 下 Conic 永不进入栅格化分支（T5 Step 4）。
+  - A3 测试断言：ZIP entry 内容经 deflate 压缩不可明文搜索，删除 `<!DOCTYPE html>` 明文断言，仅断言 entry 名（T10）。**与设计文档 11.1 的"含 DOCTYPE"表述偏离，以本计划为准。**
+  - B3 `HTMLPlusDarkerRenderer.h` 仅前置声明 `HTMLWriterContext`（`HTMLWriter.h:28` 已 include 它，include 会循环）；`HTMLPlusDarkerRenderer.cpp` 需新增 include `HTMLWriter.h`（T6）。
+  - C1 PlusDarker 写盘失败时 `continue`（保持旧语义：失败跳过该 backdrop，回退 mix-blend-mode）。
+  - C2 PlusDarker 的 `rasterScale` 改用 clamp 后的 `ctx->rasterScale`，超范围输入下与旧实现不同；options 契约本身声明 clamp，视为修正，正常输入逐字节不变。
+  - C3 字体写失败时 `continue`，丢弃未写入的资源；与旧失败路径（HTML 引用可能不存在的字体文件）的差异仅存在于写盘失败时。
+  - C4 更新 `staticImgDir` 注释，ToData 下 "both fields are non-empty" 假设不成立。
+  - C5 ToData 分支对 `hash:`/`http(s)` filePath 降级空 src 为有意设计（设计文档第 8 节），与 ToHTML 的 `EscapeCSSUrl` 直引不同。

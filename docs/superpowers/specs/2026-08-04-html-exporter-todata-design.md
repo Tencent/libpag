@@ -108,7 +108,9 @@ HTMLResourceWriter* resourceWriter = nullptr;
 bool writeResource(const std::string& relativePath, const void* bytes, size_t size,
                    std::string* errorMsg) {
   if (resourceWriter) {
-    return resourceWriter->write(relativePath, bytes, size, errorMsg);
+    // ToData：entry 名须与 HTML 引用 URL 逐字节一致，故加 staticImgUrlPrefix（"assets/"）；
+    // ToHTML 下 resourceWriter 为 null，走下方原写盘逻辑，行为不变。
+    return resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, errorMsg);
   }
   // 原写盘逻辑原样保留：create_directories(staticImgDir + dirname) + ofstream 写文件
 }
@@ -118,7 +120,7 @@ bool hasResourceOutput() const {
 }
 ```
 
-所有现有 `staticImgDir.empty()` 守卫（如 `HTMLWriterShape.cpp:2418`）改为 `!hasResourceOutput()`，否则 ToData 时（`staticImgDir` 为空）静态图会被跳过。
+所有现有 `staticImgDir.empty()` 守卫（如 `HTMLWriterShape.cpp:2418`）改为 `!hasResourceOutput()`，否则 ToData 时（`staticImgDir` 为空）静态图会被跳过。**注意 `HTMLWriterShape.cpp:2329` 的 Conic 调度条件**（`!_ctx->staticImgDir.empty()`）同样必须改为 `_ctx->hasResourceOutput()`——它是"是否路由到 `renderConicCanvas`"的分支判断，不改则 ToData 下 Conic 永远走 CSS 回退路径。
 
 ### 5.4 共享 BuildHTML
 
@@ -188,7 +190,7 @@ std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
 }
 ```
 
-`GetImageBytes` 内部即 `image->data` 的字节视图，或 `tgfx::Data::MakeFromFile(filePath)`（读不到返回空），libpag 可自由 IO。
+`GetImageBytes` 内部即 `image->data` 的字节视图，或 `tgfx::Data::MakeFromFile(filePath)`（读不到返回空），libpag 可自由 IO。返回的 `"assets/img0.png"` 与 ZIP entry 名（`assets/img0.png`）逐字节一致——entry 名前缀由 5.3 的 `writeResource` 统一加 `staticImgUrlPrefix`，此处 `filename` 仅为 `img0.png`。
 
 ## 8. 错误处理
 
@@ -220,13 +222,23 @@ assets/
 - 第一版不做 `assets/images/` / `assets/generated/` 三层目录（需在 6 个落地点区分类别，收益低）；
 - 全部 entry 使用 `/` 分隔符；
 - entry 名由 `nextId()` 生成，天然满足唯一、无绝对路径、无 `..`；
+- `assets/` 前缀由 5.3 的 `writeResource` 统一添加（`staticImgUrlPrefix`），各落地点仅传相对路径（`img0.png`、`fonts/font_f0.woff2`）；
 - `index.html` 为保留路径，与资源名无冲突可能。
 
 ## 10. CMake 改动
 
-- `CMakeLists.txt:268-270`：minizip 源码（`zip.c`、`ioapi.c`）挂载条件 `PAG_BUILD_PPT` → `PAG_BUILD_HTML OR PAG_BUILD_PPT`；
-- `CMakeLists.txt:400`：zlib include 条件 `PAG_BUILD_PPT` → `PAG_BUILD_HTML OR PAG_BUILD_PPT`；
+HTMLExporter 源码与 `src/pagx/utils/*` 均随 `PAG_BUILD_PAGX` 编译（`CMakeLists.txt:273-277` 的 HTML exporter glob 无 `PAG_BUILD_HTML` 门控），而 `PAG_BUILD_HTML`/`PAG_BUILD_PPT`/`PAG_BUILD_CLI`/`PAG_BUILD_TESTS` 都强制 `PAG_BUILD_PAGX`，故 minizip 依赖的实际锚点是 PAGX：
+
+- `CMakeLists.txt:265-271`：minizip 源码（`zip.c`、`ioapi.c`）+ `MINIZIP_DIR` include 从 `PAG_BUILD_PPT` 分支移到独立的 `if (PAG_BUILD_PAGX)` 块；`PAG_BUILD_PPT` 分支只保留 `PAGX_PPT_SOURCES` glob；
+- `CMakeLists.txt:380-388`：`if (PAG_BUILD_PAGX)` 块内追加 `list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})`；
+- `CMakeLists.txt:398-401`：PPT 块删除 zlib include 行，仅保留 `list(APPEND PAG_DEFINES PAG_BUILD_PPT)`；
 - `src/pagx/utils/MemZip.h/.cpp` 加入 `PAGX_UTILS_SOURCES`（`CMakeLists.txt:210` 已 glob `utils/*.*`，自动纳入）。
+
+`pagx/wechat/CMakeLists.txt` 是独立 CMake 项目（不读主 CMakeLists，编译宏仅 `PAG_BUILD_PAGX` + `PAG_USE_HARFBUZZ`），其 `file(GLOB_RECURSE PAGX_UTILS_SOURCES .../src/pagx/utils/*.cpp)` 会自动编译 MemZip.cpp 但该构建无 minizip 资源，需在 utils glob 后加 FILTER 排除（仿现有 `Woff2FontGenerator.cpp` 先例）：
+
+```cmake
+list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "MemZip\\.cpp$")
+```
 
 ## 11. 测试计划（新增 test/src/PAGXHTMLDataTest.cpp）
 
@@ -235,8 +247,7 @@ ZIP 验证方式照抄 `PAGXPPTTest`（`HasZipMagic` + buffer 内搜 entry 名�
 ### 11.1 接口与 ZIP
 - 有效 document 返回非空 `Data`，`HasZipMagic` 通过；
 - buffer 中含 `index.html`、`assets/fonts/font_*.woff2`、`assets/img*.png` entry 名；
-- `index.html` 为 FullDocument（含 `<!DOCTYPE html>`）；
-- HTML 中每个相对资源 URL 都能在 ZIP 中找到对应 entry。
+- **仅断言 entry 名，不搜 entry 内容**：ZIP entry 内容经 DEFLATE 压缩，明文（如 `<!DOCTYPE html>`）不会出现在 buffer 中，只有 entry 名在 local file header / central directory 中明文可见。验证 HTML 内容（DOCTYPE、URL-entry 对应关系）需用 minizip `unz*` 解压 index.html entry，本测试套件不引 unzip 库，故不验证。
 
 ### 11.2 资源
 - WOFF2 字体进入 `assets/fonts/`；
