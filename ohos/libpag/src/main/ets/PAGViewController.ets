@@ -120,7 +120,7 @@ export class PAGViewController {
    * the beginning.
    */
   play() {
-    this.jView?.play();
+    this.jView.play();
   }
 
   /**
@@ -303,7 +303,7 @@ export class PAGViewController {
    * Sets the progress of play position, the valid value is from 0.0 to 1.0.
    */
   setProgress(progress: number) {
-    this.jView?.setProgress(progress);
+    this.jView.setProgress(progress);
   }
 
   /**

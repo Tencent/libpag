@@ -615,6 +615,7 @@ void JPAGImageView::onAnimationUpdate(PAGAnimator* animator) {
 }
 
 void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
+  std::shared_ptr<PAGAnimator> animator = nullptr;
   {
     std::lock_guard lock_guard(locker);
     if (_animator == nullptr) {
@@ -623,13 +624,12 @@ void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
     _window = window;
     targetWindow = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(_window));
     invalidSize();
+    animator = _animator;
   }
   // animator->update() can synchronously flow back into onAnimationUpdate,
   // which also acquires `locker`. Call it outside the critical section to
   // avoid re-entering the same non-recursive mutex on the caller thread.
-  if (_animator) {
-    _animator->update();
-  }
+  animator->update();
 }
 
 void JPAGImageView::onSurfaceSizeChanged() {
