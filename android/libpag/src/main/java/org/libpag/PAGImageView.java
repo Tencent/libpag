@@ -525,7 +525,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
                 // never reloaded here. Trade-off: the previous "null out the composition to save
                 // memory" optimization is dropped, so path-loaded compositions now stay resident;
                 // large lists should reuse or detach views to bound memory.
-                decoderInfo.initDecoder(_composition, width, height, _maxFrameRate);
+                if (!decoderInfo.initDecoder(_composition, width, height, _maxFrameRate)) {
+                    Log.w(TAG, "initDecoder failed in initDecoderInfo, composition=" + _composition);
+                }
                 if (!decoderInfo.isValid()) {
                     return;
                 }
