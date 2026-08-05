@@ -171,6 +171,12 @@ export class EditorPanel {
     // NOT bump documentGeneration, otherwise the Apply would falsely detect a document swap
     // and skip its own success report (leaving "Applying..." pinned to the status pill).
     private pendingApplyXml: string | null = null;
+    // True when setDocumentXml() received a new document while the panel was closed, so the
+    // CodeMirror instance (which survives close(), only the `visible` class is dropped) still
+    // holds the previous document's text. open() consumes this to push the pending content in.
+    // Without it a closed-then-reopened panel would keep showing - and Apply would write back -
+    // the stale text of the document that was loaded before the switch.
+    private pendingEditorSync = false;
     private panelWidthPx: number | null = null;
     private resizing = false;
     // True while an onApply/onSave promise from the host is still pending. Prevents overlapping
@@ -224,10 +230,22 @@ export class EditorPanel {
                 this.editor.destroy();
                 this.editor = null;
             }
+            // The next open() recreates the instance and seeds it from currentXmlText, so there is
+            // no deferred push outstanding.
+            this.pendingEditorSync = false;
             return;
         }
         if (this.isOpen() && this.editor !== null) {
-            this.editor.setContent(xmlText);
+            // An Apply loopback re-loads the just-edited XML (only a few characters changed), so
+            // preserve the caret and scroll position — the user should stay exactly where they were
+            // editing. A genuine document switch resets to the top.
+            this.editor.setContent(xmlText, isApplyLoopback);
+            this.pendingEditorSync = false;
+        } else if (!isApplyLoopback) {
+            // Panel is closed (or not built yet): close() keeps the CodeMirror instance alive, so it
+            // still holds the previous document's text. Defer the push to open() instead of dropping
+            // it, otherwise reopening the panel would show — and Apply would write back — stale XML.
+            this.pendingEditorSync = true;
         }
     }
 
@@ -251,9 +269,18 @@ export class EditorPanel {
                     this.editor.onCursorLine(this.pendingCursorCb);
                 }
             }
-        }
-        if (this.editor !== null && this.currentXmlText !== null) {
+            // Seed the freshly created instance with the current document.
+            if (this.editor !== null && this.currentXmlText !== null) {
+                this.editor.setContent(this.currentXmlText);
+            }
+            this.pendingEditorSync = false;
+        } else if (this.pendingEditorSync && this.currentXmlText !== null) {
+            // A different document was loaded while the panel was closed. Push it now — resetting
+            // the view to the top, since this is a genuine document switch. Re-opening on the same
+            // document leaves pendingEditorSync false and skips this, so toggling inspect mode or
+            // reopening the panel preserves the user's caret and scroll position.
             this.editor.setContent(this.currentXmlText);
+            this.pendingEditorSync = false;
         }
         this.panel.classList.add('visible');
         // Toggles the `with-editor` class on the container. Hosts are responsible for providing
@@ -278,9 +305,10 @@ export class EditorPanel {
         }
     }
 
-    /** Grey transient hover highlight of a node's source span. No-op when the editor is closed. */
-    public highlightHover(startLine: number, endLine: number): void {
-        this.editor?.highlightHover(startLine, endLine);
+    /** Grey transient hover highlight of a node's source span. No-op when the editor is closed.
+     *  Pass scrollAlign to scroll the span into view within the same CodeMirror transaction. */
+    public highlightHover(startLine: number, endLine: number, scrollAlign?: 'start' | 'nearest'): void {
+        this.editor?.highlightHover(startLine, endLine, scrollAlign);
     }
 
     public clearHover(): void {
@@ -531,7 +559,10 @@ export class EditorPanel {
             return;
         }
         if (this.currentXmlText !== null) {
-            this.editor.setContent(this.currentXmlText);
+            // Preserve the caret and scroll position: discard restores the original text but the
+            // user should stay where they were, not jump to the top. Mirrors Apply's loopback
+            // path, which keeps the view stable across a content reload.
+            this.editor.setContent(this.currentXmlText, true);
         }
         this.report('Changes discarded', 'success');
     }
@@ -647,6 +678,11 @@ export class EditorPanel {
         }
         this.setBusy(true);
         const savingToken = this.report('Saving...', 'info', { sticky: true });
+        // Advertise the XML the host is about to receive so a host that reloads via
+        // player.load() -> setDocumentXml() recognizes its own loopback and preserves the
+        // caret/scroll position, mirroring Apply. Without this the reload is treated as a
+        // foreign document swap and the editor resets to the top.
+        this.pendingApplyXml = xmlText;
         // Same rationale as handleApply's yield: paint the sticky "Saving..." pill and the
         // disabled button state before the host callback (which may run heavy synchronous
         // work) enters the microtask queue.
@@ -661,6 +697,7 @@ export class EditorPanel {
         } catch (err) {
             this.report(err instanceof Error ? err.message : String(err), 'error');
         } finally {
+            this.pendingApplyXml = null;
             this.setBusy(false);
             // Safety-net dismiss: successful and error paths already replaced the sticky pill
             // via report() (whose fresh token makes this dismiss a no-op), but a synchronous

@@ -83,6 +83,9 @@ const highlightField = StateField.define<{ hover: LineRange | null; select: Line
             if (select != null) {
                 decos.push(...buildRangeDecos(state.doc, select, 'cm-select-line'));
             }
+            // Hover and select spans are produced independently, so concatenate order does not
+            // guarantee RangeSet's required ordering by `from`.
+            decos.sort((a, b) => a.from - b.from);
             return Decoration.set(decos);
         }),
 });
@@ -190,9 +193,12 @@ export class SourceEditor {
         // Ctrl+Z from unwinding past the load point into an empty editor.
     }
 
-    private createState(initialContent: string): EditorState {
+    private createState(initialContent: string, selectionHead?: number): EditorState {
         return EditorState.create({
             doc: initialContent,
+            selection: selectionHead !== undefined
+                ? { anchor: Math.min(selectionHead, initialContent.length) }
+                : undefined,
             extensions: [
                 minimalSetup,
                 lineNumbers(),
@@ -276,17 +282,30 @@ export class SourceEditor {
         this.view.scrollDOM.style.paddingBottom = '200px';
     }
 
-    /** Replaces the entire document content, resetting the undo history to this content. */
-    setContent(text: string): void {
+    /** Replaces the entire document content, resetting the undo history to this content. When
+     *  preserveViewState is true, keeps the current caret and scroll offset. */
+    setContent(text: string, preserveViewState = false): void {
         const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
         if (this.view === null) {
             this.createView(trimmed);
             return;
         }
-        // Rebuild the state instead of dispatching a change so the undo history is rooted at this
-        // content. A plain change dispatch would be recorded as an undoable edit, letting Ctrl+Z
-        // revert to a previously loaded file's content.
-        this.view.setState(this.createState(trimmed));
+        if (!preserveViewState) {
+            // Rebuild the state instead of dispatching a change so the undo history is rooted at
+            // this content. A plain change dispatch would be recorded as an undoable edit, letting
+            // Ctrl+Z revert to a previously loaded file's content.
+            this.view.setState(this.createState(trimmed));
+            return;
+        }
+        const savedHead = this.view.state.selection.main.head;
+        const savedScrollTop = this.view.scrollDOM.scrollTop;
+        this.view.setState(this.createState(trimmed, savedHead));
+        this.view.requestMeasure({
+            read: () => savedScrollTop,
+            write: (scrollTop, view) => {
+                view.scrollDOM.scrollTop = scrollTop;
+            },
+        });
     }
 
     /** Returns the current document text. */

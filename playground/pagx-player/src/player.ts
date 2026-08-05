@@ -83,6 +83,129 @@ function attributeMap(element: Element): Record<string, string> {
     return map;
 }
 
+/** One resolved sub-channel write produced by splitting a composite attribute (e.g. position ->
+ *  position.x / position.y). channel is the dotted sub-channel name the engine's channel table
+ *  understands; value is that component in the same string form the importer would parse. */
+interface SubEdit {
+    channel: string;
+    value: string;
+}
+
+/** The composite XML attributes and how each expands into sub-channels. A composite attribute is a
+ *  single XML attribute (e.g. position="10 20") that the channel table addresses as several dotted
+ *  sub-channels (position.x / position.y). The kind selects the split/expand rule below. left /
+ *  right / top / bottom / centerX / centerY and Text's x / y are plain scalars, not composites, and
+ *  are handled by the normal whitelist path. matrix / matrix3D have no sub-channels and are
+ *  intentionally absent so they keep falling back to a full reparse. */
+const COMPOSITE_ATTRIBUTES = new Map<string, 'point' | 'size' | 'padding'>([
+    ['position', 'point'],
+    ['scale', 'point'],
+    ['anchor', 'point'],
+    ['startPoint', 'point'],
+    ['endPoint', 'point'],
+    ['center', 'point'],
+    ['baselineOrigin', 'point'],
+    ['size', 'size'],
+    ['padding', 'padding'],
+]);
+
+/** Splits a whitespace/comma-separated numeric string into floats, matching the importer's
+ *  ParseFloatList (strtof over each token). Returns null when a token is not a leading-number, so a
+ *  malformed composite value forces a full reparse instead of a wrong incremental write. */
+function parseFloatTokens(value: string): number[] | null {
+    const tokens = value.trim().split(/[\s,]+/).filter((token) => token.length > 0);
+    const result: number[] = [];
+    for (const token of tokens) {
+        // parseFloat mirrors strtof's leading-number semantics (trailing junk after a valid number
+        // is ignored by the importer too); a token with no leading number is rejected.
+        const parsed = Number.parseFloat(token);
+        if (Number.isNaN(parsed)) {
+            return null;
+        }
+        result.push(parsed);
+    }
+    return result;
+}
+
+/** Expands a padding attribute into its four [top, right, bottom, left] components, replicating the
+ *  importer's CSS-shorthand rule (PaddingFromString): 1 value = all four; 2 = [v0,v1,v0,v1] as
+ *  top/bottom then right/left; 4 = [top,right,bottom,left]. Returns null for any other count so the
+ *  edit falls back to a full reparse (the importer rejects those too). Components are emitted as the
+ *  original token strings (not reformatted numbers) so an unchanged component is byte-identical to
+ *  what setNodeChannel would parse. */
+function expandPadding(value: string): { top: string; right: string; bottom: string; left: string } | null {
+    const tokens = value.trim().split(/[\s,]+/).filter((token) => token.length > 0);
+    if (parseFloatTokens(value) === null) {
+        return null;
+    }
+    if (tokens.length === 1) {
+        return { top: tokens[0], right: tokens[0], bottom: tokens[0], left: tokens[0] };
+    }
+    if (tokens.length === 2) {
+        return { top: tokens[0], right: tokens[1], bottom: tokens[0], left: tokens[1] };
+    }
+    if (tokens.length === 4) {
+        return { top: tokens[0], right: tokens[1], bottom: tokens[2], left: tokens[3] };
+    }
+    return null;
+}
+
+/** Splits a composite attribute's old and new values into the sub-channel writes for only the
+ *  components that actually changed (e.g. editing just y in position="10 20" -> position="10 30"
+ *  emits a single position.y write). attrName is the XML attribute (position / size / padding /
+ *  scale / center / ...); kind selects the parse+expand rule. Returns null when either value is
+ *  malformed or has the wrong component count, so the caller falls back to a full reparse. An empty
+ *  array means the values are equivalent (e.g. padding "10" vs "10 10 10 10"): no write is needed.
+ *  Emitting only changed components keeps each sub-channel's own layout/anim flag accurate (a
+ *  position.y edit must not redundantly re-drive position.x). */
+function splitCompositeChange(
+    attrName: string,
+    kind: 'point' | 'size' | 'padding',
+    oldValue: string,
+    newValue: string,
+): SubEdit[] | null {
+    if (kind === 'padding') {
+        const oldPad = expandPadding(oldValue);
+        const newPad = expandPadding(newValue);
+        if (oldPad === null || newPad === null) {
+            return null;
+        }
+        const edits: SubEdit[] = [];
+        const sides: Array<keyof typeof newPad> = ['left', 'top', 'right', 'bottom'];
+        for (const side of sides) {
+            if (Number.parseFloat(oldPad[side]) !== Number.parseFloat(newPad[side])) {
+                edits.push({ channel: `${attrName}.${side}`, value: newPad[side] });
+            }
+        }
+        return edits;
+    }
+    const oldTokens = pointTokens(oldValue);
+    const newTokens = pointTokens(newValue);
+    if (oldTokens === null || newTokens === null) {
+        return null;
+    }
+    // point -> .x/.y, size -> .width/.height, matching the channel table's sub-channel names.
+    const suffixes = kind === 'size' ? ['width', 'height'] : ['x', 'y'];
+    const edits: SubEdit[] = [];
+    for (let i = 0; i < suffixes.length; i++) {
+        if (Number.parseFloat(oldTokens[i]) !== Number.parseFloat(newTokens[i])) {
+            edits.push({ channel: `${attrName}.${suffixes[i]}`, value: newTokens[i] });
+        }
+    }
+    return edits;
+}
+
+/** Returns the two component token strings of a point/size value, or null when it does not hold
+ *  exactly two numbers (the importer's ParseTwoFloats requires both). Token strings (not reparsed
+ *  numbers) are returned so an unchanged component round-trips byte-identically. */
+function pointTokens(value: string): [string, string] | null {
+    const tokens = value.trim().split(/[\s,]+/).filter((token) => token.length > 0);
+    if (tokens.length !== 2 || parseFloatTokens(value) === null) {
+        return null;
+    }
+    return [tokens[0], tokens[1]];
+}
+
 /** Result of classifying one node's span: either the incremental channel writes, or a human-
  *  readable reason the edit cannot go incremental (surfaced via console.debug for diagnosing why an
  *  Apply fell back to a full reparse). */
@@ -124,15 +247,47 @@ function classifyNodeSpan(
         if (oldAttrs[key] === newAttrs[key]) {
             continue;
         }
-        if (!channels.includes(key)) {
-            return {
-                reason: `attribute "${key}" on <${oldElement.tagName}> is not an incrementable channel (composite or unsupported)`,
-            };
+        if (channels.includes(key)) {
+            edits.push({ index: -1, channel: key, value: newAttrs[key] });
+            continue;
         }
-        edits.push({ index: -1, channel: key, value: newAttrs[key] });
+        // Composite attribute (position / size / padding / ...): the channel table addresses it as
+        // dotted sub-channels, so split the change into per-component writes and keep only the
+        // components that actually changed. The value is re-parsed exactly as the importer would, so
+        // an incremental sub-channel write reproduces the full-reparse result.
+        const compositeKind = COMPOSITE_ATTRIBUTES.get(key);
+        if (compositeKind !== undefined) {
+            const subEdits = splitCompositeChange(key, compositeKind, oldAttrs[key], newAttrs[key]);
+            if (subEdits === null) {
+                return {
+                    reason: `composite attribute "${key}" on <${oldElement.tagName}> is malformed or has an unexpected component count`,
+                };
+            }
+            for (const subEdit of subEdits) {
+                if (!channels.includes(subEdit.channel)) {
+                    return {
+                        reason: `composite attribute "${key}" maps to sub-channel "${subEdit.channel}" which is not incrementable on <${oldElement.tagName}>`,
+                    };
+                }
+                edits.push({ index: -1, channel: subEdit.channel, value: subEdit.value });
+            }
+            continue;
+        }
+        return {
+            reason: `attribute "${key}" on <${oldElement.tagName}> is not an incrementable channel (composite or unsupported)`,
+        };
     }
-    for (const edit of edits) {
-        oldElement.setAttribute(edit.channel, edit.value);
+    // Round-trip check against the ORIGINAL attribute names (not the split sub-channels): write each
+    // changed attribute's new value back onto the old element under its own name, then require a
+    // byte-identical serialization. This guarantees the only differences between the spans are the
+    // attribute values we accounted for above; any residual difference (child element, text content,
+    // attribute reorder, embedded <svg> subtree change) still forces a full reparse. Done with the
+    // original names so a composite like position stays a single attribute here even though it was
+    // emitted as position.x / position.y sub-channel writes.
+    for (const key of newKeys) {
+        if (oldAttrs[key] !== newAttrs[key]) {
+            oldElement.setAttribute(key, newAttrs[key]);
+        }
     }
     const serializer = new XMLSerializer();
     if (serializer.serializeToString(oldElement) !== serializer.serializeToString(newElement)) {
@@ -423,10 +578,15 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         const generation = ++this.loadGeneration;
+        // [ORT] Optimize Release Test - full-load timing instrumentation. Remove all `[ORT]`
+        // lines when the comparison is done.
+        const ortT0 = performance.now();
+        console.log(`[ORT] load() start: ${pagxBytes.length} bytes`);
         // Snapshots taken while it's still safe to read pre-existing view state; used after
         // the reset() inside parsePAGX() to restore playback position and play/pause state.
         try {
             await this.ensureView();
+            console.log(`[ORT] ensureView (wasm ready): +${(performance.now() - ortT0).toFixed(1)}ms`);
             if (!this.isCurrentLoad(generation)) return;
             const view = this.view!;
 
@@ -435,7 +595,9 @@ export class PAGXPlayer extends EventTarget {
                 : 0;
             const wasPlaying = options.preserveCurrentTime && view.isPlaying();
 
+            const ortParseStart = performance.now();
             view.parsePAGX(pagxBytes);
+            console.log(`[ORT] parsePAGX: ${(performance.now() - ortParseStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
 
             // Register fonts (host-supplied); the view resets font registration on each load
             // so this must run before buildLayers.
@@ -449,6 +611,7 @@ export class PAGXPlayer extends EventTarget {
             // concurrently but push in order so a hypothetical duplicate path list stays
             // deterministic.
             if (options.resolveResource) {
+                const ortResStart = performance.now();
                 const paths: string[] = view.getExternalFilePaths();
                 if (paths && paths.length > 0) {
                     const resolve = options.resolveResource;
@@ -464,10 +627,13 @@ export class PAGXPlayer extends EventTarget {
                             view.loadFileData(item.rel, item.buf);
                         }
                     }
+                    console.log(`[ORT] resolveResource: ${paths.length} file(s) in ${(performance.now() - ortResStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
                 }
             }
 
+            const ortBuildStart = performance.now();
             view.buildLayers();
+            console.log(`[ORT] buildLayers: ${(performance.now() - ortBuildStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
 
             if (options.forceLoop !== false) {
                 view.setLoop(true);
@@ -509,7 +675,9 @@ export class PAGXPlayer extends EventTarget {
             // Force a synchronous first frame so the canvas reflects the newly built document
             // before we unhide it below; without this the view is drawn one rAF later and the
             // previous document's last frame briefly ghosts through when hidden -> visible.
+            const ortDrawStart = performance.now();
             view.draw();
+            console.log(`[ORT] first draw: ${(performance.now() - ortDrawStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
 
             this.canvas.classList.remove('hidden');
             setToolbarVisible(this.toolbarRoot, true);
@@ -527,7 +695,9 @@ export class PAGXPlayer extends EventTarget {
 
             // Refresh the source map (node index -> source span) for selection highlighting.
             // Rebuilt on every load since a new document renumbers nodes.
+            const ortMapStart = performance.now();
             this.sourceMap = view.getNodeSourceMap();
+            console.log(`[ORT] getNodeSourceMap: ${(performance.now() - ortMapStart).toFixed(1)}ms, ${this.sourceMap.length} node(s) (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
             this.hoverIndex = -1;
             this.editorHoverIndex = -1;
             this.selectedIndex = -1;
@@ -541,6 +711,7 @@ export class PAGXPlayer extends EventTarget {
                 xmlText,
             };
             this.dispatchEvent(new CustomEvent('loaded', { detail }));
+            console.log(`[ORT] load() done (full load path): total ${(performance.now() - ortT0).toFixed(1)}ms`);
         } catch (err) {
             // Only the currently active load reports the failure. Superseded loads dropping
             // out via isCurrentLoad() never enter this branch since generation checks come
@@ -766,14 +937,19 @@ export class PAGXPlayer extends EventTarget {
      *  of newXml is the authoritative final state regardless of any channel writes already applied
      *  here. */
     private tryIncrementalApply(oldXml: string, newXml: string): boolean {
-        if (!this.view || this.sourceMap.length === 0) {
-            return false;
+        // [ORT] Optimize Release Test - incremental-apply timing. This is the fast path the
+        // optimization adds; compare its total against buildLayers on the full-load path.
+        const ortT0 = performance.now();
+    if (!this.view || this.sourceMap.length === 0) {
+      return false;
         }
         const edits = this.classifyEdits(oldXml, newXml);
         if (edits === null) {
+            console.log(`[ORT] incremental: NOT applicable, fall back to full reparse (+${(performance.now() - ortT0).toFixed(1)}ms)`);
             return false;
         }
         if (edits.length === 0) {
+            console.log(`[ORT] incremental: no-op (0 edits) in ${(performance.now() - ortT0).toFixed(1)}ms`);
             return true;
         }
         for (const edit of edits) {
@@ -781,6 +957,7 @@ export class PAGXPlayer extends EventTarget {
                 console.debug(
                     `[pagx] full reparse: engine rejected setNodeChannel #${edit.index}.${edit.channel}="${edit.value}" (unknown channel or unparseable value)`,
                 );
+                console.log(`[ORT] incremental: setNodeChannel rejected, fall back to full reparse (+${(performance.now() - ortT0).toFixed(1)}ms)`);
                 return false;
             }
         }
@@ -788,7 +965,8 @@ export class PAGXPlayer extends EventTarget {
         const summary = edits
             .map((edit) => `#${edit.index}.${edit.channel}="${edit.value}"`)
             .join(', ');
-        console.log(`[pagx] incremental subtree update applied: ${summary}`);
+           console.log(`[pagx] incremental subtree update applied: ${summary}`);
+        console.log(`[ORT] incremental apply done (fast path): ${edits.length} edit(s) in ${(performance.now() - ortT0).toFixed(1)}ms`);
         return true;
     }
 
