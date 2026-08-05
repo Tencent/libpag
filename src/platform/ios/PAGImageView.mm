@@ -458,8 +458,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
   if (oldScaleFactor != scaleFactor) {
+    std::lock_guard<std::mutex> autoLock(imageViewLock);
     if (pagComposition || filePath) {
-      std::lock_guard<std::mutex> autoLock(imageViewLock);
       [self reset];
       [self updatePAGDecoder];
       self.viewSize = CGSizeMake(self.frame.size.width, self.frame.size.height);
