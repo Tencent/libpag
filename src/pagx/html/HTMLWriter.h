@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -26,6 +27,7 @@
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
+#include "pagx/html/HTMLResourceWriter.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -184,9 +186,35 @@ class HTMLWriterContext {
   // `staticImgUrlPrefix` is the relative URL prefix that the generated HTML uses to reference
   // them (derived as the directory's basename + '/'). The resourceDir is mandatory at the
   // public API boundary, so both fields are non-empty when HTMLWriter runs.
+  //
+  // When `resourceWriter` is set (the ToData path), staticImgDir/staticImgUrlPrefix are left
+  // empty and every resource is routed into the in-memory archive through writeResource()
+  // instead of the filesystem.
   std::string staticImgDir = {};
   std::string staticImgUrlPrefix = {};
   float rasterScale = 2.0f;
+
+  // Optional in-memory resource sink. ToHTML leaves this unset so resources are written to
+  // staticImgDir on disk exactly as before; ToData sets it to an HTMLZipResourceWriter so every
+  // resource (rasterized PNGs, copied images, WOFF2 fonts, PlusDarker backdrops) lands inside
+  // the returned archive instead. All resource writes must go through writeResource(), never
+  // the filesystem directly.
+  std::shared_ptr<HTMLResourceWriter> resourceWriter = {};
+
+  // Returns true when the context can produce resource output: either an explicit
+  // resourceWriter (ToData path) or a non-empty staticImgDir (ToHTML path). Callers use this
+  // to decide whether rasterization-based fallbacks are available.
+  bool hasResourceOutput() const {
+    return resourceWriter != nullptr || !staticImgDir.empty();
+  }
+
+  // Writes one resource into the active output. `relativePath` is '/'-separated relative to the
+  // output root (e.g. "dgc0.png" or "fonts/font_f0.woff2"). When resourceWriter is set the
+  // bytes are forwarded to it; otherwise they are written to staticImgDir/relativePath on disk,
+  // creating parent directories as needed. Returns false on failure with errorMsg populated if
+  // non-null.
+  bool writeResource(const std::string& relativePath, const void* bytes, size_t size,
+                     std::string* errorMsg = nullptr);
 
   // Cache: source absolute file path → assigned filename inside staticImgDir. Used by
   // GetImageSrc to deduplicate identical source paths (one source copied at most once per
