@@ -176,9 +176,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagComposition == newComposition) {
     return;
   }
-  if (!filePath) {
-    pagComposition = newComposition;
-  }
+  // Keep the composition resident even for path-loaded views. Nulling it out (the old
+  // `if (!filePath)` guard) forced updatePAGDecoder to reload from filePath on every decoder
+  // rebuild, and those rebuilds run on the main thread (setBounds/setFrame -> handleSizeChanged,
+  // setContentScaleFactor, setRenderScale), so a network path blocked the main thread on a
+  // synchronous download. The composition is loaded once here and reused on every rebuild.
+  pagComposition = newComposition;
   if (newComposition) {
     self.fileWidth = newComposition->width();
     self.fileHeight = newComposition->height();
@@ -247,14 +250,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     if (pagComposition) {
       pagDecoder = pag::PAGDecoder::MakeFrom(pagComposition, self.maxFrameRate, scaleFactor);
-    } else if (filePath) {
-      PAGFile* pagFile = [PAGFile Load:filePath];
-      if (pagFile != nil) {
-        auto layer = [[pagFile impl] pagLayer];
-        auto composition = std::static_pointer_cast<pag::PAGComposition>(layer);
-        pagDecoder = pag::PAGDecoder::MakeFrom(composition, self.maxFrameRate, scaleFactor);
-      }
     }
+    // Reuse the resident composition; never reload from filePath here. Reloading would reissue
+    // [PAGFile Load:] on the caller thread, and decoder rebuilds are driven by the view lifecycle
+    // on the main thread, so a network path would block the main thread on a synchronous download.
     if (pagDecoder) {
       width = pagDecoder->width();
       height = pagDecoder->height();
