@@ -18,7 +18,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <functional>
 #include <string>
 #include <vector>
@@ -2305,7 +2304,7 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
   // Rendering strategy dispatch (highest priority first):
   // 1. DiamondGradient fill → renderDiamondCanvas (always PNG, no CSS equivalent)
   // 2. ImagePattern fill (non-CSSable) → renderImagePatternCanvas (mirror/clamp modes)
-  // 3. ConicGradient fill + staticImgDir → renderConicCanvas (fallback when CSS conic fails)
+  // 3. ConicGradient fill + resource output → renderConicCanvas (fallback when CSS conic fails)
   // 4. CSS-feasible geometry → renderCSSDiv (preferred: smaller output, standard CSS)
   // 5. Fallback → renderSVG (complex geometries, stroke modes, trims)
   if (fill && fill->color && fill->color->nodeType() == NodeType::DiamondGradient &&
@@ -2326,10 +2325,11 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     }
   }
   if (fill && fill->color && fill->color->nodeType() == NodeType::ConicGradient &&
-      !_ctx->staticImgDir.empty() && !stroke && !hasTrim) {
+      _ctx->hasResourceOutput() && !stroke && !hasTrim) {
     // CSS conic-gradient via SVG pattern+foreignObject is unreliable in headless Chromium (the
     // foreignObject content is not painted inside <defs>). Fall back to tgfx rasterization when
-    // a static image directory is available, so the gradient is always visible.
+    // a resource output (static image directory or in-memory resource writer) is available, so
+    // the gradient is always visible.
     renderConicCanvas(out, geos, fill, alpha, painterBlend);
     return;
   }
@@ -2342,9 +2342,9 @@ void HTMLWriter::renderGeo(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
 
 void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill,
                                      float alpha, BlendMode painterBlend) {
-  if (_ctx->staticImgDir.empty()) {
-    // Rasterization disabled; silently skip. Caller can enable it by setting staticImgDir in
-    // HTMLExportOptions.
+  if (!_ctx->hasResourceOutput()) {
+    // Rasterization disabled; silently skip. Caller can enable it by setting resourceDir in
+    // HTMLExportOptions (or by providing a resource writer in ToData mode).
     return;
   }
   auto dg = static_cast<const DiamondGradient*>(fill->color);
@@ -2374,22 +2374,20 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
 
   std::string imgId = _ctx->nextId("dgc");
   std::string fileName = imgId + ".png";
-  std::filesystem::create_directories(_ctx->staticImgDir);
-  std::string absPath = _ctx->staticImgDir;
-  if (!absPath.empty() && absPath.back() != '/') {
-    absPath += "/";
-  }
-  absPath += fileName;
 
-  bool ok = false;
+  std::shared_ptr<tgfx::Data> png;
   if (geo.type == NodeType::Ellipse) {
-    ok = HTMLStaticImageRenderer::RenderDiamondEllipseToPng(left, top, w, h, dg, _ctx->rasterScale,
-                                                            absPath);
+    png =
+        HTMLStaticImageRenderer::RenderDiamondEllipseToPng(left, top, w, h, dg, _ctx->rasterScale);
   } else {
-    ok = HTMLStaticImageRenderer::RenderDiamondToPng(left, top, w, h, roundness, dg,
-                                                     _ctx->rasterScale, absPath);
+    png = HTMLStaticImageRenderer::RenderDiamondToPng(left, top, w, h, roundness, dg,
+                                                      _ctx->rasterScale);
   }
-  if (!ok) {
+  if (!png || png->size() == 0) {
+    return;
+  }
+  std::string error;
+  if (!_ctx->writeResource(fileName, png->data(), png->size(), &error)) {
     return;
   }
 
@@ -2415,7 +2413,7 @@ void HTMLWriter::renderDiamondCanvas(HTMLBuilder& out, const GeoInfo& geo, const
 
 void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>& geos,
                                    const Fill* fill, float alpha, BlendMode painterBlend) {
-  if (_ctx->staticImgDir.empty()) {
+  if (!_ctx->hasResourceOutput()) {
     return;
   }
   auto* cg = static_cast<const ConicGradient*>(fill->color);
@@ -2427,15 +2425,14 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
 
   std::string imgId = _ctx->nextId("cgc");
   std::string fileName = imgId + ".png";
-  std::filesystem::create_directories(_ctx->staticImgDir);
-  std::string absPath = _ctx->staticImgDir;
-  if (!absPath.empty() && absPath.back() != '/') {
-    absPath += "/";
-  }
-  absPath += fileName;
 
-  if (!HTMLStaticImageRenderer::RenderConicGradientToPng(x0, y0, sw, sh, cg, _ctx->rasterScale,
-                                                         absPath)) {
+  auto png =
+      HTMLStaticImageRenderer::RenderConicGradientToPng(x0, y0, sw, sh, cg, _ctx->rasterScale);
+  if (!png || png->size() == 0) {
+    return;
+  }
+  std::string error;
+  if (!_ctx->writeResource(fileName, png->data(), png->size(), &error)) {
     return;
   }
 
@@ -2498,7 +2495,7 @@ void HTMLWriter::renderConicCanvas(HTMLBuilder& out, const std::vector<GeoInfo>&
 
 void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, const Fill* fill,
                                           float alpha, BlendMode painterBlend) {
-  if (_ctx->staticImgDir.empty()) {
+  if (!_ctx->hasResourceOutput()) {
     return;
   }
   auto p = static_cast<const ImagePattern*>(fill->color);
@@ -2531,22 +2528,20 @@ void HTMLWriter::renderImagePatternCanvas(HTMLBuilder& out, const GeoInfo& geo, 
 
   std::string imgId = _ctx->nextId("ipc");
   std::string fileName = imgId + ".png";
-  std::filesystem::create_directories(_ctx->staticImgDir);
-  std::string absPath = _ctx->staticImgDir;
-  if (!absPath.empty() && absPath.back() != '/') {
-    absPath += "/";
-  }
-  absPath += fileName;
 
-  bool ok = false;
+  std::shared_ptr<tgfx::Data> png;
   if (geo.type == NodeType::Ellipse) {
-    ok = HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(left, top, w, h, p,
-                                                                 _ctx->rasterScale, absPath);
+    png = HTMLStaticImageRenderer::RenderImagePatternEllipseToPng(left, top, w, h, p,
+                                                                  _ctx->rasterScale);
   } else {
-    ok = HTMLStaticImageRenderer::RenderImagePatternToPng(left, top, w, h, roundness, p,
-                                                          _ctx->rasterScale, absPath);
+    png = HTMLStaticImageRenderer::RenderImagePatternToPng(left, top, w, h, roundness, p,
+                                                           _ctx->rasterScale);
   }
-  if (!ok) {
+  if (!png || png->size() == 0) {
+    return;
+  }
+  std::string error;
+  if (!_ctx->writeResource(fileName, png->data(), png->size(), &error)) {
     return;
   }
 
