@@ -1,0 +1,59 @@
+{
+  "name": "@libpag/pagx-preview",
+  "version": "0.1.0-alpha.1",
+  "description": "Local PAGX preview server with live reload. Run `pagx-preview file.pagx` to view a PAGX in the browser with automatic refresh on file changes.",
+  "license": "Apache-2.0",
+  "author": "Tencent",
+  "keywords": [
+    "pagx",
+    "pag",
+    "libpag",
+    "preview",
+    "live-reload",
+    "animation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tencent/libpag",
+    "directory": "playground/pagx-preview"
+  },
+  "bugs": {
+    "url": "https://github.com/Tencent/libpag/issues"
+  },
+  "homepage": "https://github.com/Tencent/libpag#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=16.7.0"
+  },
+  "bin": {
+    "pagx-preview": "src/cli.js"
+  },
+  "files": [
+    "src/",
+    "static/",
+    "wasm/",
+    "scripts/check-artifacts.js",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/prebuild.js --build",
+    "build:release": "node scripts/prebuild.js --build --release",
+    "build:mt": "node scripts/prebuild.js --build --mt",
+    "build:release:mt": "node scripts/prebuild.js --build --release --mt",
+    "prebuild": "node scripts/prebuild.js",
+    "preview": "node src/cli.js",
+    "prepack": "node scripts/prebuild.js --build --release && node scripts/check-artifacts.js",
+    "prepublishOnly": "node scripts/check-artifacts.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "chokidar": "^3.6.0",
+    "express": "^4.21.1"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -16,6 +16,7 @@ and `pagx <command> --help` for per-command usage.
 - [pagx import](#pagx-import) — convert SVG/HTML to PAGX
 - [pagx resolve](#pagx-resolve) — expand inline `<svg>` and `import` attributes
 - [pagx export](#pagx-export) — export PAGX to SVG/HTML/PPTX
+- [pagx preview](#pagx-preview) — live browser preview with hot reload
 
 ---
 
@@ -473,7 +474,12 @@ Format-specific options (e.g. `--svg-*`) are shared with `pagx import`; see abov
 Export a PAGX file to another format (SVG, PPTX, or HTML). The output format is inferred from the
 output file extension. If neither `--format` nor an output file with a recognizable extension is
 provided, the command reports an error (there is no implicit default format — `--input icon.pagx`
-alone fails). Once the format is known, `--output` defaults to `<input>.<format>`.
+alone fails). Once the format is known, `--output` defaults to `<first input>.<format>`.
+
+For **PPTX only**, `--input` may be repeated to build a multi-slide deck — each `--input` becomes one
+slide, in the order given, and the deck adopts the first document's canvas size (PPTX stores a single
+slide size for the whole presentation). SVG and HTML take a single document, so passing more than one
+`--input` for those formats is rejected. If any input fails to load, the whole export aborts.
 
 ```bash
 pagx export --format svg --input icon.pagx       # PAGX to icon.svg
@@ -481,19 +487,72 @@ pagx export --input icon.pagx --output out.svg   # PAGX to out.svg
 pagx export --input icon.pagx --output out.pptx  # PAGX to out.pptx
 pagx export --format svg --input icon.pagx       # force SVG output format
 pagx export --format pptx --input icon.pagx      # force PPTX output format
+pagx export --input a.pagx --input b.pagx --output deck.pptx  # multi-slide deck (one slide per input)
 pagx export --input icon.pagx --svg-indent 4     # 4-space indent
 pagx export --input icon.pagx --text-to-path     # convert text to paths
 pagx export --input icon.pagx --output out.pptx --ppt-no-bake-unsupported  # keep unsupported features editable
+pagx export --input icon.pagx --output out.pptx --ppt-ignore-glyphruns  # editable text instead of glyph paths
 pagx export --input icon.pagx --output out.html  # PAGX to HTML
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--input <file>` | Input PAGX file (required) |
-| `--output <file>` | Output file (default: `<input>.<format>`) |
+| `--input <file>` | Input PAGX file (required). Repeat to add more slides — **pptx only**; each `--input` becomes one slide in deck order |
+| `--output <file>` | Output file (default: `<first input>.<format>`) |
 | `--format <format>` | Output format (`svg`, `pptx`, or `html`; inferred from output extension). Required if output has no extension |
 | `--text-to-path` | Convert text to path geometry using pre-shaped glyph outlines (default: native text rendering) |
+| `--ppt-ignore-glyphruns` | Ignore the GlyphRun geometry carried by Text nodes and emit native, editable PowerPoint text derived from the `text` attribute instead. By default a Text that carries GlyphRun data is written as custom glyph paths, because `a:r` runs cannot express arbitrary glyph IDs, per-glyph offsets, anchors, or rotations; this flag trades that glyph-level fidelity for text the reader can still edit. Text nodes without GlyphRun data are unaffected. Opposite of `--text-to-path` — if both are passed, `--text-to-path` wins |
 | `--svg-indent <n>` | Indentation spaces (default: 2, valid range: 0–16) |
 | `--svg-no-xml-declaration` | Omit the `<?xml ...?>` declaration |
 | `--ppt-no-bake-unsupported` | Disable the default baking of layers that use features OOXML cannot represent natively — masks, scrollRect clipping, blend modes outside of `Normal`/`Multiply`/`Screen`/`Darken`/`Lighten`, wide-gamut color, and `BackgroundBlurStyle`. By default the exporter bakes these layers into PNG patches so the slide matches the tgfx renderer (for unsupported blend modes and `BackgroundBlurStyle` the backdrop beneath the layer is baked into the PNG too, so the blend/frosted-glass composites against the real scene, at the cost of turning native content under the patch into pixels). Pass this flag to silently drop those features and emit the layer as editable shapes instead (mask ignored, scrollRect dropped, blend falls back to `Normal`, wide-gamut clamped to sRGB). Tiled image patterns are always baked regardless of this flag, and features with no vector fallback (TextPath, ColorMatrix, conic/diamond gradient, shear transform) always bake regardless of this flag |
+
+---
+
+## pagx preview
+
+Launch a live, interactive browser preview of a PAGX file with hot reload. Unlike `pagx render`
+(a one-shot PNG screenshot for QA), `pagx preview` starts a local HTTP server that renders the
+PAGX in a browser tab and watches the file — saving the `.pagx` (or the source HTML in the
+HTML→PAGX workflow) reloads the open tab automatically. Use it to let the user see and interact
+with the finished design; use `pagx render` for pixel-level QA comparisons.
+
+```bash
+pagx preview input.pagx                # background daemon, prints URL, returns prompt
+pagx preview --json input.pagx         # single-line JSON {url,pid,logFile,reused} on stdout
+pagx preview --foreground input.pagx   # run in foreground (Ctrl+C to stop)
+pagx preview --port 8080 input.pagx    # pick a specific port (default: random free port)
+pagx preview stop                      # stop the background daemon
+pagx preview --log                     # print the daemon log file
+```
+
+| Option / Subcommand | Description |
+|---------------------|-------------|
+| `<file>` | PAGX file to preview (required unless using `--mcp`, `stop`, or `--log`) |
+| `--port <n>` | Port to bind (default: 0 = auto-pick a free port) |
+| `--host <addr>` | Bind address (default: `127.0.0.1`) |
+| `--fonts <dir>` | Extra font directory for the preview renderer |
+| `--json` | Emit a single-line JSON record on stdout (`{url,pid,logFile,reused}`); implies `--no-open` |
+| `--no-open` | Do not auto-open a system browser (default in non-TTY / agent contexts) |
+| `--foreground` | Run the server in the foreground instead of a detached daemon |
+| `--mcp` | Run as a stdio MCP server for AI assistants (not for interactive preview) |
+| `stop` | Stop the running background daemon |
+| `--log` | Print the daemon log file path and contents |
+
+### Behavior
+
+- **Default = background daemon.** `pagx preview input.pagx` spawns a detached server process,
+  prints `pagx preview: http://127.0.0.1:<port>/...` to stdout, and **returns the shell prompt**
+  (it does not block). The server keeps running in the background so repeated invocations reuse
+  it instead of starting a new one.
+- **Browser auto-open.** In a real TTY the default opens the system browser; in non-TTY contexts
+  (piped stdout, IDE agents, CI) it does not — the URL is printed only. Pass `--no-open` to force
+  it off, or open the printed URL manually / via the IDE's browser preview tool.
+- **Hot reload.** The server watches the `.pagx` file; any save triggers a `reload` SSE event
+  that refreshes every open tab. Editing the source HTML in the HTML→PAGX workflow and re-running
+  `pagx import` will also reload the preview automatically.
+- **Session reuse.** A second `pagx preview another.pagx` reuses the already-running daemon,
+  opens a new session for the new file, and prints its URL. Each file gets its own session and
+  is cleaned up independently when its tab disconnects.
+- **Lifecycle.** The daemon stays up until explicitly stopped with `pagx preview stop` or the
+  machine reboots. Always run `pagx preview stop` when done to free the port and process.
 

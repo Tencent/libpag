@@ -20,12 +20,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PPTExporter.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/TextLayout.h"
 #include "pagx/nodes/BackgroundBlurStyle.h"
 #include "pagx/nodes/BlendFilter.h"
 #include "pagx/nodes/BlurFilter.h"
@@ -62,6 +65,11 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/ppt/PPTBoilerplate.h"
+#include "pagx/ppt/PPTWriter.h"
+#include "pagx/ppt/PPTWriterContext.h"
+#include "pagx/utils/TextUtils.h"
+#include "pagx/xml/XMLBuilder.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
@@ -78,7 +86,7 @@ static std::string PPTOutDir() {
 static bool ExportAndVerify(pagx::PAGXDocument& doc, const std::string& name,
                             const pagx::PPTExportOptions& options = {}) {
   auto path = PPTOutDir() + "/" + name + ".pptx";
-  bool ok = pagx::PPTExporter::ToFile(doc, path, options);
+  bool ok = pagx::PPTExporter::ToFile({&doc}, path, options);
   if (ok) {
     ok = std::filesystem::exists(path) && std::filesystem::file_size(path) > 0;
   }
@@ -127,7 +135,7 @@ PAGX_TEST(PAGXPPTTest, PPTExport_FromSVG) {
     ASSERT_NE(reimported, nullptr) << baseName << " PAGX re-import failed";
 
     auto pptxPath = outDir + "/" + baseName + ".pptx";
-    ASSERT_TRUE(pagx::PPTExporter::ToFile(*reimported, pptxPath))
+    ASSERT_TRUE(pagx::PPTExporter::ToFile({reimported.get()}, pptxPath))
         << baseName << " PPT export failed";
     EXPECT_TRUE(std::filesystem::exists(pptxPath));
     EXPECT_GT(std::filesystem::file_size(pptxPath), 0u) << baseName << " PPTX file is empty";
@@ -904,6 +912,18 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithTextBox) {
 
   pagx::PPTExportOptions options;
   options.convertTextToPath = false;
+  doc->applyLayout();
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+  // Ordinary editable text keeps PowerPoint's bounded wrapping as a cross-platform fallback when
+  // the export host cannot reproduce the authored font metrics.
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
   ASSERT_TRUE(ExportAndVerify(*doc, "native_text_textbox", options));
 }
 
@@ -1441,6 +1461,430 @@ PAGX_TEST(PAGXPPTTest, TextWithGlyphRuns) {
   ASSERT_TRUE(ExportAndVerify(*doc, "text_glyph_runs", options));
 }
 
+// ignoreGlyphRuns forces the native-text path even when a Text carries GlyphRun
+// data, so the exporter derives editable runs from Text::text instead of
+// walking the pre-shaped glyphs. Exercises the branch in emitGeometryWithFs.
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRuns) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 500;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  glyph->path->moveTo(100, 0);
+  glyph->path->lineTo(400, 0);
+  glyph->path->lineTo(400, 800);
+  glyph->path->lineTo(100, 800);
+  glyph->path->close();
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A";
+  text->position = {100, 200};
+  text->fontSize = 48.0f;
+
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 48.0f;
+  run->glyphs = {1};
+  // Non-zero run offset: native fallback must fold this into the shape frame
+  // (mirroring writeTextAsPath) so per-line Texts that separate purely through
+  // run->y don't collapse onto a shared origin.
+  run->y = 36.0f;
+  text->glyphRuns.push_back(run);
+
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_ignore_glyph_runs", options));
+
+  auto writeBody = [&](const pagx::PPTExportOptions& opts) {
+    pagx::PPTWriterContext writerContext;
+    pagx::FontConfig fontConfig;
+    pagx::LayoutContext layoutContext(&fontConfig);
+    pagx::PPTWriter writer(&writerContext, doc.get(), opts, &layoutContext);
+    pagx::XMLBuilder xml;
+    writer.writeDocument(xml);
+    return xml.release();
+  };
+  // The flag replaces the glyph outlines with an editable run carrying the readable text.
+  auto editableBody = writeBody(options);
+  EXPECT_NE(editableBody.find("<a:t>A</a:t>"), std::string::npos);
+  EXPECT_EQ(editableBody.find("a:custGeom"), std::string::npos);
+
+  // convertTextToPath asks for the opposite and is the stronger guarantee (the slide renders the
+  // same without the reader's fonts), so it wins when both are set instead of one flag silently
+  // cancelling the other depending on which branch is evaluated first.
+  pagx::PPTExportOptions conflictingOptions;
+  conflictingOptions.ignoreGlyphRuns = true;
+  conflictingOptions.convertTextToPath = true;
+  pagx::PPTExportOptions pathOnlyOptions;
+  pathOnlyOptions.convertTextToPath = true;
+  EXPECT_EQ(writeBody(conflictingOptions), writeBody(pathOnlyOptions));
+  EXPECT_EQ(writeBody(conflictingOptions).find("<a:t>A</a:t>"), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesLineBoxVerticalAlignment) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 500;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  glyph->path->moveTo(100, -700);
+  glyph->path->lineTo(400, -700);
+  glyph->path->lineTo(400, 0);
+  glyph->path->lineTo(100, 0);
+  glyph->path->close();
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Q1 2025";
+  text->fontFamily = "Arial";
+  text->fontSize = 22.0f;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 22.0f;
+  run->glyphs = {1, 1, 1, 1, 1, 1, 1};
+  run->x = 21.5f;
+  run->y = 28.0f;
+  run->positions = {{0.0f, 0.0f},  {16.0f, 0.0f}, {32.0f, 0.0f}, {48.0f, 0.0f},
+                    {64.0f, 0.0f}, {80.0f, 0.0f}, {96.0f, 0.0f}};
+  run->bounds = pagx::Rect::MakeXYWH(0, 0, 120, 40);
+  text->glyphRuns.push_back(run);
+
+  group->elements.push_back(text);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.1f, 0.3f, 0.9f, 1.0f};
+  fill->color = solid;
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 120;
+  textBox->height = 40;
+  textBox->textAlign = pagx::TextAlign::Center;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  ASSERT_TRUE(ExportAndVerify(*doc, "text_ignore_glyph_runs_linebox_alignment", options));
+
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  // Complete single-baseline GlyphRun positions disable PowerPoint's metric-dependent second
+  // wrapping pass.
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\" lIns=\"0\" tIns=\"0\" rIns=\"0\" "
+                      "bIns=\"0\" anchor=\"ctr\"/>"),
+            std::string::npos);
+  // Horizontal textAlign is already encoded by run->x, so centering must not
+  // also be applied on a:pPr.
+  EXPECT_EQ(body.find("<a:pPr algn=\"ctr\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsPreservesBitmapGlyphPosition) {
+  auto doc = pagx::PAGXDocument::Make(500, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 160;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 160;
+  // Match an embedded emoji glyph: it has bitmap content but no vector
+  // outline, and its owning GlyphRun carries no authored bounds.
+  glyph->image = doc->makeNode<pagx::Image>();
+  font->glyphs.push_back(glyph);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "🤣";
+  text->fontFamily = "Arial";
+  text->fontSize = 32.0f;
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 32.0f;
+  run->glyphs = {1};
+  run->y = 31.0f;
+  run->positions = {{160.0f, 0.0f}};
+  text->glyphRuns.push_back(run);
+
+  group->elements.push_back(text);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  group->elements.push_back(fill);
+  layer->contents.push_back(group);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 440.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  // positions[0].x = 160px must become the shape's left edge. The old fallback
+  // discarded it and emitted x="0", placing the emoji at the start of the line.
+  EXPECT_NE(body.find("<a:off x=\"1524000\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsCombinesModifierTextBoxRuns) {
+  auto doc = pagx::PAGXDocument::Make(500, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* vectorFont = doc->makeNode<pagx::Font>();
+  vectorFont->unitsPerEm = 160;
+  auto* vectorGlyph = doc->makeNode<pagx::Glyph>();
+  vectorGlyph->advance = 160;
+  vectorGlyph->path = doc->makeNode<pagx::PathData>();
+  vectorGlyph->path->moveTo(0, -140);
+  vectorGlyph->path->lineTo(140, -140);
+  vectorGlyph->path->lineTo(140, 0);
+  vectorGlyph->path->lineTo(0, 0);
+  vectorGlyph->path->close();
+  vectorFont->glyphs.push_back(vectorGlyph);
+
+  auto* title = doc->makeNode<pagx::Text>();
+  title->text = "云原生架构";
+  title->fontFamily = "Inter";
+  title->fontStyle = "SemiBold";
+  title->fontSize = 32.0f;
+  auto* titleRun = doc->makeNode<pagx::GlyphRun>();
+  titleRun->font = vectorFont;
+  titleRun->fontSize = 32.0f;
+  titleRun->glyphs = {1, 1, 1, 1, 1};
+  titleRun->y = 31.0f;
+  titleRun->positions = {{0.0f, 0.0f}, {32.0f, 0.0f}, {64.0f, 0.0f}, {96.0f, 0.0f}, {128.0f, 0.0f}};
+  title->glyphRuns.push_back(titleRun);
+
+  auto* bitmapFont = doc->makeNode<pagx::Font>();
+  bitmapFont->unitsPerEm = 160;
+  auto* bitmapGlyph = doc->makeNode<pagx::Glyph>();
+  bitmapGlyph->advance = 160;
+  bitmapGlyph->offset = {0.0f, -160.0f};
+  bitmapGlyph->image = doc->makeNode<pagx::Image>();
+  bitmapGlyph->image->filePath = "emoji:1F923";
+  bitmapFont->glyphs.push_back(bitmapGlyph);
+
+  auto* emoji = doc->makeNode<pagx::Text>();
+  emoji->text = "🤣";
+  emoji->fontFamily = "Inter";
+  emoji->fontStyle = "SemiBold";
+  emoji->fontSize = 32.0f;
+  auto* emojiRun = doc->makeNode<pagx::GlyphRun>();
+  emojiRun->font = bitmapFont;
+  emojiRun->fontSize = 32.0f;
+  emojiRun->glyphs = {1};
+  emojiRun->y = 31.0f;
+  emojiRun->positions = {{160.0f, 0.0f}};
+  emoji->glyphRuns.push_back(emojiRun);
+
+  auto addTextGroup = [&](pagx::Text* text) {
+    auto* group = doc->makeNode<pagx::Group>();
+    group->elements.push_back(text);
+    auto* fill = doc->makeNode<pagx::Fill>();
+    auto* solid = doc->makeNode<pagx::SolidColor>();
+    solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+    fill->color = solid;
+    group->elements.push_back(fill);
+    layer->contents.push_back(group);
+    return group;
+  };
+  auto* titleGroup = addTextGroup(title);
+  addTextGroup(emoji);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 440.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  auto firstShape = body.find("<p:sp>");
+  ASSERT_NE(firstShape, std::string::npos);
+  EXPECT_EQ(body.find("<p:sp>", firstShape + 1), std::string::npos);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+  auto titleText = body.find("<a:t>云原生架构</a:t>");
+  auto emojiText = body.find("<a:t>🤣</a:t>");
+  ASSERT_NE(titleText, std::string::npos);
+  ASSERT_NE(emojiText, std::string::npos);
+  EXPECT_LT(titleText, emojiText);
+  EXPECT_LT(emojiText, body.find("</a:p>", emojiText));
+  auto titleRunStart = body.rfind("<a:r>", titleText);
+  auto emojiRunStart = body.rfind("<a:r>", emojiText);
+  ASSERT_NE(titleRunStart, std::string::npos);
+  ASSERT_NE(emojiRunStart, std::string::npos);
+  auto titleProperties = body.substr(titleRunStart, titleText - titleRunStart);
+  auto emojiProperties = body.substr(emojiRunStart, emojiText - emojiRunStart);
+  EXPECT_EQ(titleProperties.find("baseline="), std::string::npos);
+  EXPECT_NE(titleProperties.find("sz=\"2400\""), std::string::npos);
+  EXPECT_NE(emojiProperties.find("baseline=\"-10000\""), std::string::npos);
+  EXPECT_NE(emojiProperties.find("sz=\"4000\""), std::string::npos);
+
+  // An emoji on another line must not be shifted merely because the TextBox contains normal text.
+  emoji->text = "\n🤣";
+  pagx::PPTWriterContext separateLineWriterContext;
+  pagx::PPTWriter separateLineWriter(&separateLineWriterContext, doc.get(), options,
+                                     &layoutContext);
+  pagx::XMLBuilder separateLineXML;
+  separateLineWriter.writeDocument(separateLineXML);
+  auto separateLineBody = separateLineXML.release();
+  auto separateLineEmojiText = separateLineBody.find("<a:t>🤣</a:t>");
+  ASSERT_NE(separateLineEmojiText, std::string::npos);
+  auto separateLineEmojiRun = separateLineBody.rfind("<a:r>", separateLineEmojiText);
+  ASSERT_NE(separateLineEmojiRun, std::string::npos);
+  EXPECT_EQ(
+      separateLineBody.substr(separateLineEmojiRun, separateLineEmojiText - separateLineEmojiRun)
+          .find("baseline="),
+      std::string::npos);
+  emoji->text = "🤣";
+
+  // Bitmap glyphs that are not explicit emoji resources must retain their authored style.
+  bitmapGlyph->image->filePath = "icon.png";
+  pagx::PPTWriterContext bitmapIconWriterContext;
+  pagx::PPTWriter bitmapIconWriter(&bitmapIconWriterContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder bitmapIconXML;
+  bitmapIconWriter.writeDocument(bitmapIconXML);
+  auto bitmapIconBody = bitmapIconXML.release();
+  auto bitmapIconText = bitmapIconBody.find("<a:t>🤣</a:t>");
+  ASSERT_NE(bitmapIconText, std::string::npos);
+  auto bitmapIconRun = bitmapIconBody.rfind("<a:r>", bitmapIconText);
+  ASSERT_NE(bitmapIconRun, std::string::npos);
+  EXPECT_EQ(bitmapIconBody.substr(bitmapIconRun, bitmapIconText - bitmapIconRun).find("baseline="),
+            std::string::npos);
+  bitmapGlyph->image->filePath = "emoji:1F923";
+
+  // A transformed child is not safe to flatten into the TextBox transform. Verify that the
+  // exporter keeps the original per-geometry path instead of applying the rich-text optimization.
+  titleGroup->rotation = 1.0f;
+  pagx::PPTWriterContext fallbackWriterContext;
+  pagx::PPTWriter fallbackWriter(&fallbackWriterContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder fallbackXML;
+  fallbackWriter.writeDocument(fallbackXML);
+  auto fallbackBody = fallbackXML.release();
+  auto fallbackFirstShape = fallbackBody.find("<p:sp>");
+  ASSERT_NE(fallbackFirstShape, std::string::npos);
+  EXPECT_NE(fallbackBody.find("<p:sp>", fallbackFirstShape + 1), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, TextIgnoreGlyphRunsAutoTextBoxUsesEmbeddedBounds) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 500;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  glyph->path->moveTo(0, -800);
+  glyph->path->lineTo(500, -800);
+  glyph->path->lineTo(500, 0);
+  glyph->path->lineTo(0, 0);
+  glyph->path->close();
+  font->glyphs.push_back(glyph);
+
+  auto* firstLine = doc->makeNode<pagx::Text>();
+  // Deliberately use readable content whose runtime fallback estimate is much wider than the
+  // authored block. This reproduces Web/WASM builds where the requested typeface is unavailable.
+  firstLine->text = "MMMMMMMM\n";
+  firstLine->fontFamily = "Unavailable Test Font";
+  firstLine->fontSize = 52.0f;
+  auto* firstRun = doc->makeNode<pagx::GlyphRun>();
+  firstRun->font = font;
+  firstRun->fontSize = 52.0f;
+  firstRun->glyphs = {1, 1, 1, 1, 1, 1, 1, 1};
+  firstRun->y = 48.0f;
+  firstRun->bounds = pagx::Rect::MakeXYWH(0, 0, 161, 116);
+  firstLine->glyphRuns.push_back(firstRun);
+
+  auto* secondLine = doc->makeNode<pagx::Text>();
+  secondLine->text = "亿";
+  secondLine->fontFamily = "Unavailable Test Font";
+  secondLine->fontSize = 52.0f;
+  auto* secondRun = doc->makeNode<pagx::GlyphRun>();
+  secondRun->font = font;
+  secondRun->fontSize = 52.0f;
+  secondRun->glyphs = {1};
+  secondRun->x = 54.0f;
+  secondRun->y = 106.0f;
+  secondLine->glyphRuns.push_back(secondRun);
+
+  layer->contents.push_back(firstLine);
+  layer->contents.push_back(secondLine);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1.0f, 0.8f, 0.3f, 1.0f};
+  fill->color = color;
+  layer->contents.push_back(fill);
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->textAlign = pagx::TextAlign::Center;
+  textBox->paragraphAlign = pagx::ParagraphAlign::Middle;
+  textBox->lineHeight = 58.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  ASSERT_TRUE(std::isnan(pagx::EffectiveTextBoxWidth(textBox)));
+  ASSERT_TRUE(std::isnan(pagx::EffectiveTextBoxHeight(textBox)));
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  // The native text remains editable, but its auto-sized frame must use the embedded 161x116
+  // authoring bounds instead of the platform-dependent runtime fallback width.
+  EXPECT_NE(body.find("<a:ext cx=\"1533525\" cy=\"1104900\"/>"), std::string::npos);
+  EXPECT_NE(body.find("<a:t>MMMMMMMM</a:t>"), std::string::npos);
+  EXPECT_NE(body.find("<a:t>亿</a:t>"), std::string::npos);
+}
+
 PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
   auto doc = pagx::PAGXDocument::Make(500, 400);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -1477,7 +1921,7 @@ PAGX_TEST(PAGXPPTTest, MultipleElementsInLayer) {
 
 PAGX_TEST(PAGXPPTTest, InvalidFilePath) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
-  EXPECT_FALSE(pagx::PPTExporter::ToFile(*doc, "/nonexistent/dir/file.pptx"));
+  EXPECT_FALSE(pagx::PPTExporter::ToFile({doc.get()}, "/nonexistent/dir/file.pptx"));
 }
 
 PAGX_TEST(PAGXPPTTest, LargeCanvas) {
@@ -2032,11 +2476,11 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeProducesSmaller) {
 
   pagx::PPTExportOptions bakedOpts;
   bakedOpts.bakeUnsupported = true;
-  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, bakedPath, bakedOpts));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, bakedPath, bakedOpts));
 
   pagx::PPTExportOptions vectorOpts;
   vectorOpts.bakeUnsupported = false;
-  ASSERT_TRUE(pagx::PPTExporter::ToFile(*doc, vectorPath, vectorOpts));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, vectorPath, vectorOpts));
 
   auto bakedSize = std::filesystem::file_size(bakedPath);
   auto vectorSize = std::filesystem::file_size(vectorPath);
@@ -2094,6 +2538,75 @@ PAGX_TEST(PAGXPPTTest, MaskNoBakeWithChildLayers) {
   pagx::PPTExportOptions options;
   options.bakeUnsupported = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "mask_no_bake_children", options));
+}
+
+// Regression: a mask layer authored as an INVISIBLE CHILD of the layer it masks
+// (the pattern the PAGX / HTML importer produces) must not be emitted as visible
+// content when the mask clip is dropped in the no-bake vector path. Previously
+// the mask layer's own fill (here a solid rect covering the whole slide) painted
+// on top of the masked content as an opaque patch — the "white cover layer" seen
+// in exported website decks. The fix skips the child that equals layer->mask.
+//
+// Verify via deck size: exporting with the mask layer also linked as a child
+// must match exporting without the mask child present at all (the mask
+// contributes zero visible shapes either way). Both paths keep bakeUnsupported
+// off so the clip is dropped rather than rasterized, isolating the child-
+// emission behaviour.
+PAGX_TEST(PAGXPPTTest, MaskAsChildNotEmittedAsContent) {
+  // Build a layer masked by a full-slide white rectangle that is ALSO one of the
+  // layer's children (the real-world importer pattern that triggered the bug).
+  auto makeDoc = [](bool linkMaskAsChild) {
+    auto doc = pagx::PAGXDocument::Make(400, 300);
+
+    auto* contentLayer = doc->makeNode<pagx::Layer>();
+    auto* contentEllipse = doc->makeNode<pagx::Ellipse>();
+    contentEllipse->position = {200, 150};
+    contentEllipse->size = {250, 200};
+    auto* contentFill = doc->makeNode<pagx::Fill>();
+    auto* contentSolid = doc->makeNode<pagx::SolidColor>();
+    contentSolid->color = {0.0f, 0.5f, 1.0f, 1.0f};
+    contentFill->color = contentSolid;
+    contentLayer->contents.push_back(contentEllipse);
+    contentLayer->contents.push_back(contentFill);
+
+    // The mask: a full-slide opaque white rect. If wrongly emitted it covers all.
+    auto* maskLayer = doc->makeNode<pagx::Layer>();
+    auto* maskRect = doc->makeNode<pagx::Rectangle>();
+    maskRect->position = {200, 150};
+    maskRect->size = {400, 300};
+    auto* maskFill = doc->makeNode<pagx::Fill>();
+    auto* maskSolid = doc->makeNode<pagx::SolidColor>();
+    maskSolid->color = {1.0f, 1.0f, 1.0f, 1.0f};
+    maskFill->color = maskSolid;
+    maskLayer->contents.push_back(maskRect);
+    maskLayer->contents.push_back(maskFill);
+
+    contentLayer->mask = maskLayer;
+    if (linkMaskAsChild) {
+      contentLayer->children.push_back(maskLayer);
+    }
+    doc->layers.push_back(contentLayer);
+    return doc;
+  };
+
+  auto outDir = PPTOutDir();
+  auto withChildPath = outDir + "/mask_as_child.pptx";
+  auto withoutChildPath = outDir + "/mask_not_child.pptx";
+
+  pagx::PPTExportOptions opts;
+  opts.bakeUnsupported = false;
+  auto docWithChild = makeDoc(true);
+  auto docWithoutChild = makeDoc(false);
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({docWithChild.get()}, withChildPath, opts));
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({docWithoutChild.get()}, withoutChildPath, opts));
+
+  // The mask layer must contribute no visible shapes in either case, so linking
+  // it as a child must not change the exported deck size. Before the fix the
+  // child path emitted two extra shapes (the mask rect + its fill), inflating
+  // the archive; equal sizes prove the mask child is now skipped.
+  auto withChildSize = std::filesystem::file_size(withChildPath);
+  auto withoutChildSize = std::filesystem::file_size(withoutChildPath);
+  EXPECT_EQ(withChildSize, withoutChildSize);
 }
 
 PAGX_TEST(PAGXPPTTest, MaskNoBakeWithTransformAndAlpha) {
@@ -3421,6 +3934,37 @@ static pagx::Fill* MakeSolidFill(pagx::PAGXDocument* doc, pagx::Color color) {
   return fill;
 }
 
+static pagx::GlyphRun* MakeEmbeddedGlyphRun(pagx::PAGXDocument* doc,
+                                            const std::vector<pagx::Point>& positions,
+                                            const pagx::Rect& bounds, float baseline,
+                                            float fontSize) {
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = fontSize;
+  run->glyphs.assign(positions.size(), 1);
+  run->y = baseline;
+  run->positions = positions;
+  run->bounds = bounds;
+  return run;
+}
+
+static std::string WritePPTDocumentXML(pagx::PAGXDocument* doc,
+                                       const pagx::PPTExportOptions& options) {
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc, options, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  return xml.release();
+}
+
 PAGX_TEST(PAGXPPTTest, PolystarStarShape) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -4355,7 +4899,203 @@ PAGX_TEST(PAGXPPTTest, TextBoxContainerSingleText) {
 
   layer->contents.push_back(textBox);
   doc->layers.push_back(layer);
+  doc->applyLayout();
+  auto body = WritePPTDocumentXML(doc.get(), {});
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
   ASSERT_TRUE(ExportAndVerify(*doc, "textbox_container_single"));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxEmbeddedSingleLineDisablesAutoWrap) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {40, 40};
+  textBox->width = 120;
+  textBox->height = 60;
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "ABCD";
+  text->fontFamily = "Arial";
+  text->fontSize = 32;
+  text->letterSpacing = 8;
+
+  // Embedded text normally takes the bounds-only TextLayout path. Complete glyph positions prove
+  // that this authored text has one horizontal baseline, so native PPT export can safely suppress
+  // PowerPoint's independent wrapping pass.
+  auto* glyphRun =
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {30.0f, 0.0f}, {60.0f, 0.0f}, {90.0f, 0.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 120, 40), 36.0f, text->fontSize);
+  text->glyphRuns.push_back(glyphRun);
+
+  pagx::TextLayoutParams params = {};
+  params.boxWidth = textBox->width;
+  params.boxHeight = textBox->height;
+  pagx::LayoutContext layoutContext(nullptr);
+  auto textElements = pagx::TextLayout::MakeElements({text});
+  auto embeddedLayout = pagx::TextLayout::Layout(textElements, params, &layoutContext);
+  EXPECT_EQ(embeddedLayout.getTextLines(text), nullptr);
+  auto editableLayout = pagx::TextLayout::Layout(textElements, params, &layoutContext, false);
+  auto* editableLines = editableLayout.getTextLines(text);
+  ASSERT_NE(editableLines, nullptr);
+  ASSERT_EQ(editableLines->size(), 1u);
+  EXPECT_EQ(editableLines->front().byteStart, 0u);
+  EXPECT_EQ(editableLines->front().byteEnd, text->text.size());
+
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:t>ABCD</a:t>"), std::string::npos);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  ASSERT_TRUE(ExportAndVerify(*doc, "textbox_embedded_editable_lines", options));
+}
+
+PAGX_TEST(PAGXPPTTest, TextBoxEmbeddedSingleLineRejectsHostInferredBreaks) {
+  auto doc = pagx::PAGXDocument::Make(400, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {40, 40};
+  textBox->width = 100;
+  textBox->height = 180;
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "石破天惊";
+  text->fontFamily = "Noto Serif SC";
+  text->fontStyle = "Black";
+  text->fontSize = 72;
+  text->letterSpacing = 8;
+  text->glyphRuns.push_back(
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {80.0f, 0.0f}, {160.0f, 0.0f}, {240.0f, 0.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 320, 103), 83.0f, text->fontSize));
+
+  pagx::TextLayoutParams params = {};
+  params.boxWidth = textBox->width;
+  params.boxHeight = textBox->height;
+  pagx::LayoutContext layoutContext(nullptr);
+  auto editableLayout = pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params,
+                                                 &layoutContext, false);
+  auto* editableLines = editableLayout.getTextLines(text);
+  ASSERT_NE(editableLines, nullptr);
+  ASSERT_GT(editableLines->size(), 1u);
+
+  textBox->elements.push_back(text);
+  textBox->elements.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+  EXPECT_NE(body.find("<a:t>石破天惊</a:t>"), std::string::npos);
+  EXPECT_EQ(body.find("<a:br"), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, ModifierTextBoxEmbeddedSingleLineDisablesAutoWrap) {
+  auto doc = pagx::PAGXDocument::Make(1200, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "石破天惊";
+  text->fontFamily = "Noto Serif SC";
+  text->fontStyle = "Black";
+  text->fontSize = 72;
+  text->letterSpacing = 8;
+  text->glyphRuns.push_back(
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {80.0f, 0.0f}, {160.0f, 0.0f}, {240.0f, 0.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 940, 103), 83.0f, text->fontSize));
+  group->elements.push_back(text);
+  group->elements.push_back(MakeSolidFill(doc.get(), {0.1f, 0.1f, 0.1f, 1.0f}));
+  layer->contents.push_back(group);
+
+  // This sibling TextBox is a modifier for the preceding Text group, matching the imported PAGX
+  // structure that exposed the 石破天惊 3+1 line split in PowerPoint/LibreOffice.
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 940;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+  EXPECT_NE(body.find("<a:t>石破天惊</a:t>"), std::string::npos);
+  EXPECT_EQ(body.find("<a:br"), std::string::npos);
+  ASSERT_TRUE(ExportAndVerify(*doc, "modifier_textbox_embedded_single_line", options));
+}
+
+PAGX_TEST(PAGXPPTTest, ModifierTextBoxEmbeddedMultipleLinesKeepsBoundedWrapFallback) {
+  auto doc = pagx::PAGXDocument::Make(1200, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* group = doc->makeNode<pagx::Group>();
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "石破天惊";
+  text->fontFamily = "Noto Serif SC";
+  text->fontSize = 72;
+  text->glyphRuns.push_back(
+      MakeEmbeddedGlyphRun(doc.get(), {{0.0f, 0.0f}, {80.0f, 0.0f}, {0.0f, 96.0f}, {80.0f, 96.0f}},
+                           pagx::Rect::MakeXYWH(0, 0, 940, 206), 83.0f, text->fontSize));
+  group->elements.push_back(text);
+  group->elements.push_back(MakeSolidFill(doc.get(), {0.1f, 0.1f, 0.1f, 1.0f}));
+  layer->contents.push_back(group);
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->width = 940;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, ModifierTextBoxSiblingRenderPositionsRemainSeparateLines) {
+  auto doc = pagx::PAGXDocument::Make(400, 240);
+  auto* layer = doc->makeNode<pagx::Layer>();
+
+  auto makeText = [&](const char* content, float y) {
+    auto* text = doc->makeNode<pagx::Text>();
+    text->text = content;
+    text->position = {40.0f, y};
+    text->fontFamily = "Arial";
+    text->fontSize = 32.0f;
+    text->glyphRuns.push_back(MakeEmbeddedGlyphRun(
+        doc.get(), {{0.0f, 0.0f}}, pagx::Rect::MakeXYWH(0, 0, 32, 40), 36.0f, text->fontSize));
+    layer->contents.push_back(text);
+  };
+  makeText("A", 40.0f);
+  makeText("B", 120.0f);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+
+  auto* textBox = doc->makeNode<pagx::TextBox>();
+  textBox->position = {40.0f, 40.0f};
+  textBox->width = 200.0f;
+  textBox->height = 160.0f;
+  layer->contents.push_back(textBox);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  pagx::PPTExportOptions options;
+  options.ignoreGlyphRuns = true;
+  auto body = WritePPTDocumentXML(doc.get(), options);
+  // Both runs use the same GlyphRun-local baseline, but their Text render positions place them on
+  // different visual lines. Comparing absolute baselines must retain bounded wrapping.
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_EQ(body.find("<a:bodyPr wrap=\"none\""), std::string::npos);
 }
 
 PAGX_TEST(PAGXPPTTest, TextBoxContainerMultipleTexts) {
@@ -5576,6 +6316,41 @@ PAGX_TEST(PAGXPPTTest, TextBoxJustifyTextAlign) {
   ASSERT_TRUE(ExportAndVerify(*doc, "textbox_justify"));
 }
 
+// Justify needs a bounded text area: with wrap="none" PowerPoint has no target line width to
+// distribute the extra space across and silently falls back to start alignment. A modifier TextBox
+// is a bare typography carrier with no resolved layout box, so it has no authored inline extent to
+// wrap against — the exporter must still turn wrapping on for the justified paragraph.
+PAGX_TEST(PAGXPPTTest, TextBoxJustifyAutoInlineExtentKeepsWrap) {
+  auto doc = pagx::PAGXDocument::Make(400, 250);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Justified text content here.";
+  text->fontFamily = "Arial";
+  text->fontSize = 16;
+  text->position = {40, 100};
+  layer->contents.push_back(text);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {0.0f, 0.0f, 0.0f, 1.0f}));
+  auto* tb = doc->makeNode<pagx::TextBox>();
+  tb->textAlign = pagx::TextAlign::Justify;
+  layer->contents.push_back(tb);
+  doc->layers.push_back(layer);
+  doc->applyLayout();
+
+  ASSERT_TRUE(std::isnan(pagx::EffectiveTextBoxWidth(tb)))
+      << "the box must stay auto-sized for this test to cover the justify fallback";
+
+  pagx::PPTWriterContext writerContext;
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::PPTWriter writer(&writerContext, doc.get(), {}, &layoutContext);
+  pagx::XMLBuilder xml;
+  writer.writeDocument(xml);
+  auto body = xml.release();
+
+  EXPECT_NE(body.find("<a:bodyPr wrap=\"square\""), std::string::npos);
+  EXPECT_NE(body.find("algn=\"just\""), std::string::npos);
+}
+
 PAGX_TEST(PAGXPPTTest, TextBoxParagraphAlignMiddle) {
   // ParagraphAlign::Middle → bodyPr@anchor="ctr" via AddBodyPrAttrsForTextBox
   // line 528-531.
@@ -5840,6 +6615,327 @@ PAGX_TEST(PAGXPPTTest, ImagePatternFill_TileFlipNone) {
   layer->contents.push_back(fill);
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "imagepattern_tile_flip_none"));
+}
+
+//==============================================================================
+// PPTExporter::ToData — in-memory export
+//==============================================================================
+
+static std::string ReadFileBytes(const std::string& path) {
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  if (!file.good()) {
+    return {};
+  }
+  auto size = static_cast<std::streamsize>(file.tellg());
+  std::string contents(static_cast<size_t>(size), '\0');
+  file.seekg(0);
+  file.read(contents.data(), size);
+  return contents;
+}
+
+// Every ZIP (and therefore every PPTX/OOXML container) begins with the local
+// file header signature "PK\x03\x04".
+static bool HasZipMagic(const pagx::Data* data) {
+  if (data == nullptr || data->size() < 4) {
+    return false;
+  }
+  const auto* bytes = data->bytes();
+  return bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+}
+
+static std::shared_ptr<pagx::PAGXDocument> MakeSimplePPTDoc() {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 100};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {1.0f, 0.0f, 0.0f, 1.0f}));
+  doc->layers.push_back(layer);
+  return doc;
+}
+
+PAGX_TEST(PAGXPPTTest, ToData_SimpleDocument) {
+  auto doc = MakeSimplePPTDoc();
+  auto data = pagx::PPTExporter::ToData({doc.get()});
+  ASSERT_NE(data, nullptr);
+  EXPECT_GT(data->size(), 0u);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+}
+
+PAGX_TEST(PAGXPPTTest, ToData_EmptyDocument) {
+  auto doc = pagx::PAGXDocument::Make(800, 600);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
+  ASSERT_NE(data, nullptr);
+  EXPECT_GT(data->size(), 0u);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+}
+
+// The in-memory archive is assembled from the same parts as the on-disk one and
+// minizip zeroes the per-entry timestamps (zip_fileinfo{}), so ToData must be
+// byte-for-byte identical to ToFile.
+PAGX_TEST(PAGXPPTTest, ToData_MatchesToFile) {
+  auto doc = MakeSimplePPTDoc();
+
+  auto data = pagx::PPTExporter::ToData({doc.get()});
+  ASSERT_NE(data, nullptr);
+  ASSERT_GT(data->size(), 0u);
+
+  auto path = PPTOutDir() + "/to_data_parity.pptx";
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, path));
+  auto fileBytes = ReadFileBytes(path);
+  ASSERT_FALSE(fileBytes.empty());
+
+  ASSERT_EQ(data->size(), fileBytes.size());
+  EXPECT_EQ(0, std::memcmp(data->data(), fileBytes.data(), fileBytes.size()));
+}
+
+// A document with an embedded image produces media entries in the archive; the
+// in-memory path must handle those binary parts the same way ToFile does.
+PAGX_TEST(PAGXPPTTest, ToData_WithImageMedia) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+
+  auto* image = MakeTestPNGImage(doc.get());
+  auto* pattern = doc->makeNode<pagx::ImagePattern>();
+  pattern->image = image;
+  pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = pattern;
+
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto data = pagx::PPTExporter::ToData({doc.get()});
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  auto path = PPTOutDir() + "/to_data_with_image.pptx";
+  ASSERT_TRUE(pagx::PPTExporter::ToFile({doc.get()}, path));
+  auto fileBytes = ReadFileBytes(path);
+  ASSERT_FALSE(fileBytes.empty());
+  ASSERT_EQ(data->size(), fileBytes.size());
+  EXPECT_EQ(0, std::memcmp(data->data(), fileBytes.data(), fileBytes.size()));
+}
+
+// The buffer is a real ZIP whose local file headers store each part name in the
+// clear, so we can spot-check the slide part without pulling in an unzip lib.
+PAGX_TEST(PAGXPPTTest, ToData_ContainsSlidePart) {
+  auto doc = MakeSimplePPTDoc();
+  auto data = pagx::PPTExporter::ToData({doc.get()});
+  ASSERT_NE(data, nullptr);
+
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("[Content_Types].xml"), std::string::npos);
+}
+
+// Options that route through the rasterizer (bakeUnsupported) must not crash the
+// in-memory path and still yield a valid archive.
+PAGX_TEST(PAGXPPTTest, ToData_RespectsOptions) {
+  auto doc = MakeSimplePPTDoc();
+  pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
+  options.convertTextToPath = true;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+}
+
+//==============================================================================
+// PPTExporter — multi-slide export
+//==============================================================================
+
+// Counts non-overlapping occurrences of `needle` in `haystack`. Used to spot-
+// check how many times a part name appears in the raw ZIP bytes.
+static size_t CountOccurrences(const std::string& haystack, const std::string& needle) {
+  if (needle.empty()) {
+    return 0;
+  }
+  size_t count = 0;
+  for (size_t pos = haystack.find(needle); pos != std::string::npos;
+       pos = haystack.find(needle, pos + needle.size())) {
+    ++count;
+  }
+  return count;
+}
+
+// Builds a one-rectangle document with a distinct fill colour so each slide in a
+// deck is visually different.
+static std::shared_ptr<pagx::PAGXDocument> MakeColoredPPTDoc(float r, float g, float b) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 100};
+  layer->contents.push_back(rect);
+  layer->contents.push_back(MakeSolidFill(doc.get(), {r, g, b, 1.0f}));
+  doc->layers.push_back(layer);
+  return doc;
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_ToFileThreeSlides) {
+  auto page1 = MakeColoredPPTDoc(1.0f, 0.0f, 0.0f);
+  auto page2 = MakeColoredPPTDoc(0.0f, 1.0f, 0.0f);
+  auto page3 = MakeColoredPPTDoc(0.0f, 0.0f, 1.0f);
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get(), page3.get()};
+
+  auto path = PPTOutDir() + "/multi_page_three.pptx";
+  ASSERT_TRUE(pagx::PPTExporter::ToFile(docs, path));
+  EXPECT_TRUE(std::filesystem::exists(path));
+  EXPECT_GT(std::filesystem::file_size(path), 0u);
+
+  auto bytes = ReadFileBytes(path);
+  ASSERT_FALSE(bytes.empty());
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_ToDataContainsAllSlideParts) {
+  auto page1 = MakeColoredPPTDoc(1.0f, 0.0f, 0.0f);
+  auto page2 = MakeColoredPPTDoc(0.0f, 1.0f, 0.0f);
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get()};
+
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  // Both slide parts and both slide-rels parts must be present as local file
+  // entries in the archive.
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/_rels/slide1.xml.rels"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/_rels/slide2.xml.rels"), std::string::npos);
+  // A third slide part must not exist for a two-document deck.
+  EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+}
+
+// A one-element list yields a valid single-slide deck: exactly one slide part,
+// and no second slide. This is the common single-document case expressed through
+// the multi-document API.
+PAGX_TEST(PAGXPPTTest, MultiPage_SingleElementYieldsOneSlide) {
+  auto doc = MakeSimplePPTDoc();
+  std::vector<pagx::PAGXDocument*> docs = {doc.get()};
+
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+}
+
+// Media from different slides must land in distinct ppt/media/ files so nothing
+// is overwritten inside the shared media directory.
+PAGX_TEST(PAGXPPTTest, MultiPage_ImageMediaNamesAreUnique) {
+  auto MakeImageDoc = []() {
+    auto doc = pagx::PAGXDocument::Make(400, 300);
+    auto* layer = doc->makeNode<pagx::Layer>();
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {200, 150};
+    rect->size = {200, 150};
+    auto* image = MakeTestPNGImage(doc.get());
+    auto* pattern = doc->makeNode<pagx::ImagePattern>();
+    pattern->image = image;
+    pattern->matrix = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+    auto* fill = doc->makeNode<pagx::Fill>();
+    fill->color = pattern;
+    layer->contents.push_back(rect);
+    layer->contents.push_back(fill);
+    doc->layers.push_back(layer);
+    return doc;
+  };
+
+  auto page1 = MakeImageDoc();
+  auto page2 = MakeImageDoc();
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get()};
+
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+
+  // Each slide contributes its own media file with a distinct index; the second
+  // slide's image must not reuse image1's path.
+  EXPECT_NE(bytes.find("ppt/media/image1.png"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/media/image2.png"), std::string::npos);
+  // The full media path "ppt/media/image1.png" is stored once in each entry's
+  // local file header and once in the central directory — so exactly twice.
+  // Seeing it more than that would mean a name collision wrote it repeatedly.
+  EXPECT_EQ(CountOccurrences(bytes, "ppt/media/image1.png"), 2u);
+  EXPECT_EQ(CountOccurrences(bytes, "ppt/media/image2.png"), 2u);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_EmptyListFails) {
+  std::vector<pagx::PAGXDocument*> docs;
+  auto path = PPTOutDir() + "/multi_page_empty.pptx";
+  EXPECT_FALSE(pagx::PPTExporter::ToFile(docs, path));
+  EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_NullEntryFails) {
+  auto page1 = MakeSimplePPTDoc();
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), nullptr};
+  auto path = PPTOutDir() + "/multi_page_null.pptx";
+  EXPECT_FALSE(pagx::PPTExporter::ToFile(docs, path));
+  EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_UnresolvedImportFailsWholeExport) {
+  auto page1 = MakeSimplePPTDoc();
+  auto page2 = MakeSimplePPTDoc();
+  page2->layers.front()->importDirective.source = "missing.svg";
+  auto page3 = MakeSimplePPTDoc();
+
+  EXPECT_EQ(pagx::PPTExporter::ToData({page1.get(), page2.get(), page3.get()}), nullptr);
+}
+
+PAGX_TEST(PAGXPPTTest, MultiPage_LayoutErrorFailsWholeExport) {
+  auto page1 = MakeSimplePPTDoc();
+  auto page2 = pagx::PAGXDocument::Make(400, 300);
+  auto* cyclicLayer = page2->makeNode<pagx::Layer>();
+  cyclicLayer->externalDoc = page2;
+  page2->layers.push_back(cyclicLayer);
+  auto page3 = MakeSimplePPTDoc();
+
+  EXPECT_EQ(pagx::PPTExporter::ToData({page1.get(), page2.get(), page3.get()}), nullptr);
+  EXPECT_FALSE(page2->errors.empty());
+  // Break the shared_ptr cycle created specifically for this regression case.
+  cyclicLayer->externalDoc.reset();
+}
+
+// Slides may declare different canvas sizes; the deck adopts the first document's
+// size and still produces a valid archive with a slide per document.
+PAGX_TEST(PAGXPPTTest, MultiPage_MixedDocumentSizes) {
+  auto page1 = pagx::PAGXDocument::Make(800, 600);
+  auto page2 = MakeColoredPPTDoc(0.2f, 0.4f, 0.6f);  // 400x300
+  std::vector<pagx::PAGXDocument*> docs = {page1.get(), page2.get()};
+
+  auto data = pagx::PPTExporter::ToData(docs);
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+
+  auto presentation = pagx::GeneratePresentation(page1->width, page1->height, docs.size());
+  EXPECT_NE(presentation.find("<p:sldSz cx=\"7620000\" cy=\"5715000\"/>"), std::string::npos);
+}
+
+PAGX_TEST(PAGXPPTTest, ZeroSizedDocumentUsesMinimumSlideSize) {
+  auto doc = pagx::PAGXDocument::Make(0, 0);
+  auto data = pagx::PPTExporter::ToData({doc.get()});
+  ASSERT_NE(data, nullptr);
+  EXPECT_TRUE(HasZipMagic(data.get()));
+
+  auto presentation = pagx::GeneratePresentation(doc->width, doc->height, 1);
+  EXPECT_NE(presentation.find("<p:sldSz cx=\"914400\" cy=\"914400\"/>"), std::string::npos);
 }
 
 }  // namespace pag

@@ -9,6 +9,7 @@
 #   bin/<platform>-<arch>/pagx arch-specific native binary (preferred by the
 #                              wrapper, e.g. bin/linux-arm64/pagx)
 #   html-snapshot/             bundled HTML->PAGX snapshot runtime (generated)
+#   preview/                   pagx-preview runtime: src/ + static/ + wasm/ (generated)
 #   README.md
 #
 # Native binaries come from the CMake `pagx-cli` target (OUTPUT_NAME=pagx) and
@@ -17,11 +18,19 @@
 # back to bin/<platform>/, so a single-arch host build can land in the plain
 # bin/<platform>/ directory.
 #
+# The preview/ tree is built + staged by this script (stage_preview): it runs
+# pagx-preview's release build and copies src/static/wasm into cli/npm/preview/
+# (gitignored). node_modules is not copied — @libpag/pagx already declares
+# pagx-preview's runtime deps.
+#
 # The html-snapshot/ runtime and the multi-platform binary check are NOT done by
 # this script directly: package.json wires them into npm lifecycle hooks, so
 # `npm pack` runs `prepack` (scripts/build-html-snapshot.js) and `npm publish`
-# additionally runs `prepublishOnly` (scripts/check-binaries.js). This script
-# only builds/stages the host binary (with --build) and invokes npm.
+# additionally runs `prepublishOnly` (scripts/check-binaries.js +
+# scripts/check-preview.js, which guard that the native binaries and the
+# preview/ wasm artifacts were actually staged). This script
+# builds/stages the host binary (with --build), builds/stages preview/, then
+# invokes npm.
 #
 # Usage:
 #   ./pack.sh                 # pack using already-staged binaries
@@ -44,6 +53,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BIN_DIR="$SCRIPT_DIR/bin"
+PREVIEW_SRC_DIR="$REPO_ROOT/playground/pagx-preview"
+PREVIEW_DEST_DIR="$SCRIPT_DIR/preview"
 
 DO_BUILD=0
 DO_SYNC=0
@@ -54,7 +65,7 @@ DO_PUBLISH=0
 BUILD_DIR="$REPO_ROOT/cmake-build-pagx-npm"
 
 usage() {
-  sed -n '2,44p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,47p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -80,6 +91,48 @@ host_platform() {
 
 bin_name_for() {
   [[ "$1" == win32 ]] && echo "pagx.exe" || echo "pagx"
+}
+
+# Build the pagx-preview runtime and stage it under cli/npm/preview/ so it ships
+# inside the @libpag/pagx tarball (package.json "files" lists preview/). The
+# published layout is:
+#
+#   preview/src/       pagx-preview runtime source (cli.js, daemon.js, server/, mcp/)
+#   preview/static/    browser assets (HTML/JS/CSS/icons)
+#   preview/wasm/      build outputs (viewer + player + ext + mcp-widget bundle)
+#
+# node_modules is deliberately NOT copied: pagx-preview's runtime deps
+# (express/chokidar/@modelcontextprotocol/sdk) are declared in @libpag/pagx's own
+# dependencies, so `npm install -g @libpag/pagx` installs them into the package's
+# node_modules; Node's upward module resolution finds them from preview/src/*.
+#
+# The build runs pagx-preview's `build:release` (release, single-threaded viewer):
+# release strips wasm/player source maps, and the single-threaded viewer is the
+# only variant that works in every consumer (the MCP widget sandbox has no
+# SharedArrayBuffer). This step needs Emscripten toolchain + network (npm install)
+# and is the slow part of packing.
+stage_preview() {
+  echo "==> Building pagx-preview runtime (release, single-threaded)"
+  # Install dev deps for preview + its two workspace-local build inputs. prebuild.js
+  # (invoked by build:release) only builds these packages; it does not install them.
+  for dir in "$PREVIEW_SRC_DIR" "$REPO_ROOT/playground/pagx-viewer" "$REPO_ROOT/playground/pagx-player"; do
+    echo "    npm install ($dir)"
+    (cd "$dir" && npm install)
+  done
+  (cd "$PREVIEW_SRC_DIR" && npm run build:release)
+
+  echo "==> Staging preview/ into $PREVIEW_DEST_DIR"
+  rm -rf "$PREVIEW_DEST_DIR"
+  mkdir -p "$PREVIEW_DEST_DIR"
+  cp -R "$PREVIEW_SRC_DIR/src" "$PREVIEW_DEST_DIR/src"
+  cp -R "$PREVIEW_SRC_DIR/static" "$PREVIEW_DEST_DIR/static"
+  cp -R "$PREVIEW_SRC_DIR/wasm" "$PREVIEW_DEST_DIR/wasm"
+
+  # Belt-and-suspenders cleanup: release build already skips source maps, but strip
+  # any stray *.map (e.g. from a prior debug build lingering in wasm/) and macOS
+  # .DS_Store junk so they never reach the published tarball.
+  find "$PREVIEW_DEST_DIR" -name '*.map' -delete
+  find "$PREVIEW_DEST_DIR" -name '.DS_Store' -delete
 }
 
 if [[ $DO_SYNC -eq 1 ]]; then
@@ -158,6 +211,9 @@ if [[ $found -eq 0 ]]; then
   echo "       binaries (e.g. CI artifacts) into bin/{darwin,linux,win32}/ first." >&2
   exit 1
 fi
+
+# Build + stage the pagx-preview runtime under preview/ (see stage_preview).
+stage_preview
 
 # npm runs the lifecycle hooks for us: `prepack` builds html-snapshot/ and, for
 # publish, `prepublishOnly` runs the multi-platform binary check.

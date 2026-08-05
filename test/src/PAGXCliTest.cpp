@@ -39,6 +39,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
 #include "tgfx/core/Bitmap.h"
@@ -1680,6 +1681,85 @@ CLI_TEST(PAGXCliTest, Export_PagxToPptx_ValidateSimple) {
   EXPECT_GT(std::filesystem::file_size(outputPath), 0u);
 }
 
+// Multiple --input flags produce a multi-slide deck, one slide per input in the
+// order given. slide2.xml only appears when the second document became its own slide.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputs) {
+  auto firstInput = TestResourcePath("render_basic.pagx");
+  auto secondInput = TestResourcePath("render_gradient.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_MultiSlide.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", firstInput, "--input", secondInput,
+                                            "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  ASSERT_TRUE(std::filesystem::exists(outputPath));
+  auto bytes = ReadFile(outputPath);
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_NE(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+}
+
+// Repeating --input three times yields three slides; the default output name is
+// derived from the first input.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_ThreeInputsDefaultOutput) {
+  auto firstInput = CopyToTemp("render_basic.pagx", "ExportPPTXThree.pagx");
+  auto secondInput = TestResourcePath("render_gradient.pagx");
+  auto thirdInput = TestResourcePath("render_text.pagx");
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--format", "pptx", "--input", firstInput,
+                                            "--input", secondInput, "--input", thirdInput});
+  EXPECT_EQ(ret, 0);
+  auto defaultOutput = TempDir() + "/ExportPPTXThree.pptx";
+  ASSERT_TRUE(std::filesystem::exists(defaultOutput));
+  auto bytes = ReadFile(defaultOutput);
+  EXPECT_NE(bytes.find("ppt/slides/slide3.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide4.xml"), std::string::npos);
+}
+
+// A single --input still yields a valid one-slide deck (no slide2.xml), confirming
+// the vector refactor did not regress the single-document path.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_SingleInputOneSlide) {
+  auto inputPath = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_SingleSlide.pptx";
+  auto ret =
+      CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
+  EXPECT_EQ(ret, 0);
+  auto bytes = ReadFile(outputPath);
+  EXPECT_NE(bytes.find("ppt/slides/slide1.xml"), std::string::npos);
+  EXPECT_EQ(bytes.find("ppt/slides/slide2.xml"), std::string::npos);
+}
+
+// --ppt-ignore-glyphruns swaps the pre-shaped glyph paths for editable a:t runs, so the readable
+// text ends up in the slide XML. --text-to-path is its opposite and wins when both are given.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_IgnoreGlyphRuns) {
+  auto inputPath = TestResourcePath("render_text.pagx");
+  auto editablePath = TempDir() + "/ExportPPTX_IgnoreGlyphRuns.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output",
+                                            editablePath, "--ppt-ignore-glyphruns"});
+  EXPECT_EQ(ret, 0);
+  ASSERT_TRUE(std::filesystem::exists(editablePath));
+  EXPECT_GT(std::filesystem::file_size(editablePath), 0u);
+
+  auto pathsPath = TempDir() + "/ExportPPTX_IgnoreGlyphRunsWithTextToPath.pptx";
+  ret = CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", pathsPath,
+                                       "--ppt-ignore-glyphruns", "--text-to-path"});
+  EXPECT_EQ(ret, 0);
+  ASSERT_TRUE(std::filesystem::exists(pathsPath));
+  // Combining the two flags must behave exactly like --text-to-path alone.
+  auto textToPathOnlyPath = TempDir() + "/ExportPPTX_TextToPathOnly.pptx";
+  ret = CallRun(pagx::cli::RunExport,
+                {"export", "--input", inputPath, "--output", textToPathOnlyPath, "--text-to-path"});
+  EXPECT_EQ(ret, 0);
+  EXPECT_EQ(ReadFile(pathsPath), ReadFile(textToPathOnlyPath));
+}
+
+// If one of several inputs fails to load, the whole export aborts with an error
+// rather than silently dropping the bad slide.
+CLI_TEST(PAGXCliTest, Export_PagxToPptx_MultipleInputsOneMissing) {
+  auto firstInput = TestResourcePath("render_basic.pagx");
+  auto outputPath = TempDir() + "/ExportPPTX_MultiMissing.pptx";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", firstInput, "--input",
+                                            "nonexistent.pagx", "--output", outputPath});
+  EXPECT_NE(ret, 0);
+}
+
 #endif  // PAG_BUILD_PPT
 
 CLI_TEST(PAGXCliTest, Export_NoConvertTextToPath) {
@@ -1720,6 +1800,18 @@ CLI_TEST(PAGXCliTest, Export_WriteFailure) {
   auto ret =
       CallRun(pagx::cli::RunExport, {"export", "--input", inputPath, "--output", outputPath});
   EXPECT_NE(ret, 0);
+}
+
+// Multiple --input flags are only meaningful for the multi-slide pptx deck; every
+// other format takes a single document, so a repeated --input is rejected up front.
+CLI_TEST(PAGXCliTest, Export_MultipleInputsRejectedForSvg) {
+  auto firstInput = TestResourcePath("render_basic.pagx");
+  auto secondInput = TestResourcePath("render_gradient.pagx");
+  auto outputPath = TempDir() + "/ExportMultiSvg.svg";
+  auto ret = CallRun(pagx::cli::RunExport, {"export", "--input", firstInput, "--input", secondInput,
+                                            "--output", outputPath});
+  EXPECT_NE(ret, 0);
+  EXPECT_FALSE(std::filesystem::exists(outputPath));
 }
 
 CLI_TEST(PAGXCliTest, Import_WriteFailure) {
@@ -2841,8 +2933,9 @@ CLI_TEST(PAGXCliTest, Resolve_MissingFile) {
 }
 
 CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
-  // Verifies that resolving an inline SVG with multiple elements preserves each SVG element
-  // in a separate painter scope, preventing painter accumulation bugs.
+  // Resolving an inline SVG with two sibling paths must preserve their common source depth:
+  // each path and its painter live in a separate peer Group. Flattening only the first path while
+  // grouping the second would make the output asymmetric and can change painter accumulation.
   auto pagxPath = CopyToTemp("import_resolve_multi_layer.pagx", "resolve_multi_layer.pagx");
   auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
   EXPECT_EQ(ret, 0);
@@ -2853,17 +2946,58 @@ CLI_TEST(PAGXCliTest, Resolve_MultiLayerPreservesIsolation) {
 
   ASSERT_EQ(doc->layers.size(), 1u);
   auto* hostLayer = doc->layers[0];
-  EXPECT_FALSE(hostLayer->contents.empty());
-  size_t groupCount = 0;
+  EXPECT_TRUE(hostLayer->children.empty());
+  ASSERT_EQ(hostLayer->contents.size(), 2u);
   for (auto* element : hostLayer->contents) {
-    if (element->nodeType() == pagx::NodeType::Group) {
-      groupCount++;
-    }
+    ASSERT_EQ(element->nodeType(), pagx::NodeType::Group);
+    auto* group = static_cast<pagx::Group*>(element);
+    ASSERT_EQ(group->elements.size(), 2u);
+    EXPECT_EQ(group->elements[0]->nodeType(), pagx::NodeType::Path);
+    EXPECT_EQ(group->elements[1]->nodeType(), pagx::NodeType::Stroke);
   }
-  EXPECT_GE(groupCount, 1u);
 
   // Screenshot test: render the resolved file and compare against baseline.
   EXPECT_TRUE(RenderAndCompare({"render", pagxPath}, "PAGXCliTest/ImportResolve_MultiLayer"));
+}
+
+CLI_TEST(PAGXCliTest, Resolve_SkewSiblingKeepsAllLayers) {
+  // The first sibling has both a tiny scale and a real skew. Skew detection must be
+  // scale-independent, and one non-downgradable matrix must keep every sibling in children so
+  // contents/children paint ordering cannot reverse them.
+  auto pagxPath = CopyToTemp("import_resolve_skew_siblings.pagx", "resolve_skew_siblings.pagx");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* hostLayer = doc->layers[0];
+  EXPECT_TRUE(hostLayer->contents.empty());
+  ASSERT_EQ(hostLayer->children.size(), 2u);
+  EXPECT_FALSE(hostLayer->children[0]->matrix.isIdentity());
+  EXPECT_TRUE(hostLayer->children[1]->matrix.isIdentity());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_TransformableSiblingMatricesBecomeGroups) {
+  auto pagxPath =
+      CopyToTemp("import_resolve_transformed_siblings.pagx", "resolve_transformed_siblings.pagx");
+  auto ret = CallRun(pagx::cli::RunResolve, {"resolve", pagxPath});
+  EXPECT_EQ(ret, 0);
+
+  auto doc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* hostLayer = doc->layers[0];
+  EXPECT_TRUE(hostLayer->children.empty());
+  ASSERT_EQ(hostLayer->contents.size(), 2u);
+  ASSERT_EQ(hostLayer->contents[0]->nodeType(), pagx::NodeType::Group);
+  auto* transformed = static_cast<pagx::Group*>(hostLayer->contents[0]);
+  EXPECT_FLOAT_EQ(transformed->position.x, 4.0f);
+  EXPECT_FLOAT_EQ(transformed->position.y, 5.0f);
+  EXPECT_FLOAT_EQ(transformed->rotation, 30.0f);
+  EXPECT_FLOAT_EQ(transformed->scale.x, 2.0f);
+  EXPECT_FLOAT_EQ(transformed->scale.y, 3.0f);
+  EXPECT_EQ(hostLayer->contents[1]->nodeType(), pagx::NodeType::Group);
 }
 
 CLI_TEST(PAGXCliTest, Resolve_DeduplicatesInlineSvgImageIds) {

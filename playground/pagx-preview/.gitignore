@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+
+# Packing output
+*.tgz
+
+# Generated/copied build artifacts: pagx-viewer wasm+glue, pagx-player bundle, MCP ext bundle,
+# and the MCP widget bundle. Kept in a single directory outside static/ (mirrors pagx-playground's
+# wasm-mt/ layout) and never committed, so the source tree stays free of heavy binaries. These are
+# regenerated on demand via `npm run build` and on publish via the prepack hook.
+wasm/

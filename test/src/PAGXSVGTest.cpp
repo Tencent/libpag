@@ -2620,6 +2620,45 @@ PAGX_TEST(PAGXSVGTest, SVGExport_MaskContour) {
   SaveFile(svg, "PAGXSVGTest/svg_export_mask_contour.svg");
 }
 
+// Regression: a mask layer authored as an INVISIBLE CHILD of the layer it masks
+// (the pattern the PAGX / HTML importer produces) must be emitted only into the
+// <clipPath> / <mask> def, never again as a visible <g> in the body. Otherwise
+// the mask's own fill paints on top of the masked content as an opaque patch
+// (the "white cover layer" seen in exported website decks). The def still uses
+// the mask layer's id, so we assert the clip def references it while no visible
+// group carries it.
+PAGX_TEST(PAGXSVGTest, SVGExport_MaskAsChildNotEmittedAsContent) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->id = "coverMask";
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {100, 100};
+  maskRect->size = {200, 200};
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+  auto* user = doc->makeNode<pagx::Layer>();
+  user->mask = maskLayer;
+  user->maskType = pagx::MaskType::Contour;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  user->contents.push_back(rect);
+  user->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+  // The mask is ALSO one of the layer's children — the real-world importer shape.
+  user->children.push_back(maskLayer);
+  doc->layers.push_back(user);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  // The clip def is emitted from the mask layer (its id seeds the clipPath id).
+  EXPECT_NE(svg.find("<clipPath"), std::string::npos);
+  EXPECT_NE(svg.find("clip-path=\"url(#coverMask"), std::string::npos);
+  // The mask layer must NOT appear as a visible group in the body.
+  EXPECT_EQ(svg.find("<g id=\"coverMask\""), std::string::npos);
+  SaveFile(svg, "PAGXSVGTest/svg_export_mask_as_child.svg");
+}
+
 PAGX_TEST(PAGXSVGTest, SVGExport_MaskContourWithScrollRectCoexist) {
   // Regression: when a layer carries both a contour mask and a scrollRect, both must remain
   // effective. Prior code wrote `clip-path="url(#contour)"` and then `clip-path="url(#scroll)"`

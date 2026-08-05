@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <string>
@@ -41,6 +42,7 @@
 #include "pagx/ppt/PPTGeomEmitter.h"
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
+#include "pagx/types/Data.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StringParser.h"
@@ -67,6 +69,63 @@ bool CanSkipShapeAfterPicture(bool imageWritten, const FillStrokeInfo& fs,
                               const std::vector<LayerFilter*>& filters,
                               const std::vector<LayerStyle*>& styles) {
   return imageWritten && !fs.stroke && filters.empty() && styles.empty();
+}
+
+struct EditableTextScope {
+  size_t textCount = 0;
+  bool hasPainter = false;
+  LayerPlacement placement = LayerPlacement::Background;
+};
+
+// A modifier-only TextBox can be emitted as one native PowerPoint rich-text shape when the
+// surrounding scope contains only untransformed Text/style groups. Keeping all runs in the same
+// a:p lets PowerPoint apply one baseline and choose its own platform emoji fallback consistently.
+// Mixed geometry, transformed groups, nested TextBoxes, and mixed painter placements keep using
+// the ordinary per-geometry walk because collapsing those cases would change z-order or transforms.
+bool AnalyzeEditableTextScope(const std::vector<Element*>& elements, const TextBox* textBox,
+                              EditableTextScope* scope) {
+  for (const auto* element : elements) {
+    switch (element->nodeType()) {
+      case NodeType::Text: {
+        const auto* text = static_cast<const Text*>(element);
+        if (!text->text.empty()) {
+          scope->textCount++;
+        }
+        break;
+      }
+      case NodeType::Fill:
+      case NodeType::Stroke: {
+        LayerPlacement placement = element->nodeType() == NodeType::Fill
+                                       ? static_cast<const Fill*>(element)->placement
+                                       : static_cast<const Stroke*>(element)->placement;
+        if (scope->hasPainter && placement != scope->placement) {
+          return false;
+        }
+        scope->hasPainter = true;
+        scope->placement = placement;
+        break;
+      }
+      case NodeType::Group: {
+        const auto* group = static_cast<const Group*>(element);
+        if (group->alpha != 1.0f || !BuildGroupMatrix(group).isIdentity() ||
+            FindModifierTextBox(group->elements) != nullptr ||
+            !AnalyzeEditableTextScope(group->elements, textBox, scope)) {
+          return false;
+        }
+        break;
+      }
+      case NodeType::TextBox: {
+        const auto* current = static_cast<const TextBox*>(element);
+        if (current != textBox || !current->elements.empty()) {
+          return false;
+        }
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace
@@ -403,7 +462,10 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
       // The convertTextToPath flag has the same effect, but only when GlyphRun
       // data is available to walk — without glyphRuns there is no geometry to
       // emit and we must fall back to native text anyway.
-      if (!text->glyphRuns.empty()) {
+      // The ignoreGlyphRuns flag is the inverse override: it discards the
+      // GlyphRun geometry and forces native text even when GlyphRun data is
+      // present, trading glyph-level fidelity for editable PowerPoint text.
+      if (!text->glyphRuns.empty() && !_ignoreGlyphRuns) {
         writeTextAsPath(out, text, localFs, entry.transform, alpha, filters, styles);
       } else {
         writeNativeText(out, text, localFs, entry.transform, alpha, filters, styles);
@@ -434,8 +496,50 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
   // legacy CollectFillStroke().textBox behaviour, then fall back to the
   // parent's TextBox so Text inside a Group still inherits an outer one.
   const TextBox* localTextBox = FindModifierTextBox(elements);
+  if (_ignoreGlyphRuns && localTextBox != nullptr) {
+    EditableTextScope editableScope;
+    if (AnalyzeEditableTextScope(elements, localTextBox, &editableScope) &&
+        editableScope.textCount >= 2 && editableScope.hasPainter) {
+      if (editableScope.placement == targetPlacement) {
+        auto textBoxMatrix = transform * BuildGroupMatrix(localTextBox);
+        writeTextBoxGroup(out, localTextBox, elements, textBoxMatrix, alpha, filters, styles);
+      }
+      return;
+    }
+  }
   if (localTextBox == nullptr) {
     localTextBox = parentTextBox;
+  }
+  // A modifier-only TextBox may lay out several Text nodes as one fixed-line-height block, while
+  // the embedded file stores the whole block bounds only on the first Text's first GlyphRun.
+  // Capture that first line's baseline offset before painters emit any sibling. Later native-text
+  // shapes can then derive line-box tops from their embedded baselines without depending on the
+  // fallback font metrics used to re-shape editable text.
+  if (_ignoreGlyphRuns && localTextBox != nullptr &&
+      localTextBox->writingMode == WritingMode::Horizontal && localTextBox->lineHeight > 0 &&
+      _embeddedBaselineOffsets.count(localTextBox) == 0) {
+    // Inspect only Text nodes in this exact vector scope. Nested Group/TextBox scopes run this
+    // same pre-scan recursively with their own effective modifier, so a nested override cannot
+    // accidentally seed the parent TextBox's baseline cache.
+    for (const auto* element : elements) {
+      if (element->nodeType() != NodeType::Text) {
+        continue;
+      }
+      const auto* text = static_cast<const Text*>(element);
+      float baselineY = 0.0f;
+      if (!firstEmbeddedBaselineY(*text, &baselineY)) {
+        continue;
+      }
+      for (const auto* run : text->glyphRuns) {
+        if (run != nullptr && run->bounds.height > 0) {
+          _embeddedBaselineOffsets[localTextBox] = baselineY - run->bounds.y;
+          break;
+        }
+      }
+      if (_embeddedBaselineOffsets.count(localTextBox) > 0) {
+        break;
+      }
+    }
   }
 
   for (auto* element : elements) {
@@ -759,6 +863,16 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
       childTgfx = (*tgfxChildren)[tgfxChildIndex];
     }
     ++tgfxChildIndex;
+    // The mask layer is authored as an invisible child of the layer it masks (the PAGX / HTML
+    // importer attaches the rebuilt mask this way). It defines the clip shape, not visible content,
+    // so tgfx never draws it (LayerBuilder marks it visible only for hasValidMask() and skips it via
+    // maskOwner). When the mask clip itself is dropped here (bakeUnsupported off, or an unbakeable
+    // environment) we must still skip emitting the mask layer's own geometry — otherwise its fill
+    // (e.g. a solid rounded rect) paints as an opaque patch over the masked content. The tgfx child
+    // slot is still consumed above so later children stay aligned with the tgfx subtree.
+    if (child == layer->mask) {
+      continue;
+    }
     writeLayer(out, child, childTgfx, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
   }
 
@@ -814,25 +928,124 @@ static bool AddZipString(zipFile zf, const char* name, const std::string& conten
 }
 
 //==============================================================================
-// PPTExporter::ToFile
+// In-memory ZIP backend
 //==============================================================================
 
-bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const Options& options) {
-  if (!doc.isLayoutApplied()) {
-    doc.applyLayout();
+namespace {
+
+// Growable byte buffer with a read/write cursor, driving minizip through a
+// custom zlib_filefunc_def so a PPTX can be assembled entirely in RAM. minizip
+// seeks backward to patch each local file header's CRC / sizes once the entry
+// is closed, so this must support seek/tell/overwrite in addition to append.
+struct MemZipBuffer {
+  std::string data;
+  size_t position = 0;
+};
+
+voidpf ZCALLBACK MemZipOpen(voidpf opaque, const char*, int) {
+  // A single buffer is shared for the whole archive; reset the cursor so the
+  // stream starts writing at the beginning.
+  auto* buffer = static_cast<MemZipBuffer*>(opaque);
+  buffer->data.clear();
+  buffer->position = 0;
+  return opaque;
+}
+
+uLong ZCALLBACK MemZipRead(voidpf, voidpf stream, void* buf, uLong size) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  if (buffer->position >= buffer->data.size()) {
+    return 0;
   }
+  uLong available = static_cast<uLong>(buffer->data.size() - buffer->position);
+  uLong toRead = std::min(size, available);
+  std::memcpy(buf, buffer->data.data() + buffer->position, toRead);
+  buffer->position += toRead;
+  return toRead;
+}
 
-  auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+uLong ZCALLBACK MemZipWrite(voidpf, voidpf stream, const void* buf, uLong size) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  size_t end = buffer->position + size;
+  if (end > buffer->data.size()) {
+    buffer->data.resize(end);
+  }
+  std::memcpy(&buffer->data[buffer->position], buf, size);
+  buffer->position += size;
+  return size;
+}
 
-  PPTWriterContext context;
-  PPTWriter writer(&context, &doc, options, layoutContext.get());
+long ZCALLBACK MemZipTell(voidpf, voidpf stream) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  return static_cast<long>(buffer->position);
+}
 
-  // Build slide body content
+long ZCALLBACK MemZipSeek(voidpf, voidpf stream, uLong offset, int origin) {
+  auto* buffer = static_cast<MemZipBuffer*>(stream);
+  size_t base = 0;
+  switch (origin) {
+    case ZLIB_FILEFUNC_SEEK_SET:
+      base = 0;
+      break;
+    case ZLIB_FILEFUNC_SEEK_CUR:
+      base = buffer->position;
+      break;
+    case ZLIB_FILEFUNC_SEEK_END:
+      base = buffer->data.size();
+      break;
+    default:
+      return -1;
+  }
+  // minizip only ever seeks within the bytes it has already written (back to a
+  // local header to patch its CRC / sizes, then forward to the end again).
+  // Rejecting anything beyond that turns an unexpected seek into a reported
+  // failure instead of a silently zero-filled, corrupt archive.
+  if (offset > buffer->data.size() - base) {
+    return -1;
+  }
+  buffer->position = base + offset;
+  return 0;
+}
+
+int ZCALLBACK MemZipClose(voidpf, voidpf) {
+  return 0;
+}
+
+int ZCALLBACK MemZipError(voidpf, voidpf) {
+  return 0;
+}
+
+zlib_filefunc_def MakeMemZipFileFunc(MemZipBuffer* buffer) {
+  zlib_filefunc_def def = {};
+  def.zopen_file = MemZipOpen;
+  def.zread_file = MemZipRead;
+  def.zwrite_file = MemZipWrite;
+  def.ztell_file = MemZipTell;
+  def.zseek_file = MemZipSeek;
+  def.zclose_file = MemZipClose;
+  def.zerror_file = MemZipError;
+  def.opaque = buffer;
+  return def;
+}
+
+}  // namespace
+
+//==============================================================================
+// Shared assembly
+//==============================================================================
+
+namespace {
+
+// Serializes the document into the single slide XML string and populates
+// `context` with the media entries referenced by that slide. Shared by ToFile
+// and ToData so both entry points produce byte-identical archives.
+std::string BuildSlideXml(PAGXDocument& doc, const PPTExportOptions& options,
+                          PPTWriterContext& context, LayoutContext* layoutContext) {
+  PPTWriter writer(&context, &doc, options, layoutContext);
+
   XMLBuilder body(false, 2, 0, 16384);
   writer.writeDocument(body);
   std::string bodyContent = body.release();
 
-  // Assemble slide XML
   std::string slide;
   slide.reserve(2048 + bodyContent.size());
   slide += "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
@@ -849,20 +1062,88 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
   slide += "</p:spTree></p:cSld>";
   slide += "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>";
   slide += "</p:sld>";
+  return slide;
+}
 
-  // Write ZIP via minizip
-  zipFile zf = zipOpen(filePath.c_str(), APPEND_STATUS_CREATE);
-  if (!zf) {
-    return false;
+// One serialized slide: the slide XML plus the media context that XML
+// references. The context is kept alive because WriteZipEntries streams the
+// slide's media (and its slideN.xml.rels) out of it; the LayoutContext that
+// produced the XML is short-lived and freed as soon as the XML is built.
+struct SlideBuild {
+  std::string xml;
+  std::unique_ptr<PPTWriterContext> context;
+};
+
+// Serializes every document into its own slide. Returns an empty vector when the
+// input is invalid (empty list, nullptr entry, unresolved import, or a newly
+// reported layout error) so callers can bail out. A structurally valid document
+// with no visible content is intentionally retained as a blank slide. Each
+// slide's media numbering is offset by the running image total so all slides can
+// share the single ppt/media/ directory without file-name collisions.
+std::vector<SlideBuild> BuildSlides(const std::vector<PAGXDocument*>& documents,
+                                    const PPTExportOptions& options) {
+  std::vector<SlideBuild> slides;
+  if (documents.empty()) {
+    return slides;
+  }
+  slides.reserve(documents.size());
+  int imageBase = 0;
+  for (auto* doc : documents) {
+    if (doc == nullptr || doc->hasUnresolvedImports()) {
+      return {};
+    }
+    auto errorCount = doc->errors.size();
+    if (!doc->isLayoutApplied()) {
+      doc->applyLayout();
+    }
+    // applyLayout reports structural failures (for example, a cyclic external
+    // composition) through the document's error list. Do not silently turn the
+    // failed document into an empty slide while returning success for the deck.
+    if (!doc->isLayoutApplied() || doc->errors.size() != errorCount) {
+      return {};
+    }
+    SlideBuild slide;
+    slide.context = std::make_unique<PPTWriterContext>(imageBase);
+    // The LayoutContext only backs the writer while the slide XML is produced;
+    // once BuildSlideXml returns the XML is self-contained, so scope it to this
+    // iteration instead of holding one per slide alive for the whole deck.
+    auto layoutContext = std::make_unique<LayoutContext>(options.fontConfig);
+    slide.xml = BuildSlideXml(*doc, options, *slide.context, layoutContext.get());
+    imageBase += static_cast<int>(slide.context->images().size());
+    slides.push_back(std::move(slide));
+  }
+  return slides;
+}
+
+// Writes every OOXML part (boilerplate XML + per-slide XML + media) into the
+// already-opened zip handle. `slideW` / `slideH` are the deck-wide slide size
+// taken from the first document. Returns false on the first write failure so
+// callers can discard the partial archive.
+bool WriteZipEntries(zipFile zf, const std::vector<SlideBuild>& slides, float slideW,
+                     float slideH) {
+  size_t slideCount = slides.size();
+  bool hasPNG = false;
+  bool hasJPEG = false;
+  for (const auto& slide : slides) {
+    hasPNG = hasPNG || slide.context->hasPNG();
+    hasJPEG = hasJPEG || slide.context->hasJPEG();
   }
 
   bool ok = true;
-  ok = ok && AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(context));
+  ok = ok &&
+       AddZipString(zf, "[Content_Types].xml", GenerateContentTypes(hasPNG, hasJPEG, slideCount));
   ok = ok && AddZipString(zf, "_rels/.rels", GenerateRootRels());
-  ok = ok && AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(doc.width, doc.height));
-  ok = ok && AddZipString(zf, "ppt/_rels/presentation.xml.rels", GeneratePresentationRels());
-  ok = ok && AddZipString(zf, "ppt/slides/slide1.xml", slide);
-  ok = ok && AddZipString(zf, "ppt/slides/_rels/slide1.xml.rels", GenerateSlideRels(context));
+  ok = ok &&
+       AddZipString(zf, "ppt/presentation.xml", GeneratePresentation(slideW, slideH, slideCount));
+  ok = ok &&
+       AddZipString(zf, "ppt/_rels/presentation.xml.rels", GeneratePresentationRels(slideCount));
+  for (size_t i = 0; i < slideCount && ok; i++) {
+    std::string n = std::to_string(i + 1);
+    std::string slidePath = "ppt/slides/slide" + n + ".xml";
+    std::string slideRelsPath = "ppt/slides/_rels/slide" + n + ".xml.rels";
+    ok = ok && AddZipString(zf, slidePath.c_str(), slides[i].xml);
+    ok = ok && AddZipString(zf, slideRelsPath.c_str(), GenerateSlideRels(*slides[i].context));
+  }
   ok = ok && AddZipString(zf, "ppt/slideMasters/slideMaster1.xml", GenerateSlideMaster());
   ok = ok &&
        AddZipString(zf, "ppt/slideMasters/_rels/slideMaster1.xml.rels", GenerateSlideMasterRels());
@@ -874,23 +1155,51 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
   ok = ok && AddZipString(zf, "ppt/viewProps.xml", GenerateViewProps());
   ok = ok && AddZipString(zf, "ppt/tableStyles.xml", GenerateTableStyles());
   ok = ok && AddZipString(zf, "docProps/core.xml", GenerateCoreProps());
-  ok = ok && AddZipString(zf, "docProps/app.xml", GenerateAppProps());
+  ok = ok && AddZipString(zf, "docProps/app.xml", GenerateAppProps(slideCount));
 
-  for (const auto& img : context.images()) {
+  for (const auto& slide : slides) {
+    for (const auto& img : slide.context->images()) {
+      if (!ok) {
+        break;
+      }
+      if (img.cachedData && img.cachedData->size() > 0) {
+        // minizip's zipWriteInFileInZip takes a 32-bit length. Reject entries
+        // that would be silently truncated rather than writing a corrupt PPTX.
+        if (img.cachedData->size() > std::numeric_limits<unsigned>::max()) {
+          ok = false;
+          break;
+        }
+        ok = AddZipEntry(zf, img.mediaPath.c_str(), img.cachedData->bytes(),
+                         static_cast<unsigned>(img.cachedData->size()));
+      }
+    }
     if (!ok) {
       break;
     }
-    if (img.cachedData && img.cachedData->size() > 0) {
-      // minizip's zipWriteInFileInZip takes a 32-bit length. Reject entries
-      // that would be silently truncated rather than writing a corrupt PPTX.
-      if (img.cachedData->size() > std::numeric_limits<unsigned>::max()) {
-        ok = false;
-        break;
-      }
-      ok = AddZipEntry(zf, img.mediaPath.c_str(), img.cachedData->bytes(),
-                       static_cast<unsigned>(img.cachedData->size()));
-    }
   }
+  return ok;
+}
+
+}  // namespace
+
+//==============================================================================
+// PPTExporter::ToFile
+//==============================================================================
+
+bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std::string& filePath,
+                         const Options& options) {
+  auto slides = BuildSlides(documents, options);
+  if (slides.empty()) {
+    return false;
+  }
+
+  // Write ZIP via minizip
+  zipFile zf = zipOpen(filePath.c_str(), APPEND_STATUS_CREATE);
+  if (!zf) {
+    return false;
+  }
+
+  bool ok = WriteZipEntries(zf, slides, documents.front()->width, documents.front()->height);
 
   if (!ok) {
     zipClose(zf, nullptr);
@@ -905,6 +1214,36 @@ bool PPTExporter::ToFile(PAGXDocument& doc, const std::string& filePath, const O
     return false;
   }
   return true;
+}
+
+//==============================================================================
+// PPTExporter::ToData
+//==============================================================================
+
+std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& documents,
+                                          const Options& options) {
+  auto slides = BuildSlides(documents, options);
+  if (slides.empty()) {
+    return nullptr;
+  }
+
+  // Assemble the archive into a growable RAM buffer instead of a file on disk.
+  MemZipBuffer memBuffer;
+  zlib_filefunc_def fileFunc = MakeMemZipFileFunc(&memBuffer);
+  zipFile zf = zipOpen2("in-memory.pptx", APPEND_STATUS_CREATE, nullptr, &fileFunc);
+  if (!zf) {
+    return nullptr;
+  }
+
+  bool ok = WriteZipEntries(zf, slides, documents.front()->width, documents.front()->height);
+  if (zipClose(zf, nullptr) != ZIP_OK) {
+    ok = false;
+  }
+  if (!ok) {
+    return nullptr;
+  }
+
+  return Data::MakeWithCopy(memBuffer.data.data(), memBuffer.data.size());
 }
 
 }  // namespace pagx

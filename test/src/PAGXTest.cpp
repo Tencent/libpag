@@ -2318,6 +2318,47 @@ PAGX_TEST(PAGXTest, LayoutConstraintScaleTextBothAxes) {
   EXPECT_FLOAT_EQ(text->renderFontSize(), expectedFontSize);
 }
 
+PAGX_TEST(PAGXTest, TextLayoutCanReshapeReadableTextWhenGlyphRunsAreIgnored) {
+  auto doc = pagx::PAGXDocument::Make(400, 200);
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Hello\n";
+  text->fontSize = 24;
+
+  auto embeddedFont = doc->makeNode<pagx::Font>();
+  auto embeddedGlyph = doc->makeNode<pagx::Glyph>();
+  embeddedGlyph->advance = 500;
+  embeddedFont->glyphs.push_back(embeddedGlyph);
+  auto embeddedRun = doc->makeNode<pagx::GlyphRun>();
+  embeddedRun->font = embeddedFont;
+  embeddedRun->fontSize = 24;
+  embeddedRun->glyphs = {1};
+  embeddedRun->y = 27;
+  // Simulate a producer that stores the whole three-line block on the first Text.
+  embeddedRun->bounds = pagx::Rect::MakeXYWH(0, 0, 440, 108);
+  text->glyphRuns.push_back(embeddedRun);
+
+  pagx::FontConfig fontConfig;
+  pagx::LayoutContext layoutContext(&fontConfig);
+  pagx::TextLayoutParams params = {};
+  params.boxWidth = 440;
+  params.lineHeight = 36;
+
+  auto embeddedResult =
+      pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params, &layoutContext);
+  EXPECT_FLOAT_EQ(embeddedResult.bounds.height, 108);
+  EXPECT_EQ(embeddedResult.getTextLines(text), nullptr);
+
+  auto reshapedResult = pagx::TextLayout::Layout(pagx::TextLayout::MakeElements({text}), params,
+                                                 &layoutContext, false);
+  auto reshapedBounds = reshapedResult.getTextBounds(text);
+  auto* reshapedLines = reshapedResult.getTextLines(text);
+  EXPECT_FLOAT_EQ(reshapedBounds.height, 36);
+  ASSERT_NE(reshapedLines, nullptr);
+  ASSERT_EQ(reshapedLines->size(), 1u);
+  EXPECT_GT(reshapedLines->front().baselineY, reshapedBounds.y);
+  EXPECT_LT(reshapedLines->front().baselineY, reshapedBounds.y + reshapedBounds.height);
+}
+
 PAGX_TEST(PAGXTest, LayoutConstraintScaleTextSingleAxis) {
   auto doc = pagx::PAGXDocument::Make(400, 200);
   auto layer = doc->makeNode<pagx::Layer>();

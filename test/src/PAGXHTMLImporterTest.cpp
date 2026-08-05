@@ -31,6 +31,7 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -1261,6 +1262,125 @@ PAG_TEST(PAGXHTMLImporterTest, RadialGradientEllipseOnNonSquareBoxKeepsNormalise
   EXPECT_TRUE(rg->fitsToGeometry);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleOmittedSizeUsesFarthestCorner) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:400px">
+      <div style="width:400px;height:200px;background-image:radial-gradient(circle at 25% 25%, #FFFFFF 0%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // A `circle` with no size defaults to farthest-corner: center (100,50) on a 400x200 box reaches
+  // the farthest corner (400,200) at sqrt(300^2 + 150^2) ~= 335.4px. The pixel model keeps the
+  // radius isotropic, so center/radius are stored in px with fitsToGeometry disabled.
+  EXPECT_FALSE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 100.0f, 0.5f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 50.0f, 0.5f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 335.41f, 0.5f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleExtentKeywordsUseDistanceFromCenter) {
+  struct ExtentCase {
+    const char* keyword;
+    float radius;
+  };
+  // Center (100,50) in a 400x200 box gives side distances 100, 300, 50, 150.
+  // Corner radii are therefore hypot(100,50) and hypot(300,150).
+  const std::vector<ExtentCase> cases = {
+      {"closest-side", 50.0f},
+      {"farthest-side", 300.0f},
+      {"closest-corner", 111.80f},
+      {"farthest-corner", 335.41f},
+  };
+  for (const auto& extent : cases) {
+    SCOPED_TRACE(extent.keyword);
+    auto html = std::string(
+                    "<html><body style=\"width:400px;height:400px\">"
+                    "<div style=\"width:400px;height:200px;background-image:radial-gradient("
+                    "circle ") +
+                extent.keyword +
+                " at 25% 25%, #FFFFFF 0%, transparent 100%)\"></div></body></html>";
+    auto doc = ParseFromString(html);
+    ASSERT_NE(doc, nullptr);
+    auto* div = doc->layers.front()->children.front();
+    auto* fill = FindElementOfType<pagx::Fill>(div);
+    ASSERT_NE(fill, nullptr);
+    auto* rg = As<pagx::RadialGradient>(fill->color);
+    ASSERT_NE(rg, nullptr);
+    EXPECT_FALSE(rg->fitsToGeometry);
+    EXPECT_TRUE(NearlyEqual(rg->center.x, 100.0f, 0.01f));
+    EXPECT_TRUE(NearlyEqual(rg->center.y, 50.0f, 0.01f));
+    EXPECT_TRUE(NearlyEqual(rg->radius, extent.radius, 0.01f));
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleClosestSideOutsideBoxUsesPositiveDistance) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:400px;height:400px">
+      <div style="width:400px;height:200px;background-image:radial-gradient(
+        circle closest-side at -80px -138px, #FFFFFF 0%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // The center is outside the box, but closest-side is still the positive geometric distance to
+  // the nearest edge: min(80, 480, 138, 338) = 80px.
+  EXPECT_FALSE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, -80.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, -138.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 80.0f, 0.01f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RadialGradientCircleExtentOnSquareBoxKeepsNormalised) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:100px;background-image:radial-gradient(circle farthest-corner at center, #FFFFFF 0%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* rg = As<pagx::RadialGradient>(fill->color);
+  ASSERT_NE(rg, nullptr);
+  // A square box is already isotropic in geometry space, so the farthest-corner radius
+  // hypot(50,50) is stored as hypot(0.5,0.5) instead of switching to pixel coordinates.
+  EXPECT_TRUE(rg->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(rg->center.x, 0.5f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->center.y, 0.5f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rg->radius, 0.7071f, 0.001f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, GradientTransparentStopsBorrowOpaqueNeighborRGB) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:50px">
+      <div style="width:100px;height:50px;background-image:linear-gradient(
+        90deg, transparent 0%, rgba(220, 210, 255, 0.4) 50%, transparent 100%)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(div);
+  ASSERT_NE(fill, nullptr);
+  auto* lg = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(lg, nullptr);
+  ASSERT_EQ(lg->colorStops.size(), 3u);
+
+  // The renderer interpolates unpremultiplied colors. Giving both transparent edge stops the
+  // purple neighbor's RGB preserves a purple fade instead of blending through transparent black.
+  EXPECT_TRUE(ColorNear(lg->colorStops[0]->color, HexColor(0xDCD2FF, 0.0f)));
+  EXPECT_TRUE(ColorNear(lg->colorStops[1]->color, HexColor(0xDCD2FF, 0.4f)));
+  EXPECT_TRUE(ColorNear(lg->colorStops[2]->color, HexColor(0xDCD2FF, 0.0f)));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, ConicGradientAngleOffset) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:50px;height:50px">
@@ -1413,8 +1533,9 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedOverflowClipUsesContourMaskForNonImageChil
   // `border-radius: 50%` inscribes an ellipse, so the mask geometry is an Ellipse.
   auto* ellipse = FindElementOfType<pagx::Ellipse>(wrapper->mask);
   EXPECT_NE(ellipse, nullptr);
-  // The mask is an invisible, layout-excluded child that shares the container's coordinate space.
-  EXPECT_FALSE(wrapper->mask->visible);
+  // The mask stays visible at the PAGX level so the renderer can resolve it; mask ownership
+  // suppresses normal drawing. It is excluded only from layout.
+  EXPECT_TRUE(wrapper->mask->visible);
   EXPECT_FALSE(wrapper->mask->includeInLayout);
 }
 
@@ -3337,16 +3458,15 @@ PAG_TEST(PAGXHTMLImporterTest, HeadingDefaultFontSizes) {
     auto* text = FindElementOfType<pagx::Text>(leaf);
     ASSERT_NE(text, nullptr) << r.tag;
     EXPECT_FLOAT_EQ(text->fontSize, r.size) << r.tag;
-    // Headings default to font-weight:bold, which is baked as faux bold (synthesised on a base
-    // face) rather than a "Bold" style label so the authored weight survives a missing styled face.
-    // The base-face label surfaces as the canonical "Regular" so every Text node carries a style.
-    EXPECT_EQ(text->fontStyle, "Regular") << r.tag;
-    EXPECT_TRUE(text->fauxBold) << r.tag;
+    // Headings default to font-weight:bold, which is written as a real-face "Bold" style label so
+    // the renderer resolves the authored heavy face; no faux flag is baked into the Text node.
+    EXPECT_EQ(text->fontStyle, "Bold") << r.tag;
+    EXPECT_FALSE(text->fauxBold) << r.tag;
     EXPECT_FALSE(text->fauxItalic) << r.tag;
   }
 }
 
-PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToFauxBold) {
+PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToBold) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-weight:700">Heavy</span>
@@ -3355,11 +3475,43 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeightNumericMapsToFauxBold) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // Bold (weight >= 600) is synthesised via faux bold rather than locking onto a "Bold" face; the
-  // base-face label surfaces as the canonical "Regular".
-  EXPECT_EQ(text->fontStyle, "Regular");
-  EXPECT_TRUE(text->fauxBold);
+  // Weight 700 is written as a real-face "Bold" style label so the renderer can resolve the
+  // authored heavy face; no faux flag is baked in.
+  EXPECT_EQ(text->fontStyle, "Bold");
+  EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceFallsBackWithoutFauxBold) {
+  constexpr const char* family = "HTML Missing Bold Test";
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'HTML Missing Bold Test';font-weight:700">Heavy</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  ASSERT_EQ(text->fontFamily, family);
+  ASSERT_EQ(text->fontStyle, "Bold");
+  ASSERT_FALSE(text->fauxBold);
+
+  // Register only a Regular face under the requested family. Font lookup therefore falls back to
+  // that face without synthesising the unavailable Bold weight.
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0, family,
+                          "Regular");
+  doc->applyLayout(&fontConfig);
+
+  ASSERT_NE(text->glyphData, nullptr);
+  ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+  for (const auto& run : text->glyphData->layoutRuns) {
+    auto typeface = run.font.getTypeface();
+    ASSERT_NE(typeface, nullptr);
+    EXPECT_EQ(typeface->fontStyle(), "Regular");
+    EXPECT_FALSE(run.font.isFauxBold());
+  }
+  EXPECT_FALSE(text->fauxBold);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
@@ -3371,7 +3523,8 @@ PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // Medium (weight < 600) cannot be synthesised, so it stays a real-face style label with no faux.
+  // Medium stays a real-face style label so font lookup can select it precisely. The importer does
+  // not bake a faux flag when that face is unavailable.
   EXPECT_EQ(text->fontStyle, "Medium");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
@@ -3386,10 +3539,10 @@ PAG_TEST(PAGXHTMLImporterTest, BoldItalicCombined) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // Both axes are synthesised: the style label drops to the canonical "Regular" base face and both
-  // faux flags are set so the run renders bold + italic even when the styled face is unavailable.
-  EXPECT_EQ(text->fontStyle, "Regular");
-  EXPECT_TRUE(text->fauxBold);
+  // The weight axis becomes a real-face "Bold" style label; only the italic axis is synthesised via
+  // faux italic so the slant survives a missing styled italic face.
+  EXPECT_EQ(text->fontStyle, "Bold");
+  EXPECT_FALSE(text->fauxBold);
   EXPECT_TRUE(text->fauxItalic);
 }
 
@@ -9221,7 +9374,7 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundDataImageExplicitSizeUsesNativeDimensio
 
 // CSS `mask-image: url(data:image/svg+xml,...)` with `mask-mode: alpha` rebuilds an alpha mask
 // layer (the inverse of HTMLWriter::writeMaskCSS). The ellipse geometry round-trips and the mask
-// layer is attached invisibly and excluded from layout.
+// layer stays renderer-visible for mask lookup and is excluded from layout.
 PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:110px;height:110px">
@@ -9234,7 +9387,7 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   auto* masked = doc->layers.front()->children.front();
   ASSERT_NE(masked->mask, nullptr);
   EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
-  EXPECT_FALSE(masked->mask->visible);
+  EXPECT_TRUE(masked->mask->visible);
   EXPECT_FALSE(masked->mask->includeInLayout);
   auto* ellipse = FindElementOfType<pagx::Ellipse>(masked->mask);
   ASSERT_NE(ellipse, nullptr);

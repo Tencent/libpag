@@ -164,9 +164,15 @@ class TextLayout {
    * Performs text layout and returns TextLayoutResult with bounds and positioned glyph runs.
    * Shapes text, computes line/column breaks, but does not build TextBlob. The caller uses
    * GlyphRunRenderer to convert layout glyph runs to TextBlob with the appropriate inverse matrix.
+   *
+   * When useEmbeddedGlyphRuns is true (the default), a set of Text elements that all carry
+   * pre-shaped GlyphRuns takes the embedded fast path and returns only their authored bounds.
+   * Pass false when a caller intentionally needs fresh line-box and baseline metadata from the
+   * readable Text content (for example, editable-text export with GlyphRuns explicitly ignored).
    */
   static TextLayoutResult Layout(const std::vector<TextElement>& textElements,
-                                 const TextLayoutParams& params, LayoutContext* context);
+                                 const TextLayoutParams& params, LayoutContext* context,
+                                 bool useEmbeddedGlyphRuns = true);
 
   /**
    * Collects all Text elements from an element list (including nested Groups).
