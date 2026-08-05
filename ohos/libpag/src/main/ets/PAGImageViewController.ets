@@ -221,6 +221,10 @@ export class PAGImageViewController {
     this.jImageView.pause();
   }
 
+  /**
+   * Driven by the view's visible-area changes to stop rendering while off-screen and resume it when
+   * on-screen, saving power without altering the caller's play/pause intention.
+   */
   onVisibilityChanged(visible: boolean) {
     this.jImageView.setVisible(visible);
   }
@@ -327,6 +331,9 @@ export class PAGImageViewController {
   }
 
   detachFromView() {
+    // Reset the visibility state so a reused controller does not carry a stale visible flag into the
+    // next view, which would otherwise skip resuming playback on the new view.
+    this.onVisibilityChanged(false);
     this.view = null;
   }
 

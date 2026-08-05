@@ -946,6 +946,7 @@ void JPAGView::release() {
     player->setSurface(nullptr);
     player = nullptr;
   }
+  isVisible = false;
 }
 
 std::shared_ptr<PAGAnimator> JPAGView::getAnimator() {
@@ -959,41 +960,45 @@ std::shared_ptr<PAGPlayer> JPAGView::getPlayer() {
 }
 
 void JPAGView::setComposition(std::shared_ptr<PAGComposition> composition) {
-  auto player = getPlayer();
-  auto animator = getAnimator();
+  std::shared_ptr<PAGPlayer> player = nullptr;
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  bool visible = false;
+  {
+    std::lock_guard lock_guard(locker);
+    player = this->player;
+    animator = this->animator;
+    visible = isVisible;
+  }
   if (player == nullptr || animator == nullptr) {
     return;
   }
   player->setComposition(composition);
   animator->setProgress(player->getProgress());
-  bool visible = false;
-  {
-    std::lock_guard lock_guard(locker);
-    visible = isVisible;
-  }
-  int64_t duration = 0;
-  if (composition != nullptr && visible) {
-    duration = composition->duration();
-  }
+  int64_t duration = (composition != nullptr && visible) ? composition->duration() : 0;
   animator->setDuration(duration);
+  if (visible) {
+    animator->update();
+  }
 }
 
 void JPAGView::setVisible(bool visible) {
-  auto player = getPlayer();
-  auto animator = getAnimator();
+  std::shared_ptr<PAGPlayer> player = nullptr;
+  std::shared_ptr<PAGAnimator> animator = nullptr;
   {
     std::lock_guard lock_guard(locker);
     if (isVisible == visible) {
       return;
     }
     isVisible = visible;
+    player = this->player;
+    animator = this->animator;
   }
-  int64_t duration = 0;
-  if (visible && player != nullptr) {
-    duration = player->duration();
+  if (animator == nullptr) {
+    return;
   }
-  if (animator != nullptr) {
-    animator->setDuration(visible ? duration : 0);
+  animator->setDuration(visible && player != nullptr ? player->duration() : 0);
+  if (visible) {
+    animator->update();
   }
 }
 

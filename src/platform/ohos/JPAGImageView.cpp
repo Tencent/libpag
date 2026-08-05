@@ -708,6 +708,9 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, 
     duration = composition->duration();
   }
   animator->setDuration(duration);
+  if (visible) {
+    animator->update();
+  }
 }
 
 void JPAGImageView::setVisible(bool visible) {
@@ -730,6 +733,9 @@ void JPAGImageView::setVisible(bool visible) {
     duration = composition->duration();
   }
   animator->setDuration(visible ? duration : 0);
+  if (visible) {
+    animator->update();
+  }
 }
 
 void JPAGImageView::setScaleMode(PAGScaleMode scaleMode) {
@@ -940,6 +946,7 @@ void JPAGImageView::release() {
     _animator = nullptr;
   }
 
+  isVisible = false;
   invalidDecoder();
 }
 
