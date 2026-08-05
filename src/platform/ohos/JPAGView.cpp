@@ -966,29 +966,34 @@ void JPAGView::setComposition(std::shared_ptr<PAGComposition> composition) {
   }
   player->setComposition(composition);
   animator->setProgress(player->getProgress());
-  std::lock_guard lock_guard(locker);
-  if (composition != nullptr && isVisible) {
-    animator->setDuration(composition->duration());
-  } else {
-    animator->setDuration(0);
+  bool visible = false;
+  {
+    std::lock_guard lock_guard(locker);
+    visible = isVisible;
   }
+  int64_t duration = 0;
+  if (composition != nullptr && visible) {
+    duration = composition->duration();
+  }
+  animator->setDuration(duration);
 }
 
 void JPAGView::setVisible(bool visible) {
   auto player = getPlayer();
   auto animator = getAnimator();
-  std::lock_guard lock_guard(locker);
-  if (isVisible == visible) {
-    return;
+  {
+    std::lock_guard lock_guard(locker);
+    if (isVisible == visible) {
+      return;
+    }
+    isVisible = visible;
   }
-  isVisible = visible;
-  if (animator == nullptr) {
-    return;
+  int64_t duration = 0;
+  if (visible && player != nullptr) {
+    duration = player->duration();
   }
-  if (isVisible && player != nullptr) {
-    animator->setDuration(player->duration());
-  } else {
-    animator->setDuration(0);
+  if (animator != nullptr) {
+    animator->setDuration(visible ? duration : 0);
   }
 }
 

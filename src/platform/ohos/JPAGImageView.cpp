@@ -690,34 +690,46 @@ Frame JPAGImageView::currentFrame() {
 }
 
 void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, float frameRate) {
-  std::lock_guard lock_guard(locker);
-  if (_animator == nullptr) {
-    return;
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  bool visible = false;
+  {
+    std::lock_guard lock_guard(locker);
+    animator = _animator;
+    if (animator == nullptr) {
+      return;
+    }
+    _composition = composition;
+    _frameRate = frameRate;
+    invalidDecoder();
+    visible = isVisible;
   }
-  if (composition != nullptr && isVisible) {
-    _animator->setDuration(composition->duration());
-  } else {
-    _animator->setDuration(0);
+  int64_t duration = 0;
+  if (composition != nullptr && visible) {
+    duration = composition->duration();
   }
-  _composition = composition;
-  _frameRate = frameRate;
-  invalidDecoder();
+  animator->setDuration(duration);
 }
 
 void JPAGImageView::setVisible(bool visible) {
-  std::lock_guard lock_guard(locker);
-  if (isVisible == visible) {
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::shared_ptr<PAGComposition> composition = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (isVisible == visible) {
+      return;
+    }
+    isVisible = visible;
+    animator = _animator;
+    composition = _composition;
+  }
+  if (animator == nullptr) {
     return;
   }
-  isVisible = visible;
-  if (_animator == nullptr) {
-    return;
+  int64_t duration = 0;
+  if (visible && composition != nullptr) {
+    duration = composition->duration();
   }
-  if (isVisible) {
-    _animator->setDuration(_composition != nullptr ? _composition->duration() : 0);
-  } else {
-    _animator->setDuration(0);
-  }
+  animator->setDuration(visible ? duration : 0);
 }
 
 void JPAGImageView::setScaleMode(PAGScaleMode scaleMode) {
