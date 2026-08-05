@@ -40,7 +40,10 @@ public class PAGFile extends PAGComposition {
 
     /**
      * Load a pag file from the specified path, returns null if the file does not exist or the
-     * data is not a pag file.
+     * data is not a pag file. If the path is a network URL (starting with "http://" or "https://"),
+     * this method must be called on a worker thread; otherwise it throws a
+     * NetworkOnMainThreadException when the file is not in the disk cache. Use LoadAsync() to load a
+     * network file from the UI thread.
      * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
      * cache is alive until all PAGFiles are released. Use 'PAGFile.Load(byte[])' instead
      * if you don't want to load a PAGFile from the intenal caches.
@@ -58,7 +61,9 @@ public class PAGFile extends PAGComposition {
     }
 
     /**
-     * Asynchronously load a pag file from the specific path.
+     * Asynchronously loads a pag file from the specified path. The path can be a network URL
+     * ("http://" or "https://") or a local path; the file is loaded on a worker thread, so this
+     * method is safe to call from the UI thread.
      */
     public static void LoadAsync(String path, LoadListener listener) {
         NativeTask.Run(() -> {
