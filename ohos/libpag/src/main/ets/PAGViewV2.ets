@@ -51,9 +51,9 @@ export struct PAGViewV2 {
 
   private onVisibleAreaChanged(isExpanding: boolean, currentRatio: number): void {
     if (currentRatio <= 0.0) {
-      this.controller.setVisible(false);
+      this.controller.onVisibilityChanged(false);
     } else if (isExpanding) {
-      this.controller.setVisible(true);
+      this.controller.onVisibilityChanged(true);
     }
   }
 }

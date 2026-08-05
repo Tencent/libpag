@@ -29,6 +29,9 @@ export struct PAGImageView {
       libraryname: "pag",
     })
       .backgroundColor(Color.Transparent)
+      .onVisibleAreaChange([0.0, 1.0], (isExpanding: boolean, currentRatio: number) => {
+        this.onVisibleAreaChanged(isExpanding, currentRatio);
+      })
   }
 
   onPageShow(): void {
@@ -41,5 +44,13 @@ export struct PAGImageView {
 
   aboutToDisappear(): void {
     this.controller.detachFromView();
+  }
+
+  private onVisibleAreaChanged(isExpanding: boolean, currentRatio: number): void {
+    if (currentRatio <= 0.0) {
+      this.controller.onVisibilityChanged(false);
+    } else if (isExpanding) {
+      this.controller.onVisibilityChanged(true);
+    }
   }
 }

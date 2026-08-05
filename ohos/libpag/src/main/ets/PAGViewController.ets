@@ -120,10 +120,6 @@ export class PAGViewController {
    * the beginning.
    */
   play() {
-    this.userWantsPlaying = true;
-    // A caller-initiated play overrides the off-screen pause latch, so the visibility
-    // handling can pause the animation again if it later goes off-screen.
-    this.pausedForInvisible = false;
     this.jView?.play();
   }
 
@@ -132,28 +128,11 @@ export class PAGViewController {
    * animation from the last paused position.
    */
   pause() {
-    this.userWantsPlaying = false;
     this.jView.pause();
   }
 
-  /**
-   * Notifies the controller whether the view is currently visible. When it becomes invisible, a
-   * playing animation is paused to save power; when it becomes visible again, playback is resumed
-   * only if the caller has requested playing via play(). The play intention set by play()/pause()
-   * is preserved across visibility changes.
-   */
-  setVisible(visible: boolean) {
-    if (!visible) {
-      if (this.jView.isPlaying() && !this.pausedForInvisible) {
-        this.pausedForInvisible = true;
-        this.jView.pause();
-      }
-    } else if (this.pausedForInvisible) {
-      this.pausedForInvisible = false;
-      if (this.userWantsPlaying) {
-        this.jView?.play();
-      }
-    }
+  onVisibilityChanged(visible: boolean) {
+    this.jView.setVisible(visible);
   }
 
   /**
@@ -483,6 +462,4 @@ export class PAGViewController {
   private listeners: Array<WeakRef<PAGViewListener>> = [];
   private jView: JPAGView = new JPAGView();
   private view: WeakRef<ESObject> | null = null;
-  private userWantsPlaying: boolean = false;
-  private pausedForInvisible: boolean = false;
 }

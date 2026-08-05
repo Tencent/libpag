@@ -123,20 +123,12 @@ static napi_value SetComposition(napi_env env, napi_callback_info info) {
   JPAGView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
   if (view != nullptr) {
-    auto player = view->getPlayer();
-    auto animator = view->getAnimator();
-    if (player == nullptr || animator == nullptr) {
-      return nullptr;
-    }
     if (layer != nullptr) {
       if (layer->layerType() == LayerType::PreCompose) {
-        player->setComposition(std::static_pointer_cast<PAGComposition>(layer));
-        animator->setProgress(player->getProgress());
-        animator->setDuration(layer->duration());
+        view->setComposition(std::static_pointer_cast<PAGComposition>(layer));
       }
     } else {
-      player->setComposition(nullptr);
-      animator->setDuration(0);
+      view->setComposition(nullptr);
     }
   }
   return nullptr;
@@ -763,6 +755,24 @@ static napi_value Release(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static napi_value SetVisible(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  bool visible = false;
+  napi_get_value_bool(env, args[0], &visible);
+  JPAGView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->setVisible(visible);
+  }
+  return nullptr;
+}
+
 napi_value JPAGView::Constructor(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
@@ -820,6 +830,7 @@ bool JPAGView::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(makeSnapshot, MakeSnapshot),
       PAG_DEFAULT_METHOD_ENTRY(useDiskCache, UseDiskCache),
       PAG_DEFAULT_METHOD_ENTRY(setUseDiskCache, SetUseDiskCache),
+      PAG_DEFAULT_METHOD_ENTRY(setVisible, SetVisible),
       PAG_DEFAULT_METHOD_ENTRY(release, Release)};
   auto status = DefineClass(env, exports, ClassName(), sizeof(classProp) / sizeof(classProp[0]),
                             classProp, Constructor, "");
@@ -945,6 +956,40 @@ std::shared_ptr<PAGAnimator> JPAGView::getAnimator() {
 std::shared_ptr<PAGPlayer> JPAGView::getPlayer() {
   std::lock_guard lock_guard(locker);
   return player;
+}
+
+void JPAGView::setComposition(std::shared_ptr<PAGComposition> composition) {
+  auto player = getPlayer();
+  auto animator = getAnimator();
+  if (player == nullptr || animator == nullptr) {
+    return;
+  }
+  player->setComposition(composition);
+  animator->setProgress(player->getProgress());
+  std::lock_guard lock_guard(locker);
+  if (composition != nullptr && isVisible) {
+    animator->setDuration(composition->duration());
+  } else {
+    animator->setDuration(0);
+  }
+}
+
+void JPAGView::setVisible(bool visible) {
+  auto player = getPlayer();
+  auto animator = getAnimator();
+  std::lock_guard lock_guard(locker);
+  if (isVisible == visible) {
+    return;
+  }
+  isVisible = visible;
+  if (animator == nullptr) {
+    return;
+  }
+  if (isVisible && player != nullptr) {
+    animator->setDuration(player->duration());
+  } else {
+    animator->setDuration(0);
+  }
 }
 
 void JPAGView::setProgressCallback(napi_threadsafe_function callback) {

@@ -203,10 +203,6 @@ export class PAGImageViewController {
    * the beginning.
    */
   play() {
-    this.userWantsPlaying = true;
-    // A caller-initiated play overrides the off-screen pause latch, so the visibility
-    // handling can pause the animation again if it later goes off-screen.
-    this.pausedForInvisible = false;
     this.jImageView.play();
   }
 
@@ -222,28 +218,11 @@ export class PAGImageViewController {
    * animation from the last paused position.
    */
   pause() {
-    this.userWantsPlaying = false;
     this.jImageView.pause();
   }
 
-  /**
-   * Notifies the controller whether the view is currently visible. When it becomes invisible, a
-   * playing animation is paused to save power; when it becomes visible again, playback is resumed
-   * only if the caller has requested playing via play(). The play intention set by play()/pause()
-   * is preserved across visibility changes.
-   */
-  setVisible(visible: boolean) {
-    if (!visible) {
-      if (this.jImageView.isPlaying() && !this.pausedForInvisible) {
-        this.pausedForInvisible = true;
-        this.jImageView.pause();
-      }
-    } else if (this.pausedForInvisible) {
-      this.pausedForInvisible = false;
-      if (this.userWantsPlaying) {
-        this.jImageView.play();
-      }
-    }
+  onVisibilityChanged(visible: boolean) {
+    this.jImageView.setVisible(visible);
   }
 
   /**
@@ -364,8 +343,6 @@ export class PAGImageViewController {
   private listeners: Array<WeakRef<PAGImageViewListener>> = [];
   private view: WeakRef<ESObject> | null = null;
   private jImageView: JPAGImageView = new JPAGImageView();
-  private userWantsPlaying: boolean = false;
-  private pausedForInvisible: boolean = false;
   readonly onAnimatorStateChange = (state: number): void => {
     switch (state) {
       case PAGAnimatorState.Start:

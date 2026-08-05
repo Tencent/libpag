@@ -444,6 +444,24 @@ static napi_value SetCurrentFrame(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static napi_value SetVisible(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  bool visible = false;
+  napi_get_value_bool(env, args[0], &visible);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->setVisible(visible);
+  }
+  return nullptr;
+}
+
 static napi_value CurrentImage(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
@@ -532,6 +550,7 @@ bool JPAGImageView::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(renderScale, RenderScale),
       PAG_DEFAULT_METHOD_ENTRY(currentFrame, CurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
+      PAG_DEFAULT_METHOD_ENTRY(setVisible, SetVisible),
       PAG_DEFAULT_METHOD_ENTRY(numFrame, NumFrame),
       PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(currentImage, CurrentImage),
@@ -675,7 +694,7 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, 
   if (_animator == nullptr) {
     return;
   }
-  if (composition != nullptr) {
+  if (composition != nullptr && isVisible) {
     _animator->setDuration(composition->duration());
   } else {
     _animator->setDuration(0);
@@ -683,6 +702,22 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, 
   _composition = composition;
   _frameRate = frameRate;
   invalidDecoder();
+}
+
+void JPAGImageView::setVisible(bool visible) {
+  std::lock_guard lock_guard(locker);
+  if (isVisible == visible) {
+    return;
+  }
+  isVisible = visible;
+  if (_animator == nullptr) {
+    return;
+  }
+  if (isVisible) {
+    _animator->setDuration(_composition != nullptr ? _composition->duration() : 0);
+  } else {
+    _animator->setDuration(0);
+  }
 }
 
 void JPAGImageView::setScaleMode(PAGScaleMode scaleMode) {

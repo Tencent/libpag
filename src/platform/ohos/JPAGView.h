@@ -57,6 +57,10 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
 
   std::shared_ptr<PAGAnimator> getAnimator();
 
+  void setComposition(std::shared_ptr<PAGComposition> composition);
+
+  void setVisible(bool visible);
+
   void setProgressCallback(napi_threadsafe_function callback);
 
   void setPlayingStateCallback(napi_threadsafe_function callback);
@@ -69,6 +73,7 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
   std::shared_ptr<PAGAnimator> animator = nullptr;
   napi_threadsafe_function progressCallback = nullptr;
   napi_threadsafe_function playingStateCallback = nullptr;
+  bool isVisible = false;
   std::mutex locker;
 };
 }  // namespace pag
