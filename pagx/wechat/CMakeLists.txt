@@ -53,6 +53,8 @@ file(GLOB_RECURSE PAGX_RUNTIME_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pag
 file(GLOB_RECURSE PAGX_UTILS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/utils/*.cpp)
 # Woff2FontGenerator depends on the woff2 library which is only needed for HTML/SVG export.
 list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "Woff2FontGenerator\\.cpp$")
+# MemZip depends on minizip (zip.c/ioapi.c) which is only needed for PPT/HTML export.
+list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "MemZip\\.cpp$")
 file(GLOB_RECURSE PAGX_XML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/xml/*.cpp)
 # Only SVGPathParser is needed (used by PAGXImporter for path data). SVG/HTML exporters are not
 # used in the wechat viewer and depend on woff2 which is not available in this build.
