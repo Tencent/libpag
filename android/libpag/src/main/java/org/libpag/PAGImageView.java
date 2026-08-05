@@ -612,7 +612,10 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
             memoryCacheStatusHasChanged = false;
         }
         PAGComposition composition = _composition; // Hold strong reference to avoid UAF
-        if (_pagFilePath == null && composition != null) {
+        // The composition is kept resident for path-loaded views too, so detect content changes
+        // (e.g. replaceText/replaceImage on a PAGFile obtained from setPathAsync) for them as well,
+        // not only for compositions set via setComposition().
+        if (composition != null) {
             int nVersion = ContentVersion(composition);
             if (lastContentVersion >= 0 && lastContentVersion != nVersion) {
                 needResetBitmapCache = true;
