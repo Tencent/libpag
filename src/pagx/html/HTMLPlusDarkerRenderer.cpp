@@ -19,12 +19,11 @@
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
 #include <cmath>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
 #include <functional>
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/LayerBuilder.h"
@@ -132,10 +131,10 @@ bool ComputeScreenBounds(const Layer* target,
 
 // Renders the whole document (with one Layer already flipped to visible=false) into a Surface
 // sized to `bw*rasterScale x bh*rasterScale`, translated so that screen-space (bx, by) maps to
-// (0,0) in the Surface. Writes the result to outputPath (PNG) and returns the raw PNG bytes so
-// the caller can also embed them as a base64 data URL in the generated HTML.
+// (0,0) in the Surface. Returns the raw PNG bytes so the caller can embed them as a base64 data
+// URL in the generated HTML or write them out through the context.
 bool RenderCroppedBackdrop(const PAGXDocument& doc, tgfx::Context* ctx, float bx, float by,
-                           float bw, float bh, float rasterScale, const std::string& outputPath,
+                           float bw, float bh, float rasterScale,
                            std::shared_ptr<tgfx::Data>* outEncoded) {
   if (bw <= 0 || bh <= 0) {
     return false;
@@ -175,23 +174,13 @@ bool RenderCroppedBackdrop(const PAGXDocument& doc, tgfx::Context* ctx, float bx
   if (!encoded) {
     return false;
   }
-  std::ofstream out(outputPath, std::ios::binary);
-  if (!out.is_open()) {
-    return false;
-  }
-  out.write(reinterpret_cast<const char*>(encoded->data()),
-            static_cast<std::streamsize>(encoded->size()));
-  if (!out.good()) {
-    return false;
-  }
   *outEncoded = encoded;
   return true;
 }
 
 }  // namespace
 
-void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, const std::string& staticImgDir,
-                                       const std::string& /*urlPrefix*/, float rasterScale,
+void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContext* ctx,
                                        std::unordered_map<const Layer*, PlusDarkerBackdrop>& out) {
   std::unordered_map<const Layer*, const Layer*> parentMap;
   std::vector<Layer*> candidates;
@@ -204,12 +193,10 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, const std::strin
   if (!device) {
     return;
   }
-  auto ctx = device->lockContext();
-  if (!ctx) {
+  auto gpuCtx = device->lockContext();
+  if (!gpuCtx) {
     return;
   }
-
-  std::filesystem::create_directories(staticImgDir);
 
   int idx = 0;
   for (Layer* target : candidates) {
@@ -240,10 +227,20 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, const std::strin
     target->visible = false;
 
     std::string fileName = "pd_" + std::to_string(idx) + ".png";
-    std::string absPath = staticImgDir + "/" + fileName;
     std::shared_ptr<tgfx::Data> encoded;
-    if (!RenderCroppedBackdrop(doc, ctx, bx, by, bw, bh, rasterScale, absPath, &encoded)) {
+    if (!RenderCroppedBackdrop(doc, gpuCtx, bx, by, bw, bh, ctx->rasterScale, &encoded)) {
       continue;
+    }
+
+    // The HTML consumes backdropDataURL (base64); the pd_N.png file is written
+    // only on the legacy ToHTML path so the on-disk layout stays unchanged.
+    if (ctx->resourceWriter == nullptr) {
+      std::string error;
+      if (!ctx->writeResource(fileName, encoded->bytes(), encoded->size(), &error)) {
+        // Match the legacy behavior: a failed backdrop write drops this entry so
+        // the caller falls back to the mix-blend-mode approximation.
+        continue;
+      }
     }
 
     PlusDarkerBackdrop entry;

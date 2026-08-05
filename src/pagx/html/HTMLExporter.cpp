@@ -189,8 +189,7 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an
   // SVG filter (feImage + feComposite arithmetic) that matches tgfx PlusDarker pixel-for-pixel.
-  HTMLPlusDarkerRenderer::RenderAll(doc, resourceDir, urlPrefix, options.rasterScale,
-                                    ctx.plusDarkerBackdrops);
+  HTMLPlusDarkerRenderer::RenderAll(doc, &ctx, ctx.plusDarkerBackdrops);
 
   // Pre-pass: build WOFF2 fonts for embedded vector fonts. Each Font resource that contains
   // only vector glyphs (Glyph.path, no Glyph.image) is converted to a minimal OpenType-CFF

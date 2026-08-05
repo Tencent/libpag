@@ -25,6 +25,7 @@ namespace pagx {
 
 class Layer;
 class PAGXDocument;
+class HTMLWriterContext;
 
 /**
  * Per-plusDarker-Layer backdrop data consumed by HTMLWriter to emit an SVG filter whose feImage
@@ -49,17 +50,19 @@ struct PlusDarkerBackdrop {
 class HTMLPlusDarkerRenderer {
  public:
   /**
-   * For every compatible PlusDarker Layer found in doc, writes a backdrop PNG into staticImgDir
-   * and registers a PlusDarkerBackdrop keyed by the Layer pointer. Layers that fail the
-   * compatibility check (filters, masks, 3D transforms, non-translation matrix, scroll rect) are
-   * silently skipped and the caller falls back to the mix-blend-mode: darken approximation.
+   * For every compatible PlusDarker Layer found in doc, renders a cropped backdrop PNG and
+   * registers a PlusDarkerBackdrop keyed by the Layer pointer. The PNG is written to disk via
+   * ctx->writeResource on the legacy ToHTML path (resourceWriter null) and skipped entirely on
+   * the ToData path (resourceWriter non-null), where only the base64 backdropDataURL is consumed
+   * by the generated HTML. Layers that fail the compatibility check (filters, masks, 3D
+   * transforms, non-translation matrix, scroll rect) are silently skipped and the caller falls
+   * back to the mix-blend-mode: darken approximation.
    *
    * Temporarily flips layer->visible via const_cast to achieve "render doc minus layer"; the
    * value is restored on every code path including early returns. The caller must not use the
    * document concurrently during this call.
    */
-  static void RenderAll(const PAGXDocument& doc, const std::string& staticImgDir,
-                        const std::string& staticImgUrlPrefix, float rasterScale,
+  static void RenderAll(const PAGXDocument& doc, HTMLWriterContext* ctx,
                         std::unordered_map<const Layer*, PlusDarkerBackdrop>& out);
 };
 
