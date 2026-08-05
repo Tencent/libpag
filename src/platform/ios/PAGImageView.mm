@@ -268,6 +268,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (void)didMoveToWindow {
   [super didMoveToWindow];
+  std::lock_guard<std::mutex> autoLock(imageViewLock);
   [self checkVisible];
 }
 
