@@ -136,55 +136,13 @@ static std::string WrapAsHTMLDocument(const std::string& fragment, float width, 
          " }\n</style>\n</head>\n<body>\n" + fragment + "\n</body>\n</html>\n";
 }
 
-std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceDir,
-                                 HTMLOutputMode mode, const Options& options,
-                                 std::string* errorMsg) {
-  if (resourceDir.empty()) {
-    if (errorMsg) {
-      *errorMsg = "resourceDir must not be empty.";
-    }
-    std::cerr << "HTMLExporter::ToHTML: resourceDir must not be empty. "
-                 "Use HTMLExporter::ToFile for automatic resource-directory derivation."
-              << std::endl;
-    return {};
-  }
-  if (!std::filesystem::path(resourceDir).is_absolute()) {
-    if (errorMsg) {
-      *errorMsg = "resourceDir must be an absolute path, got '" + resourceDir + "'.";
-    }
-    std::cerr << "HTMLExporter::ToHTML: resourceDir must be an absolute path, got '" << resourceDir
-              << "'." << std::endl;
-    return {};
-  }
-  // Resolve symlinks to prevent path-traversal attacks via symlinked directories.
-  std::error_code canonEc;
-  auto canonicalDir = std::filesystem::weakly_canonical(resourceDir, canonEc);
-  if (canonEc) {
-    if (errorMsg) {
-      *errorMsg = "resourceDir path cannot be resolved: " + canonEc.message();
-    }
-    return {};
-  }
+namespace {
+
+std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter::Options& options,
+                      HTMLWriterContext& ctx, std::string* /*errorMsg*/) {
   if (!doc.isLayoutApplied()) {
     doc.applyLayout();
   }
-  // Derive the URL prefix used by <img src=...> from the resource directory's basename. This
-  // assumes the caller will write the returned HTML string to a file located in resourceDir's
-  // parent directory (ToFile enforces this layout automatically).
-  auto resourceDirPath = std::filesystem::path(resourceDir);
-  std::string urlPrefix = resourceDirPath.filename().string();
-  if (!urlPrefix.empty()) {
-    urlPrefix += '/';
-  }
-
-  HTMLBuilder html(0, 4096);
-  HTMLBuilder defs(2, 4096);
-  HTMLWriterContext ctx;
-  ctx.docWidth = doc.width;
-  ctx.docHeight = doc.height;
-  ctx.staticImgDir = resourceDir;
-  ctx.staticImgUrlPrefix = urlPrefix;
-  ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
   // Pre-pass: for every compatible PlusDarker Layer, render a cropped backdrop PNG with the layer
   // temporarily hidden. The resulting base64 data URLs are consumed by writeLayer below to emit an
@@ -193,9 +151,9 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
 
   // Pre-pass: build WOFF2 fonts for embedded vector fonts. Each Font resource that contains
   // only vector glyphs (Glyph.path, no Glyph.image) is converted to a minimal OpenType-CFF
-  // font compressed as WOFF2. The resulting files are written to {resourceDir}/fonts/ and
-  // registered in ctx.woff2Fonts so writeEmbeddedShapeGlyphs can emit <span> with @font-face
-  // instead of SVG <path> elements.
+  // font compressed as WOFF2. The resulting files are written through ctx.writeResource to the
+  // fonts/ directory and registered in ctx.woff2Fonts so writeEmbeddedShapeGlyphs can emit
+  // <span> with @font-face instead of SVG <path> elements.
   std::string fontFaceRules;
   for (auto& nodePtr : doc.nodes) {
     if (nodePtr->nodeType() != NodeType::Font) {
@@ -215,25 +173,21 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
       continue;
     }
     std::string filename = "font_" + fontId + ".woff2";
-    result.relativeUrl = urlPrefix + "fonts/" + filename;
-    std::string fontsDir = resourceDir + "/fonts";
-    std::error_code ec;
-    std::filesystem::create_directories(fontsDir, ec);
-    std::ofstream f(fontsDir + "/" + filename, std::ios::binary);
-    if (f.is_open()) {
-      f.write(reinterpret_cast<const char*>(result.woff2Data.data()),
-              static_cast<std::streamsize>(result.woff2Data.size()));
-      f.flush();
-      if (!f) {
-        std::cerr << "HTMLExporter: failed to write font file: " << fontsDir << "/" << filename
-                  << std::endl;
-      }
+    result.relativeUrl = ctx.staticImgUrlPrefix + "fonts/" + filename;
+    std::string error;
+    if (!ctx.writeResource("fonts/" + filename, result.woff2Data.data(), result.woff2Data.size(),
+                           &error)) {
+      // Skip the font so the generated HTML never references a resource that was not written.
+      // In ToData mode this also avoids dangling URLs to missing ZIP entries.
+      continue;
     }
     fontFaceRules += "@font-face{font-family:'" + EscapeCssFontFamily(result.familyName) +
                      "';src:url('" + result.relativeUrl + "') format('woff2')}\n";
     ctx.woff2Fonts[font] = std::move(result);
   }
 
+  HTMLBuilder html(0, 4096);
+  HTMLBuilder defs(2, 4096);
   HTMLWriter writer(&defs, &ctx);
 
   // Root div
@@ -288,6 +242,56 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   }
 
   return result;
+}
+
+}  // namespace
+
+std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceDir,
+                                 HTMLOutputMode mode, const Options& options,
+                                 std::string* errorMsg) {
+  if (resourceDir.empty()) {
+    if (errorMsg) {
+      *errorMsg = "resourceDir must not be empty.";
+    }
+    std::cerr << "HTMLExporter::ToHTML: resourceDir must not be empty. "
+                 "Use HTMLExporter::ToFile for automatic resource-directory derivation."
+              << std::endl;
+    return {};
+  }
+  if (!std::filesystem::path(resourceDir).is_absolute()) {
+    if (errorMsg) {
+      *errorMsg = "resourceDir must be an absolute path, got '" + resourceDir + "'.";
+    }
+    std::cerr << "HTMLExporter::ToHTML: resourceDir must be an absolute path, got '" << resourceDir
+              << "'." << std::endl;
+    return {};
+  }
+  // Resolve symlinks to prevent path-traversal attacks via symlinked directories.
+  std::error_code canonEc;
+  auto canonicalDir = std::filesystem::weakly_canonical(resourceDir, canonEc);
+  if (canonEc) {
+    if (errorMsg) {
+      *errorMsg = "resourceDir path cannot be resolved: " + canonEc.message();
+    }
+    return {};
+  }
+  // Derive the URL prefix used by <img src=...> from the resource directory's basename. This
+  // assumes the caller will write the returned HTML string to a file located in resourceDir's
+  // parent directory (ToFile enforces this layout automatically).
+  auto resourceDirPath = std::filesystem::path(resourceDir);
+  std::string urlPrefix = resourceDirPath.filename().string();
+  if (!urlPrefix.empty()) {
+    urlPrefix += '/';
+  }
+
+  HTMLWriterContext ctx;
+  ctx.docWidth = doc.width;
+  ctx.docHeight = doc.height;
+  ctx.staticImgDir = resourceDir;
+  ctx.staticImgUrlPrefix = urlPrefix;
+  ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
+
+  return BuildHTML(doc, mode, options, ctx, errorMsg);
 }
 
 bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
