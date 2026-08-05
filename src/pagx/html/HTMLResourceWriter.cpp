@@ -80,6 +80,17 @@ std::shared_ptr<Data> HTMLZipResourceWriter::finish(std::string* errorMsg) {
     }
     return nullptr;
   }
+  // minizip writes the end-of-central-directory record on close, so check the
+  // buffer before closing: a zero-entry archive must yield nullptr, not an
+  // empty ZIP.
+  if (_buffer.data.empty()) {
+    if (errorMsg) {
+      *errorMsg = "HTMLZipResourceWriter: archive is empty.";
+    }
+    zipClose(_zip, nullptr);
+    _zip = nullptr;
+    return nullptr;
+  }
   if (zipClose(_zip, nullptr) != ZIP_OK) {
     _zip = nullptr;
     if (errorMsg) {
@@ -88,12 +99,6 @@ std::shared_ptr<Data> HTMLZipResourceWriter::finish(std::string* errorMsg) {
     return nullptr;
   }
   _zip = nullptr;
-  if (_buffer.data.empty()) {
-    if (errorMsg) {
-      *errorMsg = "HTMLZipResourceWriter: archive is empty.";
-    }
-    return nullptr;
-  }
   return Data::MakeWithCopy(_buffer.data.data(), _buffer.data.size());
 }
 
