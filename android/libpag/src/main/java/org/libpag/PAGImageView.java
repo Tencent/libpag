@@ -26,6 +26,7 @@ import android.graphics.Paint;
 import android.hardware.HardwareBuffer;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 
@@ -154,7 +155,10 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
     /**
      * Asynchronously loads a pag file from the specified path. The path can be a network URL
      * ("http://" or "https://") or a local path; the file is loaded on a worker thread, so this
-     * method is safe to call from the UI thread.
+     * method is safe to call from the UI thread. Note: if the load fails (missing file, invalid
+     * data, or network error), the view keeps its previous content and null is reported to the
+     * listener; the load is NOT retried automatically, so the caller must invoke setPathAsync()
+     * again to retry.
      */
     public void setPathAsync(String path, PAGFile.LoadListener listener) {
         setPathAsync(path, DEFAULT_MAX_FRAMERATE, listener);
@@ -518,7 +522,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
                 // lifecycle on the main thread, so a network path would throw a
                 // NetworkOnMainThreadException and a local path would block on disk I/O. The
                 // composition is loaded once by setPath()/setPathAsync()/setComposition() and is
-                // never reloaded here.
+                // never reloaded here. Trade-off: the previous "null out the composition to save
+                // memory" optimization is dropped, so path-loaded compositions now stay resident;
+                // large lists should reuse or detach views to bound memory.
                 decoderInfo.initDecoder(_composition, width, height, _maxFrameRate);
                 if (!decoderInfo.isValid()) {
                     return;
@@ -616,7 +622,9 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
             if (!decoderInfo.hasPAGDecoder()) {
                 // Reuse the in-memory composition; never reload it from _pagFilePath here (see
                 // initDecoderInfo() for why reloading on this thread is unsafe).
-                decoderInfo.initDecoder(composition, width, height, _maxFrameRate);
+                if (!decoderInfo.initDecoder(composition, width, height, _maxFrameRate)) {
+                    Log.w(TAG, "initDecoder failed in checkStatusChange, composition=" + composition);
+                }
             }
         }
     }
