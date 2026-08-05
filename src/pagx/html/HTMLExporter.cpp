@@ -23,6 +23,7 @@
 #include <iostream>
 #include <string>
 #include "pagx/html/HTMLBuilder.h"
+#include "pagx/html/HTMLResourceWriter.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Font.h"
@@ -345,6 +346,29 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
     return false;
   }
   return true;
+}
+
+std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
+                                           std::string* errorMsg) {
+  HTMLZipResourceWriter zipWriter;
+  HTMLWriterContext ctx;
+  ctx.docWidth = document.width;
+  ctx.docHeight = document.height;
+  ctx.resourceWriter = &zipWriter;
+  ctx.staticImgUrlPrefix = "assets/";
+  ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
+
+  auto html = BuildHTML(document, HTMLOutputMode::FullDocument, options, ctx, errorMsg);
+  if (html.empty()) {
+    if (errorMsg && errorMsg->empty()) {
+      *errorMsg = "document produced no HTML output.";
+    }
+    return nullptr;
+  }
+  if (!zipWriter.write("index.html", html.data(), html.size(), errorMsg)) {
+    return nullptr;
+  }
+  return zipWriter.finish(errorMsg);
 }
 
 }  // namespace pagx
