@@ -20,7 +20,9 @@
 #include <GLES3/gl3.h>
 #include <emscripten/html5.h>
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
+#include "base/utils/Log.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
 #include "pagx/tgfx.h"
@@ -29,7 +31,6 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
-#include "base/utils/Log.h"
 
 using namespace emscripten;
 
@@ -121,6 +122,48 @@ void PAGXView::parsePAGX(const val& pagxData) {
     return;
   }
   document = PAGXImporter::FromXML(data->bytes(), data->size());
+}
+
+static int ParseDiagnosticLine(const std::string& error) {
+  constexpr const char* LinePrefix = "line ";
+  if (error.rfind(LinePrefix, 0) != 0) {
+    return 1;
+  }
+  auto cursor = error.data() + 5;
+  auto line = std::strtol(cursor, nullptr, 10);
+  return line > 0 ? static_cast<int>(line) : 1;
+}
+
+static std::string ParseDiagnosticMessage(const std::string& error) {
+  auto separator = error.find(": ");
+  return separator == std::string::npos ? error : error.substr(separator + 2);
+}
+
+emscripten::val PAGXView::validatePAGX(const val& pagxData) const {
+  auto diagnostics = val::array();
+  auto data = GetPagxDataFromEmscripten(pagxData);
+  if (!data) {
+    return diagnostics;
+  }
+  auto validationDocument = PAGXImporter::FromXML(data->bytes(), data->size());
+  if (!validationDocument) {
+    // XML well-formedness is diagnosed by the browser-side DOMParser. Reaching here with valid
+    // XML means the document root is not PAGX, which is a schema error at the root element.
+    auto diagnostic = val::object();
+    diagnostic.set("message", "Root element must be 'pagx'.");
+    diagnostic.set("line", 1);
+    diagnostic.set("column", 1);
+    diagnostics.call<void>("push", diagnostic);
+    return diagnostics;
+  }
+  for (const auto& error : validationDocument->errors) {
+    auto diagnostic = val::object();
+    diagnostic.set("message", ParseDiagnosticMessage(error));
+    diagnostic.set("line", ParseDiagnosticLine(error));
+    diagnostic.set("column", 1);
+    diagnostics.call<void>("push", diagnostic);
+  }
+  return diagnostics;
 }
 
 std::vector<std::string> PAGXView::getExternalFilePaths() const {

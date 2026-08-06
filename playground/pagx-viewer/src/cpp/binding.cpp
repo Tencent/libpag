@@ -66,5 +66,6 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("_hitTest", &pagx::PAGXView::hitTest)
       .function("_getNodeSourceMap", &pagx::PAGXView::getNodeSourceMap)
       .function("_getNodeBounds", &pagx::PAGXView::getNodeBounds)
+      .function("_validatePAGX", &pagx::PAGXView::validatePAGX)
       .function("_setNodeChannel", &pagx::PAGXView::setNodeChannel);
 }

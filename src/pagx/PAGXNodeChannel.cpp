@@ -371,10 +371,10 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessOptionalFloat<T, &T::member>, ChannelValueType::Float }
 #define FIELD_OPT_COLOR(T, name, member, cls) \
   { name, cls, &AccessOptionalColor<T, &T::member>, ChannelValueType::Color }
-#define FIELD_ENUM(T, name, member, cls, E)                                                 \
-  {                                                                                         \
+#define FIELD_ENUM(T, name, member, cls, E)                                                   \
+  {                                                                                           \
     name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String>, \
-        ChannelValueType::String                                                            \
+        ChannelValueType::String                                                              \
   }
 
 // The shared LayoutNode constraint fields (layout inputs) appended to every LayoutNode-derived type.

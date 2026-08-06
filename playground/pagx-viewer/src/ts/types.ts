@@ -198,6 +198,12 @@ export interface _PAGXView {
   _getNodeBounds(index: number): any;
 
   /**
+   * Validates UTF-8 PAGX XML without replacing the currently loaded document. Returns a plain JS
+   * array of { message, line, column } schema diagnostics.
+   */
+  _validatePAGX(data: Uint8Array): any;
+
+  /**
    * Sets a channel on nodes[index] from its raw PAGX attribute string and refreshes the scene in
    * place. Returns false when the index is invalid, the channel is unknown for the node type, or
    * the string cannot be parsed (the caller should fall back to a full reparse).

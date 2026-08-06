@@ -32,6 +32,8 @@ import type {
     PAGXPlayerEventMap,
     PAGXPlayerLoadOptions,
     PAGXPlayerOptions,
+    SourceDiagnostic,
+    SourceDiagnosticProvider,
     StatusOptions,
     ToolbarSlot,
 } from './types';
@@ -472,6 +474,7 @@ export class PAGXPlayer extends EventTarget {
                     });
                 },
                 dismiss: (token) => this.hideStatus(token),
+                diagnosticProviders: this.createDiagnosticProviders(options.diagnosticProviders ?? []),
                 incrementalApply: (oldXml, newXml) => this.tryIncrementalApply(oldXml, newXml),
             });
         }
@@ -571,6 +574,39 @@ export class PAGXPlayer extends EventTarget {
             });
             this.resizeObserver.observe(this.sizeContainer);
         }
+    }
+
+    /** Creates the built-in importer provider followed by host-provided providers. The importer
+     *  validates only well-formed XML and never replaces the view's current document; the editor
+     *  handles XML syntax separately before invoking this provider. */
+    private createDiagnosticProviders(
+        providers: readonly SourceDiagnosticProvider[],
+    ): SourceDiagnosticProvider[] {
+        return [
+            {
+                id: 'pagx-importer',
+                validate: this.validateWithImporter.bind(this),
+            },
+            ...providers,
+        ];
+    }
+
+    /** Converts the WASM importer's line-based errors into generic source diagnostics. Importer
+     *  errors currently identify an entire element line rather than an attribute span, therefore
+     *  endColumn uses a large value that SourceEditor clamps to the end of that line. */
+    private validateWithImporter(xmlText: string): SourceDiagnostic[] {
+        if (this.view === null) {
+            return [];
+        }
+        return this.view.validatePAGX(new TextEncoder().encode(xmlText)).map((diagnostic) => ({
+            owner: 'pagx-importer',
+            severity: 'error',
+            message: diagnostic.message,
+            startLine: diagnostic.line,
+            startColumn: 1,
+            endLine: diagnostic.line,
+            endColumn: Number.MAX_SAFE_INTEGER,
+        }));
     }
 
     /** Load a pagx from raw bytes. Handles the full pipeline: ensure wasm module, parse the
@@ -1578,6 +1614,8 @@ export type {
     LoadErrorEventDetail,
     PAGXPlayerLoadOptions,
     PAGXPlayerOptions,
+    SourceDiagnostic,
+    SourceDiagnosticProvider,
     StatusOptions,
     ToolbarSlot,
 };

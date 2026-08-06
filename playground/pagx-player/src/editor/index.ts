@@ -29,6 +29,7 @@
 
 import type { EditorCallbacks } from '../types';
 import { SourceEditor } from './SourceEditor';
+import type { SourceDiagnosticProvider } from '../types';
 import { EDITOR_STYLES } from './styles';
 
 const MOBILE_BREAKPOINT = 768;
@@ -82,6 +83,10 @@ export interface EditorPanelOptions {
      *  Apply's own result no longer relevant. */
     dismiss: (token: number) => void;
 
+    /** Semantic source diagnostic providers. XML well-formedness remains built into SourceEditor;
+     *  these providers run only after syntax passes and render independent Monaco marker owners.
+     *  Providers may be sync or async and errors block Apply/Save. */
+    diagnosticProviders?: SourceDiagnosticProvider[];
     /** Optional incremental fast path for Apply. Given the previous baseline XML and the newly
      *  edited XML, the player attempts to apply the change in place (setNodeChannel) without a full
      *  reparse. Returns true when it fully handled the edit (Apply then skips onApply and promotes
@@ -121,20 +126,6 @@ function isEditableTarget(target: EventTarget | null): boolean {
     return target.isContentEditable;
 }
 
-/** Validates XML well-formedness using DOMParser. Returns empty string on success, error
- *  message on failure. */
-function validateXml(xmlText: string): string {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xmlText, 'application/xml');
-    const parseError = doc.querySelector('parsererror');
-    if (parseError) {
-        const errorText = parseError.textContent || 'Invalid XML';
-        const firstLine = errorText.trim().split('\n')[0].trim();
-        return firstLine || 'Invalid XML format';
-    }
-    return '';
-}
-
 /** Yield the main thread for one frame + one macrotask so the browser can paint any DOM
  *  changes made just before the caller `await`s a heavy synchronous operation. Apply/Save
  *  callbacks typically enter player.load() which runs long synchronous wasm calls
@@ -161,6 +152,7 @@ export class EditorPanel {
     private readonly dismiss: (token: number) => void;
     private readonly onToggleSelect: () => void;
     private readonly onClose: (() => void) | null;
+    private readonly diagnosticProviders: readonly SourceDiagnosticProvider[];
     private readonly incrementalApply: ((oldXml: string, newXml: string) => boolean) | null;
 
     private panel!: HTMLElement;
@@ -208,6 +200,7 @@ export class EditorPanel {
         this.dismiss = opts.dismiss;
         this.onToggleSelect = opts.onToggleSelect;
         this.onClose = opts.onClose ?? null;
+        this.diagnosticProviders = opts.diagnosticProviders ?? [];
         this.incrementalApply = opts.incrementalApply ?? null;
         ensureEditorStylesInjected();
         this.buildDom();
@@ -269,7 +262,7 @@ export class EditorPanel {
         if (this.editor === null) {
             const host = this.panel.querySelector('.editor-host');
             if (host instanceof HTMLElement) {
-                this.editor = new SourceEditor(host);
+                this.editor = new SourceEditor(host, this.diagnosticProviders);
                 if (this.pendingHoverCb !== null) {
                     this.editor.onHoverLine(this.pendingHoverCb);
                 }
@@ -588,7 +581,7 @@ export class EditorPanel {
             this.report('No changes to apply', 'info');
             return;
         }
-        const validationError = validateXml(xmlText);
+        const validationError = await this.editor.getValidationError();
         if (validationError !== '') {
             this.report(validationError, 'error');
             return;
@@ -681,7 +674,7 @@ export class EditorPanel {
             return;
         }
         const xmlText = this.editor.getContent();
-        const validationError = validateXml(xmlText);
+        const validationError = await this.editor.getValidationError();
         if (validationError !== '') {
             this.report(validationError, 'error');
             return;

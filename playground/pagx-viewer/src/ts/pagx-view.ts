@@ -391,6 +391,15 @@ export class PAGXView {
   }
 
   /**
+   * Validates well-formed PAGX XML against the importer schema without changing the document
+   * currently being rendered. XML syntax errors are handled separately by the source editor;
+   * this returns importer diagnostics for valid XML with invalid PAGX semantics.
+   */
+  public validatePAGX(data: Uint8Array): any {
+    return this.nativeView._validatePAGX(data);
+  }
+
+  /**
    * Sets a channel on nodes[index] from its raw PAGX attribute string and refreshes the scene in
    * place (the incremental fast path for a source-editor attribute edit). Returns false when the
    * index is invalid, the channel is unknown for the node type, or the string cannot be parsed;

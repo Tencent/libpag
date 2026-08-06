@@ -21,6 +21,7 @@
 // esbuild at build time, so rollup never tries to bundle Monaco's non-standard ESM internals
 // (which use bare `vs/...` specifiers that nodeResolve cannot map).
 import type * as MonacoNS from 'monaco-editor';
+import type { SourceDiagnostic, SourceDiagnosticProvider } from '../types';
 
 type Monaco = typeof MonacoNS;
 
@@ -97,6 +98,18 @@ function definePagxTheme(m: Monaco): void {
             'editor.lineHighlightBackground': '#2D2D2D',
             'editorCursor.foreground': '#FFFFFF',
             'editorGutter.background': '#1E1E1E',
+            // Opaque scrollbar slider colors (DevTools style). vs-dark's defaults are
+            // semi-transparent (#79797966 etc.); setting opaque hex values here makes Monaco's
+            // theme system emit --vscode-scrollbarSlider-background etc. as opaque colors, which
+            // the built-in scrollbars.css applies to .slider via var(). This is more reliable
+            // than overriding .slider background in EDITOR_STYLES because the variable is set on
+            // .monaco-editor as an inline style by the theme application, and inline style + var()
+            // would need !important on a very specific selector to override — setting the token
+            // here updates the variable at the source.
+            'scrollbarSlider.background': '#797979',
+            'scrollbarSlider.hoverBackground': '#646464',
+            'scrollbarSlider.activeBackground': '#505050',
+            'scrollbar.shadow': '#00000000',
         },
     });
 }
@@ -114,6 +127,44 @@ interface LineRange {
 const HOVER_LINE_CLASS = 'pagx-hover-line';
 const SELECT_LINE_CLASS = 'pagx-select-line';
 const EDIT_LINE_CLASS = 'pagx-edit-line';
+const XML_MARKER_OWNER = 'pagx-xml-syntax';
+const XML_VALIDATION_DELAY_MS = 400;
+
+interface XmlSyntaxDiagnostic {
+    message: string;
+    line: number;
+    column: number;
+}
+
+/** Parses XML with the browser parser and returns source-positioned syntax diagnostics. The
+ *  browser-specific parsererror text is normalized into a stable message plus 1-based line and
+ *  column, which Monaco can render as a gutter error marker and an inline squiggle. */
+export function getXmlSyntaxDiagnostics(xmlText: string): XmlSyntaxDiagnostic[] {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    const parseError = doc.querySelector('parsererror');
+    if (parseError === null) {
+        return [];
+    }
+    const errorText = parseError.textContent?.trim() || 'Invalid XML format';
+    const chromeMatch = errorText.match(
+        /error on line\s+(\d+)\s+at column\s+(\d+)\s*:\s*([^\n]+)/i,
+    );
+    if (chromeMatch !== null) {
+        return [{ message: chromeMatch[3].trim(), line: Number(chromeMatch[1]), column: Number(chromeMatch[2]) }];
+    }
+    const firefoxPosition = errorText.match(/Line Number\s+(\d+),\s*Column\s+(\d+)/i);
+    const firefoxMessage = errorText.match(/XML Parsing Error:\s*([^\n]+)/i);
+    if (firefoxPosition !== null) {
+        return [{
+            message: firefoxMessage?.[1].trim() || 'Invalid XML format',
+            line: Number(firefoxPosition[1]),
+            column: Number(firefoxPosition[2]),
+        }];
+    }
+    const firstLine = errorText.split('\n').find((line) => line.trim() !== '')?.trim() || 'Invalid XML format';
+    return [{ message: firstLine, line: 1, column: 1 }];
+}
+
 const EDIT_LINE_FIRST_CLASS = 'pagx-edit-line-first';
 const EDIT_LINE_LAST_CLASS = 'pagx-edit-line-last';
 
@@ -177,6 +228,8 @@ function buildEditDecos(
  */
 export class SourceEditor {
     private readonly host: HTMLElement;
+    private readonly diagnosticProviders: readonly SourceDiagnosticProvider[];
+    private diagnosticGeneration = 0;
     private editor: MonacoNS.editor.IStandaloneCodeEditor | null = null;
     private model: MonacoNS.editor.ITextModel | null = null;
     private onHoverLineCb: ((line: number) => void) | null = null;
@@ -189,12 +242,14 @@ export class SourceEditor {
     private editRangeActive = false;
     private editRangeOffset: { from: number; to: number } | null = null;
     private contentChangeListener: MonacoNS.IDisposable | null = null;
+    private syntaxValidationTimer: number | null = null;
     private destroyed = false;
     private creating = false;
     private readonly disposers: MonacoNS.IDisposable[] = [];
 
-    constructor(host: HTMLElement) {
+    constructor(host: HTMLElement, diagnosticProviders: readonly SourceDiagnosticProvider[] = []) {
         this.host = host;
+        this.diagnosticProviders = diagnosticProviders;
     }
 
     private createEditor(initialContent: string): void {
@@ -230,16 +285,27 @@ export class SourceEditor {
                 renderWhitespace: 'none',
                 largeFileOptimizations: true,
                 automaticLayout: true,
+                // Monaco defaults renderValidationDecorations to 'editable', which hides marker
+                // squiggles as soon as the editor re-locks to read-only on blur. Schema/XML
+                // diagnostics must remain visible in both browsing and editing modes.
+                renderValidationDecorations: 'on',
                 unicodeHighlight: { ambiguousCharacters: false, invisibleCharacters: false },
                 fontSize: 13,
                 fontFamily: 'Menlo, Monaco, "Courier New", monospace',
                 lineHeight: 18,
                 scrollbar: {
-                    vertical: 'auto',
-                    horizontal: 'auto',
-                    verticalScrollbarSize: 10,
-                    horizontalScrollbarSize: 10,
+                    // Keep tracks visible instead of fading out after scrolling.
+                    vertical: 'visible',
+                    horizontal: 'visible',
+                    // The opaque track is wider than its 10px thumb, matching DevTools.
+                    verticalScrollbarSize: 14,
+                    horizontalScrollbarSize: 14,
+                    useShadows: false,
+                    verticalHasArrows: false,
                 },
+                // The overview ruler only adds a redundant canvas strip beside the scrollbar.
+                overviewRulerLanes: 0,
+                overviewRulerBorder: false,
                 padding: { top: 0, bottom: 200 },
                 smoothScrolling: false,
                 cursorBlinking: 'smooth',
@@ -287,6 +353,7 @@ export class SourceEditor {
                     this.editRangeActive = false;
                     this.editRangeOffset = null;
                     this.editDecoIds = this.editor!.deltaDecorations(this.editDecoIds, []);
+                    this.host.classList.remove('pagx-editor-editing');
                     this.host.classList.add('pagx-editor-readonly');
                     this.editor!.updateOptions({
                         readOnly: true,
@@ -339,6 +406,7 @@ export class SourceEditor {
         }
         this.contentChangeListener = this.model.onDidChangeContent(
             (e: MonacoNS.editor.IModelContentChangedEvent) => {
+                this.scheduleSyntaxValidation();
                 if (e.isFlush) {
                     return;
                 }
@@ -388,6 +456,121 @@ export class SourceEditor {
                 };
             },
         );
+        void this.updateSyntaxDiagnostics();
+    }
+
+    /** Defers XML syntax parsing until the user pauses typing. DOMParser is fast for normal
+     *  documents but can still be expensive for large PAGX files, so each new change replaces
+     *  the pending check rather than parsing every keystroke. */
+    private scheduleSyntaxValidation(): void {
+        if (this.syntaxValidationTimer !== null) {
+            window.clearTimeout(this.syntaxValidationTimer);
+        }
+        this.syntaxValidationTimer = window.setTimeout(() => {
+            this.syntaxValidationTimer = null;
+            void this.updateSyntaxDiagnostics();
+        }, XML_VALIDATION_DELAY_MS);
+    }
+
+    /** Runs every registered semantic provider. A provider's id is the Monaco marker owner for
+     *  its result, so it can safely refresh without clearing syntax or another provider's output.
+     *  Individual provider failures do not turn the current source into an invalid document; they
+     *  are ignored until that provider can produce a concrete diagnostic. */
+    private async getProviderDiagnostics(xmlText: string): Promise<SourceDiagnostic[]> {
+        const results = await Promise.all(
+            this.diagnosticProviders.map(async (provider) => {
+                try {
+                    const diagnostics = await provider.validate(xmlText);
+                    return diagnostics.map((diagnostic) => ({ ...diagnostic, owner: provider.id }));
+                } catch {
+                    return [];
+                }
+            }),
+        );
+        return results.flat();
+    }
+
+    /** Builds Monaco markers at the source locations supplied by a diagnostic provider. */
+    private makeErrorMarkers(diagnostics: ReadonlyArray<SourceDiagnostic>): MonacoNS.editor.IMarkerData[] {
+        const model = this.model;
+        const monaco = monacoInstance;
+        if (model === null || monaco === null) {
+            return [];
+        }
+        return diagnostics.map((diagnostic) => {
+            const startLine = clampLine(diagnostic.startLine, model.getLineCount());
+            const endLine = clampLine(diagnostic.endLine ?? startLine, model.getLineCount());
+            const startColumn = Math.min(
+                Math.max(1, diagnostic.startColumn),
+                model.getLineMaxColumn(startLine),
+            );
+            const endColumn = Math.min(
+                Math.max(startColumn + 1, diagnostic.endColumn ?? startColumn + 1),
+                model.getLineMaxColumn(endLine),
+            );
+            const severity = diagnostic.severity === 'warning'
+                ? monaco.MarkerSeverity.Warning
+                : diagnostic.severity === 'info'
+                    ? monaco.MarkerSeverity.Info
+                    : monaco.MarkerSeverity.Error;
+            return {
+                severity,
+                message: diagnostic.message,
+                startLineNumber: startLine,
+                startColumn,
+                endLineNumber: endLine,
+                endColumn,
+            };
+        });
+    }
+
+    /** Publishes XML well-formedness and all registered semantic provider diagnostics. Each
+     *  provider is independently owned in Monaco. XML syntax failure skips semantic providers,
+     *  avoiding misleading schema errors while a tag or attribute is being typed. Stale async
+     *  validation results are dropped if the model text changes before they resolve. */
+    private async updateSyntaxDiagnostics(): Promise<SourceDiagnostic[]> {
+        const model = this.model;
+        const monaco = monacoInstance;
+        if (model === null || monaco === null) {
+            return [];
+        }
+        const xmlText = model.getValue();
+        const generation = ++this.diagnosticGeneration;
+        const syntaxDiagnostics = getXmlSyntaxDiagnostics(xmlText);
+        const syntaxMarkers = syntaxDiagnostics.map((diagnostic): SourceDiagnostic => ({
+            owner: XML_MARKER_OWNER,
+            severity: 'error',
+            message: diagnostic.message,
+            startLine: diagnostic.line,
+            startColumn: diagnostic.column,
+        }));
+        monaco.editor.setModelMarkers(model, XML_MARKER_OWNER, this.makeErrorMarkers(syntaxMarkers));
+        if (syntaxMarkers.length !== 0) {
+            for (const provider of this.diagnosticProviders) {
+                monaco.editor.setModelMarkers(model, provider.id, []);
+            }
+            return syntaxMarkers;
+        }
+        const providerDiagnostics = await this.getProviderDiagnostics(xmlText);
+        if (this.destroyed || generation !== this.diagnosticGeneration || this.model !== model || model.getValue() !== xmlText) {
+            return [];
+        }
+        for (const provider of this.diagnosticProviders) {
+            const diagnostics = providerDiagnostics.filter((diagnostic) => diagnostic.owner === provider.id);
+            monaco.editor.setModelMarkers(model, provider.id, this.makeErrorMarkers(diagnostics));
+        }
+        return providerDiagnostics;
+    }
+
+    /** Returns the first blocking diagnostic for Apply and Save, after synchronously awaiting the
+     *  current validation generation so the toast and Monaco marker always describe the same text. */
+    public async getValidationError(): Promise<string> {
+        const diagnostics = await this.updateSyntaxDiagnostics();
+        const error = diagnostics.find((diagnostic) => diagnostic.severity === 'error');
+        if (error === undefined) {
+            return '';
+        }
+        return `Line ${error.startLine}, column ${error.startColumn}: ${error.message}`;
     }
 
     /** Replaces the entire document content, resetting the undo history to this content. When
@@ -413,6 +596,7 @@ export class SourceEditor {
             this.editDecoIds = [];
             this.editRangeActive = false;
             this.editRangeOffset = null;
+            this.host.classList.remove('pagx-editor-editing');
             this.host.classList.add('pagx-editor-readonly');
             this.editor.updateOptions({
                 readOnly: true,
@@ -439,6 +623,7 @@ export class SourceEditor {
         this.editDecoIds = [];
         this.editRangeActive = false;
         this.editRangeOffset = null;
+        this.host.classList.remove('pagx-editor-editing');
         this.host.classList.add('pagx-editor-readonly');
         this.editor.updateOptions({
             readOnly: true,
@@ -512,6 +697,7 @@ export class SourceEditor {
         this.editRangeActive = true;
         this.editRangeOffset = this.computeEditRangeOffset(startLine, endLine);
         this.host.classList.remove('pagx-editor-readonly');
+        this.host.classList.add('pagx-editor-editing');
         this.editor.updateOptions({ readOnly: false, domReadOnly: false });
         const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
         buildEditDecos({ startLine, endLine }, this.model, decos);
@@ -592,6 +778,10 @@ export class SourceEditor {
         if (this.hoverLineRaf !== 0) {
             cancelAnimationFrame(this.hoverLineRaf);
             this.hoverLineRaf = 0;
+        }
+        if (this.syntaxValidationTimer !== null) {
+            window.clearTimeout(this.syntaxValidationTimer);
+            this.syntaxValidationTimer = null;
         }
         const domNode = this.editor?.getDomNode();
         if (domNode !== null && domNode !== undefined) {

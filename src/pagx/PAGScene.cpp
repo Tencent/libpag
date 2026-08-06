@@ -814,7 +814,7 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     }
     instantiatedTimelines.clear();
   } else if (_rootComposition != nullptr) {
- // RefreshLayerInPlace reset the rebuilt layers' runtime channels to their node defaults. The
+    // RefreshLayerInPlace reset the rebuilt layers' runtime channels to their node defaults. The
     // per-frame updateDataBinds restores ViewModel-bound channels, but timeline-driven channels
     // recover only on the next apply(). When playback is paused no advance/apply happens, so an
     // animated property (e.g. a Channel-driven x) would snap back to its static layout value until
@@ -825,10 +825,10 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // Top-level PAGAnimation instances live in instantiatedTimelines, not inside the root
     // composition subtree, so _rootComposition->apply() above does not reach them. Re-apply them at
     // their current position so an animated property on a top-level Animation (e.g. slidingBar's x)
-  // is written back immediately while paused. State machines are left to recover via the dirty
+    // is written back immediately while paused. State machines are left to recover via the dirty
     // flags set above (markInternalTargetsDirty) rather than being driven here, matching how the
-  // normal frame path advances them.
-for (auto& entry : instantiatedTimelines) {
+    // normal frame path advances them.
+    for (auto& entry : instantiatedTimelines) {
       if (entry.second != nullptr && entry.second->type() == TimelineType::Animation) {
         entry.second->apply();
       }

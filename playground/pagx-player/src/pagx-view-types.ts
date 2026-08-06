@@ -55,6 +55,7 @@ export interface PlayerView {
     hitTest(surfaceX: number, surfaceY: number): HitTestResult | null;
     getNodeSourceMap(): NodeSourceEntry[];
     getNodeBounds(index: number): NodeBounds | null;
+    validatePAGX(data: Uint8Array): PagxSchemaDiagnostic[];
 
     // Incremental edit (phase 2, source-editor attribute edits). Sets a channel on nodes[index]
     // from its raw PAGX attribute string and refreshes the scene in place. Returns false when the
@@ -93,6 +94,15 @@ export interface HitTestResult {
     startLine: number;
     endLine: number;
     bounds: NodeBounds | null;
+}
+
+/** A schema-level PAGX diagnostic exported by the WASM importer. XML well-formedness diagnostics
+ *  are produced separately in SourceEditor with DOMParser; these cover valid XML that violates the
+ *  PAGX schema, such as unknown elements, invalid attribute values, and unresolved references. */
+export interface PagxSchemaDiagnostic {
+    message: string;
+    line: number;
+    column: number;
 }
 
 /** Static shape of the wasm module returned by the host-supplied `moduleFactory`. The player

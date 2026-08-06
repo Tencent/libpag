@@ -168,28 +168,35 @@ export const EDITOR_STYLES = `
     box-shadow: inset 2px 0 0 rgba(68, 142, 249, 0.9);
 }
 
-/* Active editable span (after double-click). Draws a single rectangle around the whole block:
-   middle lines get only the background fill, the first line draws the top edge + left/right
-   verticals, the last line draws the bottom edge + left/right verticals, and a single-line
-   span (first === last) draws all four edges. This matches the original CodeMirror look —
-   border rings the block, not every line. */
+/* Editing is a distinct mode from canvas/node selection. Keep node selection blue in read-only
+   mode, but mute it once a range is unlocked so there is never a blue-on-blue collision with
+   Monaco's native text selection. The editable block uses a neutral charcoal fill and a warm
+   amber outline; its text selection is a light gray strip, visually close to DevTools' editable
+   source selection while remaining clearly distinct from the canvas-selection blue. */
+#editor-panel .editor-host.pagx-editor-editing .monaco-editor .pagx-select-line {
+    background-color: transparent;
+    box-shadow: none;
+}
+
 #editor-panel .editor-host .monaco-editor .pagx-edit-line {
-    background-color: rgba(68, 142, 249, 0.3);
+    background-color: rgba(255, 190, 92, 0.13);
 }
 
 #editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-first:not(.pagx-edit-line-last) {
-    box-shadow: inset 0 1px 0 rgba(68, 142, 249, 0.95),
-        inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
+    box-shadow: inset 0 1px 0 #C68A32, inset 1px 0 0 #C68A32, inset -1px 0 0 #C68A32;
 }
 
 #editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-last:not(.pagx-edit-line-first) {
-    box-shadow: inset 0 -1px 0 rgba(68, 142, 249, 0.95),
-        inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
+    box-shadow: inset 0 -1px 0 #C68A32, inset 1px 0 0 #C68A32, inset -1px 0 0 #C68A32;
 }
 
 #editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-first.pagx-edit-line-last {
-    box-shadow: inset 0 1px 0 rgba(68, 142, 249, 0.95), inset 0 -1px 0 rgba(68, 142, 249, 0.95),
-        inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
+    box-shadow: inset 0 1px 0 #C68A32, inset 0 -1px 0 #C68A32, inset 1px 0 0 #C68A32,
+        inset -1px 0 0 #C68A32;
+}
+
+#editor-panel .editor-host.pagx-editor-editing .monaco-editor .view-line .selected-text {
+    background-color: rgba(232, 232, 232, 0.72) !important;
 }
 
 /* Editor feedback ("Changes applied", validation errors, etc.) now flows through the player's
@@ -268,6 +275,63 @@ export const EDITOR_STYLES = `
     border-color: #81C784;
 }
 
-/* Monaco's scrollbar is styled via editor options (scrollbar.verticalScrollbarSize etc.),
-   not CSS. No custom scrollbar rules needed here. */
+/* DevTools-style scrollbars. Use Monaco's native geometry instead of shortening either track in
+   CSS: Monaco already makes the horizontal track stop before the vertical lane (as shown by its
+   inline width). The vertical track is appended after the horizontal track in Monaco's DOM, so it
+   naturally paints the opaque bottom-right corner without masking either thumb. CSS resizing or a
+   pseudo-element mask desynchronizes Monaco's internal thumb transform and causes the thumb to be
+   covered at the far edge. */
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar {
+    background: #1E1E1E !important;
+    box-sizing: border-box;
+}
+
+/* Do not use inset box-shadows for these separators: the vertical shadow spans through the
+   bottom-right corner. Explicit pseudo-elements let the vertical separator stop 14px before the
+   bottom while leaving the overlap as a solid background, matching DevTools. */
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.vertical::before {
+    position: absolute;
+    top: 0;
+    bottom: 14px;
+    left: 0;
+    width: 1px;
+    background: #3C3C3C;
+    content: '';
+    pointer-events: none;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.horizontal::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 1px;
+    background: #3C3C3C;
+    content: '';
+    pointer-events: none;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar > .slider {
+    background: rgb(121, 121, 121) !important;
+    border-radius: 5px !important;
+}
+
+/* The track is 14px wide, while the thumb remains the 10px DevTools width. */
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.vertical > .slider {
+    left: 2px !important;
+    width: 10px !important;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar.horizontal > .slider {
+    top: 2px !important;
+    height: 10px !important;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar > .slider:hover {
+    background: rgb(150, 150, 150) !important;
+}
+
+#editor-panel .editor-host .monaco-editor .monaco-scrollable-element > .scrollbar > .slider.active {
+    background: rgb(170, 170, 170) !important;
+}
 `;

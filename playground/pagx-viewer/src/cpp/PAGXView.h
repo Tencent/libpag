@@ -109,7 +109,18 @@ class PAGXView {
   // or null if index is out of range or has no runtime layer. For overlay box drawing.
   emscripten::val getNodeBounds(int index) const;
 
-  // --- Incremental edit (phase 2, source-editor attribute edits) ---
+  // --- Source-editor validation and incremental edit ---
+
+  /**
+   * Validates a PAGX XML byte buffer without modifying the view's loaded document or scene.
+   *
+   * The browser-side XML parser reports well-formedness. This method reports importer/schema
+   * errors (unknown elements, invalid attribute values, unresolved references, etc.) as an array
+   * of {message, line, column} objects for Monaco diagnostics.
+   * @param pagxData UTF-8 encoded PAGX XML bytes.
+   * @return JavaScript array of schema diagnostic objects.
+   */
+  emscripten::val validatePAGX(const emscripten::val& pagxData) const;
 
   // Sets the given channel on nodes[index] from its raw PAGX attribute string and refreshes the
   // scene in place (reusing Layer handles; layout re-run only when the channel requires it). This
