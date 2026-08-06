@@ -376,6 +376,8 @@ export declare class JPAGView {
 
   setUseDiskCache(value: boolean);
 
+  setVisible(visible: boolean): void;
+
   release();
 }
 
@@ -505,6 +507,8 @@ export declare class JPAGImageView {
   currentImage(): image.PixelMap | null;
 
   update(): void;
+
+  setVisible(visible: boolean): void;
 
   release();
 }
