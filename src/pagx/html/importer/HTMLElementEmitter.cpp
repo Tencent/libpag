@@ -108,7 +108,7 @@ bool IsLayoutOnlyWrapperBox(const HTMLBoxAttributes& box) {
   if (box.opacitySet && box.opacity < 1.0f) return false;
   if (!box.mixBlendMode.empty()) return false;
   if (box.transform.valid) return false;
-  if (HTMLLayerBuilder::requiresInnerHost(box)) return false;
+  if (HTMLLayerBuilder::hasLayoutHostAttributes(box)) return false;
   return true;
 }
 
@@ -468,7 +468,7 @@ std::string BuildClipShapeGeometry(const std::string& value, float w, float h) {
 bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& element,
                                                 const HTMLBoxAttributes& box, Layer* layer) {
   if (!box.borderRadiusSet || !box.clipOverflow) return false;
-  if (HTMLLayerBuilder::requiresInnerHost(box)) return false;
+  if (HTMLLayerBuilder::hasLayoutHostAttributes(box)) return false;
 
   // Walk down through up to `HTML_ROUND_IMAGE_MAX_WRAPPER_DEPTH` intermediate
   // layout-only `<div>` wrappers that share `element`'s content box. The

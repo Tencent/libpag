@@ -9527,8 +9527,8 @@ PAG_TEST(PAGXHTMLImporterTest, FontConfigOptionIsApplied) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BodyBackgroundColorEmitsRectangleFill) {
-  // A background on <body> with padding splits an inner host and emits the body background as a
-  // Rectangle + Fill, exercising the body-level background branch of convertBody.
+  // A non-zero body padding splits an inner host but keeps the background on the outer border box;
+  // moving its 100%-sized Rectangle into the padded host would incorrectly inset the paint.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px;background-color:#F59E0B;padding:10px">
       <div style="width:20px;height:20px;background-color:#000"></div>
@@ -9537,6 +9537,77 @@ PAG_TEST(PAGXHTMLImporterTest, BodyBackgroundColorEmitsRectangleFill) {
   ASSERT_NE(doc, nullptr);
   auto* body = doc->layers.front();
   EXPECT_TRUE(ColorNear(SolidFillColorOf(body), HexColor(0xF59E0B)));
+  ASSERT_EQ(body->children.size(), 1U);
+  auto* contentHost = body->children.front();
+  EXPECT_TRUE(NearlyEqual(contentHost->percentWidth, 100.0f));
+  EXPECT_TRUE(NearlyEqual(contentHost->percentHeight, 100.0f));
+  EXPECT_EQ(FindElementOfType<pagx::Fill>(contentHost), nullptr);
+  ASSERT_EQ(contentHost->children.size(), 1U);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BodyZeroPaddingBackgroundAvoidsInnerHost) {
+  // html-snapshot always authors `body { padding: 0 }`. Since the effective inset is zero, the
+  // body can own both its full-canvas background and children without an anonymous inner host.
+  auto doc = ParseFromString(R"HTML(
+    <html>
+      <head><style>body { padding: 0; }</style></head>
+      <body style="width:80px;height:80px;background-color:#F59E0B">
+        <div style="width:20px;height:20px;background-color:#000"></div>
+      </body>
+    </html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* body = doc->layers.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(body), HexColor(0xF59E0B)));
+  ASSERT_EQ(body->children.size(), 1U);
+  auto* child = body->children.front();
+  EXPECT_TRUE(std::isnan(child->percentWidth));
+  EXPECT_TRUE(std::isnan(child->percentHeight));
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(child), HexColor(0x000000)));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ZeroPaddingBackgroundFlexAvoidsInnerHost) {
+  // Flex and gap affect child arrangement, not Layer contents. With no effective content inset,
+  // the background geometry and flex children can safely share one host.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="display:flex;gap:4px;padding:0;width:60px;height:20px;background:#FFF">
+        <div style="width:10px;height:10px;background:#000"></div>
+        <div style="width:10px;height:10px;background:#000"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* host = doc->layers.front()->children.front();
+  EXPECT_EQ(host->layout, pagx::LayoutMode::Horizontal);
+  EXPECT_FLOAT_EQ(host->gap, 4.0f);
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(host), HexColor(0xFFFFFF)));
+  ASSERT_EQ(host->children.size(), 2U);
+  EXPECT_TRUE(std::isnan(host->children.front()->percentWidth));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ZeroPaddingBorderedFlexKeepsInnerHost) {
+  // An inside border contributes an effective content inset even when authored padding is zero,
+  // so the border-box paint must remain isolated from the flex layout host.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="display:flex;padding:0;width:60px;height:60px;
+                  border:4px solid #000;background:#FFF">
+        <div style="width:10px;height:10px"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(outer), HexColor(0xFFFFFF)));
+  ASSERT_EQ(outer->children.size(), 1U);
+  auto* host = outer->children.front();
+  EXPECT_EQ(host->layout, pagx::LayoutMode::Horizontal);
+  EXPECT_FLOAT_EQ(host->padding.top, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.right, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.bottom, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.left, 4.0f);
+  ASSERT_EQ(host->children.size(), 1U);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BasePathResolvesBodyBackgroundImage) {
