@@ -34,8 +34,10 @@ class HTMLResourceWriter {
  public:
   virtual ~HTMLResourceWriter() = default;
 
-  // relativePath is the archive entry path relative to the ZIP root, always
-  // '/'-separated. Returns false on failure with errorMsg populated if non-null.
+  // relativePath is the complete archive entry path (e.g. "index.html" or
+  // "assets/img0.png"), always '/'-separated. HTMLWriterContext prepends
+  // staticImgUrlPrefix ("assets/" in ToData mode) before calling this.
+  // Returns false on failure with errorMsg populated if non-null.
   virtual bool write(const std::string& relativePath, const void* bytes, size_t size,
                      std::string* errorMsg) = 0;
 };
