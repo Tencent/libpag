@@ -23,6 +23,7 @@
 #include <QSizeF>
 #include <QString>
 #include <memory>
+#include <mutex>
 
 namespace pag {
 
@@ -58,6 +59,7 @@ class ContentViewModel : public QObject {
                  editableImageLayerCountChanged)
   Q_PROPERTY(bool showVideoFrames READ getShowVideoFrames WRITE setShowVideoFrames)
   Q_PROPERTY(ContentType contentType READ getContentType CONSTANT)
+  Q_PROPERTY(double zoomScale READ zoomScale NOTIFY zoomScaleChanged)
 
   explicit ContentViewModel(QObject* parent = nullptr) : QObject(parent) {
   }
@@ -89,6 +91,33 @@ class ContentViewModel : public QObject {
   Q_INVOKABLE virtual void nextFrame() = 0;
   Q_INVOKABLE virtual void previousFrame() = 0;
 
+  struct ViewTransform {
+    double zoomScale = 1.0;
+    double offsetX = 0.0;
+    double offsetY = 0.0;
+  };
+
+  /// Returns the current zoom scale factor.
+  double zoomScale() const;
+
+  /// Returns a snapshot of the current view transform (zoom + pan offset).
+  ViewTransform getViewTransform() const;
+
+  /// Applies a zoom factor anchored at the given point in surface pixel coordinates.
+  void zoomAt(double factor, double anchorX, double anchorY);
+
+  /// Pans the view by the given delta in surface pixel coordinates.
+  void panBy(double deltaX, double deltaY);
+
+  /// Resets the view transform to the default (no zoom, no pan).
+  void resetView();
+
+  /// Adjusts the pan offset to compensate for a surface size change, keeping the content visually
+  /// anchored at the same position. All parameters are in surface pixel coordinates.
+  void adjustForSurfaceResize(double oldSurfaceWidth, double oldSurfaceHeight,
+                              double newSurfaceWidth, double newSurfaceHeight, double contentWidth,
+                              double contentHeight);
+
   Q_SIGNAL void isPlayingChanged(bool isPlaying);
   Q_SIGNAL void hasAnimationChanged(bool hasAnimation);
   Q_SIGNAL void progressChanged(double progress);
@@ -101,6 +130,17 @@ class ContentViewModel : public QObject {
   Q_SIGNAL void preferredSizeChanged();
   Q_SIGNAL void requestFlush();
   Q_SIGNAL void contentSizeChanged();
+  Q_SIGNAL void zoomScaleChanged(double value);
+
+ protected:
+  virtual void onViewTransformChanged() {
+  }
+
+ private:
+  void notifyViewTransformChanged(double newZoomScale);
+
+  mutable std::mutex viewTransformMutex = {};
+  ViewTransform viewTransform = {};
 };
 
 }  // namespace pag

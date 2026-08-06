@@ -1,0 +1,9 @@
+<pagx width="40" height="40">
+  <Layer centerX="0" centerY="0">
+    <svg viewBox="0 0 20 20">
+      <path d="M0 0H4V4H0Z" fill="#FF4757"
+            transform="translate(4 5) rotate(30) scale(2 3)"/>
+      <path d="M10 10H18V18H10Z" fill="#3498DB"/>
+    </svg>
+  </Layer>
+</pagx>

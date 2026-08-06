@@ -1,6 +1,6 @@
 {
   "name": "@libpag/pagx",
-  "version": "0.4.33",
+  "version": "0.4.41",
   "description": "PAGX command-line tool for validation, rendering, optimization and formatting",
   "license": "Apache-2.0",
   "keywords": [
@@ -30,8 +30,9 @@
   "scripts": {
     "build:html-snapshot": "node scripts/build-html-snapshot.js",
     "check:binaries": "node scripts/check-binaries.js",
+    "check:preview": "node scripts/check-preview.js",
     "prepack": "node scripts/build-html-snapshot.js",
-    "prepublishOnly": "node scripts/check-binaries.js"
+    "prepublishOnly": "node scripts/check-binaries.js && node scripts/check-preview.js"
   },
   "os": [
     "darwin",
@@ -42,9 +43,15 @@
     "x64",
     "arm64"
   ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "chokidar": "^3.6.0",
+    "express": "^4.21.1"
+  },
   "files": [
     "bin/",
     "html-snapshot/",
+    "preview/",
     "README.md"
   ]
 }

@@ -69,6 +69,8 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   void setComposition(std::shared_ptr<PAGComposition> composition, float frameRate);
 
+  void setVisible(bool visible);
+
   void setScaleMode(PAGScaleMode scaleMode);
 
   PAGScaleMode scaleMode();
@@ -125,6 +127,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
   PAGScaleMode _scaleMode = PAGScaleMode::LetterBox;
   tgfx::Matrix _matrix = tgfx::Matrix::I();
   bool _cacheAllFramesInMemory = false;
+  bool isVisible = false;
   std::shared_ptr<PAGComposition> _composition = nullptr;
   std::shared_ptr<PAGAnimator> _animator = nullptr;
   std::shared_ptr<PAGDecoder> _decoder = nullptr;

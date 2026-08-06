@@ -258,7 +258,7 @@ $ISCCPath = Join-Path $InnoSetupDir "ISCC.exe"
 if (-not (Test-Path $ISCCPath)) {
     Log-Info "InnoSetup not found, installing..."
     $Installer = "$env:TEMP\innosetup.exe"
-    Invoke-WebRequest -Uri "https://www.jrsoftware.org/download.php/is.exe" -OutFile $Installer
+    Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe" -OutFile $Installer
     $InstallProcess = Start-Process -PassThru -Wait -FilePath $Installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=$InnoSetupDir"
     Remove-Item -Path $Installer -Force -ErrorAction SilentlyContinue
     if ($InstallProcess.ExitCode -ne 0) { Exit-WithError "Install InnoSetup failed" }

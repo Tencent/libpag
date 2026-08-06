@@ -282,8 +282,7 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unordered_map<const Layer*, PAGLayer*> nodeToLayer = {};
 
   friend class PAGXDocument;
-  friend class PAGAnimation;
-  friend class PAGStateMachine;
+  friend class PAGTimeline;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;

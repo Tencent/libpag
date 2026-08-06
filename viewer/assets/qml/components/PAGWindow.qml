@@ -337,7 +337,7 @@ Window {
     Item {
         id: placeholder
         anchors.fill: parent
-        anchors.topMargin: window.isWindows ? 32 : 22
+        anchors.topMargin: window.titleBarHeight
         anchors.leftMargin: window.isWindows ? 1 : 0
         anchors.rightMargin: window.isWindows ? 1 : 0
         anchors.bottomMargin: window.isWindows ? 1 : 0

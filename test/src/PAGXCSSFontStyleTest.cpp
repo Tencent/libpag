@@ -82,27 +82,27 @@ CLI_TEST(PAGXCSSFontStyleTest, ResolveName_WhitespaceAndCaseNormalised) {
   EXPECT_EQ(pagx::ResolveFontStyleName("  BOLD  ", "  ITALIC "), "Bold Italic");
 }
 
-// ResolveFontStyleSynthesis: splits the request into a real-face label plus faux axes. The bold
-// synthesis threshold is weight >= 600; weights below stay as keywords with no faux flag.
+// ResolveFontStyleSynthesis: splits the request into a real-face label plus a faux italic axis. The
+// weight axis is always a real-face keyword (never faux); only italic is synthesised.
 
-CLI_TEST(PAGXCSSFontStyleTest, Synthesis_BlackItalicIsAllFaux) {
+CLI_TEST(PAGXCSSFontStyleTest, Synthesis_BlackItalicKeepsRealWeightFauxItalic) {
   auto out = pagx::ResolveFontStyleSynthesis("900", "italic");
-  EXPECT_EQ(out.fontStyleName, "");
-  EXPECT_TRUE(out.fauxBold);
+  EXPECT_EQ(out.fontStyleName, "Black");
+  EXPECT_FALSE(out.fauxBold);
   EXPECT_TRUE(out.fauxItalic);
 }
 
-CLI_TEST(PAGXCSSFontStyleTest, Synthesis_BoldOnly) {
+CLI_TEST(PAGXCSSFontStyleTest, Synthesis_BoldKeepsRealWeight) {
   auto out = pagx::ResolveFontStyleSynthesis("700", "");
-  EXPECT_EQ(out.fontStyleName, "");
-  EXPECT_TRUE(out.fauxBold);
+  EXPECT_EQ(out.fontStyleName, "Bold");
+  EXPECT_FALSE(out.fauxBold);
   EXPECT_FALSE(out.fauxItalic);
 }
 
-CLI_TEST(PAGXCSSFontStyleTest, Synthesis_SemiBoldThresholdIsFauxBold) {
+CLI_TEST(PAGXCSSFontStyleTest, Synthesis_SemiBoldKeepsRealWeightFauxItalic) {
   auto out = pagx::ResolveFontStyleSynthesis("600", "italic");
-  EXPECT_EQ(out.fontStyleName, "");
-  EXPECT_TRUE(out.fauxBold);
+  EXPECT_EQ(out.fontStyleName, "SemiBold");
+  EXPECT_FALSE(out.fauxBold);
   EXPECT_TRUE(out.fauxItalic);
 }
 

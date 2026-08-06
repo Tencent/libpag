@@ -697,8 +697,8 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   float intrinsicH = svgDoc->height;
 
   // The mask SVG produces one or more content layers (a single drawn shape in the common case).
-  // Wrap them under one invisible, layout-excluded mask layer so a multi-shape clip-path also
-  // works, then transplant every node from the temporary SVG document into ours.
+  // Wrap them under one layout-excluded mask layer so a multi-shape clip-path also works, then
+  // transplant every node from the temporary SVG document into ours.
   Layer* maskLayer = nullptr;
   if (svgDoc->layers.size() == 1) {
     maskLayer = svgDoc->layers[0];
@@ -708,7 +708,6 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
       maskLayer->children.push_back(l);
     }
   }
-  maskLayer->visible = false;
   maskLayer->includeInLayout = false;
   // CSS `mask-size` / `mask-position` scale and offset the intrinsic mask box onto the masked
   // element; replay that transform onto the mask layer. Contour clip-paths are framed to the box
@@ -730,9 +729,59 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   layer->mask = maskLayer;
   layer->maskType = maskType;
   // The mask layer must be reachable in the display list for the renderer's mask lookup, and must
-  // share the masked layer's local coordinate origin. Adding it as an invisible, layout-excluded
-  // child satisfies both: it is walked by LayerBuilder but neither drawn (maskOwner is set) nor
-  // laid out (includeInLayout is false).
+  // share the masked layer's local coordinate origin. Adding it as a layout-excluded child
+  // satisfies both: it is walked by LayerBuilder but neither drawn (maskOwner is set on the tgfx
+  // side) nor laid out (includeInLayout is false).
+  layer->children.push_back(maskLayer);
+}
+
+void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttributes& box) {
+  if (layer == nullptr) return;
+  // Only a container that both rounds its corners and clips overflow needs a shaped clip; a plain
+  // `overflow: hidden` (no radius) keeps the cheaper rectangular `clipToBounds` untouched.
+  if (!box.borderRadiusSet || !box.clipOverflow) return;
+  // `borderRadiusSet` is also true for an explicit all-zero `border-radius: 0`, which rounds
+  // nothing. Only a genuinely rounded shape (an inscribed ellipse, or at least one non-zero
+  // corner) needs the shaped mask; a zero-radius box keeps the cheaper rectangular clipToBounds.
+  bool rounded = box.borderRadiusEllipse || box.borderRadiusTLPx > 0.0f ||
+                 box.borderRadiusTRPx > 0.0f || box.borderRadiusBRPx > 0.0f ||
+                 box.borderRadiusBLPx > 0.0f;
+  if (!rounded) return;
+  // `clipToBounds` is the marker that this layer is meant to clip. The fold path clears it after
+  // baking the rounded image fill, and other paths never set it; in either case there is nothing
+  // to reshape here.
+  if (!layer->clipToBounds) return;
+  // PAGX models a single mask per layer. If a CSS mask-image / clip-path already claimed it, keep
+  // the rectangular overflow clip rather than silently dropping either effect, and warn.
+  if (layer->mask != nullptr) {
+    warn(
+        "html: border-radius overflow clip combined with mask/clip-path; rounded corners not "
+        "clipped");
+    return;
+  }
+
+  // Build a mask shaped like the border-radius geometry (Ellipse for `50%`, a uniform rounded
+  // Rectangle, or a per-corner Path) filled opaque white. Both the mask layer and the geometry
+  // size to 100% of the masked layer, so the clip follows the laid-out box even when its size is
+  // resolved by layout. A Contour mask reads only the shape's coverage, clipping descendants to
+  // the rounded outline instead of the layer's rectangle.
+  auto* maskLayer = _document->makeNode<Layer>();
+  maskLayer->includeInLayout = false;
+  maskLayer->percentWidth = 100.0f;
+  maskLayer->percentHeight = 100.0f;
+  maskLayer->contents.push_back(_layerBuilder->buildBackgroundGeometry(box));
+  maskLayer->contents.push_back(_layerBuilder->buildSolidFill(Color{1.0f, 1.0f, 1.0f, 1.0f}));
+  if (maskLayer->id.empty()) {
+    maskLayer->id = _idAllocator->generateUnique("mask");
+  }
+
+  layer->mask = maskLayer;
+  layer->maskType = MaskType::Contour;
+  // The rounded mask now performs the clip; drop the rectangular scrollRect so it does not also
+  // square off the corners the mask just rounded.
+  layer->clipToBounds = false;
+  // Layout-excluded child so it shares the masked layer's local coordinate origin and stays
+  // reachable by the renderer's mask lookup (mirrors `applyMaskOrClip`).
   layer->children.push_back(maskLayer);
 }
 

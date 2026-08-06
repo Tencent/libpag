@@ -57,7 +57,7 @@ static void ApplyResolved(
 
 PAGAnimation::PAGAnimation(Animation* anim, RuntimeBinding* binding, PAGXDocument* contextDoc,
                            std::weak_ptr<PAGScene> owner)
-    : owner(std::move(owner)), animation(anim), binding(binding), contextDoc(contextDoc) {
+    : PAGTimeline(binding, contextDoc, std::move(owner)), animation(anim) {
 }
 
 void PAGAnimation::resolveTargets(const RuntimeBinding* effectiveBinding) {
@@ -175,14 +175,7 @@ void PAGAnimation::apply(float mix) {
   if (clamped <= 0.0f) {
     return;
   }
-  // A null binding marks a top-level timeline: resolve the owning scene's current root binding now,
-  // so it tracks a runtime-tree rebuild that replaced the scene's binding. A non-null binding is a
-  // fixed composition binding co-owned with that composition.
-  RuntimeBinding* effectiveBinding = binding;
-  if (effectiveBinding == nullptr) {
-    auto scene = owner.lock();
-    effectiveBinding = scene != nullptr ? scene->mutableBinding() : nullptr;
-  }
+  RuntimeBinding* effectiveBinding = this->effectiveBinding();
   if (effectiveBinding == nullptr) {
     return;
   }

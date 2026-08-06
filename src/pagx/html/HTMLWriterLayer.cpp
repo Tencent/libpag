@@ -2676,6 +2676,16 @@ void HTMLWriter::writeLayerInner(HTMLBuilder& out, const Layer* layer, float con
   // savedChildLayerOffset* was set by the parent writeLayer immediately after computing the
   // Repeater union-bounds shift; for layers without a Repeater it is (0,0).
   for (auto* child : layer->children) {
+    // The mask layer is authored as an invisible child of the layer it masks (the PAGX / HTML
+    // importer attaches the rebuilt mask this way). It defines the clip shape, not visible content:
+    // its geometry is already emitted into the CSS mask / <clipPath> def (see writeClipDef /
+    // writeMaskCSS above) and referenced by this layer's style. Emitting it again here as a normal
+    // child would paint the mask's own fill (e.g. a solid rounded rect) on top of the masked
+    // content as an opaque patch. The node stays in `children` because the clip-def writer
+    // (writeClipContent) and the tgfx bake path both still need it.
+    if (child == layer->mask) {
+      continue;
+    }
     bool childIsFlexItem = isFlexContainer && child->includeInLayout;
     _ctx->childLayerOffsetX = childOffX;
     _ctx->childLayerOffsetY = childOffY;

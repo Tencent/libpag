@@ -1711,13 +1711,14 @@ static Rect MergeEmbeddedBounds(const std::vector<TextElement>& textElements) {
 }
 
 TextLayoutResult TextLayout::Layout(const std::vector<TextElement>& textElements,
-                                    const TextLayoutParams& params, LayoutContext* context) {
+                                    const TextLayoutParams& params, LayoutContext* context,
+                                    bool useEmbeddedGlyphRuns) {
   if (textElements.empty()) {
     return {};
   }
   TextLayoutContext layoutContext(context);
   TextLayoutResult result = {};
-  if (AllHaveEmbeddedGlyphRuns(textElements)) {
+  if (useEmbeddedGlyphRuns && AllHaveEmbeddedGlyphRuns(textElements)) {
     // Embedded path: only compute bounds. TextBlob generation is deferred to the caller
     // (TextBox::updateLayout or LayerBuilder) which applies the inverse matrix.
     result.bounds = MergeEmbeddedBounds(textElements);

@@ -21,9 +21,11 @@
 #include <cstdio>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 #include "pagx/TextLayoutParams.h"
 #include "pagx/nodes/Composition.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
@@ -52,7 +54,138 @@ void WriteRunTypeface(XMLBuilder& out, const std::string& typeface) {
   out.openElement("a:cs").addRequiredAttribute("typeface", typeface).closeElementSelfClosing();
 }
 
+// True when any path component of `filePath` is an "emoji:<codepoint>" pseudo-path. Every
+// occurrence is inspected rather than only the first, so a directory that merely ends in "emoji:"
+// (e.g. "assets/myemoji:cache/emoji:1F923") does not hide the real marker behind it.
+bool IsEmojiImagePath(const std::string& filePath) {
+  constexpr char marker[] = "emoji:";
+  for (auto pos = filePath.find(marker); pos != std::string::npos;
+       pos = filePath.find(marker, pos + 1)) {
+    if (pos == 0 || filePath[pos - 1] == '/' || filePath[pos - 1] == '\\') {
+      return true;
+    }
+  }
+  return false;
+}
+
+// PAGX represents color emoji glyphs with an "emoji:<codepoint>" image source. Importing a PAGX
+// file may resolve that pseudo-path against the document directory, so IsEmojiImagePath accepts
+// the marker at the beginning of a path component. Requiring every authored glyph to carry that
+// marker prevents ordinary bitmap fonts and icon glyphs from receiving emoji-only adjustments.
+bool HasOnlyEmbeddedEmojiGlyphs(const Text* text) {
+  bool hasEmojiGlyph = false;
+  for (const auto* run : text->glyphRuns) {
+    if (run == nullptr || run->font == nullptr) {
+      return false;
+    }
+    for (auto glyphID : run->glyphs) {
+      if (glyphID == 0) {
+        return false;
+      }
+      size_t glyphIndex = static_cast<size_t>(glyphID) - 1;
+      if (glyphIndex >= run->font->glyphs.size()) {
+        return false;
+      }
+      const auto* glyph = run->font->glyphs[glyphIndex];
+      if (glyph == nullptr || glyph->image == nullptr ||
+          !IsEmojiImagePath(glyph->image->filePath)) {
+        return false;
+      }
+      hasEmojiGlyph = true;
+    }
+  }
+  return hasEmojiGlyph;
+}
+
+constexpr float LINE_COORDINATE_EPSILON = 0.5f;
+
+void AddDistinctLineCoordinate(std::vector<float>* coordinates, float coordinate) {
+  for (float existing : *coordinates) {
+    if (std::fabs(existing - coordinate) < LINE_COORDINATE_EPSILON) {
+      return;
+    }
+  }
+  coordinates->push_back(coordinate);
+}
+
+// Embedded GlyphRun positions are the authoring layout's source of truth. Horizontal glyphs on
+// the same visual line share a final baseline (text->renderPosition().y + run->y + positions[i].y),
+// even when FontEmbedder split them into several font/bitmap runs. A single embedded baseline is
+// especially useful because it proves that the authored text is one line without requiring a
+// glyph-to-UTF-8 cluster mapping. Multi-line byte boundaries cannot be reconstructed generically
+// from GlyphRun alone (ligatures, BiDi and fallback-font splits make glyph counts differ from
+// character counts), so callers retain PowerPoint's bounded-wrap fallback for those cases.
+bool HasSingleEmbeddedHorizontalLine(const std::vector<const Text*>& texts) {
+  std::vector<float> baselines;
+  bool hasRenderedGlyph = false;
+  for (const auto* text : texts) {
+    if (text == nullptr || text->glyphRuns.empty()) {
+      return false;
+    }
+    bool textHasRenderedGlyph = false;
+    for (const auto* run : text->glyphRuns) {
+      // A missing position would make every such glyph appear to share run->y and could turn an
+      // incomplete multi-line run into a false single-line result. Only trust complete authoring
+      // coordinates; the caller will retain bounded PowerPoint wrapping otherwise.
+      if (run == nullptr || run->glyphs.empty() || run->positions.size() < run->glyphs.size()) {
+        return false;
+      }
+      for (size_t i = 0; i < run->glyphs.size(); ++i) {
+        if (run->glyphs[i] == 0) {
+          continue;
+        }
+        float baseline = text->renderPosition().y + run->y + run->positions[i].y;
+        if (!std::isfinite(baseline)) {
+          return false;
+        }
+        AddDistinctLineCoordinate(&baselines, baseline);
+        textHasRenderedGlyph = true;
+        hasRenderedGlyph = true;
+        if (baselines.size() > 1) {
+          return false;
+        }
+      }
+    }
+    if (!textHasRenderedGlyph) {
+      return false;
+    }
+  }
+  return hasRenderedGlyph && baselines.size() == 1;
+}
+
+size_t CountNonEmptyLayoutLines(const std::vector<TextLayoutLineInfo>* lines) {
+  if (lines == nullptr) {
+    return 0;
+  }
+  size_t count = 0;
+  for (const auto& line : *lines) {
+    if (line.byteStart < line.byteEnd) {
+      ++count;
+    }
+  }
+  return count;
+}
+
 }  // namespace
+
+// Returns the baseline of the first rendered glyph in the embedded run coordinate system.
+// GlyphRun::positions stores offsets relative to run->y, so this remains valid for both the
+// common one-baseline run and a run whose later glyphs move onto subsequent lines.
+bool PPTWriter::firstEmbeddedBaselineY(const Text& text, float* baselineY) {
+  for (const auto* run : text.glyphRuns) {
+    if (run == nullptr) {
+      continue;
+    }
+    for (size_t i = 0; i < run->glyphs.size(); ++i) {
+      if (run->glyphs[i] == 0) {
+        continue;
+      }
+      *baselineY = run->y + (i < run->positions.size() ? run->positions[i].y : 0.0f);
+      return true;
+    }
+  }
+  return false;
+}
 
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
                                 const Matrix& m, float alpha,
@@ -178,11 +311,111 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
     const Text* text, Text* mutableText, const FillStrokeInfo& fs,
     const TextLayoutResult* precomputed) {
   NativeTextGeometry geom;
+
+  // A Text that carries pre-shaped GlyphRuns encodes its placement in the run's
+  // pen origin (x, y), exactly like the authoritative writeTextAsPath path,
+  // which positions glyphs at text->renderPosition() + run offset via WalkGlyphs
+  // and ignores any modifier TextBox. Sibling per-line Texts commonly share a
+  // single modifier TextBox while separating their lines purely through
+  // run->y (e.g. 27 / 63 / 99 for a 36px line height), so routing them through
+  // the TextBox branch below would collapse every line onto the box's single
+  // origin. Mirror writeTextAsPath here so native fallback keeps the same
+  // vertical layout. Only the first run carries the block-level offset. This only applies to the
+  // editable-text mode: outside it a Text with GlyphRuns is emitted as glyph paths and never
+  // reaches writeNativeText.
+  if (_ignoreGlyphRuns && !text->glyphRuns.empty() && text->glyphRuns.front() != nullptr) {
+    const GlyphRun* firstRun = text->glyphRuns.front();
+    geom.originFromGlyphRun = true;
+    auto renderPos = text->renderPosition();
+    auto textBounds = precomputed->getTextBounds(mutableText);
+    auto glyphBounds = ComputeGlyphRunTextBounds(*text);
+    auto* lines = precomputed->getTextLines(mutableText);
+    float embeddedBaseline = 0.0f;
+    bool hasRuntimeLineBox =
+        fs.textBox != nullptr && fs.textBox->writingMode == WritingMode::Horizontal &&
+        fs.textBox->lineHeight > 0 && textBounds.width > 0 && textBounds.height > 0 &&
+        lines != nullptr && !lines->empty() && firstEmbeddedBaselineY(*text, &embeddedBaseline);
+    if (hasRuntimeLineBox) {
+      // The editable-text path deliberately re-shapes Text::text to recover per-Text line-box
+      // bounds and line metadata that the embedded-layout fast path does not provide. Keep the
+      // embedded advance span for X (it is the authoritative pre-shaped placement).
+      //
+      // For a fixed-line-height modifier TextBox, layout may split one block across sibling Text
+      // nodes. Their embedded baselines share the first line's baseline-to-line-box-top offset,
+      // cached before the scope is emitted. Recovering Y from that offset is independent of the
+      // runtime fallback font's metrics:
+      //
+      //   frameTop = embeddedBaseline - firstLineBaselineOffset
+      //
+      // If no sibling reference carries authored bounds, fall back to aligning the freshly shaped
+      // runtime baseline. Either path prevents a block-level GlyphRun::bounds (for example
+      // 0,0,440,108 on the first Text of a three-line block) from becoming that Text's own
+      // 108px-high PowerPoint frame.
+      auto baselineOffset = _embeddedBaselineOffsets.find(fs.textBox);
+      if (baselineOffset != _embeddedBaselineOffsets.end()) {
+        geom.posY = renderPos.y + embeddedBaseline - baselineOffset->second;
+      } else {
+        geom.posY = renderPos.y + textBounds.y + embeddedBaseline - lines->front().baselineY;
+      }
+      geom.posX = renderPos.x + (glyphBounds.width > 0 ? glyphBounds.x : textBounds.x);
+      geom.estWidth = glyphBounds.width > 0 ? glyphBounds.width : textBounds.width;
+      geom.estHeight = textBounds.height;
+      geom.frameUsesLineBox = true;
+    } else if (glyphBounds.width > 0 && glyphBounds.height > 0) {
+      // No layout-computed perTextBounds (embedded glyph runs skip the layout
+      // pass, so getTextBounds is empty), or the TextBox uses automatic line height. Derive the
+      // box directly from the pre-shaped runs: advance-width span + authored linebox/ink height,
+      // in the Text's local space. Keeping this path for automatic line height avoids changing
+      // the geometry of ordinary single-line titles merely because editable export re-shaped
+      // their readable content.
+      geom.posX = renderPos.x + glyphBounds.x;
+      geom.posY = renderPos.y + glyphBounds.y;
+      geom.estWidth = glyphBounds.width;
+      geom.estHeight = glyphBounds.height;
+      // ComputeGlyphRunTextBounds falls back to glyph ink when no authored
+      // bounds exist. Only a real authored height is a line box in which
+      // paragraphAlign should be re-applied by PowerPoint.
+      for (const auto* run : text->glyphRuns) {
+        if (run != nullptr && run->bounds.height > 0) {
+          geom.frameUsesLineBox = true;
+          break;
+        }
+      }
+    } else if (textBounds.width > 0 && textBounds.height > 0) {
+      // Bitmap glyphs commonly have no authored run bounds and no vector
+      // outline from which ComputeGlyphRunTextBounds can derive a height. The
+      // horizontal advance span is still authoritative (for example an emoji
+      // fallback run may begin at positions[0].x = 160), while the freshly
+      // shaped editable text supplies a usable line box. Align that line box
+      // to the embedded baseline instead of treating GlyphRun::y as its top.
+      float embeddedBaseline = 0.0f;
+      bool hasEmbeddedBaseline =
+          lines != nullptr && !lines->empty() && firstEmbeddedBaselineY(*text, &embeddedBaseline);
+      geom.posX =
+          renderPos.x + (glyphBounds.width > 0 ? glyphBounds.x : firstRun->x + textBounds.x);
+      geom.posY = hasEmbeddedBaseline
+                      ? renderPos.y + textBounds.y + embeddedBaseline - lines->front().baselineY
+                      : renderPos.y + firstRun->y + textBounds.y;
+      geom.estWidth = glyphBounds.width > 0 ? glyphBounds.width : textBounds.width;
+      geom.estHeight = textBounds.height;
+    } else {
+      // Last-resort estimate when the runs carry no usable glyph metrics
+      // (e.g. font glyph list unavailable): fall back to a font-size guess.
+      float effectiveFontSize = text->renderFontSize();
+      geom.estWidth =
+          static_cast<float>(CountUTF8Characters(text->text)) * effectiveFontSize * 0.6f;
+      geom.estHeight = effectiveFontSize * 1.4f;
+      geom.posX = renderPos.x + firstRun->x;
+      geom.posY = renderPos.y + firstRun->y - effectiveFontSize * 0.85f;
+    }
+    return geom;
+  }
+
   float boxWidth = fs.textBox ? EffectiveTextBoxWidth(fs.textBox) : NAN;
   float boxHeight = fs.textBox ? EffectiveTextBoxHeight(fs.textBox) : NAN;
-  geom.hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
+  bool hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
 
-  if (geom.hasTextBox) {
+  if (hasTextBox) {
     geom.posX = fs.textBox->renderPosition().x;
     geom.posY = fs.textBox->renderPosition().y;
     geom.estWidth = boxWidth;
@@ -218,7 +451,8 @@ PPTWriter::NativeTextGeometry PPTWriter::computeNativeTextGeometry(
 }
 
 void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const TextBox* textBox,
-                                      const char* wrap) {
+                                      const char* wrap, bool suppressBoxLayout,
+                                      bool includeParagraphAnchor) {
   int id = _ctx->nextShapeId();
   out.openElement("p:sp").closeElementStart();
   out.openElement("p:nvSpPr").closeElementStart();
@@ -251,8 +485,11 @@ void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const Te
   // OOXML's default insets are non-zero, so we always emit explicit values
   // -- zeros for standalone text (no TextBox parent) and for TextBoxes with
   // zero padding, to preserve the pre-padding-support behavior.
+  // When suppressBoxLayout is set the frame is already anchored to the glyph
+  // pen origin (which the box padding was baked into during shaping), so the
+  // insets are forced to zero to avoid indenting the text a second time.
   int64_t lIns = 0, tIns = 0, rIns = 0, bIns = 0;
-  if (textBox) {
+  if (textBox && !suppressBoxLayout) {
     lIns = PxToEMU(textBox->padding.left);
     tIns = PxToEMU(textBox->padding.top);
     rIns = PxToEMU(textBox->padding.right);
@@ -264,24 +501,36 @@ void PPTWriter::emitTextShapeEnvelope(XMLBuilder& out, const Xform& xf, const Te
       .addRequiredAttribute("tIns", tIns)
       .addRequiredAttribute("rIns", rIns)
       .addRequiredAttribute("bIns", bIns);
-  AddBodyPrAttrsForTextBox(out, textBox);
+  AddBodyPrAttrsForTextBox(out, textBox, includeParagraphAnchor, !suppressBoxLayout);
   out.closeElementSelfClosing();
   out.openElement("a:lstStyle").closeElementSelfClosing();
 }
 
 void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
                                          const NativeTextGeometry& geom, const TextBox* textBox,
-                                         bool useLineLayout) {
+                                         bool disableAutoWrap) {
   auto xf = DecomposeXform(geom.posX, geom.posY, geom.estWidth, geom.estHeight, m);
+  // A fixed inline extent remains a wrapping boundary unless the caller has an authoritative
+  // reason to disable PowerPoint's metric-dependent wrapping: PAGX supplied explicit line
+  // boundaries, wordWrap is false, or complete embedded positions prove an authored single line.
+  bool hasInlineExtent = false;
+  if (textBox != nullptr) {
+    float inlineExtent = textBox->writingMode == WritingMode::Vertical
+                             ? EffectiveTextBoxHeight(textBox)
+                             : EffectiveTextBoxWidth(textBox);
+    hasInlineExtent = !std::isnan(inlineExtent) && inlineExtent > 0;
+  }
   // Justify alignment requires PowerPoint to know a target line width; with
   // wrap="none" the text is unbounded so PPT silently falls back to start
-  // alignment. Use wrap="square" in that case so PPT can justify within the
-  // shape's text area (our PAGX-determined visual lines should fit, so PPT
-  // shouldn't introduce additional wraps).
-  bool justifyAlign = textBox && textBox->textAlign == TextAlign::Justify;
-  const char* wrap =
-      useLineLayout ? (justifyAlign ? "square" : "none") : (geom.hasTextBox ? "square" : "none");
-  emitTextShapeEnvelope(out, xf, textBox, wrap);
+  // alignment. Force wrap="square" in that case so PPT can justify within the
+  // shape's text area even when the box itself is auto-sized. A glyph-origin
+  // frame never emits algn (the pen origin already encodes the alignment), so
+  // it needs no such fallback.
+  bool justifyAlign =
+      textBox != nullptr && textBox->textAlign == TextAlign::Justify && !geom.originFromGlyphRun;
+  const char* wrap = (justifyAlign || (!disableAutoWrap && hasInlineExtent)) ? "square" : "none";
+  emitTextShapeEnvelope(out, xf, textBox, wrap, geom.originFromGlyphRun,
+                        !geom.originFromGlyphRun || geom.frameUsesLineBox);
 }
 
 void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
@@ -372,26 +621,57 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   auto* mutableText = const_cast<Text*>(text);
   float boxWidth = fs.textBox ? EffectiveTextBoxWidth(fs.textBox) : NAN;
   bool hasTextBox = fs.textBox && !std::isnan(boxWidth) && boxWidth > 0;
+  bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
 
   TextLayoutResult localResult;
   if (!precomputed) {
     auto params = hasTextBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
-    localResult =
-        TextLayout::Layout({{mutableText, MakeGlyphParams(mutableText)}}, params, _layoutContext);
+    // --ppt-ignore-glyphruns requests editable native text. Re-shape the readable Text content
+    // even when GlyphRuns are present so the native frame gets real per-Text line-box/baseline
+    // metadata; computeNativeTextGeometry still uses the embedded advances and pen origin for
+    // authoritative placement.
+    localResult = TextLayout::Layout({{mutableText, MakeGlyphParams(mutableText)}}, params,
+                                     _layoutContext, !_ignoreGlyphRuns);
     precomputed = &localResult;
   }
   auto* lines = precomputed->getTextLines(mutableText);
 
+  // Embedded GlyphRun data is authoritative for PAGX rendering, so TextLayout::Layout normally
+  // returns only its stored bounds. Native PPT text cannot replay those glyph IDs; reshape the
+  // editable Text attributes here as a best-effort source of byte ranges. Embedded positions are
+  // checked separately below before those environment-dependent ranges are allowed to disable
+  // PowerPoint's bounded fallback.
+  TextLayoutResult editableTextResult;
+  if (lines == nullptr) {
+    auto params = hasTextBox ? MakeTextBoxParams(fs.textBox) : MakeStandaloneParams(text);
+    editableTextResult = TextLayout::Layout({{mutableText, MakeGlyphParams(mutableText)}}, params,
+                                            _layoutContext, false);
+    lines = editableTextResult.getTextLines(mutableText);
+  }
+
   auto geom = computeNativeTextGeometry(text, mutableText, fs, precomputed);
 
-  // When PAGX layout produced explicit per-line byte ranges we emit them as
-  // soft <a:br/> breaks within a single paragraph ourselves, so PowerPoint
-  // shouldn't perform additional line-wrapping on top (its font metrics differ
-  // slightly from PAGX's, which would shift the break points). Vertical layout
-  // has no line info; fall back to PowerPoint-driven wrapping in that case.
+  // Line byte ranges are emitted as soft <a:br/> breaks within one paragraph. For ordinary text
+  // they come from the same PAGX layout that renders the document and are authoritative. For
+  // embedded text, fresh shaping is only a best-effort editable fallback and is validated against
+  // the authoring positions below.
   bool useLineLayout = (lines != nullptr) && !lines->empty();
+  bool hasEmbeddedGlyphRuns = !text->glyphRuns.empty();
+  bool hasSingleEmbeddedLine = hasEmbeddedGlyphRuns && !isVertical &&
+                               HasSingleEmbeddedHorizontalLine(std::vector<const Text*>{text});
+  // If the embedded authoring data proves this is a single line but the export environment's
+  // fallback font wrapped it, those fresh byte ranges are not authoritative. Stream the readable
+  // text without inferred soft breaks and keep PowerPoint wrapping disabled so the authored
+  // single-line contract wins.
+  if (hasSingleEmbeddedLine && CountNonEmptyLayoutLines(lines) != 1) {
+    useLineLayout = false;
+  }
+  // Only an explicit wordWrap=false contract or complete embedded positions proving one authored
+  // line are strong enough to disable PowerPoint's bounded fallback. Even ordinary PAGX line
+  // metadata can be platform-dependent when the export host lacks the authored font.
+  bool disableAutoWrap = (fs.textBox != nullptr && !fs.textBox->wordWrap) || hasSingleEmbeddedLine;
 
-  emitNativeTextShapeFrame(out, m, geom, fs.textBox, useLineLayout);
+  emitNativeTextShapeFrame(out, m, geom, fs.textBox, disableAutoWrap);
 
   // Paragraph base direction by UBA P2/P3. Emitted via pPr@rtl so PowerPoint
   // runs BiDi with the correct base direction and reproduces the same visual
@@ -407,32 +687,40 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   // and to the left for End. Center / Justify are direction-symmetric.
   // OOXML's default algn is "l", so we leave style.algn as nullptr for the
   // physical-Start case and emit explicit "r" only for the physical-End case.
-  switch (ResolveLogicalAnchor(text->textAnchor, rtl)) {
-    case TextAnchor::Center:
-      style.algn = "ctr";
-      break;
-    case TextAnchor::End:
-      style.algn = "r";
-      break;
-    case TextAnchor::Start:
-    default:
-      break;
-  }
-  if (fs.textBox) {
-    switch (ResolveLogicalAlign(fs.textBox->textAlign, rtl)) {
-      case TextAlign::Center:
+  // When the shape frame is anchored to the GlyphRun pen origin, the modifier
+  // TextBox's horizontal alignment (and the Text's own anchor) is already baked
+  // into that origin — the frame's left edge sits exactly where the first glyph
+  // starts. Re-emitting an OOXML algn here would center/right-align the text a
+  // second time inside the frame, so leave algn at its default (left) and let
+  // the origin do the positioning.
+  if (!geom.originFromGlyphRun) {
+    switch (ResolveLogicalAnchor(text->textAnchor, rtl)) {
+      case TextAnchor::Center:
         style.algn = "ctr";
         break;
-      case TextAlign::End:
+      case TextAnchor::End:
         style.algn = "r";
         break;
-      case TextAlign::Justify:
-        style.algn = "just";
-        break;
-      case TextAlign::Start:
+      case TextAnchor::Start:
       default:
-        style.algn = nullptr;
         break;
+    }
+    if (fs.textBox) {
+      switch (ResolveLogicalAlign(fs.textBox->textAlign, rtl)) {
+        case TextAlign::Center:
+          style.algn = "ctr";
+          break;
+        case TextAlign::End:
+          style.algn = "r";
+          break;
+        case TextAlign::Justify:
+          style.algn = "just";
+          break;
+        case TextAlign::Start:
+        default:
+          style.algn = nullptr;
+          break;
+      }
     }
   }
   // PAGX lineHeight maps onto OOXML <a:lnSpc> in both writing modes: in horizontal mode each
@@ -441,7 +729,6 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   // vertical mode under the assumption that lnSpc only ever drives the inline axis, which left
   // PowerPoint to fall back to its default ~1.2x font-size column width regardless of the
   // PAGX-authored lineHeight.
-  bool isVertical = fs.textBox && fs.textBox->writingMode == WritingMode::Vertical;
   int64_t lnSpcPts = fs.textBox ? LineHeightToSpcPts(fs.textBox->lineHeight) : 0;
 
   // Vertical writing mode ignores BiDi base direction; suppress the rtl
@@ -479,6 +766,9 @@ void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
   }
   if (style.hasLetterSpacing) {
     out.addRequiredAttribute("spc", style.letterSpc);
+  }
+  if (style.baseline != 0) {
+    out.addRequiredAttribute("baseline", style.baseline);
   }
   out.closeElementStart();
   // OOXML rPr child order is: a:ln, then EG_FillProperties, then a:effectLst,
@@ -622,8 +912,7 @@ void PPTWriter::ParagraphEmitter::emitLineBreak(const PPTRunStyle& style) {
 }
 
 void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const Matrix& transform,
-                                      float estWidth, float estHeight, bool useLineLayout,
-                                      bool hasBoxWidth) {
+                                      float estWidth, float estHeight, bool disableAutoWrap) {
   // `transform` already incorporates BuildGroupMatrix(box) (applied by the
   // caller in writeElements), so the local origin here is (0, 0). Adding
   // box->position again would double-offset the shape, pushing the text-box
@@ -670,14 +959,16 @@ void PPTWriter::emitTextBoxShapeFrame(XMLBuilder& out, const TextBox* box, const
     }
   }
   auto xf = DecomposeXform(anchorOffsetX, anchorOffsetY, estWidth, estHeight, transform);
+  // Preserve the authored inline wrapping boundary unless the caller has an authoritative reason
+  // to disable PowerPoint's independent wrapping pass.
+  float inlineExtent = isVertical ? EffectiveTextBoxHeight(box) : EffectiveTextBoxWidth(box);
+  bool hasInlineExtent = !std::isnan(inlineExtent) && inlineExtent > 0;
   // Justify alignment requires PowerPoint to know a target line width; with
   // wrap="none" the text is unbounded so PPT silently falls back to start
-  // alignment. Use wrap="square" in that case so PPT can justify within the
-  // shape's text area. Our PAGX-determined visual lines should already fit
-  // within the shape, so PPT shouldn't introduce additional wraps.
+  // alignment. Force wrap="square" in that case so PPT can justify within the
+  // shape's text area even when the box is auto-sized in the inline axis.
   bool justifyAlign = box->textAlign == TextAlign::Justify;
-  const char* wrap =
-      useLineLayout ? (justifyAlign ? "square" : "none") : (hasBoxWidth ? "square" : "none");
+  const char* wrap = (justifyAlign || (!disableAutoWrap && hasInlineExtent)) ? "square" : "none";
   emitTextShapeEnvelope(out, xf, box, wrap);
 }
 
@@ -809,6 +1100,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   if (runs.empty()) {
     return;
   }
+  bool isVertical = box->writingMode == WritingMode::Vertical;
 
   // Run a layout pass to obtain the textbox's resolved bounds AND its
   // per-Text line-break decisions. We use those line breaks as paragraph
@@ -821,19 +1113,41 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     mutableTexts.push_back(const_cast<Text*>(run.text));
   }
   auto params = MakeTextBoxParams(box);
-  auto layoutResult =
-      TextLayout::Layout(TextLayout::MakeElements(mutableTexts), params, _layoutContext);
+  auto textElements = TextLayout::MakeElements(mutableTexts);
+  auto layoutResult = TextLayout::Layout(textElements, params, _layoutContext, !_ignoreGlyphRuns);
 
+  // Editable export re-shapes Text::text to recover line and baseline metadata, but that fresh
+  // layout is environment-dependent. In Web/WASM a missing typeface may fall back to the
+  // character-count estimate (0.6 * fontSize per character), making an auto-sized centered frame
+  // wider than the authored text and shifting every visible line. GlyphRun::bounds stores the
+  // authoring layout's block bounds, so keep those dimensions for the PowerPoint envelope while
+  // still using the fresh result above for line entries and editable runs.
+  Rect embeddedBounds = {};
+  bool allHaveEmbeddedGlyphRuns = true;
+  std::vector<const Text*> embeddedTexts;
+  embeddedTexts.reserve(runs.size());
+  for (const auto& run : runs) {
+    embeddedTexts.push_back(run.text);
+    if (run.text->glyphRuns.empty()) {
+      allHaveEmbeddedGlyphRuns = false;
+    }
+  }
+  if (_ignoreGlyphRuns && allHaveEmbeddedGlyphRuns) {
+    embeddedBounds = TextLayout::Layout(textElements, params, _layoutContext, true).bounds;
+  }
+  bool hasSingleEmbeddedLine =
+      allHaveEmbeddedGlyphRuns && !isVertical && HasSingleEmbeddedHorizontalLine(embeddedTexts);
   float boxWidth = EffectiveTextBoxWidth(box);
   float boxHeight = EffectiveTextBoxHeight(box);
   bool hasBoxWidth = !std::isnan(boxWidth) && boxWidth > 0;
-  float estWidth = hasBoxWidth ? boxWidth : layoutResult.bounds.width;
+  float autoWidth = embeddedBounds.width > 0 ? embeddedBounds.width : layoutResult.bounds.width;
+  float estWidth = hasBoxWidth ? boxWidth : autoWidth;
   if (estWidth <= 0) {
     estWidth = static_cast<float>(CountUTF8Characters(runs.front().text->text)) *
                runs.front().text->renderFontSize() * 0.6f;
   }
-  float estHeight =
-      (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : layoutResult.bounds.height;
+  float autoHeight = embeddedBounds.height > 0 ? embeddedBounds.height : layoutResult.bounds.height;
+  float estHeight = (!std::isnan(boxHeight) && boxHeight > 0) ? boxHeight : autoHeight;
   if (estHeight <= 0) {
     estHeight = runs.front().text->renderFontSize() * 1.4f;
   }
@@ -844,13 +1158,31 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   // vertical mode each entry is a column instead of a row (baselineY stores -columnX so the
   // ascending sort below maps to right-to-left source order); columns dropped by
   // overflow="hidden" are absent from the layout result and therefore omitted from the PPT output
-  // automatically. `getTextLines` only returns nullptr for layouts where line info isn't tracked
-  // (e.g. embedded glyph runs); those fall back to legacy '\n'-splitting.
+  // automatically. Embedded glyph runs only store bounds, so native PPT output reshapes their
+  // editable Text attributes below to recover the missing byte-range metadata.
   std::vector<LineEntry> lineEntries;
   bool useLineLayout = true;
+  TextLayoutResult editableTextResult;
+  bool needsEditableTextLayout = false;
   for (size_t i = 0; i < runs.size(); ++i) {
     auto* mt = const_cast<Text*>(runs[i].text);
     auto* lines = layoutResult.getTextLines(mt);
+    if (lines == nullptr) {
+      needsEditableTextLayout = true;
+      break;
+    }
+  }
+  if (needsEditableTextLayout) {
+    // See writeNativeText: all-embedded TextBox content has stored bounds but no byte-range line
+    // metadata. Reshape once as a best-effort source of editable byte ranges; the embedded
+    // positions below decide whether those ranges are authoritative enough to disable auto-wrap.
+    editableTextResult = TextLayout::Layout(textElements, params, _layoutContext, false);
+  }
+  const TextLayoutResult* lineLayoutResult =
+      needsEditableTextLayout ? &editableTextResult : &layoutResult;
+  for (size_t i = 0; i < runs.size(); ++i) {
+    auto* mt = const_cast<Text*>(runs[i].text);
+    auto* lines = lineLayoutResult->getTextLines(mt);
     if (lines == nullptr) {
       useLineLayout = false;
       lineEntries.clear();
@@ -867,7 +1199,21 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     useLineLayout = false;
   }
 
-  emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight, useLineLayout, hasBoxWidth);
+  if (hasSingleEmbeddedLine && useLineLayout) {
+    std::vector<float> freshBaselines;
+    for (const auto& entry : lineEntries) {
+      AddDistinctLineCoordinate(&freshBaselines, entry.baselineY);
+    }
+    if (freshBaselines.size() != 1) {
+      // The export host wrapped a source that the embedded authoring layout proves is one line.
+      // Do not serialize those inferred breaks; emit the source runs continuously instead.
+      useLineLayout = false;
+      lineEntries.clear();
+    }
+  }
+  bool disableAutoWrap = !box->wordWrap || hasSingleEmbeddedLine;
+
+  emitTextBoxShapeFrame(out, box, transform, estWidth, estHeight, disableAutoWrap);
 
   // Paragraph base direction by UBA P2/P3. A TextBox carries a single pPr so
   // all runs share one base direction; concatenating the run text in source
@@ -875,7 +1221,6 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   // directional character, matching the paragraph-level rule that PAGX's ICU
   // BiDi uses. Vertical writing mode ignores rtl per OOXML, so we suppress it
   // in that case to avoid emitting a no-op attribute.
-  bool isVertical = box->writingMode == WritingMode::Vertical;
   bool rtl = false;
   if (!isVertical) {
     std::string combined;
@@ -912,8 +1257,59 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
   // Alignment lives on a:pPr (not a:rPr) so we leave style.algn at nullptr here.
   std::vector<PPTRunStyle> runStyles;
   runStyles.reserve(runs.size());
-  for (const auto& run : runs) {
-    runStyles.push_back(BuildRunStyle(run.text, run.fill, run.stroke, alpha));
+  std::vector<bool> adjustEmojiRuns(runs.size(), false);
+  // A run style cannot vary between lines, so only adjust an emoji run that contributes exactly
+  // one laid-out line and has ordinary text on that same baseline. This avoids moving standalone
+  // emoji lines merely because an unrelated line elsewhere in the TextBox contains normal text.
+  if (_ignoreGlyphRuns && !isVertical && useLineLayout) {
+    constexpr float baselineEpsilon = 0.5f;
+    std::vector<bool> emojiRuns(runs.size(), false);
+    for (size_t i = 0; i < runs.size(); ++i) {
+      emojiRuns[i] = HasOnlyEmbeddedEmojiGlyphs(runs[i].text);
+    }
+    for (size_t runIndex = 0; runIndex < runs.size(); ++runIndex) {
+      if (!emojiRuns[runIndex]) {
+        continue;
+      }
+      const LineEntry* emojiLine = nullptr;
+      bool hasMultipleLines = false;
+      for (const auto& line : lineEntries) {
+        if (line.runIndex != runIndex) {
+          continue;
+        }
+        if (emojiLine != nullptr) {
+          hasMultipleLines = true;
+          break;
+        }
+        emojiLine = &line;
+      }
+      if (emojiLine == nullptr || hasMultipleLines) {
+        continue;
+      }
+      for (const auto& siblingLine : lineEntries) {
+        if (!emojiRuns[siblingLine.runIndex] &&
+            std::fabs(siblingLine.baselineY - emojiLine->baselineY) < baselineEpsilon) {
+          adjustEmojiRuns[runIndex] = true;
+          break;
+        }
+      }
+    }
+  }
+  // DrawingML exposes run-level vertical positioning only through baseline, which PowerPoint
+  // renders as subscript and therefore at 60% of the declared font size. Increase the declared
+  // size by the inverse factor so the visible emoji retains the authored size while a small
+  // negative baseline optically aligns it with adjacent text.
+  constexpr int emojiBaseline = -10000;
+  constexpr double powerPointSubscriptScale = 0.6;
+  for (size_t i = 0; i < runs.size(); ++i) {
+    const auto& run = runs[i];
+    auto style = BuildRunStyle(run.text, run.fill, run.stroke, alpha);
+    if (adjustEmojiRuns[i]) {
+      style.baseline = emojiBaseline;
+      style.fontSize = static_cast<int>(
+          std::lround(static_cast<double>(style.fontSize) / powerPointSubscriptScale));
+    }
+    runStyles.push_back(std::move(style));
   }
 
   // Locate the first run whose text contains a `\t` and use its renderFontSize

@@ -54,9 +54,9 @@ class PAGXRenderer : public IContentRenderer {
   // Returns -1 when no frame applies (no timeline, zero duration, or non-positive frame rate).
   int64_t computeProfileFrame(const PAGXViewModel::RenderState& state) const;
 
-  // Applies the fit-to-screen transform to the scene's display options so the content is centered
-  // and uniformly scaled to fit the surface.
-  void applyFitTransform(PAGXViewModel::RenderState& state, int surfaceWidth, int surfaceHeight);
+  // Applies the combined fit-to-screen and user zoom/pan transform to the scene's display options.
+  void applyDisplayTransform(PAGXViewModel::RenderState& state, int surfaceWidth,
+                             int surfaceHeight);
 
   PAGXViewModel* viewModel = nullptr;
   GPUDrawable* drawable = nullptr;

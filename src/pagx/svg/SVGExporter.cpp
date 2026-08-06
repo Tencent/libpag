@@ -3383,6 +3383,15 @@ void SVGWriter::writeLayerBody(SVGBuilder& out, const Layer* layer, float perChi
     }
   }
   for (const auto* child : layer->children) {
+    // The mask layer is authored as an invisible child of the layer it masks (the PAGX / HTML
+    // importer attaches the rebuilt mask this way). It defines the clip shape, not visible content:
+    // its geometry is already emitted into the <mask> / <clipPath> def via writeLayerOuterAttributes
+    // and referenced by the wrapping <g>. Emitting it again here as a normal child would paint the
+    // mask's own fill (e.g. a solid rounded rect) on top of the masked content as an opaque patch.
+    // The node stays in `children` because the mask-def writers and the tgfx bake path both need it.
+    if (child == layer->mask) {
+      continue;
+    }
     if (perChildAlpha < 1.0f) {
       out.openElement("g");
       out.addAttribute("opacity", FloatToString(perChildAlpha));

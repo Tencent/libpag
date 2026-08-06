@@ -39,8 +39,9 @@ void PAGWindow::openFile(QString path) {
   }
   // Set filePath immediately so PAGViewer::openFile() can detect this window already
   // owns the file, preventing duplicate windows when the same file is opened rapidly.
-  // On successful load the ViewModel emits filePathChanged which calls updateFilePath()
-  // to keep filePath in sync; on failure it emits filePathChanged("") to clear it.
+  // On successful load the ViewModel emits filePathChanged with the real path, which
+  // updateFilePath() uses to mark the window as holding content; on failure it emits
+  // filePathChanged("") which clears both filePath and the content flag.
   filePath = path;
   Q_EMIT requestOpenFile(path);
   window->raise();
@@ -216,10 +217,19 @@ QString PAGWindow::getFilePath() {
 
 void PAGWindow::updateFilePath(const QString& path) {
   filePath = path;
+  contentLoaded = !path.isEmpty();
 }
 
 QQmlApplicationEngine* PAGWindow::getEngine() {
   return engine.get();
+}
+
+bool PAGWindow::isReady() const {
+  return window != nullptr;
+}
+
+bool PAGWindow::hasContent() const {
+  return contentLoaded;
 }
 
 }  // namespace pag

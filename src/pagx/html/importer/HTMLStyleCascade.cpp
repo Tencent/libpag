@@ -348,6 +348,11 @@ void HTMLStyleCascade::setFontFallbackSink(FontFallbackThunk thunk, void* userDa
   _fontFallbackUserData = userData;
 }
 
+void HTMLStyleCascade::setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData) {
+  _fontAvailabilityThunk = thunk;
+  _fontAvailabilityUserData = userData;
+}
+
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
   while (child) {
@@ -496,7 +501,20 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
       out.fontFamilyChain.push_back(resolved);
     }
     if (!out.fontFamilyChain.empty()) {
+      // Default to the stack's first concrete family, then prefer the first family the renderer
+      // can actually resolve. A leading family that the renderer would silently substitute (a
+      // hidden system font such as "SF Mono", or any font absent on this machine) is skipped so
+      // the later CSS fallbacks that DO resolve (e.g. "Menlo" for a `monospace` stack) win —
+      // matching the browser cascade instead of collapsing to the default proportional face.
       out.primaryFontFamily = out.fontFamilyChain.front();
+      if (_fontAvailabilityThunk != nullptr) {
+        for (const auto& family : out.fontFamilyChain) {
+          if (_fontAvailabilityThunk(_fontAvailabilityUserData, family)) {
+            out.primaryFontFamily = family;
+            break;
+          }
+        }
+      }
     }
     if (_fontFallbackThunk) {
       _fontFallbackThunk(_fontFallbackUserData, out.fontFamilyChain);
@@ -527,11 +545,12 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
     out.textFillImage = ownBgImage;
   }
   // Split the CSS font-weight / font-style request into the real-face style label PAGX Text
-  // resolves plus the synthetic (faux) axes the renderer embosses on top. Bold (weight >= 600) and
-  // italic/oblique are baked as faux flags and dropped from the label so an uninstalled web face
-  // (e.g. "Noto Sans SC Black Italic") still renders at the authored weight and slant instead of
-  // collapsing to a thin upright fallback. Lighter weights (Light / Medium) cannot be synthesised
-  // and stay in the label.
+  // resolves plus the synthetic (faux) italic axis the renderer embosses on top. The weight axis
+  // is always written as a real-face keyword (Bold / SemiBold / Black) so the renderer resolves the
+  // authored heavy face when it is installed or embedded and preserves the SemiBold / Bold / Black
+  // distinction. If that face is unavailable, normal font lookup fallback applies without faux
+  // bold. Italic stays a faux flag so an oblique slant survives when the styled italic face is
+  // unavailable.
   FontStyleSynthesis fontSynthesis = ResolveFontStyleSynthesis(out.fontWeight, out.fontStyle);
   out.fontStyleName = fontSynthesis.fontStyleName;
   out.fauxBold = fontSynthesis.fauxBold;

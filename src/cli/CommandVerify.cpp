@@ -1755,10 +1755,16 @@ static void RunStaticDetectionOnElements(const std::vector<Element*>& elements,
 
 static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, float canvasHeight,
                                       bool parentHasLayout, const LineNodeMap& lineNodeMap,
-                                      std::vector<VerifyDiagnostic>& diagnostics) {
+                                      std::vector<VerifyDiagnostic>& diagnostics,
+                                      bool isMaskLayer = false) {
   DetectEmptyLayer(layer, parentHasLayout, diagnostics);
   DetectFullCanvasClipMask(layer, canvasWidth, canvasHeight, diagnostics);
-  DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
+  // A mask layer is a synthetic, layout-excluded construct attached to its owner; its
+  // `includeInLayout="false"` is required regardless of the owner's layout mode, so the
+  // "ineffective layout attr" lint does not apply to it.
+  if (!isMaskLayer) {
+    DetectIneffectiveLayoutAttrs(layer, parentHasLayout, diagnostics);
+  }
   DetectDowngradableLayers(layer, diagnostics);
   // Dedup with DetectDowngradableLayers: it fires when parent has no contents and no layout.
   bool dedupWithDowngrade = layer->contents.empty() && layer->layout == LayoutMode::None;
@@ -1788,7 +1794,7 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   bool thisHasLayout = layer->layout != LayoutMode::None;
   for (auto* child : layer->children) {
     RunStaticDetectionOnLayer(child, canvasWidth, canvasHeight, thisHasLayout, lineNodeMap,
-                              diagnostics);
+                              diagnostics, /*isMaskLayer=*/child == layer->mask);
   }
 }
 

@@ -67,16 +67,16 @@ static bool SetConstructor(napi_env env, napi_value constructor, const std::stri
       return false;
     }
   }
-  auto refIt = envMap.find(name);
-  if (refIt != envMap.end()) {
-    napi_delete_reference(env, refIt->second);
-    envMap.erase(refIt);
-  }
   napi_ref ref = nullptr;
   auto refStatus = napi_create_reference(env, constructor, 1, &ref);
   if (refStatus != napi_ok) {
     LOGE("SetConstructor napi_create_reference failed :%d", refStatus);
     return false;
+  }
+  auto refIt = envMap.find(name);
+  if (refIt != envMap.end()) {
+    napi_delete_reference(env, refIt->second);
+    envMap.erase(refIt);
   }
   envMap[name] = ref;
   return true;
@@ -86,7 +86,7 @@ napi_value GetConstructor(napi_env env, const std::string& name) {
   if (env == nullptr || name.empty()) {
     return nullptr;
   }
-  napi_ref ref = nullptr;
+  napi_value result = nullptr;
   {
     std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
     auto envIt = ConstructorRefMap.find(env);
@@ -97,10 +97,8 @@ napi_value GetConstructor(napi_env env, const std::string& name) {
     if (refIt == envIt->second.end()) {
       return nullptr;
     }
-    ref = refIt->second;
+    napi_get_reference_value(env, refIt->second, &result);
   }
-  napi_value result = nullptr;
-  napi_get_reference_value(env, ref, &result);
   return result;
 }
 

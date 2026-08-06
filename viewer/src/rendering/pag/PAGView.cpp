@@ -73,6 +73,7 @@ void PAGView::initDrawable() {
   }
   viewModel->getPAGPlayer()->setSurface(pagSurface);
   if (renderThread != nullptr) {
+    renderThread->setDrawable(drawable.get());
     drawable->moveToThread(renderThread.get());
   }
 }

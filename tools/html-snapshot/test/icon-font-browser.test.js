@@ -28,12 +28,15 @@ function makeSheet({ href = null, rules = null, throwOnRules = false } = {}) {
   };
 }
 
-function fontFaceRule(family, src) {
+function fontFaceRule(family, src, { weight = '', style = '' } = {}) {
   return {
     type: 5,
     style: {
       getPropertyValue: (k) =>
-        k === 'font-family' ? family : k === 'src' ? src : '',
+        k === 'font-family' ? family
+          : k === 'src' ? src
+            : k === 'font-weight' ? weight
+              : k === 'font-style' ? style : '',
     },
   };
 }
@@ -43,13 +46,17 @@ function nonFontRule(type = 1) {
 }
 
 // Build an element stub mirroring the slice of the DOM API the walker touches.
-// `before` / `after` are `{ content, family }` specs for the matching pseudo.
+// `before` / `after` are `{ content, family, weight, style }` specs for the
+// matching pseudo.
 function makeEl({ tag = 'I', childCount = 0, text = [], before = null, after = null, attrs = {} } = {}) {
   const a = { ...attrs };
   const childNodes = text.map((t) => ({ nodeType: 3, nodeValue: t }));
   const csFor = (spec) => ({
     getPropertyValue: (k) =>
-      k === 'content' ? (spec && spec.content) || '' : k === 'font-family' ? (spec && spec.family) || '' : '',
+      k === 'content' ? (spec && spec.content) || ''
+        : k === 'font-family' ? (spec && spec.family) || ''
+          : k === 'font-weight' ? (spec && spec.weight) || ''
+            : k === 'font-style' ? (spec && spec.style) || '' : '',
   });
   return {
     tagName: tag,
@@ -92,7 +99,7 @@ describe('browserCollectFontFaceMap', () => {
     expect(await browserCollectFontFaceMap()).toEqual({});
   });
 
-  test('reads @font-face rules from an accessible sheet, first-write wins', async () => {
+  test('reads every weight of a family from an accessible sheet', async () => {
     global.document = {
       baseURI: 'https://x/',
       styleSheets: [
@@ -100,18 +107,23 @@ describe('browserCollectFontFaceMap', () => {
           href: 'https://cdn.example/css/sheet.css',
           rules: [
             nonFontRule(1), // CSSStyleRule — ignored
-            fontFaceRule('"Phosphor"', "url('p.woff2') format('woff2')"),
+            fontFaceRule('"Phosphor"', "url('p.woff2') format('woff2')", { weight: '400' }),
             fontFaceRule('NoSrc', ''), // missing src — skipped
-            // Duplicate family: the first source must win.
-            fontFaceRule('Phosphor', "url('p-bold.woff2') format('woff2')"),
+            fontFaceRule('Phosphor', "url('p-bold.woff2') format('woff2')", { weight: '700' }),
           ],
         }),
       ],
     };
     const map = await browserCollectFontFaceMap();
     expect(Object.keys(map)).toEqual(['Phosphor']);
-    expect(map.Phosphor.url).toBe('https://cdn.example/css/p.woff2');
-    expect(map.Phosphor.format).toBe('woff2');
+    expect(map.Phosphor).toHaveLength(2);
+    expect(map.Phosphor[0]).toMatchObject({
+      url: 'https://cdn.example/css/p.woff2',
+      format: 'woff2',
+      weight: '400',
+      style: 'normal',
+    });
+    expect(map.Phosphor[1].url).toBe('https://cdn.example/css/p-bold.woff2');
   });
 
   test('skips a sheet whose cssRules is null', async () => {
@@ -137,7 +149,7 @@ describe('browserCollectFontFaceMap', () => {
         `@font-face { font-family: "Remix"; src: url(remix.woff2) format("woff2"); }`,
     });
     const map = await browserCollectFontFaceMap();
-    expect(map.Remix.url).toBe('https://cdn.example/remix.woff2');
+    expect(map.Remix[0].url).toBe('https://cdn.example/remix.woff2');
   });
 
   test('ignores a cross-origin fallback that returns non-OK', async () => {
@@ -232,6 +244,35 @@ describe('browserCollectIconFontTargets', () => {
     const targets = await browserCollectIconFontTargets();
     expect(targets).toHaveLength(2);
     expect(targets[0].id).not.toBe(targets[1].id);
+  });
+
+  test('selects Font Awesome Solid/900 instead of the first Regular/400 face', async () => {
+    const hit = makeEl({
+      tag: 'I',
+      before: {
+        content: '"\uf1ad"',
+        family: '"Font Awesome 6 Free"',
+        weight: '900',
+        style: 'normal',
+      },
+    });
+    global.document = {
+      baseURI: 'https://x/',
+      styleSheets: [
+        makeSheet({
+          href: 'https://cdn.example/fontawesome/all.css',
+          rules: [
+            fontFaceRule('"Font Awesome 6 Free"', "url('fa-regular-400.woff2') format('woff2')", { weight: '400' }),
+            fontFaceRule('"Font Awesome 6 Free"', "url('fa-solid-900.woff2') format('woff2')", { weight: '900' }),
+          ],
+        }),
+      ],
+      body: { querySelectorAll: () => [hit] },
+    };
+
+    const targets = await browserCollectIconFontTargets();
+    expect(targets).toHaveLength(1);
+    expect(targets[0].fontUrl).toBe('https://cdn.example/fontawesome/fa-solid-900.woff2');
   });
 });
 
