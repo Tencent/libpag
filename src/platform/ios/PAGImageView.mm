@@ -192,6 +192,11 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   self.maxFrameRate = maxFrameRate;
 
+  // The animator keeps a progress that is independent of the composition, so it must be reset to
+  // the new composition's progress when the resource is switched. Otherwise a switch triggered
+  // during playback keeps the previous progress and the new animation starts from the middle.
+  // This matches the behavior of the Android PAGImageView.
+  [animator setProgress:newComposition ? newComposition->getProgress() : 0.0];
   [self reset];
   [self updatePAGDecoder];
   if (self.isVisible) {
