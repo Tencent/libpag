@@ -184,6 +184,23 @@ inline std::shared_ptr<pagx::PAGXDocument> ParseFromString(const std::string& ht
   return pagx::HTMLImporter::ParseString(html);
 }
 
+// Parses HTML with the subset transformer disabled so the importer's own CSS cascade and
+// transform machinery run end-to-end.
+inline std::shared_ptr<pagx::PAGXDocument> ParseRaw(const std::string& html) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  return pagx::HTMLImporter::ParseString(html, opts);
+}
+
+inline bool HasDiagnosticContaining(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                    const std::string& needle) {
+  if (!doc) return false;
+  for (const auto& msg : doc->errors) {
+    if (msg.find(needle) != std::string::npos) return true;
+  }
+  return false;
+}
+
 pagx::ColorMatrixFilter* ParseColorMatrixFilter(const std::string& filter,
                                                 std::shared_ptr<pagx::PAGXDocument>& document) {
   document = ParseFromString(
@@ -4417,6 +4434,58 @@ PAG_TEST(PAGXHTMLImporterTest, ImageObjectFitCoverMapsToZoom) {
   EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Zoom);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, ImagePreservesBorderEffectsAndTransform) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <img src="logo.png" style="width:60px;height:40px;border:3px solid #00FF00;
+           box-shadow:0 2px 8px #0008;backdrop-filter:blur(6px);
+           transform:translate(7px,9px)"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* image = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(image->matrix.tx, 7.0f);
+  EXPECT_FLOAT_EQ(image->matrix.ty, 9.0f);
+  auto* stroke = FindElementOfType<pagx::Stroke>(image);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 3.0f);
+  auto* fill = FindElementOfType<pagx::Fill>(image);
+  ASSERT_NE(fill, nullptr);
+  EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
+  EXPECT_EQ(CountBackgroundBlurStyles(image), 1u);
+  bool foundShadow = false;
+  for (auto* style : image->styles) {
+    if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
+  }
+  EXPECT_TRUE(foundShadow);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgPreservesBorderEffectsAndTransform) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <svg width="60" height="40" style="width:60px;height:40px;border:2px solid #FF0000;
+           box-shadow:0 2px 4px #0008;transform:translate(5px,6px)">
+        <rect width="60" height="40" fill="#00F"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* svg = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(svg->matrix.tx, 5.0f);
+  EXPECT_FLOAT_EQ(svg->matrix.ty, 6.0f);
+  ASSERT_EQ(svg->children.size(), 2u);
+  EXPECT_EQ(svg->children.front()->importDirective.format, "svg");
+  EXPECT_FALSE(svg->children.front()->importDirective.content.empty());
+  auto* stroke = FindElementOfType<pagx::Stroke>(svg->children.back());
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 2.0f);
+  bool foundShadow = false;
+  for (auto* style : svg->styles) {
+    if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
+  }
+  EXPECT_TRUE(foundShadow);
+}
+
 // CSS `background-image: url(...)` round-trips into an ImagePattern fill (the inverse of the
 // HTML exporter). `background-size` selects the scaleMode: contain → LetterBox.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeContainMapsToLetterBox) {
@@ -5633,6 +5702,17 @@ PAG_TEST(PAGXHTMLImporterTest, RawPxLengthUnknownUnitWarnsThroughPadding) {
   EXPECT_TRUE(warned);
 }
 
+PAG_TEST(PAGXHTMLValueParserTest, UnknownAbsoluteLengthUnitIsRejected) {
+  auto document = pagx::PAGXDocument::Make(100.0f, 100.0f);
+  float canvasWidth = 100.0f;
+  float canvasHeight = 100.0f;
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  diagnostics.bindDocument(document.get());
+  pagx::HTMLValueParser parser(diagnostics, canvasWidth, canvasHeight);
+  EXPECT_TRUE(std::isnan(parser.parseAbsoluteLengthPx("1solid")));
+  EXPECT_TRUE(HasDiagnosticContaining(document, "value ignored"));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RawLineHeightUnitless) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
@@ -6476,6 +6556,43 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationCubicBezierSetsBezierInterpolation) {
   EXPECT_NEAR(ch->keyframes.back().bezierIn.x, 0.58f, kEps);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, AnimationInvalidCubicBezierFallsBackToLinear) {
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @keyframes fade { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div style="width:10px;height:10px;animation:fade 1s cubic-bezier(2,0,-1,1)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* channel = dynamic_cast<pagx::TypedChannel<float>*>(
+      FindChannel(static_cast<pagx::Animation*>(doc->animations.front()), "alpha"));
+  ASSERT_NE(channel, nullptr);
+  ASSERT_FALSE(channel->keyframes.empty());
+  EXPECT_EQ(channel->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Linear);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "invalid cubic-bezier()"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationLonghandListImportsFirstAndWarns) {
+  auto doc = ParseRaw(R"HTML(
+    <html><head><style>
+      @keyframes first { from { opacity:0; } to { opacity:1; } }
+      @keyframes second { from { opacity:1; } to { opacity:0; } }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div style="width:10px;height:10px;animation-name:first,second;
+                  animation-duration:1s,2s;animation-timing-function:linear,ease"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Animation*>(doc->animations.front())->duration, 61);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "subset:animation-multiple"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "unknown @keyframes"));
+}
+
 // CSS reverses the timing-function alongside the keyframes for `direction: reverse`. With the
 // keyframes already mirrored by the builder, the resolved easing must be reversed too — applying
 // `B'(t) = 1 - B(1 - t)` to the cubic-bezier control points (e.g. ease-in -> ease-out) so the
@@ -6706,7 +6823,10 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationFiniteCountWarns) {
   ASSERT_NE(doc, nullptr);
   bool warned = false;
   for (const auto& msg : doc->errors) {
-    if (msg.find("subset:animation-finite-count") != std::string::npos) warned = true;
+    if (msg.find("played once instead of 3 times") != std::string::npos &&
+        msg.find("subset:animation-finite-count") != std::string::npos) {
+      warned = true;
+    }
   }
   EXPECT_TRUE(warned);
   ASSERT_EQ(doc->animations.size(), 1u);
@@ -6798,28 +6918,6 @@ PAG_TEST(PAGXHTMLImporterTest, FixtureTableVisual) {
 // input. Without these, the per-CSS-function transform handlers, several CSS tokenizer edge
 // cases, and the `<br>` / unknown-element / stray-text branches in the parser stay dark.
 //==================================================================================================
-
-namespace {
-
-// Parses HTML with the subset transformer disabled so the importer's own CSS cascade and
-// transform machinery run end-to-end.
-inline std::shared_ptr<pagx::PAGXDocument> ParseRaw(const std::string& html) {
-  pagx::HTMLImporter::Options opts;
-  opts.autoNormalize = false;
-  return pagx::HTMLImporter::ParseString(html, opts);
-}
-
-// Returns true if any diagnostic message contains all of the given substrings.
-inline bool HasDiagnosticContaining(const std::shared_ptr<pagx::PAGXDocument>& doc,
-                                    const std::string& needle) {
-  if (!doc) return false;
-  for (const auto& msg : doc->errors) {
-    if (msg.find(needle) != std::string::npos) return true;
-  }
-  return false;
-}
-
-}  // namespace
 
 //==================================================================================================
 // HTMLStyleCascade — single-function `transform` handlers (raw cascade only)
@@ -10301,6 +10399,41 @@ PAG_TEST(PAGXHTMLImporterTest, HslColorSpaceSyntaxParsed) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x0000FF), 0.02f));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RgbFunctionNameIsCaseInsensitive) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:40px;height:40px">
+      <div style="width:40px;height:40px;background-color:RGB(255,0,0)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0xFF0000)));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, MalformedRgbWarnsAndFallsBackToBlack) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:40px;height:40px">
+      <div style="width:40px;height:40px;background-color:rgb(120)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "malformed rgb()"));
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x000000)));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ModernHslAlphaRequiresSlash) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:40px;height:40px">
+      <div style="width:40px;height:40px;background-color:hsl(120 100% 50% 0.5)"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "unrecognised color value"));
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(ColorNear(SolidFillColorOf(div), HexColor(0x000000)));
 }
 
 //==================================================================================================

@@ -449,7 +449,6 @@ bool ParseCSSHSLColor(const std::string& value, Color& out) {
     // Replace commas with spaces, then walk through tokens manually so we keep the unit suffix
     // attached to each numeric component.
     std::string spaced = inner;
-    bool sawSlash = false;
     for (auto& c : spaced) {
       if (c == ',') c = ' ';
     }
@@ -476,7 +475,6 @@ bool ParseCSSHSLColor(const std::string& value, Color& out) {
 
     while (ptr < end &&
            (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r' || *ptr == '/')) {
-      if (*ptr == '/') sawSlash = true;
       ++ptr;
     }
     if (ptr < end) {
@@ -487,7 +485,6 @@ bool ParseCSSHSLColor(const std::string& value, Color& out) {
       a = std::clamp(av, 0.0f, 1.0f);
       hasAlpha = true;
     }
-    (void)sawSlash;
   } else {
     const char* ptr = inner.c_str();
     const char* end = ptr + inner.size();
@@ -511,7 +508,10 @@ bool ParseCSSHSLColor(const std::string& value, Color& out) {
     while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r')) {
       ++ptr;
     }
-    if (ptr < end && *ptr == '/') {
+    if (ptr < end) {
+      // CSS Color 4 requires a slash before alpha in the modern space-separated form. Reject
+      // trailing tokens such as `hsl(120 100% 50% 0.5)` instead of silently ignoring them.
+      if (*ptr != '/') return false;
       ++ptr;
       float av = 0;
       if (!ConsumeNumber(ptr, end, av)) return false;
@@ -519,6 +519,10 @@ bool ParseCSSHSLColor(const std::string& value, Color& out) {
       if (aUnit == "%") av /= 100.0f;
       a = std::clamp(av, 0.0f, 1.0f);
       hasAlpha = true;
+      while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r')) {
+        ++ptr;
+      }
+      if (ptr != end) return false;
     }
   }
   (void)isHsla;

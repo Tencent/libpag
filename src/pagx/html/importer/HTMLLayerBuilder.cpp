@@ -326,7 +326,8 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
   return path;
 }
 
-bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
+bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
+                                              Fill* foregroundFill) {
   // `background-clip: text` redirects the gradient to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
   // `background-image`, suppress the rectangle + gradient Fill that would otherwise
@@ -339,13 +340,17 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
   // `geometry` is the shape node (Rectangle or Path) that anchors the Fill / Stroke chain
   // emitted below. We only allocate it when the box actually carries a paintable visual.
   Element* geometry = nullptr;
-  if (box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
-      box.borderSet) {
+  if (foregroundFill != nullptr || box.backgroundColorSet || !box.backgroundImage.empty() ||
+      box.borderRadiusSet || box.borderSet) {
     geometry = buildBackgroundGeometry(box);
     layer->contents.push_back(geometry);
     emitted = true;
   }
   applyBackgroundFill(layer, box, geometry, emitted);
+  if (foregroundFill != nullptr) {
+    layer->contents.push_back(foregroundFill);
+    emitted = true;
+  }
   applyBorderStroke(layer, box, geometry, emitted);
   applyBoxShadows(layer, box, emitted);
   applyBackdropFilter(layer, box, emitted);

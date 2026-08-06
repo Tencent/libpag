@@ -540,13 +540,44 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   auto* srcAttr = element->findAttribute("src");
   const std::string src = (srcAttr != nullptr) ? *srcAttr : std::string();
   if (IsExternalSvgSrc(src)) {
-    auto layer = _document->makeNode<Layer>();
+    auto* layer = _document->makeNode<Layer>();
     _layerBuilder->applySizeAndPosition(layer, box);
     _layerBuilder->applyLayerAttributes(layer, element, box);
-    layer->importDirective.source = resolveImageSource(src);
-    layer->importDirective.format = "svg";
-    assignElementId(layer, element);
-    return layer;
+    _layerBuilder->applyBoxTransform(layer, box, element);
+
+    // A Layer with an unresolved import directive cannot also carry vector contents. When the
+    // replaced SVG has box visuals, keep those on an outer layer, resolve the SVG in a filling
+    // child, and paint a border-only overlay child last so the SVG cannot cover the border.
+    Layer* importHost = layer;
+    if (HTMLLayerBuilder::hasBackgroundVisuals(box)) {
+      HTMLBoxAttributes underlayBox = box;
+      underlayBox.borderSet = false;
+      _layerBuilder->applyBackgroundVisuals(layer, underlayBox);
+
+      importHost = _document->makeNode<Layer>();
+      importHost->percentWidth = 100.0f;
+      importHost->percentHeight = 100.0f;
+      layer->children.push_back(importHost);
+
+      if (box.borderSet) {
+        HTMLBoxAttributes borderBox = box;
+        borderBox.backgroundColorSet = false;
+        borderBox.backgroundImage.clear();
+        borderBox.boxShadow.clear();
+        borderBox.backdropFilter.clear();
+        auto* borderOverlay = _document->makeNode<Layer>();
+        borderOverlay->percentWidth = 100.0f;
+        borderOverlay->percentHeight = 100.0f;
+        borderOverlay->includeInLayout = false;
+        _layerBuilder->applyBackgroundVisuals(borderOverlay, borderBox);
+        layer->children.push_back(borderOverlay);
+      }
+    }
+    importHost->importDirective.source = resolveImageSource(src);
+    importHost->importDirective.format = "svg";
+    auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
+    assignElementId(wrapper, element);
+    return wrapper;
   }
 
   // A missing / empty `src` is not a reason to drop the element: the `<img>` still occupies a
@@ -560,33 +591,31 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
     imageNode = _imageResources->createPlaceholder();
   }
 
-  auto layer = _document->makeNode<Layer>();
+  auto* layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
   _layerBuilder->applyLayerAttributes(layer, element, box);
 
-  // Honour `border-radius` directly on `<img>`: a CSS `<img style="border-radius: 50%">` is the
-  // canonical way to draw a circular avatar, and per-corner radii (e.g. only the top corners
-  // rounded for a "card cover" image) follow the same Path-emission path the container code
-  // uses. When the image has no border-radius, `buildBackgroundGeometry` falls back to a plain
-  // `Rectangle width=100% height=100%`, preserving the legacy emission verbatim.
-  layer->contents.push_back(_layerBuilder->buildBackgroundGeometry(box));
-
-  auto fill = _document->makeNode<Fill>();
-  auto pattern = _document->makeNode<ImagePattern>();
+  auto* fill = _document->makeNode<Fill>();
+  auto* pattern = _document->makeNode<ImagePattern>();
   pattern->image = imageNode;
   pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
   fill->color = pattern;
-  layer->contents.push_back(fill);
-  assignElementId(layer, element);
-  return layer;
+  // The image is the foreground paint: CSS backgrounds sit behind it, while border and box
+  // effects remain visible around it. The shared geometry also preserves border-radius.
+  _layerBuilder->applyBackgroundVisuals(layer, box, fill);
+  _layerBuilder->applyBoxTransform(layer, box, element);
+  auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
+  assignElementId(wrapper, element);
+  return wrapper;
 }
 
 Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& element,
                                            const HTMLBoxAttributes& box,
                                            const HTMLInheritedStyle& inherited) {
-  auto layer = _document->makeNode<Layer>();
+  auto* layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
   _layerBuilder->applyLayerAttributes(layer, element, box);
+  _layerBuilder->applyBoxTransform(layer, box, element);
 
   // CSS `color` cascades into the SVG and is what `currentColor` resolves to.
   // `resolveInheritedStyle` returns the style descendants see, but `resolvedTextColor`
@@ -617,10 +646,36 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   // import directive and the SVG importer can derive matching Fill / Stroke painter ids.
   collectInlineSvgShapeAnimations(element);
 
-  layer->importDirective.content = _svgEmitter->serialize(element);
-  layer->importDirective.format = "svg";
-  assignElementId(layer, element);
-  return layer;
+  Layer* importHost = layer;
+  if (HTMLLayerBuilder::hasBackgroundVisuals(box)) {
+    HTMLBoxAttributes underlayBox = box;
+    underlayBox.borderSet = false;
+    _layerBuilder->applyBackgroundVisuals(layer, underlayBox);
+
+    importHost = _document->makeNode<Layer>();
+    importHost->percentWidth = 100.0f;
+    importHost->percentHeight = 100.0f;
+    layer->children.push_back(importHost);
+
+    if (box.borderSet) {
+      HTMLBoxAttributes borderBox = box;
+      borderBox.backgroundColorSet = false;
+      borderBox.backgroundImage.clear();
+      borderBox.boxShadow.clear();
+      borderBox.backdropFilter.clear();
+      auto* borderOverlay = _document->makeNode<Layer>();
+      borderOverlay->percentWidth = 100.0f;
+      borderOverlay->percentHeight = 100.0f;
+      borderOverlay->includeInLayout = false;
+      _layerBuilder->applyBackgroundVisuals(borderOverlay, borderBox);
+      layer->children.push_back(borderOverlay);
+    }
+  }
+  importHost->importDirective.content = _svgEmitter->serialize(element);
+  importHost->importDirective.format = "svg";
+  auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
+  assignElementId(wrapper, element);
+  return wrapper;
 }
 
 void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node) {

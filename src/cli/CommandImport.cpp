@@ -18,9 +18,7 @@
 
 #include "cli/CommandImport.h"
 #ifdef _WIN32
-// MSVC exposes the POSIX pipe helpers under underscore-prefixed names (declared in <cstdio>).
-#define popen _popen
-#define pclose _pclose
+#include <windows.h>
 #else
 #include <sys/wait.h>
 #endif
@@ -120,9 +118,9 @@ static bool IsHttpUrl(const std::string& path) {
   return StartsWithLower(path, "http://", 7) || StartsWithLower(path, "https://", 8);
 }
 
-// POSIX shell quoting (single-quote wrap, escape any embedded single quotes). The
-// snapshot.js path and input path are user-controlled, so we route them through this
-// before they hit `popen`'s shell.
+#ifndef _WIN32
+// POSIX shell quoting (single-quote wrap, escape any embedded single quotes). Windows bypasses
+// the shell entirely and launches Node with CreateProcessW below.
 static std::string ShellQuote(const std::string& value) {
   std::string out = "'";
   for (char ch : value) {
@@ -135,35 +133,45 @@ static std::string ShellQuote(const std::string& value) {
   out += "'";
   return out;
 }
+#endif
 
 // Resolve the path to the html-snapshot driver script. The path is fixed in code; resolution
 // order (first hit wins):
-//   1. the relative path `tools/html-snapshot/snapshot.js` when it resolves from cwd,
-//   2. `PAGX_HTML_SNAPSHOT_BIN` environment variable,
-//   3. Upward search from cwd for `tools/html-snapshot/snapshot.js` (max 8 levels — covers
-//      the common case of running `pagx` from anywhere under the repo).
+//   1. `PAGX_HTML_SNAPSHOT_BIN` environment variable,
+//   2. the relative path `tools/html-snapshot/snapshot.js` when it resolves from cwd,
+//   3. the repository root's `tools/html-snapshot/snapshot.js`, when a `.git` marker can be found
+//      within eight parent levels.
+// Every candidate must be a regular file. Searching only after locating the repository root also
+// avoids executing a same-named script planted in an arbitrary writable ancestor directory.
 // Returns empty when nothing matched; the caller surfaces a clear error in that case.
 static std::string ResolveSnapshotBin() {
-  std::error_code existsEc;
-  const std::string relativeDefault = "tools/html-snapshot/snapshot.js";
-  if (std::filesystem::exists(relativeDefault, existsEc) && !existsEc) {
-    return relativeDefault;
-  }
+  namespace fs = std::filesystem;
+  auto isRegularFile = [](const fs::path& path) {
+    std::error_code ec;
+    return fs::is_regular_file(path, ec) && !ec;
+  };
+
   if (const char* env = std::getenv("PAGX_HTML_SNAPSHOT_BIN")) {
     if (env[0] != '\0') {
-      return env;
+      return isRegularFile(env) ? std::string(env) : std::string();
     }
   }
-  namespace fs = std::filesystem;
+
+  const std::string relativeDefault = "tools/html-snapshot/snapshot.js";
+  if (isRegularFile(relativeDefault)) {
+    return relativeDefault;
+  }
+
   std::error_code ec;
   auto cur = fs::current_path(ec);
   if (ec) {
     return {};
   }
   for (int depth = 0; depth < 8; ++depth) {
-    auto candidate = cur / "tools" / "html-snapshot" / "snapshot.js";
-    if (fs::exists(candidate, ec) && !ec) {
-      return candidate.string();
+    std::error_code markerEc;
+    if (fs::exists(cur / ".git", markerEc) && !markerEc) {
+      auto candidate = cur / "tools" / "html-snapshot" / "snapshot.js";
+      return isRegularFile(candidate) ? candidate.string() : std::string();
     }
     auto parent = cur.parent_path();
     if (parent == cur) {
@@ -197,10 +205,109 @@ struct SnapshotResult {
   std::string error = {};
 };
 
-// Spawn `node <snapshot.js> <input> -o -` and capture its stdout (the rendered HTML
-// subset). snapshot.js routes its `wrote ...` progress line and any browser errors to
-// stderr, which `popen` leaves connected to the parent's stderr — so the user still sees
-// progress and diagnostics while we get a clean HTML payload back on stdout.
+#ifdef _WIN32
+static std::wstring UTF8ToWide(const std::string& value) {
+  if (value.empty()) return {};
+  int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
+                                 static_cast<int>(value.size()), nullptr, 0);
+  if (size <= 0) return {};
+  std::wstring wide(static_cast<size_t>(size), L'\0');
+  MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()),
+                      wide.data(), size);
+  return wide;
+}
+
+// Quotes one argv item using the CommandLineToArgvW / Microsoft C runtime rules. CreateProcessW
+// receives this command line directly, so cmd.exe metacharacters never get a chance to execute.
+static std::wstring QuoteWindowsArg(const std::wstring& value) {
+  std::wstring out = L"\"";
+  size_t backslashes = 0;
+  for (wchar_t ch : value) {
+    if (ch == L'\\') {
+      backslashes++;
+      continue;
+    }
+    if (ch == L'\"') {
+      out.append(backslashes * 2 + 1, L'\\');
+      out.push_back(L'\"');
+    } else {
+      out.append(backslashes, L'\\');
+      out.push_back(ch);
+    }
+    backslashes = 0;
+  }
+  out.append(backslashes * 2, L'\\');
+  out.push_back(L'\"');
+  return out;
+}
+
+static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& inputPath,
+                                   bool captureAnimations, std::string& html, int& exitCode,
+                                   std::string& error) {
+  std::wstring node = L"node";
+  std::wstring wideBin = UTF8ToWide(bin);
+  std::wstring wideInput = UTF8ToWide(inputPath);
+  if (wideBin.empty() || wideInput.empty()) {
+    error = "failed to encode html-snapshot arguments as UTF-16";
+    return false;
+  }
+  std::wstring command = QuoteWindowsArg(node) + L" " + QuoteWindowsArg(wideBin) + L" " +
+                         QuoteWindowsArg(wideInput) + L" \"-o\" \"-\"";
+  if (captureAnimations) command += L" \"--capture-animations\"";
+
+  SECURITY_ATTRIBUTES security = {};
+  security.nLength = sizeof(security);
+  security.bInheritHandle = TRUE;
+  HANDLE readPipe = nullptr;
+  HANDLE writePipe = nullptr;
+  if (!CreatePipe(&readPipe, &writePipe, &security, 0)) {
+    error = "failed to create html-snapshot output pipe (Windows error " +
+            std::to_string(GetLastError()) + ")";
+    return false;
+  }
+  if (!SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0)) {
+    error = "failed to configure html-snapshot output pipe (Windows error " +
+            std::to_string(GetLastError()) + ")";
+    CloseHandle(readPipe);
+    CloseHandle(writePipe);
+    return false;
+  }
+
+  STARTUPINFOW startup = {};
+  startup.cb = sizeof(startup);
+  startup.dwFlags = STARTF_USESTDHANDLES;
+  startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  startup.hStdOutput = writePipe;
+  startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+  PROCESS_INFORMATION process = {};
+  BOOL started = CreateProcessW(nullptr, command.data(), nullptr, nullptr, TRUE, 0, nullptr,
+                                nullptr, &startup, &process);
+  CloseHandle(writePipe);
+  if (!started) {
+    error = "failed to spawn html-snapshot (Windows error " + std::to_string(GetLastError()) + ")";
+    CloseHandle(readPipe);
+    return false;
+  }
+
+  char buffer[4096];
+  DWORD read = 0;
+  while (ReadFile(readPipe, buffer, sizeof(buffer), &read, nullptr) && read > 0) {
+    html.append(buffer, read);
+  }
+  CloseHandle(readPipe);
+  WaitForSingleObject(process.hProcess, INFINITE);
+  DWORD code = 1;
+  GetExitCodeProcess(process.hProcess, &code);
+  exitCode = static_cast<int>(code);
+  CloseHandle(process.hThread);
+  CloseHandle(process.hProcess);
+  return true;
+}
+#endif
+
+// Spawn `node <snapshot.js> <input> -o -` and capture its stdout (the rendered HTML subset).
+// snapshot.js routes progress and browser errors to stderr, which remains connected to the
+// parent's stderr on both the POSIX popen path and the Windows CreateProcessW path.
 static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool captureAnimations) {
   SnapshotResult result;
   auto bin = ResolveSnapshotBin();
@@ -210,6 +317,18 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool capture
         "that contains tools/html-snapshot/snapshot.js";
     return result;
   }
+#ifdef _WIN32
+  int exitCode = 1;
+  if (!RunHTMLSnapshotProcess(bin, inputPath, captureAnimations, result.html, exitCode,
+                              result.error)) {
+    return result;
+  }
+  if (exitCode != 0) {
+    result.error = "html-snapshot failed (exit code " + std::to_string(exitCode) +
+                   "); see stderr above for details";
+    return result;
+  }
+#else
   std::string command = "node ";
   command += ShellQuote(bin);
   command += " ";
@@ -235,16 +354,10 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool capture
   }
   int status = pclose(pipe);
   if (status != 0) {
-    // `pclose` returns the wait(2) status on POSIX (so 127 lives in the high byte and means
-    // "shell could not exec the command", typically `node` not on PATH) and the raw exit code
-    // on Windows. Decode where we can so the diagnostic distinguishes `node` missing from a
-    // genuine snapshot failure — without this the raw status integer (e.g. 32512 == 127 << 8)
-    // looks identical to "snapshot crashed".
-#ifdef _WIN32
-    int exitCode = status;
-#else
+    // `pclose` returns the wait(2) status on POSIX, so 127 lives in the high byte and means
+    // "shell could not exec the command" (typically `node` not on PATH). Decode it so the
+    // diagnostic distinguishes a missing runtime from a genuine snapshot failure.
     int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-#endif
     if (exitCode == 127) {
       result.error =
           "html-snapshot failed: `node` not found on PATH. Install Node.js (>=18) or set "
@@ -258,11 +371,14 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool capture
     }
     return result;
   }
-  if (html.empty()) {
+#endif
+#ifndef _WIN32
+  result.html = std::move(html);
+#endif
+  if (result.html.empty()) {
     result.error = "html-snapshot produced empty output";
     return result;
   }
-  result.html = std::move(html);
   return result;
 }
 

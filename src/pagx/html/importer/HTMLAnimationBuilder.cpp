@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <sstream>
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/html/importer/HTMLCssCascade.h"
@@ -159,9 +160,21 @@ void ReverseEasing(ResolvedEasing& easing) {
   }
 }
 
+bool ParseFiniteNumber(const std::string& token, float& value) {
+  std::string trimmed = Trim(token);
+  const char* begin = trimmed.c_str();
+  char* end = nullptr;
+  float parsed = std::strtof(begin, &end);
+  if (end == begin || !Trim(end).empty() || !std::isfinite(parsed)) return false;
+  value = parsed;
+  return true;
+}
+
 // Resolves a CSS timing-function string to an easing descriptor. Unknown / malformed values
-// fall back to Linear.
-ResolvedEasing ResolveTimingFunction(const std::string& value) {
+// fall back to Linear. Invalid cubic-bezier coordinates are diagnosed because CSS requires both
+// x control points to stay in [0, 1] (the y coordinates may overshoot but must remain finite).
+ResolvedEasing ResolveTimingFunction(const std::string& value,
+                                     HTMLDiagnosticSink* diagnostics = nullptr) {
   ResolvedEasing e = {};
   std::string lc = ToLower(Trim(value));
   if (lc.empty() || lc == "linear") {
@@ -219,12 +232,25 @@ ResolvedEasing ResolveTimingFunction(const std::string& value) {
     if (fn == "cubic-bezier") {
       auto parts = SplitTopLevelCommas(args);
       if (parts.size() == 4) {
-        e.kind = ResolvedEasing::Kind::Bezier;
-        e.x1 = std::strtof(Trim(parts[0]).c_str(), nullptr);
-        e.y1 = std::strtof(Trim(parts[1]).c_str(), nullptr);
-        e.x2 = std::strtof(Trim(parts[2]).c_str(), nullptr);
-        e.y2 = std::strtof(Trim(parts[3]).c_str(), nullptr);
-        return e;
+        float x1 = 0.0f;
+        float y1 = 0.0f;
+        float x2 = 0.0f;
+        float y2 = 0.0f;
+        if (ParseFiniteNumber(parts[0], x1) && ParseFiniteNumber(parts[1], y1) &&
+            ParseFiniteNumber(parts[2], x2) && ParseFiniteNumber(parts[3], y2) && x1 >= 0.0f &&
+            x1 <= 1.0f && x2 >= 0.0f && x2 <= 1.0f) {
+          e.kind = ResolvedEasing::Kind::Bezier;
+          e.x1 = x1;
+          e.y1 = y1;
+          e.x2 = x2;
+          e.y2 = y2;
+          return e;
+        }
+      }
+      if (diagnostics != nullptr) {
+        diagnostics->warn("html: invalid cubic-bezier() value '" + value +
+                          "'; falling back to linear "
+                          "[subset:animation-unsupported-property]");
       }
     } else if (fn == "steps") {
       auto parts = SplitTopLevelCommas(args);
@@ -322,20 +348,32 @@ void ParseAnimationShorthand(const std::string& value, AnimationSpec& spec, bool
   }
 }
 
+// Returns the first item from an animation longhand list and records when the declaration contains
+// more than one animation. Commas nested inside functions such as cubic-bezier() are preserved.
+std::string FirstAnimationLonghandValue(const std::unordered_map<std::string, std::string>& style,
+                                        const char* key, bool& multiple) {
+  std::string value = GetTrimmed(style, key);
+  if (value.empty()) return value;
+  auto entries = SplitTopLevelCommas(value);
+  if (entries.size() > 1) multiple = true;
+  return entries.empty() ? std::string() : Trim(entries.front());
+}
+
 // Applies longhand `animation-*` declarations on top of `spec` (longhands win over the shorthand
-// for any property they specify, matching CSS cascade for individual declarations).
+// for any property they specify, matching CSS cascade for individual declarations). Only the first
+// list item is imported, consistently with the shorthand path.
 void ApplyAnimationLonghands(const std::unordered_map<std::string, std::string>& style,
-                             AnimationSpec& spec) {
-  std::string name = GetTrimmed(style, "animation-name");
+                             AnimationSpec& spec, bool& multiple) {
+  std::string name = FirstAnimationLonghandValue(style, "animation-name", multiple);
   if (!name.empty() && ToLower(name) != "none") spec.name = name;
-  std::string dur = GetTrimmed(style, "animation-duration");
+  std::string dur = FirstAnimationLonghandValue(style, "animation-duration", multiple);
   float seconds = 0.0f;
   if (!dur.empty() && ParseTimeSeconds(dur, seconds)) spec.durationSeconds = seconds;
-  std::string delay = GetTrimmed(style, "animation-delay");
+  std::string delay = FirstAnimationLonghandValue(style, "animation-delay", multiple);
   if (!delay.empty() && ParseTimeSeconds(delay, seconds)) spec.delaySeconds = seconds;
-  std::string timing = GetTrimmed(style, "animation-timing-function");
+  std::string timing = FirstAnimationLonghandValue(style, "animation-timing-function", multiple);
   if (!timing.empty()) spec.timingFunction = ToLower(timing);
-  std::string iter = GetTrimmed(style, "animation-iteration-count");
+  std::string iter = FirstAnimationLonghandValue(style, "animation-iteration-count", multiple);
   if (!iter.empty()) {
     if (ToLower(iter) == "infinite") {
       spec.iterationInfinite = true;
@@ -348,9 +386,9 @@ void ApplyAnimationLonghands(const std::unordered_map<std::string, std::string>&
       }
     }
   }
-  std::string dir = GetTrimmed(style, "animation-direction");
+  std::string dir = FirstAnimationLonghandValue(style, "animation-direction", multiple);
   if (!dir.empty()) spec.direction = ToLower(dir);
-  std::string fillMode = GetTrimmed(style, "animation-fill-mode");
+  std::string fillMode = FirstAnimationLonghandValue(style, "animation-fill-mode", multiple);
   if (!fillMode.empty()) {
     std::string lc = ToLower(fillMode);
     if (IsFillModeKeyword(lc)) spec.fillMode = lc;
@@ -927,7 +965,7 @@ bool HTMLAnimationBuilder::buildForElement(
   if (hasShorthand) {
     ParseAnimationShorthand(shorthandIt->second, spec, multiple);
   }
-  ApplyAnimationLonghands(resolvedStyle, spec);
+  ApplyAnimationLonghands(resolvedStyle, spec, multiple);
   if (multiple) {
     _diagnostics.warn(
         "html: only the first animation in a comma-separated 'animation' list is imported "
@@ -988,7 +1026,7 @@ bool HTMLAnimationBuilder::buildForElement(
   std::stable_sort(stops.begin(), stops.end(), KeyframeStopLess);
 
   // Timing -> per-segment easing (applied uniformly across the animation).
-  ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction);
+  ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction, &_diagnostics);
   if (reversed) {
     ReverseEasing(easing);
   }
@@ -1324,8 +1362,12 @@ bool HTMLAnimationBuilder::buildForElement(
   }
   animation->loop = loopMode;
   if (!spec.iterationInfinite && spec.iterationCount != 1.0f) {
+    std::ostringstream count;
+    count << spec.iterationCount;
     _diagnostics.warn(
-        "html: finite animation-iteration-count is not supported; played once "
+        "html: finite animation-iteration-count is not supported; played once instead of " +
+        count.str() +
+        " times "
         "[subset:animation-finite-count]");
   } else if (isAlternate && !spec.iterationInfinite) {
     _diagnostics.warn(
@@ -1675,7 +1717,12 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       ParseAnimationShorthand(entry, spec, dummyMultiple);
     }
     if (entries.size() == 1) {
-      ApplyAnimationLonghands(style, spec);
+      ApplyAnimationLonghands(style, spec, dummyMultiple);
+      if (dummyMultiple) {
+        _diagnostics.warn(
+            "html: only the first animation in a comma-separated animation longhand list is "
+            "imported [subset:animation-multiple]");
+      }
     }
     if (spec.name.empty() || spec.durationSeconds <= 0.0f) continue;
 
@@ -1693,7 +1740,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
     std::stable_sort(stops.begin(), stops.end(), KeyframeStopLess);
 
-    ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction);
+    ResolvedEasing easing = ResolveTimingFunction(spec.timingFunction, &_diagnostics);
     if (reversed) ReverseEasing(easing);
     KeyframeInterpolationType interp = KeyframeInterpolationType::Linear;
     if (easing.kind == ResolvedEasing::Kind::Steps) {

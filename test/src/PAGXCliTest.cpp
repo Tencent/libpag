@@ -1448,6 +1448,35 @@ CLI_TEST(PAGXCliTest, ImportFile_HtmExtensionNormalizedNoSnapshot) {
   ASSERT_NE(result.document, nullptr);
 }
 
+// An explicitly configured snapshot driver must resolve to a regular file. Do not silently pass a
+// missing path to Node or fall back to an unrelated script discovered elsewhere.
+CLI_TEST(PAGXCliTest, ImportFile_InvalidSnapshotBinRejected) {
+  auto htmlPath = TempDir() + "/ImportFile_InvalidSnapshotBin.html";
+  {
+    std::ofstream out(htmlPath);
+    out << "<html><body style=\"width:20px;height:20px\"></body></html>";
+  }
+  const char* previousEnabled = std::getenv("PAGX_HTML_SNAPSHOT");
+  const char* previousBin = std::getenv("PAGX_HTML_SNAPSHOT_BIN");
+  std::string savedEnabled = previousEnabled ? previousEnabled : "";
+  std::string savedBin = previousBin ? previousBin : "";
+  setenv("PAGX_HTML_SNAPSHOT", "1", 1);
+  setenv("PAGX_HTML_SNAPSHOT_BIN", "/definitely/not/a/snapshot-driver.js", 1);
+  auto result = pagx::cli::ImportFile(htmlPath, "", {});
+  if (previousEnabled) {
+    setenv("PAGX_HTML_SNAPSHOT", savedEnabled.c_str(), 1);
+  } else {
+    unsetenv("PAGX_HTML_SNAPSHOT");
+  }
+  if (previousBin) {
+    setenv("PAGX_HTML_SNAPSHOT_BIN", savedBin.c_str(), 1);
+  } else {
+    unsetenv("PAGX_HTML_SNAPSHOT_BIN");
+  }
+  EXPECT_NE(result.error.find("html-snapshot script not found"), std::string::npos);
+  EXPECT_EQ(result.document, nullptr);
+}
+
 // A URL input while the snapshot pre-pass is disabled is rejected: the importers cannot fetch
 // http(s) themselves.
 CLI_TEST(PAGXCliTest, ImportFile_UrlWithoutSnapshotRejected) {
@@ -2906,6 +2935,34 @@ CLI_TEST(PAGXCliTest, Resolve_ExpandExternalSource) {
   auto doc = pagx::PAGXImporter::FromFile(pagxPath);
   ASSERT_NE(doc, nullptr);
   EXPECT_FALSE(doc->hasUnresolvedImports());
+}
+
+CLI_TEST(PAGXCliTest, Resolve_BoxedInlineSvgKeepsVisualWrapper) {
+  auto imported = pagx::cli::ImportString(
+      R"HTML(<html><body style="width:80px;height:80px">
+        <svg width="60" height="40" style="width:60px;height:40px;
+             border:2px solid #FF0000;box-shadow:0 2px 4px #0008;
+             transform:translate(5px,6px)">
+          <rect width="60" height="40" fill="#00F"/>
+        </svg>
+      </body></html>)HTML",
+      "html", {});
+  ASSERT_TRUE(imported.error.empty());
+  ASSERT_NE(imported.document, nullptr);
+  EXPECT_TRUE(imported.document->hasUnresolvedImports());
+
+  auto stats = pagx::cli::ResolveDocument(imported.document.get(), "", {});
+  EXPECT_EQ(stats.resolvedCount, 1);
+  EXPECT_EQ(stats.errorCount, 0);
+  EXPECT_FALSE(imported.document->hasUnresolvedImports());
+  ASSERT_EQ(imported.document->layers.size(), 1u);
+  ASSERT_EQ(imported.document->layers.front()->children.size(), 1u);
+  auto* svgLayer = imported.document->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(svgLayer->matrix.tx, 5.0f);
+  EXPECT_FLOAT_EQ(svgLayer->matrix.ty, 6.0f);
+
+  auto xml = pagx::PAGXExporter::ToXML(*imported.document);
+  EXPECT_NE(xml.find("<Stroke"), std::string::npos);
 }
 
 CLI_TEST(PAGXCliTest, Resolve_NoImportNodes) {

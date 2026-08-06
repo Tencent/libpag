@@ -222,21 +222,23 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
       return {0, 0, 0, 1, ColorSpace::SRGB};
     }
   }
-  if (value.compare(0, 3, "rgb") == 0) {
+  if (lowered.compare(0, 3, "rgb") == 0) {
     auto open = value.find('(');
     auto close = value.find(')');
     if (open != std::string::npos && close != std::string::npos) {
       std::string inner = value.substr(open + 1, close - open - 1);
       auto comps = ParseFloatList(inner);
+      if (comps.size() < 3) {
+        _diagnostics.warn("html: malformed rgb() value '" + value +
+                          "'; falling back to opaque black");
+        return {0, 0, 0, 1, ColorSpace::SRGB};
+      }
       Color color = {};
       color.colorSpace = ColorSpace::SRGB;
-      float r = 0, g = 0, b = 0, a = 1.0f;
-      if (comps.size() >= 3) {
-        r = comps[0];
-        g = comps[1];
-        b = comps[2];
-        if (comps.size() >= 4) a = comps[3];
-      }
+      float r = comps[0];
+      float g = comps[1];
+      float b = comps[2];
+      float a = comps.size() >= 4 ? comps[3] : 1.0f;
       color.red = r / 255.0f;
       color.green = g / 255.0f;
       color.blue = b / 255.0f;
@@ -336,8 +338,8 @@ float HTMLValueParser::parseAbsoluteLengthPx(const std::string& valueRaw) {
     }
     return px;
   }
-  _diagnostics.warn("html: length unit '" + suffix + "' not supported; treated as px");
-  return num;
+  _diagnostics.warn("html: length unit '" + suffix + "' not supported; value ignored");
+  return NAN;
 }
 
 float HTMLValueParser::resolveLineHeightPx(const std::string& valueRaw, float fontSizePx) {
