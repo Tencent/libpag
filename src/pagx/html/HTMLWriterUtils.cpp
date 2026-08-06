@@ -25,6 +25,7 @@
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
+#include "pagx/html/HTMLResourceWriter.h"
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -45,6 +46,56 @@ namespace pagx {
 
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
+
+bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
+                                      size_t size, std::string* errorMsg) {
+  if (resourceWriter != nullptr) {
+    std::string error;
+    bool ok = resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, &error);
+    if (!ok) {
+      if (zipResourceError.empty()) {
+        zipResourceError = error.empty() ? "failed to write ZIP entry: " + relativePath : error;
+      }
+      if (errorMsg) {
+        *errorMsg = error;
+      }
+    }
+    return ok;
+  }
+  if (staticImgDir.empty()) {
+    return false;
+  }
+  std::string dir = staticImgDir;
+  std::string name = relativePath;
+  size_t slash = relativePath.find_last_of('/');
+  if (slash != std::string::npos) {
+    dir += "/" + relativePath.substr(0, slash);
+    name = relativePath.substr(slash + 1);
+  }
+  std::error_code ec;
+  std::filesystem::create_directories(dir, ec);
+  if (ec) {
+    if (errorMsg) {
+      *errorMsg = "failed to create directory: " + dir;
+    }
+    return false;
+  }
+  std::ofstream f(dir + "/" + name, std::ios::binary);
+  if (!f.is_open()) {
+    if (errorMsg) {
+      *errorMsg = "failed to open output file: " + dir + "/" + name;
+    }
+    return false;
+  }
+  f.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(size));
+  if (!f.good()) {
+    if (errorMsg) {
+      *errorMsg = "write error after opening file: " + dir + "/" + name;
+    }
+    return false;
+  }
+  return true;
+}
 
 //==============================================================================
 // Color Conversion

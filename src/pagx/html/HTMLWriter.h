@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <filesystem>
-#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -28,7 +26,6 @@
 #include "pagx/html/FontSignature.h"
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLPlusDarkerRenderer.h"
-#include "pagx/html/HTMLResourceWriter.h"
 #include "pagx/nodes/ColorSource.h"
 #include "pagx/nodes/ColorStop.h"
 #include "pagx/nodes/Composition.h"
@@ -54,6 +51,7 @@
 namespace pagx {
 
 class Group;
+class HTMLResourceWriter;
 class HTMLWriterContext;
 class LinearGradient;
 class RadialGradient;
@@ -280,62 +278,6 @@ class HTMLWriterContext {
  private:
   int _id = 0;
 };
-
-inline bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
-                                             size_t size, std::string* errorMsg) {
-  if (resourceWriter != nullptr) {
-    // ToData: the archive entry name must equal the URL the HTML references
-    // ("assets/img0.png", "assets/fonts/font_f0.woff2" ...), so prepend
-    // staticImgUrlPrefix ("assets/"). ToHTML never reaches here (resourceWriter
-    // is null) and keeps writing to staticImgDir unchanged.
-    std::string error;
-    bool ok = resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, &error);
-    if (!ok) {
-      if (zipResourceError.empty()) {
-        zipResourceError = error.empty() ? "failed to write ZIP entry: " + relativePath : error;
-      }
-      if (errorMsg) {
-        *errorMsg = error;
-      }
-    }
-    return ok;
-  }
-  // Original write-to-disk logic: staticImgDir + relativePath (subdirectories included), with
-  // create_directories before writing the file.
-  if (staticImgDir.empty()) {
-    return false;
-  }
-  std::string dir = staticImgDir;
-  std::string name = relativePath;
-  size_t slash = relativePath.find_last_of('/');
-  if (slash != std::string::npos) {
-    dir += "/" + relativePath.substr(0, slash);
-    name = relativePath.substr(slash + 1);
-  }
-  std::error_code ec;
-  std::filesystem::create_directories(dir, ec);
-  if (ec) {
-    if (errorMsg) {
-      *errorMsg = "failed to create directory: " + dir;
-    }
-    return false;
-  }
-  std::ofstream f(dir + "/" + name, std::ios::binary);
-  if (!f.is_open()) {
-    if (errorMsg) {
-      *errorMsg = "failed to open output file: " + dir + "/" + name;
-    }
-    return false;
-  }
-  f.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(size));
-  if (!f.good()) {
-    if (errorMsg) {
-      *errorMsg = "write error after opening file: " + dir + "/" + name;
-    }
-    return false;
-  }
-  return true;
-}
 
 class RecursionGuard {
  public:
