@@ -369,6 +369,12 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
     }
     return nullptr;
   }
+  if (!ctx.zipResourceError.empty()) {
+    if (errorMsg) {
+      *errorMsg = "failed to write resource into archive: " + ctx.zipResourceError;
+    }
+    return nullptr;
+  }
   if (!zipWriter.write("index.html", html.data(), html.size(), errorMsg)) {
     return nullptr;
   }
