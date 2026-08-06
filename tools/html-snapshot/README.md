@@ -525,9 +525,11 @@ Babel-compiled at runtime.
 
 ## Limitations
 
-- Animations, hover states, and other dynamic effects are captured in whatever
-  state the page is in when the snapshot is taken. Use `--wait-ms` or
-  `--selector` to land on the desired frame.
+- The browser requests `prefers-reduced-motion: reduce` before navigation so
+  pages can expose a complete static presentation instead of an entrance-
+  animation start frame. Dynamic effects that ignore that preference are
+  captured in whatever state they are in; use `--wait-ms` or `--selector` to
+  land on the desired frame.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
 - `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,

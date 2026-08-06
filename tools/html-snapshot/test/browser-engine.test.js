@@ -8,6 +8,7 @@ const {
   isWrapper,
   newPage,
   setViewport,
+  emulateReducedMotion,
   mapWaitUntil,
   addCookies,
   responseBytes,
@@ -150,6 +151,24 @@ describe('setViewport', () => {
 
   test('no-op when viewport is falsy', async () => {
     await expect(setViewport({}, 'puppeteer', null)).resolves.toBeUndefined();
+  });
+});
+
+describe('emulateReducedMotion', () => {
+  test('puppeteer uses emulateMediaFeatures', async () => {
+    const calls = [];
+    const page = { emulateMediaFeatures: (features) => calls.push(features) };
+    await emulateReducedMotion(page, 'puppeteer', true);
+    expect(calls).toEqual([[
+      { name: 'prefers-reduced-motion', value: 'reduce' },
+    ]]);
+  });
+
+  test('playwright uses emulateMedia', async () => {
+    const calls = [];
+    const page = { emulateMedia: (media) => calls.push(media) };
+    await emulateReducedMotion(page, 'playwright', false);
+    expect(calls).toEqual([{ reducedMotion: 'no-preference' }]);
   });
 });
 
