@@ -46,7 +46,7 @@ static bool HasZipMagic(const pagx::Data* data) {
 
 // Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced).
 static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
-  static const uint8_t kMinimalPNG[] = {
+  static const uint8_t MINIMAL_PNG[] = {
       0x89,
       0x50,
       0x4E,
@@ -126,7 +126,7 @@ static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
       0x82,
   };
   auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(kMinimalPNG, sizeof(kMinimalPNG));
+  image->data = pagx::Data::MakeWithCopy(MINIMAL_PNG, sizeof(MINIMAL_PNG));
   return image;
 }
 

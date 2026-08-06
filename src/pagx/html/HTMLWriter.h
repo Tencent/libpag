@@ -197,6 +197,10 @@ class HTMLWriterContext {
   // writer instead (ToData), so the in-memory archive receives the same bytes.
   HTMLResourceWriter* resourceWriter = nullptr;
 
+  // ToData only: first resource write failure, if any. An archive is all-or-nothing
+  // (design spec section 8), so any failed ZIP entry write fails the whole ToData call.
+  std::string zipResourceError = {};
+
   bool hasResourceOutput() const {
     return resourceWriter != nullptr || !staticImgDir.empty();
   }
@@ -284,7 +288,11 @@ inline bool HTMLWriterContext::writeResource(const std::string& relativePath, co
     // ("assets/img0.png", "assets/fonts/font_f0.woff2" ...), so prepend
     // staticImgUrlPrefix ("assets/"). ToHTML never reaches here (resourceWriter
     // is null) and keeps writing to staticImgDir unchanged.
-    return resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, errorMsg);
+    bool ok = resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, errorMsg);
+    if (!ok && zipResourceError.empty() && errorMsg) {
+      zipResourceError = *errorMsg;
+    }
+    return ok;
   }
   // Original write-to-disk logic: staticImgDir + relativePath (subdirectories included), with
   // create_directories before writing the file.
