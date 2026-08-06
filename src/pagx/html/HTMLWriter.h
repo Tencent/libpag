@@ -205,8 +205,9 @@ class HTMLWriterContext {
 
   // Writes a resource. relativePath is relative to the resource root (ToHTML:
   // staticImgDir; ToData: the ZIP root) and may contain '/'-separated sub
-  // directories. Falls back to the original write-to-disk behavior when
-  // resourceWriter is null.
+  // directories. In ToData mode the ZIP entry name is staticImgUrlPrefix +
+  // relativePath, keeping archive entries and HTML URLs in sync. Falls back
+  // to the original write-to-disk behavior when resourceWriter is null.
   bool writeResource(const std::string& relativePath, const void* bytes, size_t size,
                      std::string* errorMsg);
 
