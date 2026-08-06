@@ -288,9 +288,15 @@ inline bool HTMLWriterContext::writeResource(const std::string& relativePath, co
     // ("assets/img0.png", "assets/fonts/font_f0.woff2" ...), so prepend
     // staticImgUrlPrefix ("assets/"). ToHTML never reaches here (resourceWriter
     // is null) and keeps writing to staticImgDir unchanged.
-    bool ok = resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, errorMsg);
-    if (!ok && zipResourceError.empty() && errorMsg) {
-      zipResourceError = *errorMsg;
+    std::string error;
+    bool ok = resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, &error);
+    if (!ok) {
+      if (zipResourceError.empty()) {
+        zipResourceError = error.empty() ? "failed to write ZIP entry: " + relativePath : error;
+      }
+      if (errorMsg) {
+        *errorMsg = error;
+      }
     }
     return ok;
   }
