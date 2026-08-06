@@ -380,6 +380,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   width = 0;
   height = 0;
   numFrames = 0;
+  self.currentFrameIndex = -1;
+  self.currentUIImage = nil;
 }
 
 - (UIImage*)imageForCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
