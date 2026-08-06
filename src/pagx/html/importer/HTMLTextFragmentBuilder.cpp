@@ -343,11 +343,15 @@ Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& 
   //   - inline element (`<span>`/`<a>`): CSS shrink-to-fit. Block `<p>`/`<hN>` keep their width.
   //   - non-wrapping (`nowrap`/`pre`): the size is not a wrap boundary.
   //   - no background visuals: nothing painted depends on the box size.
+  //   - start-aligned text: center/end/justify use the box width to place the glyph run, so the
+  //     measured width is a real alignment boundary even when the element tag is `<span>`.
   //   - not anchored against the far edge: the inline-axis size does not drive the box position.
   //   - not a flex-grow child: the flex engine is not distributing free space through it.
   bool inlineTag = element->name == "span" || element->name == "a";
   bool notFlexGrow = !box.flexGrowSet || box.flexGrow == 0.0f;
-  bool shrinkToFit = inlineTag && hasNoWrap && !hasBgVisuals && notFlexGrow;
+  std::string textAlign = ToLower(Trim(inherited.textAlign));
+  bool startAligned = textAlign.empty() || textAlign == "left" || textAlign == "start";
+  bool shrinkToFit = inlineTag && hasNoWrap && !hasBgVisuals && notFlexGrow && startAligned;
   bool shrinkWidth = shrinkToFit && !isVertical && std::isnan(box.rightPx);
   bool shrinkHeight = shrinkToFit && isVertical && std::isnan(box.bottomPx);
 

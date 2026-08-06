@@ -1712,6 +1712,27 @@ PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapTextLeafShrinksToFitWidth) {
   EXPECT_FLOAT_EQ(leaf->left, 0.0f);
 }
 
+// Alignment makes an inline text leaf's measured width semantically meaningful. The snapshot
+// pipeline reconstructs a block heading with differently-coloured inline runs as one absolute
+// `<span>` so PAGX can shape the runs together. If the importer drops that span's width, a centred
+// rich title is laid out at its natural width from the left edge instead of remaining centred in
+// the browser-measured box.
+PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapCenteredRichTextLeafKeepsAlignmentWidth) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:420px;height:90px">
+      <span style="position:absolute;left:0;top:0;width:420px;height:85.5px;font-size:90px;line-height:85.5px;text-align:center;white-space:nowrap">江湖<span style="color:#C9A962">启程</span></span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_FLOAT_EQ(leaf->width, 420.0f);
+  auto* textBox = FindElementOfType<pagx::TextBox>(leaf);
+  ASSERT_NE(textBox, nullptr);
+  EXPECT_EQ(textBox->textAlign, pagx::TextAlign::Center);
+  EXPECT_FLOAT_EQ(textBox->percentWidth, 100.0f);
+}
+
 // Block-level text leaves (<p>, <h1..6>) keep their authored width: a block box is as wide as
 // its declared dimension in CSS, not shrink-to-fit, so the measured width is meaningful.
 PAG_TEST(PAGXHTMLImporterTest, BlockNoWrapTextLeafKeepsWidth) {
