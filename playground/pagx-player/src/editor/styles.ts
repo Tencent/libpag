@@ -136,83 +136,60 @@ export const EDITOR_STYLES = `
     position: relative;
 }
 
-#editor-panel .editor-host .cm-editor {
+#editor-panel .editor-host .monaco-editor {
     height: 100%;
-    font-size: 13px;
-    font-family: Menlo, Monaco, 'Courier New', monospace;
-}
-
-#editor-panel .editor-host .cm-scroller {
-    overflow: auto;
-}
-
-/* Fix white square at scrollbar corner */
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-corner {
     background: #1E1E1E;
 }
 
-#editor-panel .editor-host .cm-gutters {
+#editor-panel .editor-host .monaco-editor .margin {
     background: #1E1E1E;
     border-right: 1px solid #3C3C3C;
     color: #6E7681;
 }
 
-#editor-panel .editor-host .cm-focused {
-    outline: none;
+/* In the read-only state, hide Monaco's virtual cursor (<div class="cursor">) so a single
+   click doesn't show a blinking caret the user can never type at. Monaco 0.47.0's
+   cursorStyle enum doesn't include 'hidden' (added in a later version), so the toggle
+   is driven by the pagx-editor-readonly class that SourceEditor adds/removes on the
+   editor-host element when entering/leaving edit mode. */
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .cursor {
+    display: none !important;
 }
 
-/* Selection highlight. !important guards against CodeMirror's baseTheme and any focused-state
-   rule that may be injected inline; specificity alone is not always enough. */
-#editor-panel .editor-host .cm-editor .cm-selectionBackground,
-#editor-panel .editor-host .cm-editor.cm-focused .cm-selectionBackground,
-#editor-panel .editor-host .cm-editor ::selection {
-    background-color: rgba(68, 142, 249, 0.35) !important;
-}
-
-/* highlightSelectionMatches - subtle highlight for matching text under cursor */
-#editor-panel .editor-host .cm-editor .cm-selectionMatch {
-    background-color: rgba(234, 179, 8, 0.15);
-}
-
-#editor-panel .editor-host .cm-editor .cm-selectionMatch-selected {
-    background-color: rgba(68, 142, 249, 0.3);
-}
-
-/* Node-span highlights mirrored from the canvas selection state. Two layers, matching the DevTools
-   convention: transient grey hover and sticky blue selection. The .cm-select-line rule is declared
-   after .cm-hover-line so that when both cover the same line the blue selection wins. */
-#editor-panel .editor-host .cm-editor .cm-hover-line {
+/* Node-span highlights mirrored from the canvas selection state. Monaco applies the decoration's
+   className to each .view-line, so these selectors target the line within the editor. Class
+   order matters: select after hover so the blue wins on overlap; edit after select. */
+#editor-panel .editor-host .monaco-editor .pagx-hover-line {
     background-color: rgba(140, 140, 140, 0.28);
 }
 
-#editor-panel .editor-host .cm-editor .cm-select-line {
+#editor-panel .editor-host .monaco-editor .pagx-select-line {
     background-color: rgba(68, 142, 249, 0.22);
     box-shadow: inset 2px 0 0 rgba(68, 142, 249, 0.9);
 }
 
-/* Active editable span (after double-click). Stronger blue fill plus a SINGLE outer border ring
-   around the whole multi-line block (not one box per line): every line carries the left/right
-   edges, the first line adds the top edge and the last line adds the bottom edge. Declared after
-   .cm-select-line so it wins when both apply to the same line. box-shadow does not merge across
-   rules, so each boundary combination lists its full set of inset edges. */
-#editor-panel .editor-host .cm-editor .cm-edit-line {
+/* Active editable span (after double-click). Draws a single rectangle around the whole block:
+   middle lines get only the background fill, the first line draws the top edge + left/right
+   verticals, the last line draws the bottom edge + left/right verticals, and a single-line
+   span (first === last) draws all four edges. This matches the original CodeMirror look —
+   border rings the block, not every line. */
+#editor-panel .editor-host .monaco-editor .pagx-edit-line {
     background-color: rgba(68, 142, 249, 0.3);
-    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
 }
 
-#editor-panel .editor-host .cm-editor .cm-edit-line.cm-edit-line-first:not(.cm-edit-line-last) {
-    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95),
-        inset 0 1px 0 rgba(68, 142, 249, 0.95);
+#editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-first:not(.pagx-edit-line-last) {
+    box-shadow: inset 0 1px 0 rgba(68, 142, 249, 0.95),
+        inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
 }
 
-#editor-panel .editor-host .cm-editor .cm-edit-line.cm-edit-line-last:not(.cm-edit-line-first) {
-    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95),
-        inset 0 -1px 0 rgba(68, 142, 249, 0.95);
+#editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-last:not(.pagx-edit-line-first) {
+    box-shadow: inset 0 -1px 0 rgba(68, 142, 249, 0.95),
+        inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
 }
 
-#editor-panel .editor-host .cm-editor .cm-edit-line.cm-edit-line-first.cm-edit-line-last {
-    box-shadow: inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95),
-        inset 0 1px 0 rgba(68, 142, 249, 0.95), inset 0 -1px 0 rgba(68, 142, 249, 0.95);
+#editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-first.pagx-edit-line-last {
+    box-shadow: inset 0 1px 0 rgba(68, 142, 249, 0.95), inset 0 -1px 0 rgba(68, 142, 249, 0.95),
+        inset 1px 0 0 rgba(68, 142, 249, 0.95), inset -1px 0 0 rgba(68, 142, 249, 0.95);
 }
 
 /* Editor feedback ("Changes applied", validation errors, etc.) now flows through the player's
@@ -291,21 +268,6 @@ export const EDITOR_STYLES = `
     border-color: #81C784;
 }
 
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-thumb {
-    background: rgba(75, 75, 90, 0.67);
-    border-radius: 4px;
-}
-
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#editor-panel .editor-host .cm-scroller::-webkit-scrollbar-thumb:hover {
-    background: rgba(90, 90, 110, 0.8);
-}
+/* Monaco's scrollbar is styled via editor options (scrollbar.verticalScrollbarSize etc.),
+   not CSS. No custom scrollbar rules needed here. */
 `;

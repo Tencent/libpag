@@ -92,8 +92,13 @@ class PAGXView {
 
   // --- Selection (phase 1, read-only canvas<->editor queries) ---
 
-  // Returns the node index of the top-most layer under the surface point, or -1 if none.
-  int hitTest(float surfaceX, float surfaceY);
+  // Returns the hit-test result for the top-most layer under the surface point, or a null val if
+  // none. The result carries the source span (1-based lines) and surface bounds of the *reference*
+  // node — i.e. when the click lands inside a <Layer composition="@X"> instance, the span points
+  // at that <Layer> reference rather than at the internal definition node inside <Composition id>.
+  // bounds is the on-screen rect of the clicked instance itself (not the whole reference span),
+  // so the canvas overlay outlines exactly what the user clicked.
+  emscripten::val hitTest(float surfaceX, float surfaceY);
 
   // One-shot export of every node's source span and incrementable channel list, for the editor
   // to map lines<->index and (phase 2) decide which attr edits can go incremental. Call after

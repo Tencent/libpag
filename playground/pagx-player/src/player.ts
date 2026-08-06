@@ -22,7 +22,7 @@
 // load(); everything else - keyboard shortcuts, size responsiveness, playback UI - is owned by
 // the player.
 
-import type { NodeSourceEntry, PlayerModule, PlayerView } from './pagx-view-types';
+import type { HitTestResult, NodeSourceEntry, PlayerModule, PlayerView } from './pagx-view-types';
 import type {
     BackgroundColor,
     EditorCallbacks,
@@ -322,6 +322,14 @@ export class PAGXPlayer extends EventTarget {
     // --- Selection mode (phase 1: canvas<->editor highlighting) ---
     private selectMode = false;
     private hoverIndex = -1;
+    // Full hitTest result from the last canvas hover/select. Carries the reference node's span
+    // (so the editor highlights the <Layer composition="@X"> reference, not the internal
+    // definition) and the clicked instance's on-screen bounds (so the overlay outlines exactly
+    // what the user clicked, even when the same source node has multiple instances). Cleared by
+    // editor-direction selections (onEditorDblClick / onEditorCursor) which set selectedIndex via
+    // sourceMap line lookup and have no hitTest result to mirror.
+    private hoverHit: HitTestResult | null = null;
+    private selectHit: HitTestResult | null = null;
     // Node index the editor is hovering (editor->canvas direction). Independent of selectMode:
     // hovering an editor line always highlights the corresponding node on the canvas.
     private editorHoverIndex = -1;
@@ -699,6 +707,8 @@ export class PAGXPlayer extends EventTarget {
             this.sourceMap = view.getNodeSourceMap();
             console.log(`[ORT] getNodeSourceMap: ${(performance.now() - ortMapStart).toFixed(1)}ms, ${this.sourceMap.length} node(s) (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
             this.hoverIndex = -1;
+            this.hoverHit = null;
+            this.selectHit = null;
             this.editorHoverIndex = -1;
             this.selectedIndex = -1;
             this.editor?.clearHighlight();
@@ -799,6 +809,7 @@ export class PAGXPlayer extends EventTarget {
         this.editor?.setSelectMode(false);
         this.canvas.style.cursor = '';
         this.hoverIndex = -1;
+        this.hoverHit = null;
         this.syncEditorHover();
         this.refreshOverlay();
     }
@@ -831,9 +842,11 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
-        const idx = this.view.hitTest(surfaceX, surfaceY);
+        const hit = this.view.hitTest(surfaceX, surfaceY);
+        const idx = hit !== null ? hit.index : -1;
         if (idx !== this.hoverIndex) {
             this.hoverIndex = idx;
+            this.hoverHit = hit;
             this.refreshOverlay();
             this.syncEditorHover('start');
         }
@@ -847,13 +860,14 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
-        const idx = this.view.hitTest(surfaceX, surfaceY);
+        const hit = this.view.hitTest(surfaceX, surfaceY);
         // Missed the geometry (clicked empty canvas): keep the inspector armed so the user can
         // try again rather than silently dropping out of inspect mode.
-        if (idx < 0) {
+        if (hit === null) {
             return;
         }
-        this.selectedIndex = idx;
+        this.selectedIndex = hit.index;
+        this.selectHit = hit;
         // DevTools-style: picking a layer deactivates the inspector. exitSelectMode() clears the
         // transient hover and repaints the overlay from the now-set selection, so only the sticky
         // blue outline remains; it stays highlighted on the canvas and mirrored in the editor
@@ -882,6 +896,9 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         this.selectedIndex = idx;
+        // Editor-direction selection has no hitTest result, so clear the canvas-originating
+        // selectHit so updateOverlay falls back to getNodeBounds for the bounds lookup.
+        this.selectHit = null;
         const entry = this.sourceMap[idx];
         const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
         this.editor?.enterEditRange(entry.startLine, end);
@@ -899,6 +916,7 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         this.selectedIndex = idx;
+        this.selectHit = null;
         const entry = this.sourceMap[idx];
         const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
         this.editor?.updateEditRange(entry.startLine, end);
@@ -1023,9 +1041,21 @@ export class PAGXPlayer extends EventTarget {
         return this.editorHoverIndex >= 0 ? this.editorHoverIndex : this.hoverIndex;
     }
 
-    /** Mirrors the transient hover target onto the editor as the grey hover line highlight. */
+    /** Mirrors the transient hover target onto the editor as the grey hover line highlight.
+     *  Span source: canvas-originating hover uses the hitTest result's span (which points at the
+     *  <Layer composition="@X"> reference, not the internal definition); editor-originating hover
+     *  (editorHoverIndex) falls back to sourceMap since no hitTest ran. */
     private syncEditorHover(align: 'none' | 'nearest' | 'start' = 'none'): void {
         const idx = this.hoverTarget();
+        if (this.editorHoverIndex < 0 && this.hoverHit !== null) {
+            const start = this.hoverHit.startLine;
+            const end = this.hoverHit.endLine > 0 ? this.hoverHit.endLine : start;
+            this.editor?.highlightHover(start, end);
+            if (align !== 'none') {
+                this.editor?.scrollToLine(start, align);
+            }
+            return;
+        }
         if (idx < 0 || idx >= this.sourceMap.length || this.sourceMap[idx].startLine <= 0) {
             this.editor?.clearHover();
             return;
@@ -1038,9 +1068,20 @@ export class PAGXPlayer extends EventTarget {
         }
     }
 
-    /** Mirrors the sticky selection onto the editor as the blue select line highlight. */
+    /** Mirrors the sticky selection onto the editor as the blue select line highlight.
+     *  Span source: canvas-originating click uses the hitTest result's span; editor-originating
+     *  selection (double-click / caret move in edit mode) falls back to sourceMap. */
     private syncEditorSelect(align: 'none' | 'nearest' | 'start' = 'none'): void {
         const idx = this.selectedIndex;
+        if (this.selectHit !== null) {
+            const start = this.selectHit.startLine;
+            const end = this.selectHit.endLine > 0 ? this.selectHit.endLine : start;
+            this.editor?.highlightSelect(start, end);
+            if (align !== 'none') {
+                this.editor?.scrollToLine(start, align);
+            }
+            return;
+        }
         if (idx < 0 || idx >= this.sourceMap.length || this.sourceMap[idx].startLine <= 0) {
             this.editor?.clearSelect();
             return;
@@ -1160,6 +1201,14 @@ export class PAGXPlayer extends EventTarget {
             overlay.style.display = 'none';
             return;
         }
+        // Every frame queries getNodeBounds so the overlay tracks zoom and animation in real time.
+        // The hitTest snapshot bounds (hoverHit/selectHit) are NOT used here because they are a
+        // point-in-time snapshot that would not follow zoom/animation; using them caused the overlay
+        // to freeze and disappear during zoom. The trade-off is that getNodeBounds goes through
+        // nodeToLayer, which maps a source node to a single runtime layer instance — when the same
+        // source node has multiple instances, the overlay may outline a different instance than the
+        // one clicked. This is a known limitation of the bounds path; the span (startLine/endLine)
+        // from hitTest still correctly points at the reference node.
         const bounds = this.view.getNodeBounds(this.overlayBoundsIndex);
         if (bounds === null) {
             overlay.style.display = 'none';

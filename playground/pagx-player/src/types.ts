@@ -99,7 +99,7 @@ export interface PAGXPlayerOptions {
      *  '/static/icons/' when served by a dev server. */
     iconBaseUrl: string;
 
-    /** Enable the built-in Source Editor button and panel. CodeMirror is bundled inside the
+    /** Enable the built-in Source Editor button and panel. Monaco is loaded from CDN inside the
      *  component's shipped ESM, so hosts don't need to install any editor dependency
      *  themselves. Default false. */
     enableEditor?: boolean;

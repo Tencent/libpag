@@ -101,13 +101,24 @@ function ensureEditorStylesInjected(): void {
     document.head.appendChild(style);
 }
 
-/** True when the keyboard event originates from an editable element. */
+/** True when the keyboard event originates from an editable element. INPUT and TEXTAREA
+ *  are checked for readOnly/disabled so Monaco's hidden input textarea (which receives
+ *  `readonly="true"` when domReadOnly is enabled) is treated as non-editable — otherwise
+ *  its own keyboard handling would shadow the global L-key panel toggle. */
 function isEditableTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) {
         return false;
     }
     const tag = target.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+    if (tag === 'INPUT') {
+        const input = target as HTMLInputElement;
+        return !input.readOnly && !input.disabled;
+    }
+    if (tag === 'TEXTAREA') {
+        const textarea = target as HTMLTextAreaElement;
+        return !textarea.readOnly && !textarea.disabled;
+    }
+    return target.isContentEditable;
 }
 
 /** Validates XML well-formedness using DOMParser. Returns empty string on success, error
@@ -172,8 +183,8 @@ export class EditorPanel {
     // and skip its own success report (leaving "Applying..." pinned to the status pill).
     private pendingApplyXml: string | null = null;
     // True when setDocumentXml() received a new document while the panel was closed, so the
-    // CodeMirror instance (which survives close(), only the `visible` class is dropped) still
-    // holds the previous document's text. open() consumes this to push the pending content in.
+    // editor instance (which survives close(), only the `visible` class is dropped) still holds
+    // the previous document's text. open() consumes this to push the pending content in.
     // Without it a closed-then-reopened panel would keep showing - and Apply would write back -
     // the stale text of the document that was loaded before the switch.
     private pendingEditorSync = false;
@@ -207,7 +218,7 @@ export class EditorPanel {
     }
 
     /** Push the XML source of the currently loaded document. Called by the player after every
-     *  successful load. Passing null clears the panel and destroys the CodeMirror instance so
+     *  successful load. Passing null clears the panel and destroys the editor instance so
      *  the next open starts with fresh undo history rooted at the new content. A call that
      *  actually switches the baseline bumps documentGeneration so any Apply awaiting a slow
      *  host callback can detect that a fresher document supersedes its result and drop its
@@ -242,7 +253,7 @@ export class EditorPanel {
             this.editor.setContent(xmlText, isApplyLoopback);
             this.pendingEditorSync = false;
         } else if (!isApplyLoopback) {
-            // Panel is closed (or not built yet): close() keeps the CodeMirror instance alive, so it
+            // Panel is closed (or not built yet): close() keeps the editor instance alive, so it
             // still holds the previous document's text. Defer the push to open() instead of dropping
             // it, otherwise reopening the panel would show — and Apply would write back — stale XML.
             this.pendingEditorSync = true;
@@ -305,10 +316,9 @@ export class EditorPanel {
         }
     }
 
-    /** Grey transient hover highlight of a node's source span. No-op when the editor is closed.
-     *  Pass scrollAlign to scroll the span into view within the same CodeMirror transaction. */
-    public highlightHover(startLine: number, endLine: number, scrollAlign?: 'start' | 'nearest'): void {
-        this.editor?.highlightHover(startLine, endLine, scrollAlign);
+    /** Grey transient hover highlight of a node's source span. No-op when the editor is closed. */
+    public highlightHover(startLine: number, endLine: number): void {
+        this.editor?.highlightHover(startLine, endLine);
     }
 
     public clearHover(): void {

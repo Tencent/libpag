@@ -130,17 +130,50 @@ std::vector<std::string> PAGXView::getExternalFilePaths() const {
   return document->getExternalFilePaths();
 }
 
-int PAGXView::hitTest(float surfaceX, float surfaceY) {
+emscripten::val PAGXView::hitTest(float surfaceX, float surfaceY) {
   if (scene == nullptr) {
-    return -1;
+    return emscripten::val::null();
   }
   auto layers = scene->getLayersUnderPoint(surfaceX, surfaceY);
   if (layers.empty()) {
-    return -1;
+    return emscripten::val::null();
   }
-  // getLayersUnderPoint returns top-most first; the first hit is what the user clicked.
-  const Layer* node = layers[0]->getNode();
-  return node != nullptr ? node->index : -1;
+  // getLayersUnderPoint returns top-most first; the first hit is what the user clicked. It is the
+  // most specific runtime layer under the pointer (e.g. a <Rectangle> inside a <Composition>), not
+  // the <Layer composition="@X"> reference. Walk the parent chain up to the first PAGComposition
+  // that has a source node (i.e. a real <Layer composition="@X"> reference, not the root
+  // composition whose node is null) so the editor highlights the reference, not the internal
+  // definition. If no such composition ancestor exists (click on a plain <Layer> at the document
+  // root, whose parent is the root composition), fall back to the hit itself.
+  auto target = layers[0];
+  auto walker = target;
+  while (walker != nullptr) {
+    if (walker->layerType() == LayerType::Composition && walker->getNode() != nullptr) {
+      target = walker;
+      break;
+    }
+    walker = walker->getParent();
+  }
+  const Layer* node = target->getNode();
+  if (node == nullptr) {
+    return emscripten::val::null();
+  }
+  auto bounds = scene->getGlobalBounds(target);
+  auto obj = emscripten::val::object();
+  obj.set("index", node->index);
+  obj.set("startLine", node->sourceLine);
+  obj.set("endLine", node->endLine);
+  if (bounds.isEmpty()) {
+    obj.set("bounds", emscripten::val::null());
+  } else {
+    auto boundsObj = emscripten::val::object();
+    boundsObj.set("x", bounds.x);
+    boundsObj.set("y", bounds.y);
+    boundsObj.set("w", bounds.width);
+    boundsObj.set("h", bounds.height);
+    obj.set("bounds", boundsObj);
+  }
+  return obj;
 }
 
 emscripten::val PAGXView::getNodeSourceMap() const {

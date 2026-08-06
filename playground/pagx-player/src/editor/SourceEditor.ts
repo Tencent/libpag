@@ -10,31 +10,99 @@
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  license is distributed on an "AS is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import { EditorView, keymap, lineNumbers, highlightSpecialChars, drawSelection, Decoration } from '@codemirror/view';
-import { EditorState, StateField, StateEffect, Compartment, Range } from '@codemirror/state';
-import { defaultKeymap, historyKeymap, history } from '@codemirror/commands';
-import { xml } from '@codemirror/lang-xml';
-import { syntaxHighlighting , HighlightStyle, defaultHighlightStyle } from '@codemirror/language';
-import { highlightSelectionMatches } from '@codemirror/search';
-import { tags } from '@lezer/highlight';
+// Monaco is loaded from CDN at runtime via the AMD loader (same as the monaco-test.html page).
+// The npm package is kept in dependencies for TypeScript types only — `import type` is erased by
+// esbuild at build time, so rollup never tries to bundle Monaco's non-standard ESM internals
+// (which use bare `vs/...` specifiers that nodeResolve cannot map).
+import type * as MonacoNS from 'monaco-editor';
 
-// Inline replacement for the `codemirror` meta-package's `minimalSetup`. We depend directly on
-// the @codemirror/* sub-packages so npm never has to reconcile the meta-package's own version
-// pins against ours (mismatched pins spawn duplicate EditorState instances, which then trip
-// instanceof checks inside CodeMirror at runtime). Sourced from codemirror v6's minimalSetup.
-const minimalSetup = [
-    highlightSpecialChars(),
-    history(),
-    drawSelection(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-    keymap.of([...defaultKeymap, ...historyKeymap]),
-];
+type Monaco = typeof MonacoNS;
+
+// Module-level Monaco singleton. Loaded once on first SourceEditor construction; all subsequent
+// editors share the same instance. The AMD loader is injected as a <script> tag, then
+// require(['vs/editor/editor.main']) pulls in the editor + all basic languages (including XML).
+const MONACO_CDN = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/min/vs';
+
+let monacoInstance: Monaco | null = null;
+let monacoLoadPromise: Promise<Monaco> | null = null;
+
+function loadMonaco(): Promise<Monaco> {
+    if (monacoInstance !== null) {
+        return Promise.resolve(monacoInstance);
+    }
+    if (monacoLoadPromise !== null) {
+        return monacoLoadPromise;
+    }
+    monacoLoadPromise = new Promise<Monaco>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = `${MONACO_CDN}/loader.js`;
+        script.onload = () => {
+            const win = window as unknown as {
+                require?: {
+                    config: (opts: { paths: { vs: string } }) => void;
+                    (deps: string[], cb: () => void): void;
+                };
+                monaco?: Monaco;
+            };
+            const amdRequire = win.require;
+            if (amdRequire === undefined) {
+                reject(new Error('Monaco AMD loader failed to initialize'));
+                return;
+            }
+            amdRequire.config({ paths: { vs: MONACO_CDN } });
+            amdRequire(['vs/editor/editor.main'], () => {
+                const m = win.monaco;
+                if (m === undefined) {
+                    reject(new Error('Monaco failed to load from CDN'));
+                    return;
+                }
+                definePagxTheme(m);
+                monacoInstance = m;
+                resolve(m);
+            });
+        };
+        script.onerror = () => reject(new Error('Failed to load Monaco loader script from CDN'));
+        document.head.appendChild(script);
+    });
+    return monacoLoadPromise;
+}
+
+// Defines a custom theme matching the VS Code Dark+ palette used by the previous CodeMirror
+// highlighter, so syntax colors stay consistent across the migration.
+function definePagxTheme(m: Monaco): void {
+    m.editor.defineTheme('pagx-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [
+            { token: 'tag', foreground: '569CD6' },
+            { token: 'attribute.name', foreground: '9CDCFE' },
+            { token: 'attribute.value', foreground: 'CE9178' },
+            { token: 'string', foreground: 'CE9178' },
+            { token: 'comment', foreground: '6A9955' },
+            { token: 'delimiter', foreground: '569CD6' },
+            { token: '', foreground: 'D4D4D4' },
+        ],
+        colors: {
+            'editor.background': '#1E1E1E',
+            'editor.foreground': '#D4D4D4',
+            'editorLineNumber.foreground': '#6E7681',
+            'editorLineNumber.activeForeground': '#CCCCCC',
+            'editor.selectionBackground': '#264F78',
+            'editor.lineHighlightBackground': '#2D2D2D',
+            'editorCursor.foreground': '#FFFFFF',
+            'editorGutter.background': '#1E1E1E',
+        },
+    });
+}
+
+// Start loading immediately so the editor is ready by the time the user opens the panel.
+void loadMonaco();
 
 // A 1-based inclusive line range mirrored from a node's source span, or null to clear.
 interface LineRange {
@@ -42,455 +110,506 @@ interface LineRange {
     endLine: number;
 }
 
-// Two independent highlight layers, mirrored from the canvas selection state: 'hover' (grey,
-// transient) and 'select' (blue, sticky). Both can be shown at once on different lines; when they
-// overlap the same line, CSS ordering lets the blue select layer win visually.
-const setHover = StateEffect.define<LineRange | null>();
-const setSelect = StateEffect.define<LineRange | null>();
+// Decoration class names (must match styles.ts selectors).
+const HOVER_LINE_CLASS = 'pagx-hover-line';
+const SELECT_LINE_CLASS = 'pagx-select-line';
+const EDIT_LINE_CLASS = 'pagx-edit-line';
+const EDIT_LINE_FIRST_CLASS = 'pagx-edit-line-first';
+const EDIT_LINE_LAST_CLASS = 'pagx-edit-line-last';
 
-function buildRangeDecos(doc: EditorState['doc'], range: LineRange, cls: string): Range<Decoration>[] {
-    const first = Math.max(1, range.startLine);
-    const last = Math.min(doc.lines, range.endLine);
-    const decos: Range<Decoration>[] = [];
-    for (let n = first; n <= last; n++) {
-        decos.push(Decoration.line({ class: cls }).range(doc.line(n).from));
-    }
-    return decos;
+function clampLine(line: number, lineCount: number): number {
+    return Math.max(1, Math.min(line, lineCount));
 }
 
-const highlightField = StateField.define<{ hover: LineRange | null; select: LineRange | null }>({
-    create: () => ({ hover: null, select: null }),
-    update(value, tr) {
-        let hover = value.hover;
-        let select = value.select;
-        for (const e of tr.effects) {
-            if (e.is(setHover)) {
-                hover = e.value;
-            }
-            if (e.is(setSelect)) {
-                select = e.value;
-            }
-        }
-        return { hover, select };
-    },
-    provide: (f) =>
-        EditorView.decorations.compute([f], (state) => {
-            const { hover, select } = state.field(f);
-            const decos: Range<Decoration>[] = [];
-            if (hover != null) {
-                decos.push(...buildRangeDecos(state.doc, hover, 'cm-hover-line'));
-            }
-            if (select != null) {
-                decos.push(...buildRangeDecos(state.doc, select, 'cm-select-line'));
-            }
-            // Hover and select spans are produced independently, so concatenate order does not
-            // guarantee RangeSet's required ordering by `from`.
-            decos.sort((a, b) => a.from - b.from);
-            return Decoration.set(decos);
-        }),
-});
-
-// --- Double-click-to-edit machinery ---
-// The editor is read-only by default (browse/inspect mode). Double-clicking a line asks the host
-// to unlock the enclosing node's source span for editing; blurring re-locks it to read-only. The
-// editable/readOnly facets are swapped through a compartment so the lock toggles without
-// rebuilding the state.
-const editableCompartment = new Compartment();
-
-// The character range currently unlocked for editing (the enclosing node's source span), or null
-// when read-only. Stored as document offsets and mapped through edits so the range grows/shrinks
-// with in-span typing.
-const setEditRange = StateEffect.define<{ from: number; to: number } | null>();
-
-const editRangeField = StateField.define<{ from: number; to: number } | null>({
-    create: () => null,
-    update(value, tr) {
-        for (const e of tr.effects) {
-            if (e.is(setEditRange)) {
-                value = e.value;
-            }
-        }
-        if (value != null && tr.docChanged) {
-            value = { from: tr.changes.mapPos(value.from, -1), to: tr.changes.mapPos(value.to, 1) };
-        }
-        return value;
-    },
-    provide: (f) =>
-        EditorView.decorations.compute([f], (state) => {
-            const range = state.field(f);
-            if (range == null) {
-                return Decoration.none;
-            }
-            const fromLine = state.doc.lineAt(range.from).number;
-            const toLine = state.doc.lineAt(Math.min(range.to, state.doc.length)).number;
-            const decos: Range<Decoration>[] = [];
-            for (let n = fromLine; n <= toLine; n++) {
-                // Tag the span's boundary lines so CSS can draw a single outer border around the
-                // whole block (top on the first line, bottom on the last, left/right on all)
-                // instead of a separate box per line.
-                let cls = 'cm-edit-line';
-                if (n === fromLine) {
-                    cls += ' cm-edit-line-first';
-                }
-                if (n === toLine) {
-                    cls += ' cm-edit-line-last';
-                }
-                decos.push(Decoration.line({ class: cls }).range(state.doc.line(n).from));
-            }
-            return Decoration.set(decos);
-        }),
-});
-
-// Confines edits to the unlocked span. When read-only (range == null) every doc change is dropped;
-// while editing, a change must fall entirely within the span. Newlines are allowed since the span
-// can cover multiple lines.
-const spanFilter = EditorState.transactionFilter.of((tr) => {
-    if (!tr.docChanged) {
-        return tr;
-    }
-    const range = tr.startState.field(editRangeField);
-    if (range == null) {
-        return [];
-    }
-    let allowed = true;
-    tr.changes.iterChanges((fromA, toA) => {
-        if (fromA < range.from || toA > range.to) {
-            allowed = false;
-        }
+function buildLineDecos(
+    range: LineRange,
+    model: MonacoNS.editor.ITextModel,
+    cls: string,
+    out: MonacoNS.editor.IModelDeltaDecoration[],
+): void {
+    const last = model.getLineCount();
+    const start = clampLine(range.startLine, last);
+    const end = clampLine(range.endLine, last);
+    out.push({
+        range: {
+            startLineNumber: start,
+            startColumn: 1,
+            endLineNumber: Math.max(start, end),
+            endColumn: model.getLineMaxColumn(Math.max(start, end)),
+        },
+        options: { isWholeLine: true, className: cls },
     });
-    return allowed ? tr : [];
-});
+}
 
-/** Syntax highlight colors matching the desktop client (VS Code Dark+ palette). */
-const pagxHighlightStyle = HighlightStyle.define([
-    { tag: tags.tagName, color: '#569CD6' },
-    { tag: tags.attributeName, color: '#9CDCFE' },
-    { tag: tags.attributeValue, color: '#CE9178' },
-    { tag: tags.string, color: '#CE9178' },
-    { tag: tags.comment, color: '#6A9955' },
-    { tag: tags.meta, color: '#808080' },
-    { tag: tags.processingInstruction, color: '#808080' },
-    { tag: tags.content, color: '#D4D4D4' },
-    { tag: tags.angleBracket, color: '#569CD6' },
-]);
+function buildEditDecos(
+    range: LineRange,
+    model: MonacoNS.editor.ITextModel,
+    out: MonacoNS.editor.IModelDeltaDecoration[],
+): void {
+    const last = model.getLineCount();
+    const start = clampLine(range.startLine, last);
+    const end = clampLine(range.endLine, last);
+    for (let line = start; line <= end; line++) {
+        let cls = EDIT_LINE_CLASS;
+        if (line === start) {
+            cls += ' ' + EDIT_LINE_FIRST_CLASS;
+        }
+        if (line === end) {
+            cls += ' ' + EDIT_LINE_LAST_CLASS;
+        }
+        out.push({
+            range: {
+                startLineNumber: line,
+                startColumn: 1,
+                endLineNumber: line,
+                endColumn: model.getLineMaxColumn(line),
+            },
+            options: { isWholeLine: true, className: cls },
+        });
+    }
+}
 
 /**
- * Wraps a CodeMirror 6 instance for editing PAGX XML source.
- * Search relies on the browser's built-in Ctrl+F.
+ * Wraps a Monaco editor instance for editing PAGX XML source.
+ * Monaco loads asynchronously from CDN; until it's ready, all methods are no-ops (the editor
+ * instance is null). The first setContent() triggers creation; once Monaco resolves, the editor
+ * is created with the buffered content.
  */
 export class SourceEditor {
     private readonly host: HTMLElement;
-    private view: EditorView | null = null;
+    private editor: MonacoNS.editor.IStandaloneCodeEditor | null = null;
+    private model: MonacoNS.editor.ITextModel | null = null;
     private onHoverLineCb: ((line: number) => void) | null = null;
     private onDblClickLineCb: ((line: number) => void) | null = null;
     private onCursorLineCb: ((line: number) => void) | null = null;
     private hoverLineRaf = 0;
+    private hoverDecoIds: string[] = [];
+    private selectDecoIds: string[] = [];
+    private editDecoIds: string[] = [];
+    private editRangeActive = false;
+    private editRangeOffset: { from: number; to: number } | null = null;
+    private contentChangeListener: MonacoNS.IDisposable | null = null;
+    private destroyed = false;
+    private creating = false;
+    private readonly disposers: MonacoNS.IDisposable[] = [];
 
     constructor(host: HTMLElement) {
         this.host = host;
-        // Defer EditorView creation to the first setContent call so that the initial
-        // document is the loaded XML content (not an empty doc). This prevents
-        // Ctrl+Z from unwinding past the load point into an empty editor.
     }
 
-    private createState(initialContent: string, selectionHead?: number): EditorState {
-        return EditorState.create({
-            doc: initialContent,
-            selection: selectionHead !== undefined
-                ? { anchor: Math.min(selectionHead, initialContent.length) }
-                : undefined,
-            extensions: [
-                minimalSetup,
-                lineNumbers(),
-                xml(),
-                syntaxHighlighting(pagxHighlightStyle),
-                highlightSelectionMatches(),
-                highlightField,
-                editRangeField,
-                spanFilter,
-                editableCompartment.of([
-                    EditorView.editable.of(false),
-                    EditorState.readOnly.of(true),
-                ]),
-                EditorView.domEventHandlers({
-                    dblclick: (event, view) => this.handleEditorDblClick(event, view),
-                    blur: (_event, view) => this.handleEditorBlur(view),
-                    mousemove: (event) => this.handleEditorMouseMove(event),
-                    mouseleave: () => {
-                        this.onHoverLineCb?.(-1);
-                        return false;
-                    },
-                }),
-                // While a span is unlocked for editing, report the caret's line whenever the
-                // selection moves so the host can re-scope the editable range and blue selection
-                // to the node the caret now sits in (DevTools-like "edit follows caret"). Gated on
-                // editRangeField so caret moves in read-only browse mode stay silent.
-                EditorView.updateListener.of((update) => {
-                    if (!update.selectionSet || this.onCursorLineCb === null) {
+    private createEditor(initialContent: string): void {
+        // Guard against double-creation: if a previous createEditor is still pending (Monaco
+        // hasn't loaded yet), or the editor was already created, skip.
+        if (this.creating || this.editor !== null || this.destroyed) {
+            return;
+        }
+        this.creating = true;
+        loadMonaco().then((m) => {
+            this.creating = false;
+            if (this.destroyed || this.editor !== null) {
+                return;
+            }
+            this.model = m.editor.createModel(initialContent, 'xml');
+            this.editor = m.editor.create(this.host, {
+                model: this.model,
+                theme: 'pagx-dark',
+                // readOnly disables Monaco's edit commands; domReadOnly additionally sets the DOM
+                // contenteditable="false", which blocks IME composition (Chinese/Pinyin popup,
+                // readOnly disables Monaco's edit commands; domReadOnly additionally sets the
+                // editor's hidden <textarea> to readonly="true" (Monaco's textAreaHandler.js),
+                // which blocks IME composition (Chinese/Pinyin popup, candidate selection) in
+                // the read-only state. The virtual cursor is hidden via CSS using the
+                // pagx-editor-readonly class below, because Monaco 0.47.0's cursorStyle enum
+                // does not include 'hidden' (added in a later version).
+                readOnly: true,
+                domReadOnly: true,
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                scrollBeyondLastLine: true,
+                wordWrap: 'off',
+                renderWhitespace: 'none',
+                largeFileOptimizations: true,
+                automaticLayout: true,
+                unicodeHighlight: { ambiguousCharacters: false, invisibleCharacters: false },
+                fontSize: 13,
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                lineHeight: 18,
+                scrollbar: {
+                    vertical: 'auto',
+                    horizontal: 'auto',
+                    verticalScrollbarSize: 10,
+                    horizontalScrollbarSize: 10,
+                },
+                padding: { top: 0, bottom: 200 },
+                smoothScrolling: false,
+                cursorBlinking: 'smooth',
+                cursorSmoothCaretAnimation: 'on',
+            });
+
+            // Hover → editor->canvas overlay highlight (rAF-throttled).
+            this.disposers.push(
+                this.editor.onMouseMove((e: MonacoNS.editor.IEditorMouseEvent) => {
+                    if (this.onHoverLineCb === null) {
                         return;
                     }
-                    if (update.state.field(editRangeField) == null) {
+                    const line = e.target?.position?.lineNumber;
+                    if (line === undefined) {
                         return;
                     }
-                    const head = update.state.selection.main.head;
-                    this.onCursorLineCb(update.state.doc.lineAt(head).number);
+                    if (this.hoverLineRaf !== 0) {
+                        cancelAnimationFrame(this.hoverLineRaf);
+                    }
+                    this.hoverLineRaf = requestAnimationFrame(() => {
+                        this.hoverLineRaf = 0;
+                        this.onHoverLineCb?.(line);
+                    });
                 }),
-                // basicSetup includes searchKeymap which intercepts Ctrl+F. Use minimalSetup
-                // (which omits it) and add only the keymaps we need, so the browser's
-                // built-in Ctrl+F is free to handle search.
-                keymap.of([...defaultKeymap, ...historyKeymap]),
-                // Theme covers only CodeMirror internals that styles.ts does not target.
-                // Gutter and selection colors live in styles.ts (higher specificity overrides
-                // this theme anyway), so keeping them here would create two sources of truth.
-                EditorView.theme({
-                    '&': {
-                        backgroundColor: '#1E1E1E',
-                        color: '#D4D4D4',
-                        height: '100%',
-                    },
-                    '.cm-content': {
-                        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-                        fontSize: '13px',
-                        caretColor: '#FFFFFF',
-                    },
-                    '.cm-cursor': {
-                        borderLeftColor: '#FFFFFF',
-                        borderLeftWidth: '2px',
-                    },
-                    '.cm-activeLine': {
-                        backgroundColor: '#2D2D2D',
-                    },
-                    '.cm-activeLineGutter': {
-                        backgroundColor: '#2D2D2D',
-                    },
+            );
+            this.disposers.push(
+                this.editor.onMouseLeave(() => {
+                    if (this.hoverLineRaf !== 0) {
+                        cancelAnimationFrame(this.hoverLineRaf);
+                        this.hoverLineRaf = 0;
+                    }
+                    this.onHoverLineCb?.(-1);
                 }),
-            ],
+            );
+
+            // Double-click → host resolves the enclosing node's source span.
+            this.attachDomListeners();
+
+            // Blur re-locks to read-only.
+            this.disposers.push(
+                this.editor.onDidBlurEditorWidget(() => {
+                    if (!this.editRangeActive) {
+                        return;
+                    }
+                    this.editRangeActive = false;
+                    this.editRangeOffset = null;
+                    this.editDecoIds = this.editor!.deltaDecorations(this.editDecoIds, []);
+                    this.host.classList.add('pagx-editor-readonly');
+                    this.editor!.updateOptions({
+                        readOnly: true,
+                        domReadOnly: true,
+                    });
+                }),
+            );
+
+            // Caret moves while editing → "edit follows caret" re-scoping.
+            this.disposers.push(
+                this.editor.onDidChangeCursorPosition((e: MonacoNS.editor.ICursorPositionChangedEvent) => {
+                    if (!this.editRangeActive || this.onCursorLineCb === null) {
+                        return;
+                    }
+                    this.onCursorLineCb(e.position.lineNumber);
+                }),
+            );
+
+            // Span confinement: re-attached on each model swap (setContent replaces the model).
+            this.attachContentListener();
+            // Editor is born in the read-only state; the class is removed by enterEditRange
+            // and re-added by blur / setContent to hide Monaco's virtual cursor via CSS.
+            this.host.classList.add('pagx-editor-readonly');
         });
     }
 
-    private createView(initialContent: string): void {
-        this.view = new EditorView({
-            parent: this.host,
-            state: this.createState(initialContent),
-        });
-        // Reserve 200px of scrollable space at the bottom of the editor. Without this, the last
-        // few lines hit CodeMirror's maxScroll and scrollIntoView's 'start' alignment gets
-        // clamped to the viewport bottom, leaving the highlighted line glued to the edge
-        // regardless of yMargin. 200px of padding keeps maxScroll large enough that
-        // 'start' + yMargin:80 lands the line ~80px from the top for any line, including the
-        // document's last line.
-        this.view.scrollDOM.style.paddingBottom = '200px';
+    /** Registers the content-change listener that confines edits to the unlocked span. Called
+     *  after each model creation/swap because onDidChangeContent lives on the model, not the
+     *  editor. Uses e.isUndoing to skip the undo's own content-change event, so no manual
+     *  suppressUndo flag is needed. */
+    /** Re-attaches DOM-level event listeners that must survive model swaps. Monaco's
+     *  editor container is stable across setModel(), but as a safety net (and to guard against
+     *  any future internal DOM teardown — e.g. during editor.dispose + recreate) we re-attach
+     *  the dblclick listener after every setContent. addEventListener is a no-op for an
+     *  identical (target, type, handler, capture) triple, so duplicate calls are harmless. */
+    private attachDomListeners(): void {
+        const domNode = this.editor?.getDomNode();
+        if (domNode !== null && domNode !== undefined) {
+            domNode.addEventListener('dblclick', this.handleDomDblClick);
+        }
+    }
+
+    private attachContentListener(): void {
+        if (this.contentChangeListener !== null) {
+            this.contentChangeListener.dispose();
+            this.contentChangeListener = null;
+        }
+        if (this.model === null) {
+            return;
+        }
+        this.contentChangeListener = this.model.onDidChangeContent(
+            (e: MonacoNS.editor.IModelContentChangedEvent) => {
+                if (e.isFlush) {
+                    return;
+                }
+                if (e.isUndoing || e.isRedoing) {
+                    // Undo/redo restore or replay previously-applied edits. The out-of-range check
+                    // would just bounce the change back, so skip it — but the span's character
+                    // offset must still be re-mapped: e.changes are still relative to the pre-event
+                    // model, so the same totalDelta formula correctly tracks the new `to`.
+                    if (this.editRangeOffset !== null) {
+                        let totalDelta = 0;
+                        for (const change of e.changes) {
+                            totalDelta += change.text.length - change.rangeLength;
+                        }
+                        this.editRangeOffset = {
+                            from: this.editRangeOffset.from,
+                            to: this.editRangeOffset.to + totalDelta,
+                        };
+                    }
+                    return;
+                }
+                if (!this.editRangeActive || this.editRangeOffset === null) {
+                    return;
+                }
+                let outOfRange = false;
+                let totalDelta = 0;
+                for (const change of e.changes) {
+                    const changeStart = change.rangeOffset;
+                    const changeEnd = change.rangeOffset + change.rangeLength;
+                    if (changeStart < this.editRangeOffset.from || changeEnd > this.editRangeOffset.to) {
+                        outOfRange = true;
+                        break;
+                    }
+                    totalDelta += change.text.length - change.rangeLength;
+                }
+                if (outOfRange) {
+                    // Monaco 0.47.0's TextModel has a public undo() method at runtime, but the
+                    // TypeScript declarations don't expose it (added in a later type bump). The
+                    // cast goes through the model's own _undoRedoService which is more reliable
+                    // than editor.trigger('undo') — that path goes through the command system
+                    // and can be silently swallowed by other Monaco actions.
+                    (this.model as unknown as { undo(): void }).undo();
+                    return;
+                }
+                this.editRangeOffset = {
+                    from: this.editRangeOffset.from,
+                    to: this.editRangeOffset.to + totalDelta,
+                };
+            },
+        );
     }
 
     /** Replaces the entire document content, resetting the undo history to this content. When
      *  preserveViewState is true, keeps the current caret and scroll offset. */
     setContent(text: string, preserveViewState = false): void {
         const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
-        if (this.view === null) {
-            this.createView(trimmed);
+        if (this.editor === null || this.model === null) {
+            // Monaco may still be loading. createEditor buffers the content and creates the
+            // editor once Monaco resolves; if it's already loaded, creation is synchronous
+            // inside the .then() callback.
+            this.createEditor(trimmed);
             return;
         }
         if (!preserveViewState) {
-            // Rebuild the state instead of dispatching a change so the undo history is rooted at
-            // this content. A plain change dispatch would be recorded as an undoable edit, letting
-            // Ctrl+Z revert to a previously loaded file's content.
-            this.view.setState(this.createState(trimmed));
+            const oldModel = this.model;
+            this.model = monacoInstance!.editor.createModel(trimmed, 'xml');
+            this.editor.setModel(this.model);
+            oldModel.dispose();
+            this.attachContentListener();
+            this.attachDomListeners();
+            this.hoverDecoIds = [];
+            this.selectDecoIds = [];
+            this.editDecoIds = [];
+            this.editRangeActive = false;
+            this.editRangeOffset = null;
+            this.host.classList.add('pagx-editor-readonly');
+            this.editor.updateOptions({
+                readOnly: true,
+                domReadOnly: true,
+            });
             return;
         }
-        const savedHead = this.view.state.selection.main.head;
-        const savedScrollTop = this.view.scrollDOM.scrollTop;
-        this.view.setState(this.createState(trimmed, savedHead));
-        this.view.requestMeasure({
-            read: () => savedScrollTop,
-            write: (scrollTop, view) => {
-                view.scrollDOM.scrollTop = scrollTop;
-            },
+        const savedOffset = this.model.getOffsetAt(
+            this.editor.getPosition() ?? new monacoInstance!.Position(1, 1),
+        );
+        const savedScrollTop = this.editor.getScrollTop();
+        const oldModel = this.model;
+        this.model = monacoInstance!.editor.createModel(trimmed, 'xml');
+        this.editor.setModel(this.model);
+        oldModel.dispose();
+        this.attachContentListener();
+        this.attachDomListeners();
+        const clampedOffset = Math.min(savedOffset, this.model.getValueLength());
+        const pos = this.model.getPositionAt(clampedOffset);
+        this.editor.setPosition(pos);
+        this.editor.setScrollTop(savedScrollTop);
+        this.hoverDecoIds = [];
+        this.selectDecoIds = [];
+        this.editDecoIds = [];
+        this.editRangeActive = false;
+        this.editRangeOffset = null;
+        this.host.classList.add('pagx-editor-readonly');
+        this.editor.updateOptions({
+            readOnly: true,
+            domReadOnly: true,
         });
     }
 
     /** Returns the current document text. */
     getContent(): string {
-        if (this.view === null) {
+        if (this.model === null) {
             return '';
         }
-        return this.view.state.doc.toString();
+        return this.model.getValue();
     }
 
     /** Highlights the node's source span as the transient grey hover layer. startLine <= 0 clears. */
     highlightHover(startLine: number, endLine: number): void {
-        if (this.view === null) {
+        if (this.editor === null || this.model === null) {
             return;
         }
-        this.view.dispatch({
-            effects: setHover.of(startLine <= 0 ? null : { startLine, endLine }),
-        });
+        if (startLine <= 0) {
+            this.hoverDecoIds = this.editor.deltaDecorations(this.hoverDecoIds, []);
+            return;
+        }
+        const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
+        buildLineDecos({ startLine, endLine }, this.model, HOVER_LINE_CLASS, decos);
+        this.hoverDecoIds = this.editor.deltaDecorations(this.hoverDecoIds, decos);
     }
 
     /** Clears the grey hover highlight layer. */
     clearHover(): void {
-        this.view?.dispatch({ effects: setHover.of(null) });
+        if (this.editor === null) {
+            return;
+        }
+        this.hoverDecoIds = this.editor.deltaDecorations(this.hoverDecoIds, []);
     }
 
     /** Highlights the node's source span as the sticky blue selection layer. startLine <= 0 clears. */
     highlightSelect(startLine: number, endLine: number): void {
-        if (this.view === null) {
+        if (this.editor === null || this.model === null) {
             return;
         }
-        this.view.dispatch({
-            effects: setSelect.of(startLine <= 0 ? null : { startLine, endLine }),
-        });
+        if (startLine <= 0) {
+            this.selectDecoIds = this.editor.deltaDecorations(this.selectDecoIds, []);
+            return;
+        }
+        const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
+        buildLineDecos({ startLine, endLine }, this.model, SELECT_LINE_CLASS, decos);
+        this.selectDecoIds = this.editor.deltaDecorations(this.selectDecoIds, decos);
     }
 
     /** Clears the blue selection highlight layer. */
     clearSelect(): void {
-        this.view?.dispatch({ effects: setSelect.of(null) });
+        if (this.editor === null) {
+            return;
+        }
+        this.selectDecoIds = this.editor.deltaDecorations(this.selectDecoIds, []);
     }
 
     /** Clears both highlight layers. */
     clearHighlight(): void {
-        this.view?.dispatch({ effects: [setHover.of(null), setSelect.of(null)] });
+        this.clearHover();
+        this.clearSelect();
     }
 
-    /** Unlocks the given 1-based inclusive line span for editing (the enclosing node's source
-     *  span). Swaps the editable/readOnly facets and records the character range so the span
-     *  filter confines edits to it. Called by the host on double-click. */
+    /** Unlocks the given 1-based inclusive line span for editing. */
     enterEditRange(startLine: number, endLine: number): void {
-        if (this.view === null || startLine <= 0) {
+        if (this.editor === null || this.model === null || startLine <= 0) {
             return;
         }
-        const doc = this.view.state.doc;
-        const from = doc.line(Math.min(startLine, doc.lines)).from;
-        const to = doc.line(Math.min(endLine, doc.lines)).to;
-        this.view.dispatch({
-            effects: [
-                editableCompartment.reconfigure([
-                    EditorView.editable.of(true),
-                    EditorState.readOnly.of(false),
-                ]),
-                setEditRange.of({ from, to }),
-            ],
-        });
-        this.view.focus();
+        this.editRangeActive = true;
+        this.editRangeOffset = this.computeEditRangeOffset(startLine, endLine);
+        this.host.classList.remove('pagx-editor-readonly');
+        this.editor.updateOptions({ readOnly: false, domReadOnly: false });
+        const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
+        buildEditDecos({ startLine, endLine }, this.model, decos);
+        this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, decos);
+        this.editor.focus();
     }
 
-    /** Re-scopes the already-unlocked editable span to a new 1-based inclusive line range
-     *  without touching the editable/readOnly facets or stealing focus. Used while editing to
-     *  follow the caret into a different node's span. No-op when read-only. */
+    /** Re-scopes the already-unlocked editable span to a new line range. No-op when read-only. */
     updateEditRange(startLine: number, endLine: number): void {
-        if (this.view === null || startLine <= 0) {
+        if (this.editor === null || this.model === null || startLine <= 0) {
             return;
         }
-        if (this.view.state.field(editRangeField) == null) {
+        if (!this.editRangeActive) {
             return;
         }
-        const doc = this.view.state.doc;
-        const from = doc.line(Math.min(startLine, doc.lines)).from;
-        const to = doc.line(Math.min(endLine, doc.lines)).to;
-        this.view.dispatch({ effects: setEditRange.of({ from, to }) });
+        this.editRangeOffset = this.computeEditRangeOffset(startLine, endLine);
+        const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
+        buildEditDecos({ startLine, endLine }, this.model, decos);
+        this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, decos);
     }
 
-    /** Scrolls the given 1-based line into view. 'nearest' only scrolls when the line is already
-     *  off-screen. 'start' places the line ~80px from the viewport top with a fixed yMargin.
-     *  Together with the 200px scroll padding in createView(), this lets every line — including
-     *  the document's last line — land at a consistent, slightly-elevated spot. */
+    /** Converts a 1-based inclusive line range to character offsets for span-confinement checks. */
+    private computeEditRangeOffset(startLine: number, endLine: number): { from: number; to: number } | null {
+        if (this.model === null || monacoInstance === null) {
+            return null;
+        }
+        const last = this.model.getLineCount();
+        const start = clampLine(startLine, last);
+        const end = clampLine(endLine, last);
+        const from = this.model.getOffsetAt(new monacoInstance.Position(start, 1));
+        const to = this.model.getOffsetAt(
+            new monacoInstance.Position(end, this.model.getLineMaxColumn(end)),
+        );
+        return { from, to };
+    }
+
+    /** Scrolls the given 1-based line into view. */
     scrollToLine(line: number, align: 'start' | 'nearest' = 'start'): void {
-        if (this.view === null || line <= 0) {
+        if (this.editor === null || line <= 0) {
             return;
         }
-        const doc = this.view.state.doc;
-        const pos = doc.line(Math.min(line, doc.lines)).from;
-        const scrollOpt = align === 'nearest'
-            ? { y: 'nearest' as const }
-            : { y: 'start' as const, yMargin: 80 };
-        this.view.dispatch({ effects: EditorView.scrollIntoView(pos, scrollOpt) });
+        const targetLine = Math.min(line, this.model?.getLineCount() ?? 1);
+        if (align === 'nearest') {
+            this.editor.revealLineInCenterIfOutsideViewport(targetLine);
+        } else {
+            this.editor.revealLine(targetLine, monacoInstance!.editor.ScrollType.Smooth);
+        }
     }
 
-    /** Registers a callback fired with the 1-based line under the pointer as the user hovers the
-     *  editor content (rAF-throttled), and -1 when the pointer leaves. Drives the editor->canvas
-     *  overlay highlight. Only one callback is kept; the panel re-registers it after each editor
-     *  rebuild. Pass null to detach. */
     onHoverLine(cb: ((line: number) => void) | null): void {
         this.onHoverLineCb = cb;
     }
 
-    /** Registers a callback fired with the double-clicked 1-based line. The host resolves the
-     *  enclosing node's source span and calls enterEditRange() to unlock it. Pass null to detach. */
     onDblClickLine(cb: ((line: number) => void) | null): void {
         this.onDblClickLineCb = cb;
     }
 
-    /** Registers a callback fired with the caret's 1-based line whenever the selection moves
-     *  while a span is unlocked for editing. Drives the "edit follows caret" re-scoping. Only one
-     *  callback is kept; the panel re-registers it after each editor rebuild. Pass null to detach. */
     onCursorLine(cb: ((line: number) => void) | null): void {
         this.onCursorLineCb = cb;
     }
 
-    /** Double-click reports the clicked line to the host, which decides the editable span. */
-    private handleEditorDblClick(event: MouseEvent, view: EditorView): boolean {
-        if (this.onDblClickLineCb === null) {
-            return false;
+    private readonly handleDomDblClick = (event: MouseEvent): void => {
+        if (this.editor === null || this.onDblClickLineCb === null) {
+            return;
         }
-        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-        if (pos == null) {
-            return false;
+        const pos = this.editor.getTargetAtClientPoint(event.clientX, event.clientY);
+        const line = pos?.position?.lineNumber;
+        if (line === undefined) {
+            return;
         }
-        this.onDblClickLineCb(view.state.doc.lineAt(pos).number);
-        return false;
-    }
+        event.preventDefault();
+        this.onDblClickLineCb(line);
+    };
 
-    /** Blur re-locks the editor to read-only (desktop/DevTools-style: editing ends when focus
-     *  leaves). The edited text stays in the document for Apply/Save to pick up. */
-    private handleEditorBlur(view: EditorView): boolean {
-        if (view.state.field(editRangeField) == null) {
-            return false;
-        }
-        view.dispatch({
-            effects: [
-                editableCompartment.reconfigure([
-                    EditorView.editable.of(false),
-                    EditorState.readOnly.of(true),
-                ]),
-                setEditRange.of(null),
-            ],
-        });
-        return false;
-    }
-
-    /** rAF-throttled pointer tracking that reports the hovered 1-based line to onHoverLineCb. */
-    private handleEditorMouseMove(event: MouseEvent): boolean {
-        if (this.onHoverLineCb === null) {
-            return false;
-        }
-        const x = event.clientX;
-        const y = event.clientY;
-        if (this.hoverLineRaf !== 0) {
-            cancelAnimationFrame(this.hoverLineRaf);
-        }
-        this.hoverLineRaf = requestAnimationFrame(() => {
-            this.hoverLineRaf = 0;
-            if (this.view === null || this.onHoverLineCb === null) {
-                return;
-            }
-            const pos = this.view.posAtCoords({ x, y });
-            if (pos == null) {
-                this.onHoverLineCb(-1);
-                return;
-            }
-            this.onHoverLineCb(this.view.state.doc.lineAt(pos).number);
-        });
-        return false;
-    }
-
-    /** Releases the CodeMirror instance and frees DOM nodes. */
+    /** Releases the Monaco editor and frees DOM nodes. */
     destroy(): void {
+        this.destroyed = true;
         if (this.hoverLineRaf !== 0) {
             cancelAnimationFrame(this.hoverLineRaf);
             this.hoverLineRaf = 0;
         }
-        if (this.view !== null) {
-            this.view.destroy();
-            this.view = null;
+        const domNode = this.editor?.getDomNode();
+        if (domNode !== null && domNode !== undefined) {
+            domNode.removeEventListener('dblclick', this.handleDomDblClick);
+        }
+        this.disposers.forEach((d) => d.dispose());
+        this.disposers.length = 0;
+        if (this.contentChangeListener !== null) {
+            this.contentChangeListener.dispose();
+            this.contentChangeListener = null;
+        }
+        if (this.model !== null) {
+            this.model.dispose();
+            this.model = null;
+        }
+        if (this.editor !== null) {
+            this.editor.dispose();
+            this.editor = null;
         }
     }
 }
