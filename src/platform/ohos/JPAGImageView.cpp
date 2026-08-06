@@ -444,6 +444,24 @@ static napi_value SetCurrentFrame(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static napi_value SetVisible(napi_env env, napi_callback_info info) {
+  napi_value jsView = nullptr;
+  size_t argc = 1;
+  napi_value args[1] = {0};
+  napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
+  if (argc == 0) {
+    return nullptr;
+  }
+  bool visible = false;
+  napi_get_value_bool(env, args[0], &visible);
+  JPAGImageView* view = nullptr;
+  napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view != nullptr) {
+    view->setVisible(visible);
+  }
+  return nullptr;
+}
+
 static napi_value CurrentImage(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
@@ -532,6 +550,7 @@ bool JPAGImageView::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(renderScale, RenderScale),
       PAG_DEFAULT_METHOD_ENTRY(currentFrame, CurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
+      PAG_DEFAULT_METHOD_ENTRY(setVisible, SetVisible),
       PAG_DEFAULT_METHOD_ENTRY(numFrame, NumFrame),
       PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(currentImage, CurrentImage),
@@ -596,6 +615,7 @@ void JPAGImageView::onAnimationUpdate(PAGAnimator* animator) {
 }
 
 void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
+  std::shared_ptr<PAGAnimator> animator = nullptr;
   {
     std::lock_guard lock_guard(locker);
     if (_animator == nullptr) {
@@ -604,13 +624,12 @@ void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
     _window = window;
     targetWindow = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(_window));
     invalidSize();
+    animator = _animator;
   }
   // animator->update() can synchronously flow back into onAnimationUpdate,
   // which also acquires `locker`. Call it outside the critical section to
   // avoid re-entering the same non-recursive mutex on the caller thread.
-  if (_animator) {
-    _animator->update();
-  }
+  animator->update();
 }
 
 void JPAGImageView::onSurfaceSizeChanged() {
@@ -671,18 +690,52 @@ Frame JPAGImageView::currentFrame() {
 }
 
 void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, float frameRate) {
-  std::lock_guard lock_guard(locker);
-  if (_animator == nullptr) {
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  bool visible = false;
+  {
+    std::lock_guard lock_guard(locker);
+    animator = _animator;
+    if (animator == nullptr) {
+      return;
+    }
+    _composition = composition;
+    _frameRate = frameRate;
+    invalidDecoder();
+    visible = isVisible;
+  }
+  int64_t duration = 0;
+  if (composition != nullptr && visible) {
+    duration = composition->duration();
+  }
+  animator->setDuration(duration);
+  if (visible) {
+    animator->update();
+  }
+}
+
+void JPAGImageView::setVisible(bool visible) {
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::shared_ptr<PAGComposition> composition = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (isVisible == visible) {
+      return;
+    }
+    isVisible = visible;
+    animator = _animator;
+    composition = _composition;
+  }
+  if (animator == nullptr) {
     return;
   }
-  if (composition != nullptr) {
-    _animator->setDuration(composition->duration());
-  } else {
-    _animator->setDuration(0);
+  int64_t duration = 0;
+  if (visible && composition != nullptr) {
+    duration = composition->duration();
   }
-  _composition = composition;
-  _frameRate = frameRate;
-  invalidDecoder();
+  animator->setDuration(visible ? duration : 0);
+  if (visible) {
+    animator->update();
+  }
 }
 
 void JPAGImageView::setScaleMode(PAGScaleMode scaleMode) {
@@ -893,6 +946,7 @@ void JPAGImageView::release() {
     _animator = nullptr;
   }
 
+  isVisible = false;
   invalidDecoder();
 }
 

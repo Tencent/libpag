@@ -29,6 +29,12 @@ export struct PAGImageViewV2 {
       libraryname: "pag",
     })
       .backgroundColor(Color.Transparent)
+      .onVisibleAreaChange([0.0, 1.0], (isExpanding: boolean, currentRatio: number) => {
+        this.onVisibleAreaChanged(isExpanding, currentRatio);
+      })
+      .onLoad(() => {
+        this.controller.update();
+      })
   }
 
   onPageShow(): void {
@@ -41,5 +47,16 @@ export struct PAGImageViewV2 {
 
   aboutToDisappear(): void {
     this.controller.detachFromView();
+  }
+
+  private onVisibleAreaChanged(isExpanding: boolean, currentRatio: number): void {
+    // Use currentRatio rather than isExpanding as the visibility source: fast scrolling may merge
+    // threshold-crossing callbacks and drop the expanding flag, and the native setVisible is
+    // idempotent. Note this only reflects visible area, not alpha/hidden states within the layout tree.
+    if (currentRatio > 0.0) {
+      this.controller.onVisibilityChanged(true);
+    } else {
+      this.controller.onVisibilityChanged(false);
+    }
   }
 }

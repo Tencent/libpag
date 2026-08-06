@@ -222,6 +222,14 @@ export class PAGImageViewController {
   }
 
   /**
+   * Driven by the view's visible-area changes to stop rendering while off-screen and resume it when
+   * on-screen, saving power without altering the caller's play/pause intention.
+   */
+  onVisibilityChanged(visible: boolean) {
+    this.jImageView.setVisible(visible);
+  }
+
+  /**
    * The total number of times the animation is set to play. The default is 1, which means the
    * animation will play only once. If the repeat count is set to 0 or a negative value, the
    * animation will play infinity times.
@@ -323,6 +331,9 @@ export class PAGImageViewController {
   }
 
   detachFromView() {
+    // Reset the visibility state so a reused controller does not carry a stale visible flag into the
+    // next view, which would otherwise skip resuming playback on the new view.
+    this.onVisibilityChanged(false);
     this.view = null;
   }
 
