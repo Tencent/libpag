@@ -170,6 +170,7 @@ export interface RunSnapshotOptions {
   selector?: string;
   cookies?: CookieParam[];
   headers?: Array<[string, string]>;
+  reducedMotion?: boolean;
   inlineIconFonts?: boolean;
   downloadFonts?: boolean;
   fontDir?: string;
@@ -223,6 +224,7 @@ export async function runSnapshot(
     selector = '',
     cookies = [],
     headers = [],
+    reducedMotion = true,
     inlineIconFonts = true,
     downloadFonts = false,
     fontDir = '',
@@ -262,6 +264,7 @@ export async function runSnapshot(
     selector,
     cookies,
     headers,
+    reducedMotion,
     onConsole: log
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? (msg: any) => {
