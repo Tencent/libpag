@@ -264,7 +264,7 @@ describe('launchBrowser — package loading & options', () => {
     expect(handle.engine).toBe('puppeteer');
     expect(launches).toHaveLength(1);
     expect(launches[0].headless).toBe(true);
-    expect(launches[0].args).toEqual(['--no-sandbox', '--font-render-hinting=none']);
+    expect(launches[0].args).toEqual(['--no-sandbox', '--font-render-hinting=none', '--allow-file-access-from-files']);
     // executablePath plumbing is engine-specific; puppeteer reads its env var
     // at launch time, so this code path must NOT inject one.
     expect('executablePath' in launches[0]).toBe(false);

@@ -118,6 +118,8 @@ export interface BuildSnapshotArgsOptions {
   output: string;
   browserEngine?: string;
   inlineIconFonts?: boolean;
+  captureAnimations?: boolean;
+  scrollReveal?: boolean;
   viewportWidth?: number;
   viewportHeight?: number;
   waitMs?: number;
@@ -140,6 +142,8 @@ function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   const args = [path.join(opts.scriptDir, 'snapshot.js'), opts.input, '-o', opts.output];
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
   if (opts.inlineIconFonts === false) args.push('--no-inline-icon-fonts');
+  if (opts.captureAnimations) args.push('--capture-animations');
+  if (opts.scrollReveal) args.push('--scroll-reveal');
   if (typeof opts.viewportWidth === 'number') args.push('--viewport-width', String(opts.viewportWidth));
   if (typeof opts.viewportHeight === 'number') args.push('--viewport-height', String(opts.viewportHeight));
   if (typeof opts.waitMs === 'number') args.push('--wait-ms', String(opts.waitMs));
@@ -352,6 +356,8 @@ export interface RunHtmlToPagxOptions {
   pagxImageBaseDir?: string;
   browserEngine?: string;
   inlineIconFonts?: boolean;
+  captureAnimations?: boolean;
+  scrollReveal?: boolean;
   cookies?: string[];
   headers?: string[];
   viewportWidth?: number;
@@ -448,6 +454,8 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       scriptDir,
       browserEngine: opts.browserEngine,
       inlineIconFonts: opts.inlineIconFonts,
+      captureAnimations: opts.captureAnimations,
+      scrollReveal: opts.scrollReveal,
       cookies: opts.cookies,
       headers: opts.headers,
       viewportWidth: opts.viewportWidth,

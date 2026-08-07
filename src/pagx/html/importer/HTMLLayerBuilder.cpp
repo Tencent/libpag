@@ -326,7 +326,8 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
   return path;
 }
 
-bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
+bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
+                                              Fill* foregroundFill) {
   // `background-clip: text` redirects the gradient to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
   // `background-image`, suppress the rectangle + gradient Fill that would otherwise
@@ -339,13 +340,17 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
   // `geometry` is the shape node (Rectangle or Path) that anchors the Fill / Stroke chain
   // emitted below. We only allocate it when the box actually carries a paintable visual.
   Element* geometry = nullptr;
-  if (box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
-      box.borderSet) {
+  if (foregroundFill != nullptr || box.backgroundColorSet || !box.backgroundImage.empty() ||
+      box.borderRadiusSet || box.borderSet) {
     geometry = buildBackgroundGeometry(box);
     layer->contents.push_back(geometry);
     emitted = true;
   }
   applyBackgroundFill(layer, box, geometry, emitted);
+  if (foregroundFill != nullptr) {
+    layer->contents.push_back(foregroundFill);
+    emitted = true;
+  }
   applyBorderStroke(layer, box, geometry, emitted);
   applyBoxShadows(layer, box, emitted);
   applyBackdropFilter(layer, box, emitted);
@@ -524,6 +529,13 @@ void HTMLLayerBuilder::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& bo
       drop->blurX = sigma;
       drop->blurY = sigma;
       drop->color = s.color;
+      // A CSS outer `box-shadow` is always clipped to *outside* the element's border box, so it is
+      // never visible under the box itself — even when the box has a translucent (or absent)
+      // background. PAGX's default `showBehindLayer=true` instead paints the shadow behind the whole
+      // layer, so with a translucent fill the shadow bleeds through and washes the box in the shadow
+      // colour. Setting `showBehindLayer=false` makes the layer knock the shadow out of its own
+      // coverage, matching the CSS clip and leaving only the exterior glow.
+      drop->showBehindLayer = false;
       layer->styles.push_back(drop);
     }
   }
@@ -625,6 +637,10 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
             layer->filters.push_back(f);
           }
         }
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
+        auto cm = _document->makeNode<ColorMatrixFilter>();
+        cm->matrix = step.matrix;
+        layer->filters.push_back(cm);
       } else {
         _diagnostics.warn("html: filter '" + step.raw + "' not supported");
       }

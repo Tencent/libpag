@@ -20,6 +20,7 @@
 
 #include <emscripten/bind.h>
 #include <deque>
+#include <vector>
 #include "pag/gpu.h"
 #include "pagx/FontConfig.h"
 #include "pagx/PAGAnimation.h"
@@ -107,6 +108,11 @@ class PAGXView {
   std::shared_ptr<tgfx::Surface> tgfxSurface = nullptr;
   std::shared_ptr<PAGSurface> pagSurface = nullptr;
   std::shared_ptr<PAGScene> scene = nullptr;
+  // The non-default top-level animations of the document. An HTML-imported PAGX may declare several
+  // independent top-level animations (e.g. one per animated element); scene->advanceAndApply() only
+  // drives nested compositions and the default animation is driven via defaultAnimation below, so
+  // these extra animations must be advanced explicitly or only the first would appear to play.
+  std::vector<std::shared_ptr<PAGTimeline>> timelines = {};
   std::shared_ptr<PAGTimeline> defaultTimeline = nullptr;
   // The default timeline downcast to PAGAnimation when it is an animation. The playback value
   // methods (duration/frameRate/currentTime/setCurrentTime) live on PAGAnimation, not on the

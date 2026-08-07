@@ -158,6 +158,7 @@ describe('forkSnapshotCli — argv builder', () => {
       scriptDir: '/script',
       browserEngine: 'playwright',
       inlineIconFonts: false,
+      captureAnimations: true,
       viewportWidth: 1280,
       viewportHeight: 720,
       waitMs: 500,
@@ -182,6 +183,7 @@ describe('forkSnapshotCli — argv builder', () => {
     expect(argv).toEqual(expect.arrayContaining([
       '--browser-engine', 'playwright',
       '--no-inline-icon-fonts',
+      '--capture-animations',
       '--viewport-width', '1280',
       '--viewport-height', '720',
       '--wait-ms', '500',
@@ -210,6 +212,7 @@ describe('forkSnapshotCli — argv builder', () => {
     expect(argv).not.toContain('--download-fonts');
     expect(argv).not.toContain('--download-images');
     expect(argv).not.toContain('--no-inline-icon-fonts');
+    expect(argv).not.toContain('--capture-animations');
   });
 });
 

@@ -17,6 +17,13 @@ import {
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import {
+  capturePagxAnimationsOnPage,
+  settleAndInlineCanvasesOnPage,
+  PAGX_TRANSITION_INIT_SCRIPT,
+  PAGX_ANIM_PAUSE_INIT_SCRIPT,
+  PAGX_VIRTUAL_CLOCK_INIT_SCRIPT,
+} from './animation-capture';
+import {
   makeFontCaptureListener,
   saveDownloadedFonts,
   type SavedFont,
@@ -151,12 +158,27 @@ export function makeResourceCacheListener(
       if (!url || !/^https?:\/\//i.test(url)) return;
       if (!resp.ok()) return;
       if (cache.has(url)) return;
+      // Coalesce concurrent listeners for the same URL onto a single body
+      // read; the second-comer just awaits the first one and skips the
+      // network/buffer cost.
+      const pending = cache.awaitInflight(url);
+      if (pending !== undefined) { await pending; return; }
+      const slot = cache.beginInflight(url);
+      if (slot === null) { return; }
       const headers = resp.headers() || {};
       const contentType = headers['content-type'] || 'application/octet-stream';
-      if (!isCacheableContentType(url, contentType)) return;
-      const buf = await responseBytes(resp, engine);
-      const entry: CachedResource = { status: 200, contentType, body: buf };
-      cache.set(url, entry);
+      if (!isCacheableContentType(url, contentType)) {
+        slot.settle(undefined);
+        return;
+      }
+      let entry: CachedResource | undefined;
+      try {
+        const buf = await responseBytes(resp, engine);
+        entry = { status: 200, contentType, body: buf };
+        cache.set(url, entry);
+      } finally {
+        slot.settle(entry);
+      }
     } catch (err) {
       if (log) log(`resource cache capture skipped: ${errMessage(err)}`);
     }
@@ -171,11 +193,119 @@ export interface RunSnapshotOptions {
   cookies?: CookieParam[];
   headers?: Array<[string, string]>;
   inlineIconFonts?: boolean;
+  // Capture the page's animations into the subset (default false → static
+  // single frame). See the destructured default in `runSnapshot` for details.
+  captureAnimations?: boolean;
+  scrollReveal?: boolean;
   downloadFonts?: boolean;
   fontDir?: string;
   downloadImages?: boolean;
   imageDir?: string;
   log?: CaptureLogger | null;
+}
+
+// Step the page from top to bottom (and back) before the snapshot is walked so
+// that scroll-triggered reveal animations fire and lazy-loaded media is
+// fetched. Many marketing pages keep their below-the-fold sections at
+// `opacity: 0` until an IntersectionObserver flips them visible on scroll; the
+// snapshot is otherwise taken at scroll `(0,0)` where those sections are still
+// hidden (and therefore dropped). Walking the page once leaves those reveal
+// classes applied (reveal libraries unobserve after the first hit), and the
+// image `response` listener captures any `loading="lazy"` images that load
+// along the way. `takeSnapshot` scrolls back to `(0,0)` before measuring, so
+// the final geometry is unchanged — only the visibility/state is advanced.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: number): Promise<void> {
+  await page.evaluate(async (perStepMs: number) => {
+    // Native setTimeout stashed by PAGX_VIRTUAL_CLOCK_INIT_SCRIPT before it froze
+    // the page's timers. The page's own setTimeout only fires when the virtual
+    // clock is advanced, so a sleep on it here would never resolve and this
+    // real-time reveal walk would hang.
+    const st = (window as unknown as { __pagxRealSetTimeout?: typeof setTimeout }).__pagxRealSetTimeout || setTimeout;
+    const sleep = (ms: number) => new Promise((r) => st(r, ms));
+    const docHeight = () =>
+      Math.max(
+        document.body ? document.body.scrollHeight : 0,
+        document.documentElement ? document.documentElement.scrollHeight : 0,
+      );
+    const viewport = window.innerHeight || 800;
+    const step = Math.max(1, Math.floor(viewport * 0.8));
+    // Cap the number of steps so a page that keeps growing (infinite scroll)
+    // cannot loop forever.
+    for (let i = 0; i < 200; i++) {
+      const prevY = window.scrollY;
+      const target = Math.min(prevY + step, docHeight());
+      window.scrollTo(0, target);
+      await sleep(perStepMs);
+      // No further progress (reached the bottom or scroll is pinned): stop.
+      if (window.scrollY <= prevY) break;
+    }
+    // Let the last batch of reveals/transitions settle at the bottom, then
+    // return to the top so geometry is measured from the natural origin.
+    await sleep(perStepMs);
+    window.scrollTo(0, 0);
+  }, settleMs);
+  if (finalWaitMs > 0) {
+    await new Promise((r) => setTimeout(r, finalWaitMs));
+  }
+}
+
+// After `applyCanvasViewport` reverts a ballooned, viewport-dependent page, the
+// probe's tall-viewport resize has usually left the layout stuck inflated when
+// the virtual clock is installed (animation-capture path). The page's own
+// resize handler grew the layout on the tall probe viewport, but its matching
+// shrink is queued on the page's timers — which the virtual clock froze — so
+// restoring the settle viewport does NOT collapse it. Measured on
+// ardot.tencent.com: the canvas balloons from ~4320px to ~12040px and the
+// no-arg `takeSnapshot` below then re-measures (and emits) that inflated height,
+// producing a hugely over-tall PAGX whose content is spread across mostly-empty
+// space.
+//
+// A plain `resize` event or a wall-clock wait does not help (the shrink is
+// debounced on the page's own, frozen, setTimeout); only nudging the virtual
+// clock fires the pending timer. So flush those timers by advancing the clock a
+// bounded amount (dispatching `resize` first so event-only handlers also
+// re-run), which lets the debounced shrink run and the layout collapse back to
+// the settle-viewport size. The forward-only clock also stepped WAAPI/GSAP
+// animations forward while flushing, so re-pin them to the timeline start
+// (mirroring `pagxSeekAllToTime(0)`) — otherwise the emitted static base frame
+// would bake in a mid-animation state on top of the captured @keyframes. The
+// layout collapse is a JS/style state change, not an animation, so resetting
+// animation time does not undo it.
+//
+// Best-effort and a no-op without the virtual clock (the non-animation path
+// never installs it). Only runs on the revert branch, i.e. the already-degraded
+// viewport-dependent case; fixed-size animated mocks keep canvas ≈ viewport,
+// never balloon, and never reach here.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resettleAfterViewportRevert(page: any): Promise<void> {
+  await page.evaluate(() => {
+    const clock = (window as unknown as {
+      __pagxClock?: { now?: () => number; advanceTo?: (ms: number) => void };
+    }).__pagxClock;
+    if (!clock || typeof clock.advanceTo !== 'function' || typeof clock.now !== 'function') return;
+    // Clear typical resize/layout debounces (100–1000ms) with margin; three
+    // 2s steps also let a handler that reschedules itself settle.
+    for (let i = 0; i < 3; i++) {
+      try { window.dispatchEvent(new Event('resize')); } catch (_) { /* ignore */ }
+      try { clock.advanceTo((clock.now() as number) + 2000); } catch (_) { /* ignore */ }
+      void document.body.offsetHeight;
+    }
+    // Re-pin declarative animations to the timeline start (t=0). WAAPI/CSS:
+    // pause + currentTime=0. GSAP: seek the global timeline to 0.
+    try {
+      if (typeof document.getAnimations === 'function') {
+        for (const a of document.getAnimations()) {
+          try { a.pause(); a.currentTime = 0; } catch (_) { /* ignore */ }
+        }
+      }
+    } catch (_) { /* ignore */ }
+    try {
+      const gsap = (window as unknown as { gsap?: { globalTimeline?: { pause: () => void; time: (t: number, suppress?: boolean) => void } } }).gsap;
+      if (gsap && gsap.globalTimeline) { gsap.globalTimeline.pause(); gsap.globalTimeline.time(0, true); }
+    } catch (_) { /* ignore */ }
+    void document.body.offsetHeight;
+  });
 }
 
 export interface RunSnapshotResult {
@@ -224,6 +354,14 @@ export async function runSnapshot(
     cookies = [],
     headers = [],
     inlineIconFonts = true,
+    // Static by default: the snapshot emits a single frozen frame and no
+    // animation-capture machinery (virtual clock, transition recorder, WAAPI/
+    // GSAP/anime.js sampler) runs. Callers that want the page's motion baked
+    // into the subset as `@keyframes` + `animation` opt in via
+    // `captureAnimations: true` (surfaced as `--capture-animations` on the
+    // CLIs). See the init-script / sampler branches below.
+    captureAnimations = false,
+    scrollReveal = false,
     downloadFonts = false,
     fontDir = '',
     downloadImages = false,
@@ -275,37 +413,115 @@ export async function runSnapshot(
     // entry expression (`TAKE_SNAPSHOT_EXPR` and the icon-font helpers'
     // dispatch wrappers in lib/icon-font.ts), instead of re-encoding the
     // ~80 KB helper source for every snapshot.
-    initScripts: [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
+    // The transition recorder must be installed before the page's own scripts
+    // run so load-triggered entrance transitions are observed at their start;
+    // only register it when animation capture is enabled. PAGX_ANIM_PAUSE_INIT_SCRIPT
+    // (same script the baseline uses) is registered alongside it so finite
+    // animations stay paused across settle and remain seekable when the
+    // universal global sampler drives them to each sample time — otherwise a
+    // finite animation that finished during settle would drop out of
+    // `document.getAnimations()` and be missed, and the capture would no longer
+    // share the baseline's clock.
+    // PAGX_VIRTUAL_CLOCK_INIT_SCRIPT is installed first so it wraps
+    // setTimeout/setInterval/rAF before any page script schedules on them; the
+    // page's timer-driven state machine then stays frozen at t=0 until the
+    // animation sampler advances it deterministically (via pagxSeekAllToTime).
+    initScripts: captureAnimations
+      ? [PAGX_VIRTUAL_CLOCK_INIT_SCRIPT, SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT, PAGX_TRANSITION_INIT_SCRIPT, PAGX_ANIM_PAUSE_INIT_SCRIPT]
+      : [SNAPSHOT_INIT_SCRIPT, ICON_FONT_INIT_SCRIPT],
   });
 
   try {
+    // With the virtual clock installed the page's timers are frozen at t=0.
+    // Flush zero-delay init timers (advanceTo(0)) before measuring the body so
+    // the canvas size reflects the same t=0 layout the eval baseline measures
+    // (baseline-frames.js does the identical advanceTo(0) before its rect read).
+    // Best-effort: no-op when animation capture / the clock are disabled.
+    if (captureAnimations) {
+      try {
+        await page.evaluate(() => {
+          const clock = (window as unknown as { __pagxClock?: { advanceTo?: (ms: number) => void } }).__pagxClock;
+          if (clock && typeof clock.advanceTo === 'function') clock.advanceTo(0);
+        });
+      } catch (err) {
+        if (log) log(`virtual-clock advanceTo(0) skipped: ${errMessage(err)}`);
+      }
+    }
+
+    // Optionally walk the page top-to-bottom first so scroll-triggered reveal
+    // animations fire and lazy media is fetched (the image `response` listener
+    // is already attached, so anything loaded during the scroll lands in
+    // `imageBytesByUrl` below). Best-effort: a failure leaves the page at its
+    // settled, scroll-(0,0) state and the rest of the pipeline proceeds.
+    if (scrollReveal) {
+      try {
+        await scrollThroughPage(page, 250, Math.max(waitMs, 400));
+        if (log) log('scroll-reveal: walked page to trigger reveal animations / lazy media');
+      } catch (err) {
+        if (log) log(`scroll-reveal failed: ${errMessage(err)}`);
+      }
+    }
+
     // PAGX's renderer can read `data:` URIs and local files but not
     // `http(s)://` URLs, so every external image must be turned into one of
     // those before the snapshot is walked.
-    let images: SavedImage[] = [];
-    const srcByUrl: Record<string, string> = {};
-    if (downloadImages && imageDir) {
-      images = await bestEffortSave(
-        saveDownloadedImages,
-        imageBytesByUrl,
-        imageDir,
-        log,
-        'image',
-      );
-      for (const { url, path: filePath } of images) {
-        srcByUrl[url] = filePath;
+    //
+    // Factored into a reusable pass because a JS-driven page (Vue/React) can
+    // mount additional <img> elements *after* this first pass runs — most
+    // notably when the animation-capture virtual clock is advanced below and a
+    // component that was frozen at t=0 finally renders. Those late arrivals
+    // must be inlined too before the snapshot walk; otherwise they keep a bare
+    // site-absolute `http(s)` src (e.g. `/expert.svg`), which PAGX can neither
+    // render nor resolve, so the element is dropped from the output. Each call
+    // rebuilds `srcByUrl` from the current `imageBytesByUrl` (the `response`
+    // listener keeps filling it as new images load) and re-runs
+    // `inlineExternalImages`, which is idempotent — it skips <img> already
+    // carrying `data-snapshot-src`, so only the newly mounted images are
+    // touched.
+    const images: SavedImage[] = [];
+    const seenImageUrls = new Set<string>();
+    const inlineCapturedImages = async (): Promise<void> => {
+      const srcByUrl: Record<string, string> = {};
+      if (downloadImages && imageDir) {
+        const saved = await bestEffortSave(
+          saveDownloadedImages,
+          imageBytesByUrl,
+          imageDir,
+          log,
+          'image',
+        );
+        for (const item of saved) {
+          srcByUrl[item.url] = item.path;
+          // De-dupe across passes so the returned manifest lists each saved
+          // image once even though `saveDownloadedImages` re-reports the full
+          // set every call.
+          if (!seenImageUrls.has(item.url)) {
+            seenImageUrls.add(item.url);
+            images.push(item);
+          }
+        }
+      } else {
+        for (const [url, entry] of imageBytesByUrl) {
+          srcByUrl[url] = entryToDataUri(entry);
+        }
       }
-    } else {
-      for (const [url, entry] of imageBytesByUrl) {
-        srcByUrl[url] = entryToDataUri(entry);
-      }
-    }
-    await page.evaluate(inlineExternalImages, srcByUrl);
+      await page.evaluate(inlineExternalImages, srcByUrl);
+    };
+    await inlineCapturedImages();
 
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted
     // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
-    await page.evaluate(inlineCanvases);
+    //
+    // Non-capture path only: the real clock has already let each chart's
+    // entrance animation finish during settle, so a plain t=0 read gets the
+    // settled frame. In animation-capture mode the virtual clock froze rAF at
+    // t=0 (the chart's series has not grown yet), so canvases are settled and
+    // inlined AFTER the sampler instead — see `settleAndInlineCanvasesOnPage`
+    // below. Doing it here too would bake in the empty first frame.
+    if (!captureAnimations) {
+      await page.evaluate(inlineCanvases);
+    }
 
     if (inlineIconFonts) {
       try {
@@ -340,6 +556,54 @@ export async function runSnapshot(
       if (log) {
         log(`WARNING: pseudo-element materialisation skipped — decorative ::before/::after boxes will be missing from the snapshot: ${errMessage(err)}`);
       }
+    }
+
+    // Normalise any running animations (CSS @keyframes, WAAPI, GSAP, anime.js)
+    // into the canonical `@keyframes` + `animation` subset the importer plays
+    // back. Must run after the icon-font/image inlining and pseudo-element
+    // materialisation (so it sees the final DOM) but before the snapshot is
+    // walked (so its injected keyframes block and inline `animation-*`
+    // longhands are captured). Best-effort: a failure degrades to a static
+    // frame.
+    if (captureAnimations) {
+      try {
+        const stats = await capturePagxAnimationsOnPage(page, {
+          logger: log || (() => {}),
+        });
+        if (log && stats.count > 0) {
+          log(`captured ${stats.count} animation(s)`);
+        }
+      } catch (err) {
+        if (log) log(`animation capture failed: ${errMessage(err)}`);
+      }
+
+      // Now that the sampler has finished seeking the (forward-only) virtual
+      // clock, settle any rAF-driven <canvas> charts frozen at t=0 and inline
+      // their bitmaps as static images. Deferred to here because advancing the
+      // clock before sampling would have collapsed the declarative timeline
+      // (see `settleAndInlineCanvasesOnPage`). Best-effort: on failure the
+      // canvas simply keeps its t=0 (empty) frame, matching prior behaviour.
+      try {
+        await settleAndInlineCanvasesOnPage(page, { logger: log || (() => {}) });
+      } catch (err) {
+        if (log) log(`canvas settle failed: ${errMessage(err)}`);
+      }
+    }
+
+    // Second image-inline pass. Advancing the virtual clock during animation
+    // capture (and the canvas settle above) can mount <img> elements that did
+    // not exist during the first pass — a common shape on JS-rendered pages
+    // where a deferred/transitioned component only renders once its timers
+    // fire. Re-inline so those late arrivals become self-contained `data:` /
+    // local references instead of unresolvable site-absolute URLs that get
+    // dropped downstream. Idempotent (the in-page pass skips already-inlined
+    // <img>s), so this only touches images that appeared after the first pass.
+    // Best-effort: a failure here just leaves late images as-is, matching prior
+    // behaviour.
+    try {
+      await inlineCapturedImages();
+    } catch (err) {
+      if (log) log(`late image inline pass skipped: ${errMessage(err)}`);
     }
 
     // Resize the viewport to the body canvas before measuring geometry, exactly
@@ -377,6 +641,17 @@ export async function runSnapshot(
           { width: viewportWidth, height: viewportHeight },
           log,
         );
+        if (reverted && captureAnimations) {
+          // The revert left the frozen-clock page's layout stuck inflated by
+          // the probe resize; flush the debounced shrink and re-pin animations
+          // so the no-arg `takeSnapshot` below re-measures the collapsed,
+          // settle-viewport canvas instead of the ballooned one. Best-effort.
+          try {
+            await resettleAfterViewportRevert(page);
+          } catch (err) {
+            if (log) log(`layout re-settle after viewport revert skipped: ${errMessage(err)}`);
+          }
+        }
         if (!reverted) {
           snapshotExpr =
             `(() => window.__pagxSnapshot.takeSnapshot(` +

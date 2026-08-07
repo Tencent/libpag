@@ -74,6 +74,8 @@ async function main() {
       cookies: opts.cookies,
       headers: opts.headers,
       inlineIconFonts: opts.inlineIconFonts,
+      captureAnimations: opts.captureAnimations,
+      scrollReveal: opts.scrollReveal,
       downloadFonts: opts.downloadFonts,
       fontDir: opts.fontDir,
       downloadImages: opts.downloadImages,
