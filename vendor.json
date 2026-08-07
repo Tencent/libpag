@@ -48,8 +48,27 @@
         ],
         "platforms": [
           "mac",
-          "win",
           "linux"
+        ]
+      }
+    },
+    {
+      "name": "rttr",
+      "cmake": {
+        "targets": [
+          "rttr_core_lib"
+        ],
+        "arguments": [
+          "-DBUILD_STATIC=TRUE",
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+          "-DCMAKE_CXX_FLAGS=\"-w /EHsc\""
+        ],
+        "includes": [
+          "${SOURCE_DIR}/src/rttr",
+          "${BUILD_DIR}/src/rttr"
+        ],
+        "platforms": [
+          "win"
         ]
       }
     },
