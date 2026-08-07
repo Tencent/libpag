@@ -282,7 +282,7 @@ elseif (WIN32)
             # Copy ffmovie.dll
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VIEWER_FFMOVIE_DLL}" "${VIEWER_OUTPUT_DIR}/"
             # Deploy Qt (skip if already deployed)
-            COMMAND cmd /c "if not exist \"${VIEWER_OUTPUT_DIR}\\Qt6Core.dll\" \"${DEPLOYQT_EXECUTABLE}\" \"$<TARGET_FILE:PAGViewer>\" --qmldir=\"${CMAKE_SOURCE_DIR}/assets/qml\""
+            COMMAND "${DEPLOYQT_EXECUTABLE}" "$<TARGET_FILE:PAGViewer>" --qmldir="${CMAKE_SOURCE_DIR}/assets/qml"
             COMMENT "Deploying runtime dependencies for PAGViewer"
             VERBATIM
     )
