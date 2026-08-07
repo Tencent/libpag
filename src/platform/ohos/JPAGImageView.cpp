@@ -707,6 +707,11 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, 
   if (composition != nullptr && visible) {
     duration = composition->duration();
   }
+  // The animator keeps a progress that is independent of the composition, so it must be reset to
+  // the new composition's progress when the resource is switched. Otherwise a switch triggered
+  // during playback keeps the previous progress and the new animation starts from the middle.
+  // This matches the behavior of the Android and iOS PAGImageView.
+  animator->setProgress(composition != nullptr ? composition->getProgress() : 0.0);
   animator->setDuration(duration);
   if (visible) {
     animator->update();
