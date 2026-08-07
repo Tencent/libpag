@@ -182,10 +182,12 @@ Keep final `input.png` for reference (do not commit). If further edits are made 
 this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any
 scoped `{id}` artifacts produced during the fix.
 
-**Live browser preview (optional)**: to let the user see the edited design interactively,
-run `pagx preview input.pagx` and open the printed URL in the IDE's built-in browser. The
-preview hot-reloads on save, so any later touch-ups refresh the open tab automatically. Stop
-the background daemon with `pagx preview stop` when done.
+**Live browser preview (optional)**: do not auto-launch it. Present the preview command as a
+ready-to-copy line (`pagx preview input.pagx`) and let the user decide whether to run it. Only
+start the daemon when the user explicitly asks to preview; then open the printed URL with the
+IDE's built-in browser tool (e.g. `preview_url`). The preview hot-reloads on save, so any later
+touch-ups refresh the open tab automatically. Stop the background daemon with `pagx preview stop`
+when done.
 
 ---
 
