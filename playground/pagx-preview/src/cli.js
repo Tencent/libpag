@@ -88,7 +88,13 @@ function parseArgs(argv) {
       }
       args.port = parsed;
     } else if (a === '--host') {
-      args.host = argv[++i];
+      const value = argv[++i];
+      // Hostname / IPv4 / IPv6 only. Restricting the character set keeps --host from injecting
+      // shell metacharacters into the URL later opened by openBrowser.
+      if (!/^[A-Za-z0-9.\-:]+$/.test(value)) {
+        throw new Error(`invalid --host value: ${value}`);
+      }
+      args.host = value;
     } else if (a === '--fonts') {
       args.fonts = argv[++i];
     } else if (a === 'stop' && args.file === null && args.command === null) {
@@ -105,6 +111,20 @@ function parseArgs(argv) {
 }
 
 function openBrowser(url) {
+  // Defense in depth: only well-formed http(s) URLs ever reach the OS opener. Rejecting
+  // malformed inputs here guards every platform's spawn path, including the Windows
+  // `cmd /c start` branch whose argument parser is sensitive to quotes and metacharacters.
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (_) {
+    process.stderr.write(`pagx preview: refusing to open malformed URL: ${url}\n`);
+    return;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    process.stderr.write(`pagx preview: refusing to open non-http(s) URL: ${url}\n`);
+    return;
+  }
   const onError = (err) => {
     if (err) {
       process.stderr.write(`pagx preview: failed to open browser: ${err.message}\n`);

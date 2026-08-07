@@ -286,6 +286,12 @@ void PAGXView::applySceneDisplayOptions() {
     return;
   }
   auto options = scene->getDisplayOptions();
+  if (defaultAnimation != nullptr) {
+    // Tiled caches are invalidated on every animated frame, so tiling only adds overhead during
+    // playback. Partial mode redraws just the dirty regions and keeps animated frames smooth.
+    options->setRenderMode(PAGRenderMode::Partial);
+    return;
+  }
   options->setRenderMode(PAGRenderMode::Tiled);
   options->setTileUpdateMode(PAGTileUpdateMode::Smooth);
   options->setMaxTileCount(512);
