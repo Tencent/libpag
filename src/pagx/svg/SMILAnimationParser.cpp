@@ -422,6 +422,24 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
     case ChannelValueType::Color:
       ExpandColorRepeatCount(channel, durFrames, repeatCount, accumulate);
       break;
+    case ChannelValueType::Matrix: {
+      // Matrix repeats copy keyframes without accumulation. animateTransform accumulate on a
+      // baked matrix is intentionally ignored, matching animateMotion's accumulate behaviour.
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      auto original = ch->keyframes;
+      if (original.empty()) {
+        break;
+      }
+      ch->keyframes.clear();
+      for (int k = 0; k < repeatCount; ++k) {
+        Frame timeOffset = static_cast<Frame>(k) * durFrames;
+        for (auto key : original) {
+          key.time += timeOffset;
+          ch->keyframes.push_back(key);
+        }
+      }
+      break;
+    }
     default: {
       // For non-numeric types, repeat keyframes without accumulation. Use float as a generic
       // channel since we cannot easily template-dispatch here; but bool/string channels need
@@ -573,6 +591,93 @@ static void MergeAdditiveColor(Channel* base, const Channel* additive) {
   baseCh->keyframes = std::move(merged);
 }
 
+// Builds a Matrix from one animateTransform keyframe's parameter list. type selects the transform
+// kind; params carries the numeric arguments as parsed by ParseFloatParams:
+//   translate tx [ty]         -> Translate(tx, ty ?: tx)
+//   scale    sx [sy]           -> Scale(sx, sy ?: sx)
+//   rotate   angle [cx cy]    -> Translate(cx,cy) * Rotate(angle) * Translate(-cx,-cy)
+//   skewX    angle             -> matrix with c = tan(angle)
+//   skewY    angle             -> matrix with b = tan(angle)
+static Matrix TransformParamsToMatrix(const std::string& type, const std::vector<float>& params) {
+  if (type == "translate") {
+    float tx = (params.size() > 0) ? params[0] : 0.0f;
+    float ty = (params.size() > 1) ? params[1] : 0.0f;
+    return Matrix::Translate(tx, ty);
+  }
+  if (type == "scale") {
+    float sx = (params.size() > 0) ? params[0] : 1.0f;
+    float sy = (params.size() > 1) ? params[1] : sx;
+    return Matrix::Scale(sx, sy);
+  }
+  if (type == "rotate") {
+    float angle = (params.size() > 0) ? params[0] : 0.0f;
+    if (params.size() >= 3) {
+      float cx = params[1];
+      float cy = params[2];
+      return Matrix::Translate(cx, cy) * Matrix::Rotate(angle) * Matrix::Translate(-cx, -cy);
+    }
+    return Matrix::Rotate(angle);
+  }
+  if (type == "skewX") {
+    float angle = (params.size() > 0) ? params[0] : 0.0f;
+    float t = std::tan(angle * 3.14159265358979323846f / 180.0f);
+    Matrix m = {};
+    m.c = t;
+    return m;
+  }
+  if (type == "skewY") {
+    float angle = (params.size() > 0) ? params[0] : 0.0f;
+    float t = std::tan(angle * 3.14159265358979323846f / 180.0f);
+    Matrix m = {};
+    m.b = t;
+    return m;
+  }
+  return Matrix::Identity();
+}
+
+// Merges one additive="sum" matrix channel into the base matrix channel by composing both at the
+// union of their keyframe times. Matrix additive composition is multiplication (base * additive),
+// matching how SVG layers consecutive additive transforms. Mirrors MergeAdditiveFloat/Color.
+static void MergeAdditiveMatrix(Channel* base, const Channel* additive) {
+  auto* baseCh = static_cast<TypedChannel<Matrix>*>(base);
+  auto* additiveCh = static_cast<const TypedChannel<Matrix>*>(additive);
+  if (baseCh->keyframes.empty() || additiveCh->keyframes.empty()) {
+    return;
+  }
+  std::set<Frame> allTimes = {};
+  for (const auto& key : baseCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  for (const auto& key : additiveCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  std::vector<Keyframe<Matrix>> merged = {};
+  for (Frame time : allTimes) {
+    Matrix baseVal = std::get<Matrix>(base->evaluateAt(time));
+    Matrix additiveVal = std::get<Matrix>(additive->evaluateAt(time));
+    Keyframe<Matrix> key = {};
+    key.time = time;
+    key.value = baseVal * additiveVal;
+    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
+                               [time](const Keyframe<Matrix>& k) { return k.time == time; });
+    if (baseIt != baseCh->keyframes.end()) {
+      key.interpolation = baseIt->interpolation;
+      key.bezierOut = baseIt->bezierOut;
+      key.bezierIn = baseIt->bezierIn;
+    } else {
+      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
+                                [time](const Keyframe<Matrix>& k) { return k.time == time; });
+      if (addIt != additiveCh->keyframes.end()) {
+        key.interpolation = addIt->interpolation;
+        key.bezierOut = addIt->bezierOut;
+        key.bezierIn = addIt->bezierIn;
+      }
+    }
+    merged.push_back(key);
+  }
+  baseCh->keyframes = std::move(merged);
+}
+
 // Merges additive="sum" channels into their preceding base (replace) channel. Channels sharing
 // the same name are grouped; within each group, the first channel is the base and subsequent
 // additive="sum" channels are sampled and summed into it. A subsequent additive="replace"
@@ -606,6 +711,8 @@ static std::vector<Channel*> MergeAdditiveChannels(std::vector<ChannelWithAdditi
           MergeAdditiveFloat(base, (*channels)[idx].channel);
         } else if (base->valueType() == ChannelValueType::Color) {
           MergeAdditiveColor(base, (*channels)[idx].channel);
+        } else if (base->valueType() == ChannelValueType::Matrix) {
+          MergeAdditiveMatrix(base, (*channels)[idx].channel);
         }
       } else {
         // additive="replace": this channel becomes the new base.
@@ -714,6 +821,10 @@ static bool BoolKeyframeTimeLess(const Keyframe<bool>& a, const Keyframe<bool>& 
   return a.time < b.time;
 }
 
+static bool MatrixKeyframeTimeLess(const Keyframe<Matrix>& a, const Keyframe<Matrix>& b) {
+  return a.time < b.time;
+}
+
 // Sorts a channel's keyframes by time after inserting base-value keyframes out of order
 // (e.g. a begin-offset Hold keyframe at frame 0 appended after the animation keyframes).
 static void SortKeyframes(Channel* channel, ChannelValueType valueType) {
@@ -731,6 +842,11 @@ static void SortKeyframes(Channel* channel, ChannelValueType valueType) {
     case ChannelValueType::Bool: {
       auto* ch = static_cast<TypedChannel<bool>*>(channel);
       std::sort(ch->keyframes.begin(), ch->keyframes.end(), BoolKeyframeTimeLess);
+      break;
+    }
+    case ChannelValueType::Matrix: {
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      std::sort(ch->keyframes.begin(), ch->keyframes.end(), MatrixKeyframeTimeLess);
       break;
     }
     default:
@@ -1030,6 +1146,17 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
       ch->keyframes.push_back(key);
       break;
     }
+    case ChannelValueType::Matrix: {
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      Keyframe<Matrix> key = {};
+      key.time = time;
+      key.value = std::get<Matrix>(value);
+      key.interpolation = interpolation;
+      key.bezierOut = bezierOut;
+      key.bezierIn = bezierIn;
+      ch->keyframes.push_back(key);
+      break;
+    }
     default:
       break;
   }
@@ -1306,9 +1433,21 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
     const AnimatedNodeInfo& nodeInfo, float frameRate, Frame& outEndFrame) {
   std::vector<Channel*> channels = {};
-  if (!animElement || nodeInfo.animGroup == nullptr) {
+  if (!animElement) {
     return channels;
   }
+
+  // <g> elements carry their renderable children in layer->children, which Group.elements cannot
+  // hold (Group is an Element, children are Layers). So no animGroup is created for <g> in
+  // registerAnimatedElement, and transform animations cannot drive Group scalar channels. The
+  // Layer node exposes a runtime "matrix" channel (TypedChannel<Matrix>) that replaces the
+  // layer's static matrix when applied, affecting both contents and children. Bake each
+  // animateTransform keyframe into a full Matrix and drive the Layer's matrix channel directly.
+  // This also matches SMIL additive="replace" (default) semantics: the baked matrix replaces the
+  // layer's static transform. additive="sum" composition across multiple animateTransform elements
+  // is handled by MergeAdditiveMatrix in buildAnimation; a single additive="sum" animateTransform
+  // does not pre-compose the static matrix (known limitation).
+  bool useLayerMatrix = (nodeInfo.animGroup == nullptr && nodeInfo.targetLayer != nullptr);
 
   auto type = ctx.getAttribute(animElement, "type");
   if (type.empty()) {
@@ -1368,6 +1507,38 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   } else if (calcMode == "spline") {
     interpolation = KeyframeInterpolationType::Bezier;
     splines = parseKeySplines(ctx.getAttribute(animElement, "keySplines"));
+  }
+
+  if (useLayerMatrix) {
+    // Bake each keyframe's transform params into a full Matrix on a single "matrix" channel
+    // targeting the Layer. Bezier handles are recorded for completeness but the runtime matrix
+    // interpolation (MixTGFXMatrix) does not consume them; Linear/Hold is used effectively.
+    auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
+    for (size_t i = 0; i < paramSets.size(); ++i) {
+      Matrix m = TransformParamsToMatrix(type, paramSets[i]);
+      Point bo = {}, bi = {};
+      ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
+      Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
+      AppendKeyframe(ch, ChannelValueType::Matrix, time, m, interpolation, bo, bi);
+    }
+    channels.push_back(ch);
+
+    auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
+    int repeatCount = ParseRepeatCount(repeatCountStr);
+    if (repeatCount > 1) {
+      ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
+      outEndFrame = beginFrames + durFrames * repeatCount;
+    } else {
+      outEndFrame = beginFrames + durFrames;
+    }
+
+    // Base value is the layer's static matrix so fill="remove" reverts to the pre-animation
+    // transform and begin-offset holds the static state before the animation starts.
+    auto fillStr = ctx.getAttribute(animElement, "fill");
+    bool fillFreeze = (fillStr == "freeze");
+    AddBaseValueKeyframes(ch, ChannelValueType::Matrix, nodeInfo.targetLayer->matrix, beginFrames,
+                          outEndFrame, fillFreeze);
+    return channels;
   }
 
   if (type == "translate") {
@@ -1469,9 +1640,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
     const AnimatedNodeInfo& nodeInfo, float frameRate, Frame& outEndFrame) {
   std::vector<Channel*> channels = {};
-  if (!animElement || nodeInfo.animGroup == nullptr) {
+  if (!animElement) {
     return channels;
   }
+
+  // Like parseAnimateTransform, <g> targets use the Layer's "matrix" channel instead of Group
+  // scalar channels. Path position (and optional rotation) are baked into a Matrix per keyframe.
+  bool useLayerMatrix = (nodeInfo.animGroup == nullptr && nodeInfo.targetLayer != nullptr);
 
   // Resolve the motion path: either the `path` attribute on <animateMotion> itself, or an
   // <mpath href="#id"> child referencing a <path> element in defs.
@@ -1555,6 +1730,54 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   if (!rotateAuto && !rotateAutoReverse) {
     fixedRotation = std::strtof(rotateStr.c_str(), nullptr);
     hasFixedRotation = true;
+  }
+
+  if (useLayerMatrix) {
+    // Bake each path sample into Translate(pos) * Rotate(angle) (rotation only when auto/auto-
+    // reverse; fixed rotation is also baked into each keyframe's matrix). A single "matrix"
+    // channel targets the Layer; fill="remove" reverts to the layer's static matrix.
+    auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
+    for (int i = 0; i < sampleCount; ++i) {
+      double normalizedTime = static_cast<double>(i) / static_cast<double>(sampleCount - 1);
+      double pathProgress = normalizedTime;
+      if (!keyPoints.empty()) {
+        pathProgress = keyPoints[i];
+      }
+      float distance = static_cast<float>(pathProgress) * totalLength;
+      tgfx::Point pos = {};
+      tgfx::Point tan = {};
+      if (!pathMeasure->getPosTan(distance, &pos, &tan)) {
+        continue;
+      }
+      Matrix m = Matrix::Translate(pos.x, pos.y);
+      if (rotateAuto || rotateAutoReverse) {
+        float angle = atan2f(tan.y, tan.x) * 180.0f / static_cast<float>(M_PI);
+        if (rotateAutoReverse) {
+          angle += 180.0f;
+        }
+        m = m * Matrix::Rotate(angle);
+      } else if (hasFixedRotation) {
+        m = m * Matrix::Rotate(fixedRotation);
+      }
+      Frame time = beginFrames + static_cast<Frame>(std::round(normalizedTime * durFrames));
+      AppendKeyframe(ch, ChannelValueType::Matrix, time, m, KeyframeInterpolationType::Linear, {},
+                     {});
+    }
+    channels.push_back(ch);
+
+    auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
+    int repeatCount = ParseRepeatCount(repeatCountStr);
+    if (repeatCount > 1) {
+      ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
+      outEndFrame = beginFrames + durFrames * repeatCount;
+    } else {
+      outEndFrame = beginFrames + durFrames;
+    }
+    auto fillStr = ctx.getAttribute(animElement, "fill");
+    bool fillFreeze = (fillStr == "freeze");
+    AddBaseValueKeyframes(ch, ChannelValueType::Matrix, nodeInfo.targetLayer->matrix, beginFrames,
+                          outEndFrame, fillFreeze);
+    return channels;
   }
 
   // Sample the path and build keyframe values for position.x, position.y, and optionally rotation.
@@ -1685,6 +1908,45 @@ Animation* SMILAnimationParser::buildAnimation(
       }
       if (endFrame > layerEndFrame) {
         layerEndFrame = endFrame;
+      }
+    }
+
+    // <g> elements (animGroup == nullptr, targetLayer != nullptr) drive the Layer's "matrix"
+    // channel via baked Matrix keyframes instead of Group scalar channels. Collect them into
+    // layerEntries so they share the Layer-targeted AnimationObject with <animate>/<set> channels
+    // (e.g. opacity), and MergeAdditiveChannels composes multiple additive matrix channels.
+    if (nodeInfo.animGroup == nullptr && nodeInfo.targetLayer != nullptr &&
+        (!group.animateTransforms.empty() || !group.animateMotions.empty())) {
+      for (const auto& transformEl : group.animateTransforms) {
+        Frame endFrame = 0;
+        bool additive = (ctx.getAttribute(transformEl, "additive") == "sum");
+        auto parsedChannels =
+            parseAnimateTransform(ctx, doc, transformEl, nodeInfo, frameRate, endFrame);
+        for (auto* ch : parsedChannels) {
+          layerEntries.push_back({ch, additive, nodeInfo.targetId});
+        }
+        if (endFrame > layerEndFrame) {
+          layerEndFrame = endFrame;
+        }
+        auto repeatCount = ctx.getAttribute(transformEl, "repeatCount");
+        if (repeatCount == "indefinite") {
+          hasIndefiniteLoop = true;
+        }
+      }
+      for (const auto& motionEl : group.animateMotions) {
+        Frame endFrame = 0;
+        bool additive = (ctx.getAttribute(motionEl, "additive") == "sum");
+        auto parsedChannels = parseAnimateMotion(ctx, doc, motionEl, nodeInfo, frameRate, endFrame);
+        for (auto* ch : parsedChannels) {
+          layerEntries.push_back({ch, additive, nodeInfo.targetId});
+        }
+        if (endFrame > layerEndFrame) {
+          layerEndFrame = endFrame;
+        }
+        auto repeatCount = ctx.getAttribute(motionEl, "repeatCount");
+        if (repeatCount == "indefinite") {
+          hasIndefiniteLoop = true;
+        }
       }
     }
 
