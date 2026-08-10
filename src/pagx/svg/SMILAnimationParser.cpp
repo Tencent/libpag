@@ -1385,6 +1385,8 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
 
   auto toStr = ctx.getAttribute(setElement, "to");
   if (toStr.empty()) {
+    // SMIL 2.0 spec (Section 3.5.2): when <set> has no `to` attribute, "no animation occurs".
+    // Skipping is the normative behavior, not a missing fallback.
     return channels;
   }
 
