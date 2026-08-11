@@ -23,8 +23,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <set>
+#include "pagx/nodes/BlurFilter.h"
+#include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
@@ -769,6 +772,22 @@ static KeyValue ReadBaseValue(const ChannelTarget& target) {
       if (target.channelName == "scale.x") return group->scale.x;
       if (target.channelName == "scale.y") return group->scale.y;
       if (target.channelName == "skew") return group->skew;
+    } else if (nodeType == NodeType::BlurFilter) {
+      auto* f = static_cast<BlurFilter*>(target.node);
+      if (target.channelName == "blurX") return f->blurX;
+      if (target.channelName == "blurY") return f->blurY;
+    } else if (nodeType == NodeType::DropShadowFilter) {
+      auto* f = static_cast<DropShadowFilter*>(target.node);
+      if (target.channelName == "blurX") return f->blurX;
+      if (target.channelName == "blurY") return f->blurY;
+      if (target.channelName == "offsetX") return f->offsetX;
+      if (target.channelName == "offsetY") return f->offsetY;
+    } else if (nodeType == NodeType::InnerShadowFilter) {
+      auto* f = static_cast<InnerShadowFilter*>(target.node);
+      if (target.channelName == "blurX") return f->blurX;
+      if (target.channelName == "blurY") return f->blurY;
+      if (target.channelName == "offsetX") return f->offsetX;
+      if (target.channelName == "offsetY") return f->offsetY;
     }
     return 0.0f;
   }
@@ -928,6 +947,35 @@ ChannelTarget SMILAnimationParser::resolveAnimateTarget(SVGParserContext& ctx, P
                                                         const std::string& attributeName,
                                                         const AnimatedNodeInfo& nodeInfo) {
   ChannelTarget target = {};
+  // Filter primitive animations: <animate> on feGaussianBlur/feOffset drives the PAGX filter
+  // node's blur/offset channels. stdDeviation maps to blurX+blurY (a single animate drives
+  // both channels, mirroring how `r` drives both size.width and size.height on a circle); the
+  // two-value "sx sy" form is split in parseAnimate's stdDeviation special case.
+  if (nodeInfo.targetFilter != nullptr) {
+    if (attributeName == "stdDeviation") {
+      target.node = nodeInfo.targetFilter;
+      target.nodeId = nodeInfo.targetId;
+      target.channelName = "blurX";
+      target.valueType = ChannelValueType::Float;
+      return target;
+    }
+    if (attributeName == "dx") {
+      target.node = nodeInfo.targetFilter;
+      target.nodeId = nodeInfo.targetId;
+      target.channelName = "offsetX";
+      target.valueType = ChannelValueType::Float;
+      return target;
+    }
+    if (attributeName == "dy") {
+      target.node = nodeInfo.targetFilter;
+      target.nodeId = nodeInfo.targetId;
+      target.channelName = "offsetY";
+      target.valueType = ChannelValueType::Float;
+      return target;
+    }
+    // Unsupported filter attributeName — fall through to return empty target.
+    return target;
+  }
   if (attributeName == "opacity") {
     target.node = nodeInfo.targetLayer;
     target.nodeId = nodeInfo.targetId;
@@ -1325,6 +1373,45 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
     auto* sizeChannel = static_cast<TypedChannel<float>*>(primaryChannel);
     for (auto& key : sizeChannel->keyframes) {
       key.value *= 2.0f;
+    }
+  }
+
+  // Special case: "stdDeviation" on a filter drives both blurX and blurY. SVG's stdDeviation
+  // accepts "x" (uniform) or "x y" (per-axis). parseValue only reads the first number, so
+  // primaryChannel (blurX) already holds the first value; here we build blurY from the second
+  // value (or copy blurX when only one value was given per token). Re-parses the raw values/from
+  // /to strings so the second number is not lost.
+  if (attributeName == "stdDeviation" && target.valueType == ChannelValueType::Float &&
+      target.node != nullptr) {
+    auto nt = target.node->nodeType();
+    if (nt == NodeType::BlurFilter || nt == NodeType::DropShadowFilter ||
+        nt == NodeType::InnerShadowFilter) {
+      auto* blurYChannel = CreateChannelForType(doc, ChannelValueType::Float, "blurY");
+      if (blurYChannel != nullptr) {
+        // Collect the raw value tokens in document order (values, or from+to).
+        std::vector<std::string> rawTokens = {};
+        if (!valuesStr.empty()) {
+          rawTokens = SplitSemicolons(valuesStr);
+        } else if (!fromStr.empty() && !toStr.empty()) {
+          rawTokens.push_back(fromStr);
+          rawTokens.push_back(toStr);
+        }
+        // rawTokens aligns 1:1 with primaryChannel->keyframes (same order, same count).
+        auto* blurXChannel = static_cast<TypedChannel<float>*>(primaryChannel);
+        for (size_t i = 0; i < blurXChannel->keyframes.size(); ++i) {
+          float yVal = blurXChannel->keyframes[i].value;  // default: same as x
+          if (i < rawTokens.size()) {
+            auto params = ParseFloatParams(rawTokens[i]);
+            if (params.size() >= 2) {
+              yVal = params[1];
+            }
+          }
+          const auto& srcKey = blurXChannel->keyframes[i];
+          AppendKeyframe(blurYChannel, ChannelValueType::Float, srcKey.time, yVal,
+                         srcKey.interpolation, srcKey.bezierOut, srcKey.bezierIn);
+        }
+        channels.push_back(blurYChannel);
+      }
     }
   }
 
