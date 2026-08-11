@@ -897,6 +897,8 @@ static KeyValue ReadBaseValue(const ChannelTarget& target) {
       if (target.channelName == "scale.x") return group->scale.x;
       if (target.channelName == "scale.y") return group->scale.y;
       if (target.channelName == "skew") return group->skew;
+      if (target.channelName == "anchor.x") return group->anchor.x;
+      if (target.channelName == "anchor.y") return group->anchor.y;
     } else if (nodeType == NodeType::BlurFilter) {
       auto* f = static_cast<BlurFilter*>(target.node);
       if (target.channelName == "blurX") return f->blurX;
@@ -950,6 +952,8 @@ static float ReadGroupBaseValue(Group* group, const std::string& channelName) {
   if (channelName == "scale.x") return group->scale.x;
   if (channelName == "scale.y") return group->scale.y;
   if (channelName == "skew") return group->skew;
+  if (channelName == "anchor.x") return group->anchor.x;
+  if (channelName == "anchor.y") return group->anchor.y;
   return 0.0f;
 }
 
@@ -1787,29 +1791,62 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     channels.push_back(chY);
   } else if (type == "rotate") {
     auto* chR = CreateChannelForType(doc, ChannelValueType::Float, "rotation");
-    bool hasAnchor = false;
-    float anchorX = 0.0f;
-    float anchorY = 0.0f;
+    // SVG rotate accepts "angle cx cy" three-parameter form: rotation pivots around (cx, cy).
+    // Collect cx/cy from every keyframe that has them; when keyframes carry different centers
+    // we drive Group.anchor.x/y via dedicated channels so each keyframe pivots correctly,
+    // instead of the previous limitation of only using the first keyframe's center.
+    std::vector<std::pair<float, float>> centers = {};
+    centers.resize(paramSets.size(), {0.0f, 0.0f});
+    bool anyCenter = false;
+    bool centerVaries = false;
+    float firstCX = 0.0f;
+    float firstCY = 0.0f;
+    for (size_t i = 0; i < paramSets.size(); ++i) {
+      if (paramSets[i].size() >= 3) {
+        centers[i] = {paramSets[i][1], paramSets[i][2]};
+        if (!anyCenter) {
+          firstCX = paramSets[i][1];
+          firstCY = paramSets[i][2];
+          anyCenter = true;
+        } else if (centers[i].first != firstCX || centers[i].second != firstCY) {
+          centerVaries = true;
+        }
+      }
+    }
     for (size_t i = 0; i < paramSets.size(); ++i) {
       float angle = (paramSets[i].size() > 0) ? paramSets[i][0] : 0.0f;
-      // SVG rotate accepts "angle cx cy" three-parameter form: rotation pivots around (cx, cy).
-      // PAGX Group has a single static anchor, so we take the first keyframe's cx/cy. When later
-      // keyframes carry different centers the rotation is still driven by the angle channel;
-      // the pivot mismatch is a known limitation.
-      if (paramSets[i].size() >= 3 && !hasAnchor) {
-        anchorX = paramSets[i][1];
-        anchorY = paramSets[i][2];
-        hasAnchor = true;
-      }
       Point bo = {}, bi = {};
       ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
       Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
       AppendKeyframe(chR, ChannelValueType::Float, time, angle, interpolation, bo, bi);
     }
-    if (hasAnchor) {
-      nodeInfo.animGroup->anchor = {anchorX, anchorY};
-    }
     channels.push_back(chR);
+    if (anyCenter) {
+      if (centerVaries) {
+        // Different keyframes pivot around different centers: drive anchor.x/y as channels so each
+        // keyframe uses its own cx/cy. The static anchor is seeded from the first center so
+        // fill="remove"/begin-offset base values match.
+        nodeInfo.animGroup->anchor = {firstCX, firstCY};
+        auto* chAX = CreateChannelForType(doc, ChannelValueType::Float, "anchor.x");
+        auto* chAY = CreateChannelForType(doc, ChannelValueType::Float, "anchor.y");
+        if (chAX != nullptr && chAY != nullptr) {
+          for (size_t i = 0; i < paramSets.size(); ++i) {
+            Point bo = {}, bi = {};
+            ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
+            Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
+            AppendKeyframe(chAX, ChannelValueType::Float, time, centers[i].first, interpolation, bo,
+                           bi);
+            AppendKeyframe(chAY, ChannelValueType::Float, time, centers[i].second, interpolation,
+                           bo, bi);
+          }
+          channels.push_back(chAX);
+          channels.push_back(chAY);
+        }
+      } else {
+        // All keyframes share the same center: set it as a static anchor on the Group.
+        nodeInfo.animGroup->anchor = {firstCX, firstCY};
+      }
+    }
   } else if (type == "skewX" || type == "skewY") {
     auto* chS = CreateChannelForType(doc, ChannelValueType::Float, "skew");
     for (size_t i = 0; i < paramSets.size(); ++i) {
