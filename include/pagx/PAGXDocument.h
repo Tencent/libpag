@@ -41,6 +41,39 @@ class Image;
 class ImagePattern;
 
 /**
+ * One entry of the document's source-node map: the runtime index and source span of a node, its
+ * type, and the reflectable channel names available on it. Used by editor selection (line<->index
+ * mapping) and by hosts deciding which attribute edits can go incremental.
+ */
+struct NodeSourceEntry {
+  /**
+   * Index of the node in PAGXDocument::nodes.
+   */
+  int index = -1;
+
+  /**
+   * 1-based start line of the node in the PAGX XML, -1 when unavailable.
+   */
+  int startLine = -1;
+
+  /**
+   * 1-based end line of the node in the PAGX XML, -1 when unavailable.
+   */
+  int endLine = -1;
+
+  /**
+   * The node type.
+   */
+  NodeType nodeType = NodeType::Document;
+
+  /**
+   * Reflectable channel names of the node, from ListChannels(nodeType). Empty for node types that
+   * expose no channels.
+   */
+  std::vector<std::string> channels = {};
+};
+
+/**
  * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
  * configuration of a parsed/authored document, and tracks the live PAGScene instances created from
  * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
@@ -159,6 +192,16 @@ class PAGXDocument : public Node {
    * URL-form resources are left untouched for the host to resolve.
    */
   std::vector<std::string> getExternalImagePaths() const;
+
+  /**
+   * Returns one entry per node in PAGXDocument::nodes, in document order, carrying the node's
+   * runtime index, source span (1-based lines), type, and reflectable channel names. Use it to map
+   * source lines to node indexes for editor selection, and to decide which attribute edits can go
+   * incremental (a channel edit that fails can fall back to a full reparse). Entries reference the
+   * current node indexing; a structural document change renumbers nodes, so rebuild the map after
+   * such edits.
+   */
+  std::vector<NodeSourceEntry> getNodeSourceMap() const;
 
   /**
    * Loads external file data matching the given file path. Image data is embedded into matching

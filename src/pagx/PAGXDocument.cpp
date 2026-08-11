@@ -23,6 +23,7 @@
 #include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -479,6 +480,21 @@ std::vector<std::string> PAGXDocument::getExternalImagePaths() const {
   std::unordered_set<const PAGXDocument*> visited = {};
   AppendExternalImagePaths(this, &paths, visited);
   return paths;
+}
+
+std::vector<NodeSourceEntry> PAGXDocument::getNodeSourceMap() const {
+  std::vector<NodeSourceEntry> result = {};
+  result.reserve(nodes.size());
+  for (const auto& node : nodes) {
+    NodeSourceEntry entry = {};
+    entry.index = node->index;
+    entry.startLine = node->sourceLine;
+    entry.endLine = node->endLine;
+    entry.nodeType = node->nodeType();
+    entry.channels = ListChannels(node->nodeType());
+    result.push_back(std::move(entry));
+  }
+  return result;
 }
 
 bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Data> data) {

@@ -707,6 +707,38 @@ Rect PAGScene::getGlobalBoundsForNode(const Layer* node) const {
   return getGlobalBounds(pagLayer);
 }
 
+HitTestResult PAGScene::hitTest(float surfaceX, float surfaceY) {
+  HitTestResult result = {};
+  auto layers = getLayersUnderPoint(surfaceX, surfaceY);
+  if (layers.empty()) {
+    return result;
+  }
+  // getLayersUnderPoint returns the most specific runtime layer under the pointer (e.g. a
+  // <Rectangle> inside a <Composition>), not the <Layer composition="@X"> reference. Walk the
+  // parent chain up to the first Composition that has a source node (a real reference layer, not
+  // the root composition whose node is null) so the caller highlights the reference, not the
+  // internal definition. If no such ancestor exists (a plain <Layer> at the document root), fall
+  // back to the hit itself.
+  auto target = layers.front();
+  auto walker = target;
+  while (walker != nullptr) {
+    if (walker->layerType() == LayerType::Composition && walker->getNode() != nullptr) {
+      target = walker;
+      break;
+    }
+    walker = walker->getParent();
+  }
+  const auto* node = target->getNode();
+  if (node == nullptr) {
+    return result;
+  }
+  result.index = node->index;
+  result.startLine = node->sourceLine;
+  result.endLine = node->endLine;
+  result.bounds = getGlobalBounds(target);
+  return result;
+}
+
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
   if (rootX == nullptr || rootY == nullptr) {
     return false;

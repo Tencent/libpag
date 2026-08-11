@@ -28,6 +28,7 @@
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/types/Rect.h"
 
 namespace tgfx {
 class Context;
@@ -51,6 +52,33 @@ class ViewModel;
 class Image;
 struct Matrix;
 struct RuntimeBinding;
+
+/**
+ * The result of a scene hit test: the source node under a surface point and its source span and
+ * on-screen bounds. Used by editor selection (canvas hover/click) and any host that maps a click to
+ * a PAGX source node. A -1 index means no hit.
+ */
+struct HitTestResult {
+  /**
+   * Index of the source node in PAGXDocument::nodes, or -1 when nothing was hit.
+   */
+  int index = -1;
+
+  /**
+   * 1-based start line of the source node in the PAGX XML, -1 when unavailable.
+   */
+  int startLine = -1;
+
+  /**
+   * 1-based end line of the source node in the PAGX XML, -1 when unavailable.
+   */
+  int endLine = -1;
+
+  /**
+   * Surface-space bounds of the hit runtime layer, empty when unavailable.
+   */
+  Rect bounds = {};
+};
 
 /**
  * PAGScene is the runtime host for a PAGXDocument. It builds the runtime layer tree from the
@@ -198,6 +226,19 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * the on-screen rect without first resolving it to a PAGLayer handle.
    */
   Rect getGlobalBoundsForNode(const Layer* node) const;
+
+  /**
+   * Returns the source node under the given surface point, resolved for editor selection. This is a
+   * convenience over getLayersUnderPoint + PAGLayer::getNode: it returns the top-most hit and walks
+   * up to the first Composition that has a source node, so a click inside a <Layer composition="@X">
+   * instance resolves to the reference node rather than the internal definition node. The returned
+   * bounds are the on-screen rect of the clicked runtime layer (the instance itself, not the whole
+   * reference span). Does not require a prior draw().
+   * @param surfaceX the x coordinate in surface (device) space.
+   * @param surfaceY the y coordinate in surface (device) space.
+   * @return a HitTestResult with index -1 when nothing is hit or the hit layer has no source node.
+   */
+  HitTestResult hitTest(float surfaceX, float surfaceY);
 
  private:
   PAGScene();

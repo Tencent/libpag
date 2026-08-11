@@ -282,6 +282,11 @@ export class SourceEditor {
                 lineNumbers: 'on',
                 scrollBeyondLastLine: true,
                 wordWrap: 'off',
+                // Monaco otherwise changes wordWrap to viewport wrapping when the document is
+                // dominated by long Base64 image lines. Explicitly override that large-file mode:
+                // PAGX source must retain one visual row per physical line and use the horizontal
+                // scrollbar for long attributes.
+                wordWrapOverride1: 'off',
                 renderWhitespace: 'none',
                 largeFileOptimizations: true,
                 automaticLayout: true,
