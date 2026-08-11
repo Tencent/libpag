@@ -5492,4 +5492,109 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionOnGroup) {
   EXPECT_FLOAT_EQ(ch->keyframes.back().value.ty, 0.0f);
 }
 
+/**
+ * Test SVG import: <animate attributeName="stdDeviation"> on a <feGaussianBlur> drives the
+ * BlurFilter's blurX (and blurY when single-value, both channels equal).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateFilterBlur) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<defs><filter id=\"f\">"
+      "<feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"5\">"
+      "<animate attributeName=\"stdDeviation\" values=\"5;10;5\" dur=\"2s\" fill=\"freeze\"/>"
+      "</feGaussianBlur>"
+      "</filter></defs>"
+      "<rect width=\"50\" height=\"50\" fill=\"red\" filter=\"url(#f)\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // One AnimationObject targeting the filter node (not the rect Layer).
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  EXPECT_NE(obj->target, "f");
+  // Two channels: blurX and blurY (single-value stdDeviation drives both equally).
+  ASSERT_EQ(obj->channels.size(), 2u);
+  bool hasBlurX = false;
+  bool hasBlurY = false;
+  for (auto* ch : obj->channels) {
+    if (ch->name == "blurX") hasBlurX = true;
+    if (ch->name == "blurY") hasBlurY = true;
+    auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
+    ASSERT_EQ(fch->keyframes.size(), 3u);
+    EXPECT_FLOAT_EQ(fch->keyframes[0].value, 5.0f);
+    EXPECT_FLOAT_EQ(fch->keyframes[1].value, 10.0f);
+    EXPECT_FLOAT_EQ(fch->keyframes[2].value, 5.0f);
+  }
+  EXPECT_TRUE(hasBlurX);
+  EXPECT_TRUE(hasBlurY);
+}
+
+/**
+ * Test SVG import: <animate attributeName="stdDeviation"> with two-value "x y" form drives
+ * blurX and blurY independently.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateFilterBlurDualValue) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<defs><filter id=\"f\">"
+      "<feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"5 3\">"
+      "<animate attributeName=\"stdDeviation\" values=\"5 3;10 6\" dur=\"1s\" fill=\"freeze\"/>"
+      "</feGaussianBlur>"
+      "</filter></defs>"
+      "<rect width=\"50\" height=\"50\" fill=\"red\" filter=\"url(#f)\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 2u);
+  float blurXVal = 0.0f, blurYVal = 0.0f;
+  for (auto* ch : obj->channels) {
+    auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
+    if (ch->name == "blurX") {
+      ASSERT_EQ(fch->keyframes.size(), 2u);
+      EXPECT_FLOAT_EQ(fch->keyframes[0].value, 5.0f);
+      EXPECT_FLOAT_EQ(fch->keyframes[1].value, 10.0f);
+      blurXVal = fch->keyframes[1].value;
+    } else if (ch->name == "blurY") {
+      ASSERT_EQ(fch->keyframes.size(), 2u);
+      EXPECT_FLOAT_EQ(fch->keyframes[0].value, 3.0f);
+      EXPECT_FLOAT_EQ(fch->keyframes[1].value, 6.0f);
+      blurYVal = fch->keyframes[1].value;
+    }
+  }
+  EXPECT_NE(blurXVal, blurYVal);
+}
+
+/**
+ * Test SVG import: <animate attributeName="dx"> on <feOffset> drives DropShadowFilter.offsetX.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateFilterOffset) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<defs><filter id=\"f\">"
+      "<feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"5\"/>"
+      "<feOffset dx=\"5\" dy=\"5\">"
+      "<animate attributeName=\"dx\" from=\"5\" to=\"20\" dur=\"1s\" fill=\"freeze\"/>"
+      "</feOffset>"
+      "<feColorMatrix type=\"matrix\" values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0\"/>"
+      "<feMerge><feMergeNode/><feMergeNode in=\"SourceGraphic\"/></feMerge>"
+      "</filter></defs>"
+      "<rect width=\"50\" height=\"50\" fill=\"red\" filter=\"url(#f)\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  // One channel: offsetX (dx).
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "offsetX");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 5.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 20.0f);
+}
+
 }  // namespace pag

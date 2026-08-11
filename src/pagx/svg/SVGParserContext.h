@@ -25,6 +25,8 @@
 #include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationTimeline.h"
 #include "pagx/nodes/BlurFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
@@ -42,6 +44,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/svg/SMILAnimationParser.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -230,6 +233,37 @@ class SVGParserContext {
   // Parse data-* attributes from element and add to node's customData.
   void parseCustomData(const std::shared_ptr<DOMNode>& element, Node* node);
 
+  // Recursively collect SMIL animation elements (animate/animateTransform/animateMotion/set)
+  // grouped by their parent SVG graphics element. Populates _smilAnimations.
+  void collectSMILAnimations(const std::shared_ptr<DOMNode>& node);
+
+  // Ensure the given element has an id (generating one if missing) and record the mapping from
+  // DOM element to AnimatedNodeInfo so buildAnimation can later resolve targets. Creates a Group
+  // child element when the element has animateTransform/animateMotion so transform channels have
+  // scalar properties to drive. Returns the resolved target id (empty when element has no SMIL
+  // animations and nothing is recorded).
+  std::string registerAnimatedElement(const std::shared_ptr<DOMNode>& element, Layer* layer);
+
+  // Assign ids to Fill/Stroke/Shape content nodes that are targets of <animate> on the given
+  // element, recording them in the AnimatedNodeInfo's contentNodeIds map.
+  void registerAnimatedContentNodes(const std::shared_ptr<DOMNode>& element,
+                                    const AnimatedNodeInfo& nodeInfo);
+
+  // Build the top-level Animation node from _smilAnimations + _animatedNodeMap, append it to
+  // doc->animations, and attach an AnimationTimeline to the root layer. No-op when no SMIL
+  // animations were collected.
+  void buildAnimation(Layer* rootLayer);
+
+  // Registers a PAGX filter node created by convertFilterElement so it can be targeted by SMIL
+  // animations on the fe* primitives that produced it. Assigns an id, registers the filter in the
+  // document's nodeMap, and records each fe* DOM element → filter mapping in _feToFilterMap so
+  // registerAnimatedElement can later resolve <animate> children of feGaussianBlur/feOffset to
+  // this filter node. blurElement/offsetElement may be null when the filter was created without
+  // that primitive (e.g. a solid drop shadow has no feGaussianBlur).
+  void registerFilterAnimationTarget(LayerFilter* filterNode,
+                                     const std::shared_ptr<DOMNode>& blurElement,
+                                     const std::shared_ptr<DOMNode>& offsetElement);
+
   // Get or create ColorSource for a gradient/pattern reference.
   // If the reference is used multiple times, the ColorSource is added to resources.
   // Returns the ColorSource (either new inline instance or reference to resource).
@@ -262,6 +296,25 @@ class SVGParserContext {
   // Cache of parsed style properties per DOMNode to avoid redundant CSS parsing.
   std::unordered_map<const DOMNode*, std::unordered_map<std::string, std::string>>
       _stylePropertiesCache = {};
+
+  // SMIL animation elements grouped by their parent SVG graphics element (raw DOMNode pointer
+  // key, valid for the lifetime of the parsed XMLDOM which outlives parseDOM).
+  std::unordered_map<const DOMNode*, SMILAnimationGroup> _smilAnimations = {};
+
+  // PAGX node info for each animated SVG element, populated during convertToLayer and consumed
+  // by buildAnimation. Key matches _smilAnimations so the two maps can be walked together.
+  std::unordered_map<const DOMNode*, AnimatedNodeInfo> _animatedNodeMap = {};
+
+  // Mapping from feGaussianBlur/feOffset DOM elements to the PAGX filter node they contributed
+  // to (a single DropShadowFilter is built from multiple fe* primitives, so multiple DOM keys
+  // may map to the same filter). Populated by registerFilterAnimationTarget, consumed by
+  // registerAnimatedElement to route <animate> children of fe* elements to the filter node.
+  std::unordered_map<const DOMNode*, LayerFilter*> _feToFilterMap = {};
+
+  // Frame rate used to convert SMIL time values to PAGX Frame indices.
+  float _animationFrameRate = 60.0f;
+
+  friend class SMILAnimationParser;
 };
 
 }  // namespace pagx

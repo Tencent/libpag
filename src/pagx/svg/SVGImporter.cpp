@@ -81,6 +81,10 @@ std::shared_ptr<PAGXDocument> SVGImporter::ParseString(const std::string& svgCon
 // ============== SVGParserContext ==============
 
 SVGParserContext::SVGParserContext(const SVGImporter::Options& options) : _options(options) {
+  _animationFrameRate = options.animationFrameRate;
+  if (_animationFrameRate <= 0.0f || std::isnan(_animationFrameRate)) {
+    _animationFrameRate = 60.0f;
+  }
 }
 
 std::shared_ptr<PAGXDocument> SVGParserContext::parse(const uint8_t* data, size_t length) {
@@ -197,6 +201,11 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // This determines which ColorSources should be extracted to resources.
   countColorSourceReferences(root);
 
+  // Collect SMIL animation elements grouped by their parent graphics element. Must run before
+  // convertToLayer so the converter knows which elements have animations and can assign ids /
+  // create Groups accordingly.
+  collectSMILAnimations(root);
+
   // Compute content transform matrix for viewBox mapping.
   // This handles viewBox origin offset, uniform scaling, and centering in one matrix.
   float viewBoxX = (viewBox.size() >= 4) ? viewBox[0] : 0;
@@ -269,6 +278,22 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     for (auto& layer : convertedLayers) {
       _document->layers.push_back(layer);
     }
+  }
+
+  // Build the SMIL Animation node (if any) and attach an AnimationTimeline to a root layer.
+  // When the document has multiple top-level layers, wrap them in a new root layer to host the
+  // timeline; single-layer documents reuse that layer directly.
+  if (!_smilAnimations.empty()) {
+    Layer* animationRootLayer = nullptr;
+    if (_document->layers.size() == 1) {
+      animationRootLayer = _document->layers[0];
+    } else if (_document->layers.size() > 1) {
+      animationRootLayer = _document->makeNode<Layer>();
+      animationRootLayer->children = std::move(_document->layers);
+      _document->layers.clear();
+      _document->layers.push_back(animationRootLayer);
+    }
+    buildAnimation(animationRootLayer);
   }
 
   return _document;
@@ -399,7 +424,8 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
       tag == "mask" || tag == "clipPath" || tag == "filter" || tag == "marker" || tag == "style" ||
-      tag == "title" || tag == "desc" || tag == "metadata") {
+      tag == "title" || tag == "desc" || tag == "metadata" || tag == "animate" ||
+      tag == "animateTransform" || tag == "animateMotion" || tag == "set" || tag == "mpath") {
     return nullptr;
   }
 
@@ -559,6 +585,11 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     // Pass the shadow-only type to determine how to handle fill.
     convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
   }
+
+  // Register the element with SMIL animations: assign an id, create a Group to host transform
+  // channels when animateTransform/animateMotion targets a shape, and record the mapping for
+  // buildAnimation to consume. Done after contents are populated so the Group can wrap them.
+  registerAnimatedElement(element, layer);
 
   // Expand SVG marker references into additional child layers.
   std::string markerStart = getAttribute(element, "marker-start");
@@ -882,7 +913,26 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
       // The InnerShadowFilter draws shadow inside the layer's alpha boundary,
       // using only the shape geometry as the clipping region.
     } else {
-      addFillStroke(element, contents, inheritedStyle);
+      // For <use> elements, the fill/stroke on the referenced element should be inherited by the
+      // use instance. Since addFillStroke reads fill/stroke from `element` (the use element), we
+      // overlay the referenced element's fill/stroke onto an extended inherited style so the
+      // "use inherits referenced fill="none"" case is handled correctly.
+      InheritedStyle effectiveStyle = inheritedStyle;
+      if (tag == "use") {
+        std::string refId = resolveUrl(getHrefAttribute(element));
+        auto it = _defs.find(refId);
+        if (it != _defs.end()) {
+          std::string refFill = getAttribute(it->second, "fill");
+          if (!refFill.empty()) {
+            effectiveStyle.fill = refFill;
+          }
+          std::string refStroke = getAttribute(it->second, "stroke");
+          if (!refStroke.empty()) {
+            effectiveStyle.stroke = refStroke;
+          }
+        }
+      }
+      addFillStroke(element, contents, effectiveStyle);
     }
   }
 }
@@ -1625,8 +1675,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 4]);
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, primitives[i + 2], primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip the consumed primitives (5 elements) plus the feBlend that follows.
         i += 5;
@@ -1646,8 +1697,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [blurX, blurY] = parseFilterBlur(primitives[i + 2]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 3]);
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, primitives[i + 2], primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip the consumed primitives (4 elements) plus the feBlend that follows.
         i += 4;
@@ -1665,7 +1717,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto [offsetX, offsetY] = parseFilterOffset(primitives[i + 1]);
         auto shadowColor = parseFilterColorMatrix(primitives[i + 2]);
 
-        filters.push_back(createDropShadow(offsetX, offsetY, 0, 0, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, 0, 0, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, nullptr, primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip the consumed primitives (3 elements) plus any feBlend that follows.
         i += 3;
@@ -1712,6 +1766,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
           innerShadow->blurY = blurY;
           innerShadow->color = shadowColor;
           innerShadow->shadowOnly = shadowOnly;
+          registerFilterAnimationTarget(innerShadow, node, primitives[i + 1]);
           filters.push_back(innerShadow);
 
           // Skip consumed primitives: feGaussianBlur, feOffset, feComposite, [feColorMatrix]
@@ -1733,8 +1788,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, node, primitives[i + 1]);
+        filters.push_back(filter);
 
         // Skip consumed primitives.
         i += 2;
@@ -1761,8 +1817,9 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
           shadowColor = parseFilterColorMatrix(primitives[colorMatrixIdx]);
         }
 
-        filters.push_back(
-            createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly));
+        auto* filter = createDropShadow(offsetX, offsetY, blurX, blurY, shadowColor, shadowOnly);
+        registerFilterAnimationTarget(filter, primitives[i + 1], node);
+        filters.push_back(filter);
 
         // Skip consumed primitives.
         i += 2;
@@ -1796,6 +1853,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
         auto blurFilter = _document->makeNode<BlurFilter>();
         blurFilter->blurX = devX;
         blurFilter->blurY = devY;
+        registerFilterAnimationTarget(blurFilter, node, nullptr);
         filters.push_back(blurFilter);
       }
     }
@@ -2037,7 +2095,23 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     // matching SVG. Pixel tests on the renderer show that tgfx's dashOffset
     // shifts the phase along the reverse path direction, so a negative value
     // is required to advance the start point clockwise.
-    if (!strokeNode->dashes.empty() && (element->name == "circle" || element->name == "ellipse")) {
+    //
+    // Skip this correction when stroke-dashoffset is animated: the animation's
+    // keyframe values come from the SVG author's coordinate space (un-corrected),
+    // and applying the phase shift only to the static base value would cause a
+    // visual jump when the animation starts.
+    bool dashOffsetAnimated = false;
+    auto smilIt = _smilAnimations.find(element.get());
+    if (smilIt != _smilAnimations.end()) {
+      for (const auto& animEl : smilIt->second.animates) {
+        if (getAttribute(animEl, "attributeName") == "stroke-dashoffset") {
+          dashOffsetAnimated = true;
+          break;
+        }
+      }
+    }
+    if (!dashOffsetAnimated && !strokeNode->dashes.empty() &&
+        (element->name == "circle" || element->name == "ellipse")) {
       float rx = 0.0f;
       float ry = 0.0f;
       if (element->name == "circle") {
@@ -2823,6 +2897,44 @@ DropShadowFilter* SVGParserContext::createDropShadow(float offsetX, float offset
   return dropShadow;
 }
 
+void SVGParserContext::registerFilterAnimationTarget(
+    LayerFilter* filterNode, const std::shared_ptr<DOMNode>& blurElement,
+    const std::shared_ptr<DOMNode>& offsetElement) {
+  if (filterNode == nullptr) {
+    return;
+  }
+  // Assign an id and register so AnimationObject.target can resolve the filter node at runtime
+  // and in tests. Without this, findNode(filterId) would return nullptr.
+  if (filterNode->id.empty()) {
+    filterNode->id = generateUniqueId("anim_filter");
+  }
+  _document->registerNode(filterNode, filterNode->id);
+  // Record each fe* primitive → filter mapping so registerAnimatedElement can route <animate>
+  // children of feGaussianBlur/feOffset to this filter node. A single DropShadowFilter is built
+  // from multiple fe* primitives, so multiple DOM keys map to the same filter.
+  // fe* elements are not graphics elements (convertToLayer never visits them), so we also
+  // populate _animatedNodeMap here — registerAnimatedElement would otherwise never be called
+  // for fe* and buildAnimation would skip their <animate> children.
+  auto registerFe = [this, filterNode](const std::shared_ptr<DOMNode>& feElement) {
+    if (feElement == nullptr) {
+      return;
+    }
+    _feToFilterMap[feElement.get()] = filterNode;
+    // Only register AnimatedNodeInfo when the fe* actually has SMIL animation children;
+    // otherwise buildAnimation would still pick it up and emit an empty AnimationObject.
+    if (_smilAnimations.find(feElement.get()) == _smilAnimations.end()) {
+      return;
+    }
+    AnimatedNodeInfo info = {};
+    info.targetFilter = filterNode;
+    info.targetId = filterNode->id;
+    info.domElement = feElement;
+    _animatedNodeMap[feElement.get()] = std::move(info);
+  };
+  registerFe(blurElement);
+  registerFe(offsetElement);
+}
+
 // Parse a CSS style string into a property map. Later properties override earlier ones.
 // Handles parenthesized values (e.g., color(display-p3 ...)) by tracking parenthesis depth.
 static void ParseStyleString(const std::string& styleStr,
@@ -3264,6 +3376,149 @@ ColorSource* SVGParserContext::getColorSourceForRef(const std::string& refId,
     colorSource->id.clear();
   }
   return colorSource;
+}
+
+void SVGParserContext::collectSMILAnimations(const std::shared_ptr<DOMNode>& node) {
+  if (!node) {
+    return;
+  }
+
+  // Non-graphics subtrees cannot host SMIL animations on their children, so skip them entirely.
+  // Note: <filter> is NOT skipped — its fe* primitives (feGaussianBlur/feOffset) can carry
+  // <animate> elements that drive the filter's blur/offset channels (see registerAnimatedElement's
+  // fe* branch and SMILAnimationParser::resolveAnimateTarget's filter attributeName mapping).
+  // Non-graphics subtrees cannot host SMIL animations on their children, so skip them entirely.
+  // Note: <defs> is NOT skipped — it contains <filter> definitions whose fe* primitives can
+  // carry <animate> elements that drive the filter's blur/offset channels. Other defs children
+  // that cannot host animations (gradients, masks, clipPath, patterns) are skipped by their own
+  // entries below.
+  // Note: <filter> is NOT skipped — its fe* primitives (feGaussianBlur/feOffset) can carry
+  // <animate> elements that drive the filter's blur/offset channels (see registerAnimatedElement's
+  // fe* branch and SMILAnimationParser::resolveAnimateTarget's filter attributeName mapping).
+  const auto& name = node->name;
+  if (name == "style" || name == "title" || name == "desc" || name == "metadata" ||
+      name == "mask" || name == "clipPath" || name == "marker" ||
+      name == "linearGradient" || name == "radialGradient" || name == "pattern") {
+    return;
+  }
+
+  // Collect SMIL animation children of this element. SMIL elements target their parent graphics
+  // element, so we group them by the parent node pointer. mpath is a child of animateMotion and
+  // is handled when the animateMotion is parsed, not here.
+  // For fe* filter primitives (feGaussianBlur/feOffset/...), only <animate>/<set> are meaningful
+  // (driving the filter's blur/offset channels); <animateTransform>/<animateMotion> have no
+  // PAGX channel to drive on a filter node, so they are not collected to avoid dead entries.
+  bool isFilterPrimitive = !name.empty() && name.compare(0, 2, "fe") == 0;
+  SMILAnimationGroup group = {};
+  bool hasAnimation = false;
+  auto child = node->getFirstChild();
+  while (child) {
+    const auto& childName = child->name;
+    if (childName == "animate") {
+      group.animates.push_back(child);
+      hasAnimation = true;
+    } else if (!isFilterPrimitive && childName == "animateTransform") {
+      group.animateTransforms.push_back(child);
+      hasAnimation = true;
+    } else if (!isFilterPrimitive && childName == "animateMotion") {
+      group.animateMotions.push_back(child);
+      hasAnimation = true;
+    } else if (childName == "set") {
+      group.sets.push_back(child);
+      hasAnimation = true;
+    }
+    child = child->getNextSibling();
+  }
+  if (hasAnimation) {
+    _smilAnimations[node.get()] = std::move(group);
+  }
+
+  // Recurse into children.
+  child = node->getFirstChild();
+  while (child) {
+    collectSMILAnimations(child);
+    child = child->getNextSibling();
+  }
+}
+
+std::string SVGParserContext::registerAnimatedElement(const std::shared_ptr<DOMNode>& element,
+                                                      Layer* layer) {
+  if (!element || !layer) {
+    return {};
+  }
+  auto it = _smilAnimations.find(element.get());
+  if (it == _smilAnimations.end()) {
+    return {};
+  }
+  const auto& group = it->second;
+
+  // Ensure the Layer has an id so AnimationObject.target can reference it. SVG elements with an
+  // explicit id attribute set layer->id directly during convertToLayer, but that path does not
+  // register the id in the document's nodeMap. Register here so findNode(target) succeeds at
+  // runtime and in tests.
+  if (layer->id.empty()) {
+    layer->id = generateUniqueId("anim_layer");
+  }
+  _document->registerNode(layer, layer->id);
+
+  AnimatedNodeInfo info = {};
+  info.targetLayer = layer;
+  info.targetId = layer->id;
+  info.domElement = element;
+
+  // When animateTransform or animateMotion is present, create a Group to host the scalar
+  // transform channels (Layer has no rotation/scale/skew channels). The Group wraps the Layer's
+  // existing contents so the animated transform applies to the geometry.
+  bool needsGroup = !group.animateTransforms.empty() || !group.animateMotions.empty();
+  if (needsGroup && !layer->contents.empty()) {
+    auto* animGroup = _document->makeNode<Group>();
+    animGroup->elements = std::move(layer->contents);
+    layer->contents.clear();
+    layer->contents.push_back(animGroup);
+    animGroup->id = generateUniqueId("anim_group");
+    _document->registerNode(animGroup, animGroup->id);
+    info.animGroup = animGroup;
+    info.animGroupId = animGroup->id;
+
+    // Decompose the Layer's static transform so components targeted by animateTransform can be
+    // moved onto the Group as base values later. For now we keep the full transform on Layer and
+    // store the component list for reference; a later refinement will split it.
+    auto transformStr = getAttribute(element, "transform");
+    if (!transformStr.empty()) {
+      info.transformComponents = SMILAnimationParser::parseTransformComponents(transformStr);
+    }
+  }
+
+  _animatedNodeMap[element.get()] = std::move(info);
+  return layer->id;
+}
+
+void SVGParserContext::registerAnimatedContentNodes(const std::shared_ptr<DOMNode>& element,
+                                                    const AnimatedNodeInfo& nodeInfo) {
+  (void)element;
+  (void)nodeInfo;
+  // Content node ids are allocated lazily by SMILAnimationParser::resolveAnimateTarget when an
+  // <animate>/<set> targets a Fill/Stroke/Shape. Nothing to do here at convertToLayer time.
+}
+
+void SVGParserContext::buildAnimation(Layer* rootLayer) {
+  if (_animatedNodeMap.empty() || !rootLayer) {
+    return;
+  }
+  auto* animation = SMILAnimationParser::buildAnimation(*this, _document.get(), _smilAnimations,
+                                                        _animatedNodeMap, _animationFrameRate);
+  if (animation == nullptr) {
+    return;
+  }
+  animation->id = generateUniqueId("smil_anim");
+  _document->registerNode(animation, animation->id);
+  _document->animations.push_back(animation);
+
+  // Attach an AnimationTimeline to the root layer so the runtime activates this animation.
+  auto timeline = std::make_unique<AnimationTimeline>();
+  timeline->animationId = animation->id;
+  timeline->playing = true;
+  rootLayer->timelines.push_back(std::move(timeline));
 }
 
 }  // namespace pagx
