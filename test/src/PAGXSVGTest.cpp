@@ -5597,4 +5597,70 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateFilterOffset) {
   EXPECT_FLOAT_EQ(ch->keyframes[1].value, 20.0f);
 }
 
+/**
+ * Test SVG import: fractional repeatCount="2.5" expands to 2 full repetitions plus a truncated
+ * tail keyframe at the 0.5 boundary. The tail value is interpolated between the first and last
+ * keyframe values.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_FractionalRepeatCount) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"1;0\" dur=\"1s\" "
+      "repeatCount=\"2.5\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "alpha");
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // dur=1s at 60fps = 60 frames. repeatCount=2.5 -> end at 150 frames.
+  // ExpandFloatRepeatCount produces 5 keyframes:
+  //   0(1.0)            — round 1 start
+  //   60(0.0)           — round 1 end
+  //   60(1.0)           — round 2 start (restart value, shares time with round 1 end)
+  //   120(0.0)          — round 2 end
+  //   150(0.5)          — fractional tail interpolated between round 3 start (1.0) and end (0.0)
+  // fill="freeze" + begin=0: no base-value keyframes prepended/appended.
+  ASSERT_EQ(ch->keyframes.size(), 5u);
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 1.0f);
+  EXPECT_EQ(ch->keyframes[1].time, 60);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 0.0f);
+  EXPECT_EQ(ch->keyframes[2].time, 60);
+  EXPECT_FLOAT_EQ(ch->keyframes[2].value, 1.0f);
+  EXPECT_EQ(ch->keyframes[3].time, 120);
+  EXPECT_FLOAT_EQ(ch->keyframes[3].value, 0.0f);
+  EXPECT_EQ(ch->keyframes[4].time, 150);
+  EXPECT_FLOAT_EQ(ch->keyframes[4].value, 0.5f);
+}
+
+/**
+ * Test SVG import: two additive="sum" animations on display (Bool channel) are merged by logical
+ * OR. The element stays visible if either animation says visible=true.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_BoolAdditiveSum) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<set attributeName=\"display\" to=\"none\" begin=\"0s\" dur=\"2s\" fill=\"freeze\"/>"
+      "<set attributeName=\"display\" to=\"inline\" begin=\"1s\" dur=\"1s\" "
+      "additive=\"sum\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "visible");
+  EXPECT_EQ(obj->channels[0]->valueType(), pagx::ChannelValueType::Bool);
+  auto* ch = static_cast<pagx::TypedChannel<bool>*>(obj->channels[0]);
+  // Merged channel: frame 0 = false||true = true, frame 60 = false||true = true.
+  // After frame 60 (end of additive set), Hold returns the last keyframe's value (true).
+  // So at frame 90 (1.5s) the element is visible.
+  EXPECT_TRUE(std::get<bool>(ch->evaluateAt(90)));
+}
+
 }  // namespace pag
