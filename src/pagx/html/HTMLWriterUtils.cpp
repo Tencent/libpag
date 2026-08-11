@@ -273,8 +273,8 @@ static std::string CopyExternalImageToStaticDir(const std::string& srcPath,
 
 namespace {
 
-// Same byte-resolution semantics as PPTExporter's GetImageData: Image::data
-// wins, otherwise the file referenced by filePath is read from disk.
+// Image::data takes precedence. A base64 data URI in filePath is decoded before
+// a non-empty filePath is read from disk.
 std::shared_ptr<tgfx::Data> GetImageBytes(const Image* image) {
   if (image == nullptr) {
     return nullptr;
@@ -283,6 +283,10 @@ std::shared_ptr<tgfx::Data> GetImageBytes(const Image* image) {
     return tgfx::Data::MakeWithoutCopy(image->data->bytes(), image->data->size());
   }
   if (!image->filePath.empty()) {
+    auto decoded = DecodeBase64DataURI(image->filePath);
+    if (decoded) {
+      return tgfx::Data::MakeWithCopy(decoded->bytes(), decoded->size());
+    }
     return tgfx::Data::MakeFromFile(image->filePath);
   }
   return nullptr;

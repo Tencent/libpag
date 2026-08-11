@@ -32,6 +32,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/types/Data.h"
+#include "pagx/utils/Base64.h"
 #include "utils/PAGXImageTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/ZipTestUtils.h"
@@ -222,6 +223,33 @@ PAGX_TEST(PAGXHTMLDataTest, ToData_ReadsLocalImageFile) {
   ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
   auto imageEntry = FindEntryWithPrefix(entries, "assets/img");
   ASSERT_FALSE(imageEntry.empty());
+  EXPECT_NE(entries.at("index.html").find(imageEntry), std::string::npos);
+}
+
+PAGX_TEST(PAGXHTMLDataTest, ToData_DecodesDataURIImage) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+  layer->contents.push_back(rect);
+  auto* image = MakeTestPNGImage(doc.get());
+  std::string originalBytes(reinterpret_cast<const char*>(image->data->bytes()),
+                            image->data->size());
+  image->filePath =
+      "data:image/png;base64," + pagx::Base64Encode(image->data->bytes(), image->data->size());
+  image->data = nullptr;
+  AppendImagePatternFill(layer, doc.get(), image);
+  doc->layers.push_back(layer);
+
+  std::string error;
+  auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(data, nullptr) << error;
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  auto imageEntry = FindEntryWithPrefix(entries, "assets/img");
+  ASSERT_FALSE(imageEntry.empty());
+  EXPECT_EQ(entries.at(imageEntry), originalBytes);
   EXPECT_NE(entries.at("index.html").find(imageEntry), std::string::npos);
 }
 
