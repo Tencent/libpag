@@ -5663,4 +5663,69 @@ PAGX_TEST(PAGXSVGTest, SVGImport_BoolAdditiveSum) {
   EXPECT_TRUE(std::get<bool>(ch->evaluateAt(90)));
 }
 
+/**
+ * Test SVG import: <animateTransform type="rotate"> with different cx/cy per keyframe drives
+ * Group.anchor.x/y as channels so each keyframe pivots around its own center.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateVaryingCenter) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "values=\"0 50 50;180 100 100\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  // Three channels: rotation + anchor.x + anchor.y.
+  ASSERT_EQ(obj->channels.size(), 3u);
+  bool hasRotation = false;
+  bool hasAnchorX = false;
+  bool hasAnchorY = false;
+  for (auto* ch : obj->channels) {
+    if (ch->name == "rotation") hasRotation = true;
+    if (ch->name == "anchor.x") hasAnchorX = true;
+    if (ch->name == "anchor.y") hasAnchorY = true;
+  }
+  EXPECT_TRUE(hasRotation);
+  EXPECT_TRUE(hasAnchorX);
+  EXPECT_TRUE(hasAnchorY);
+  // Verify anchor.x keyframes: 50 at frame 0, 100 at frame 60.
+  for (auto* ch : obj->channels) {
+    if (ch->name == "anchor.x") {
+      auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
+      ASSERT_EQ(fch->keyframes.size(), 2u);
+      EXPECT_FLOAT_EQ(fch->keyframes[0].value, 50.0f);
+      EXPECT_FLOAT_EQ(fch->keyframes[1].value, 100.0f);
+    }
+    if (ch->name == "anchor.y") {
+      auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
+      ASSERT_EQ(fch->keyframes.size(), 2u);
+      EXPECT_FLOAT_EQ(fch->keyframes[0].value, 50.0f);
+      EXPECT_FLOAT_EQ(fch->keyframes[1].value, 100.0f);
+    }
+  }
+}
+
+/**
+ * Test SVG import: <animateTransform type="rotate"> with the same cx/cy across all keyframes
+ * sets a static anchor on the Group (no anchor channels).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateSameCenter) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "values=\"0 50 50;180 50 50\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  // Only rotation channel; anchor is static (same cx/cy for all keyframes).
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "rotation");
+}
+
 }  // namespace pag
