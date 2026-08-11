@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pagx/html/HTMLResourceWriter.h"
+#include "pagx/html/HTMLZipWriter.h"
 #include <limits>
 
 namespace pagx {
@@ -38,54 +38,50 @@ bool AddZipEntry(zipFile zf, const char* name, const void* data, unsigned size) 
 
 }  // namespace
 
-HTMLZipResourceWriter::HTMLZipResourceWriter() {
+HTMLZipWriter::HTMLZipWriter() {
   zlib_filefunc_def fileFunc = MakeMemZipFileFunc(&_buffer);
   _zip = zipOpen2("in-memory.html", APPEND_STATUS_CREATE, nullptr, &fileFunc);
 }
 
-HTMLZipResourceWriter::~HTMLZipResourceWriter() {
+HTMLZipWriter::~HTMLZipWriter() {
   if (_zip != nullptr) {
     zipClose(_zip, nullptr);
-    _zip = nullptr;
   }
 }
 
-bool HTMLZipResourceWriter::write(const std::string& relativePath, const void* bytes, size_t size,
-                                  std::string* errorMsg) {
+bool HTMLZipWriter::write(const std::string& entryPath, const void* bytes, size_t size,
+                          std::string* errorMsg) {
   if (_zip == nullptr) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipResourceWriter: archive not open.";
+      *errorMsg = "HTMLZipWriter: archive not open.";
     }
     return false;
   }
   if (size > std::numeric_limits<unsigned>::max()) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipResourceWriter: entry too large: " + relativePath;
+      *errorMsg = "HTMLZipWriter: entry too large: " + entryPath;
     }
     return false;
   }
-  if (!AddZipEntry(_zip, relativePath.c_str(), bytes, static_cast<unsigned>(size))) {
+  if (!AddZipEntry(_zip, entryPath.c_str(), bytes, static_cast<unsigned>(size))) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipResourceWriter: failed to add entry: " + relativePath;
+      *errorMsg = "HTMLZipWriter: failed to add entry: " + entryPath;
     }
     return false;
   }
   return true;
 }
 
-std::shared_ptr<Data> HTMLZipResourceWriter::finish(std::string* errorMsg) {
+std::shared_ptr<Data> HTMLZipWriter::finish(std::string* errorMsg) {
   if (_zip == nullptr) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipResourceWriter: archive not open.";
+      *errorMsg = "HTMLZipWriter: archive not open.";
     }
     return nullptr;
   }
-  // minizip writes the end-of-central-directory record on close, so check the
-  // buffer before closing: a zero-entry archive must yield nullptr, not an
-  // empty ZIP.
-  if (_buffer.data.empty()) {
+  if (_buffer.size() == 0) {
     if (errorMsg) {
-      *errorMsg = "HTMLZipResourceWriter: archive is empty.";
+      *errorMsg = "HTMLZipWriter: archive is empty.";
     }
     zipClose(_zip, nullptr);
     _zip = nullptr;
@@ -94,12 +90,13 @@ std::shared_ptr<Data> HTMLZipResourceWriter::finish(std::string* errorMsg) {
   if (zipClose(_zip, nullptr) != ZIP_OK) {
     _zip = nullptr;
     if (errorMsg) {
-      *errorMsg = "HTMLZipResourceWriter: failed to close archive.";
+      *errorMsg = "HTMLZipWriter: failed to close archive.";
     }
     return nullptr;
   }
   _zip = nullptr;
-  return Data::MakeWithCopy(_buffer.data.data(), _buffer.data.size());
+  size_t size = _buffer.size();
+  return Data::MakeAdopt(_buffer.release(), size);
 }
 
 }  // namespace pagx

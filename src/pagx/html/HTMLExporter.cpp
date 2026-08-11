@@ -23,9 +23,9 @@
 #include <iostream>
 #include <string>
 #include "pagx/html/HTMLBuilder.h"
-#include "pagx/html/HTMLResourceWriter.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
+#include "pagx/html/HTMLZipWriter.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
@@ -140,7 +140,7 @@ static std::string WrapAsHTMLDocument(const std::string& fragment, float width, 
 namespace {
 
 std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter::Options& options,
-                      HTMLWriterContext& ctx, std::string* /*errorMsg*/) {
+                      HTMLWriterContext& ctx) {
   if (!doc.isLayoutApplied()) {
     doc.applyLayout();
   }
@@ -292,7 +292,7 @@ std::string HTMLExporter::ToHTML(PAGXDocument& doc, const std::string& resourceD
   ctx.staticImgUrlPrefix = urlPrefix;
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
-  return BuildHTML(doc, mode, options, ctx, errorMsg);
+  return BuildHTML(doc, mode, options, ctx);
 }
 
 bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
@@ -350,28 +350,24 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
 
 std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
                                            std::string* errorMsg) {
-  if (!document.isLayoutApplied()) {
-    document.applyLayout();
-  }
-
-  HTMLZipResourceWriter zipWriter;
+  HTMLZipWriter zipWriter;
   HTMLWriterContext ctx;
   ctx.docWidth = document.width;
   ctx.docHeight = document.height;
-  ctx.resourceWriter = &zipWriter;
+  ctx.zipWriter = &zipWriter;
   ctx.staticImgUrlPrefix = "assets/";
   ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
 
-  auto html = BuildHTML(document, HTMLOutputMode::FullDocument, options, ctx, errorMsg);
+  auto html = BuildHTML(document, HTMLOutputMode::FullDocument, options, ctx);
   if (html.empty()) {
     if (errorMsg && errorMsg->empty()) {
       *errorMsg = "document produced no HTML output.";
     }
     return nullptr;
   }
-  if (!ctx.zipResourceError.empty()) {
+  if (!ctx.zipWriteError.empty()) {
     if (errorMsg) {
-      *errorMsg = "failed to write resource into archive: " + ctx.zipResourceError;
+      *errorMsg = "failed to write resource into archive: " + ctx.zipWriteError;
     }
     return nullptr;
   }

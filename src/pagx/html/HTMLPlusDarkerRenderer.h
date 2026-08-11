@@ -52,8 +52,8 @@ class HTMLPlusDarkerRenderer {
   /**
    * For every compatible PlusDarker Layer found in doc, renders a cropped backdrop PNG and
    * registers a PlusDarkerBackdrop keyed by the Layer pointer. The PNG is written to disk via
-   * ctx->writeResource on the legacy ToHTML path (resourceWriter null) and skipped entirely on
-   * the ToData path (resourceWriter non-null), where only the base64 backdropDataURL is consumed
+   * ctx->writeResource on the legacy ToHTML path (zipWriter null) and skipped entirely on
+   * the ToData path (zipWriter non-null), where only the base64 backdropDataURL is consumed
    * by the generated HTML. Layers that fail the compatibility check (filters, masks, 3D
    * transforms, non-translation matrix, scroll rect) are silently skipped and the caller falls
    * back to the mix-blend-mode: darken approximation.

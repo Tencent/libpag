@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
@@ -31,103 +32,29 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/types/Data.h"
+#include "utils/PAGXImageTestUtils.h"
+#include "utils/ProjectPath.h"
+#include "utils/ZipTestUtils.h"
 
 namespace pag {
 
 namespace {
 
-static bool HasZipMagic(const pagx::Data* data) {
-  if (data == nullptr || data->size() < 4) {
-    return false;
+static std::string FindEntryWithPrefix(const std::unordered_map<std::string, std::string>& entries,
+                                       const std::string& prefix) {
+  for (const auto& entry : entries) {
+    if (entry.first.rfind(prefix, 0) == 0) {
+      return entry.first;
+    }
   }
-  const auto* bytes = data->bytes();
-  return bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+  return {};
 }
 
-// Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced).
-static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
-  static const uint8_t MINIMAL_PNG[] = {
-      0x89,
-      0x50,
-      0x4E,
-      0x47,
-      0x0D,
-      0x0A,
-      0x1A,
-      0x0A,  // PNG signature
-      // IHDR
-      0x00,
-      0x00,
-      0x00,
-      0x0D,
-      0x49,
-      0x48,
-      0x44,
-      0x52,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x08,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0xFD,
-      0xD4,
-      0x9A,
-      0x73,
-      // IDAT (compressed pixel data)
-      0x00,
-      0x00,
-      0x00,
-      0x14,
-      0x49,
-      0x44,
-      0x41,
-      0x54,
-      0x78,
-      0x9C,
-      0x62,
-      0xF8,
-      0xCF,
-      0xC0,
-      0xF0,
-      0x1F,
-      0x01,
-      0x18,
-      0x18,
-      0x18,
-      0x00,
-      0x09,
-      0x04,
-      0x01,
-      0x01,
-      0xE2,
-      0x2D,
-      0x42,
-      0xA3,
-      // IEND
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x49,
-      0x45,
-      0x4E,
-      0x44,
-      0xAE,
-      0x42,
-      0x60,
-      0x82,
-  };
-  auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(MINIMAL_PNG, sizeof(MINIMAL_PNG));
-  return image;
+static size_t CountEntriesWithPrefix(const std::unordered_map<std::string, std::string>& entries,
+                                     const std::string& prefix) {
+  return static_cast<size_t>(std::count_if(entries.begin(), entries.end(), [&](const auto& entry) {
+    return entry.first.rfind(prefix, 0) == 0;
+  }));
 }
 
 // A document with a single centered rectangle and no fill.
@@ -165,18 +92,17 @@ static std::vector<std::string> ListWorkingDirectory() {
 
 }  // namespace
 
-// ToData returns a non-null ZIP buffer whose entry names (index.html plus assets) appear
-// verbatim in the raw bytes. Entry content is DEFLATE-compressed, so only entry names can be
-// spot-checked as plain text.
+// ToData returns a complete archive whose central directory, entry payloads, and
+// CRCs can all be read successfully.
 PAGX_TEST(PAGXHTMLDataTest, ToData_BasicArchive) {
   auto doc = MakeSimpleDoc();
   std::string error;
   auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
   ASSERT_NE(data, nullptr);
-  EXPECT_TRUE(HasZipMagic(data.get()));
-
-  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
-  EXPECT_NE(bytes.find("index.html"), std::string::npos);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  ASSERT_EQ(entries.count("index.html"), 1u);
+  EXPECT_NE(entries.at("index.html").find("<!DOCTYPE html>"), std::string::npos);
 }
 
 // An Image node whose bytes are provided via image->data is embedded as an assets/img*.png
@@ -195,10 +121,12 @@ PAGX_TEST(PAGXHTMLDataTest, ToData_WithEmbeddedImage) {
   std::string error;
   auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
   ASSERT_NE(data, nullptr);
-  EXPECT_TRUE(HasZipMagic(data.get()));
-
-  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
-  EXPECT_NE(bytes.find("assets/img"), std::string::npos);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  auto imageEntry = FindEntryWithPrefix(entries, "assets/img");
+  ASSERT_FALSE(imageEntry.empty());
+  EXPECT_FALSE(entries.at(imageEntry).empty());
+  EXPECT_NE(entries.at("index.html").find(imageEntry), std::string::npos);
 }
 
 // An Image referenced only by a "hash:" filePath has no readable bytes, so the image degrades
@@ -218,10 +146,9 @@ PAGX_TEST(PAGXHTMLDataTest, ToData_MissingHashImage) {
   std::string error;
   auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
   ASSERT_NE(data, nullptr);
-  EXPECT_TRUE(HasZipMagic(data.get()));
-
-  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
-  EXPECT_EQ(bytes.find("assets/img"), std::string::npos);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  EXPECT_TRUE(FindEntryWithPrefix(entries, "assets/img").empty());
 }
 
 // ToData is an in-memory export: nothing is written to the working directory, so the directory
@@ -233,6 +160,8 @@ PAGX_TEST(PAGXHTMLDataTest, ToData_NoFilesWritten) {
   std::string error;
   auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
   ASSERT_NE(data, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
 
   EXPECT_EQ(ListWorkingDirectory(), before);
 }
@@ -267,10 +196,86 @@ PAGX_TEST(PAGXHTMLDataTest, ToData_DiamondRasterized) {
   std::string error;
   auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
   ASSERT_NE(data, nullptr);
-  EXPECT_TRUE(HasZipMagic(data.get()));
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  auto imageEntry = FindEntryWithPrefix(entries, "assets/dgc");
+  ASSERT_FALSE(imageEntry.empty());
+  EXPECT_NE(entries.at("index.html").find(imageEntry), std::string::npos);
+}
 
-  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
-  EXPECT_NE(bytes.find("assets/dgc"), std::string::npos);
+PAGX_TEST(PAGXHTMLDataTest, ToData_ReadsLocalImageFile) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+  layer->contents.push_back(rect);
+  auto* image = doc->makeNode<pagx::Image>();
+  image->filePath = ProjectPath::Absolute("resources/apitest/imageReplacement.png");
+  AppendImagePatternFill(layer, doc.get(), image);
+  doc->layers.push_back(layer);
+
+  std::string error;
+  auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(data, nullptr) << error;
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  auto imageEntry = FindEntryWithPrefix(entries, "assets/img");
+  ASSERT_FALSE(imageEntry.empty());
+  EXPECT_NE(entries.at("index.html").find(imageEntry), std::string::npos);
+}
+
+PAGX_TEST(PAGXHTMLDataTest, ToData_DeduplicatesSharedImage) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* image = MakeTestPNGImage(doc.get());
+  for (float x : {100.0f, 300.0f}) {
+    auto* layer = doc->makeNode<pagx::Layer>();
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {x, 150};
+    rect->size = {100, 100};
+    layer->contents.push_back(rect);
+    AppendImagePatternFill(layer, doc.get(), image);
+    doc->layers.push_back(layer);
+  }
+
+  std::string error;
+  auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(data, nullptr) << error;
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  EXPECT_EQ(CountEntriesWithPrefix(entries, "assets/img"), 1u);
+}
+
+PAGX_TEST(PAGXHTMLDataTest, ToData_EmbedsGeneratedFont) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/glyph_run_embedded_font.pagx"));
+  ASSERT_NE(doc, nullptr);
+
+  std::string error;
+  auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(data, nullptr) << error;
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  auto fontEntry = FindEntryWithPrefix(entries, "assets/fonts/font_");
+  ASSERT_FALSE(fontEntry.empty());
+  EXPECT_FALSE(entries.at(fontEntry).empty());
+  EXPECT_NE(entries.at("index.html").find(fontEntry), std::string::npos);
+}
+
+PAGX_TEST(PAGXHTMLDataTest, ToData_InlinesPlusDarkerBackdrop) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/layer_blend_modes.pagx"));
+  ASSERT_NE(doc, nullptr);
+
+  std::string error;
+  auto data = pagx::HTMLExporter::ToData(*doc, {}, &error);
+  ASSERT_NE(data, nullptr) << error;
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  EXPECT_TRUE(FindEntryWithPrefix(entries, "assets/pd_").empty());
+  const auto& html = entries.at("index.html");
+  EXPECT_NE(html.find("pagx_pd_"), std::string::npos);
+  EXPECT_NE(html.find("data:image/png;base64,"), std::string::npos);
 }
 
 }  // namespace pag

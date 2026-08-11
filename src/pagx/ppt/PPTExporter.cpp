@@ -1142,7 +1142,8 @@ std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& docu
     return nullptr;
   }
 
-  return Data::MakeWithCopy(memBuffer.data.data(), memBuffer.data.size());
+  size_t size = memBuffer.size();
+  return Data::MakeAdopt(memBuffer.release(), size);
 }
 
 }  // namespace pagx

@@ -266,11 +266,9 @@ if (PAG_BUILD_PAGX)
         file(GLOB_RECURSE PAGX_PPT_SOURCES CONFIGURE_DEPENDS src/pagx/ppt/*.*)
         list(APPEND PAG_FILES ${PAGX_PPT_SOURCES})
     endif ()
-    if (PAG_BUILD_PAGX)
-        set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
-        list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
-        list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
-    endif ()
+    set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
+    list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
+    list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
 
     # HTML exporter (importer subtree is wired separately above so PAG_BUILD_HTML can keep
     # it out of non-HTML builds)
@@ -926,7 +924,9 @@ if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
-    list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES})
+    # Build minizip's reader into test binaries only, so archive-producing tests
+    # validate the central directory, entry data, and CRCs by actually extracting.
+    list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES} ${MINIZIP_DIR}/unzip.c)
     list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src

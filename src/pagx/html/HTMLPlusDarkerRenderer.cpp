@@ -234,7 +234,7 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
 
     // The HTML consumes backdropDataURL (base64); the pd_N.png file is written
     // only on the legacy ToHTML path so the on-disk layout stays unchanged.
-    if (ctx->resourceWriter == nullptr) {
+    if (ctx->zipWriter == nullptr) {
       std::string error;
       if (!ctx->writeResource(fileName, encoded->bytes(), encoded->size(), &error)) {
         // Match the legacy behavior: a failed backdrop write drops this entry so

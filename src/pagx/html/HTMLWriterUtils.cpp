@@ -25,8 +25,8 @@
 #include <vector>
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
-#include "pagx/html/HTMLResourceWriter.h"
 #include "pagx/html/HTMLWriter.h"
+#include "pagx/html/HTMLZipWriter.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -49,12 +49,12 @@ using pag::FloatNearlyZero;
 
 bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
                                       size_t size, std::string* errorMsg) {
-  if (resourceWriter != nullptr) {
+  if (zipWriter != nullptr) {
     std::string error;
-    bool ok = resourceWriter->write(staticImgUrlPrefix + relativePath, bytes, size, &error);
+    bool ok = zipWriter->write(staticImgUrlPrefix + relativePath, bytes, size, &error);
     if (!ok) {
-      if (zipResourceError.empty()) {
-        zipResourceError = error.empty() ? "failed to write ZIP entry: " + relativePath : error;
+      if (zipWriteError.empty()) {
+        zipWriteError = error.empty() ? "failed to write ZIP entry: " + relativePath : error;
       }
       if (errorMsg) {
         *errorMsg = error;
@@ -298,7 +298,7 @@ const char* MimeToExt(const std::string& mime) {
 }  // namespace
 
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
-  if (ctx != nullptr && ctx->resourceWriter != nullptr) {
+  if (ctx != nullptr && ctx->zipWriter != nullptr) {
     auto cached = ctx->externalImageAssets.find(image);
     if (cached != ctx->externalImageAssets.end()) {
       return ctx->staticImgUrlPrefix + cached->second;

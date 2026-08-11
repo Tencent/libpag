@@ -51,7 +51,7 @@
 namespace pagx {
 
 class Group;
-class HTMLResourceWriter;
+class HTMLZipWriter;
 class HTMLWriterContext;
 class LinearGradient;
 class RadialGradient;
@@ -190,24 +190,23 @@ class HTMLWriterContext {
   std::string staticImgDir = {};
   std::string staticImgUrlPrefix = {};
 
-  // Resource output abstraction. null → resources are written into staticImgDir
-  // exactly as before (ToHTML); non-null → every resource is handed to the
-  // writer instead (ToData), so the in-memory archive receives the same bytes.
-  HTMLResourceWriter* resourceWriter = nullptr;
+  // ToData sets this ZIP writer; ToHTML leaves it null and writes resources to
+  // staticImgDir. HTML export currently supports no other resource writer.
+  HTMLZipWriter* zipWriter = nullptr;
 
   // ToData only: first resource write failure, if any. An archive is all-or-nothing
   // (design spec section 8), so any failed ZIP entry write fails the whole ToData call.
-  std::string zipResourceError = {};
+  std::string zipWriteError = {};
 
   bool hasResourceOutput() const {
-    return resourceWriter != nullptr || !staticImgDir.empty();
+    return zipWriter != nullptr || !staticImgDir.empty();
   }
 
   // Writes a resource. relativePath is relative to the resource root (ToHTML:
   // staticImgDir; ToData: the ZIP root) and may contain '/'-separated sub
   // directories. In ToData mode the ZIP entry name is staticImgUrlPrefix +
   // relativePath, keeping archive entries and HTML URLs in sync. Falls back
-  // to the original write-to-disk behavior when resourceWriter is null.
+  // to the original write-to-disk behavior when zipWriter is null.
   bool writeResource(const std::string& relativePath, const void* bytes, size_t size,
                      std::string* errorMsg);
 
