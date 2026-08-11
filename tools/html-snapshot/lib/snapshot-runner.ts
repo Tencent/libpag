@@ -12,6 +12,7 @@ import {
   MEASURE_CANVAS_EXPR,
   SNAPSHOT_INIT_SCRIPT,
   inlineExternalImages,
+  normalizeEmptyImagePlaceholders,
   inlineCanvases,
   materializeDecorativePseudoElements,
 } from './browser-snapshot';
@@ -304,6 +305,14 @@ export async function runSnapshot(
       }
     }
     await page.evaluate(inlineExternalImages, srcByUrl);
+
+    // Chromium renders an empty/missing-src <img> with non-empty alt text as
+    // fallback glyphs and ignores even explicit CSS width/height in that
+    // state. Neutralise the alt text for source-less placeholders that have a
+    // real authored two-axis box before canvas/element measurement. The
+    // snapshot entry restores the live DOM after preserving the original alt
+    // in its emitted markup.
+    await page.evaluate(normalizeEmptyImagePlaceholders);
 
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted
