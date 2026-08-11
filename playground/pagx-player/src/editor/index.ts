@@ -188,7 +188,6 @@ export class EditorPanel {
     private busy = false;
     private pendingHoverCb: ((line: number) => void) | null = null;
     private pendingDblClickCb: ((line: number) => void) | null = null;
-    private pendingCursorCb: ((line: number) => void) | null = null;
     private readonly boundKeydown: (event: KeyboardEvent) => void;
     private readonly boundResize: () => void;
 
@@ -206,7 +205,9 @@ export class EditorPanel {
         this.buildDom();
         this.boundKeydown = this.handleKeydown.bind(this);
         this.boundResize = this.onWindowResize.bind(this);
-        document.addEventListener('keydown', this.boundKeydown);
+        // Capture before Monaco consumes read-only undo/redo shortcuts; SourceEditor itself checks
+        // text focus so unrelated inputs never receive this handling.
+        document.addEventListener('keydown', this.boundKeydown, true);
         window.addEventListener('resize', this.boundResize);
     }
 
@@ -268,9 +269,6 @@ export class EditorPanel {
                 }
                 if (this.pendingDblClickCb !== null) {
                     this.editor.onDblClickLine(this.pendingDblClickCb);
-                }
-                if (this.pendingCursorCb !== null) {
-                    this.editor.onCursorLine(this.pendingCursorCb);
                 }
             }
             // Seed the freshly created instance with the current document.
@@ -335,14 +333,25 @@ export class EditorPanel {
         this.editor?.scrollToLine(line, align);
     }
 
-    /** Unlock the given 1-based inclusive line span for editing (the enclosing node's span). */
-    public enterEditRange(startLine: number, endLine: number): void {
-        this.editor?.enterEditRange(startLine, endLine);
+    /** Unlock the enclosing node span while displaying the amber edit state only on the clicked tag
+     *  line. */
+    public enterEditRange(startLine: number, endLine: number, decorationLine: number): void {
+        this.editor?.enterEditRange(startLine, endLine, decorationLine);
     }
 
-    /** Re-scope the already-unlocked editable span to a new line range (edit follows caret). */
-    public updateEditRange(startLine: number, endLine: number): void {
-        this.editor?.updateEditRange(startLine, endLine);
+    /** Returns the current physical XML tag line, or null when a line is not itself a tag. */
+    public getDraftTagLine(line: number): number | null {
+        return this.editor?.getDraftTagLine(line) ?? null;
+    }
+
+    /** Returns the enclosing XML source span for a physical tag line when it has no runtime node. */
+    public getDraftTagEditRange(line: number): { startLine: number; endLine: number } | null {
+        return this.editor?.getDraftTagEditRange(line) ?? null;
+    }
+
+    /** Handles an undo/redo keyboard shortcut while the source editor is read-only. */
+    public handleReadOnlyUndoRedo(event: KeyboardEvent): boolean {
+        return this.editor?.handleReadOnlyUndoRedo(event) ?? false;
     }
 
     /** Reflects the host's selectMode state on the inspect button (active class + aria-pressed).
@@ -370,19 +379,12 @@ export class EditorPanel {
         this.editor?.onDblClickLine(cb);
     }
 
-    /** Register an editor caret-line callback for the "edit follows caret" re-scoping. Survives
-     *  editor recreation. Pass null to remove. */
-    public onCursorLine(cb: ((line: number) => void) | null): void {
-        this.pendingCursorCb = cb;
-        this.editor?.onCursorLine(cb);
-    }
-
     /** Detach global listeners and remove the panel from the DOM. Any layout side-effects the
      *  editor may have left on the host DOM (with-editor class on the canvas container,
      *  --editor-width property, body cursor/user-select set during a drag) are cleared here
      *  so tearing the player down doesn't outlive the component with orphaned styling. */
     public destroy(): void {
-        document.removeEventListener('keydown', this.boundKeydown);
+        document.removeEventListener('keydown', this.boundKeydown, true);
         window.removeEventListener('resize', this.boundResize);
         if (this.editor !== null) {
             this.editor.destroy();
@@ -441,7 +443,7 @@ export class EditorPanel {
 
         const closeBtn = this.panel.querySelector('.editor-close-btn');
         closeBtn?.addEventListener('click', () => this.close());
-        const selectBtn = this.panel.querySelector('.editor-select-btn');
+        const selectBtn = this.panel.querySelector<HTMLElement>('.editor-select-btn');
         selectBtn?.addEventListener('click', () => {
             this.onToggleSelect();
             selectBtn.blur();
@@ -460,6 +462,9 @@ export class EditorPanel {
     }
 
     private handleKeydown(event: KeyboardEvent): void {
+        if (this.editor?.handleReadOnlyUndoRedo(event)) {
+            return;
+        }
         if (event.key !== 'l' && event.key !== 'L') {
             return;
         }

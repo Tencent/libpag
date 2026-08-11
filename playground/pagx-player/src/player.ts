@@ -328,13 +328,16 @@ export class PAGXPlayer extends EventTarget {
     // (so the editor highlights the <Layer composition="@X"> reference, not the internal
     // definition) and the clicked instance's on-screen bounds (so the overlay outlines exactly
     // what the user clicked, even when the same source node has multiple instances). Cleared by
-    // editor-direction selections (onEditorDblClick / onEditorCursor) which set selectedIndex via
+    // editor-direction selection (onEditorDblClick) sets selectedIndex via
     // sourceMap line lookup and have no hitTest result to mirror.
     private hoverHit: HitTestResult | null = null;
     private selectHit: HitTestResult | null = null;
     // Node index the editor is hovering (editor->canvas direction). Independent of selectMode:
     // hovering an editor line always highlights the corresponding node on the canvas.
     private editorHoverIndex = -1;
+    // The physical tag line highlighted in the editor. It is intentionally separate from the node's
+    // full source span so parents never swallow their children during source browsing.
+    private editorHoverLine = -1;
     private selectedIndex = -1;
     private sourceMap: NodeSourceEntry[] = [];
     private overlay: HTMLDivElement | null = null;
@@ -484,7 +487,6 @@ export class PAGXPlayer extends EventTarget {
         if (this.editor) {
             this.editor.onHoverLine((line) => this.onEditorHover(line));
             this.editor.onDblClickLine((line) => this.onEditorDblClick(line));
-            this.editor.onCursorLine((line) => this.onEditorCursor(line));
         }
 
         // Gesture manager (view accessor closure keeps working across reloads)
@@ -746,6 +748,7 @@ export class PAGXPlayer extends EventTarget {
             this.hoverHit = null;
             this.selectHit = null;
             this.editorHoverIndex = -1;
+            this.editorHoverLine = -1;
             this.selectedIndex = -1;
             this.editor?.clearHighlight();
             this.refreshOverlay();
@@ -912,52 +915,47 @@ export class PAGXPlayer extends EventTarget {
         this.syncEditorSelect('start');
     }
 
-    /** Editor line hover -> canvas overlay + grey editor-line highlight (editor->canvas direction).
-     *  Always active while the editor is open, independent of selectMode. line <= 0 clears. */
+    /** Editor hover resolves only a physical XML tag line. The full node index remains available for
+     *  canvas overlay bounds, but the grey source decoration never expands to the node's children. */
     private onEditorHover(line: number): void {
-        const idx = line > 0 ? this.findNodeIndexForLine(line) : -1;
-        if (idx === this.editorHoverIndex) {
+        const tagLine = this.editor?.getDraftTagLine(line) ?? null;
+        const idx = tagLine === null ? -1 : this.findNodeIndexForLine(tagLine);
+        const nextLine = tagLine ?? -1;
+        if (idx === this.editorHoverIndex && nextLine === this.editorHoverLine) {
             return;
         }
         this.editorHoverIndex = idx;
+        this.editorHoverLine = nextLine;
         this.refreshOverlay();
         this.syncEditorHover();
     }
 
-    /** Editor double-click -> select the enclosing node (blue) and unlock its source span for
-     *  editing. */
+    /** Double-clicking an opening or closing tag unlocks its enclosing source node. The amber edit
+     *  decoration stays on the clicked tag line while the editable offset span remains the full
+     *  element, so normal text editing still works without parent-block highlighting. */
     private onEditorDblClick(line: number): void {
-        const idx = this.findNodeIndexForLine(line);
-        if (idx < 0) {
+        const tagLine = this.editor?.getDraftTagLine(line) ?? null;
+        if (tagLine === null) {
+            return;
+        }
+        const idx = this.findNodeIndexForLine(tagLine);
+        const fallbackRange = idx < 0 ? this.editor?.getDraftTagEditRange(tagLine) ?? null : null;
+        if (idx < 0 && fallbackRange === null) {
             return;
         }
         this.selectedIndex = idx;
-        // Editor-direction selection has no hitTest result, so clear the canvas-originating
-        // selectHit so updateOverlay falls back to getNodeBounds for the bounds lookup.
+        // Editor-direction selection has no hitTest result, so updateOverlay falls back to the
+        // source-map node bounds when one exists. XML declaration/root tags have no canvas node.
         this.selectHit = null;
-        const entry = this.sourceMap[idx];
-        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
-        this.editor?.enterEditRange(entry.startLine, end);
+        const entry = idx < 0 ? null : this.sourceMap[idx];
+        const startLine = entry === null ? fallbackRange!.startLine : entry.startLine;
+        const endLine = entry === null
+            ? fallbackRange!.endLine
+            : entry.endLine > 0 ? entry.endLine : entry.startLine;
+        this.editor?.clearHover();
+        this.editor?.enterEditRange(startLine, endLine, tagLine);
         this.refreshOverlay();
         this.syncEditorSelect();
-    }
-
-    /** Editor caret moved (while a span is unlocked for editing) -> re-scope the editable span
-     *  and blue selection to the node the caret now sits in. Fired only in edit mode (the editor
-     *  gates the callback on the unlocked range), so browsing/read-only caret moves never reach
-     *  here. No-op while the caret stays inside the current node's span. */
-    private onEditorCursor(line: number): void {
-        const idx = this.findNodeIndexForLine(line);
-        if (idx < 0 || idx === this.selectedIndex) {
-            return;
-        }
-        this.selectedIndex = idx;
-        this.selectHit = null;
-        const entry = this.sourceMap[idx];
-        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
-        this.editor?.updateEditRange(entry.startLine, end);
-        this.syncEditorSelect();
-        this.refreshOverlay();
     }
 
     /** Returns the index of the innermost node whose [startLine, endLine] span contains the given
@@ -1082,11 +1080,17 @@ export class PAGXPlayer extends EventTarget {
      *  <Layer composition="@X"> reference, not the internal definition); editor-originating hover
      *  (editorHoverIndex) falls back to sourceMap since no hitTest ran. */
     private syncEditorHover(align: 'none' | 'nearest' | 'start' = 'none'): void {
+        if (this.editorHoverLine > 0) {
+            this.editor?.highlightHover(this.editorHoverLine, this.editorHoverLine);
+            if (align !== 'none') {
+                this.editor?.scrollToLine(this.editorHoverLine, align);
+            }
+            return;
+        }
         const idx = this.hoverTarget();
-        if (this.editorHoverIndex < 0 && this.hoverHit !== null) {
+        if (this.hoverHit !== null) {
             const start = this.hoverHit.startLine;
-            const end = this.hoverHit.endLine > 0 ? this.hoverHit.endLine : start;
-            this.editor?.highlightHover(start, end);
+            this.editor?.highlightHover(start, start);
             if (align !== 'none') {
                 this.editor?.scrollToLine(start, align);
             }
@@ -1096,23 +1100,19 @@ export class PAGXPlayer extends EventTarget {
             this.editor?.clearHover();
             return;
         }
-        const entry = this.sourceMap[idx];
-        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
-        this.editor?.highlightHover(entry.startLine, end);
+        const start = this.sourceMap[idx].startLine;
+        this.editor?.highlightHover(start, start);
         if (align !== 'none') {
-            this.editor?.scrollToLine(entry.startLine, align);
+            this.editor?.scrollToLine(start, align);
         }
     }
 
-    /** Mirrors the sticky selection onto the editor as the blue select line highlight.
-     *  Span source: canvas-originating click uses the hitTest result's span; editor-originating
-     *  selection (double-click / caret move in edit mode) falls back to sourceMap. */
+    /** Mirrors the sticky selection onto the editor as the blue opening-tag line highlight. */
     private syncEditorSelect(align: 'none' | 'nearest' | 'start' = 'none'): void {
         const idx = this.selectedIndex;
         if (this.selectHit !== null) {
             const start = this.selectHit.startLine;
-            const end = this.selectHit.endLine > 0 ? this.selectHit.endLine : start;
-            this.editor?.highlightSelect(start, end);
+            this.editor?.highlightSelect(start, start);
             if (align !== 'none') {
                 this.editor?.scrollToLine(start, align);
             }
@@ -1123,8 +1123,7 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         const entry = this.sourceMap[idx];
-        const end = entry.endLine > 0 ? entry.endLine : entry.startLine;
-        this.editor?.highlightSelect(entry.startLine, end);
+        this.editor?.highlightSelect(entry.startLine, entry.startLine);
         if (align !== 'none') {
             this.editor?.scrollToLine(entry.startLine, align);
         }

@@ -156,6 +156,16 @@ export const EDITOR_STYLES = `
     display: none !important;
 }
 
+/* Browsing/highlighting source is not text entry. Use the normal pointer in read-only mode so a
+   grey hover line does not advertise an editable insertion cursor. */
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .monaco-mouse-cursor-text,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .view-lines,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .view-line,
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .inputarea {
+    cursor: default !important;
+}
+
 /* Node-span highlights mirrored from the canvas selection state. Monaco applies the decoration's
    className to each .view-line, so these selectors target the line within the editor. Class
    order matters: select after hover so the blue wins on overlap; edit after select. */
@@ -180,19 +190,6 @@ export const EDITOR_STYLES = `
 
 #editor-panel .editor-host .monaco-editor .pagx-edit-line {
     background-color: rgba(255, 190, 92, 0.13);
-}
-
-#editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-first:not(.pagx-edit-line-last) {
-    box-shadow: inset 0 1px 0 #C68A32, inset 1px 0 0 #C68A32, inset -1px 0 0 #C68A32;
-}
-
-#editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-last:not(.pagx-edit-line-first) {
-    box-shadow: inset 0 -1px 0 #C68A32, inset 1px 0 0 #C68A32, inset -1px 0 0 #C68A32;
-}
-
-#editor-panel .editor-host .monaco-editor .pagx-edit-line.pagx-edit-line-first.pagx-edit-line-last {
-    box-shadow: inset 0 1px 0 #C68A32, inset 0 -1px 0 #C68A32, inset 1px 0 0 #C68A32,
-        inset -1px 0 0 #C68A32;
 }
 
 #editor-panel .editor-host.pagx-editor-editing .monaco-editor .view-line .selected-text {

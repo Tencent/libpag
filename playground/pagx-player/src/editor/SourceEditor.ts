@@ -165,8 +165,6 @@ export function getXmlSyntaxDiagnostics(xmlText: string): XmlSyntaxDiagnostic[] 
     return [{ message: firstLine, line: 1, column: 1 }];
 }
 
-const EDIT_LINE_FIRST_CLASS = 'pagx-edit-line-first';
-const EDIT_LINE_LAST_CLASS = 'pagx-edit-line-last';
 
 function clampLine(line: number, lineCount: number): number {
     return Math.max(1, Math.min(line, lineCount));
@@ -197,27 +195,16 @@ function buildEditDecos(
     model: MonacoNS.editor.ITextModel,
     out: MonacoNS.editor.IModelDeltaDecoration[],
 ): void {
-    const last = model.getLineCount();
-    const start = clampLine(range.startLine, last);
-    const end = clampLine(range.endLine, last);
-    for (let line = start; line <= end; line++) {
-        let cls = EDIT_LINE_CLASS;
-        if (line === start) {
-            cls += ' ' + EDIT_LINE_FIRST_CLASS;
-        }
-        if (line === end) {
-            cls += ' ' + EDIT_LINE_LAST_CLASS;
-        }
-        out.push({
-            range: {
-                startLineNumber: line,
-                startColumn: 1,
-                endLineNumber: line,
-                endColumn: model.getLineMaxColumn(line),
-            },
-            options: { isWholeLine: true, className: cls },
-        });
-    }
+    const line = clampLine(range.startLine, model.getLineCount());
+    out.push({
+        range: {
+            startLineNumber: line,
+            startColumn: 1,
+            endLineNumber: line,
+            endColumn: model.getLineMaxColumn(line),
+        },
+        options: { isWholeLine: true, className: EDIT_LINE_CLASS },
+    });
 }
 
 /**
@@ -234,7 +221,6 @@ export class SourceEditor {
     private model: MonacoNS.editor.ITextModel | null = null;
     private onHoverLineCb: ((line: number) => void) | null = null;
     private onDblClickLineCb: ((line: number) => void) | null = null;
-    private onCursorLineCb: ((line: number) => void) | null = null;
     private hoverLineRaf = 0;
     private hoverDecoIds: string[] = [];
     private selectDecoIds: string[] = [];
@@ -351,29 +337,21 @@ export class SourceEditor {
 
             // Blur re-locks to read-only.
             this.disposers.push(
-                this.editor.onDidBlurEditorWidget(() => {
-                    if (!this.editRangeActive) {
-                        return;
-                    }
-                    this.editRangeActive = false;
-                    this.editRangeOffset = null;
-                    this.editDecoIds = this.editor!.deltaDecorations(this.editDecoIds, []);
-                    this.host.classList.remove('pagx-editor-editing');
-                    this.host.classList.add('pagx-editor-readonly');
-                    this.editor!.updateOptions({
-                        readOnly: true,
-                        domReadOnly: true,
-                    });
-                }),
+                this.editor.onDidBlurEditorWidget(() => this.leaveEditMode()),
             );
-
-            // Caret moves while editing → "edit follows caret" re-scoping.
+            // A single click on another source tag leaves the old edit session before that tag is
+            // browsed. This removes its amber decoration and prevents a read-only grey hover from
+            // retaining an editable caret or native text selection.
             this.disposers.push(
-                this.editor.onDidChangeCursorPosition((e: MonacoNS.editor.ICursorPositionChangedEvent) => {
-                    if (!this.editRangeActive || this.onCursorLineCb === null) {
-                        return;
+                this.editor.onMouseDown(() => {
+                    if (this.editRangeActive) {
+                        this.leaveEditMode();
+                        const activeElement = document.activeElement;
+                        if (activeElement instanceof HTMLElement &&
+                            this.editor?.getDomNode()?.contains(activeElement)) {
+                            activeElement.blur();
+                        }
                     }
-                    this.onCursorLineCb(e.position.lineNumber);
                 }),
             );
 
@@ -385,10 +363,6 @@ export class SourceEditor {
         });
     }
 
-    /** Registers the content-change listener that confines edits to the unlocked span. Called
-     *  after each model creation/swap because onDidChangeContent lives on the model, not the
-     *  editor. Uses e.isUndoing to skip the undo's own content-change event, so no manual
-     *  suppressUndo flag is needed. */
     /** Re-attaches DOM-level event listeners that must survive model swaps. Monaco's
      *  editor container is stable across setModel(), but as a safety net (and to guard against
      *  any future internal DOM teardown — e.g. during editor.dispose + recreate) we re-attach
@@ -644,6 +618,101 @@ export class SourceEditor {
         return this.model.getValue();
     }
 
+    /** Returns the current physical XML tag line, or null for text, blank and attribute-continuation
+     *  lines. This gives each displayed tag line one owner instead of treating every line inside a
+     *  parent element as part of that parent block. */
+    getDraftTagLine(line: number): number | null {
+        if (this.model === null || line <= 0 || line > this.model.getLineCount()) {
+            return null;
+        }
+        const text = this.model.getLineContent(line);
+        return /<\/?[A-Za-z_?!]/.test(text) ? line : null;
+    }
+
+    /** Resolves the source span owned by a physical XML tag line. This fallback covers document-level
+     *  constructs (the XML declaration and <pagx> root) that intentionally have no runtime node in
+     *  the player source map, while ordinary layer nodes continue to use that authoritative map. */
+    getDraftTagEditRange(line: number): LineRange | null {
+        const tagLine = this.getDraftTagLine(line);
+        if (this.model === null || tagLine === null) {
+            return null;
+        }
+        const lineText = this.model.getLineContent(tagLine);
+        if (/^\s*<\?/.test(lineText)) {
+            return { startLine: tagLine, endLine: tagLine };
+        }
+        const xmlText = this.model.getValue();
+        const tags = /<\s*(\/?)\s*([A-Za-z_][\w:.-]*)\b[^>]*?>/g;
+        const openTags: { name: string; startLine: number }[] = [];
+        let match: RegExpExecArray | null;
+        while ((match = tags.exec(xmlText)) !== null) {
+            const token = match[0];
+            const tokenLine = xmlText.slice(0, match.index).split('\n').length;
+            const isClosing = match[1] === '/';
+            const isSelfClosing = /\/\s*>$/.test(token);
+            const name = match[2];
+            if (!isClosing && !isSelfClosing) {
+                openTags.push({ name, startLine: tokenLine });
+                continue;
+            }
+            if (!isClosing) {
+                if (tokenLine === tagLine) {
+                    return { startLine: tagLine, endLine: tagLine };
+                }
+                continue;
+            }
+            for (let i = openTags.length - 1; i >= 0; i--) {
+                if (openTags[i].name !== name) {
+                    continue;
+                }
+                const opening = openTags[i];
+                openTags.length = i;
+                if (opening.startLine === tagLine || tokenLine === tagLine) {
+                    return { startLine: opening.startLine, endLine: tokenLine };
+                }
+                break;
+            }
+        }
+        return null;
+    }
+
+    /** Returns an active edit session to read-only browsing and clears its amber tag decoration. */
+    private leaveEditMode(): void {
+        if (!this.editRangeActive || this.editor === null) {
+            return;
+        }
+        this.editRangeActive = false;
+        this.editRangeOffset = null;
+        this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, []);
+        this.host.classList.remove('pagx-editor-editing');
+        this.host.classList.add('pagx-editor-readonly');
+        this.editor.updateOptions({ readOnly: true, domReadOnly: true });
+    }
+
+    /** Handles undo and redo while the editor is read-only. Monaco disables its built-in commands
+     *  in that mode, but document history must remain available after a temporary edit is re-locked. */
+    handleReadOnlyUndoRedo(event: KeyboardEvent): boolean {
+        if (this.editor === null || this.model === null || this.editRangeActive ||
+            !this.editor.hasTextFocus() || (!event.ctrlKey && !event.metaKey) || event.altKey) {
+            return false;
+        }
+        const key = event.key.toLowerCase();
+        const undo = key === 'z' && !event.shiftKey;
+        const redo = (key === 'z' && event.shiftKey) || (key === 'y' && event.ctrlKey && !event.metaKey);
+        if (!undo && !redo) {
+            return false;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const history = this.model as unknown as { undo(): void; redo(): void };
+        if (undo) {
+            history.undo();
+        } else {
+            history.redo();
+        }
+        return true;
+    }
+
     /** Highlights the node's source span as the transient grey hover layer. startLine <= 0 clears. */
     highlightHover(startLine: number, endLine: number): void {
         if (this.editor === null || this.model === null) {
@@ -694,34 +763,24 @@ export class SourceEditor {
         this.clearSelect();
     }
 
-    /** Unlocks the given 1-based inclusive line span for editing. */
-    enterEditRange(startLine: number, endLine: number): void {
+    /** Unlocks the enclosing element's full source span for editing while showing amber only on the
+     *  physical opening/closing tag line that was double-clicked. */
+    enterEditRange(startLine: number, endLine: number, decorationLine: number): void {
         if (this.editor === null || this.model === null || startLine <= 0) {
             return;
         }
-        this.editRangeActive = true;
         this.editRangeOffset = this.computeEditRangeOffset(startLine, endLine);
+        if (this.editRangeOffset === null) {
+            return;
+        }
+        this.editRangeActive = true;
         this.host.classList.remove('pagx-editor-readonly');
         this.host.classList.add('pagx-editor-editing');
         this.editor.updateOptions({ readOnly: false, domReadOnly: false });
         const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
-        buildEditDecos({ startLine, endLine }, this.model, decos);
+        buildEditDecos({ startLine: decorationLine, endLine: decorationLine }, this.model, decos);
         this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, decos);
         this.editor.focus();
-    }
-
-    /** Re-scopes the already-unlocked editable span to a new line range. No-op when read-only. */
-    updateEditRange(startLine: number, endLine: number): void {
-        if (this.editor === null || this.model === null || startLine <= 0) {
-            return;
-        }
-        if (!this.editRangeActive) {
-            return;
-        }
-        this.editRangeOffset = this.computeEditRangeOffset(startLine, endLine);
-        const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
-        buildEditDecos({ startLine, endLine }, this.model, decos);
-        this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, decos);
     }
 
     /** Converts a 1-based inclusive line range to character offsets for span-confinement checks. */
@@ -758,10 +817,6 @@ export class SourceEditor {
 
     onDblClickLine(cb: ((line: number) => void) | null): void {
         this.onDblClickLineCb = cb;
-    }
-
-    onCursorLine(cb: ((line: number) => void) | null): void {
-        this.onCursorLineCb = cb;
     }
 
     private readonly handleDomDblClick = (event: MouseEvent): void => {
