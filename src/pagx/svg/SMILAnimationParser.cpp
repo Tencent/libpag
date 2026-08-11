@@ -335,41 +335,45 @@ static void ComputeBezierHandles(KeyframeInterpolationType interpolation,
   }
 }
 
-// Reads repeatCount attribute: returns -1 for "indefinite", 0 for unparseable, otherwise the
-// integer count (clamped to >=1). Fractional counts are floored to the integer part.
-static int ParseRepeatCount(const std::string& value) {
+// Reads repeatCount attribute: returns -1.0 for "indefinite", 0.0 for unparseable, otherwise the
+// count (clamped to >=1.0). Fractional counts are preserved so ExpandRepeatCount can truncate the
+// final repetition at the fractional offset. Callers compare > 1.0 instead of > 1.
+static double ParseRepeatCount(const std::string& value) {
   if (value == "indefinite") {
-    return -1;
+    return -1.0;
   }
   if (value.empty()) {
-    return 1;
+    return 1.0;
   }
   double count = std::atof(value.c_str());
   if (count < 1.0) {
-    return 1;
+    return 1.0;
   }
-  return static_cast<int>(std::floor(count));
+  return count;
 }
 
 // Expands a float-typed channel's keyframes to repeat the animation repeatCount times. When
 // accumulate is true, each repetition's values are offset by k * (lastValue - firstValue) so the
 // animation accumulates across loops. The original keyframes are replaced by the expanded set.
-static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, int repeatCount,
+static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, double repeatCount,
                                    bool accumulate) {
   auto* ch = static_cast<TypedChannel<float>*>(channel);
   auto original = ch->keyframes;
-  if (original.empty() || repeatCount <= 1) {
+  if (original.empty() || repeatCount <= 1.0) {
     return;
   }
+  int fullRepeats = static_cast<int>(std::floor(repeatCount));
+  double fraction = repeatCount - std::floor(repeatCount);
   float delta = 0.0f;
   if (accumulate && original.size() >= 2) {
     delta = original.back().value - original.front().value;
   }
   ch->keyframes.clear();
-  for (int k = 0; k < repeatCount; ++k) {
+  for (int k = 0; k < fullRepeats; ++k) {
     float offset = static_cast<float>(k) * delta;
     Frame timeOffset = static_cast<Frame>(k) * durFrames;
-    for (auto key : original) {
+    for (size_t idx = 0; idx < original.size(); ++idx) {
+      auto key = original[idx];
       key.time += timeOffset;
       if (accumulate) {
         key.value += offset;
@@ -377,17 +381,41 @@ static void ExpandFloatRepeatCount(Channel* channel, Frame durFrames, int repeat
       ch->keyframes.push_back(key);
     }
   }
+  // Fractional tail: sample one extra keyframe at the fractional boundary so the last repetition
+  // is truncated rather than dropped. The boundary value is the interpolated value at the original
+  // keyframe whose normalized time equals the fraction (linear interp between first and second
+  // keyframe covers the common case; for multi-keyframe sequences we sample at fraction of dur).
+  if (fraction > 0.0 && original.size() >= 2) {
+    int k = fullRepeats;
+    float offset = static_cast<float>(k) * delta;
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+    // Sample the original keyframe sequence at the fractional position. Use the first keyframe's
+    // interpolation mode (commonly Linear) and interpolate between the two surrounding originals.
+    float firstVal = original.front().value + offset;
+    float lastVal = original.back().value + offset;
+    float sampled = firstVal + (lastVal - firstVal) * static_cast<float>(fraction);
+    Keyframe<float> key = {};
+    key.time = fractionalTime;
+    key.value = sampled;
+    key.interpolation = original.front().interpolation;
+    key.bezierOut = original.front().bezierOut;
+    key.bezierIn = original.front().bezierIn;
+    ch->keyframes.push_back(key);
+  }
 }
 
 // Expands a Color-typed channel's keyframes similarly to ExpandFloatRepeatCount, accumulating
 // each color channel independently.
-static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, int repeatCount,
+static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, double repeatCount,
                                    bool accumulate) {
   auto* ch = static_cast<TypedChannel<Color>*>(channel);
   auto original = ch->keyframes;
-  if (original.empty() || repeatCount <= 1) {
+  if (original.empty() || repeatCount <= 1.0) {
     return;
   }
+  int fullRepeats = static_cast<int>(std::floor(repeatCount));
+  double fraction = repeatCount - std::floor(repeatCount);
   Color delta = {0, 0, 0, 0};
   if (accumulate && original.size() >= 2) {
     delta.red = original.back().value.red - original.front().value.red;
@@ -396,9 +424,10 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, int repeat
     delta.alpha = original.back().value.alpha - original.front().value.alpha;
   }
   ch->keyframes.clear();
-  for (int k = 0; k < repeatCount; ++k) {
+  for (int k = 0; k < fullRepeats; ++k) {
     Frame timeOffset = static_cast<Frame>(k) * durFrames;
-    for (auto key : original) {
+    for (size_t idx = 0; idx < original.size(); ++idx) {
+      auto key = original[idx];
       key.time += timeOffset;
       if (accumulate) {
         key.value.red += static_cast<float>(k) * delta.red;
@@ -409,13 +438,42 @@ static void ExpandColorRepeatCount(Channel* channel, Frame durFrames, int repeat
       ch->keyframes.push_back(key);
     }
   }
+  if (fraction > 0.0 && original.size() >= 2) {
+    int k = fullRepeats;
+    Frame timeOffset = static_cast<Frame>(k) * durFrames;
+    Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+    Color firstVal = original.front().value;
+    Color lastVal = original.back().value;
+    if (accumulate) {
+      firstVal.red += static_cast<float>(k) * delta.red;
+      firstVal.green += static_cast<float>(k) * delta.green;
+      firstVal.blue += static_cast<float>(k) * delta.blue;
+      firstVal.alpha += static_cast<float>(k) * delta.alpha;
+      lastVal.red += static_cast<float>(k) * delta.red;
+      lastVal.green += static_cast<float>(k) * delta.green;
+      lastVal.blue += static_cast<float>(k) * delta.blue;
+      lastVal.alpha += static_cast<float>(k) * delta.alpha;
+    }
+    Keyframe<Color> key = {};
+    key.time = fractionalTime;
+    key.value.red = firstVal.red + (lastVal.red - firstVal.red) * static_cast<float>(fraction);
+    key.value.green =
+        firstVal.green + (lastVal.green - firstVal.green) * static_cast<float>(fraction);
+    key.value.blue = firstVal.blue + (lastVal.blue - firstVal.blue) * static_cast<float>(fraction);
+    key.value.alpha =
+        firstVal.alpha + (lastVal.alpha - firstVal.alpha) * static_cast<float>(fraction);
+    key.interpolation = original.front().interpolation;
+    key.bezierOut = original.front().bezierOut;
+    key.bezierIn = original.front().bezierIn;
+    ch->keyframes.push_back(key);
+  }
 }
 
 // Dispatches repeatCount expansion to the correct TypedChannel<T> specialization based on
 // valueType. Non-numeric types (bool/string) repeat without accumulation.
 static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Frame durFrames,
-                              int repeatCount, bool accumulate) {
-  if (repeatCount <= 1) {
+                              double repeatCount, bool accumulate) {
+  if (repeatCount <= 1.0) {
     return;
   }
   switch (valueType) {
@@ -433,13 +491,38 @@ static void ExpandRepeatCount(Channel* channel, ChannelValueType valueType, Fram
       if (original.empty()) {
         break;
       }
+      int fullRepeats = static_cast<int>(std::floor(repeatCount));
+      double fraction = repeatCount - std::floor(repeatCount);
       ch->keyframes.clear();
-      for (int k = 0; k < repeatCount; ++k) {
+      for (int k = 0; k < fullRepeats; ++k) {
         Frame timeOffset = static_cast<Frame>(k) * durFrames;
-        for (auto key : original) {
+        for (size_t idx = 0; idx < original.size(); ++idx) {
+          auto key = original[idx];
           key.time += timeOffset;
           ch->keyframes.push_back(key);
         }
+      }
+      // Fractional tail: sample one extra matrix keyframe at the fractional boundary by linearly
+      // interpolating between the first and last original (runtime MixTGFXMatrix will re-blend).
+      if (fraction > 0.0 && original.size() >= 2) {
+        int k = fullRepeats;
+        Frame timeOffset = static_cast<Frame>(k) * durFrames;
+        Frame fractionalTime = timeOffset + static_cast<Frame>(std::round(fraction * durFrames));
+        const auto& first = original.front().value;
+        const auto& last = original.back().value;
+        Keyframe<Matrix> key = {};
+        key.time = fractionalTime;
+        auto lerp = [](float a, float b, double t) { return a + (b - a) * static_cast<float>(t); };
+        key.value.a = lerp(first.a, last.a, fraction);
+        key.value.b = lerp(first.b, last.b, fraction);
+        key.value.c = lerp(first.c, last.c, fraction);
+        key.value.d = lerp(first.d, last.d, fraction);
+        key.value.tx = lerp(first.tx, last.tx, fraction);
+        key.value.ty = lerp(first.ty, last.ty, fraction);
+        key.interpolation = original.front().interpolation;
+        key.bezierOut = original.front().bezierOut;
+        key.bezierIn = original.front().bezierIn;
+        ch->keyframes.push_back(key);
       }
       break;
     }
@@ -681,6 +764,46 @@ static void MergeAdditiveMatrix(Channel* base, const Channel* additive) {
   baseCh->keyframes = std::move(merged);
 }
 
+// Merges additive="sum" Bool channels by logical OR at each keyframe time. SMIL does not define
+// arithmetic addition for booleans; the common interpretation (and the one that matches SVG's
+// `display`/`visibility` accumulation) is that the element stays visible if any contributing
+// animation says so. Mirrors MergeAdditiveFloat/Color/Matrix's union-of-times approach.
+static void MergeAdditiveBool(Channel* base, const Channel* additive) {
+  auto* baseCh = static_cast<TypedChannel<bool>*>(base);
+  auto* additiveCh = static_cast<const TypedChannel<bool>*>(additive);
+  if (baseCh->keyframes.empty() || additiveCh->keyframes.empty()) {
+    return;
+  }
+  std::set<Frame> allTimes = {};
+  for (const auto& key : baseCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  for (const auto& key : additiveCh->keyframes) {
+    allTimes.insert(key.time);
+  }
+  std::vector<Keyframe<bool>> merged = {};
+  for (Frame time : allTimes) {
+    bool baseVal = std::get<bool>(base->evaluateAt(time));
+    bool additiveVal = std::get<bool>(additive->evaluateAt(time));
+    Keyframe<bool> key = {};
+    key.time = time;
+    key.value = baseVal || additiveVal;
+    auto baseIt = std::find_if(baseCh->keyframes.begin(), baseCh->keyframes.end(),
+                               [time](const Keyframe<bool>& k) { return k.time == time; });
+    if (baseIt != baseCh->keyframes.end()) {
+      key.interpolation = baseIt->interpolation;
+    } else {
+      auto addIt = std::find_if(additiveCh->keyframes.begin(), additiveCh->keyframes.end(),
+                                [time](const Keyframe<bool>& k) { return k.time == time; });
+      if (addIt != additiveCh->keyframes.end()) {
+        key.interpolation = addIt->interpolation;
+      }
+    }
+    merged.push_back(key);
+  }
+  baseCh->keyframes = std::move(merged);
+}
+
 // Merges additive="sum" channels into their preceding base (replace) channel. Channels sharing
 // the same name are grouped; within each group, the first channel is the base and subsequent
 // additive="sum" channels are sampled and summed into it. A subsequent additive="replace"
@@ -716,6 +839,8 @@ static std::vector<Channel*> MergeAdditiveChannels(std::vector<ChannelWithAdditi
           MergeAdditiveColor(base, (*channels)[idx].channel);
         } else if (base->valueType() == ChannelValueType::Matrix) {
           MergeAdditiveMatrix(base, (*channels)[idx].channel);
+        } else if (base->valueType() == ChannelValueType::Bool) {
+          MergeAdditiveBool(base, (*channels)[idx].channel);
         }
       } else {
         // additive="replace": this channel becomes the new base.
@@ -1089,7 +1214,9 @@ KeyValue SMILAnimationParser::parseValue(SVGParserContext& ctx, const std::strin
       return ctx.parseColor(str);
     }
     case ChannelValueType::Bool: {
-      return str == "true" || str == "1";
+      // SVG display/visibility use string values ("none"/"inline", "visible"/"hidden") that
+      // must map to bool for the Layer.visible channel. "true"/"1" are also accepted.
+      return str == "true" || str == "1" || str == "inline" || str == "visible";
     }
     case ChannelValueType::Int: {
       return static_cast<int>(std::strtol(str.c_str(), nullptr, 10));
@@ -1432,13 +1559,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
   // accumulate="sum" offsets each repetition's values by k*(lastValue - firstValue).
   // "indefinite" is handled by buildAnimation (sets LoopMode::Loop), not expanded here.
   auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-  int repeatCount = ParseRepeatCount(repeatCountStr);
+  double repeatCount = ParseRepeatCount(repeatCountStr);
   bool accumulate = (ctx.getAttribute(animElement, "accumulate") == "sum");
-  if (repeatCount > 1) {
+  if (repeatCount > 1.0) {
     for (auto* ch : channels) {
       ExpandRepeatCount(ch, target.valueType, durFrames, repeatCount, accumulate);
     }
-    outEndFrame = beginFrames + durFrames * repeatCount;
+    outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
   }
@@ -1613,10 +1740,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     channels.push_back(ch);
 
     auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-    int repeatCount = ParseRepeatCount(repeatCountStr);
-    if (repeatCount > 1) {
+    double repeatCount = ParseRepeatCount(repeatCountStr);
+    if (repeatCount > 1.0) {
       ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
-      outEndFrame = beginFrames + durFrames * repeatCount;
+      outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
     } else {
       outEndFrame = beginFrames + durFrames;
     }
@@ -1702,13 +1829,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
 
   // Expand repeatCount for transform channels (all float-typed).
   auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-  int repeatCount = ParseRepeatCount(repeatCountStr);
+  double repeatCount = ParseRepeatCount(repeatCountStr);
   bool accumulate = (ctx.getAttribute(animElement, "accumulate") == "sum");
-  if (repeatCount > 1) {
+  if (repeatCount > 1.0) {
     for (auto* ch : channels) {
       ExpandRepeatCount(ch, ChannelValueType::Float, durFrames, repeatCount, accumulate);
     }
-    outEndFrame = beginFrames + durFrames * repeatCount;
+    outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
   }
@@ -1855,10 +1982,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     channels.push_back(ch);
 
     auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-    int repeatCount = ParseRepeatCount(repeatCountStr);
-    if (repeatCount > 1) {
+    double repeatCount = ParseRepeatCount(repeatCountStr);
+    if (repeatCount > 1.0) {
       ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
-      outEndFrame = beginFrames + durFrames * repeatCount;
+      outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
     } else {
       outEndFrame = beginFrames + durFrames;
     }
@@ -1916,12 +2043,12 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   // accumulate="sum" in a meaningful way (the path repeats, values don't accumulate), so
   // accumulate is ignored here.
   auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-  int repeatCount = ParseRepeatCount(repeatCountStr);
-  if (repeatCount > 1) {
+  double repeatCount = ParseRepeatCount(repeatCountStr);
+  if (repeatCount > 1.0) {
     for (auto* ch : channels) {
       ExpandRepeatCount(ch, ChannelValueType::Float, durFrames, repeatCount, false);
     }
-    outEndFrame = beginFrames + durFrames * repeatCount;
+    outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
   }
