@@ -339,7 +339,10 @@ export class PAGXPlayer extends EventTarget {
     // full source span so parents never swallow their children during source browsing.
     private editorHoverLine = -1;
     private selectedIndex = -1;
+    // Runtime spans are refreshed only by load(). Draft spans are a line-number projection used
+    // while unsaved source edits insert or remove lines, then reset from runtime spans on Apply/Discard.
     private sourceMap: NodeSourceEntry[] = [];
+    private draftSourceMap: NodeSourceEntry[] = [];
     private overlay: HTMLDivElement | null = null;
     // The bounds-bearing node the overlay currently paints (resolved from the hover/select target
     // by climbing to the owning Layer for internal elements), and which visual state to render.
@@ -487,6 +490,7 @@ export class PAGXPlayer extends EventTarget {
         if (this.editor) {
             this.editor.onHoverLine((line) => this.onEditorHover(line));
             this.editor.onDblClickLine((line) => this.onEditorDblClick(line));
+            this.editor.onDraftLineChanges((changes) => this.onDraftLineChanges(changes));
         }
 
         // Gesture manager (view accessor closure keeps working across reloads)
@@ -743,6 +747,7 @@ export class PAGXPlayer extends EventTarget {
             // Rebuilt on every load since a new document renumbers nodes.
             const ortMapStart = performance.now();
             this.sourceMap = view.getNodeSourceMap();
+            this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
             console.log(`[ORT] getNodeSourceMap: ${(performance.now() - ortMapStart).toFixed(1)}ms, ${this.sourceMap.length} node(s) (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
             this.hoverIndex = -1;
             this.hoverHit = null;
@@ -947,7 +952,7 @@ export class PAGXPlayer extends EventTarget {
         // Editor-direction selection has no hitTest result, so updateOverlay falls back to the
         // source-map node bounds when one exists. XML declaration/root tags have no canvas node.
         this.selectHit = null;
-        const entry = idx < 0 ? null : this.sourceMap[idx];
+        const entry = idx < 0 ? null : this.draftSourceMap[idx];
         const startLine = entry === null ? fallbackRange!.startLine : entry.startLine;
         const endLine = entry === null
             ? fallbackRange!.endLine
@@ -958,13 +963,78 @@ export class PAGXPlayer extends EventTarget {
         this.syncEditorSelect();
     }
 
+    private cloneSourceMap(entries: readonly NodeSourceEntry[]): NodeSourceEntry[] {
+        return entries.map((entry) => ({ ...entry, channels: [...entry.channels] }));
+    }
+
+    /** Applies accepted draft line deltas to a projection of the runtime source map. Entries wholly
+     *  deleted or partially cut by a multi-line replacement become unavailable rather than pointing
+     *  at an unrelated surviving tag. Apply/Discard/reset restores a fresh projection. */
+    private onDraftLineChanges(
+        changes: readonly { startLine: number; endLine: number; insertedLineCount: number }[] | null,
+    ): void {
+        if (changes === null) {
+            this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
+            return;
+        }
+        for (const change of changes) {
+            this.applyDraftLineChange(change);
+        }
+        // The pointer may now refer to a shifted source line; wait for the next mouse move instead
+        // of leaving a stale editor-originated hover decoration behind.
+        this.editorHoverLine = -1;
+        this.editorHoverIndex = -1;
+    }
+
+    private applyDraftLineChange(
+        change: { startLine: number; endLine: number; insertedLineCount: number },
+    ): void {
+        const removedLineCount = change.endLine - change.startLine;
+        const lineDelta = change.insertedLineCount - removedLineCount;
+        if (lineDelta === 0) {
+            return;
+        }
+        for (const entry of this.draftSourceMap) {
+            if (entry.startLine <= 0) {
+                continue;
+            }
+            const endLine = entry.endLine > 0 ? entry.endLine : entry.startLine;
+            if (endLine < change.startLine) {
+                continue;
+            }
+            if (entry.startLine > change.endLine) {
+                entry.startLine += lineDelta;
+                if (entry.endLine > 0) {
+                    entry.endLine += lineDelta;
+                }
+                continue;
+            }
+            if (removedLineCount > 0 && entry.startLine >= change.startLine &&
+                endLine <= change.endLine) {
+                entry.startLine = -1;
+                entry.endLine = -1;
+                continue;
+            }
+            if (entry.startLine <= change.startLine && endLine >= change.endLine) {
+                if (entry.endLine > 0) {
+                    entry.endLine += lineDelta;
+                }
+                continue;
+            }
+            // A range boundary was cut but the node was not wholly removed. It has no reliable
+            // textual identity until Apply rebuilds the runtime map, so never map it incorrectly.
+            entry.startLine = -1;
+            entry.endLine = -1;
+        }
+    }
+
     /** Returns the index of the innermost node whose [startLine, endLine] span contains the given
      *  1-based line, or -1 if none. endLine < 0 (programmatic nodes) falls back to a single-line
      *  match at startLine. */
     private findNodeIndexForLine(line: number): number {
         let bestIndex = -1;
         let bestSpan = Number.POSITIVE_INFINITY;
-        for (const entry of this.sourceMap) {
+        for (const entry of this.draftSourceMap) {
             const start = entry.startLine;
             if (start <= 0 || start > line) {
                 continue;
@@ -992,7 +1062,7 @@ export class PAGXPlayer extends EventTarget {
         // [ORT] Optimize Release Test - incremental-apply timing. This is the fast path the
         // optimization adds; compare its total against buildLayers on the full-load path.
         const ortT0 = performance.now();
-    if (!this.view || this.sourceMap.length === 0) {
+    if (!this.view || this.draftSourceMap.length === 0) {
       return false;
         }
         const edits = this.classifyEdits(oldXml, newXml);
@@ -1049,7 +1119,7 @@ export class PAGXPlayer extends EventTarget {
         }
         const edits: ChannelEdit[] = [];
         for (const idx of affected) {
-            const entry = this.sourceMap[idx];
+            const entry = this.draftSourceMap[idx];
             const start = entry.startLine;
             const end = entry.endLine > 0 ? entry.endLine : start;
             if (start <= 0) {
@@ -1089,18 +1159,19 @@ export class PAGXPlayer extends EventTarget {
         }
         const idx = this.hoverTarget();
         if (this.hoverHit !== null) {
-            const start = this.hoverHit.startLine;
+            const projected = this.draftSourceMap[this.hoverHit.index];
+            const start = projected?.startLine > 0 ? projected.startLine : this.hoverHit.startLine;
             this.editor?.highlightHover(start, start);
             if (align !== 'none') {
                 this.editor?.scrollToLine(start, align);
             }
             return;
         }
-        if (idx < 0 || idx >= this.sourceMap.length || this.sourceMap[idx].startLine <= 0) {
+        if (idx < 0 || idx >= this.draftSourceMap.length || this.draftSourceMap[idx].startLine <= 0) {
             this.editor?.clearHover();
             return;
         }
-        const start = this.sourceMap[idx].startLine;
+        const start = this.draftSourceMap[idx].startLine;
         this.editor?.highlightHover(start, start);
         if (align !== 'none') {
             this.editor?.scrollToLine(start, align);
@@ -1111,18 +1182,19 @@ export class PAGXPlayer extends EventTarget {
     private syncEditorSelect(align: 'none' | 'nearest' | 'start' = 'none'): void {
         const idx = this.selectedIndex;
         if (this.selectHit !== null) {
-            const start = this.selectHit.startLine;
+            const projected = this.draftSourceMap[this.selectHit.index];
+            const start = projected?.startLine > 0 ? projected.startLine : this.selectHit.startLine;
             this.editor?.highlightSelect(start, start);
             if (align !== 'none') {
                 this.editor?.scrollToLine(start, align);
             }
             return;
         }
-        if (idx < 0 || idx >= this.sourceMap.length || this.sourceMap[idx].startLine <= 0) {
+        if (idx < 0 || idx >= this.draftSourceMap.length || this.draftSourceMap[idx].startLine <= 0) {
             this.editor?.clearSelect();
             return;
         }
-        const entry = this.sourceMap[idx];
+        const entry = this.draftSourceMap[idx];
         this.editor?.highlightSelect(entry.startLine, entry.startLine);
         if (align !== 'none') {
             this.editor?.scrollToLine(entry.startLine, align);
@@ -1167,7 +1239,7 @@ export class PAGXPlayer extends EventTarget {
      *  span, or -1 if none. Used to climb from a Layer-internal element (Fill/Rectangle/... which
      *  has no independent canvas outline) up to the Layer that owns it. */
     private enclosingNodeIndex(index: number): number {
-        const child = this.sourceMap[index];
+        const child = this.draftSourceMap[index];
         if (!child || child.startLine <= 0) {
             return -1;
         }
@@ -1175,7 +1247,7 @@ export class PAGXPlayer extends EventTarget {
         const childEnd = child.endLine > 0 ? child.endLine : childStart;
         let bestIndex = -1;
         let bestSpan = Number.POSITIVE_INFINITY;
-        for (const entry of this.sourceMap) {
+        for (const entry of this.draftSourceMap) {
             if (entry.index === index || entry.startLine <= 0) {
                 continue;
             }

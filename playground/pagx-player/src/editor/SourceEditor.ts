@@ -123,6 +123,13 @@ interface LineRange {
     endLine: number;
 }
 
+/** A model replacement expressed in pre-change physical line coordinates. */
+export interface DraftLineChange {
+    startLine: number;
+    endLine: number;
+    insertedLineCount: number;
+}
+
 // Decoration class names (must match styles.ts selectors).
 const HOVER_LINE_CLASS = 'pagx-hover-line';
 const SELECT_LINE_CLASS = 'pagx-select-line';
@@ -221,6 +228,9 @@ export class SourceEditor {
     private model: MonacoNS.editor.ITextModel | null = null;
     private onHoverLineCb: ((line: number) => void) | null = null;
     private onDblClickLineCb: ((line: number) => void) | null = null;
+    private onDraftLineChangesCb: ((changes: readonly DraftLineChange[] | null) => void) | null = null;
+    private editPointerDown: { lineNumber: number; column: number } | null = null;
+    private editDecorationLine = -1;
     private hoverLineRaf = 0;
     private hoverDecoIds: string[] = [];
     private selectDecoIds: string[] = [];
@@ -306,7 +316,7 @@ export class SourceEditor {
             // Hover → editor->canvas overlay highlight (rAF-throttled).
             this.disposers.push(
                 this.editor.onMouseMove((e: MonacoNS.editor.IEditorMouseEvent) => {
-                    if (this.onHoverLineCb === null) {
+                    if (this.editRangeActive || this.onHoverLineCb === null) {
                         return;
                     }
                     const line = e.target?.position?.lineNumber;
@@ -335,30 +345,40 @@ export class SourceEditor {
             // Double-click → host resolves the enclosing node's source span.
             this.attachDomListeners();
 
-            // Blur re-locks to read-only.
+            // The exit gesture is deliberately narrow: an unmoved left-click landing on a
+            // different XML tag line is the only thing that leaves edit mode. Losing DOM focus
+            // (onDidBlurEditorWidget) is intentionally NOT wired to leaveEditMode — Monaco's own
+            // right-click context menu blurs the hidden textarea as a transient side effect of
+            // opening it, which previously kicked the editor back to read-only mid-context-menu.
+            // Right-click and drag must never change edit state, so right/middle-button presses
+            // are ignored below and any pointer movement between down and up is treated as a
+            // selection, not a click.
             this.disposers.push(
-                this.editor.onDidBlurEditorWidget(() => this.leaveEditMode()),
-            );
-            // A single click on another source tag leaves the old edit session before that tag is
-            // browsed. This removes its amber decoration and prevents a read-only grey hover from
-            // retaining an editable caret or native text selection.
-            this.disposers.push(
-                this.editor.onMouseDown(() => {
-                    if (this.editRangeActive) {
-                        this.leaveEditMode();
-                        const activeElement = document.activeElement;
-                        if (activeElement instanceof HTMLElement &&
-                            this.editor?.getDomNode()?.contains(activeElement)) {
-                            activeElement.blur();
-                        }
+                this.editor.onMouseDown((e: MonacoNS.editor.IEditorMouseEvent) => {
+                    if (!this.editRangeActive || !e.event.leftButton) {
+                        this.editPointerDown = null;
+                        return;
                     }
+                    const position = e.target?.position;
+                    this.editPointerDown = position === null || position === undefined
+                        ? null
+                        : { lineNumber: position.lineNumber, column: position.column };
+                }),
+            );
+            this.disposers.push(
+                this.editor.onMouseUp((e: MonacoNS.editor.IEditorMouseEvent) => {
+                    if (!e.event.leftButton) {
+                        this.editPointerDown = null;
+                        return;
+                    }
+                    this.handleEditPointerUp(e.target?.position);
                 }),
             );
 
             // Span confinement: re-attached on each model swap (setContent replaces the model).
             this.attachContentListener();
             // Editor is born in the read-only state; the class is removed by enterEditRange
-            // and re-added by blur / setContent to hide Monaco's virtual cursor via CSS.
+            // and re-added by leaveEditMode / setContent to hide Monaco's virtual cursor via CSS.
             this.host.classList.add('pagx-editor-readonly');
         });
     }
@@ -404,6 +424,7 @@ export class SourceEditor {
                             to: this.editRangeOffset.to + totalDelta,
                         };
                     }
+                    this.onDraftLineChangesCb?.(this.getDraftLineChanges(e));
                     return;
                 }
                 if (!this.editRangeActive || this.editRangeOffset === null) {
@@ -433,6 +454,7 @@ export class SourceEditor {
                     from: this.editRangeOffset.from,
                     to: this.editRangeOffset.to + totalDelta,
                 };
+                this.onDraftLineChangesCb?.(this.getDraftLineChanges(e));
             },
         );
         void this.updateSyntaxDiagnostics();
@@ -575,12 +597,14 @@ export class SourceEditor {
             this.editDecoIds = [];
             this.editRangeActive = false;
             this.editRangeOffset = null;
+            this.editPointerDown = null;
             this.host.classList.remove('pagx-editor-editing');
             this.host.classList.add('pagx-editor-readonly');
             this.editor.updateOptions({
                 readOnly: true,
                 domReadOnly: true,
             });
+            this.onDraftLineChangesCb?.(null);
             return;
         }
         const savedOffset = this.model.getOffsetAt(
@@ -602,12 +626,14 @@ export class SourceEditor {
         this.editDecoIds = [];
         this.editRangeActive = false;
         this.editRangeOffset = null;
+        this.editPointerDown = null;
         this.host.classList.remove('pagx-editor-editing');
         this.host.classList.add('pagx-editor-readonly');
         this.editor.updateOptions({
             readOnly: true,
             domReadOnly: true,
         });
+        this.onDraftLineChangesCb?.(null);
     }
 
     /** Returns the current document text. */
@@ -682,6 +708,8 @@ export class SourceEditor {
             return;
         }
         this.editRangeActive = false;
+        this.editDecorationLine = -1;
+        this.editPointerDown = null;
         this.editRangeOffset = null;
         this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, []);
         this.host.classList.remove('pagx-editor-editing');
@@ -774,6 +802,7 @@ export class SourceEditor {
             return;
         }
         this.editRangeActive = true;
+        this.editDecorationLine = decorationLine;
         this.host.classList.remove('pagx-editor-readonly');
         this.host.classList.add('pagx-editor-editing');
         this.editor.updateOptions({ readOnly: false, domReadOnly: false });
@@ -809,6 +838,43 @@ export class SourceEditor {
         } else {
             this.editor.revealLine(targetLine, monacoInstance!.editor.ScrollType.Smooth);
         }
+    }
+
+    /** Converts replacements to line deltas. Apply them from bottom to top because all ranges use
+     *  the same pre-change model coordinates. */
+    private getDraftLineChanges(e: MonacoNS.editor.IModelContentChangedEvent): DraftLineChange[] {
+        return e.changes.map((change) => ({
+            startLine: change.range.startLineNumber,
+            endLine: change.range.endLineNumber,
+            insertedLineCount: change.text.split('\n').length - 1,
+        })).sort((a, b) => b.startLine - a.startLine);
+    }
+
+    /** Completes an edit-mode pointer gesture. Only a click (not a drag) on a different tag exits
+     *  editing; selections and clipboard gestures preserve Monaco focus and the full edit range. */
+    private handleEditPointerUp(
+        position: { lineNumber: number; column: number } | null | undefined,
+    ): void {
+        const down = this.editPointerDown;
+        this.editPointerDown = null;
+        if (!this.editRangeActive || down === null || position === null || position === undefined ||
+            down.lineNumber !== position.lineNumber || down.column !== position.column) {
+            return;
+        }
+        const tagLine = this.getDraftTagLine(position.lineNumber);
+        if (tagLine === null || tagLine === this.editDecorationLine) {
+            return;
+        }
+        this.leaveEditMode();
+        const activeElement = document.activeElement;
+        if (activeElement instanceof HTMLElement && this.editor?.getDomNode()?.contains(activeElement)) {
+            activeElement.blur();
+        }
+        this.onHoverLineCb?.(tagLine);
+    }
+
+    onDraftLineChanges(cb: ((changes: readonly DraftLineChange[] | null) => void) | null): void {
+        this.onDraftLineChangesCb = cb;
     }
 
     onHoverLine(cb: ((line: number) => void) | null): void {

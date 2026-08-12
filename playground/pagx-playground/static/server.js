@@ -80,7 +80,7 @@ app.get('/', (req, res) => {
   res.redirect('/index.html');
 });
 
-const port = 8001;
+const port = 8002;
 
 /** Returns the first non-internal IPv4 address for LAN sharing, or 'localhost' if none. */
 function getLanIp() {

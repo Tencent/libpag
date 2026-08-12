@@ -28,7 +28,7 @@
 // `setDocumentXml()` calls driven by the player.
 
 import type { EditorCallbacks } from '../types';
-import { SourceEditor } from './SourceEditor';
+import { SourceEditor, type DraftLineChange } from './SourceEditor';
 import type { SourceDiagnosticProvider } from '../types';
 import { EDITOR_STYLES } from './styles';
 
@@ -188,6 +188,7 @@ export class EditorPanel {
     private busy = false;
     private pendingHoverCb: ((line: number) => void) | null = null;
     private pendingDblClickCb: ((line: number) => void) | null = null;
+    private pendingDraftLineChangesCb: ((changes: readonly DraftLineChange[] | null) => void) | null = null;
     private readonly boundKeydown: (event: KeyboardEvent) => void;
     private readonly boundResize: () => void;
 
@@ -269,6 +270,9 @@ export class EditorPanel {
                 }
                 if (this.pendingDblClickCb !== null) {
                     this.editor.onDblClickLine(this.pendingDblClickCb);
+                }
+                if (this.pendingDraftLineChangesCb !== null) {
+                    this.editor.onDraftLineChanges(this.pendingDraftLineChangesCb);
                 }
             }
             // Seed the freshly created instance with the current document.
@@ -377,6 +381,13 @@ export class EditorPanel {
     public onDblClickLine(cb: ((line: number) => void) | null): void {
         this.pendingDblClickCb = cb;
         this.editor?.onDblClickLine(cb);
+    }
+
+    /** Reports accepted draft line replacements so the host can project source-map line numbers
+     *  until Apply rebuilds the runtime document. A null value resets that projection. */
+    public onDraftLineChanges(cb: ((changes: readonly DraftLineChange[] | null) => void) | null): void {
+        this.pendingDraftLineChangesCb = cb;
+        this.editor?.onDraftLineChanges(cb);
     }
 
     /** Detach global listeners and remove the panel from the DOM. Any layout side-effects the
