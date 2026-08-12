@@ -73,9 +73,9 @@ from the same directory as the `.pagx` file. See `references/cli.md` for verify 
 all other CLI commands (`render`, `format`, `layout`, `bounds`, `font`, `import`, `export`,
 `preview`).
 
-`pagx preview` starts a live browser preview with hot reload — use it to show the user the
-finished design interactively (see [Live browser preview](#live-browser-preview)). It runs as
-a background daemon and prints a URL; stop it with `pagx preview stop` when done.
+`pagx preview` starts a live browser preview with hot reload — present the command to the user
+after generating a `.pagx` (see [Live browser preview](#live-browser-preview)). Do not auto-launch
+it; let the user decide. Stop it with `pagx preview stop` when done.
 
 ---
 
@@ -182,10 +182,12 @@ Keep final `input.png` for reference (do not commit). If further edits are made 
 this step, re-run the full verify to regenerate it. Delete `input.layout.xml` and any
 scoped `{id}` artifacts produced during the fix.
 
-**Live browser preview (optional)**: to let the user see the edited design interactively,
-run `pagx preview input.pagx` and open the printed URL in the IDE's built-in browser. The
-preview hot-reloads on save, so any later touch-ups refresh the open tab automatically. Stop
-the background daemon with `pagx preview stop` when done.
+**Live browser preview (optional)**: do not auto-launch it. Present the preview command as a
+ready-to-copy line (`pagx preview input.pagx`) and let the user decide whether to run it. Only
+start the daemon when the user explicitly asks to preview; then open the printed URL with the
+IDE's built-in browser tool (e.g. `preview_url`). The preview hot-reloads on save, so any later
+touch-ups refresh the open tab automatically. Stop the background daemon with `pagx preview stop`
+when done.
 
 ---
 
@@ -291,7 +293,6 @@ needed. `pagx render` then writes the preview PNG:
 ```bash
 pagx import --input <name>.html --output <name>.pagx   # snapshot + import + resolve
 pagx render <name>.pagx -o <name>.png                  # preview PNG; add --scale 2 for a crisp image
-pagx preview <name>.pagx                               # live browser preview (background daemon, non-blocking)
 ```
 
 - Output: `<name>.pagx` (the result) and `<name>.png` (the preview render).
@@ -318,7 +319,6 @@ triggers the one-time browser download). `pagx import` snapshots, imports, **and
 ```bash
 pagx import --input <name>.html --output <name>.pagx
 pagx render <name>.pagx -o <name>.png   # preview PNG; add --scale 2 for a crisp image
-pagx preview <name>.pagx                # live browser preview (background daemon, non-blocking)
 ```
 
 A public URL works the same way (`--input https://… --output <name>.pagx`). Note: this path does not
@@ -329,20 +329,30 @@ machine, or embed it explicitly with `pagx font embed --file <font>`. See `refer
 See `references/pipeline.md` for advanced options (URL inputs, image storage modes, custom viewport
 via `snapshot.js`, and a manual step-by-step path for debugging).
 
-**Open the live preview in the IDE browser (REQUIRED, do not skip).** `pagx preview` prints a URL
-line like `pagx preview: http://127.0.0.1:<port>/...` to stdout. Parse that URL and open it with
-the IDE's built-in browser tool (e.g. `preview_url`) so the user sees the real, interactive
-design — not just the static PNG. The PNG from `pagx render` is for your own QA comparison only;
-the live browser preview is what you show the user. The preview daemon watches the `.pagx`, so
-later re-imports (Step 4) reload the open tab automatically — do not restart it each time.
+**Offer a live browser preview, do not auto-launch it.** After Step 3 finishes, show the user the
+preview command as a ready-to-copy line and tell them they can either run it manually or ask you to
+preview. Do not run `pagx preview` yourself unless the user explicitly asks to preview. Use this
+exact wording (replace `<name>` with the actual file name, and keep the `export PATH=...` prefix
+only when the user is working inside the libpag repo and needs the locally built `pagx` on PATH):
+
+```
+需在浏览器中查看交互预览（带热重载——自动追踪文件更新），可手动执行：
+
+  export PATH="<repo>/cmake-build-debug:$PATH"   # repo 内部才需要
+  pagx preview <name>.pagx
+
+或者对我说："使用 pagx preview 预览 <name>.pagx 文件"
+```
+
+When the user asks to preview, run `pagx preview <name>.pagx`, parse the printed URL, and open it
+with the IDE's built-in browser tool (e.g. `preview_url`). The PNG from `pagx render` is for your
+own QA comparison; the live browser preview is what the user sees.
 
 ### Step 4: Review and iterate
 
-1. The live browser preview is already open from Step 3 — compare it (and the `<name>.png` QA
-   screenshot) against the user's intent.
+1. Compare the `<name>.png` QA screenshot against the user's intent.
 2. If something is wrong, **edit the `<name>.html`** (not the PAGX) and re-run Step 3. The HTML is
-   the source of truth; treat the `.pagx` as a build artifact. The preview tab reloads on its own
-   — do not restart `pagx preview`.
+   the source of truth; treat the `.pagx` as a build artifact.
 3. Common fixes:
    - Text in the wrong font → ensure the Google Fonts `<link>` is present; if the typeface is still
      wrong, install that font on the machine or embed it with `pagx font embed --file <font>`.
@@ -350,8 +360,8 @@ later re-imports (Step 4) reload the open tab automatically — do not restart i
    - An element missing from the PNG → it was hidden, an unsupported widget, or a tainted
      `<canvas>`; see `references/authoring-html.md` §What to avoid and `references/pipeline.md`.
 4. When the preview matches the intent, deliver `<name>.pagx` to the user and briefly describe what
-   it contains. Stop the background preview daemon with `pagx preview stop`. Do not commit
-   generated `.png` / `.subset.html` files.
+   it contains. If a `pagx preview` daemon is running, stop it with `pagx preview stop`. Do not
+   commit generated `.png` / `.subset.html` files.
 
 For deeper polish of the resulting PAGX (precise spacing, constraints, animation-ready structure),
 switch to the [Update Workflow](#update-workflow), which edits the `.pagx` directly.
@@ -361,9 +371,13 @@ switch to the [Update Workflow](#update-workflow), which edits the `.pagx` direc
 ## Live browser preview
 
 `pagx preview <file>.pagx` starts a local HTTP server that renders the PAGX in a browser tab and
-watches the file for hot reload. Use it to show the user the finished design interactively;
+watches the file for hot reload. Use it to let the user see the finished design interactively;
 use `pagx render` / `pagx verify` for pixel-level QA screenshots (the sub-agent reviewer reads
 PNG files, not a live tab).
+
+**Do not auto-launch.** After generating a `.pagx`, present the preview command as a ready-to-copy
+line (`pagx preview <name>.pagx`) and let the user decide whether to run it. Only start the daemon
+when the user explicitly asks to preview.
 
 ```bash
 pagx preview input.pagx      # background daemon, prints URL, returns prompt
@@ -383,9 +397,3 @@ pagx preview stop            # stop the daemon when done
   is done previewing to free the port and process.
 
 See `references/cli.md` §pagx preview for all options (`--port`, `--json`, `--foreground`, etc.).
-
-**Tip**: when creating internal task lists, keep the PNG-screenshot step and the live-browser-preview
-step as separate items with their real actions — "generate preview PNG via `pagx render`" (QA
-screenshot for visual comparison) vs "launch `pagx preview` and open the URL in the IDE browser"
-(interactive preview for the user). Do not collapse them into a single "preview" item, or the
-live browser preview gets misnamed as a PNG export.
