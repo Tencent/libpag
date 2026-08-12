@@ -337,20 +337,15 @@ export class EditorPanel {
         this.editor?.scrollToLine(line, align);
     }
 
-    /** Unlock the enclosing node span while displaying the amber edit state only on the clicked tag
-     *  line. */
-    public enterEditRange(startLine: number, endLine: number, decorationLine: number): void {
-        this.editor?.enterEditRange(startLine, endLine, decorationLine);
+    /** Unlocks the whole document for editing, showing the amber edit state only on the clicked
+     *  tag line. */
+    public enterEditMode(decorationLine: number): void {
+        this.editor?.enterEditMode(decorationLine);
     }
 
     /** Returns the current physical XML tag line, or null when a line is not itself a tag. */
     public getDraftTagLine(line: number): number | null {
         return this.editor?.getDraftTagLine(line) ?? null;
-    }
-
-    /** Returns the enclosing XML source span for a physical tag line when it has no runtime node. */
-    public getDraftTagEditRange(line: number): { startLine: number; endLine: number } | null {
-        return this.editor?.getDraftTagEditRange(line) ?? null;
     }
 
     /** Handles an undo/redo keyboard shortcut while the source editor is read-only. */

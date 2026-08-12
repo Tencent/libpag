@@ -198,11 +198,11 @@ function buildLineDecos(
 }
 
 function buildEditDecos(
-    range: LineRange,
+    decorationLine: number,
     model: MonacoNS.editor.ITextModel,
     out: MonacoNS.editor.IModelDeltaDecoration[],
 ): void {
-    const line = clampLine(range.startLine, model.getLineCount());
+    const line = clampLine(decorationLine, model.getLineCount());
     out.push({
         range: {
             startLineNumber: line,
@@ -235,8 +235,11 @@ export class SourceEditor {
     private hoverDecoIds: string[] = [];
     private selectDecoIds: string[] = [];
     private editDecoIds: string[] = [];
-    private editRangeActive = false;
-    private editRangeOffset: { from: number; to: number } | null = null;
+    // Whether the whole document is currently writable. This flag has exactly one
+    // responsibility: gating readOnly on/off. It is set purely by line-number comparisons
+    // (double-click enters, an unmoved click on a different line exits) and never by inspecting
+    // document content — well-formedness is the separate job of the syntax/Apply validators.
+    private editingActive = false;
     private contentChangeListener: MonacoNS.IDisposable | null = null;
     private syntaxValidationTimer: number | null = null;
     private destroyed = false;
@@ -316,7 +319,7 @@ export class SourceEditor {
             // Hover → editor->canvas overlay highlight (rAF-throttled).
             this.disposers.push(
                 this.editor.onMouseMove((e: MonacoNS.editor.IEditorMouseEvent) => {
-                    if (this.editRangeActive || this.onHoverLineCb === null) {
+                    if (this.editingActive || this.onHoverLineCb === null) {
                         return;
                     }
                     const line = e.target?.position?.lineNumber;
@@ -345,8 +348,9 @@ export class SourceEditor {
             // Double-click → host resolves the enclosing node's source span.
             this.attachDomListeners();
 
-            // The exit gesture is deliberately narrow: an unmoved left-click landing on a
-            // different XML tag line is the only thing that leaves edit mode. Losing DOM focus
+            // Whether to leave edit mode is decided purely by comparing line numbers: an unmoved
+            // left-click landing on a physical line other than editDecorationLine exits, full
+            // stop — the clicked line's text is never inspected. Losing DOM focus
             // (onDidBlurEditorWidget) is intentionally NOT wired to leaveEditMode — Monaco's own
             // right-click context menu blurs the hidden textarea as a transient side effect of
             // opening it, which previously kicked the editor back to read-only mid-context-menu.
@@ -355,7 +359,7 @@ export class SourceEditor {
             // selection, not a click.
             this.disposers.push(
                 this.editor.onMouseDown((e: MonacoNS.editor.IEditorMouseEvent) => {
-                    if (!this.editRangeActive || !e.event.leftButton) {
+                    if (!this.editingActive || !e.event.leftButton) {
                         this.editPointerDown = null;
                         return;
                     }
@@ -375,9 +379,9 @@ export class SourceEditor {
                 }),
             );
 
-            // Span confinement: re-attached on each model swap (setContent replaces the model).
+            // Line-delta bookkeeping: re-attached on each model swap (setContent replaces the model).
             this.attachContentListener();
-            // Editor is born in the read-only state; the class is removed by enterEditRange
+            // Editor is born in the read-only state; the class is removed by enterEditMode
             // and re-added by leaveEditMode / setContent to hide Monaco's virtual cursor via CSS.
             this.host.classList.add('pagx-editor-readonly');
         });
@@ -395,6 +399,12 @@ export class SourceEditor {
         }
     }
 
+    /** Line-delta bookkeeping only: every content change (typed, pasted, undone, redone — it makes
+     *  no difference) is translated to inserted/removed line counts and handed to the player so it
+     *  can re-project draftSourceMap. This listener never inspects what the new text says or
+     *  rejects/reverts a change; whether the resulting document is well-formed is entirely the
+     *  syntax validator's and Apply's job, checked independently below via
+     *  scheduleSyntaxValidation. */
     private attachContentListener(): void {
         if (this.contentChangeListener !== null) {
             this.contentChangeListener.dispose();
@@ -409,51 +419,6 @@ export class SourceEditor {
                 if (e.isFlush) {
                     return;
                 }
-                if (e.isUndoing || e.isRedoing) {
-                    // Undo/redo restore or replay previously-applied edits. The out-of-range check
-                    // would just bounce the change back, so skip it — but the span's character
-                    // offset must still be re-mapped: e.changes are still relative to the pre-event
-                    // model, so the same totalDelta formula correctly tracks the new `to`.
-                    if (this.editRangeOffset !== null) {
-                        let totalDelta = 0;
-                        for (const change of e.changes) {
-                            totalDelta += change.text.length - change.rangeLength;
-                        }
-                        this.editRangeOffset = {
-                            from: this.editRangeOffset.from,
-                            to: this.editRangeOffset.to + totalDelta,
-                        };
-                    }
-                    this.onDraftLineChangesCb?.(this.getDraftLineChanges(e));
-                    return;
-                }
-                if (!this.editRangeActive || this.editRangeOffset === null) {
-                    return;
-                }
-                let outOfRange = false;
-                let totalDelta = 0;
-                for (const change of e.changes) {
-                    const changeStart = change.rangeOffset;
-                    const changeEnd = change.rangeOffset + change.rangeLength;
-                    if (changeStart < this.editRangeOffset.from || changeEnd > this.editRangeOffset.to) {
-                        outOfRange = true;
-                        break;
-                    }
-                    totalDelta += change.text.length - change.rangeLength;
-                }
-                if (outOfRange) {
-                    // Monaco 0.47.0's TextModel has a public undo() method at runtime, but the
-                    // TypeScript declarations don't expose it (added in a later type bump). The
-                    // cast goes through the model's own _undoRedoService which is more reliable
-                    // than editor.trigger('undo') — that path goes through the command system
-                    // and can be silently swallowed by other Monaco actions.
-                    (this.model as unknown as { undo(): void }).undo();
-                    return;
-                }
-                this.editRangeOffset = {
-                    from: this.editRangeOffset.from,
-                    to: this.editRangeOffset.to + totalDelta,
-                };
                 this.onDraftLineChangesCb?.(this.getDraftLineChanges(e));
             },
         );
@@ -595,8 +560,7 @@ export class SourceEditor {
             this.hoverDecoIds = [];
             this.selectDecoIds = [];
             this.editDecoIds = [];
-            this.editRangeActive = false;
-            this.editRangeOffset = null;
+            this.editingActive = false;
             this.editPointerDown = null;
             this.host.classList.remove('pagx-editor-editing');
             this.host.classList.add('pagx-editor-readonly');
@@ -624,8 +588,7 @@ export class SourceEditor {
         this.hoverDecoIds = [];
         this.selectDecoIds = [];
         this.editDecoIds = [];
-        this.editRangeActive = false;
-        this.editRangeOffset = null;
+        this.editingActive = false;
         this.editPointerDown = null;
         this.host.classList.remove('pagx-editor-editing');
         this.host.classList.add('pagx-editor-readonly');
@@ -645,8 +608,8 @@ export class SourceEditor {
     }
 
     /** Returns the current physical XML tag line, or null for text, blank and attribute-continuation
-     *  lines. This gives each displayed tag line one owner instead of treating every line inside a
-     *  parent element as part of that parent block. */
+     *  lines. Used only by read-only hover preview to decide which line to highlight — this is a
+     *  cosmetic concern separate from the edit-mode state machine, which never calls this. */
     getDraftTagLine(line: number): number | null {
         if (this.model === null || line <= 0 || line > this.model.getLineCount()) {
             return null;
@@ -655,62 +618,14 @@ export class SourceEditor {
         return /<\/?[A-Za-z_?!]/.test(text) ? line : null;
     }
 
-    /** Resolves the source span owned by a physical XML tag line. This fallback covers document-level
-     *  constructs (the XML declaration and <pagx> root) that intentionally have no runtime node in
-     *  the player source map, while ordinary layer nodes continue to use that authoritative map. */
-    getDraftTagEditRange(line: number): LineRange | null {
-        const tagLine = this.getDraftTagLine(line);
-        if (this.model === null || tagLine === null) {
-            return null;
-        }
-        const lineText = this.model.getLineContent(tagLine);
-        if (/^\s*<\?/.test(lineText)) {
-            return { startLine: tagLine, endLine: tagLine };
-        }
-        const xmlText = this.model.getValue();
-        const tags = /<\s*(\/?)\s*([A-Za-z_][\w:.-]*)\b[^>]*?>/g;
-        const openTags: { name: string; startLine: number }[] = [];
-        let match: RegExpExecArray | null;
-        while ((match = tags.exec(xmlText)) !== null) {
-            const token = match[0];
-            const tokenLine = xmlText.slice(0, match.index).split('\n').length;
-            const isClosing = match[1] === '/';
-            const isSelfClosing = /\/\s*>$/.test(token);
-            const name = match[2];
-            if (!isClosing && !isSelfClosing) {
-                openTags.push({ name, startLine: tokenLine });
-                continue;
-            }
-            if (!isClosing) {
-                if (tokenLine === tagLine) {
-                    return { startLine: tagLine, endLine: tagLine };
-                }
-                continue;
-            }
-            for (let i = openTags.length - 1; i >= 0; i--) {
-                if (openTags[i].name !== name) {
-                    continue;
-                }
-                const opening = openTags[i];
-                openTags.length = i;
-                if (opening.startLine === tagLine || tokenLine === tagLine) {
-                    return { startLine: opening.startLine, endLine: tokenLine };
-                }
-                break;
-            }
-        }
-        return null;
-    }
-
     /** Returns an active edit session to read-only browsing and clears its amber tag decoration. */
     private leaveEditMode(): void {
-        if (!this.editRangeActive || this.editor === null) {
+        if (!this.editingActive || this.editor === null) {
             return;
         }
-        this.editRangeActive = false;
+        this.editingActive = false;
         this.editDecorationLine = -1;
         this.editPointerDown = null;
-        this.editRangeOffset = null;
         this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, []);
         this.host.classList.remove('pagx-editor-editing');
         this.host.classList.add('pagx-editor-readonly');
@@ -720,7 +635,7 @@ export class SourceEditor {
     /** Handles undo and redo while the editor is read-only. Monaco disables its built-in commands
      *  in that mode, but document history must remain available after a temporary edit is re-locked. */
     handleReadOnlyUndoRedo(event: KeyboardEvent): boolean {
-        if (this.editor === null || this.model === null || this.editRangeActive ||
+        if (this.editor === null || this.model === null || this.editingActive ||
             !this.editor.hasTextFocus() || (!event.ctrlKey && !event.metaKey) || event.altKey) {
             return false;
         }
@@ -791,40 +706,23 @@ export class SourceEditor {
         this.clearSelect();
     }
 
-    /** Unlocks the enclosing element's full source span for editing while showing amber only on the
-     *  physical opening/closing tag line that was double-clicked. */
-    enterEditRange(startLine: number, endLine: number, decorationLine: number): void {
-        if (this.editor === null || this.model === null || startLine <= 0) {
+    /** Unlocks the whole document for editing, showing the amber tag decoration only on the
+     *  physical line that was double-clicked. There is no per-element edit boundary: once active,
+     *  every line is writable, and typing/pasting is never inspected or reverted based on its
+     *  content — line-delta bookkeeping (attachContentListener) is the only thing tracking edits. */
+    enterEditMode(decorationLine: number): void {
+        if (this.editor === null || this.model === null || decorationLine <= 0) {
             return;
         }
-        this.editRangeOffset = this.computeEditRangeOffset(startLine, endLine);
-        if (this.editRangeOffset === null) {
-            return;
-        }
-        this.editRangeActive = true;
+        this.editingActive = true;
         this.editDecorationLine = decorationLine;
         this.host.classList.remove('pagx-editor-readonly');
         this.host.classList.add('pagx-editor-editing');
         this.editor.updateOptions({ readOnly: false, domReadOnly: false });
         const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
-        buildEditDecos({ startLine: decorationLine, endLine: decorationLine }, this.model, decos);
+        buildEditDecos(decorationLine, this.model, decos);
         this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, decos);
         this.editor.focus();
-    }
-
-    /** Converts a 1-based inclusive line range to character offsets for span-confinement checks. */
-    private computeEditRangeOffset(startLine: number, endLine: number): { from: number; to: number } | null {
-        if (this.model === null || monacoInstance === null) {
-            return null;
-        }
-        const last = this.model.getLineCount();
-        const start = clampLine(startLine, last);
-        const end = clampLine(endLine, last);
-        const from = this.model.getOffsetAt(new monacoInstance.Position(start, 1));
-        const to = this.model.getOffsetAt(
-            new monacoInstance.Position(end, this.model.getLineMaxColumn(end)),
-        );
-        return { from, to };
     }
 
     /** Scrolls the given 1-based line into view. */
@@ -850,27 +748,27 @@ export class SourceEditor {
         })).sort((a, b) => b.startLine - a.startLine);
     }
 
-    /** Completes an edit-mode pointer gesture. Only a click (not a drag) on a different tag exits
-     *  editing; selections and clipboard gestures preserve Monaco focus and the full edit range. */
+    /** Completes an edit-mode pointer gesture. Only an unmoved click (not a drag) landing on a
+     *  physical line other than the current amber tag line exits editing; the decision is a pure
+     *  line-number comparison and never looks at what that line's text is. Selections and
+     *  clipboard gestures preserve Monaco focus and the writable state. */
     private handleEditPointerUp(
         position: { lineNumber: number; column: number } | null | undefined,
     ): void {
         const down = this.editPointerDown;
         this.editPointerDown = null;
-        if (!this.editRangeActive || down === null || position === null || position === undefined ||
-            down.lineNumber !== position.lineNumber || down.column !== position.column) {
+        if (!this.editingActive || down === null || position === null || position === undefined ||
+            down.lineNumber !== position.lineNumber || down.column !== position.column ||
+            position.lineNumber === this.editDecorationLine) {
             return;
         }
-        const tagLine = this.getDraftTagLine(position.lineNumber);
-        if (tagLine === null || tagLine === this.editDecorationLine) {
-            return;
-        }
+        const clickedLine = position.lineNumber;
         this.leaveEditMode();
         const activeElement = document.activeElement;
         if (activeElement instanceof HTMLElement && this.editor?.getDomNode()?.contains(activeElement)) {
             activeElement.blur();
         }
-        this.onHoverLineCb?.(tagLine);
+        this.onHoverLineCb?.(clickedLine);
     }
 
     onDraftLineChanges(cb: ((changes: readonly DraftLineChange[] | null) => void) | null): void {

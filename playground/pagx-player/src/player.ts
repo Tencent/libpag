@@ -935,30 +935,21 @@ export class PAGXPlayer extends EventTarget {
         this.syncEditorHover();
     }
 
-    /** Double-clicking an opening or closing tag unlocks its enclosing source node. The amber edit
-     *  decoration stays on the clicked tag line while the editable offset span remains the full
-     *  element, so normal text editing still works without parent-block highlighting. */
+    /** Double-clicking any physical line unlocks the whole document for editing; the amber edit
+     *  decoration marks the double-clicked line itself. There is no "is this a valid tag" gate:
+     *  whether one can edit depends only on which line was clicked, never on that line's content
+     *  (a line whose tag markup was deleted mid-edit must still be re-enterable). findNodeIndexForLine
+     *  is a pure line-number lookup against draftSourceMap (not a content check) and only drives the
+     *  canvas selection sync; when the line falls outside every node's span (e.g. the XML
+     *  declaration), it simply returns -1 and no canvas node gets selected. */
     private onEditorDblClick(line: number): void {
-        const tagLine = this.editor?.getDraftTagLine(line) ?? null;
-        if (tagLine === null) {
-            return;
-        }
-        const idx = this.findNodeIndexForLine(tagLine);
-        const fallbackRange = idx < 0 ? this.editor?.getDraftTagEditRange(tagLine) ?? null : null;
-        if (idx < 0 && fallbackRange === null) {
-            return;
-        }
+        const idx = this.findNodeIndexForLine(line);
         this.selectedIndex = idx;
         // Editor-direction selection has no hitTest result, so updateOverlay falls back to the
-        // source-map node bounds when one exists. XML declaration/root tags have no canvas node.
+        // source-map node bounds when one exists. Lines with no runtime node clear the canvas box.
         this.selectHit = null;
-        const entry = idx < 0 ? null : this.draftSourceMap[idx];
-        const startLine = entry === null ? fallbackRange!.startLine : entry.startLine;
-        const endLine = entry === null
-            ? fallbackRange!.endLine
-            : entry.endLine > 0 ? entry.endLine : entry.startLine;
         this.editor?.clearHover();
-        this.editor?.enterEditRange(startLine, endLine, tagLine);
+        this.editor?.enterEditMode(line);
         this.refreshOverlay();
         this.syncEditorSelect();
     }
