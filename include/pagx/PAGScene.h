@@ -212,9 +212,11 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
-   * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
-   * rectangle if the layer is null or does not belong to this scene. For the layer's untransformed
-   * local bounds, use PAGLayer::getBounds.
+   * on-screen transform (including animation and the display zoom/offset) applied. The bounds are
+   * tight (per-glyph extents for text instead of the font-wide envelope) and clipped to the
+   * layer's own scrollRect window when one is present, so the result outlines the visible
+   * content. Returns an empty rectangle if the layer is null or does not belong to this scene.
+   * For the layer's untransformed local bounds, use PAGLayer::getBounds.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;

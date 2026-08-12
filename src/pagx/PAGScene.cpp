@@ -40,6 +40,7 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/RasterUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
@@ -686,7 +687,10 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
     return {};
   }
   auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
-  auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
+  // Tight bounds clipped to the layer's own scrollRect window, so selection outlines hug the
+  // visible content (per-glyph extents for text) instead of the conservative content envelope
+  // that Layer::getBounds returns by default.
+  auto rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
   Matrix rootToSurface = {};
   rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
