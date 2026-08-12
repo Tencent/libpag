@@ -73,17 +73,13 @@ class PAGAnimation : public PAGTimeline {
   float frameRate() const;
 
   /**
-   * Returns the loop mode declared by the animation. Returns LoopMode::Once once the owning
-   * PAGScene is destroyed or the animation is missing.
-   */
-  LoopMode loopMode() const;
-
-  /**
-   * Returns the raw accumulated playback time folded into a single loop period, in microseconds.
-   * Unlike currentTime(), which folds to the in-cycle phase (a triangle wave under PingPong that
-   * decreases on the return half), this returns a value that advances monotonically across one full
-   * loop period: [0, duration) for Once/Loop and [0, 2 * duration) for PingPong. Returns 0 once the
-   * owning PAGScene is destroyed or the duration is zero.
+   * Returns the raw accumulated playback time mapped onto a monotonic linear timeline spanning one
+   * full loop period, in microseconds. Unlike currentTime(), which folds to the in-cycle phase (a
+   * triangle wave under PingPong that decreases on the return half), this rises monotonically across
+   * one full loop period: [0, duration] for Once/Loop and [0, 2 * duration] for PingPong. The end of
+   * a period reports the full period (not 0), so seeking to the timeline end stays at the end instead
+   * of wrapping back to the start. Returns 0 once the owning PAGScene is destroyed or the duration
+   * is zero.
    */
   int64_t playbackPosition() const;
 

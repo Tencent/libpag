@@ -174,12 +174,17 @@ void PAGXView::advanceTimelines(double frameStartMs) {
   if (playing) {
     if (defaultAnimation != nullptr) {
       int64_t duration = defaultAnimation->duration();
-      int64_t before = defaultAnimation->currentTime();
+      // Track the boundary on the linear playbackPosition rather than currentTime. currentTime is
+      // the folded in-cycle phase, which for PingPong is a triangle wave that turns around at the
+      // half point; that turn made a single pass stop after only the forward half. playbackPosition
+      // rises across one full loop period (duration for Once/Loop, 2 * duration for PingPong) and
+      // only wraps back down when a complete pass finishes, so it marks the true end for every mode.
+      int64_t before = defaultAnimation->playbackPosition();
       // Let the engine advance and wrap according to the file's loop mode; this keeps the in-cycle
       // motion intact, including PingPong mirroring. The view only overrides what happens at a cycle
       // boundary based on loopEnabled, so the file's loop flag never dictates repeat vs stop.
       bool changed = defaultAnimation->advanceAndApply(deltaUs);
-      int64_t after = defaultAnimation->currentTime();
+      int64_t after = defaultAnimation->playbackPosition();
       if (!changed) {
         // A Once file clamps at the last frame and stops changing. Rewind to the head either way;
         // when looping keep playing for the next cycle, otherwise park on the first frame so a
@@ -192,12 +197,13 @@ void PAGXView::advanceTimelines(double frameStartMs) {
           playing = false;
         }
       } else if (!loopEnabled && duration > 0 && after < before) {
-        // A Loop/PingPong file wrapped or reversed past the end while the user wants a single pass.
-        // Forward motion is monotonic until the boundary, so the first backward step marks one
-        // completed pass: rewind to the first frame and stop there. For PingPong this counts the
-        // forward half as the single pass and stops as soon as it reaches the end, so the mirrored
-        // return half is not played — "single pass" is inherently ambiguous for PingPong and this
-        // is the accepted tradeoff.
+        // A Loop/PingPong file crossed its period boundary while the user wants a single pass. The
+        // linear position climbs monotonically to the period and then wraps back down, so the first
+        // backward step marks one completed pass: rewind to the first frame and stop there. For
+        // PingPong the period is 2 * duration, so this fires only after the full forward-and-back
+        // trip, not at the half-way turning point. Here duration > 0 is only a validity guard; the
+        // actual boundary is the playbackPosition period, which already accounts for PingPong's
+        // doubled span, so this condition does not need the period value itself.
         defaultAnimation->setCurrentTime(0);
         defaultAnimation->apply();
         playing = false;
