@@ -505,14 +505,20 @@ bool PAGXView::isPlaying() const {
 
 int64_t PAGXView::currentTimeMicros() const {
   if (defaultAnimation != nullptr) {
-    return defaultAnimation->currentTime();
+    // Report the linear timeline position so the UI progress bar advances monotonically across one
+    // full loop period. For PingPong this treats a complete forward-and-back pass as one timeline
+    // (0 -> 2 * duration) instead of currentTime()'s folded triangle-wave phase, which would make
+    // the progress bar run backward on the return half.
+    return defaultAnimation->playbackPosition();
   }
   return 0;
 }
 
 int64_t PAGXView::durationMicros() const {
   if (defaultAnimation != nullptr) {
-    return defaultAnimation->duration();
+    // Match currentTimeMicros(): expose the full loop period so PingPong reports 2 * duration (one
+    // complete round trip) and the progress bar / time / frame readouts stay consistent.
+    return defaultAnimation->playbackPeriod();
   }
   return 0;
 }

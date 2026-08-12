@@ -104,6 +104,36 @@ float PAGAnimation::frameRate() const {
   return (!owner.expired() && animation != nullptr) ? animation->frameRate : 0.0f;
 }
 
+LoopMode PAGAnimation::loopMode() const {
+  return (!owner.expired() && animation != nullptr) ? animation->loop : LoopMode::Once;
+}
+
+int64_t PAGAnimation::playbackPeriod() const {
+  if (owner.expired() || animation == nullptr) {
+    return 0;
+  }
+  auto duration = DurationMicros(animation);
+  return animation->loop == LoopMode::PingPong ? duration * 2 : duration;
+}
+
+int64_t PAGAnimation::playbackPosition() const {
+  auto period = playbackPeriod();
+  if (period <= 0) {
+    return 0;
+  }
+  // Once does not repeat: clamp to [0, duration] so the position stays at the end after finishing,
+  // instead of wrapping back to 0 (which would make the progress bar jump to the start). Loop and
+  // PingPong fold into [0, period).
+  if (animation->loop == LoopMode::Once) {
+    return std::clamp<int64_t>(elapsedUs, 0, period);
+  }
+  auto pos = elapsedUs % period;
+  if (pos < 0) {
+    pos += period;
+  }
+  return pos;
+}
+
 void PAGAnimation::setCurrentTime(int64_t microseconds) {
   elapsedUs = std::max<int64_t>(0, microseconds);
 }
