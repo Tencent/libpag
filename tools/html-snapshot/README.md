@@ -126,6 +126,7 @@ Options:
 | `--selector <css>` | _(auto)_ | Wait for this selector before snapshotting |
 | `--cookie <name=value>` | — | Cookie scoped to the URL (URL inputs only; repeatable) |
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
+| `--no-reduced-motion` | _reduced motion enabled_ | Request `prefers-reduced-motion: no-preference`; use when reduced-motion styles hide content |
 | `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
@@ -529,7 +530,8 @@ Babel-compiled at runtime.
   pages can expose a complete static presentation instead of an entrance-
   animation start frame. Dynamic effects that ignore that preference are
   captured in whatever state they are in; use `--wait-ms` or `--selector` to
-  land on the desired frame.
+  land on the desired frame. Some pages instead hide or remove animated content
+  in their reduced-motion styles; use `--no-reduced-motion` for those pages.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
 - `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
