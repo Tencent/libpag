@@ -47,7 +47,7 @@ function loadMonaco(): Promise<Monaco> {
             const win = window as unknown as {
                 require?: {
                     config: (opts: { paths: { vs: string } }) => void;
-                    (deps: string[], cb: () => void): void;
+                    (deps: string[], cb: (...modules: unknown[]) => void): void;
                 };
                 monaco?: Monaco;
             };
@@ -63,6 +63,7 @@ function loadMonaco(): Promise<Monaco> {
                     reject(new Error('Monaco failed to load from CDN'));
                     return;
                 }
+                pruneBuiltInContextMenuItems(amdRequire);
                 definePagxTheme(m);
                 monacoInstance = m;
                 resolve(m);
@@ -114,11 +115,58 @@ function definePagxTheme(m: Monaco): void {
     });
 }
 
+// The standalone editor offers no public API to remove built-in context menu entries (the
+// clipboard trio, Change All Occurrences, Command Palette). The pagx editor replaces the whole
+// menu with its own actions, so right after the AMD bundle loads - before any editor instance
+// appends its own items - every entry registered under MenuId.EditorContext is cleared. This
+// relies on the private MenuRegistry._menuItems structure of the pinned monaco-editor 0.47.0
+// build (see MONACO_CDN); each step is shape-checked so a future Monaco upgrade degrades to
+// showing the default menu instead of throwing.
+function pruneBuiltInContextMenuItems(
+    amdRequire: (deps: string[], cb: (...modules: unknown[]) => void) => void,
+): void {
+    amdRequire(['vs/platform/actions/common/actions'], (actionsModule: unknown) => {
+        const actions = actionsModule as {
+            MenuId?: { EditorContext?: unknown };
+            MenuRegistry?: { _menuItems?: unknown };
+        } | null;
+        const menuId = actions?.MenuId?.EditorContext;
+        const menuItems = actions?.MenuRegistry?._menuItems;
+        if (menuId === undefined || !(menuItems instanceof Map)) {
+            return;
+        }
+        const list = menuItems.get(menuId) as { clear?: () => void } | undefined;
+        list?.clear?.();
+    });
+}
+
+// Clipboard write for the tag-block and whole-file copy actions. navigator.clipboard is only
+// exposed in secure contexts, so plain-http hosts fall back to a temporary textarea and
+// execCommand('copy') (deprecated, but the only mechanism available there).
+function copyTextToClipboard(text: string): void {
+    if (navigator.clipboard !== undefined) {
+        navigator.clipboard.writeText(text).then(undefined, () => execCommandCopy(text));
+        return;
+    }
+    execCommandCopy(text);
+}
+
+function execCommandCopy(text: string): void {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+}
+
 // Start loading immediately so the editor is ready by the time the user opens the panel.
 void loadMonaco();
 
 // A 1-based inclusive line range mirrored from a node's source span, or null to clear.
-interface LineRange {
+export interface LineRange {
     startLine: number;
     endLine: number;
 }
@@ -136,6 +184,8 @@ const SELECT_LINE_CLASS = 'pagx-select-line';
 const EDIT_LINE_CLASS = 'pagx-edit-line';
 const XML_MARKER_OWNER = 'pagx-xml-syntax';
 const XML_VALIDATION_DELAY_MS = 400;
+// Editor context key gating the Cut/Paste context menu actions to edit mode.
+const EDITING_CONTEXT_KEY = 'pagxSourceEditing';
 
 interface XmlSyntaxDiagnostic {
     message: string;
@@ -229,6 +279,8 @@ export class SourceEditor {
     private onHoverLineCb: ((line: number) => void) | null = null;
     private onDblClickLineCb: ((line: number) => void) | null = null;
     private onDraftLineChangesCb: ((changes: readonly DraftLineChange[] | null) => void) | null = null;
+    private tagSpanResolver: ((line: number) => LineRange | null) | null = null;
+    private editingContextKey: MonacoNS.editor.IContextKey<boolean> | null = null;
     private editPointerDown: { lineNumber: number; column: number } | null = null;
     private editDecorationLine = -1;
     private hoverLineRaf = 0;
@@ -381,6 +433,8 @@ export class SourceEditor {
 
             // Line-delta bookkeeping: re-attached on each model swap (setContent replaces the model).
             this.attachContentListener();
+            this.editingContextKey = this.editor.createContextKey(EDITING_CONTEXT_KEY, false);
+            this.registerContextMenuActions(m);
             // Editor is born in the read-only state; the class is removed by enterEditMode
             // and re-added by leaveEditMode / setContent to hide Monaco's virtual cursor via CSS.
             this.host.classList.add('pagx-editor-readonly');
@@ -397,6 +451,198 @@ export class SourceEditor {
         if (domNode !== null && domNode !== undefined) {
             domNode.addEventListener('dblclick', this.handleDomDblClick);
         }
+    }
+
+    /** Replaces Monaco's built-in context menu (cleared once in loadMonaco) with the pagx action
+     *  set. Copy/Cut/Paste re-dispatch the built-in clipboard commands so their behavior matches
+     *  the original menu entries exactly; the whole-file and tag-block variants are custom.
+     *  Cut/Paste show only in edit mode via the pagxSourceEditing context key; the delete actions
+     *  stay available while read-only, where they apply as draft changes that still need Apply to
+     *  reach the canvas. */
+    private registerContextMenuActions(m: Monaco): void {
+        const editor = this.editor;
+        if (editor === null) {
+            return;
+        }
+        // Swallow the built-in F1 shortcut so the Command Palette stays unreachable now that its
+        // menu entry is pruned.
+        editor.addCommand(m.KeyCode.F1, () => undefined, 'editorTextFocus');
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.copy',
+                label: 'Copy',
+                contextMenuGroupId: '1_copy',
+                contextMenuOrder: 1,
+                run: (ed) => ed.trigger('contextMenu', 'editor.action.clipboardCopyAction', null),
+            }),
+        );
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.copyEntireFile',
+                label: 'Copy Entire File',
+                contextMenuGroupId: '1_copy',
+                contextMenuOrder: 2,
+                run: () => {
+                    if (this.model !== null) {
+                        copyTextToClipboard(this.model.getValue());
+                    }
+                },
+            }),
+        );
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.copyTagBlock',
+                label: 'Copy Tag Block',
+                contextMenuGroupId: '1_copy',
+                contextMenuOrder: 3,
+                run: (ed) => {
+                    const model = this.model;
+                    const position = ed.getPosition();
+                    if (model === null || position === null) {
+                        return;
+                    }
+                    const span = this.getTagBlockLineRange(position.lineNumber);
+                    const text = model.getValueInRange({
+                        startLineNumber: span.startLine,
+                        startColumn: 1,
+                        endLineNumber: span.endLine,
+                        endColumn: model.getLineMaxColumn(span.endLine),
+                    });
+                    copyTextToClipboard(text + '\n');
+                },
+            }),
+        );
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.cut',
+                label: 'Cut',
+                precondition: EDITING_CONTEXT_KEY,
+                contextMenuGroupId: '2_edit',
+                contextMenuOrder: 1,
+                run: (ed) => ed.trigger('contextMenu', 'editor.action.clipboardCutAction', null),
+            }),
+        );
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.paste',
+                label: 'Paste',
+                precondition: EDITING_CONTEXT_KEY,
+                contextMenuGroupId: '2_edit',
+                contextMenuOrder: 2,
+                run: (ed) => ed.trigger('contextMenu', 'editor.action.clipboardPasteAction', null),
+            }),
+        );
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.delete',
+                label: 'Delete',
+                contextMenuGroupId: '3_delete',
+                contextMenuOrder: 1,
+                run: (ed) => {
+                    const selections = ed.getSelections() ?? [];
+                    const nonEmpty = selections.filter((selection) => !selection.isEmpty());
+                    if (nonEmpty.length > 0) {
+                        this.deleteRanges(nonEmpty.map((range) => ({
+                            startLineNumber: range.startLineNumber,
+                            startColumn: range.startColumn,
+                            endLineNumber: range.endLineNumber,
+                            endColumn: range.endColumn,
+                        })));
+                        return;
+                    }
+                    const position = ed.getPosition();
+                    if (position !== null) {
+                        this.deleteLineRange(position.lineNumber, position.lineNumber);
+                    }
+                },
+            }),
+        );
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.deleteEntireFile',
+                label: 'Delete Entire File',
+                contextMenuGroupId: '3_delete',
+                contextMenuOrder: 2,
+                run: () => {
+                    if (this.model !== null) {
+                        this.deleteLineRange(1, this.model.getLineCount());
+                    }
+                },
+            }),
+        );
+        this.disposers.push(
+            editor.addAction({
+                id: 'pagx.deleteTagBlock',
+                label: 'Delete Tag Block',
+                contextMenuGroupId: '3_delete',
+                contextMenuOrder: 3,
+                run: (ed) => {
+                    const position = ed.getPosition();
+                    if (position !== null) {
+                        const span = this.getTagBlockLineRange(position.lineNumber);
+                        this.deleteLineRange(span.startLine, span.endLine);
+                    }
+                },
+            }),
+        );
+    }
+
+    /** Resolves the inclusive line span of the tag enclosing the given line via the
+     *  host-registered resolver. Falls back to the line itself when no resolver is set or the
+     *  host cannot identify a well-formed tag there (missing or unrecognizable tag markers). */
+    private getTagBlockLineRange(line: number): LineRange {
+        const model = this.model;
+        const span = this.tagSpanResolver?.(line) ?? null;
+        if (model === null || span === null) {
+            return { startLine: line, endLine: line };
+        }
+        const lineCount = model.getLineCount();
+        const startLine = clampLine(span.startLine, lineCount);
+        const endLine = clampLine(span.endLine, lineCount);
+        if (startLine > endLine) {
+            return { startLine: line, endLine: line };
+        }
+        return { startLine, endLine };
+    }
+
+    /** Deletes the given ranges in a single undo stop. Unlike editor.executeEdits (which silently
+     *  no-ops while readOnly is set), model.pushEditOperations applies at the model layer so the
+     *  delete context menu actions also work in read-only browsing mode, where the change still
+     *  flows into draft tracking and the undo stack like a typed edit. */
+    private deleteRanges(ranges: readonly MonacoNS.IRange[]): void {
+        const model = this.model;
+        if (model === null || ranges.length === 0) {
+            return;
+        }
+        model.pushEditOperations(
+            null,
+            ranges.map((range) => ({ range, text: '' })),
+            () => null,
+        );
+    }
+
+    /** Deletes the whole lines [startLine, endLine] including their line breaks so the lines are
+     *  removed rather than blanked. */
+    private deleteLineRange(startLine: number, endLine: number): void {
+        const model = this.model;
+        const m = monacoInstance;
+        if (model === null || m === null) {
+            return;
+        }
+        const lineCount = model.getLineCount();
+        const start = clampLine(startLine, lineCount);
+        const end = clampLine(endLine, lineCount);
+        let range: MonacoNS.Range;
+        if (start === 1 && end === lineCount) {
+            range = new m.Range(1, 1, lineCount, model.getLineMaxColumn(lineCount));
+        } else if (end < lineCount) {
+            range = new m.Range(start, 1, end + 1, 1);
+        } else {
+            range = new m.Range(
+                start - 1, model.getLineMaxColumn(start - 1), end, model.getLineMaxColumn(end),
+            );
+        }
+        this.deleteRanges([range]);
     }
 
     /** Line-delta bookkeeping only: every content change (typed, pasted, undone, redone — it makes
@@ -561,6 +807,7 @@ export class SourceEditor {
             this.selectDecoIds = [];
             this.editDecoIds = [];
             this.editingActive = false;
+            this.editingContextKey?.set(false);
             this.editPointerDown = null;
             this.host.classList.remove('pagx-editor-editing');
             this.host.classList.add('pagx-editor-readonly');
@@ -589,6 +836,7 @@ export class SourceEditor {
         this.selectDecoIds = [];
         this.editDecoIds = [];
         this.editingActive = false;
+        this.editingContextKey?.set(false);
         this.editPointerDown = null;
         this.host.classList.remove('pagx-editor-editing');
         this.host.classList.add('pagx-editor-readonly');
@@ -624,6 +872,7 @@ export class SourceEditor {
             return;
         }
         this.editingActive = false;
+        this.editingContextKey?.set(false);
         this.editDecorationLine = -1;
         this.editPointerDown = null;
         this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, []);
@@ -715,6 +964,7 @@ export class SourceEditor {
             return;
         }
         this.editingActive = true;
+        this.editingContextKey?.set(true);
         this.editDecorationLine = decorationLine;
         this.host.classList.remove('pagx-editor-readonly');
         this.host.classList.add('pagx-editor-editing');
@@ -781,6 +1031,14 @@ export class SourceEditor {
 
     onDblClickLine(cb: ((line: number) => void) | null): void {
         this.onDblClickLineCb = cb;
+    }
+
+    /** Registers the resolver mapping a source line to the line span of its enclosing tag, used
+     *  by the tag-block copy/delete context menu actions. The host returns null when the tag
+     *  cannot be identified, in which case the actions fall back to the single line. Pass null
+     *  to remove. */
+    setTagSpanResolver(resolver: ((line: number) => LineRange | null) | null): void {
+        this.tagSpanResolver = resolver;
     }
 
     private readonly handleDomDblClick = (event: MouseEvent): void => {

@@ -28,7 +28,9 @@
 // `setDocumentXml()` calls driven by the player.
 
 import type { EditorCallbacks } from '../types';
-import { SourceEditor, type DraftLineChange } from './SourceEditor';
+import { SourceEditor, type DraftLineChange, type LineRange } from './SourceEditor';
+
+export type { LineRange };
 import type { SourceDiagnosticProvider } from '../types';
 import { EDITOR_STYLES } from './styles';
 
@@ -189,6 +191,7 @@ export class EditorPanel {
     private pendingHoverCb: ((line: number) => void) | null = null;
     private pendingDblClickCb: ((line: number) => void) | null = null;
     private pendingDraftLineChangesCb: ((changes: readonly DraftLineChange[] | null) => void) | null = null;
+    private pendingTagSpanResolver: ((line: number) => LineRange | null) | null = null;
     private readonly boundKeydown: (event: KeyboardEvent) => void;
     private readonly boundResize: () => void;
 
@@ -273,6 +276,9 @@ export class EditorPanel {
                 }
                 if (this.pendingDraftLineChangesCb !== null) {
                     this.editor.onDraftLineChanges(this.pendingDraftLineChangesCb);
+                }
+                if (this.pendingTagSpanResolver !== null) {
+                    this.editor.setTagSpanResolver(this.pendingTagSpanResolver);
                 }
             }
             // Seed the freshly created instance with the current document.
@@ -383,6 +389,20 @@ export class EditorPanel {
     public onDraftLineChanges(cb: ((changes: readonly DraftLineChange[] | null) => void) | null): void {
         this.pendingDraftLineChangesCb = cb;
         this.editor?.onDraftLineChanges(cb);
+    }
+
+    /** Registers the resolver SourceEditor consults for its tag-block copy/delete context menu
+     *  actions: it maps a source line to the line span of the enclosing tag, or null when the
+     *  tag cannot be identified (the actions then fall back to the single line). Survives editor
+     *  recreation. Pass null to remove. */
+    public setTagSpanResolver(resolver: ((line: number) => LineRange | null) | null): void {
+        this.pendingTagSpanResolver = resolver;
+        this.editor?.setTagSpanResolver(resolver);
+    }
+
+    /** Returns the current editor document text, or '' when the editor instance is not created. */
+    public getContent(): string {
+        return this.editor?.getContent() ?? '';
     }
 
     /** Detach global listeners and remove the panel from the DOM. Any layout side-effects the

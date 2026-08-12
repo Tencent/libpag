@@ -40,7 +40,7 @@ import type {
 import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
 import { buildToolbar, setToolbarVisible } from './toolbar';
-import { EditorPanel, EDITOR_STATUS_DURATION_MS } from './editor/index';
+import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
 import { ensureStylesInjected } from './styles';
 
 /** Canvas element id assigned by the player. Kept stable so external CSS or debug tooling
@@ -491,6 +491,7 @@ export class PAGXPlayer extends EventTarget {
             this.editor.onHoverLine((line) => this.onEditorHover(line));
             this.editor.onDblClickLine((line) => this.onEditorDblClick(line));
             this.editor.onDraftLineChanges((changes) => this.onDraftLineChanges(changes));
+            this.editor.setTagSpanResolver((line) => this.resolveTagSpan(line));
         }
 
         // Gesture manager (view accessor closure keeps working across reloads)
@@ -1041,6 +1042,32 @@ export class PAGXPlayer extends EventTarget {
             }
         }
         return bestIndex;
+    }
+
+    /** Resolves the line span of the innermost tag enclosing the given 1-based source line, for
+     *  the editor's tag-block copy/delete context menu actions. The span taken from
+     *  draftSourceMap is re-validated against the current draft text: when unsaved structural
+     *  edits have broken the tag (missing or unrecognizable markers) so the span no longer parses
+     *  as a single element, null is returned and the caller falls back to the line itself. */
+    private resolveTagSpan(line: number): LineRange | null {
+        const index = this.findNodeIndexForLine(line);
+        if (index < 0 || this.editor === null) {
+            return null;
+        }
+        const entry = this.draftSourceMap[index];
+        const start = entry.startLine;
+        if (start <= 0) {
+            return null;
+        }
+        const end = entry.endLine > 0 ? entry.endLine : start;
+        const lines = this.editor.getContent().split('\n');
+        if (end > lines.length) {
+            return null;
+        }
+        if (parseSpanElement(lines.slice(start - 1, end).join('\n')) === null) {
+            return null;
+        }
+        return { startLine: start, endLine: end };
     }
 
     /** Attempts to apply the edit from oldXml to newXml incrementally, in place, via setNodeChannel
