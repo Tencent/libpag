@@ -32,6 +32,7 @@ export interface SnapshotCliOptions {
   selector: string;
   cookies: ParsedCookie[];
   headers: ParsedHeader[];
+  reducedMotion: boolean;
   inlineIconFonts: boolean;
   captureAnimations: boolean;
   scrollReveal: boolean;
@@ -98,6 +99,11 @@ const FLAGS: FlagSpec[] = [
   { names: ['--selector'],         set: (o, v) => { o.selector = v as string; } },
   { names: ['--cookie'],           set: (o, v) => { o.cookies.push(parseCookie('--cookie', v)); } },
   { names: ['--header'],           set: (o, v) => { o.headers.push(parseHeader('--header', v)); } },
+  // Static snapshots normally request the page's reduced-motion presentation
+  // before navigation so entrance animations do not hide content at capture
+  // time. Some sites use that media query to remove animated content instead,
+  // so expose an opt-out rather than making the default impossible to escape.
+  { names: ['--no-reduced-motion'], takesArg: false, set: (o) => { o.reducedMotion = false; } },
   // Disable the inline-icon-font pre-pass (default: enabled). When the pass
   // is on, every PUA `::before` glyph whose font is registered via
   // `@font-face` is replaced with a vector `<svg>` extracted from the font
@@ -180,6 +186,9 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     selector: '',
     cookies: [],
     headers: [],
+    // Prefer a complete static presentation. Sites that remove content under
+    // prefers-reduced-motion can opt out with `--no-reduced-motion`.
+    reducedMotion: true,
     // Inline-icon-font pre-pass: convert every PUA `::before` glyph backed
     // by a webfont (Phosphor, Material Icons, Font Awesome, Lucide, …) to
     // an inline `<svg>` so the snapshot — and the PAGX downstream — no
@@ -338,6 +347,9 @@ Options:
                              repeatable)
   --header <Key: Value>      Set an extra HTTP request header (URL inputs only;
                              repeatable)
+  --no-reduced-motion       Request 'prefers-reduced-motion: no-preference'
+                             instead of 'reduce'. Use for pages whose reduced-
+                             motion styles hide content. Default: reduce.
   --no-inline-icon-fonts     Disable converting webfont icon glyphs (Phosphor,
                              Material Icons, Font Awesome, Lucide, …) to
                              inline <svg>. Default: enabled (the snapshot is

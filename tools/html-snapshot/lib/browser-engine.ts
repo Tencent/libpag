@@ -254,6 +254,28 @@ export async function setViewport(
   });
 }
 
+// Ask the page to use its reduced-motion presentation before navigation.
+// Static PAGX snapshots cannot reproduce entrance animations, and capturing a
+// multi-view document while only its active view has finished animating can
+// otherwise drop the still-transparent content from every inactive view.
+//
+// Puppeteer and Playwright expose the same media feature through differently
+// shaped APIs, so keep the engine fork here with the other page adapters.
+export async function emulateReducedMotion(
+  page: Page,
+  engine: EngineName,
+  reduce: boolean,
+): Promise<void> {
+  if (engine === 'playwright') {
+    await page.emulateMedia({ reducedMotion: reduce ? 'reduce' : 'no-preference' });
+    return;
+  }
+  await page.emulateMediaFeatures([{
+    name: 'prefers-reduced-motion',
+    value: reduce ? 'reduce' : 'no-preference',
+  }]);
+}
+
 export type WaitUntilToken = 'load' | 'domcontentloaded' | 'networkidle' | 'networkidle0' | string;
 
 // Translate our generic "fully settled" waitUntil token into the engine's

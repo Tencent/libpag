@@ -109,12 +109,17 @@ class HTMLLayerBuilder {
    *  chain on the outer Layer (used to decide whether a double-host split is needed). */
   static bool hasBackgroundVisuals(const HTMLBoxAttributes& box);
 
-  /** Returns true when an inner host Layer is needed (the outer carries the background and
-   *  the inner carries padding / layout). */
+  /** Returns true when the box carries authored container-layout semantics. This is broader than
+   *  requiresInnerHost(): zero padding and zero-gap flex still affect structural folds even though
+   *  they do not require a separate background host. */
+  static bool hasLayoutHostAttributes(const HTMLBoxAttributes& box);
+
+  /** Returns true when the final layout host has a non-zero content inset, requiring the outer
+   *  Layer to carry border-box paint and an inner Layer to carry padding / layout. */
   static bool requiresInnerHost(const HTMLBoxAttributes& box);
 
   /** Creates the inner host Layer for the standard "outer background + inner padded
-   *  container" double-layer pattern. */
+   *  container" double-layer pattern, including the border inset of flex containers. */
   Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
 
   /** Hoists `DropShadowStyle` entries off `inner` onto a fresh outer wrapper Layer when

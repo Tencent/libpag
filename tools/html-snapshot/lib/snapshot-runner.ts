@@ -12,6 +12,7 @@ import {
   MEASURE_CANVAS_EXPR,
   SNAPSHOT_INIT_SCRIPT,
   inlineExternalImages,
+  normalizeEmptyImagePlaceholders,
   inlineCanvases,
   materializeDecorativePseudoElements,
 } from './browser-snapshot';
@@ -192,6 +193,7 @@ export interface RunSnapshotOptions {
   selector?: string;
   cookies?: CookieParam[];
   headers?: Array<[string, string]>;
+  reducedMotion?: boolean;
   inlineIconFonts?: boolean;
   // Capture the page's animations into the subset (default false → static
   // single frame). See the destructured default in `runSnapshot` for details.
@@ -353,6 +355,7 @@ export async function runSnapshot(
     selector = '',
     cookies = [],
     headers = [],
+    reducedMotion = true,
     inlineIconFonts = true,
     // Static by default: the snapshot emits a single frozen frame and no
     // animation-capture machinery (virtual clock, transition recorder, WAAPI/
@@ -400,6 +403,7 @@ export async function runSnapshot(
     selector,
     cookies,
     headers,
+    reducedMotion,
     onConsole: log
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? (msg: any) => {
@@ -508,6 +512,14 @@ export async function runSnapshot(
       await page.evaluate(inlineExternalImages, srcByUrl);
     };
     await inlineCapturedImages();
+
+    // Chromium renders an empty/missing-src <img> with non-empty alt text as
+    // fallback glyphs and ignores even explicit CSS width/height in that
+    // state. Neutralise the alt text for source-less placeholders that have a
+    // real authored two-axis box before canvas/element measurement. The
+    // snapshot entry restores the live DOM after preserving the original alt
+    // in its emitted markup.
+    await page.evaluate(normalizeEmptyImagePlaceholders);
 
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted

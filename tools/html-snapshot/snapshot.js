@@ -73,6 +73,7 @@ async function main() {
       selector: opts.selector,
       cookies: opts.cookies,
       headers: opts.headers,
+      reducedMotion: opts.reducedMotion,
       inlineIconFonts: opts.inlineIconFonts,
       captureAnimations: opts.captureAnimations,
       scrollReveal: opts.scrollReveal,
