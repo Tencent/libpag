@@ -12,6 +12,7 @@
 import {
   unwrap,
   newPage,
+  emulateReducedMotion,
   mapWaitUntil,
   addCookies,
   addInitScript,
@@ -145,6 +146,10 @@ export interface OpenAndSettlePageOptions {
   onPageError?: PageErrorListener | null;
   onResponse?: ResponseListener | null;
   initScripts?: string[];
+  // Prefer the page's static/reduced-motion presentation. Defaults to true:
+  // PAGX is a static snapshot, so entrance-animation start states (commonly
+  // opacity:0) would otherwise make content disappear from the export.
+  reducedMotion?: boolean;
   // Walk the viewport from top to bottom before settling so lazy-loaded content
   // (IntersectionObserver / scroll listeners / native `loading="lazy"`) is
   // realised instead of captured as skeleton placeholders. Defaults to true;
@@ -256,6 +261,7 @@ export async function openAndSettlePage(
     onPageError = null,
     onResponse = null,
     initScripts = [],
+    reducedMotion = true,
     autoScroll = process.env.HTML_SNAPSHOT_NO_AUTOSCROLL !== '1',
   } = opts || {};
 
@@ -263,6 +269,11 @@ export async function openAndSettlePage(
   const page = await newPage(browserOrWrapper, {
     viewport: { width: viewportWidth, height: viewportHeight, deviceScaleFactor: 1 },
   });
+  // Set the media preference before navigation so inline boot scripts and
+  // `@media (prefers-reduced-motion: reduce)` rules see it on first paint.
+  // Presentation/deck pages commonly use this branch to reveal every slide's
+  // content instead of leaving inactive slides at their entrance opacity.
+  await emulateReducedMotion(page, engine, reducedMotion);
   if (onConsole) page.on('console', onConsole);
   if (onPageError) page.on('pageerror', onPageError);
   // Register onResponse before any navigation so the listener captures the
