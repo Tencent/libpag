@@ -22,7 +22,7 @@
 // load(); everything else - keyboard shortcuts, size responsiveness, playback UI - is owned by
 // the player.
 
-import type { HitTestResult, NodeSourceEntry, PlayerModule, PlayerView } from './pagx-view-types';
+import type { HitTestResult, NodeBounds, NodeSourceEntry, PlayerModule, PlayerView } from './pagx-view-types';
 import type {
     BackgroundColor,
     EditorCallbacks,
@@ -349,6 +349,10 @@ export class PAGXPlayer extends EventTarget {
     // Cached by refreshOverlay so the per-frame follow-loop skips the ancestry walk.
     private overlayBoundsIndex = -1;
     private overlayKind: 'hover' | 'select' = 'hover';
+    // Bounds queried on the previous overlay tick. PAGXView.draw() double-buffers recordings, so
+    // during playback the canvas presents the frame recorded one tick earlier than the scene state
+    // getNodeBounds reads; presenting the previous tick's bounds keeps the outline on the pixels.
+    private overlayPreviousBounds: NodeBounds | null = null;
     private overlayRaf = 0;
     private hoverRaf = 0;
     private detachHover: (() => void) | null = null;
@@ -893,7 +897,7 @@ export class PAGXPlayer extends EventTarget {
             this.hoverIndex = idx;
             this.hoverHit = hit;
             this.refreshOverlay();
-            this.syncEditorHover('start');
+            this.syncEditorHover('center');
         }
     }
 
@@ -918,7 +922,7 @@ export class PAGXPlayer extends EventTarget {
         // blue outline remains; it stays highlighted on the canvas and mirrored in the editor
         // until the user's next action.
         this.exitSelectMode();
-        this.syncEditorSelect('start');
+        this.syncEditorSelect('center');
     }
 
     /** Editor hover resolves only a physical XML tag line. The full node index remains available for
@@ -1167,7 +1171,7 @@ export class PAGXPlayer extends EventTarget {
      *  Span source: canvas-originating hover uses the hitTest result's span (which points at the
      *  <Layer composition="@X"> reference, not the internal definition); editor-originating hover
      *  (editorHoverIndex) falls back to sourceMap since no hitTest ran. */
-    private syncEditorHover(align: 'none' | 'nearest' | 'start' = 'none'): void {
+    private syncEditorHover(align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
         if (this.editorHoverLine > 0) {
             this.editor?.highlightHover(this.editorHoverLine, this.editorHoverLine);
             if (align !== 'none') {
@@ -1197,7 +1201,7 @@ export class PAGXPlayer extends EventTarget {
     }
 
     /** Mirrors the sticky selection onto the editor as the blue opening-tag line highlight. */
-    private syncEditorSelect(align: 'none' | 'nearest' | 'start' = 'none'): void {
+    private syncEditorSelect(align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
         const idx = this.selectedIndex;
         if (this.selectHit !== null) {
             const projected = this.draftSourceMap[this.selectHit.index];
@@ -1311,6 +1315,9 @@ export class PAGXPlayer extends EventTarget {
         const raw = this.currentOverlayTarget();
         this.overlayBoundsIndex = raw.index >= 0 ? this.resolveBoundsIndex(raw.index) : -1;
         this.overlayKind = raw.kind;
+        // The previous-tick bounds belong to the old target; carrying them over would flash the
+        // old outline for one frame when the target switches mid-playback.
+        this.overlayPreviousBounds = null;
         if (this.overlayBoundsIndex >= 0) {
             this.startOverlayLoop();
         } else {
@@ -1337,17 +1344,27 @@ export class PAGXPlayer extends EventTarget {
         const bounds = this.view.getNodeBounds(this.overlayBoundsIndex);
         if (bounds === null) {
             overlay.style.display = 'none';
+            this.overlayPreviousBounds = null;
             return;
         }
+        // PAGXView.draw() double-buffers recordings: while the timeline is playing, the canvas
+        // presents the frame recorded one rAF earlier than the scene state getNodeBounds reads,
+        // so applying the current bounds would lead the pixels by one frame. Present the previous
+        // tick's bounds instead. Paused interactions (scrub/zoom/edit) set presentImmediately in
+        // draw(), which presents the current frame, so the current bounds are correct there.
+        const shown = this.view.isPlaying() && this.overlayPreviousBounds !== null
+            ? this.overlayPreviousBounds
+            : bounds;
+        this.overlayPreviousBounds = bounds;
         const rect = this.canvas.getBoundingClientRect();
         // Surface (backing) -> CSS pixels.
         const scaleX = rect.width / this.canvas.width;
         const scaleY = rect.height / this.canvas.height;
         overlay.style.display = 'block';
-        overlay.style.left = bounds.x * scaleX + 'px';
-        overlay.style.top = bounds.y * scaleY + 'px';
-        overlay.style.width = bounds.w * scaleX + 'px';
-        overlay.style.height = bounds.h * scaleY + 'px';
+        overlay.style.left = shown.x * scaleX + 'px';
+        overlay.style.top = shown.y * scaleY + 'px';
+        overlay.style.width = shown.w * scaleX + 'px';
+        overlay.style.height = shown.h * scaleY + 'px';
         overlay.classList.toggle('is-selected', this.overlayKind === 'select');
         overlay.classList.toggle('is-hover', this.overlayKind === 'hover');
     }

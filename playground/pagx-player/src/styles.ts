@@ -329,13 +329,15 @@ const CSS = `
     box-sizing: border-box;
 }
 
+/* Colors follow Chrome DevTools' inspect overlay: the fill is its content-box blue; the sticky
+   selection adds a solid accent border to distinguish it from the transient hover. */
 .pagx-select-overlay.is-hover {
-    background: rgba(68, 142, 249, 0.28);
+    background: rgba(111, 168, 220, 0.66);
 }
 
 .pagx-select-overlay.is-selected {
-    background: rgba(68, 142, 249, 0.32);
-    border: 1px solid rgba(68, 142, 249, 0.95);
+    background: rgba(111, 168, 220, 0.66);
+    border: 1px solid rgba(26, 115, 232, 1);
 }
 
 /* Transient status pill anchored above the canvas area. position: absolute relative to the

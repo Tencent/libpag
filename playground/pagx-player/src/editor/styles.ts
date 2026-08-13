@@ -173,9 +173,10 @@ export const EDITOR_STYLES = `
     background-color: rgba(140, 140, 140, 0.28);
 }
 
+/* Same Chrome-inspect blue family as the canvas overlay, at a lower alpha so code stays readable. */
 #editor-panel .editor-host .monaco-editor .pagx-select-line {
-    background-color: rgba(68, 142, 249, 0.22);
-    box-shadow: inset 2px 0 0 rgba(68, 142, 249, 0.9);
+    background-color: rgba(111, 168, 220, 0.32);
+    box-shadow: inset 2px 0 0 rgba(26, 115, 232, 0.9);
 }
 
 /* Editing is a distinct mode from canvas/node selection. Keep node selection blue in read-only

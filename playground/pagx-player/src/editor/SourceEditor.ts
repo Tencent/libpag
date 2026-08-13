@@ -975,13 +975,17 @@ export class SourceEditor {
         this.editor.focus();
     }
 
-    /** Scrolls the given 1-based line into view. */
-    scrollToLine(line: number, align: 'start' | 'nearest' = 'start'): void {
+    /** Scrolls the given 1-based line into view. 'center' always recenters the line in the
+     *  viewport; 'start' scrolls the minimum needed to reveal it (landing at the viewport edge);
+     *  'nearest' centers only when the line is outside the viewport. */
+    scrollToLine(line: number, align: 'start' | 'nearest' | 'center' = 'start'): void {
         if (this.editor === null || line <= 0) {
             return;
         }
         const targetLine = Math.min(line, this.model?.getLineCount() ?? 1);
-        if (align === 'nearest') {
+        if (align === 'center') {
+            this.editor.revealLineInCenter(targetLine, monacoInstance!.editor.ScrollType.Smooth);
+        } else if (align === 'nearest') {
             this.editor.revealLineInCenterIfOutsideViewport(targetLine);
         } else {
             this.editor.revealLine(targetLine, monacoInstance!.editor.ScrollType.Smooth);

@@ -339,7 +339,7 @@ export class EditorPanel {
         this.editor?.clearHighlight();
     }
 
-    public scrollToLine(line: number, align: 'start' | 'nearest' = 'start'): void {
+    public scrollToLine(line: number, align: 'start' | 'nearest' | 'center' = 'start'): void {
         this.editor?.scrollToLine(line, align);
     }
 
