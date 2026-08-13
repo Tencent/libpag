@@ -5728,4 +5728,73 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateSameCenter) {
   EXPECT_EQ(obj->channels[0]->name, "rotation");
 }
 
+/**
+ * Test SVG import: <animate attributeName="stroke-width"> drives Stroke.width channel. Verifies
+ * the shadow/roundness/stroke-width animation trio exports to PAGX correctly.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateStrokeWidth) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"none\" stroke=\"black\" stroke-width=\"2\">"
+      "<animate attributeName=\"stroke-width\" values=\"2;6;2\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  ASSERT_EQ(anim->objects.size(), 1u);
+  auto* obj = anim->objects[0];
+  // stroke-width → Stroke.width (Float channel).
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "width");
+  EXPECT_EQ(obj->channels[0]->valueType(), pagx::ChannelValueType::Float);
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 2.0f);
+  EXPECT_EQ(ch->keyframes[1].time, 60);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 6.0f);
+  EXPECT_EQ(ch->keyframes[2].time, 120);
+  EXPECT_FLOAT_EQ(ch->keyframes[2].value, 2.0f);
+}
+
+/**
+ * Test SVG import: combined roundness + stroke-width + drop-shadow-blur animation on a single
+ * rect, verifying all three export to PAGX as independent AnimationObjects targeting different
+ * nodes (Rectangle.roundness, Stroke.width, BlurFilter.blurX/blurY).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateRoundnessStrokeWidthAndShadowBlur) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\">"
+      "<defs><filter id=\"f\">"
+      "<feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"4\">"
+      "<animate attributeName=\"stdDeviation\" values=\"4;8;4\" dur=\"2s\" fill=\"freeze\"/>"
+      "</feGaussianBlur>"
+      "</filter></defs>"
+      "<rect width=\"80\" height=\"80\" rx=\"5\" fill=\"red\" stroke=\"black\" "
+      "stroke-width=\"2\" filter=\"url(#f)\">"
+      "<animate attributeName=\"rx\" values=\"5;20;5\" dur=\"2s\" fill=\"freeze\"/>"
+      "<animate attributeName=\"stroke-width\" values=\"2;6;2\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // Three AnimationObjects: Rectangle(roundness), Stroke(width), BlurFilter(blurX+blurY).
+  ASSERT_EQ(anim->objects.size(), 3u);
+  int roundnessCh = 0;
+  int widthCh = 0;
+  int blurCh = 0;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->name == "roundness") roundnessCh++;
+      if (ch->name == "width") widthCh++;
+      if (ch->name == "blurX" || ch->name == "blurY") blurCh++;
+    }
+  }
+  EXPECT_EQ(roundnessCh, 1);
+  EXPECT_EQ(widthCh, 1);
+  EXPECT_EQ(blurCh, 2);
+}
+
 }  // namespace pag
