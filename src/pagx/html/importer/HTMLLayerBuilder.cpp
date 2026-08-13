@@ -124,6 +124,14 @@ void ResetLayoutAnchors(Layer* inner) {
   inner->flex = 0.0f;
 }
 
+// `background-clip: text` redirects gradient backgrounds to descendant text fills. Keep this
+// predicate separate from the visual-emission code because replaced elements may still have a
+// foreground fill, border, shadow, or backdrop filter that must survive the redirect.
+bool ClipsGradientBackgroundToText(const HTMLBoxAttributes& box) {
+  return box.backgroundClipText &&
+         ToLower(box.backgroundImage).find("gradient(") != std::string::npos;
+}
+
 }  // namespace
 
 BlendMode HTMLLayerBuilder::resolveBackgroundBlendMode(const std::string& value) {
@@ -148,8 +156,11 @@ void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
 }
 
 bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
-  return box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
-         box.borderSet || !box.boxShadow.empty() || !box.backdropFilter.empty();
+  bool hasBoxBackground =
+      !ClipsGradientBackgroundToText(box) &&
+      (box.backgroundColorSet || !box.backgroundImage.empty());
+  return hasBoxBackground || box.borderRadiusSet || box.borderSet || !box.boxShadow.empty() ||
+         !box.backdropFilter.empty();
 }
 
 bool HTMLLayerBuilder::hasLayoutHostAttributes(const HTMLBoxAttributes& box) {
@@ -344,23 +355,23 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
                                               Fill* foregroundFill) {
   // `background-clip: text` redirects the gradient to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
-  // `background-image`, suppress the rectangle + gradient Fill that would otherwise
-  // paint a coloured block behind the text.
-  if (box.backgroundClipText && !box.backgroundImage.empty() &&
-      box.backgroundImage.find("gradient") != std::string::npos) {
-    return false;
-  }
+  // `background-image`, suppress only that box background. Replaced-element foregrounds and
+  // independent box visuals (border, shadow, backdrop filter) must still be emitted.
+  bool clipsGradientToText = ClipsGradientBackgroundToText(box);
   bool emitted = false;
   // `geometry` is the shape node (Rectangle or Path) that anchors the Fill / Stroke chain
   // emitted below. We only allocate it when the box actually carries a paintable visual.
   Element* geometry = nullptr;
-  if (foregroundFill != nullptr || box.backgroundColorSet || !box.backgroundImage.empty() ||
-      box.borderRadiusSet || box.borderSet) {
+  bool hasBoxBackground =
+      !clipsGradientToText && (box.backgroundColorSet || !box.backgroundImage.empty());
+  if (foregroundFill != nullptr || hasBoxBackground || box.borderRadiusSet || box.borderSet) {
     geometry = buildBackgroundGeometry(box);
     layer->contents.push_back(geometry);
     emitted = true;
   }
-  applyBackgroundFill(layer, box, geometry, emitted);
+  if (!clipsGradientToText) {
+    applyBackgroundFill(layer, box, geometry, emitted);
+  }
   if (foregroundFill != nullptr) {
     layer->contents.push_back(foregroundFill);
     emitted = true;

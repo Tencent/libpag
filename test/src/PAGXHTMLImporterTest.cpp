@@ -4481,6 +4481,34 @@ PAG_TEST(PAGXHTMLImporterTest, ImagePreservesBorderEffectsAndTransform) {
   EXPECT_TRUE(foundShadow);
 }
 
+// `background-clip:text` redirects a CSS gradient away from the element's box, but it must not
+// suppress the replaced image itself or unrelated box visuals. The old early return in
+// applyBackgroundVisuals produced an entirely empty `<img>` layer for this combination.
+PAG_TEST(PAGXHTMLImporterTest, ImageBackgroundClipTextKeepsForegroundAndBoxEffects) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <img src="logo.png" style="width:60px;height:40px;
+           background-image:linear-gradient(red,blue);background-clip:text;
+           border:3px solid #00FF00;box-shadow:0 2px 8px #0008"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* image = doc->layers.front()->children.front();
+  ASSERT_EQ(CountElements<pagx::Fill>(image->contents), 1u);
+  auto* fill = FindElementOfType<pagx::Fill>(image);
+  ASSERT_NE(fill, nullptr);
+  EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
+  EXPECT_EQ(As<pagx::LinearGradient>(fill->color), nullptr);
+  auto* stroke = FindElementOfType<pagx::Stroke>(image);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 3.0f);
+  bool foundShadow = false;
+  for (auto* style : image->styles) {
+    if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
+  }
+  EXPECT_TRUE(foundShadow);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, InlineSvgPreservesBorderEffectsAndTransform) {
   auto doc = ParseRaw(R"HTML(
     <html><body style="width:100px;height:100px">
@@ -4505,6 +4533,25 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgPreservesBorderEffectsAndTransform) {
     if (As<pagx::DropShadowStyle>(style)) foundShadow = true;
   }
   EXPECT_TRUE(foundShadow);
+}
+
+// A clip-to-text gradient is not a box visual for an inline SVG (there are no descendant HTML
+// text fills to receive it). It must not force an empty underlay wrapper around the SVG import.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgBackgroundClipTextAvoidsEmptyVisualWrapper) {
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <svg width="60" height="40" style="width:60px;height:40px;
+           background-image:linear-gradient(red,blue);background-clip:text">
+        <rect width="60" height="40" fill="#00F"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* svg = doc->layers.front()->children.front();
+  EXPECT_EQ(svg->importDirective.format, "svg");
+  EXPECT_FALSE(svg->importDirective.content.empty());
+  EXPECT_TRUE(svg->children.empty());
+  EXPECT_TRUE(svg->contents.empty());
 }
 
 // CSS `background-image: url(...)` round-trips into an ImagePattern fill (the inverse of the
