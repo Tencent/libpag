@@ -5795,6 +5795,11 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateRoundnessStrokeWidthAndShadowBlur) {
   EXPECT_EQ(roundnessCh, 1);
   EXPECT_EQ(widthCh, 1);
   EXPECT_EQ(blurCh, 2);
+
+  // Export to PAGX XML and write to test/out/ for inspection.
+  auto pagxXml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(pagxXml.empty());
+  SaveFile(pagxXml, "PAGXSVGTest/animate_roundness_stroke_width_shadow.pagx");
 }
 
 }  // namespace pag
