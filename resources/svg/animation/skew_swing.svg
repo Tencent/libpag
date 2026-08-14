@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <g transform="translate(60 60)">
+    <rect x="-30" y="-30" width="60" height="60" rx="10" fill="#ec4899">
+      <animateTransform attributeName="transform" type="skewX" values="0;-20;0;20;0" keyTimes="0;0.25;0.5;0.75;1" dur="3s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <g transform="translate(60 60)">
+    <rect x="-30" y="-30" width="60" height="60" rx="10" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.4">
+      <animateTransform attributeName="transform" type="skewY" values="0;-15;0;15;0" keyTimes="0;0.25;0.5;0.75;1" dur="3s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>
