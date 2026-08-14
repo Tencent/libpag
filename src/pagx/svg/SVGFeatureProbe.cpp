@@ -30,6 +30,7 @@ static void Merge(SVGFeatureFlags* dst, const SVGFeatureFlags& src) {
   dst->hasTextModifier |= src.hasTextModifier;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasDiamondGradient |= src.hasDiamondGradient;
+  dst->hasAnimation |= src.hasAnimation;
 }
 
 static void ProbeColorSource(const ColorSource* source, SVGFeatureFlags* out) {
