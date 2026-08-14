@@ -156,9 +156,8 @@ void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
 }
 
 bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
-  bool hasBoxBackground =
-      !ClipsGradientBackgroundToText(box) &&
-      (box.backgroundColorSet || !box.backgroundImage.empty());
+  bool hasBoxBackground = !ClipsGradientBackgroundToText(box) &&
+                          (box.backgroundColorSet || !box.backgroundImage.empty());
   return hasBoxBackground || box.borderRadiusSet || box.borderSet || !box.boxShadow.empty() ||
          !box.backdropFilter.empty();
 }
