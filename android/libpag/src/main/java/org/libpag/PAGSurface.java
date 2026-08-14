@@ -203,6 +203,11 @@ public class PAGSurface {
     private void releaseSurface() {
         if (needsReleaseSurface && surface != null) {
             surface.release();
+            // Null out the reference so that a later GC finalize() does not release the same
+            // Surface (and its underlying ANativeWindow) a second time. Otherwise an explicit
+            // release() followed by GC could double-release the native surface and crash in
+            // android::RefBase::decStrong.
+            surface = null;
         }
     }
 
