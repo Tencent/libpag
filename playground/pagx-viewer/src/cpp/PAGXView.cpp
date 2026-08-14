@@ -20,8 +20,8 @@
 #include <GLES3/gl3.h>
 #include <emscripten/html5.h>
 #include <algorithm>
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 #include "base/utils/Log.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
@@ -125,11 +125,11 @@ void PAGXView::parsePAGX(const val& pagxData) {
 }
 
 static int ParseDiagnosticLine(const std::string& error) {
-  constexpr const char* LinePrefix = "line ";
+  constexpr char LinePrefix[] = "line ";
   if (error.rfind(LinePrefix, 0) != 0) {
     return 1;
   }
-  auto cursor = error.data() + 5;
+  auto cursor = error.data() + sizeof(LinePrefix) - 1;
   auto line = std::strtol(cursor, nullptr, 10);
   return line > 0 ? static_cast<int>(line) : 1;
 }
@@ -177,43 +177,22 @@ emscripten::val PAGXView::hitTest(float surfaceX, float surfaceY) {
   if (scene == nullptr) {
     return emscripten::val::null();
   }
-  auto layers = scene->getLayersUnderPoint(surfaceX, surfaceY);
-  if (layers.empty()) {
+  auto hit = scene->hitTest(surfaceX, surfaceY);
+  if (hit.index < 0) {
     return emscripten::val::null();
   }
-  // getLayersUnderPoint returns top-most first; the first hit is what the user clicked. It is the
-  // most specific runtime layer under the pointer (e.g. a <Rectangle> inside a <Composition>), not
-  // the <Layer composition="@X"> reference. Walk the parent chain up to the first PAGComposition
-  // that has a source node (i.e. a real <Layer composition="@X"> reference, not the root
-  // composition whose node is null) so the editor highlights the reference, not the internal
-  // definition. If no such composition ancestor exists (click on a plain <Layer> at the document
-  // root, whose parent is the root composition), fall back to the hit itself.
-  auto target = layers[0];
-  auto walker = target;
-  while (walker != nullptr) {
-    if (walker->layerType() == LayerType::Composition && walker->getNode() != nullptr) {
-      target = walker;
-      break;
-    }
-    walker = walker->getParent();
-  }
-  const Layer* node = target->getNode();
-  if (node == nullptr) {
-    return emscripten::val::null();
-  }
-  auto bounds = scene->getGlobalBounds(target);
   auto obj = emscripten::val::object();
-  obj.set("index", node->index);
-  obj.set("startLine", node->sourceLine);
-  obj.set("endLine", node->endLine);
-  if (bounds.isEmpty()) {
+  obj.set("index", hit.index);
+  obj.set("startLine", hit.startLine);
+  obj.set("endLine", hit.endLine);
+  if (hit.bounds.isEmpty()) {
     obj.set("bounds", emscripten::val::null());
   } else {
     auto boundsObj = emscripten::val::object();
-    boundsObj.set("x", bounds.x);
-    boundsObj.set("y", bounds.y);
-    boundsObj.set("w", bounds.width);
-    boundsObj.set("h", bounds.height);
+    boundsObj.set("x", hit.bounds.x);
+    boundsObj.set("y", hit.bounds.y);
+    boundsObj.set("w", hit.bounds.width);
+    boundsObj.set("h", hit.bounds.height);
     obj.set("bounds", boundsObj);
   }
   return obj;
@@ -224,15 +203,14 @@ emscripten::val PAGXView::getNodeSourceMap() const {
   if (document == nullptr) {
     return array;
   }
-  for (const auto& up : document->nodes) {
-    Node* n = up.get();
+  for (const auto& source : document->getNodeSourceMap()) {
     auto entry = emscripten::val::object();
-    entry.set("index", n->index);
-    entry.set("startLine", n->sourceLine);
-    entry.set("endLine", n->endLine);
-    entry.set("nodeType", static_cast<int>(n->nodeType()));
+    entry.set("index", source.index);
+    entry.set("startLine", source.startLine);
+    entry.set("endLine", source.endLine);
+    entry.set("nodeType", static_cast<int>(source.nodeType));
     auto channels = emscripten::val::array();
-    for (const auto& c : ListChannels(n->nodeType())) {
+    for (const auto& c : source.channels) {
       channels.call<void>("push", c);
     }
     entry.set("channels", channels);

@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
@@ -14,7 +14,7 @@
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
-///////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Playback bar: renders play/pause, prev/next frame, progress slider, time/frame counters and
 // loop toggle. Owns the 100ms UI tick that keeps the slider and counters in sync with the
@@ -34,12 +34,12 @@ export interface PlaybackBarCallbacks {
     onFrameChange?: (currentTimeMicros: number) => void;
     onPlay?: () => void;
     onPause?: () => void;
-  onSeek?: (currentTimeMicros: number) => void;
+    onSeek?: (currentTimeMicros: number) => void;
 }
 
 export interface PlaybackBarOptions {
     /** Root DOM element to append the playback bar into. */
- parent: HTMLElement;
+    parent: HTMLElement;
     /** Base URL for play/pause/previous/next.png. Trailing slash optional. */
     iconBaseUrl: string;
     /** Callback returning the active PAGXView, or null when nothing is loaded. */
@@ -55,13 +55,13 @@ function iconUrl(base: string, name: string): string {
 
 export class PlaybackBar {
     private readonly parent: HTMLElement;
- private readonly getView: () => PlayerView | null;
-  private readonly callbacks: PlaybackBarCallbacks;
+    private readonly getView: () => PlayerView | null;
+    private readonly callbacks: PlaybackBarCallbacks;
     private readonly iconBaseUrl: string;
 
     private root!: HTMLDivElement;
     private playPauseBtn!: HTMLButtonElement;
-  private playPauseImg!: HTMLImageElement;
+    private playPauseImg!: HTMLImageElement;
     private prevFrameBtn!: HTMLButtonElement;
     private nextFrameBtn!: HTMLButtonElement;
     private progressSlider!: HTMLInputElement;
@@ -72,8 +72,8 @@ export class PlaybackBar {
     private isDraggingSlider = false;
     private wasPlayingBeforeDrag = false;
     private wasPlaying = false;
-      // Handle of the pending requestAnimationFrame callback; null when the tick loop is stopped.
-  private tickHandle: number | null = null;
+    // Handle of the pending requestAnimationFrame callback; null when the tick loop is stopped.
+    private tickHandle: number | null = null;
 
     constructor(opts: PlaybackBarOptions) {
         this.parent = opts.parent;
@@ -87,77 +87,77 @@ export class PlaybackBar {
     /** Whether the bar is currently visible to the user. Guards keyboard shortcuts so they
      *  don't fire when the bar is intentionally hidden (static pagx or no document loaded). */
     public isVisible(): boolean {
-      return !this.root.classList.contains('hidden');
+        return !this.root.classList.contains('hidden');
     }
 
-/** Force the bar visible / hidden. Called by the player based on the loaded document's
+    /** Force the bar visible / hidden. Called by the player based on the loaded document's
      *  duration (>0 = visible). */
     public setVisible(visible: boolean): void {
-   this.root.classList.toggle('hidden', !visible);
+        this.root.classList.toggle('hidden', !visible);
         if (visible) {
-       this.updateAll();
+            this.updateAll();
             this.updateLoopIcon();
         }
- }
+    }
 
     /** Push all current PAGXView state onto the DOM. Called on visibility change and after
      *  user actions to keep the UI in sync. */
     public updateAll(): void {
-  this.updatePlayPauseIcon();
+        this.updatePlayPauseIcon();
         this.updateProgressSlider();
         this.updateTimeDisplay();
     }
 
     /** Toggle play/pause, wrapping around from the last frame back to the start so a single
-*  playthrough that ended at the tail becomes replay-able. */
+     *  playthrough that ended at the tail becomes replay-able. */
     public togglePlayback(): void {
- const view = this.getView();
-   if (!view || view.durationMicros() <= 0) {
-          return;
+        const view = this.getView();
+        if (!view || view.durationMicros() <= 0) {
+            return;
         }
-    if (view.isPlaying()) {
-       view.pause();
-      this.callbacks.onPause?.();
-      } else {
+        if (view.isPlaying()) {
+            view.pause();
+            this.callbacks.onPause?.();
+        } else {
             if (view.currentTimeMicros() >= view.durationMicros()) {
-      view.setCurrentTimeMicros(0);
+                view.setCurrentTimeMicros(0);
             }
-view.play();
-   this.callbacks.onPlay?.();
-   }
+            view.play();
+            this.callbacks.onPlay?.();
+        }
         this.updateAll();
-  }
+    }
 
-  /** Step one frame in either direction (-1 previous, +1 next). Always pauses first so the
+    /** Step one frame in either direction (-1 previous, +1 next). Always pauses first so the
      *  render loop can't advance the playhead past the destination frame. Steps on frame
      *  boundaries (not raw float microseconds) so repeated stepping keeps the frame counter and
      *  the time label perfectly in sync — the underlying playhead is snapped to `frame / rate`
      *  rather than drifting by the non-integer `1e6 / rate` each click. */
     public stepFrame(direction: number): void {
- const view = this.getView();
+        const view = this.getView();
         if (!view) {
             return;
         }
- const rate = view.frameRate();
-  const duration = view.durationMicros();
+        const rate = view.frameRate();
+        const duration = view.durationMicros();
         if (rate <= 0 || duration <= 0) {
             return;
         }
-    view.pause();
-this.callbacks.onPause?.();
-     const totalFrames = Math.ceil((duration * rate) / 1_000_000);
+        view.pause();
+        this.callbacks.onPause?.();
+        const totalFrames = Math.ceil((duration * rate) / 1_000_000);
         const currentFrame = Math.round((Math.max(0, view.currentTimeMicros()) * rate) / 1_000_000);
         const targetFrame = Math.max(0, Math.min(totalFrames, currentFrame + direction));
-   const clamped = Math.min(duration, (targetFrame * 1_000_000) / rate);
+        const clamped = Math.min(duration, (targetFrame * 1_000_000) / rate);
         view.setCurrentTimeMicros(clamped);
-     this.callbacks.onSeek?.(clamped);
+        this.callbacks.onSeek?.(clamped);
         this.updateAll();
-  }
+    }
 
     /** Detach listeners and stop the tick. */
     public destroy(): void {
         if (this.tickHandle !== null) {
-     window.cancelAnimationFrame(this.tickHandle);
+            window.cancelAnimationFrame(this.tickHandle);
             this.tickHandle = null;
         }
         this.root.remove();
@@ -170,7 +170,7 @@ this.callbacks.onPause?.();
 
         this.playPauseBtn = document.createElement('button');
         this.playPauseBtn.id = 'play-pause-btn';
-    this.playPauseBtn.className = 'playback-btn playback-btn-primary';
+        this.playPauseBtn.className = 'playback-btn playback-btn-primary';
         this.playPauseImg = document.createElement('img');
         this.playPauseImg.id = 'play-pause-img';
         this.playPauseImg.src = iconUrl(this.iconBaseUrl, 'play.png');
@@ -190,115 +190,115 @@ this.callbacks.onPause?.();
         this.prevFrameBtn.appendChild(prevImg);
         this.prevFrameBtn.addEventListener('click', () => {
             this.stepFrame(-1);
-   this.prevFrameBtn.blur();
+            this.prevFrameBtn.blur();
         });
 
-this.nextFrameBtn = document.createElement('button');
+        this.nextFrameBtn = document.createElement('button');
         this.nextFrameBtn.id = 'next-frame-btn';
         this.nextFrameBtn.className = 'playback-btn playback-btn-step';
         const nextImg = document.createElement('img');
-nextImg.src = iconUrl(this.iconBaseUrl, 'next.png');
+        nextImg.src = iconUrl(this.iconBaseUrl, 'next.png');
         nextImg.alt = '';
         this.nextFrameBtn.appendChild(nextImg);
         this.nextFrameBtn.addEventListener('click', () => {
-   this.stepFrame(1);
-         this.nextFrameBtn.blur();
+            this.stepFrame(1);
+            this.nextFrameBtn.blur();
         });
 
         const progressWrapper = document.createElement('div');
         progressWrapper.className = 'progress-wrapper';
-   this.progressSlider = document.createElement('input');
+        this.progressSlider = document.createElement('input');
         this.progressSlider.id = 'progress-slider';
         this.progressSlider.className = 'progress-slider';
         this.progressSlider.type = 'range';
         this.progressSlider.min = '0';
-    this.progressSlider.max = '1000';
+        this.progressSlider.max = '1000';
         this.progressSlider.value = '0';
         this.progressSlider.step = '1';
         this.bindSlider();
         progressWrapper.appendChild(this.progressSlider);
 
-    const timeDisplay = document.createElement('div');
-    timeDisplay.id = 'time-display';
-      timeDisplay.className = 'time-display';
-  this.timeText = document.createElement('span');
+        const timeDisplay = document.createElement('div');
+        timeDisplay.id = 'time-display';
+        timeDisplay.className = 'time-display';
+        this.timeText = document.createElement('span');
         this.timeText.id = 'time-text';
         this.timeText.className = 'time-text';
-     this.timeText.textContent = '0.00s / 0.00s';
-    const divider = document.createElement('span');
+        this.timeText.textContent = '0.00s / 0.00s';
+        const divider = document.createElement('span');
         divider.className = 'time-divider';
         this.frameText = document.createElement('span');
-   this.frameText.id = 'frame-text';
+        this.frameText.id = 'frame-text';
         this.frameText.className = 'frame-text';
         this.frameText.textContent = '0 / 0';
-    timeDisplay.appendChild(this.timeText);
-   timeDisplay.appendChild(divider);
+        timeDisplay.appendChild(this.timeText);
+        timeDisplay.appendChild(divider);
         timeDisplay.appendChild(this.frameText);
 
-     this.loopBtn = document.createElement('button');
-    this.loopBtn.id = 'loop-btn';
+        this.loopBtn = document.createElement('button');
+        this.loopBtn.id = 'loop-btn';
         this.loopBtn.className = 'playback-btn playback-btn-loop';
         this.loopBtn.setAttribute('aria-label', 'Loop');
         this.loopBtn.innerHTML = LOOP_SEQUENCE_ICON_SVG + LOOP_SINGLE_ICON_SVG;
         this.loopBtn.addEventListener('click', () => {
- const view = this.getView();
+            const view = this.getView();
             if (!view) return;
-view.setLoop(!view.isLoop());
-  this.updateLoopIcon();
+            view.setLoop(!view.isLoop());
+            this.updateLoopIcon();
             this.loopBtn.blur();
         });
 
-  this.root.appendChild(this.playPauseBtn);
+        this.root.appendChild(this.playPauseBtn);
         this.root.appendChild(this.prevFrameBtn);
         this.root.appendChild(this.nextFrameBtn);
         this.root.appendChild(progressWrapper);
-  this.root.appendChild(timeDisplay);
+        this.root.appendChild(timeDisplay);
         this.root.appendChild(this.loopBtn);
         this.parent.appendChild(this.root);
     }
 
     private bindSlider(): void {
-      const seekToSliderValue = () => {
+        const seekToSliderValue = () => {
             const view = this.getView();
-          if (!view) return;
+            if (!view) return;
             const duration = view.durationMicros();
             if (duration <= 0) return;
-          const value = parseFloat(this.progressSlider.value);
+            const value = parseFloat(this.progressSlider.value);
             const targetTime = (value / 1000) * duration;
-    view.setCurrentTimeMicros(targetTime);
-    this.callbacks.onSeek?.(targetTime);
+            view.setCurrentTimeMicros(targetTime);
+            this.callbacks.onSeek?.(targetTime);
         };
-   this.progressSlider.addEventListener('input', () => {
-    const view = this.getView();
-if (!view) return;
-   // First input event of a drag: pause the view so subsequent frames follow the slider
-  // instead of the render loop. Remember the pre-drag playing state so 'change' can
-     // restore it.
- if (!this.isDraggingSlider) {
-          this.isDraggingSlider = true;
-    this.wasPlayingBeforeDrag = view.isPlaying();
-         if (this.wasPlayingBeforeDrag) {
-     view.pause();
-             this.callbacks.onPause?.();
-           }
-   }
+        this.progressSlider.addEventListener('input', () => {
+            const view = this.getView();
+            if (!view) return;
+            // First input event of a drag: pause the view so subsequent frames follow the slider
+            // instead of the render loop. Remember the pre-drag playing state so 'change' can
+            // restore it.
+            if (!this.isDraggingSlider) {
+                this.isDraggingSlider = true;
+                this.wasPlayingBeforeDrag = view.isPlaying();
+                if (this.wasPlayingBeforeDrag) {
+                    view.pause();
+                    this.callbacks.onPause?.();
+                }
+            }
             this.updateSliderFill();
-         seekToSliderValue();
-   this.updateTimeDisplay();
-   this.updatePlayPauseIcon();
-});
+            seekToSliderValue();
+            this.updateTimeDisplay();
+            this.updatePlayPauseIcon();
+        });
         this.progressSlider.addEventListener('change', () => {
             this.isDraggingSlider = false;
-    const view = this.getView();
+            const view = this.getView();
             if (!view) return;
-     seekToSliderValue();
-     if (this.wasPlayingBeforeDrag) {
-    view.play();
-      this.callbacks.onPlay?.();
-          this.wasPlayingBeforeDrag = false;
-     }
+            seekToSliderValue();
+            if (this.wasPlayingBeforeDrag) {
+                view.play();
+                this.callbacks.onPlay?.();
+                this.wasPlayingBeforeDrag = false;
+            }
             this.updateAll();
-       // Release focus so Space keeps toggling playback after a scrub.
+            // Release focus so Space keeps toggling playback after a scrub.
             this.progressSlider.blur();
         });
     }
@@ -311,21 +311,21 @@ if (!view) return;
         // land on the final frame after a single (non-looping) playback ends, and hosts
         // subscribing to 'framechange' see the terminal frame explicitly.
         const tick = () => {
-    if (this.tickHandle === null) {
-        return;
-          }
-     const view = this.getView();
-         if (view && this.isVisible()) {
+            if (this.tickHandle === null) {
+                return;
+            }
+            const view = this.getView();
+            if (view && this.isVisible()) {
                 const playing = view.isPlaying();
-       if (!this.isDraggingSlider && (playing || this.wasPlaying)) {
-this.updateAll();
-   // Emit onFrameChange on both playing frames and the play -> stop transition so
-               // hosts can react to the final frame settling; skipping the transition case
-                 // would leave subscribers stuck on the last "playing" frame value.
-      this.callbacks.onFrameChange?.(view.currentTimeMicros());
+                if (!this.isDraggingSlider && (playing || this.wasPlaying)) {
+                    this.updateAll();
+                    // Emit onFrameChange on both playing frames and the play -> stop transition so
+                    // hosts can react to the final frame settling; skipping the transition case
+                    // would leave subscribers stuck on the last "playing" frame value.
+                    this.callbacks.onFrameChange?.(view.currentTimeMicros());
                 }
-    this.wasPlaying = playing;
-   }
+                this.wasPlaying = playing;
+            }
             this.tickHandle = window.requestAnimationFrame(tick);
         };
         this.tickHandle = window.requestAnimationFrame(tick);
@@ -337,49 +337,49 @@ this.updateAll();
         const view = this.getView();
         if (!view) return;
         const playing = view.isPlaying();
-   this.playPauseImg.src = iconUrl(this.iconBaseUrl, playing ? 'pause.png' : 'play.png');
+        this.playPauseImg.src = iconUrl(this.iconBaseUrl, playing ? 'pause.png' : 'play.png');
     }
 
     private updateSliderFill(): void {
         const pct = (parseFloat(this.progressSlider.value) / 1000) * 100;
         this.progressSlider.style.background =
             'linear-gradient(90deg, #4c7cf3, #8b5cf0, #ec5b9c) no-repeat 0 0 / ' +
- pct + '% 100%, rgba(255, 255, 255, 0.18)';
-  }
+            pct + '% 100%, rgba(255, 255, 255, 0.18)';
+    }
 
     private updateProgressSlider(): void {
         const view = this.getView();
         if (!view) return;
-  const duration = view.durationMicros();
+        const duration = view.durationMicros();
         if (duration <= 0) {
-        this.progressSlider.value = '0';
-          this.updateSliderFill();
-    return;
-      }
-     const current = Math.max(0, view.currentTimeMicros());
+            this.progressSlider.value = '0';
+            this.updateSliderFill();
+            return;
+        }
+        const current = Math.max(0, view.currentTimeMicros());
         const v = Math.round((current / duration) * 1000);
         this.progressSlider.value = String(v);
-   this.updateSliderFill();
+        this.updateSliderFill();
     }
 
     private updateTimeDisplay(): void {
-      const view = this.getView();
-  if (!view) return;
-  const rate = view.frameRate();
+        const view = this.getView();
+        if (!view) return;
+        const rate = view.frameRate();
         const duration = view.durationMicros();
-    const currentFrame = getCurrentFrame(view);
+        const currentFrame = getCurrentFrame(view);
         const totalFrames = getTotalFrames(view);
         // Derive the displayed seconds from the (rounded) frame number rather than the raw
         // playhead microseconds so the time label and the frame counter can never disagree —
-    // e.g. frame 30 always reads exactly 1.00s at 30fps instead of 0.99s / 1.01s depending
+        // e.g. frame 30 always reads exactly 1.00s at 30fps instead of 0.99s / 1.01s depending
         // on sub-frame drift.
         this.timeText.textContent =
-        formatFrameTime(currentFrame, rate) + ' / ' + formatTime(duration);
+            formatFrameTime(currentFrame, rate) + ' / ' + formatTime(duration);
         this.frameText.textContent = String(currentFrame) + ' / ' + String(totalFrames);
     }
 
     private updateLoopIcon(): void {
-    const view = this.getView();
+        const view = this.getView();
         if (!view) return;
         this.loopBtn.classList.toggle('active', view.isLoop());
     }

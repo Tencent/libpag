@@ -136,6 +136,20 @@ export const EDITOR_STYLES = `
     position: relative;
 }
 
+/* Shown in place of the editor when Monaco fails to load from the CDN (offline / intranet). */
+#editor-panel .editor-host .pagx-editor-load-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 24px;
+    box-sizing: border-box;
+    color: #CCCCCC;
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+}
+
 #editor-panel .editor-host .monaco-editor {
     height: 100%;
     background: #1E1E1E;
@@ -154,6 +168,13 @@ export const EDITOR_STYLES = `
    editor-host element when entering/leaving edit mode. */
 #editor-panel .editor-host.pagx-editor-readonly .monaco-editor .cursor {
     display: none !important;
+}
+
+/* The theme's opaque light-blue selection is reserved for editable text. In read-only browsing,
+   native text selection uses the same translucent blue as a canvas-picked element's source line,
+   preserving syntax colors and keeping both selection paths visually consistent. */
+#editor-panel .editor-host.pagx-editor-readonly .monaco-editor .selected-text {
+    background-color: rgba(111, 168, 220, 0.32) !important;
 }
 
 /* Browsing/highlighting source is not text entry. Use the normal pointer in read-only mode so a
@@ -181,20 +202,36 @@ export const EDITOR_STYLES = `
 
 /* Editing is a distinct mode from canvas/node selection. Keep node selection blue in read-only
    mode, but mute it once a range is unlocked so there is never a blue-on-blue collision with
-   Monaco's native text selection. The editable block uses a neutral charcoal fill and a warm
-   amber outline; its text selection is a light gray strip, visually close to DevTools' editable
-   source selection while remaining clearly distinct from the canvas-selection blue. */
+   Monaco's native text selection. The unlocked line and the in-edit text selection follow Chrome
+   DevTools' dark editing look: a subtly lifted dark box with a thin dark edge, and a periwinkle
+   blue selection that keeps the text readable. */
 #editor-panel .editor-host.pagx-editor-editing .monaco-editor .pagx-select-line {
     background-color: transparent;
     box-shadow: none;
 }
 
 #editor-panel .editor-host .monaco-editor .pagx-edit-line {
-    background-color: rgba(255, 190, 92, 0.13);
+    background-color: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55);
 }
 
-#editor-panel .editor-host.pagx-editor-editing .monaco-editor .view-line .selected-text {
-    background-color: rgba(232, 232, 232, 0.72) !important;
+/* Monaco renders the native selection and delayed matching-word highlights in independent layers,
+   so selectors cannot express "word highlight except where native selection overlaps". SourceEditor
+   mirrors only the real selection into the text layer as this inline decoration. Giving that span
+   its own opaque blue background and a higher stacking order guarantees it stays above the delayed
+   grey word highlights, while unmatched occurrences retain Monaco's original grey decoration. */
+#editor-panel .editor-host.pagx-editor-editing .monaco-editor .view-line .pagx-edit-selection {
+    position: relative;
+    z-index: 2;
+    background-color: #A8C7FA !important;
+    color: #000000 !important;
+}
+
+/* Indent guides are separate absolutely positioned lines above Monaco's text decorations. Their
+   one-pixel borders show through an opaque multiline selection as dotted marks at each line box.
+   Hide only those guides while an edit selection is non-empty; they return as soon as it collapses. */
+#editor-panel .editor-host.pagx-editor-editing.pagx-editor-has-selection .monaco-editor .core-guide {
+    visibility: hidden;
 }
 
 /* Editor feedback ("Changes applied", validation errors, etc.) now flows through the player's

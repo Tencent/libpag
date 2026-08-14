@@ -407,7 +407,7 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
     }
     binding->remove(child->node);
     if (scene != nullptr) {
-      scene->nodeToLayer.erase(child->node);
+      scene->eraseNodeToLayerSubtree(child.get());
     }
   }
   children = std::move(newChildren);
@@ -479,6 +479,7 @@ void PAGComposition::refreshPlainContainerChildren(
           slot->removeFromParent();
         }
         binding->remove(oldChild->node);
+        scene->eraseNodeToLayerSubtree(oldChild.get());
       }
       container->children = std::move(newChildren);
       // Re-parent the container's direct children so the parent chain matches the rebuilt subtree.

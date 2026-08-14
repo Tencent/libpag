@@ -27,12 +27,11 @@
 // per player, and the `pagx:loaded` global event has been replaced with explicit
 // `setDocumentXml()` calls driven by the player.
 
-import type { EditorCallbacks } from '../types';
+import type { EditorCallbacks, SourceDiagnosticProvider } from '../types';
 import { SourceEditor, type DraftLineChange, type LineRange } from './SourceEditor';
+import { EDITOR_STYLES } from './styles';
 
 export type { LineRange };
-import type { SourceDiagnosticProvider } from '../types';
-import { EDITOR_STYLES } from './styles';
 
 const MOBILE_BREAKPOINT = 768;
 /** Auto-hide window (ms) used by the player when it forwards editor notifications to the
@@ -245,10 +244,12 @@ export class EditorPanel {
             return;
         }
         if (this.isOpen() && this.editor !== null) {
-            // An Apply loopback re-loads the just-edited XML (only a few characters changed), so
-            // preserve the caret and scroll position — the user should stay exactly where they were
-            // editing. A genuine document switch resets to the top.
-            this.editor.setContent(xmlText, isApplyLoopback);
+            // An Apply loopback carries exactly the text already in the current Monaco model. Do
+            // not replace that model: replacement preserves the viewport but destroys undo/redo
+            // history. A genuine document load still creates a fresh model and starts a new history.
+            if (!isApplyLoopback) {
+                this.editor.setContent(xmlText);
+            }
             this.pendingEditorSync = false;
         } else if (!isApplyLoopback) {
             // Panel is closed (or not built yet): close() keeps the editor instance alive, so it
@@ -268,6 +269,11 @@ export class EditorPanel {
             const host = this.panel.querySelector('.editor-host');
             if (host instanceof HTMLElement) {
                 this.editor = new SourceEditor(host, this.diagnosticProviders);
+                // Enter-to-apply and read-only delete auto-apply both converge on the same
+                // pipeline the Apply button runs.
+                this.editor.onApplyRequest(() => {
+                    void this.handleApply();
+                });
                 if (this.pendingHoverCb !== null) {
                     this.editor.onHoverLine(this.pendingHoverCb);
                 }
@@ -392,8 +398,9 @@ export class EditorPanel {
     }
 
     /** Registers the resolver SourceEditor consults for its tag-block copy/delete context menu
-     *  actions: it maps a source line to the line span of the enclosing tag, or null when the
-     *  tag cannot be identified (the actions then fall back to the single line). Survives editor
+     *  actions: it maps a source line to the line span of the enclosing tag, or null when that
+     *  tag's own boundaries cannot be identified (the actions then fall back to the single line).
+     *  Malformed descendants do not invalidate an intact enclosing block. Survives editor
      *  recreation. Pass null to remove. */
     public setTagSpanResolver(resolver: ((line: number) => LineRange | null) | null): void {
         this.pendingTagSpanResolver = resolver;
@@ -593,10 +600,10 @@ export class EditorPanel {
             return;
         }
         if (this.currentXmlText !== null) {
-            // Preserve the caret and scroll position: discard restores the original text but the
-            // user should stay where they were, not jump to the top. Mirrors Apply's loopback
-            // path, which keeps the view stable across a content reload.
-            this.editor.setContent(this.currentXmlText, true);
+            // Restore the last applied text inside the existing model. This keeps the full history
+            // and records Discard itself as one edit, so Ctrl+Z can recover the discarded draft.
+            // Only a genuine document load replaces the model and starts a new undo history.
+            this.editor.discardTo(this.currentXmlText);
         }
         this.report('Changes discarded', 'success');
     }
@@ -630,11 +637,15 @@ export class EditorPanel {
             let handled = false;
             try {
                 handled = this.incrementalApply(this.currentXmlText, xmlText);
-            } catch {
+            } catch (error) {
+                // Falling back to the full Apply below is the intended recovery, but leave a
+                // trace so a silently-never-incremental editor stays diagnosable.
+                console.debug('[pagx] incremental apply threw, falling back to full apply:', error);
                 handled = false;
             }
             if (handled) {
                 this.currentXmlText = xmlText;
+                this.editor.markApplied();
                 this.report('Changes applied', 'success');
                 return;
             }
@@ -679,6 +690,7 @@ export class EditorPanel {
             // Discard still restores a known-good state.
             if (error === '') {
                 this.currentXmlText = xmlText;
+                this.editor.markApplied();
                 this.report('Changes applied', 'success');
             } else {
                 this.report(error, 'error');

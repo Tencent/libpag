@@ -10,22 +10,23 @@
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS is" basis, without warranties or conditions of any kind,
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Monaco is loaded from CDN at runtime via the AMD loader (same as the monaco-test.html page).
-// The npm package is kept in dependencies for TypeScript types only — `import type` is erased by
-// esbuild at build time, so rollup never tries to bundle Monaco's non-standard ESM internals
+// The npm package is kept in devDependencies for TypeScript types only — `import type` is erased
+// by esbuild at build time, so rollup never tries to bundle Monaco's non-standard ESM internals
 // (which use bare `vs/...` specifiers that nodeResolve cannot map).
 import type * as MonacoNS from 'monaco-editor';
 import type { SourceDiagnostic, SourceDiagnosticProvider } from '../types';
 
 type Monaco = typeof MonacoNS;
 
-// Module-level Monaco singleton. Loaded once on first SourceEditor construction; all subsequent
+// Module-level Monaco singleton. Loaded on demand when the first editor is created — nothing is
+// fetched at import time, so hosts that never open the editor panel never touch the CDN. All
 // editors share the same instance. The AMD loader is injected as a <script> tag, then
 // require(['vs/editor/editor.main']) pulls in the editor + all basic languages (including XML).
 const MONACO_CDN = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.47.0/min/vs';
@@ -95,7 +96,10 @@ function definePagxTheme(m: Monaco): void {
             'editor.foreground': '#D4D4D4',
             'editorLineNumber.foreground': '#6E7681',
             'editorLineNumber.activeForeground': '#CCCCCC',
-            'editor.selectionBackground': '#264F78',
+            // Keep active and inactive selections identical so the double-click transition from
+            // read-only browsing into edit mode does not flash between two colors.
+            'editor.selectionBackground': '#A8C7FA',
+            'editor.inactiveSelectionBackground': '#A8C7FA',
             'editor.lineHighlightBackground': '#2D2D2D',
             'editorCursor.foreground': '#FFFFFF',
             'editorGutter.background': '#1E1E1E',
@@ -162,9 +166,6 @@ function execCommandCopy(text: string): void {
     textarea.remove();
 }
 
-// Start loading immediately so the editor is ready by the time the user opens the panel.
-void loadMonaco();
-
 // A 1-based inclusive line range mirrored from a node's source span, or null to clear.
 export interface LineRange {
     startLine: number;
@@ -182,6 +183,7 @@ export interface DraftLineChange {
 const HOVER_LINE_CLASS = 'pagx-hover-line';
 const SELECT_LINE_CLASS = 'pagx-select-line';
 const EDIT_LINE_CLASS = 'pagx-edit-line';
+const EDIT_SELECTION_CLASS = 'pagx-edit-selection';
 const XML_MARKER_OWNER = 'pagx-xml-syntax';
 const XML_VALIDATION_DELAY_MS = 400;
 // Editor context key gating the Cut/Paste context menu actions to edit mode.
@@ -279,6 +281,7 @@ export class SourceEditor {
     private onHoverLineCb: ((line: number) => void) | null = null;
     private onDblClickLineCb: ((line: number) => void) | null = null;
     private onDraftLineChangesCb: ((changes: readonly DraftLineChange[] | null) => void) | null = null;
+    private onApplyRequestCb: (() => void) | null = null;
     private tagSpanResolver: ((line: number) => LineRange | null) | null = null;
     private editingContextKey: MonacoNS.editor.IContextKey<boolean> | null = null;
     private editPointerDown: { lineNumber: number; column: number } | null = null;
@@ -287,6 +290,7 @@ export class SourceEditor {
     private hoverDecoIds: string[] = [];
     private selectDecoIds: string[] = [];
     private editDecoIds: string[] = [];
+    private editSelectionDecoIds: string[] = [];
     // Whether the whole document is currently writable. This flag has exactly one
     // responsibility: gating readOnly on/off. It is set purely by line-number comparisons
     // (double-click enters, an unmoved click on a different line exits) and never by inspecting
@@ -296,6 +300,7 @@ export class SourceEditor {
     private syntaxValidationTimer: number | null = null;
     private destroyed = false;
     private creating = false;
+    private loadErrorEl: HTMLElement | null = null;
     private readonly disposers: MonacoNS.IDisposable[] = [];
 
     constructor(host: HTMLElement, diagnosticProviders: readonly SourceDiagnosticProvider[] = []) {
@@ -315,12 +320,11 @@ export class SourceEditor {
             if (this.destroyed || this.editor !== null) {
                 return;
             }
+            this.clearLoadError();
             this.model = m.editor.createModel(initialContent, 'xml');
             this.editor = m.editor.create(this.host, {
                 model: this.model,
                 theme: 'pagx-dark',
-                // readOnly disables Monaco's edit commands; domReadOnly additionally sets the DOM
-                // contenteditable="false", which blocks IME composition (Chinese/Pinyin popup,
                 // readOnly disables Monaco's edit commands; domReadOnly additionally sets the
                 // editor's hidden <textarea> to readonly="true" (Monaco's textAreaHandler.js),
                 // which blocks IME composition (Chinese/Pinyin popup, candidate selection) in
@@ -339,6 +343,11 @@ export class SourceEditor {
                 // scrollbar for long attributes.
                 wordWrapOverride1: 'off',
                 renderWhitespace: 'none',
+                // Keep Monaco's matching-text highlights, but SourceEditor marks the real edit
+                // selection with an inline decoration so CSS can suppress the matching-token grey
+                // only under the active blue selection.
+                selectionHighlight: true,
+                occurrencesHighlight: 'singleFile',
                 largeFileOptimizations: true,
                 automaticLayout: true,
                 // Monaco defaults renderValidationDecorations to 'editable', which hides marker
@@ -430,6 +439,12 @@ export class SourceEditor {
                     this.handleEditPointerUp(e.target?.position);
                 }),
             );
+            // Monaco paints selection backgrounds in an overlay and leaves syntax-token foregrounds
+            // untouched. Mirror non-empty edit selections as inline decorations so selected text can
+            // reliably use Chrome DevTools' black foreground regardless of token type.
+            this.disposers.push(
+                this.editor.onDidChangeCursorSelection(() => this.refreshEditSelectionDecorations()),
+            );
 
             // Line-delta bookkeeping: re-attached on each model swap (setContent replaces the model).
             this.attachContentListener();
@@ -438,7 +453,34 @@ export class SourceEditor {
             // Editor is born in the read-only state; the class is removed by enterEditMode
             // and re-added by leaveEditMode / setContent to hide Monaco's virtual cursor via CSS.
             this.host.classList.add('pagx-editor-readonly');
+        }).catch((error: unknown) => {
+            this.creating = false;
+            // Drop the rejected promise so a later setContent() retries the CDN fetch instead of
+            // re-attaching to the same failure.
+            monacoLoadPromise = null;
+            if (this.destroyed) {
+                return;
+            }
+            console.error('SourceEditor: failed to load Monaco from CDN.', error);
+            this.showLoadError();
         });
+    }
+
+    private showLoadError(): void {
+        if (this.loadErrorEl !== null) {
+            return;
+        }
+        const el = document.createElement('div');
+        el.className = 'pagx-editor-load-error';
+        el.textContent = 'The source editor failed to load (Monaco CDN unreachable). Check the ' +
+            'network connection; the editor retries on the next document load.';
+        this.host.appendChild(el);
+        this.loadErrorEl = el;
+    }
+
+    private clearLoadError(): void {
+        this.loadErrorEl?.remove();
+        this.loadErrorEl = null;
     }
 
     /** Re-attaches DOM-level event listeners that must survive model swaps. Monaco's
@@ -457,8 +499,8 @@ export class SourceEditor {
      *  set. Copy/Cut/Paste re-dispatch the built-in clipboard commands so their behavior matches
      *  the original menu entries exactly; the whole-file and tag-block variants are custom.
      *  Cut/Paste show only in edit mode via the pagxSourceEditing context key; the delete actions
-     *  stay available while read-only, where they apply as draft changes that still need Apply to
-     *  reach the canvas. */
+     *  stay available while read-only, where the removal is applied to the canvas immediately
+     *  (see deleteRanges) instead of staging a draft that needs a separate Apply click. */
     private registerContextMenuActions(m: Monaco): void {
         const editor = this.editor;
         if (editor === null) {
@@ -467,6 +509,16 @@ export class SourceEditor {
         // Swallow the built-in F1 shortcut so the Command Palette stays unreachable now that its
         // menu entry is pruned.
         editor.addCommand(m.KeyCode.F1, () => undefined, 'editorTextFocus');
+        // While the document is unlocked, Enter commits the edits through the host's Apply
+        // pipeline (same as the Apply button); Shift+Enter keeps newline insertion available.
+        // addCommand returns a command id rather than a disposable; the commands are bound to
+        // this editor instance and disappear with its dispose(), like the F1 swallow above.
+        editor.addCommand(m.KeyCode.Enter, () => {
+            this.onApplyRequestCb?.();
+        }, EDITING_CONTEXT_KEY);
+        editor.addCommand(m.KeyMod.Shift | m.KeyCode.Enter, () => {
+            editor.trigger('keyboard', 'type', { text: '\n' });
+        }, EDITING_CONTEXT_KEY);
         this.disposers.push(
             editor.addAction({
                 id: 'pagx.copy',
@@ -589,7 +641,8 @@ export class SourceEditor {
 
     /** Resolves the inclusive line span of the tag enclosing the given line via the
      *  host-registered resolver. Falls back to the line itself when no resolver is set or the
-     *  host cannot identify a well-formed tag there (missing or unrecognizable tag markers). */
+     *  host cannot identify intact boundary tags there. Malformed descendants do not invalidate
+     *  an otherwise intact enclosing block. */
     private getTagBlockLineRange(line: number): LineRange {
         const model = this.model;
         const span = this.tagSpanResolver?.(line) ?? null;
@@ -619,6 +672,14 @@ export class SourceEditor {
             ranges.map((range) => ({ range, text: '' })),
             () => null,
         );
+        // pushEditOperations dispatches the content change synchronously, so the draft tracking
+        // and the model text are already settled here. Read-only deletes skip the draft staging
+        // and go straight through the host's Apply pipeline (validation errors surface there and
+        // leave the undoable change intact); edit-mode deletes stay drafts because the user is
+        // mid-editing and commits with Enter or the Apply button.
+        if (!this.editingActive) {
+            this.onApplyRequestCb?.();
+        }
     }
 
     /** Deletes the whole lines [startLine, endLine] including their line breaks so the lines are
@@ -796,45 +857,35 @@ export class SourceEditor {
             this.createEditor(trimmed);
             return;
         }
-        if (!preserveViewState) {
-            const oldModel = this.model;
-            this.model = monacoInstance!.editor.createModel(trimmed, 'xml');
-            this.editor.setModel(this.model);
-            oldModel.dispose();
-            this.attachContentListener();
-            this.attachDomListeners();
-            this.hoverDecoIds = [];
-            this.selectDecoIds = [];
-            this.editDecoIds = [];
-            this.editingActive = false;
-            this.editingContextKey?.set(false);
-            this.editPointerDown = null;
-            this.host.classList.remove('pagx-editor-editing');
-            this.host.classList.add('pagx-editor-readonly');
-            this.editor.updateOptions({
-                readOnly: true,
-                domReadOnly: true,
-            });
-            this.onDraftLineChangesCb?.(null);
-            return;
-        }
-        const savedOffset = this.model.getOffsetAt(
-            this.editor.getPosition() ?? new monacoInstance!.Position(1, 1),
-        );
-        const savedScrollTop = this.editor.getScrollTop();
+        const savedOffset = preserveViewState
+            ? this.model.getOffsetAt(this.editor.getPosition() ?? new monacoInstance!.Position(1, 1))
+            : 0;
+        const savedScrollTop = preserveViewState ? this.editor.getScrollTop() : 0;
         const oldModel = this.model;
         this.model = monacoInstance!.editor.createModel(trimmed, 'xml');
         this.editor.setModel(this.model);
         oldModel.dispose();
         this.attachContentListener();
         this.attachDomListeners();
-        const clampedOffset = Math.min(savedOffset, this.model.getValueLength());
-        const pos = this.model.getPositionAt(clampedOffset);
-        this.editor.setPosition(pos);
-        this.editor.setScrollTop(savedScrollTop);
+        if (preserveViewState) {
+            const clampedOffset = Math.min(savedOffset, this.model.getValueLength());
+            const pos = this.model.getPositionAt(clampedOffset);
+            this.editor.setPosition(pos);
+            this.editor.setScrollTop(savedScrollTop);
+        }
+        this.resetStateAfterModelSwap();
+    }
+
+    /** Returns the editor to its pristine read-only browsing state after a model swap: clears
+     *  transient decorations, leaves edit mode, and notifies the host that no draft remains. */
+    private resetStateAfterModelSwap(): void {
+        if (this.editor === null) {
+            return;
+        }
         this.hoverDecoIds = [];
         this.selectDecoIds = [];
         this.editDecoIds = [];
+        this.editSelectionDecoIds = [];
         this.editingActive = false;
         this.editingContextKey?.set(false);
         this.editPointerDown = null;
@@ -844,6 +895,46 @@ export class SourceEditor {
             readOnly: true,
             domReadOnly: true,
         });
+        this.onDraftLineChangesCb?.(null);
+    }
+
+    /** Marks the current model content as successfully applied without replacing the model. This
+     *  keeps undo/redo history across Apply while adding a boundary before subsequent edits. */
+    markApplied(): void {
+        if (this.model === null) {
+            return;
+        }
+        this.model.pushStackElement();
+        this.leaveEditMode();
+        this.onDraftLineChangesCb?.(null);
+    }
+
+    /** Restores the last applied text as one undoable edit instead of replacing the Monaco model.
+     *  This keeps the complete document history; a subsequent Ctrl+Z restores the discarded draft.
+     *  View state is unchanged because the existing model and editor instance remain in place. */
+    discardTo(text: string): void {
+        if (this.editor === null || this.model === null) {
+            return;
+        }
+        const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+        if (this.model.getValue() !== trimmed) {
+            // Discard is commonly invoked after Apply has returned the editor to read-only mode.
+            // editor.executeEdits() silently no-ops while readOnly is enabled; mutate the model
+            // directly instead, exactly like the read-only Delete actions. pushEditOperations keeps
+            // the replacement undoable, so Ctrl+Z restores the discarded draft.
+            this.model.pushStackElement();
+            this.model.pushEditOperations(
+                null,
+                [{
+                    range: this.model.getFullModelRange(),
+                    text: trimmed,
+                    forceMoveMarkers: true,
+                }],
+                () => null,
+            );
+            this.model.pushStackElement();
+        }
+        this.leaveEditMode();
         this.onDraftLineChangesCb?.(null);
     }
 
@@ -866,7 +957,31 @@ export class SourceEditor {
         return /<\/?[A-Za-z_?!]/.test(text) ? line : null;
     }
 
-    /** Returns an active edit session to read-only browsing and clears its amber tag decoration. */
+    /** Mirrors Monaco's non-empty selections as inline decorations. Native selection is rendered
+     *  in a separate overlay and therefore cannot override syntax-token foreground colors. */
+    private refreshEditSelectionDecorations(): void {
+        if (this.editor === null || !this.editingActive) {
+            if (this.editor !== null) {
+                this.editSelectionDecoIds = this.editor.deltaDecorations(this.editSelectionDecoIds, []);
+            }
+            this.host.classList.remove('pagx-editor-has-selection');
+            return;
+        }
+        const decos: MonacoNS.editor.IModelDeltaDecoration[] = [];
+        for (const selection of this.editor.getSelections() ?? []) {
+            if (selection.isEmpty()) {
+                continue;
+            }
+            decos.push({
+                range: selection,
+                options: { inlineClassName: EDIT_SELECTION_CLASS },
+            });
+        }
+        this.editSelectionDecoIds = this.editor.deltaDecorations(this.editSelectionDecoIds, decos);
+        this.host.classList.toggle('pagx-editor-has-selection', decos.length > 0);
+    }
+
+    /** Returns an active edit session to read-only browsing and clears its edit decorations. */
     private leaveEditMode(): void {
         if (!this.editingActive || this.editor === null) {
             return;
@@ -876,6 +991,8 @@ export class SourceEditor {
         this.editDecorationLine = -1;
         this.editPointerDown = null;
         this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, []);
+        this.editSelectionDecoIds = this.editor.deltaDecorations(this.editSelectionDecoIds, []);
+        this.host.classList.remove('pagx-editor-has-selection');
         this.host.classList.remove('pagx-editor-editing');
         this.host.classList.add('pagx-editor-readonly');
         this.editor.updateOptions({ readOnly: true, domReadOnly: true });
@@ -973,6 +1090,7 @@ export class SourceEditor {
         buildEditDecos(decorationLine, this.model, decos);
         this.editDecoIds = this.editor.deltaDecorations(this.editDecoIds, decos);
         this.editor.focus();
+        this.refreshEditSelectionDecorations();
     }
 
     /** Scrolls the given 1-based line into view. 'center' always recenters the line in the
@@ -1037,6 +1155,12 @@ export class SourceEditor {
         this.onDblClickLineCb = cb;
     }
 
+    /** Registers the callback that runs the host's Apply pipeline. Fired on Enter while editing
+     *  and after a read-only delete action. Pass null to remove. */
+    onApplyRequest(cb: (() => void) | null): void {
+        this.onApplyRequestCb = cb;
+    }
+
     /** Registers the resolver mapping a source line to the line span of its enclosing tag, used
      *  by the tag-block copy/delete context menu actions. The host returns null when the tag
      *  cannot be identified, in which case the actions fall back to the single line. Pass null
@@ -1087,5 +1211,6 @@ export class SourceEditor {
             this.editor.dispose();
             this.editor = null;
         }
+        this.clearLoadError();
     }
 }

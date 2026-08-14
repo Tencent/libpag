@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import type { _PAGXView } from './types';
+import type { _PAGXView, HitTestResult, NodeBounds, NodeSourceEntry, PagxSchemaDiagnostic } from './types';
 import { getPAGXModule } from './pagx-module';
 import { destroyVerify } from './decorators';
 
@@ -366,11 +366,11 @@ export class PAGXView {
   }
 
   /**
-   * Returns the node index of the top-most layer under the surface point, or -1 if none.
-   * Coordinates are surface (backing-store) pixels; convert from CSS pixels via
-   * canvas.width / rect.width so DPR is absorbed.
+   * Returns the source node under the surface point (index, source span, and on-screen
+   * bounds), or null when nothing is hit. Coordinates are surface (backing-store) pixels;
+   * convert from CSS pixels via canvas.width / rect.width so DPR is absorbed.
    */
-  public hitTest(surfaceX: number, surfaceY: number): number {
+  public hitTest(surfaceX: number, surfaceY: number): HitTestResult | null {
     return this.nativeView._hitTest(surfaceX, surfaceY);
   }
 
@@ -378,7 +378,7 @@ export class PAGXView {
    * Exports every node's source span and incrementable channel list. Call after buildLayers()
    * and rebuild on full reload. Returns a plain JS array (emscripten::val, no delete() needed).
    */
-  public getNodeSourceMap(): any {
+  public getNodeSourceMap(): NodeSourceEntry[] {
     return this.nativeView._getNodeSourceMap();
   }
 
@@ -386,7 +386,7 @@ export class PAGXView {
    * Returns the current-frame surface bounds { x, y, w, h } of the layer built from
    * nodes[index], or null if the index is out of range or has no runtime layer.
    */
-  public getNodeBounds(index: number): any {
+  public getNodeBounds(index: number): NodeBounds | null {
     return this.nativeView._getNodeBounds(index);
   }
 
@@ -395,7 +395,7 @@ export class PAGXView {
    * currently being rendered. XML syntax errors are handled separately by the source editor;
    * this returns importer diagnostics for valid XML with invalid PAGX semantics.
    */
-  public validatePAGX(data: Uint8Array): any {
+  public validatePAGX(data: Uint8Array): PagxSchemaDiagnostic[] {
     return this.nativeView._validatePAGX(data);
   }
 

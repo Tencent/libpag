@@ -41,6 +41,8 @@ import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
 import { buildToolbar, setToolbarVisible } from './toolbar';
 import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
+import type { DraftLineChange } from './editor/SourceEditor';
+import { classifyEdits, findNodeIndexForLine, hasMatchingSpanBoundaries } from './incremental-apply';
 import { ensureStylesInjected } from './styles';
 
 /** Canvas element id assigned by the player. Kept stable so external CSS or debug tooling
@@ -53,252 +55,6 @@ const CANVAS_ID = 'pagx-canvas';
 /** Default background: fully transparent so the checkered canvas backdrop shows through for
  *  pagx documents with alpha. */
 const DEFAULT_BACKGROUND: BackgroundColor = { r: 0, g: 0, b: 0, a: 0 };
-
-/** One incremental channel write derived from a source-editor edit: set channel on nodes[index]
- *  to the raw attribute string value. */
-interface ChannelEdit {
-    index: number;
-    channel: string;
-    value: string;
-}
-
-/** Parses a node's source-span fragment and returns its root element, or null when the fragment is
- *  not a single well-formed element (malformed XML, or extra content around the root). */
-function parseSpanElement(span: string): Element | null {
-    const doc = new DOMParser().parseFromString(span, 'application/xml');
-    if (doc.querySelector('parsererror') !== null) {
-        return null;
-    }
-    return doc.documentElement;
-}
-
-/** Returns an element's own attributes as a name->value map (values are XML-decoded, matching the
- *  importer, which reads decoded attribute values too). */
-function attributeMap(element: Element): Record<string, string> {
-    const map: Record<string, string> = {};
-    for (let i = 0; i < element.attributes.length; i++) {
-        const attr = element.attributes.item(i);
-        if (attr !== null) {
-            map[attr.name] = attr.value;
-        }
-    }
-    return map;
-}
-
-/** One resolved sub-channel write produced by splitting a composite attribute (e.g. position ->
- *  position.x / position.y). channel is the dotted sub-channel name the engine's channel table
- *  understands; value is that component in the same string form the importer would parse. */
-interface SubEdit {
-    channel: string;
-    value: string;
-}
-
-/** The composite XML attributes and how each expands into sub-channels. A composite attribute is a
- *  single XML attribute (e.g. position="10 20") that the channel table addresses as several dotted
- *  sub-channels (position.x / position.y). The kind selects the split/expand rule below. left /
- *  right / top / bottom / centerX / centerY and Text's x / y are plain scalars, not composites, and
- *  are handled by the normal whitelist path. matrix / matrix3D have no sub-channels and are
- *  intentionally absent so they keep falling back to a full reparse. */
-const COMPOSITE_ATTRIBUTES = new Map<string, 'point' | 'size' | 'padding'>([
-    ['position', 'point'],
-    ['scale', 'point'],
-    ['anchor', 'point'],
-    ['startPoint', 'point'],
-    ['endPoint', 'point'],
-    ['center', 'point'],
-    ['baselineOrigin', 'point'],
-    ['size', 'size'],
-    ['padding', 'padding'],
-]);
-
-/** Splits a whitespace/comma-separated numeric string into floats, matching the importer's
- *  ParseFloatList (strtof over each token). Returns null when a token is not a leading-number, so a
- *  malformed composite value forces a full reparse instead of a wrong incremental write. */
-function parseFloatTokens(value: string): number[] | null {
-    const tokens = value.trim().split(/[\s,]+/).filter((token) => token.length > 0);
-    const result: number[] = [];
-    for (const token of tokens) {
-        // parseFloat mirrors strtof's leading-number semantics (trailing junk after a valid number
-        // is ignored by the importer too); a token with no leading number is rejected.
-        const parsed = Number.parseFloat(token);
-        if (Number.isNaN(parsed)) {
-            return null;
-        }
-        result.push(parsed);
-    }
-    return result;
-}
-
-/** Expands a padding attribute into its four [top, right, bottom, left] components, replicating the
- *  importer's CSS-shorthand rule (PaddingFromString): 1 value = all four; 2 = [v0,v1,v0,v1] as
- *  top/bottom then right/left; 4 = [top,right,bottom,left]. Returns null for any other count so the
- *  edit falls back to a full reparse (the importer rejects those too). Components are emitted as the
- *  original token strings (not reformatted numbers) so an unchanged component is byte-identical to
- *  what setNodeChannel would parse. */
-function expandPadding(value: string): { top: string; right: string; bottom: string; left: string } | null {
-    const tokens = value.trim().split(/[\s,]+/).filter((token) => token.length > 0);
-    if (parseFloatTokens(value) === null) {
-        return null;
-    }
-    if (tokens.length === 1) {
-        return { top: tokens[0], right: tokens[0], bottom: tokens[0], left: tokens[0] };
-    }
-    if (tokens.length === 2) {
-        return { top: tokens[0], right: tokens[1], bottom: tokens[0], left: tokens[1] };
-    }
-    if (tokens.length === 4) {
-        return { top: tokens[0], right: tokens[1], bottom: tokens[2], left: tokens[3] };
-    }
-    return null;
-}
-
-/** Splits a composite attribute's old and new values into the sub-channel writes for only the
- *  components that actually changed (e.g. editing just y in position="10 20" -> position="10 30"
- *  emits a single position.y write). attrName is the XML attribute (position / size / padding /
- *  scale / center / ...); kind selects the parse+expand rule. Returns null when either value is
- *  malformed or has the wrong component count, so the caller falls back to a full reparse. An empty
- *  array means the values are equivalent (e.g. padding "10" vs "10 10 10 10"): no write is needed.
- *  Emitting only changed components keeps each sub-channel's own layout/anim flag accurate (a
- *  position.y edit must not redundantly re-drive position.x). */
-function splitCompositeChange(
-    attrName: string,
-    kind: 'point' | 'size' | 'padding',
-    oldValue: string,
-    newValue: string,
-): SubEdit[] | null {
-    if (kind === 'padding') {
-        const oldPad = expandPadding(oldValue);
-        const newPad = expandPadding(newValue);
-        if (oldPad === null || newPad === null) {
-            return null;
-        }
-        const edits: SubEdit[] = [];
-        const sides: Array<keyof typeof newPad> = ['left', 'top', 'right', 'bottom'];
-        for (const side of sides) {
-            if (Number.parseFloat(oldPad[side]) !== Number.parseFloat(newPad[side])) {
-                edits.push({ channel: `${attrName}.${side}`, value: newPad[side] });
-            }
-        }
-        return edits;
-    }
-    const oldTokens = pointTokens(oldValue);
-    const newTokens = pointTokens(newValue);
-    if (oldTokens === null || newTokens === null) {
-        return null;
-    }
-    // point -> .x/.y, size -> .width/.height, matching the channel table's sub-channel names.
-    const suffixes = kind === 'size' ? ['width', 'height'] : ['x', 'y'];
-    const edits: SubEdit[] = [];
-    for (let i = 0; i < suffixes.length; i++) {
-        if (Number.parseFloat(oldTokens[i]) !== Number.parseFloat(newTokens[i])) {
-            edits.push({ channel: `${attrName}.${suffixes[i]}`, value: newTokens[i] });
-        }
-    }
-    return edits;
-}
-
-/** Returns the two component token strings of a point/size value, or null when it does not hold
- *  exactly two numbers (the importer's ParseTwoFloats requires both). Token strings (not reparsed
- *  numbers) are returned so an unchanged component round-trips byte-identically. */
-function pointTokens(value: string): [string, string] | null {
-    const tokens = value.trim().split(/[\s,]+/).filter((token) => token.length > 0);
-    if (tokens.length !== 2 || parseFloatTokens(value) === null) {
-        return null;
-    }
-    return [tokens[0], tokens[1]];
-}
-
-/** Result of classifying one node's span: either the incremental channel writes, or a human-
- *  readable reason the edit cannot go incremental (surfaced via console.debug for diagnosing why an
- *  Apply fell back to a full reparse). */
-type NodeSpanClassification = { edits: ChannelEdit[] } | { reason: string };
-
-/** Classifies the change to one node's source span into per-attribute channel writes, or a reason
- *  it cannot go incremental. Only pure own-attribute value changes on whitelisted channels qualify:
- *  the tag name and attribute key set must be unchanged, every changed attribute must be an
- *  incrementable channel, and — crucially — after applying those value changes to the old element
- *  it must serialize identically to the new one. That exact-match check guarantees no other
- *  difference (child element, text content, attribute reordering, or a change inside embedded
- *  non-node content like an <svg> subtree) is silently dropped: any residual difference forces a
- *  full reparse. */
-function classifyNodeSpan(
-    oldSpan: string,
-    newSpan: string,
-    channels: string[],
-): NodeSpanClassification {
-    const oldElement = parseSpanElement(oldSpan);
-    const newElement = parseSpanElement(newSpan);
-    if (oldElement === null || newElement === null) {
-        return { reason: 'node span is not a single well-formed element (unparseable fragment)' };
-    }
-    if (oldElement.tagName !== newElement.tagName) {
-        return { reason: `tag name changed (${oldElement.tagName} -> ${newElement.tagName})` };
-    }
-    const oldAttrs = attributeMap(oldElement);
-    const newAttrs = attributeMap(newElement);
-    const oldKeys = Object.keys(oldAttrs);
-    const newKeys = Object.keys(newAttrs);
-    if (oldKeys.length !== newKeys.length) {
-        return { reason: `attribute added or removed on <${oldElement.tagName}>` };
-    }
-    const edits: ChannelEdit[] = [];
-    for (const key of newKeys) {
-        if (!(key in oldAttrs)) {
-            return { reason: `attribute renamed on <${oldElement.tagName}> (new key "${key}")` };
-        }
-        if (oldAttrs[key] === newAttrs[key]) {
-            continue;
-        }
-        if (channels.includes(key)) {
-            edits.push({ index: -1, channel: key, value: newAttrs[key] });
-            continue;
-        }
-        // Composite attribute (position / size / padding / ...): the channel table addresses it as
-        // dotted sub-channels, so split the change into per-component writes and keep only the
-        // components that actually changed. The value is re-parsed exactly as the importer would, so
-        // an incremental sub-channel write reproduces the full-reparse result.
-        const compositeKind = COMPOSITE_ATTRIBUTES.get(key);
-        if (compositeKind !== undefined) {
-            const subEdits = splitCompositeChange(key, compositeKind, oldAttrs[key], newAttrs[key]);
-            if (subEdits === null) {
-                return {
-                    reason: `composite attribute "${key}" on <${oldElement.tagName}> is malformed or has an unexpected component count`,
-                };
-            }
-            for (const subEdit of subEdits) {
-                if (!channels.includes(subEdit.channel)) {
-                    return {
-                        reason: `composite attribute "${key}" maps to sub-channel "${subEdit.channel}" which is not incrementable on <${oldElement.tagName}>`,
-                    };
-                }
-                edits.push({ index: -1, channel: subEdit.channel, value: subEdit.value });
-            }
-            continue;
-        }
-        return {
-            reason: `attribute "${key}" on <${oldElement.tagName}> is not an incrementable channel (composite or unsupported)`,
-        };
-    }
-    // Round-trip check against the ORIGINAL attribute names (not the split sub-channels): write each
-    // changed attribute's new value back onto the old element under its own name, then require a
-    // byte-identical serialization. This guarantees the only differences between the spans are the
-    // attribute values we accounted for above; any residual difference (child element, text content,
-    // attribute reorder, embedded <svg> subtree change) still forces a full reparse. Done with the
-    // original names so a composite like position stays a single attribute here even though it was
-    // emitted as position.x / position.y sub-channel writes.
-    for (const key of newKeys) {
-        if (oldAttrs[key] !== newAttrs[key]) {
-            oldElement.setAttribute(key, newAttrs[key]);
-        }
-    }
-    const serializer = new XMLSerializer();
-    if (serializer.serializeToString(oldElement) !== serializer.serializeToString(newElement)) {
-        return {
-            reason: `<${oldElement.tagName}> span differs beyond the edited attributes (child/text/embedded content changed)`,
-        };
-    }
-    return { edits };
-}
 
 export class PAGXPlayer extends EventTarget {
     private readonly options: PAGXPlayerOptions;
@@ -633,15 +389,10 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         const generation = ++this.loadGeneration;
-        // [ORT] Optimize Release Test - full-load timing instrumentation. Remove all `[ORT]`
-        // lines when the comparison is done.
-        const ortT0 = performance.now();
-        console.log(`[ORT] load() start: ${pagxBytes.length} bytes`);
         // Snapshots taken while it's still safe to read pre-existing view state; used after
         // the reset() inside parsePAGX() to restore playback position and play/pause state.
         try {
             await this.ensureView();
-            console.log(`[ORT] ensureView (wasm ready): +${(performance.now() - ortT0).toFixed(1)}ms`);
             if (!this.isCurrentLoad(generation)) return;
             const view = this.view!;
 
@@ -650,9 +401,7 @@ export class PAGXPlayer extends EventTarget {
                 : 0;
             const wasPlaying = options.preserveCurrentTime && view.isPlaying();
 
-            const ortParseStart = performance.now();
             view.parsePAGX(pagxBytes);
-            console.log(`[ORT] parsePAGX: ${(performance.now() - ortParseStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
 
             // Register fonts (host-supplied); the view resets font registration on each load
             // so this must run before buildLayers.
@@ -666,7 +415,6 @@ export class PAGXPlayer extends EventTarget {
             // concurrently but push in order so a hypothetical duplicate path list stays
             // deterministic.
             if (options.resolveResource) {
-                const ortResStart = performance.now();
                 const paths: string[] = view.getExternalFilePaths();
                 if (paths && paths.length > 0) {
                     const resolve = options.resolveResource;
@@ -682,13 +430,10 @@ export class PAGXPlayer extends EventTarget {
                             view.loadFileData(item.rel, item.buf);
                         }
                     }
-                    console.log(`[ORT] resolveResource: ${paths.length} file(s) in ${(performance.now() - ortResStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
                 }
             }
 
-            const ortBuildStart = performance.now();
             view.buildLayers();
-            console.log(`[ORT] buildLayers: ${(performance.now() - ortBuildStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
 
             if (options.forceLoop !== false) {
                 view.setLoop(true);
@@ -730,9 +475,7 @@ export class PAGXPlayer extends EventTarget {
             // Force a synchronous first frame so the canvas reflects the newly built document
             // before we unhide it below; without this the view is drawn one rAF later and the
             // previous document's last frame briefly ghosts through when hidden -> visible.
-            const ortDrawStart = performance.now();
             view.draw();
-            console.log(`[ORT] first draw: ${(performance.now() - ortDrawStart).toFixed(1)}ms (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
 
             this.canvas.classList.remove('hidden');
             setToolbarVisible(this.toolbarRoot, true);
@@ -750,10 +493,8 @@ export class PAGXPlayer extends EventTarget {
 
             // Refresh the source map (node index -> source span) for selection highlighting.
             // Rebuilt on every load since a new document renumbers nodes.
-            const ortMapStart = performance.now();
             this.sourceMap = view.getNodeSourceMap();
             this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
-            console.log(`[ORT] getNodeSourceMap: ${(performance.now() - ortMapStart).toFixed(1)}ms, ${this.sourceMap.length} node(s) (total +${(performance.now() - ortT0).toFixed(1)}ms)`);
             this.hoverIndex = -1;
             this.hoverHit = null;
             this.selectHit = null;
@@ -770,7 +511,6 @@ export class PAGXPlayer extends EventTarget {
                 xmlText,
             };
             this.dispatchEvent(new CustomEvent('loaded', { detail }));
-            console.log(`[ORT] load() done (full load path): total ${(performance.now() - ortT0).toFixed(1)}ms`);
         } catch (err) {
             // Only the currently active load reports the failure. Superseded loads dropping
             // out via isCurrentLoad() never enter this branch since generation checks come
@@ -929,7 +669,7 @@ export class PAGXPlayer extends EventTarget {
      *  canvas overlay bounds, but the grey source decoration never expands to the node's children. */
     private onEditorHover(line: number): void {
         const tagLine = this.editor?.getDraftTagLine(line) ?? null;
-        const idx = tagLine === null ? -1 : this.findNodeIndexForLine(tagLine);
+        const idx = tagLine === null ? -1 : findNodeIndexForLine(this.draftSourceMap, tagLine);
         const nextLine = tagLine ?? -1;
         if (idx === this.editorHoverIndex && nextLine === this.editorHoverLine) {
             return;
@@ -948,7 +688,7 @@ export class PAGXPlayer extends EventTarget {
      *  canvas selection sync; when the line falls outside every node's span (e.g. the XML
      *  declaration), it simply returns -1 and no canvas node gets selected. */
     private onEditorDblClick(line: number): void {
-        const idx = this.findNodeIndexForLine(line);
+        const idx = findNodeIndexForLine(this.draftSourceMap, line);
         this.selectedIndex = idx;
         // Editor-direction selection has no hitTest result, so updateOverlay falls back to the
         // source-map node bounds when one exists. Lines with no runtime node clear the canvas box.
@@ -967,7 +707,7 @@ export class PAGXPlayer extends EventTarget {
      *  deleted or partially cut by a multi-line replacement become unavailable rather than pointing
      *  at an unrelated surviving tag. Apply/Discard/reset restores a fresh projection. */
     private onDraftLineChanges(
-        changes: readonly { startLine: number; endLine: number; insertedLineCount: number }[] | null,
+        changes: readonly DraftLineChange[] | null,
     ): void {
         if (changes === null) {
             this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
@@ -982,9 +722,7 @@ export class PAGXPlayer extends EventTarget {
         this.editorHoverIndex = -1;
     }
 
-    private applyDraftLineChange(
-        change: { startLine: number; endLine: number; insertedLineCount: number },
-    ): void {
+    private applyDraftLineChange(change: DraftLineChange): void {
         const removedLineCount = change.endLine - change.startLine;
         const lineDelta = change.insertedLineCount - removedLineCount;
         if (lineDelta === 0) {
@@ -1024,37 +762,13 @@ export class PAGXPlayer extends EventTarget {
         }
     }
 
-    /** Returns the index of the innermost node whose [startLine, endLine] span contains the given
-     *  1-based line, or -1 if none. endLine < 0 (programmatic nodes) falls back to a single-line
-     *  match at startLine. */
-    private findNodeIndexForLine(line: number): number {
-        let bestIndex = -1;
-        let bestSpan = Number.POSITIVE_INFINITY;
-        for (const entry of this.draftSourceMap) {
-            const start = entry.startLine;
-            if (start <= 0 || start > line) {
-                continue;
-            }
-            const end = entry.endLine > 0 ? entry.endLine : start;
-            if (line > end) {
-                continue;
-            }
-            const span = end - start;
-            if (span < bestSpan) {
-                bestSpan = span;
-                bestIndex = entry.index;
-            }
-        }
-        return bestIndex;
-    }
-
     /** Resolves the line span of the innermost tag enclosing the given 1-based source line, for
-     *  the editor's tag-block copy/delete context menu actions. The span taken from
-     *  draftSourceMap is re-validated against the current draft text: when unsaved structural
-     *  edits have broken the tag (missing or unrecognizable markers) so the span no longer parses
-     *  as a single element, null is returned and the caller falls back to the line itself. */
+     *  the editor's tag-block copy/delete context menu actions. The last valid source map supplies
+     *  the structural span; only that node's own boundary tags are re-validated against the draft.
+     *  A malformed child therefore does not prevent deleting its intact parent, while a damaged
+     *  parent boundary still falls back safely to the current line. */
     private resolveTagSpan(line: number): LineRange | null {
-        const index = this.findNodeIndexForLine(line);
+        const index = findNodeIndexForLine(this.draftSourceMap, line);
         if (index < 0 || this.editor === null) {
             return null;
         }
@@ -1068,7 +782,7 @@ export class PAGXPlayer extends EventTarget {
         if (end > lines.length) {
             return null;
         }
-        if (parseSpanElement(lines.slice(start - 1, end).join('\n')) === null) {
+        if (!hasMatchingSpanBoundaries(lines.slice(start - 1, end).join('\n'))) {
             return null;
         }
         return { startLine: start, endLine: end };
@@ -1081,19 +795,14 @@ export class PAGXPlayer extends EventTarget {
      *  of newXml is the authoritative final state regardless of any channel writes already applied
      *  here. */
     private tryIncrementalApply(oldXml: string, newXml: string): boolean {
-        // [ORT] Optimize Release Test - incremental-apply timing. This is the fast path the
-        // optimization adds; compare its total against buildLayers on the full-load path.
-        const ortT0 = performance.now();
-    if (!this.view || this.draftSourceMap.length === 0) {
-      return false;
+        if (!this.view || this.draftSourceMap.length === 0) {
+            return false;
         }
-        const edits = this.classifyEdits(oldXml, newXml);
+        const edits = classifyEdits(oldXml, newXml, this.draftSourceMap);
         if (edits === null) {
-            console.log(`[ORT] incremental: NOT applicable, fall back to full reparse (+${(performance.now() - ortT0).toFixed(1)}ms)`);
             return false;
         }
         if (edits.length === 0) {
-            console.log(`[ORT] incremental: no-op (0 edits) in ${(performance.now() - ortT0).toFixed(1)}ms`);
             return true;
         }
         for (const edit of edits) {
@@ -1101,65 +810,11 @@ export class PAGXPlayer extends EventTarget {
                 console.debug(
                     `[pagx] full reparse: engine rejected setNodeChannel #${edit.index}.${edit.channel}="${edit.value}" (unknown channel or unparseable value)`,
                 );
-                console.log(`[ORT] incremental: setNodeChannel rejected, fall back to full reparse (+${(performance.now() - ortT0).toFixed(1)}ms)`);
                 return false;
             }
         }
         this.view.draw();
-        const summary = edits
-            .map((edit) => `#${edit.index}.${edit.channel}="${edit.value}"`)
-            .join(', ');
-           console.log(`[pagx] incremental subtree update applied: ${summary}`);
-        console.log(`[ORT] incremental apply done (fast path): ${edits.length} edit(s) in ${(performance.now() - ortT0).toFixed(1)}ms`);
         return true;
-    }
-
-    /** Classifies a text edit into a flat list of incremental channel writes, or null when it
-     *  cannot go incremental. First-version constraints (each a null-return): the line count
-     *  changed (would shift the cached source spans), a changed line lies outside any node, or a
-     *  node's own change is not a pure whitelisted-channel value edit (see classifyNodeSpan). */
-    private classifyEdits(oldXml: string, newXml: string): ChannelEdit[] | null {
-        const oldLines = oldXml.split('\n');
-        const newLines = newXml.split('\n');
-        if (oldLines.length !== newLines.length) {
-            console.debug(
-                `[pagx] full reparse: line count changed (${oldLines.length} -> ${newLines.length})`,
-            );
-            return null;
-        }
-        const affected = new Set<number>();
-        for (let i = 0; i < oldLines.length; i++) {
-            if (oldLines[i] === newLines[i]) {
-                continue;
-            }
-            const idx = this.findNodeIndexForLine(i + 1);
-            if (idx < 0) {
-                console.debug(`[pagx] full reparse: changed line ${i + 1} lies outside any node`);
-                return null;
-            }
-            affected.add(idx);
-        }
-        const edits: ChannelEdit[] = [];
-        for (const idx of affected) {
-            const entry = this.draftSourceMap[idx];
-            const start = entry.startLine;
-            const end = entry.endLine > 0 ? entry.endLine : start;
-            if (start <= 0) {
-                console.debug(`[pagx] full reparse: node #${idx} has no source span`);
-                return null;
-            }
-            const oldSpan = oldLines.slice(start - 1, end).join('\n');
-            const newSpan = newLines.slice(start - 1, end).join('\n');
-            const result = classifyNodeSpan(oldSpan, newSpan, entry.channels);
-            if ('reason' in result) {
-                console.debug(`[pagx] full reparse: node #${idx} - ${result.reason}`);
-                return null;
-            }
-            for (const nodeEdit of result.edits) {
-                edits.push({ index: idx, channel: nodeEdit.channel, value: nodeEdit.value });
-            }
-        }
-        return edits;
     }
 
     /** The transient hover target: editor-hover wins over canvas-hover (mouse can only be in one). */

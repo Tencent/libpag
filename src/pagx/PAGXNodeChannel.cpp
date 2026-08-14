@@ -341,6 +341,13 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 
 // Convenience macros that turn a (channel, member) pair into a ChannelDef row. They only build the
 // table entries; all access logic lives in the templated generators above.
+//
+// The FIELD_POINT_X/Y, FIELD_SIZE_W/H and FIELD_PADDING_L/T/R/B rows address one composite XML
+// attribute (position="10 20", size=..., padding=...) as dotted sub-channels. The playground
+// player's incremental-apply classifier keeps a mirror of these composite attributes in
+// playground/pagx-player/src/incremental-apply.ts (COMPOSITE_ATTRIBUTES); when a composite channel
+// is added or renamed here, update that table too, or the edit silently falls back to a full
+// reparse instead of an incremental write.
 #define FIELD_FLOAT(T, name, member, cls) \
   { name, cls, &AccessFloat<T, &T::member>, ChannelValueType::Float }
 #define FIELD_BOOL(T, name, member, cls) \

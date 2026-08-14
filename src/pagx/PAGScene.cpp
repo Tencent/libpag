@@ -697,6 +697,18 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   return FromTGFX(surfaceBounds);
 }
 
+void PAGScene::eraseNodeToLayerSubtree(const PAGLayer* layer) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->node != nullptr) {
+    nodeToLayer.erase(layer->node);
+  }
+  for (const auto& child : layer->children) {
+    eraseNodeToLayerSubtree(child.get());
+  }
+}
+
 Rect PAGScene::getGlobalBoundsForNode(const Layer* node) const {
   if (node == nullptr) {
     return {};

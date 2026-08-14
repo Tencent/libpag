@@ -297,7 +297,7 @@ void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float contain
 // Above this many resets the incremental path stops paying off versus a full layout, so callers
 // fall back to applyLayout. Kept small since the reset set is only the edited Layers plus their
 // ancestor chains, not their subtrees.
-static const size_t kMaxIncrementalLayoutLayers = 64;
+static const size_t MAX_INCREMENTAL_LAYOUT_LAYERS = 64;
 
 bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
                                           std::vector<Layer*>* changedOut) {
@@ -337,7 +337,7 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
   for (auto* layer : changedLayers) {
     Layer* cursor = layer;
     while (cursor != nullptr && resetLayers.insert(cursor).second) {
-      if (resetLayers.size() > kMaxIncrementalLayoutLayers) {
+      if (resetLayers.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
         return false;
       }
       auto it = parentOf.find(cursor);
@@ -369,8 +369,6 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
     }
   }
   layoutLayers(layers, width, height, &context);
-  LOGI("PAGXDocument::applyLayoutIncremental: incremental subtree re-layout, reset %zu layer(s).",
-       resetLayers.size());
   if (changedOut != nullptr) {
     for (auto& [layer, oldBounds] : beforeBounds) {
       if (layer->layoutBounds() != oldBounds) {
@@ -422,6 +420,9 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
     }
   }
   nodes.resize(writeIdx);
+  for (size_t i = 0; i < nodes.size(); i++) {
+    nodes[i]->index = static_cast<int>(i);
+  }
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {

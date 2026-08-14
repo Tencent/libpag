@@ -41,6 +41,59 @@ export interface StringVector {
 }
 
 /**
+ * Surface-space bounds of a layer, in backing-store pixels (canvas.width space, includes DPR).
+ */
+export interface NodeBounds {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The result of a hit test: the source node under a surface point with its source span and
+ * on-screen bounds. startLine/endLine point at the reference node: when the hit lands inside a
+ * <Layer composition="@X"> instance they refer to that reference rather than the internal
+ * definition node. bounds is the hit instance's surface rect, or null when the resolved layer
+ * has no measurable on-screen rect.
+ */
+export interface HitTestResult {
+  /** Index of the source node in the document's node list. */
+  index: number;
+  /** 1-based source line of the node's start tag; -1 when unavailable. */
+  startLine: number;
+  /** 1-based source line of the node's end tag; -1 when unavailable. */
+  endLine: number;
+  bounds: NodeBounds | null;
+}
+
+/**
+ * One node's source span and incrementable channels, as exported by getNodeSourceMap.
+ */
+export interface NodeSourceEntry {
+  /** Index of the node in the document's node list. */
+  index: number;
+  /** 1-based source line of the start tag; -1 when unavailable. */
+  startLine: number;
+  /** 1-based source line of the end tag; -1 when unavailable. */
+  endLine: number;
+  /** NodeType enum int (see NodeType.h). */
+  nodeType: number;
+  /** Incrementable channel names (e.g. "alpha", "position.x"). */
+  channels: string[];
+}
+
+/**
+ * A schema-level PAGX diagnostic produced by validatePAGX: valid XML that violates the PAGX
+ * schema, such as unknown elements, invalid attribute values, or unresolved references.
+ */
+export interface PagxSchemaDiagnostic {
+  message: string;
+  line: number;
+  column: number;
+}
+
+/**
  * The native PAGX View instance bound from C++.
  */
 export interface _PAGXView {
@@ -179,29 +232,29 @@ export interface _PAGXView {
   _isLoop(): boolean;
 
   /**
-   * Returns the node index of the top-most layer under the surface point, or -1 if none.
-   * Surface coordinates are backing-store pixels (canvas.width space, includes DPR).
+   * Returns the source node under the surface point as a HitTestResult, or null when nothing
+   * is hit. Surface coordinates are backing-store pixels (canvas.width space, includes DPR).
    */
-  _hitTest(surfaceX: number, surfaceY: number): number;
+  _hitTest(surfaceX: number, surfaceY: number): HitTestResult | null;
 
   /**
    * Exports every node's source span and incrementable channel list as a JS array of
    * { index, startLine, endLine, nodeType, channels }. Rebuilt by the host after each load.
    * Returns a plain JS value (emscripten::val), no manual delete() needed.
    */
-  _getNodeSourceMap(): any;
+  _getNodeSourceMap(): NodeSourceEntry[];
 
   /**
    * Returns the current-frame surface bounds { x, y, w, h } of the layer built from
    * nodes[index], or null if index is out of range or has no runtime layer.
    */
-  _getNodeBounds(index: number): any;
+  _getNodeBounds(index: number): NodeBounds | null;
 
   /**
    * Validates UTF-8 PAGX XML without replacing the currently loaded document. Returns a plain JS
    * array of { message, line, column } schema diagnostics.
    */
-  _validatePAGX(data: Uint8Array): any;
+  _validatePAGX(data: Uint8Array): PagxSchemaDiagnostic[];
 
   /**
    * Sets a channel on nodes[index] from its raw PAGX attribute string and refreshes the scene in

@@ -318,11 +318,18 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
   // Maps source Layer nodes to their runtime PAGLayer for index-based bounds lookup
-  // (getGlobalBoundsForNode). Populated by PAGComposition::BuildChildLayer and synced in
-  // syncChildren. Property-only edits go through RefreshLayerInPlace which does NOT replace the
-  // PAGLayer, so this map stays valid across incremental attribute edits; only structural changes
-  // (handled by a full runtime-tree rebuild in buildRuntimeTree) clear and repopulate it.
+  // (getGlobalBoundsForNode). Populated by PAGComposition::BuildChildLayer and kept in sync by
+  // both removal paths (syncChildren and refreshPlainContainerChildren) via
+  // eraseNodeToLayerSubtree. Property-only edits go through RefreshLayerInPlace which does NOT
+  // replace the PAGLayer, so this map stays valid across incremental attribute edits; only
+  // structural changes (handled by a full runtime-tree rebuild in buildRuntimeTree) clear and
+  // repopulate it.
   std::unordered_map<const Layer*, PAGLayer*> nodeToLayer = {};
+
+  // Erases the nodeToLayer entries of an entire PAGLayer subtree. Every removal path must call
+  // this before dropping a subtree from its parent's children so the map never holds dangling
+  // PAGLayer pointers that getGlobalBoundsForNode would dereference.
+  void eraseNodeToLayerSubtree(const PAGLayer* layer);
 
   friend class PAGXDocument;
   friend class PAGTimeline;
