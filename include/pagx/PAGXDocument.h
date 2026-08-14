@@ -354,6 +354,8 @@ class PAGXDocument : public Node {
   friend class PAGComposition;
   friend class LayerBuilderContext;
   friend class LayerBuilderSession;
+  friend class SVGParserContext;
+  friend class SMILAnimationParser;
 };
 
 }  // namespace pagx

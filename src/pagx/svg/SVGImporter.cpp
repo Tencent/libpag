@@ -3397,8 +3397,8 @@ void SVGParserContext::collectSMILAnimations(const std::shared_ptr<DOMNode>& nod
   // fe* branch and SMILAnimationParser::resolveAnimateTarget's filter attributeName mapping).
   const auto& name = node->name;
   if (name == "style" || name == "title" || name == "desc" || name == "metadata" ||
-      name == "mask" || name == "clipPath" || name == "marker" ||
-      name == "linearGradient" || name == "radialGradient" || name == "pattern") {
+      name == "mask" || name == "clipPath" || name == "marker" || name == "linearGradient" ||
+      name == "radialGradient" || name == "pattern") {
     return;
   }
 

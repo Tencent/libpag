@@ -1060,6 +1060,12 @@ bool UnwrapRedundantFirstGroupInElements(std::vector<Element*>& elements) {
   if (!IsDefaultTransformGroup(group)) {
     return false;
   }
+  // A Group with a non-empty id may be referenced by an AnimationObject target (e.g. Groups
+  // created by SVG SMIL import to host animateTransform/animateMotion channels). Unwrapping
+  // such a Group would orphan the animation target, so skip it.
+  if (!group->id.empty()) {
+    return false;
+  }
   if (!group->customData.empty()) {
     return false;
   }

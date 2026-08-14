@@ -39,6 +39,7 @@ struct SVGFeatureFlags {
   bool hasTextModifier = false;     // TextModifier / RangeSelector (per-glyph animation styling).
   bool hasConicGradient = false;    // No SVG conic/sweep gradient primitive.
   bool hasDiamondGradient = false;  // No SVG diamond gradient primitive.
+  bool hasAnimation = false;        // PAGX Animation nodes (SVG export cannot express animation).
 
   /**
    * Returns true when at least one feature is present.
