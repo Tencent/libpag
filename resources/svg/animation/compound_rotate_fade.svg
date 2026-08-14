@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <g transform="translate(60 60)">
+    <polygon points="0,-30 26,15 -26,15" fill="#8b5cf6">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="1;0.3;1" keyTimes="0;0.5;1" dur="2s" repeatCount="indefinite"/>
+    </polygon>
+  </g>
+</svg>

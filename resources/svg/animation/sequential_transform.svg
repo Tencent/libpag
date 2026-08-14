@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <g transform="translate(60 60)">
+    <rect x="-30" y="-30" width="60" height="60" rx="10" fill="#8b5cf6" opacity="0.8">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="45" dur="0.5s" begin="0s" fill="freeze"/>
+      <animateTransform attributeName="transform" type="rotate" from="45" to="0" dur="0.5s" begin="0.5s" fill="freeze"/>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="-45" dur="0.5s" begin="1s" fill="freeze"/>
+      <animateTransform attributeName="transform" type="rotate" from="-45" to="0" dur="0.5s" begin="1.5s" fill="freeze"/>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="1s" begin="2s" fill="freeze"/>
+    </rect>
+  </g>
+</svg>

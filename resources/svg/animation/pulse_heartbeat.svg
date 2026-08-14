@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <circle cx="60" cy="60" r="25" fill="#ef4444">
+    <animate attributeName="opacity" values="1;0.2;1" keyTimes="0;0.5;1" dur="1.5s" calcMode="spline" keySplines="0.42 0 0.58 1;0.42 0 0.58 1" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="60" cy="60" r="40" fill="none" stroke="#ef4444" stroke-width="2" opacity="0.5">
+    <animate attributeName="r" values="25;50;25" keyTimes="0;0.5;1" dur="1.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0;0.5" keyTimes="0;0.5;1" dur="1.5s" repeatCount="indefinite"/>
+  </circle>
+</svg>
