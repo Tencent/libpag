@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <rect x="20" y="20" width="80" height="80" rx="12" fill="#f97316">
+    <animate attributeName="width" values="80;40;80" keyTimes="0;0.5;1" dur="2s" calcMode="paced" repeatCount="indefinite"/>
+    <animate attributeName="height" values="80;40;80" keyTimes="0;0.5;1" dur="2s" calcMode="paced" repeatCount="indefinite"/>
+    <animate attributeName="x" values="20;40;20" keyTimes="0;0.5;1" dur="2s" calcMode="paced" repeatCount="indefinite"/>
+    <animate attributeName="y" values="20;40;20" keyTimes="0;0.5;1" dur="2s" calcMode="paced" repeatCount="indefinite"/>
+  </rect>
+</svg>
