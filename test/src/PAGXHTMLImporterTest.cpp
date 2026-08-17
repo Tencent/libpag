@@ -31,6 +31,8 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
+#include "pagx/PAGScene.h"
+#include "pagx/PAGStateMachine.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -66,6 +68,9 @@
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
@@ -6261,17 +6266,30 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationsWithMatchingTimingAreCoalesced) {
                                              opts);
   ASSERT_NE(doc, nullptr);
   // `a` and `b` share (duration 120, 60fps, Loop) and merge into one Animation; `c` runs 1s so it
-  // has a different duration and stays in its own Animation.
-  ASSERT_EQ(doc->animations.size(), 2u);
+  // has a different duration and stays in its own Animation. A generated StateMachine is placed
+  // first and plays both animations through parallel regions.
+  ASSERT_EQ(doc->animations.size(), 3u);
 
-  auto* merged = static_cast<pagx::Animation*>(doc->animations.front());
+  ASSERT_EQ(doc->animations.front()->nodeType(), pagx::NodeType::StateMachine);
+  auto* stateMachine = static_cast<pagx::StateMachine*>(doc->animations.front());
+  ASSERT_EQ(stateMachine->regions.size(), 2u);
+  EXPECT_EQ(stateMachine->regions[0]->name, "animation0");
+  EXPECT_EQ(stateMachine->regions[0]->initialState, "playing");
+  ASSERT_EQ(stateMachine->regions[0]->states.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::AnimationState*>(stateMachine->regions[0]->states[0])->animationId,
+            doc->animations[1]->id);
+  ASSERT_EQ(stateMachine->regions[1]->states.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::AnimationState*>(stateMachine->regions[1]->states[0])->animationId,
+            doc->animations[2]->id);
+
+  auto* merged = static_cast<pagx::Animation*>(doc->animations[1]);
   EXPECT_EQ(merged->loop, pagx::LoopMode::Loop);
   EXPECT_EQ(merged->duration, 120);
   EXPECT_NE(FindObjectByTarget(merged, "a"), nullptr);
   EXPECT_NE(FindObjectByTarget(merged, "b"), nullptr);
   EXPECT_EQ(FindObjectByTarget(merged, "c"), nullptr);
 
-  auto* separate = static_cast<pagx::Animation*>(doc->animations.back());
+  auto* separate = static_cast<pagx::Animation*>(doc->animations[2]);
   EXPECT_EQ(separate->duration, 60);
   EXPECT_NE(FindObjectByTarget(separate, "c"), nullptr);
   EXPECT_EQ(FindObjectByTarget(separate, "a"), nullptr);
@@ -6286,6 +6304,15 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationsWithMatchingTimingAreCoalesced) {
     pos += 11;
   }
   EXPECT_EQ(animationCount, 2u);
+  EXPECT_NE(xml.find("<StateMachine "), std::string::npos);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto defaultTimeline = scene->getDefaultTimeline();
+  ASSERT_NE(defaultTimeline, nullptr);
+  EXPECT_EQ(defaultTimeline->type(), pagx::TimelineType::StateMachine);
+  EXPECT_EQ(defaultTimeline->getId(), stateMachine->id);
+  EXPECT_TRUE(defaultTimeline->advanceAndApply(500'000));
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {

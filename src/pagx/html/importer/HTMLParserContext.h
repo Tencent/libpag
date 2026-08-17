@@ -219,6 +219,10 @@ class HTMLParserContext {
   // mismatched shared timeline. Runs after both animation build passes.
   void coalesceAnimations();
 
+  // Wraps multiple independent top-level animations in one parallel StateMachine so hosts that
+  // drive only PAGScene::getDefaultTimeline() still play every imported HTML animation.
+  void buildAnimationStateMachine();
+
   // Diagnostics ------------------------------------------------------------------------
   // Short forwarders to `_diagnostics`; kept for the very common warn / hardError call
   // sites where the unique_ptr-deref boilerplate would dominate the surrounding code.

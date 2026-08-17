@@ -29,6 +29,9 @@
 #include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
@@ -355,6 +358,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
                                               shape.strokeTargetId, shape.dashScale);
   }
   coalesceAnimations();
+  buildAnimationStateMachine();
   suppressBackdropBlurUnderOpacityFade();
   flushFontFallbacksToDocument();
   return _document;
@@ -403,6 +407,46 @@ void HTMLParserContext::coalesceAnimations() {
     anim->objects.clear();
   }
   _document->animations = std::move(coalesced);
+}
+
+void HTMLParserContext::buildAnimationStateMachine() {
+  if (!_document) {
+    return;
+  }
+  std::vector<Animation*> animations;
+  for (auto* node : _document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+      auto* animation = static_cast<Animation*>(node);
+      // Empty animations are not exported, so they must not be referenced by the generated state
+      // machine either. The builder normally filters them earlier; keep this guard so the graph
+      // remains valid if a future optimization empties an animation before this pass.
+      if (!animation->objects.empty()) {
+        animations.push_back(animation);
+      }
+    }
+  }
+  if (animations.size() < 2) {
+    return;
+  }
+
+  // PAGStateMachine advances its StateRegions in parallel. Give each independent HTML animation
+  // one always-active region, then place the state machine first so PAGScene::getDefaultTimeline()
+  // returns it. This preserves each Animation's own duration, delay and loop mode while exposing a
+  // single playback driver to viewers and other hosts.
+  auto* stateMachine =
+      _document->makeNode<StateMachine>(_idAllocator->generateUnique("htmlAnimations"));
+  for (size_t index = 0; index < animations.size(); index++) {
+    auto* region = _document->makeNode<StateRegion>();
+    region->name = "animation" + std::to_string(index);
+    region->initialState = "playing";
+
+    auto* state = _document->makeNode<AnimationState>();
+    state->name = region->initialState;
+    state->animationId = animations[index]->id;
+    region->states.push_back(state);
+    stateMachine->regions.push_back(region);
+  }
+  _document->animations.insert(_document->animations.begin(), stateMachine);
 }
 
 void HTMLParserContext::suppressBackdropBlurUnderOpacityFade() {
