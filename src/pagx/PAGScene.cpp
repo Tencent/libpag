@@ -691,6 +691,17 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   // visible content (per-glyph extents for text) instead of the conservative content envelope
   // that Layer::getBounds returns by default.
   auto rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
+  // Anti-aliasing overshoot compensation for the selection outline: FreeType's per-glyph tight
+  // bounds come from FT_Outline_Get_CBox, which is the geometric outline extent. For letters
+  // whose outline touches the baseline (a/b/c/d/e/o and other round shapes) the rasterizer
+  // still paints anti-aliased pixels slightly below the baseline, so the tight extent visually
+  // clips the last row of rendered ink. Extending the bottom by a small fraction of the layer
+  // height covers this overshoot on text layers while remaining unnoticeable on non-text layers
+  // whose bounds already fully contain their ink. The 0.5 floor keeps very small layers from
+  // rounding to zero padding after the surface-space mapping.
+  if (!rootBounds.isEmpty()) {
+    rootBounds.bottom += std::max(0.5f, rootBounds.height() * 0.05f);
+  }
   Matrix rootToSurface = {};
   rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
