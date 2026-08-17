@@ -2899,22 +2899,40 @@ PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
   return path;
 }
 std::string SVGParserContext::resolveUrl(const std::string& url) {
-  if (url.empty()) {
+  auto trim = [](const std::string& value) {
+    size_t first = 0;
+    while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) first++;
+    size_t last = value.size();
+    while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1]))) last--;
+    return value.substr(first, last - first);
+  };
+  std::string value = trim(url);
+  if (value.empty()) {
     return "";
   }
-  // Handle url(#id) format.
-  if (url.compare(0, 4, "url(") == 0) {
-    size_t start = url.find('#');
-    size_t end = url.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      return url.substr(start + 1, end - start - 1);
+  // Handle CSS url(#id), url("#id") and url('#id') forms. Computed SVG
+  // presentation attributes emitted by Chromium commonly retain the quotes;
+  // including the closing quote in the lookup key makes the gradient/filter
+  // reference miss and leaves the painter black.
+  if (value.compare(0, 4, "url(") == 0) {
+    size_t end = value.rfind(')');
+    if (end != std::string::npos && end >= 4) {
+      std::string inner = trim(value.substr(4, end - 4));
+      if (inner.size() >= 2 &&
+          ((inner.front() == '"' && inner.back() == '"') ||
+           (inner.front() == '\'' && inner.back() == '\''))) {
+        inner = trim(inner.substr(1, inner.size() - 2));
+      }
+      if (!inner.empty() && inner.front() == '#') {
+        return inner.substr(1);
+      }
     }
   }
   // Handle #id format.
-  if (url[0] == '#') {
-    return url.substr(1);
+  if (value[0] == '#') {
+    return value.substr(1);
   }
-  return url;
+  return value;
 }
 std::pair<float, float> SVGParserContext::parseFilterOffset(const std::shared_ptr<DOMNode>& node) {
   std::string dx = getAttribute(node, "dx", "0");

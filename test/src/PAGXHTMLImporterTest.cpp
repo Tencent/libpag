@@ -6275,6 +6275,17 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationsWithMatchingTimingAreCoalesced) {
   EXPECT_EQ(separate->duration, 60);
   EXPECT_NE(FindObjectByTarget(separate, "c"), nullptr);
   EXPECT_EQ(FindObjectByTarget(separate, "a"), nullptr);
+
+  // Coalescing clears the merged-away Animation node, which remains owned by
+  // doc.nodes. The exporter must not resurrect that empty orphan timeline.
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  size_t animationCount = 0;
+  size_t pos = 0;
+  while ((pos = xml.find("<Animation ", pos)) != std::string::npos) {
+    animationCount++;
+    pos += 11;
+  }
+  EXPECT_EQ(animationCount, 2u);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
@@ -6827,6 +6838,48 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixWithScaleProducesMatrixChannel) {
   // The 0% matrix scales by 2 — preserved, not dropped.
   EXPECT_FLOAT_EQ(mCh->keyframes.front().value.a, 2.0f);
   EXPECT_FLOAT_EQ(mCh->keyframes.front().value.d, 2.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgRotateProducesPivotedMatrixChannel) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spin {
+        0%   { transform: matrix(1, 0, 0, 1, 0, 0); }
+        100% { transform: matrix(0, 1, -1, 0, 0, 0); }
+      }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle id="spinner" cx="40" cy="40" r="30" fill="none" stroke="#8B5CF6"
+                style="transform-origin:40px 40px;animation:spin 1s linear infinite"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  for (const auto& msg : doc->errors) {
+    EXPECT_EQ(msg.find("subset:animation-unsupported-property"), std::string::npos)
+        << "Unexpected diagnostic: " << msg;
+  }
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  auto* object = FindObjectByTarget(anim, "spinner");
+  ASSERT_NE(object, nullptr);
+  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
+  ASSERT_NE(mCh, nullptr);
+  EXPECT_EQ(FindChannel(anim, "x"), nullptr);
+  EXPECT_EQ(FindChannel(anim, "y"), nullptr);
+  ASSERT_EQ(mCh->keyframes.size(), 2u);
+  const auto& last = mCh->keyframes.back().value;
+  EXPECT_NEAR(last.a, 0.0f, kEps);
+  EXPECT_NEAR(last.b, 1.0f, kEps);
+  EXPECT_NEAR(last.c, -1.0f, kEps);
+  EXPECT_NEAR(last.d, 0.0f, kEps);
+  EXPECT_NEAR(last.tx, 80.0f, kEps);
+  EXPECT_NEAR(last.ty, 0.0f, kEps);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupported3DTransformWarnsAndDrops) {

@@ -499,7 +499,7 @@ describe('pagxEmitCaptured', () => {
       body: { offsetHeight: 0 },
     };
     // Base transform read under the animation-blocking <style>: report `none`.
-    global.getComputedStyle = () => ({ transform: 'none' });
+    global.getComputedStyle = () => ({ transform: 'none', transformOrigin: '50px 25px' });
 
     const out = pagxEmitCaptured(captured, PAGX_ANIM_PREFIX, PAGX_ANIM_STYLE_ID);
 
@@ -514,6 +514,8 @@ describe('pagxEmitCaptured', () => {
     // The element gets the canonical shorthand and a neutral base transform.
     expect(el.style.animation).toBe('pagxAnim0 2s linear 0s infinite normal both');
     expect(el.style.transform).toBe('none');
+    // Opacity-only keyframes do not need to pin a transform pivot.
+    expect(el.style.transformOrigin).toBeUndefined();
   });
 
   test('skips a detached element and reports zero', () => {
@@ -533,6 +535,37 @@ describe('pagxEmitCaptured', () => {
     global.getComputedStyle = () => ({ transform: 'none' });
     expect(pagxEmitCaptured(captured, PAGX_ANIM_PREFIX, PAGX_ANIM_STYLE_ID))
       .toEqual({ count: 0, names: [] });
+  });
+
+  test('pins the computed transform-origin for transform-driven SVG shapes', () => {
+    const el = {
+      isConnected: true,
+      style: {},
+      getBoundingClientRect: () => ({ width: 80, height: 80, left: 0, top: 0 }),
+    };
+    const captured = [{
+      el,
+      keyframes: [
+        { offset: 0, props: { transform: 'matrix(1, 0, 0, 1, 0, 0)' } },
+        { offset: 1, props: { transform: 'matrix(0, 1, -1, 0, 0, 0)' } },
+      ],
+      durationMs: 1000,
+      delayMs: 0,
+      iterations: Infinity,
+      direction: 'normal',
+      timing: 'linear',
+    }];
+    const head = makeContainer();
+    global.document = {
+      head, documentElement: head,
+      createElement: () => makeStyleNode(),
+      getElementById: () => null,
+      body: { offsetHeight: 0 },
+    };
+    global.getComputedStyle = () => ({ transform: 'none', transformOrigin: '40px 40px' });
+
+    expect(pagxEmitCaptured(captured, PAGX_ANIM_PREFIX, PAGX_ANIM_STYLE_ID).count).toBe(1);
+    expect(el.style.transformOrigin).toBe('40px 40px');
   });
 });
 
@@ -608,5 +641,50 @@ describe('pagxAnimMain', () => {
     const out = pagxAnimMain(OPTS);
     expect(out).toEqual({ count: 1, names: ['pagxAnim0'] });
     expect(mover.style.animation).toBe('pagxAnim0 0.2s linear 0s 1 normal both');
+  });
+
+  test('preserves an authored infinite WAAPI timeline instead of flattening it', () => {
+    const target = {
+      nodeType: 1,
+      isConnected: true,
+      style: {},
+      children: [],
+      namespaceURI: 'http://www.w3.org/2000/svg',
+      textContent: '',
+      getAttribute: () => null,
+      setAttribute() {},
+      removeAttribute() {},
+      getBoundingClientRect: () => ({ width: 80, height: 80, left: 0, top: 0 }),
+    };
+    const effect = {
+      target,
+      getKeyframes: () => [
+        { computedOffset: 0, transform: 'matrix(1, 0, 0, 1, 0, 0)' },
+        { computedOffset: 1, transform: 'matrix(0, 1, -1, 0, 0, 0)' },
+      ],
+      getComputedTiming: () => ({
+        duration: 2400, delay: 150, iterations: Infinity, direction: 'normal', easing: 'linear',
+      }),
+      getTiming: () => ({ easing: 'linear' }),
+    };
+    const anim = { effect, pause() {} };
+    const head = makeContainer();
+    global.window = {};
+    global.document = {
+      head,
+      documentElement: head,
+      styleSheets: [],
+      getAnimations: () => [anim],
+      createElement: () => makeStyleNode(),
+      getElementById: () => null,
+      body: { offsetHeight: 0, querySelectorAll: () => [target] },
+    };
+    global.getComputedStyle = () => ({
+      ...makeCS(1), transform: 'none', transformOrigin: '40px 40px',
+    });
+
+    expect(pagxAnimMain(OPTS)).toEqual({ count: 1, names: ['pagxAnim0'] });
+    expect(target.style.animation).toBe('pagxAnim0 2.4s linear 0.15s infinite normal both');
+    expect(target.style.transformOrigin).toBe('40px 40px');
   });
 });

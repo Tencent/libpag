@@ -184,6 +184,7 @@ describe('forkSnapshotCli — argv builder', () => {
       '--browser-engine', 'playwright',
       '--no-inline-icon-fonts',
       '--capture-animations',
+      '--no-reduced-motion',
       '--viewport-width', '1280',
       '--viewport-height', '720',
       '--wait-ms', '500',

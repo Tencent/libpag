@@ -142,7 +142,7 @@ function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   const args = [path.join(opts.scriptDir, 'snapshot.js'), opts.input, '-o', opts.output];
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
   if (opts.inlineIconFonts === false) args.push('--no-inline-icon-fonts');
-  if (opts.captureAnimations) args.push('--capture-animations');
+  if (opts.captureAnimations) args.push('--capture-animations', '--no-reduced-motion');
   if (opts.scrollReveal) args.push('--scroll-reveal');
   if (typeof opts.viewportWidth === 'number') args.push('--viewport-width', String(opts.viewportWidth));
   if (typeof opts.viewportHeight === 'number') args.push('--viewport-height', String(opts.viewportHeight));

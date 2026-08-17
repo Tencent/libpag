@@ -70,11 +70,11 @@ class HTMLAnimationBuilder {
    * (keyed by the shape's DOM `id`, passed here as `shapeTargetId`) whose `Fill` / `Stroke` painters
    * get the derived ids `<id>__fill` / `<id>__stroke`. Painter-space properties (`fill`,
    * `fill-opacity`, `stroke`, `stroke-opacity`, `stroke-dashoffset`) target those painter ids;
-   * layer-space properties (`opacity` -> `alpha`, and a pure-translate `transform` -> `x` / `y`)
-   * target the shape's `Layer` directly. The shape layer sits at layout origin in the SVG user
-   * (view-box) space, so translate keyframes — captured in that same space via `transform-box:
-   * view-box` — map onto `x` / `y` verbatim. Non-translate transforms (scale / rotate / skew) have
-   * no Layer channel and are dropped with a diagnostic. Honours the full comma-separated `animation`
+   * layer-space properties (`opacity` -> `alpha`, a pure-translate `transform` -> `x` / `y`, and
+   * scale / rotate / skew transforms -> `matrix`) target the shape's `Layer` directly. The shape
+   * layer sits at layout origin in SVG user (view-box) space, so translate keyframes — captured in
+   * that same space via `transform-box: view-box` — map onto `x` / `y` verbatim; affine transforms
+   * are pivoted around the captured `transform-origin`. Honours the full comma-separated `animation`
    * list (each entry becomes its own `Animation`). `dashScale` (real path length / author
    * `pathLength`) rescales `stroke-dashoffset` keyframes into user units, mirroring the static dash
    * scaling the SVG importer applies. Returns true when at least one channel was emitted.

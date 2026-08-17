@@ -166,6 +166,10 @@ async function main() {
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
       selector: opts.selector,
+      // Animation baselines must observe the authored presentation. Requesting
+      // `reduce` here can collapse durations to 0.01ms and make a broken capture
+      // appear correct because both sides are effectively static.
+      reducedMotion: false,
       // Pause every CSS / WAAPI animation as soon as it is created so finite
       // animations cannot run to completion during settle (and thus disappear
       // from `document.getAnimations()` before the seek loop sees them). The

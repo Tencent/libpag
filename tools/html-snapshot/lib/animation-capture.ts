@@ -1827,7 +1827,11 @@ export function pagxBuildKeyframesIndex(): Record<string, unknown> {
   return idx;
 }
 
-export function pagxCollectWAAPI(captured: unknown[], seen: Set<Element>): void {
+export function pagxCollectWAAPI(
+  captured: unknown[],
+  seen: Set<Element>,
+  sampleCount = 24,
+): void {
   let anims: Animation[] = [];
   try {
     anims = (document as { getAnimations?: () => Animation[] }).getAnimations
@@ -1846,11 +1850,18 @@ export function pagxCollectWAAPI(captured: unknown[], seen: Set<Element>): void 
       const durationMs = typeof ct.duration === 'number' ? ct.duration : 0;
       if (!durationMs || durationMs <= 0) continue;
       const norm: Array<{ offset: number | null; props: Record<string, string> }> = [];
+      const authoredTransforms: string[] = [];
       // Used box dimensions of the animated element. Forwarded to
       // pagxNormalizeProps so percent translates resolve to absolute pixels.
       const tgtRect = (target as HTMLElement).getBoundingClientRect();
       const tgtBox = { width: tgtRect.width, height: tgtRect.height };
       for (const kf of effect.getKeyframes()) {
+        const authoredTransform = pagxPickProp(
+          kf as unknown as Record<string, unknown>, 'transform', 'transform',
+        );
+        if (authoredTransform != null && authoredTransform !== 'none') {
+          authoredTransforms.push(authoredTransform);
+        }
         const props = pagxNormalizeProps(kf, tgtBox);
         if (Object.keys(props).length === 0) continue;
         const offset = kf.computedOffset != null ? kf.computedOffset : kf.offset;
@@ -1858,6 +1869,62 @@ export function pagxCollectWAAPI(captured: unknown[], seen: Set<Element>): void 
       }
       if (norm.length === 0) continue;
       pagxFillOffsets(norm);
+      // A full-turn transform such as rotate(0deg) -> rotate(360deg) resolves
+      // both authored endpoints to the identity matrix. Keeping only those two
+      // matrices erases the spin completely. Sample that one animation through
+      // computed style so intermediate quarter-turn matrices survive, while
+      // retaining its own period / delay / infinite-loop semantics.
+      const authoredTransformCount = new Set(authoredTransforms).size;
+      const normalizedTransformCount = new Set(
+        norm.map((stop) => stop.props.transform).filter((value) => value != null),
+      ).size;
+      if (authoredTransformCount > 1 && normalizedTransformCount <= 1) {
+        const before = captured.length;
+        const timingDelay = typeof ct.delay === 'number' ? ct.delay : 0;
+        const sourceDirection = ct.direction || 'normal';
+        const sampledDirection = sourceDirection === 'alternate' || sourceDirection === 'alternate-reverse'
+          ? 'alternate'
+          : 'normal';
+        let originalTime: CSSNumberish | null = null;
+        try {
+          originalTime = (anim as Animation).currentTime;
+        } catch (_) {
+          originalTime = null;
+        }
+        pagxSampleTimeline(
+          captured,
+          seen,
+          durationMs,
+          (progress) => {
+            try {
+              anim.pause();
+              // An infinite animation wraps its exact duration back to zero.
+              // Sample an infinitesimal moment before the endpoint so the final
+              // matrix is the visual 100% state instead of another 0% sample.
+              const local = progress >= 1
+                ? Math.max(0, durationMs - 0.001)
+                : progress * durationMs;
+              anim.currentTime = timingDelay + local;
+            } catch (_) {
+              /* skip a seek the engine rejects */
+            }
+          },
+          ct.iterations,
+          Math.max(8, sampleCount),
+          1,
+          sampledDirection,
+          timingDelay,
+          undefined,
+          undefined,
+          [target as HTMLElement],
+        );
+        try {
+          anim.currentTime = originalTime;
+        } catch (_) {
+          /* leave the sampled position; the global clock resets it below */
+        }
+        if (captured.length > before) continue;
+      }
       const easing = pagxResolveWaapiEasing(anim, effect, ct, target as HTMLElement);
       captured.push({
         el: target as HTMLElement,
@@ -2086,8 +2153,11 @@ export function pagxSampleTimeline(
   delayMs: number,
   textDynamics?: PagxTextDynamic[],
   useDynamics?: PagxUseDynamic[],
+  onlyElements?: HTMLElement[],
 ): void {
-  const candidates = pagxCandidateElements(maxElements);
+  const candidates = Array.isArray(onlyElements)
+    ? onlyElements.slice(0, maxElements)
+    : pagxCandidateElements(maxElements);
   const series = new Map<HTMLElement, Array<Record<string, string | null>>>();
   // Parallel per-sample record of every text-leaf element (an element with no
   // element children) so a `textContent` that the timeline mutates — a combo
@@ -3265,9 +3335,18 @@ export function pagxEmitCaptured(
     const blockerParent = document.head || document.documentElement;
     if (blockerParent) blockerParent.appendChild(blocker);
     void document.body.offsetHeight;
-    const baseT = pagxExtractTransform(getComputedStyle(cap.el).transform || '', elBox);
+    const baseStyle = getComputedStyle(cap.el);
+    const baseT = pagxExtractTransform(baseStyle.transform || '', elBox);
+    const baseOrigin = baseStyle.transformOrigin || '';
     if (blocker.parentNode) blocker.parentNode.removeChild(blocker);
     cap.el.style.transform = keyframesDriveTransform ? 'none' : (baseT || 'none');
+    // `freezeSvg` serialises descendant SVG presentation from inline values.
+    // Preserve the computed pivot when transform keyframes are canonicalised,
+    // otherwise a class-authored `transform-origin: center` silently becomes
+    // SVG's default top-left pivot in the emitted subset.
+    if (keyframesDriveTransform && baseOrigin) {
+      cap.el.style.transformOrigin = baseOrigin;
+    }
     cap.el.style.animation = built.animationShorthand;
     names.push(built.name);
   }
@@ -3320,13 +3399,17 @@ export function pagxAnimMain(opts: {
   } catch (_) {
     checkpoint = null;
   }
-  // Universal path: one shared-clock global sampler replaces the per-source
-  // collectors (WAAPI / CSS / GSAP / anime). Seeking the whole page to N
-  // absolute times and reading computed style captures motion from every
-  // source uniformly and on the same clock the baseline seeks to, so the
-  // imported timeline aligns frame-for-frame with the ground truth. Each seek
-  // also advances the virtual clock, so JS timer-driven scene changes are
-  // sampled as opacity / transform curves too.
+  // Declarative CSS / WAAPI animations retain their own duration, delay,
+  // direction and iteration semantics. In particular, an infinite animation
+  // must remain infinite instead of being flattened into one global page-sized
+  // window. The CSS collector is a fallback for engines that do not expose a
+  // CSS animation's keyframes through WAAPI.
+  pagxCollectWAAPI(captured, seen, sampleCount);
+  pagxCollectCSS(captured, seen, maxElements);
+
+  // Supplement the declarative collectors with the shared-clock global sampler.
+  // It handles unseen elements driven by timers / GSAP / anime.js and keeps
+  // their sampled motion on the same clock the visual baseline seeks to.
   // Elements whose `textContent` the timeline scripts through several values
   // (a combo counter, a countdown). The sampler records them here; after the
   // DOM is restored they are rebuilt as overlay text layers so the changing

@@ -1800,11 +1800,22 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
       }
     }
   }
-  bool hasAnimOrSM = !doc.animations.empty();
+  auto isExportableTimelineNode = [](const Node* node) {
+    if (node == nullptr) return false;
+    if (node->nodeType() == NodeType::StateMachine) return true;
+    return node->nodeType() == NodeType::Animation &&
+           !static_cast<const Animation*>(node)->objects.empty();
+  };
+  bool hasAnimOrSM = false;
+  for (const auto* node : doc.animations) {
+    if (isExportableTimelineNode(node)) {
+      hasAnimOrSM = true;
+      break;
+    }
+  }
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
-      if (node != nullptr &&
-          (node->nodeType() == NodeType::Animation || node->nodeType() == NodeType::StateMachine) &&
+      if (isExportableTimelineNode(node.get()) &&
           written.find(node.get()) == written.end()) {
         hasAnimOrSM = true;
         break;
@@ -1819,7 +1830,8 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
         continue;
       }
       if (node->nodeType() == NodeType::Animation) {
-        WriteAnimation(xml, static_cast<const Animation*>(node));
+        auto* animation = static_cast<const Animation*>(node);
+        if (!animation->objects.empty()) WriteAnimation(xml, animation);
       } else if (node->nodeType() == NodeType::StateMachine) {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node));
       }
@@ -1831,7 +1843,8 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
         continue;
       }
       if (node->nodeType() == NodeType::Animation) {
-        WriteAnimation(xml, static_cast<const Animation*>(node.get()));
+        auto* animation = static_cast<const Animation*>(node.get());
+        if (!animation->objects.empty()) WriteAnimation(xml, animation);
       } else {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
       }

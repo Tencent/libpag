@@ -887,6 +887,34 @@ PAGX_TEST(PAGXSVGTest, SVGImport_SharedGradientReferencedTwice) {
   EXPECT_GE(fills.size(), 2u);
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_QuotedGradientUrlReferences) {
+  std::string svg =
+      "<svg width=\"200\" height=\"100\" viewBox=\"0 0 200 100\">"
+      "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\">"
+      "<stop offset=\"0\" stop-color=\"#F00\"/><stop offset=\"1\" stop-color=\"#00F\"/>"
+      "</linearGradient></defs>"
+      "<rect x=\"0\" y=\"0\" width=\"80\" height=\"80\" fill=\"url('#g')\"/>"
+      "<rect x=\"100\" y=\"0\" width=\"80\" height=\"80\" fill=\"none\" "
+      "stroke=\"url(&quot;#g&quot;)\" stroke-width=\"4\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+
+  std::vector<pagx::Element*> fills;
+  std::vector<pagx::Element*> strokes;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+    CollectElementsByType(layer, pagx::NodeType::Stroke, strokes);
+  }
+  ASSERT_FALSE(fills.empty());
+  ASSERT_FALSE(strokes.empty());
+  auto* fill = static_cast<pagx::Fill*>(fills.front());
+  auto* stroke = static_cast<pagx::Stroke*>(strokes.front());
+  ASSERT_NE(fill->color, nullptr);
+  ASSERT_NE(stroke->color, nullptr);
+  EXPECT_EQ(fill->color->nodeType(), pagx::NodeType::LinearGradient);
+  EXPECT_EQ(stroke->color->nodeType(), pagx::NodeType::LinearGradient);
+}
+
 /**
  * Test SVG export with inner shadow filter.
  */

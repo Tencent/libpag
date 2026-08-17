@@ -128,7 +128,7 @@ Options:
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
 | `--no-reduced-motion` | _reduced motion enabled_ | Request `prefers-reduced-motion: no-preference`; use when reduced-motion styles hide content |
 | `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
-| `--capture-animations` | _disabled_ | Capture the page's animations (CSS `@keyframes`, Web Animations, GSAP, anime.js) into the subset as `@keyframes` + `animation` so the importer can replay the motion; otherwise a single static frame is emitted |
+| `--capture-animations` | _disabled_ | Capture the page's animations (CSS `@keyframes`, Web Animations, GSAP, anime.js) into the subset as `@keyframes` + `animation` so the importer can replay the motion; implies `--no-reduced-motion`; otherwise a single static frame is emitted |
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
 | `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |

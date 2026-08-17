@@ -60,6 +60,7 @@ describe('parseArgs — file inputs', () => {
     expect(parseArgs(argv('/tmp/page.html')).captureAnimations).toBe(false);
     const opts = parseArgs(argv('/tmp/page.html', '--capture-animations'));
     expect(opts.captureAnimations).toBe(true);
+    expect(opts.reducedMotion).toBe(false);
   });
 
   test('reduced motion defaults on and --no-reduced-motion disables it', () => {

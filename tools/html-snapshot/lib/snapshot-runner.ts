@@ -348,6 +348,12 @@ export async function runSnapshot(
   targetUrl: string,
   opts?: RunSnapshotOptions,
 ): Promise<RunSnapshotResult> {
+  const captureAnimations = opts?.captureAnimations ?? false;
+  // Static snapshots prefer the accessibility presentation so entrance motion
+  // cannot leave content hidden. Animation capture is the opposite operation:
+  // unless a caller explicitly chooses a media preference, observe the authored
+  // timeline under `no-preference`.
+  const reducedMotion = opts?.reducedMotion ?? !captureAnimations;
   const {
     viewportWidth = SNAPSHOT_DEFAULTS.viewportWidth,
     viewportHeight = SNAPSHOT_DEFAULTS.viewportHeight,
@@ -355,7 +361,6 @@ export async function runSnapshot(
     selector = '',
     cookies = [],
     headers = [],
-    reducedMotion = true,
     inlineIconFonts = true,
     // Static by default: the snapshot emits a single frozen frame and no
     // animation-capture machinery (virtual clock, transition recorder, WAAPI/
@@ -363,7 +368,6 @@ export async function runSnapshot(
     // into the subset as `@keyframes` + `animation` opt in via
     // `captureAnimations: true` (surfaced as `--capture-animations` on the
     // CLIs). See the init-script / sampler branches below.
-    captureAnimations = false,
     scrollReveal = false,
     downloadFonts = false,
     fontDir = '',

@@ -113,12 +113,19 @@ const FLAGS: FlagSpec[] = [
   // becomes non-portable).
   { names: ['--no-inline-icon-fonts'], takesArg: false, set: (o) => { o.inlineIconFonts = false; } },
   // Capture the page's animations into the subset. Off by default: the snapshot
-  // emits a single static frame. When on, the animation-capture pass
+  // emits a single static frame. Animation capture must observe the page's real
+  // motion, so it also opts out of the static snapshot's reduced-motion media
+  // emulation. Otherwise a common accessibility rule turns every duration into
+  // 0.01ms while leaving its delay intact, producing a one-frame jump instead of
+  // the authored timeline. The animation-capture pass
   // (lib/animation-capture.ts) installs a virtual clock + transition recorder,
   // then reads running CSS `@keyframes` / WAAPI / GSAP / anime.js animations and
   // rewrites them as canonical `@keyframes pagxAnim<N>` + inline `animation`
   // shorthands so the importer can replay the motion in PAGX.
-  { names: ['--capture-animations'], takesArg: false, set: (o) => { o.captureAnimations = true; } },
+  { names: ['--capture-animations'], takesArg: false, set: (o) => {
+    o.captureAnimations = true;
+    o.reducedMotion = false;
+  } },
   // Walk the page from top to bottom (then back to the top) before taking the
   // snapshot. This fires scroll-triggered reveal animations (sections kept at
   // `opacity: 0` until an IntersectionObserver flips them visible) and forces
@@ -359,8 +366,8 @@ Options:
   --capture-animations       Capture the page's animations (CSS @keyframes, Web
                              Animations, GSAP, anime.js) into the subset as
                              @keyframes + animation so the importer can replay
-                             the motion. Default: disabled (a single static
-                             frame is emitted).
+                             the motion. Implies --no-reduced-motion. Default:
+                             disabled (a single static frame is emitted).
   --scroll-reveal            Walk the page top-to-bottom (then back to the top)
                              before snapshotting so scroll-triggered reveal
                              animations fire and lazy-loaded media is fetched.

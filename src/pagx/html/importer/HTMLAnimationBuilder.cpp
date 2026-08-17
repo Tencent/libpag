@@ -1758,13 +1758,16 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     std::vector<Keyframe<Color>> strokeColorKeys;
     std::vector<Keyframe<float>> strokeAlphaKeys;
     std::vector<Keyframe<float>> dashKeys;
-    // Layer-space channels: `opacity` -> the shape Layer's `alpha`, a pure-translate `transform` ->
-    // its `x` / `y`. The shape Layer sits at layout origin in SVG user (view-box) space, so the
-    // captured translate values (emitted in that space via `transform-box: view-box`) map verbatim.
+    // Layer-space channels: `opacity` -> the shape Layer's `alpha`; a pure-translate `transform`
+    // -> `x` / `y`; and rotate / scale / skew -> the full affine `matrix` channel. The shape Layer
+    // sits at layout origin in SVG user (view-box) space, so captured values map verbatim.
     std::vector<Keyframe<float>> alphaKeys;
     std::vector<Keyframe<float>> xKeys;
     std::vector<Keyframe<float>> yKeys;
-    bool transformDropped = false;
+    std::vector<Keyframe<Matrix>> matrixKeys;
+    std::vector<std::pair<Frame, Matrix>> transformStops;
+    bool transformAllPureTranslate = true;
+    bool transformInvalid = false;
 
     for (const auto& stop : stops) {
       Frame time = static_cast<Frame>(
@@ -1782,11 +1785,14 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
         } else if (prop == "transform") {
           Matrix m = Matrix::Identity();
           bool pureTranslate = false;
-          if (ParseTransformMatrix(val, _valueParser, m, pureTranslate) && pureTranslate) {
-            xKeys.push_back({time, m.tx, interp, {}, {}});
-            yKeys.push_back({time, m.ty, interp, {}, {}});
+          if (ParseTransformMatrix(val, _valueParser, m, pureTranslate)) {
+            transformStops.push_back({time, m});
+            if (!pureTranslate) transformAllPureTranslate = false;
           } else {
-            transformDropped = true;
+            transformInvalid = true;
+            _diagnostics.warn("html: unsupported inline-svg 'transform' value '" + Trim(val) +
+                              "' in @keyframes; dropped "
+                              "[subset:animation-unsupported-property]");
           }
         } else if (prop == "fill") {
           fillColorKeys.push_back({time, _valueParser.parseColor(val), interp, {}, {}});
@@ -1813,19 +1819,40 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       }
     }
 
-    // A pure-translate track that got interrupted by an unrepresentable function (scale / rotate /
-    // matrix-with-linear-part) can't be faithfully split across `x` / `y`, so drop the whole track.
-    if (transformDropped) {
-      xKeys.clear();
-      yKeys.clear();
-      _diagnostics.warn(
-          "html: inline-svg shape 'transform' animation is not a pure translate; transform channel "
-          "dropped [subset:animation-unsupported-property]");
+    // Keep translations as x/y so they compose with SVG layout. Any other valid 2D affine routes
+    // through a single matrix channel, pivoted about the computed transform-origin captured on the
+    // shape. Invalid 3D / perspective values drop the complete transform track so a partial set of
+    // keyframes can never produce a discontinuous animation.
+    if (transformInvalid) {
+      transformStops.clear();
+    } else if (transformAllPureTranslate) {
+      for (const auto& ts : transformStops) {
+        xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
+        yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
+      }
+    } else if (!transformStops.empty()) {
+      float cx = 0.0f;
+      float cy = 0.0f;
+      bool hasPivot = ResolvePivot(style, nullptr, _valueParser, cx, cy);
+      if (!hasPivot && !GetTrimmed(style, "transform-origin").empty()) {
+        _diagnostics.warn(
+            "html: inline-svg transform animation has an unresolvable transform-origin; pivoting "
+            "at top-left may differ from CSS [subset:animation-unsupported-property]");
+      }
+      Matrix toCenter = Matrix::Translate(cx, cy);
+      Matrix fromCenter = Matrix::Translate(-cx, -cy);
+      for (const auto& ts : transformStops) {
+        Matrix m = ts.second;
+        if (hasPivot) {
+          m = toCenter * m * fromCenter;
+        }
+        matrixKeys.push_back({ts.first, m, interp, {}, {}});
+      }
     }
 
     if (fillColorKeys.empty() && fillAlphaKeys.empty() && strokeColorKeys.empty() &&
         strokeAlphaKeys.empty() && dashKeys.empty() && alphaKeys.empty() && xKeys.empty() &&
-        yKeys.empty()) {
+        yKeys.empty() && matrixKeys.empty()) {
       continue;
     }
 
@@ -1837,6 +1864,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     ApplyBezierHandles(yKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(matrixKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     if (easing.kind == ResolvedEasing::Kind::Steps) {
       ExpandSteps(fillColorKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(fillAlphaKeys, easing.stepCount, easing.stepJump);
@@ -1846,6 +1874,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       ExpandSteps(alphaKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(xKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(yKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(matrixKeys, easing.stepCount, easing.stepJump);
     }
 
     LoopMode loopMode = LoopMode::Once;
@@ -1891,12 +1920,17 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     if (!yKeys.empty()) {
       ApplyFillMode(yKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
     }
+    if (!matrixKeys.empty()) {
+      ApplyFillMode(matrixKeys, spec.fillMode, Matrix::Identity(), loopOnce, activeEnd);
+    }
 
     bool needsTrailingBaseline =
         loopOnce && (spec.fillMode == "none" || spec.fillMode == "backwards");
 
-    std::string animId =
-        (strokeTargetId.empty() ? fillTargetId : strokeTargetId) + "_" + spec.name + "_anim";
+    std::string idBase = !strokeTargetId.empty()
+                             ? strokeTargetId
+                             : (!fillTargetId.empty() ? fillTargetId : shapeTargetId);
+    std::string animId = idBase + "_" + spec.name + "_anim";
     auto* animation = _document->makeNode<Animation>(animId);
     animation->frameRate = kFrameRate;
     if (loopOnce) {
@@ -1908,7 +1942,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     animation->loop = loopMode;
 
     // Layer-space channels (opacity / translate) target the shape's own `Layer`.
-    if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty()) {
+    if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty() || !matrixKeys.empty()) {
       if (shapeTargetId.empty()) {
         _diagnostics.warn(
             "html: inline-svg 'opacity' / 'transform' animation has no shape layer to target; "
@@ -1932,6 +1966,12 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
           auto* ch = _document->makeNode<TypedChannel<float>>();
           ch->name = "y";
           ch->keyframes = std::move(yKeys);
+          object->channels.push_back(ch);
+        }
+        if (!matrixKeys.empty()) {
+          auto* ch = _document->makeNode<TypedChannel<Matrix>>();
+          ch->name = "matrix";
+          ch->keyframes = std::move(matrixKeys);
           object->channels.push_back(ch);
         }
         animation->objects.push_back(object);
