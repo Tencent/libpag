@@ -30,6 +30,8 @@
 #include "pagx/SystemFonts.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/VerifyUtils.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx::cli {
@@ -242,5 +244,15 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
  */
 bool WriteStringToFile(const std::string& content, const std::string& filePath,
                        const std::string& command);
+
+/**
+ * Maps a format string ("png"/"webp"/"jpg") to a tgfx::EncodedFormat, defaulting to PNG.
+ */
+tgfx::EncodedFormat GetEncodedFormat(const std::string& format);
+
+/**
+ * Writes binary data to a file. Returns true on success, false on failure.
+ */
+bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<tgfx::Data>& data);
 
 }  // namespace pagx::cli

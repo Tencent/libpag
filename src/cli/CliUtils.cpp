@@ -112,4 +112,27 @@ bool WriteStringToFile(const std::string& content, const std::string& filePath,
   return true;
 }
 
+tgfx::EncodedFormat GetEncodedFormat(const std::string& format) {
+  if (format == "webp") {
+    return tgfx::EncodedFormat::WEBP;
+  }
+  if (format == "jpg") {
+    return tgfx::EncodedFormat::JPEG;
+  }
+  return tgfx::EncodedFormat::PNG;
+}
+
+bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<tgfx::Data>& data) {
+  if (data == nullptr) {
+    return false;
+  }
+  FILE* file = fopen(filePath.c_str(), "wb");
+  if (file == nullptr) {
+    return false;
+  }
+  auto written = fwrite(data->data(), 1, data->size(), file);
+  fclose(file);
+  return written == data->size();
+}
+
 }  // namespace pagx::cli
