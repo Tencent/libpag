@@ -56,6 +56,12 @@ describe('parseArgs — file inputs', () => {
     expect(opts.inlineIconFonts).toBe(false);
   });
 
+  test('reduced motion defaults on and --no-reduced-motion disables it', () => {
+    expect(parseArgs(argv('/tmp/page.html')).reducedMotion).toBe(true);
+    const opts = parseArgs(argv('/tmp/page.html', '--no-reduced-motion'));
+    expect(opts.reducedMotion).toBe(false);
+  });
+
   test('--download-fonts defaults --font-dir to a sibling .fonts dir', () => {
     const opts = parseArgs(argv('/tmp/page.html', '-o', '/tmp/out.subset.html', '--download-fonts'));
     expect(opts.downloadFonts).toBe(true);

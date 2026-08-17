@@ -279,7 +279,7 @@ command-line tool and try again.**
 If you find libpag helpful, please give us a **Star**. We truly appreciate your support :)
 
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Tencent/libpag&type=Date)](https://star-history.com/#Tencent/libpag&Date)
+[![Star History Chart](https://api.star-history.dera.page/svg?repos=Tencent/libpag&type=Date)](https://star-history.dera.page/#Tencent/libpag&Date)
 
 
 ## License
