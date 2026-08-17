@@ -83,8 +83,7 @@ class HTMLAnimationBuilder {
    * emitted.
    */
   bool buildForInlineSvgShape(const std::unordered_map<std::string, std::string>& style,
-                              const std::string& shapeTargetId,
-                              const std::string& rotationTargetId,
+                              const std::string& shapeTargetId, const std::string& rotationTargetId,
                               const std::string& fillTargetId, const std::string& strokeTargetId,
                               float dashScale);
 

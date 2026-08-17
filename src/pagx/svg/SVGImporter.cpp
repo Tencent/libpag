@@ -2945,9 +2945,8 @@ std::string SVGParserContext::resolveUrl(const std::string& url) {
     size_t end = value.rfind(')');
     if (end != std::string::npos && end >= 4) {
       std::string inner = trim(value.substr(4, end - 4));
-      if (inner.size() >= 2 &&
-          ((inner.front() == '"' && inner.back() == '"') ||
-           (inner.front() == '\'' && inner.back() == '\''))) {
+      if (inner.size() >= 2 && ((inner.front() == '"' && inner.back() == '"') ||
+                                (inner.front() == '\'' && inner.back() == '\''))) {
         inner = trim(inner.substr(1, inner.size() - 2));
       }
       if (!inner.empty() && inner.front() == '#') {

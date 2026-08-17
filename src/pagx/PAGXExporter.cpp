@@ -1815,8 +1815,7 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
   }
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
-      if (isExportableTimelineNode(node.get()) &&
-          written.find(node.get()) == written.end()) {
+      if (isExportableTimelineNode(node.get()) && written.find(node.get()) == written.end()) {
         hasAnimOrSM = true;
         break;
       }
