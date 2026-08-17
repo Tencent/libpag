@@ -73,6 +73,24 @@ class PAGAnimation : public PAGTimeline {
   float frameRate() const;
 
   /**
+   * Returns the raw accumulated playback time mapped onto a monotonic linear timeline spanning one
+   * full loop period, in microseconds. Unlike currentTime(), which folds to the in-cycle phase (a
+   * triangle wave under PingPong that decreases on the return half), this rises monotonically across
+   * one full loop period: [0, duration] for Once/Loop and [0, 2 * duration] for PingPong. The end of
+   * a period reports the full period (not 0), so seeking to the timeline end stays at the end instead
+   * of wrapping back to the start. Returns 0 once the owning PAGScene is destroyed or the duration
+   * is zero.
+   */
+  int64_t playbackPosition() const;
+
+  /**
+   * Returns the length of one full loop period in microseconds: the animation duration for
+   * Once/Loop and 2 * duration for PingPong (one complete forward-and-back pass). Returns 0 once
+   * the owning PAGScene is destroyed.
+   */
+  int64_t playbackPeriod() const;
+
+  /**
    * Sets the current playback time in microseconds. Only updates the time; call apply() to reflect
    * it in the content.
    */

@@ -263,12 +263,32 @@ export class PlaybackBar {
             view.setCurrentTimeMicros(targetTime);
             this.callbacks.onSeek?.(targetTime);
         };
+        // Ends a scrub: releases the dragging flag, applies the final seek, restores the
+        // pre-drag play state and refreshes the UI. Idempotent so it's safe to route every
+        // drag-end signal through it ('pointerup', 'pointercancel', 'change').
+        const endDrag = () => {
+            if (!this.isDraggingSlider) {
+                return;
+            }
+            this.isDraggingSlider = false;
+            const view = this.getView();
+            if (!view) return;
+            seekToSliderValue();
+            if (this.wasPlayingBeforeDrag) {
+                view.play();
+                this.callbacks.onPlay?.();
+                this.wasPlayingBeforeDrag = false;
+            }
+            this.updateAll();
+            // Release focus so Space keeps toggling playback after a scrub.
+            this.progressSlider.blur();
+        };
         this.progressSlider.addEventListener('input', () => {
             const view = this.getView();
             if (!view) return;
             // First input event of a drag: pause the view so subsequent frames follow the slider
-            // instead of the render loop. Remember the pre-drag playing state so 'change' can
-            // restore it.
+            // instead of the render loop. Remember the pre-drag playing state so the drag end
+            // can restore it.
             if (!this.isDraggingSlider) {
                 this.isDraggingSlider = true;
                 this.wasPlayingBeforeDrag = view.isPlaying();
@@ -282,20 +302,16 @@ export class PlaybackBar {
             this.updateTimeDisplay();
             this.updatePlayPauseIcon();
         });
-        this.progressSlider.addEventListener('change', () => {
-            this.isDraggingSlider = false;
-            const view = this.getView();
-            if (!view) return;
-            seekToSliderValue();
-            if (this.wasPlayingBeforeDrag) {
-                view.play();
-                this.callbacks.onPlay?.();
-                this.wasPlayingBeforeDrag = false;
-            }
-            this.updateAll();
-            // Release focus so Space keeps toggling playback after a scrub.
-            this.progressSlider.blur();
-        });
+        // A range input can finish a scrub without ever firing 'change': dragging the thumb to
+        // the min/max edge and releasing it back at the same edge value leaves the value
+        // unchanged, so the browser skips 'change'. Resetting the flag only in 'change' would
+        // then stick it true forever and freeze the playback tick. 'pointerup'/'pointercancel'
+        // always fire on the captured slider, so they release the flag reliably; 'change' stays
+        // as the fallback for keyboard scrubbing (arrow keys / Home / End fire input + change
+        // but no pointer events).
+        this.progressSlider.addEventListener('pointerup', endDrag);
+        this.progressSlider.addEventListener('pointercancel', endDrag);
+        this.progressSlider.addEventListener('change', endDrag);
     }
 
     private startTick(): void {
