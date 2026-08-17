@@ -249,26 +249,6 @@ static int ParseRenderOptions(int argc, char* argv[], RenderOptions* options) {
   return 0;
 }
 
-static tgfx::EncodedFormat GetEncodedFormat(const std::string& format) {
-  if (format == "webp") {
-    return tgfx::EncodedFormat::WEBP;
-  }
-  if (format == "jpg") {
-    return tgfx::EncodedFormat::JPEG;
-  }
-  return tgfx::EncodedFormat::PNG;
-}
-
-static bool WriteDataToFile(const std::string& filePath, const std::shared_ptr<tgfx::Data>& data) {
-  FILE* file = fopen(filePath.c_str(), "wb");
-  if (file == nullptr) {
-    return false;
-  }
-  auto written = fwrite(data->data(), 1, data->size(), file);
-  fclose(file);
-  return written == data->size();
-}
-
 // Renders a single animation frame through the runtime animation path. The document's top-level
 // timelines are all seeked to `options.timeSeconds` and applied before drawing, so an animated
 // element's alpha / position / color reflect that playback time. Static documents (no animations)
