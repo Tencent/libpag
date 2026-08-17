@@ -769,9 +769,6 @@ PAGX_TEST(PAGXRuntimeTest, AnimationVisibleChannelWindow) {
 // Helper that builds a scene owning a single Animation with the given loop mode. The animation is
 // 60 frames at 60 fps so DurationMicros == 1_000_000 exactly, keeping the boundary math free of
 // rounding noise (an integer-only period is required for the period-boundary assertions below).
-// Helper that builds a scene owning a single Animation with the given loop mode. The animation is
-// 60 frames at 60 fps so DurationMicros == 1_000_000 exactly, keeping the boundary math free of
-// rounding noise (an integer-only period is required for the period-boundary assertions below).
 // The scene is returned alongside the animation because PAGAnimation only holds a weak reference
 // to its owning scene: without keeping the scene alive in the caller, duration()/playbackPeriod()
 // short-circuit to 0 via the owner.expired() guard and every assertion below would fire.
