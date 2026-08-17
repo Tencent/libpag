@@ -71,17 +71,22 @@ class HTMLAnimationBuilder {
    * get the derived ids `<id>__fill` / `<id>__stroke`. Painter-space properties (`fill`,
    * `fill-opacity`, `stroke`, `stroke-opacity`, `stroke-dashoffset`) target those painter ids;
    * layer-space properties (`opacity` -> `alpha`, a pure-translate `transform` -> `x` / `y`, and
-   * scale / rotate / skew transforms -> `matrix`) target the shape's `Layer` directly. The shape
-   * layer sits at layout origin in SVG user (view-box) space, so translate keyframes — captured in
-   * that same space via `transform-box: view-box` — map onto `x` / `y` verbatim; affine transforms
-   * are pivoted around the captured `transform-origin`. Honours the full comma-separated `animation`
-   * list (each entry becomes its own `Animation`). `dashScale` (real path length / author
-   * `pathLength`) rescales `stroke-dashoffset` keyframes into user units, mirroring the static dash
-   * scaling the SVG importer applies. Returns true when at least one channel was emitted.
+   * scale / skew transforms -> `matrix`) target the shape's `Layer` directly. A pure fixed-origin
+   * rotation targets `rotationTargetId`, a Group synthesised by the SVG resolver, through its
+   * scalar `rotation` channel so matrix interpolation cannot move the pivot. The shape layer sits
+   * at layout origin in SVG user (view-box) space, so translate keyframes — captured in that same
+   * space via `transform-box: view-box` — map onto `x` / `y` verbatim; remaining affine transforms
+   * are pivoted around the captured `transform-origin`. Honours the full comma-separated
+   * `animation` list (each entry becomes its own `Animation`). `dashScale` (real path length /
+   * author `pathLength`) rescales `stroke-dashoffset` keyframes into user units, mirroring the
+   * static dash scaling the SVG importer applies. Returns true when at least one channel was
+   * emitted.
    */
   bool buildForInlineSvgShape(const std::unordered_map<std::string, std::string>& style,
-                              const std::string& shapeTargetId, const std::string& fillTargetId,
-                              const std::string& strokeTargetId, float dashScale);
+                              const std::string& shapeTargetId,
+                              const std::string& rotationTargetId,
+                              const std::string& fillTargetId, const std::string& strokeTargetId,
+                              float dashScale);
 
  private:
   HTMLDiagnosticSink& _diagnostics;

@@ -569,6 +569,44 @@ bool KeyframeStopLess(const CssKeyframeStop& a, const CssKeyframeStop& b) {
   return a.percent < b.percent;
 }
 
+// Converts sampled raw CSS matrices into an unwrapped scalar rotation track when every stop is a
+// unit rotation without translation. html-snapshot samples long turns into intermediate matrices,
+// so unwrapping adjacent atan2 angles preserves winding across the +/-180-degree boundary. The
+// resulting Group.rotation channel keeps transform-origin structural instead of baking it into a
+// matrix translation that can drift during runtime interpolation.
+bool BuildPureRotationKeys(const std::vector<std::pair<Frame, Matrix>>& transformStops,
+                           KeyframeInterpolationType interpolation,
+                           std::vector<Keyframe<float>>* rotationKeys) {
+  if (transformStops.empty() || rotationKeys == nullptr) return false;
+  static constexpr float Epsilon = 2.0e-3f;
+  std::vector<Keyframe<float>> result;
+  result.reserve(transformStops.size());
+  float previousAngle = 0.0f;
+  bool first = true;
+  for (const auto& stop : transformStops) {
+    const Matrix& matrix = stop.second;
+    float lengthX = std::sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
+    float lengthY = std::sqrt(matrix.c * matrix.c + matrix.d * matrix.d);
+    float determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+    if (std::fabs(matrix.tx) > Epsilon || std::fabs(matrix.ty) > Epsilon ||
+        std::fabs(lengthX - 1.0f) > Epsilon || std::fabs(lengthY - 1.0f) > Epsilon ||
+        std::fabs(matrix.a - matrix.d) > Epsilon || std::fabs(matrix.b + matrix.c) > Epsilon ||
+        std::fabs(determinant - 1.0f) > Epsilon) {
+      return false;
+    }
+    float angle = std::atan2(matrix.b, matrix.a) * 180.0f / kPi;
+    if (!first) {
+      while (angle - previousAngle > 180.0f) angle -= 360.0f;
+      while (angle - previousAngle < -180.0f) angle += 360.0f;
+    }
+    result.push_back({stop.first, angle, interpolation, {}, {}});
+    previousAngle = angle;
+    first = false;
+  }
+  *rotationKeys = std::move(result);
+  return true;
+}
+
 // Writes bezier control handles between consecutive keyframes of a channel. No-op unless the
 // channel uses bezier interpolation.
 template <typename T>
@@ -1682,7 +1720,8 @@ bool HTMLAnimationBuilder::buildForElement(
 
 bool HTMLAnimationBuilder::buildForInlineSvgShape(
     const std::unordered_map<std::string, std::string>& style, const std::string& shapeTargetId,
-    const std::string& fillTargetId, const std::string& strokeTargetId, float dashScale) {
+    const std::string& rotationTargetId, const std::string& fillTargetId,
+    const std::string& strokeTargetId, float dashScale) {
   if (_document == nullptr || _keyframes == nullptr) return false;
   auto shorthandIt = style.find("animation");
   bool hasShorthand = shorthandIt != style.end() && !Trim(shorthandIt->second).empty();
@@ -1759,11 +1798,13 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     std::vector<Keyframe<float>> strokeAlphaKeys;
     std::vector<Keyframe<float>> dashKeys;
     // Layer-space channels: `opacity` -> the shape Layer's `alpha`; a pure-translate `transform`
-    // -> `x` / `y`; and rotate / scale / skew -> the full affine `matrix` channel. The shape Layer
-    // sits at layout origin in SVG user (view-box) space, so captured values map verbatim.
+    // -> `x` / `y`; scale / skew -> the full affine `matrix` channel. A pure rotation uses the
+    // scalar `rotation` channel on the resolver-created Group so its pivot stays fixed. The shape
+    // Layer sits at layout origin in SVG user (view-box) space, so captured values map verbatim.
     std::vector<Keyframe<float>> alphaKeys;
     std::vector<Keyframe<float>> xKeys;
     std::vector<Keyframe<float>> yKeys;
+    std::vector<Keyframe<float>> rotationKeys;
     std::vector<Keyframe<Matrix>> matrixKeys;
     std::vector<std::pair<Frame, Matrix>> transformStops;
     bool transformAllPureTranslate = true;
@@ -1830,6 +1871,10 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
         xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
         yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
       }
+    } else if (!rotationTargetId.empty() &&
+               BuildPureRotationKeys(transformStops, interp, &rotationKeys)) {
+      // The SVG resolver has already applied the captured transform-origin as the Group's static
+      // anchor/position. Only the authored angle remains animated.
     } else if (!transformStops.empty()) {
       float cx = 0.0f;
       float cy = 0.0f;
@@ -1852,7 +1897,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
 
     if (fillColorKeys.empty() && fillAlphaKeys.empty() && strokeColorKeys.empty() &&
         strokeAlphaKeys.empty() && dashKeys.empty() && alphaKeys.empty() && xKeys.empty() &&
-        yKeys.empty() && matrixKeys.empty()) {
+        yKeys.empty() && rotationKeys.empty() && matrixKeys.empty()) {
       continue;
     }
 
@@ -1864,6 +1909,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     ApplyBezierHandles(alphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     ApplyBezierHandles(xKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     ApplyBezierHandles(yKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    ApplyBezierHandles(rotationKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     ApplyBezierHandles(matrixKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
     if (easing.kind == ResolvedEasing::Kind::Steps) {
       ExpandSteps(fillColorKeys, easing.stepCount, easing.stepJump);
@@ -1874,6 +1920,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       ExpandSteps(alphaKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(xKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(yKeys, easing.stepCount, easing.stepJump);
+      ExpandSteps(rotationKeys, easing.stepCount, easing.stepJump);
       ExpandSteps(matrixKeys, easing.stepCount, easing.stepJump);
     }
 
@@ -1919,6 +1966,9 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
     if (!yKeys.empty()) {
       ApplyFillMode(yKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
+    }
+    if (!rotationKeys.empty()) {
+      ApplyFillMode(rotationKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
     }
     if (!matrixKeys.empty()) {
       ApplyFillMode(matrixKeys, spec.fillMode, Matrix::Identity(), loopOnce, activeEnd);
@@ -1976,6 +2026,16 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
         }
         animation->objects.push_back(object);
       }
+    }
+
+    if (!rotationKeys.empty()) {
+      auto* object = _document->makeNode<AnimationObject>();
+      object->target = rotationTargetId;
+      auto* channel = _document->makeNode<TypedChannel<float>>();
+      channel->name = "rotation";
+      channel->keyframes = std::move(rotationKeys);
+      object->channels.push_back(channel);
+      animation->objects.push_back(object);
     }
 
     // Group channels by their target painter node (fill vs stroke).

@@ -263,6 +263,8 @@ class HTMLParserContext {
   struct PendingSvgShapeAnimation {
     std::unordered_map<std::string, std::string> style = {};
     std::string shapeTargetId = {};
+    // Optional Group created by the SVG resolver for fixed-origin rotation channels.
+    std::string rotationTargetId = {};
     std::string fillTargetId = {};
     std::string strokeTargetId = {};
     float dashScale = 1.0f;

@@ -59,6 +59,42 @@ bool IsExternalSvgSrc(const std::string& src) {
   return ToLower(src.substr(src.size() - 4)) == ".svg";
 }
 
+void SetDOMAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
+                     const std::string& value) {
+  if (node == nullptr) return;
+  for (auto& attribute : node->attributes) {
+    if (attribute.name == name) {
+      attribute.value = value;
+      return;
+    }
+  }
+  node->attributes.push_back({name, value});
+}
+
+bool IsInlineSvgLeafShape(const std::string& name) {
+  return name == "rect" || name == "circle" || name == "ellipse" || name == "line" ||
+         name == "polyline" || name == "polygon" || name == "path" || name == "use" ||
+         name == "image";
+}
+
+// html-snapshot pins transform-origin on animated SVG shapes to two absolute pixel values. Record
+// that resolved pivot in private intermediate attributes so SVG resolution can build a native
+// PAGX Group around the vector contents. Hand-authored unresolved keyword/percentage origins keep
+// the existing matrix-channel fallback.
+bool ResolvePinnedSvgTransformOrigin(const std::unordered_map<std::string, std::string>& style,
+                                     HTMLValueParser& parser, float* x, float* y) {
+  auto it = style.find("transform-origin");
+  if (it == style.end()) return false;
+  auto tokens = SplitTopLevelWhitespace(Trim(it->second));
+  if (tokens.size() != 2) return false;
+  float parsedX = parser.parseAbsoluteLengthPx(tokens[0]);
+  float parsedY = parser.parseAbsoluteLengthPx(tokens[1]);
+  if (!std::isfinite(parsedX) || !std::isfinite(parsedY)) return false;
+  *x = parsedX;
+  *y = parsedY;
+  return true;
+}
+
 // Resolves one axis of a per-axis `mask-size` token into an on-element pixel length. A length
 // (`120px`) is taken verbatim; a percentage resolves against the element's box axis; `auto` (and
 // any unparseable token) returns NaN so the caller can tie the axis to the other for aspect-ratio
@@ -740,6 +776,18 @@ void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DO
         PendingSvgShapeAnimation pending;
         pending.style = std::move(style);
         pending.shapeTargetId = id;
+        float rotationOriginX = 0.0f;
+        float rotationOriginY = 0.0f;
+        if (IsInlineSvgLeafShape(child->name) &&
+            ResolvePinnedSvgTransformOrigin(pending.style, *_valueParser, &rotationOriginX,
+                                            &rotationOriginY)) {
+          pending.rotationTargetId = _idAllocator->generateUnique("svgrotation");
+          // These attributes exist only inside the unresolved inline-SVG directive. SVGImporter
+          // consumes them while resolving the directive and does not expose them as custom data.
+          SetDOMAttribute(child, "pagx-rotation-group", pending.rotationTargetId);
+          SetDOMAttribute(child, "pagx-rotation-origin-x", CssFloatToString(rotationOriginX));
+          SetDOMAttribute(child, "pagx-rotation-origin-y", CssFloatToString(rotationOriginY));
+        }
         pending.fillTargetId = id + "__fill";
         pending.strokeTargetId = id + "__stroke";
         pending.dashScale = dashScale;

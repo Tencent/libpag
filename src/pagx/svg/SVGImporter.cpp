@@ -42,6 +42,15 @@ using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 
+static bool ParseInternalFloat(const std::string& value, float* result) {
+  if (value.empty() || result == nullptr) return false;
+  char* end = nullptr;
+  float parsed = std::strtof(value.c_str(), &end);
+  if (end == value.c_str() || *end != '\0' || !std::isfinite(parsed)) return false;
+  *result = parsed;
+  return true;
+}
+
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                                  const Options& options) {
   SVGParserContext parser(options);
@@ -576,6 +585,24 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     // Shape element: convert to vector contents.
     // Pass the shadow-only type to determine how to handle fill.
     convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
+
+    // HTMLImporter marks transform-animated inline-SVG leaf shapes with a private Group id and a
+    // resolved pixel pivot. Wrapping the vector elements here lets the HTML animation builder emit
+    // a scalar Group.rotation channel for pure rotations. The static position and anchor cancel,
+    // so the wrapper is visually neutral before animation is applied.
+    std::string rotationGroupId = getAttribute(element, "pagx-rotation-group");
+    float rotationOriginX = 0.0f;
+    float rotationOriginY = 0.0f;
+    if (!rotationGroupId.empty() &&
+        ParseInternalFloat(getAttribute(element, "pagx-rotation-origin-x"), &rotationOriginX) &&
+        ParseInternalFloat(getAttribute(element, "pagx-rotation-origin-y"), &rotationOriginY) &&
+        !layer->contents.empty()) {
+      auto* rotationGroup = _document->makeNode<Group>(rotationGroupId);
+      rotationGroup->anchor = {rotationOriginX, rotationOriginY};
+      rotationGroup->position = rotationGroup->anchor;
+      rotationGroup->elements = std::move(layer->contents);
+      layer->contents.push_back(rotationGroup);
+    }
   }
 
   // Expand SVG marker references into additional child layers.

@@ -33,6 +33,7 @@
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGStateMachine.h"
+#include "pagx/SVGImporter.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -6867,7 +6868,7 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationMatrixWithScaleProducesMatrixChannel) {
   EXPECT_FLOAT_EQ(mCh->keyframes.front().value.d, 2.0f);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, InlineSvgRotateProducesPivotedMatrixChannel) {
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgRotateProducesScalarRotationChannel) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -6893,20 +6894,45 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgRotateProducesPivotedMatrixChannel) {
   ASSERT_EQ(doc->animations.size(), 1u);
   auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
-  auto* object = FindObjectByTarget(anim, "spinner");
-  ASSERT_NE(object, nullptr);
-  auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
-  ASSERT_NE(mCh, nullptr);
+  auto* rotation = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "rotation"));
+  ASSERT_NE(rotation, nullptr);
+  ASSERT_EQ(rotation->keyframes.size(), 2u);
+  EXPECT_NEAR(rotation->keyframes.front().value, 0.0f, kEps);
+  EXPECT_NEAR(rotation->keyframes.back().value, 90.0f, kEps);
+  pagx::AnimationObject* rotationObject = nullptr;
+  for (auto* candidate : anim->objects) {
+    if (candidate != nullptr && !candidate->channels.empty() &&
+        candidate->channels.front() == rotation) {
+      rotationObject = candidate;
+      break;
+    }
+  }
+  ASSERT_NE(rotationObject, nullptr);
+  EXPECT_EQ(rotationObject->target.rfind("svgrotation", 0), 0u);
+  EXPECT_EQ(FindChannel(anim, "matrix"), nullptr);
   EXPECT_EQ(FindChannel(anim, "x"), nullptr);
   EXPECT_EQ(FindChannel(anim, "y"), nullptr);
-  ASSERT_EQ(mCh->keyframes.size(), 2u);
-  const auto& last = mCh->keyframes.back().value;
-  EXPECT_NEAR(last.a, 0.0f, kEps);
-  EXPECT_NEAR(last.b, 1.0f, kEps);
-  EXPECT_NEAR(last.c, -1.0f, kEps);
-  EXPECT_NEAR(last.d, 0.0f, kEps);
-  EXPECT_NEAR(last.tx, 80.0f, kEps);
-  EXPECT_NEAR(last.ty, 0.0f, kEps);
+  auto* svgLayer = doc->layers.front()->children.front();
+  ASSERT_FALSE(svgLayer->importDirective.content.empty());
+  EXPECT_NE(svgLayer->importDirective.content.find("pagx-rotation-group=\"" +
+                                                   rotationObject->target + "\""),
+            std::string::npos);
+  EXPECT_NE(svgLayer->importDirective.content.find("pagx-rotation-origin-x=\"40\""),
+            std::string::npos);
+  EXPECT_NE(svgLayer->importDirective.content.find("pagx-rotation-origin-y=\"40\""),
+            std::string::npos);
+
+  auto svgDocument = pagx::SVGImporter::ParseString(svgLayer->importDirective.content);
+  ASSERT_NE(svgDocument, nullptr);
+  ASSERT_EQ(svgDocument->layers.size(), 1u);
+  auto* rotationGroup = FindElementOfType<pagx::Group>(svgDocument->layers.front());
+  ASSERT_NE(rotationGroup, nullptr);
+  EXPECT_EQ(rotationGroup->id, rotationObject->target);
+  EXPECT_EQ(svgDocument->findNode(rotationObject->target), rotationGroup);
+  EXPECT_FLOAT_EQ(rotationGroup->anchor.x, 40.0f);
+  EXPECT_FLOAT_EQ(rotationGroup->anchor.y, 40.0f);
+  EXPECT_FLOAT_EQ(rotationGroup->position.x, 40.0f);
+  EXPECT_FLOAT_EQ(rotationGroup->position.y, 40.0f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationUnsupported3DTransformWarnsAndDrops) {
