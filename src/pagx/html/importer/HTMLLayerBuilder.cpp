@@ -152,8 +152,16 @@ bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
          box.borderSet || !box.boxShadow.empty() || !box.backdropFilter.empty();
 }
 
-bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
+bool HTMLLayerBuilder::hasLayoutHostAttributes(const HTMLBoxAttributes& box) {
   return box.paddingSet || box.displayFlex || box.gapSet;
+}
+
+bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
+  if (!box.padding.isZero()) return true;
+  // Flex-flow children sit inside the CSS border edge. The importer models that edge as extra
+  // padding on the layout host, so a bordered flex box still needs paint/layout isolation even
+  // when its authored padding is zero.
+  return box.displayFlex && box.borderSet && box.borderWidthPx > 0.0f;
 }
 
 Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
@@ -161,6 +169,12 @@ Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& 
   inner->percentWidth = 100.0f;
   inner->percentHeight = 100.0f;
   applyLayoutAttributes(inner, box);
+  if (box.borderSet && box.borderWidthPx > 0.0f && inner->layout != LayoutMode::None) {
+    inner->padding.top += box.borderWidthPx;
+    inner->padding.right += box.borderWidthPx;
+    inner->padding.bottom += box.borderWidthPx;
+    inner->padding.left += box.borderWidthPx;
+  }
   outer->children.push_back(inner);
   return inner;
 }

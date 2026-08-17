@@ -220,6 +220,18 @@ function formatFlexGrow(n) {
   return n.toFixed(3).replace(/\.?0+$/, '');
 }
 
+// Whether a flex item can be represented by PAGX's `flex: <grow>` model on
+// `mainAxis`. PAGX has no max-size constraint, so a capped grow item must keep
+// the used pixel size Chromium measured instead of consuming all remaining
+// space.
+function canForwardFlexGrow(computed, mainAxis) {
+  const grow = readNum(computed, 'flex-grow');
+  if (!(grow > 0) || (mainAxis !== 'row' && mainAxis !== 'column')) return false;
+  const maxProp = mainAxis === 'column' ? 'max-height' : 'max-width';
+  const maxValue = (computed.getPropertyValue(maxProp) || '').trim().toLowerCase();
+  return maxValue === '' || maxValue === 'none';
+}
+
 function escapeHtml(s) {
   return s
     .replace(/&/g, '&amp;')
@@ -504,6 +516,124 @@ function imgSrc(el) {
   return el.getAttribute('src') || '';
 }
 
+// Chromium treats an <img> with an empty / missing source and non-empty `alt`
+// as rendered fallback text rather than as an ordinary replaced element. In
+// that state even authored CSS sizes are ignored: `width:100%;height:100%`
+// and `width:80px;height:60px` both collapse to the glyph bounds of the alt
+// string. That glyph-sized rect then gets frozen by the snapshot and survives
+// all the way into PAGX, so resolving the placeholder image later cannot make
+// it reclaim its authored box.
+//
+// Temporarily neutralise the alt string for source-less images and let the
+// browser resolve the real CSS box. Keep the neutralisation only when it
+// produces a non-degenerate two-dimensional box; an actually-unsized image
+// should retain Chromium's fallback-text layout instead of disappearing. A
+// shallow clone is inserted with an empty alt before its first layout. This
+// is important: dynamically clearing alt on the already-failed element can
+// make Chromium asynchronously switch from fallback text to its 16x16 broken-
+// image icon, re-collapsing the authored box after the first layout flush. A
+// fresh source-less clone starts directly in the ordinary replaced-element
+// sizing path. All authored attributes (including empty src/srcset, class,
+// style, name and data-*) remain intact; only alt is temporarily empty. The
+// original node is stored as an expando (rather than a data-* attribute) so it
+// can be put back after capture. Multiple passes let a later placeholder
+// expand a containing block that an earlier percentage-sized placeholder
+// depends on.
+//
+// `root` is injectable for the Node unit tests. In the browser it is omitted
+// and the live document is used. The function is deliberately self-contained
+// because snapshot-runner passes it directly to page.evaluate().
+function normalizeEmptyImagePlaceholders(root) {
+  const scope = root || document;
+  if (!scope || typeof scope.querySelectorAll !== 'function') return 0;
+  const images = Array.from(scope.querySelectorAll('img'));
+  const stateKey = '__pagxSnapshotImagePlaceholderState';
+  let normalized = 0;
+
+  // A newly-normalised image can expand a containing block used by an image
+  // visited earlier in the same pass. Retry at most N additional times for N
+  // images; the first no-change pass exits immediately in the common case.
+  for (let pass = 0; pass <= images.length; pass++) {
+    let changed = false;
+    for (let index = 0; index < images.length; index++) {
+      const img = images[index];
+      if (!img || typeof img.getAttribute !== 'function' ||
+          typeof img.setAttribute !== 'function' ||
+          typeof img.getBoundingClientRect !== 'function') {
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(img, stateKey)) continue;
+
+      // A non-empty src/srcset is a real image request (loaded, loading, or
+      // broken), not a source-less placeholder. Its live rendered box remains
+      // the snapshot source of truth.
+      const rawSrc = (img.getAttribute('src') || '').trim();
+      const rawSrcset = (img.getAttribute('srcset') || '').trim();
+      if (rawSrc || rawSrcset) continue;
+
+      const alt = img.getAttribute('alt');
+      if (!alt) continue;
+
+      const parent = img.parentNode;
+      if (!parent || typeof parent.replaceChild !== 'function' ||
+          typeof img.cloneNode !== 'function') {
+        continue;
+      }
+      const probe = img.cloneNode(false);
+      probe[stateKey] = { alt, originalElement: img };
+      probe.setAttribute('alt', '');
+      parent.replaceChild(probe, img);
+      const rect = probe.getBoundingClientRect();
+      if (rect && rect.width > 0 && rect.height > 0) {
+        images[index] = probe;
+        normalized++;
+        changed = true;
+        continue;
+      }
+
+      // No authored two-axis box emerged. Restore the fallback text and allow
+      // a later pass to retry in case another placeholder expands its parent.
+      parent.replaceChild(img, probe);
+      delete probe[stateKey];
+    }
+    if (!changed) break;
+  }
+  return normalized;
+}
+
+// Return every temporarily-neutralised alt string after the snapshot has
+// copied it into the output. This matters for the standalone browser bundle,
+// whose caller keeps using the live page after takeSnapshot() returns.
+function restoreEmptyImagePlaceholders(root) {
+  const scope = root || document;
+  if (!scope || typeof scope.querySelectorAll !== 'function') return 0;
+  const stateKey = '__pagxSnapshotImagePlaceholderState';
+  let restored = 0;
+  for (const img of Array.from(scope.querySelectorAll('img'))) {
+    if (!img || !Object.prototype.hasOwnProperty.call(img, stateKey)) continue;
+    const state = img[stateKey];
+    const parent = img.parentNode;
+    if (state.originalElement && parent && typeof parent.replaceChild === 'function') {
+      parent.replaceChild(state.originalElement, img);
+    } else {
+      img.setAttribute('alt', state.alt);
+    }
+    delete img[stateKey];
+    restored++;
+  }
+  return restored;
+}
+
+// Snapshot output must retain the author's accessibility/fallback text even
+// while the live element's alt is neutralised for box measurement.
+function imgAlt(el) {
+  const stateKey = '__pagxSnapshotImagePlaceholderState';
+  if (el && Object.prototype.hasOwnProperty.call(el, stateKey)) {
+    return el[stateKey].alt || '';
+  }
+  return (el && el.getAttribute('alt')) || '';
+}
+
 // Synthesize text content for form elements (placeholder / value / button
 // label). For checkboxes / radios / file pickers / colour swatches / date
 // pickers there is no meaningful text to surface; their `value` attribute is
@@ -759,13 +889,9 @@ function buildStyle(left, top, width, height, computed, opts) {
     // `flex-1 max-w-xl` search wrapper grew to 1010px instead of 576px).
     // When such a cap exists on the main axis, fall through to the pinned-
     // size branch so the measured layout survives.
-    const grow = readNum(computed, 'flex-grow');
     const mainAxis = opts.flexMainAxis;
-    const mainAxisMaxProp = mainAxis === 'column' ? 'max-height' : 'max-width';
-    const mainAxisMax = (computed.getPropertyValue(mainAxisMaxProp) || '').trim().toLowerCase();
-    const mainAxisCapped = mainAxisMax !== '' && mainAxisMax !== 'none';
-    const growActive =
-      grow > 0 && (mainAxis === 'row' || mainAxis === 'column') && !mainAxisCapped;
+    const grow = readNum(computed, 'flex-grow');
+    const growActive = canForwardFlexGrow(computed, mainAxis) && !opts.flexMainSizePinned;
     if (growActive) {
       if (mainAxis === 'row') {
         parts.push(`height: ${px(height)}`);
@@ -2057,6 +2183,75 @@ function isFlexLayoutFaithful(children, computed) {
   return true;
 }
 
+// PAGX models a grown flex item as a pure zero-basis share of the remaining
+// main-axis space. CSS flex layout is richer: padding and borders impose a
+// non-zero floor even with `flex-basis: 0%`, min-size / intrinsic constraints
+// can freeze an item, a non-zero flex-basis participates in the free-space
+// calculation, and grow sums below one intentionally leave space unused.
+// Forwarding only the numeric grow in any of those cases changes the sizes of
+// the whole row (or column).
+//
+// Compare Chromium's measured margin-box sizes with the sizes PAGX would
+// assign after the snapshot's other emitted declarations are applied. If any
+// grow item differs materially, all forwardable grow siblings are pinned to
+// their measured main-axis sizes. Pinning the group is important: making one
+// former grow item fixed changes the remaining space seen by every sibling.
+function shouldPinFlexGrowItems(containerRect, computed, children, mainAxis) {
+  if (!containerRect || !children || children.length === 0) return false;
+  const isRow = mainAxis === 'row';
+  if (!isRow && mainAxis !== 'column') return false;
+
+  const pad = readPadding(computed);
+  const borderStart = borderWidthOf(computed, isRow ? 'left' : 'top');
+  const borderEnd = borderWidthOf(computed, isRow ? 'right' : 'bottom');
+  const paddingMain = isRow ? pad.left + pad.right : pad.top + pad.bottom;
+  const rectMain = isRow ? containerRect.width : containerRect.height;
+  const availableMain = Math.max(0, rectMain - paddingMain - borderStart - borderEnd);
+  const gapRaw = isRow
+    ? computed.getPropertyValue('column-gap')
+    : computed.getPropertyValue('row-gap');
+  const gap = Math.max(0, parseFloat(gapRaw) || 0);
+  const totalGap = gap * Math.max(0, children.length - 1);
+
+  const growItems = [];
+  let fixedMain = 0;
+  let totalGrow = 0;
+  for (const child of children) {
+    const rect = child && child.rect;
+    if (!rect) continue;
+    const childMain = isRow ? rect.width : rect.height;
+    let marginMain = 0;
+    if (child.kind === 'element' && child.computed) {
+      const margin = readMargin(child.computed);
+      marginMain = isRow ? margin.left + margin.right : margin.top + margin.bottom;
+    }
+    const measuredOuterMain = childMain + marginMain;
+    if (child.kind === 'element' && child.computed &&
+        canForwardFlexGrow(child.computed, mainAxis)) {
+      const grow = readNum(child.computed, 'flex-grow');
+      growItems.push({ grow, measuredOuterMain });
+      totalGrow += grow;
+    } else {
+      fixedMain += measuredOuterMain;
+    }
+  }
+  if (growItems.length === 0 || !(totalGrow > 0)) return false;
+
+  const flexSpace = availableMain - fixedMain - totalGap;
+  if (!(flexSpace > 0)) return growItems.some((item) => item.measuredOuterMain > 1.5);
+
+  // Layer::layoutChildren rounds each allocated flex size to integral pixels
+  // with carry. Comparing against the unrounded share with 1.5 px tolerance
+  // accepts that harmless rounding while still catching real basis/clamp
+  // differences (typically tens or hundreds of pixels).
+  const TOLERANCE = 1.5;
+  for (const item of growItems) {
+    const pagxMain = flexSpace * item.grow / totalGrow;
+    if (Math.abs(item.measuredOuterMain - pagxMain) > TOLERANCE) return true;
+  }
+  return false;
+}
+
 // The single cross-axis alignment a flex container will serialise to — the
 // value collectFlexProps() would emit (or the subset default `stretch` when
 // the source keyword is `stretch` / `baseline` / any value outside the
@@ -2304,7 +2499,7 @@ function forwardDataAttrs(el) {
 // baked into overlay rectangles painted on top.
 function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
-  const alt = escapeHtml(el.getAttribute('alt') || '');
+  const alt = escapeHtml(imgAlt(el));
   const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
   const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
   const dataAttrs = forwardDataAttrs(el);
@@ -2978,7 +3173,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     // The flex container's `gap` and `align-items` continue to drive
     // sibling spacing because PAGX takes the layer's intrinsic content
     // width as its main-axis size when no explicit width is authored.
-    const isPure = isPureInlineTextLeaf(el, computed);
+    const isPure = !opts.flexMainSizePinned && isPureInlineTextLeaf(el, computed);
     if (isPure) {
       // Pure-inline branch sidesteps `buildStyle`'s flexItem header (no
       // `position: relative`, no `width/height`), so the parent loop's
@@ -3000,10 +3195,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
       const grow = readNum(computed, 'flex-grow');
       const parts = [textStyle];
       const parentMainAxis = opts.flexMainAxis === 'column' ? 'column' : 'row';
-      const inlineMaxProp = parentMainAxis === 'column' ? 'max-height' : 'max-width';
-      const inlineMax = (computed.getPropertyValue(inlineMaxProp) || '').trim().toLowerCase();
-      const inlineCapped = inlineMax !== '' && inlineMax !== 'none';
-      if (grow > 0 && !inlineCapped) {
+      if (canForwardFlexGrow(computed, parentMainAxis) && !opts.flexMainSizePinned) {
         parts.push(`flex: ${formatFlexGrow(grow)}`);
       } else {
         parts.push('flex-shrink: 0');
@@ -3039,7 +3231,8 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     //     box to paint into, and its importer host nests a `100% x 100%` inner
     //     layer that has nothing to resolve against once the outer is unsized.
     const contentSized =
-      !hasAuthorDefinedFlexSize(el) && !hasBoxVisualsForInline(computed);
+      !opts.flexMainSizePinned && !hasAuthorDefinedFlexSize(el) &&
+      !hasBoxVisualsForInline(computed);
     const wrapperBox = contentSized
       ? buildStyle(left, top, rect.width, rect.height, computed,
                    { box: true, ...opts, flexContentSized: true })
@@ -3229,6 +3422,7 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
   // child path purely state-less.
   const direction = computed.getPropertyValue('flex-direction').trim() || 'row';
   const mainAxis = direction === 'column' || direction === 'column-reverse' ? 'column' : 'row';
+  const flexMainSizePinned = shouldPinFlexGrowItems(rect, computed, flexChildren, mainAxis);
   const childParts = [];
   for (const child of flexChildren) {
     if (child.kind === 'text') {
@@ -3236,7 +3430,11 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
     } else {
       // Pass the cached computed style so render() does not have to ask
       // the engine again for the same node.
-      childParts.push(render(child.node, rect, { flexItem: true, flexMainAxis: mainAxis }, child.computed));
+      childParts.push(render(child.node, rect, {
+        flexItem: true,
+        flexMainAxis: mainAxis,
+        flexMainSizePinned,
+      }, child.computed));
     }
   }
   return `<div style="${style}">${childParts.join('')}</div>`;
@@ -3624,7 +3822,7 @@ function measureCanvas() {
   return { width, height };
 }
 
-function snapshotMain(opts) {
+function snapshotMainImpl(opts) {
   opts = opts || {};
   // Neutralise the page and measure the canvas. When the runner has already
   // resized the viewport to the canvas (the normal split-payload path) it
@@ -3735,6 +3933,18 @@ ${parts.join('')}
     width: canvasWidth,
     height: canvasHeight,
   };
+}
+
+// Standalone/browser-bundle callers may skip the optional image-inlining
+// pre-pass. Normalise source-less placeholders here as a final safety net,
+// then always restore the live DOM once the flat snapshot has been built.
+function snapshotMain(opts) {
+  normalizeEmptyImagePlaceholders();
+  try {
+    return snapshotMainImpl(opts);
+  } finally {
+    restoreEmptyImagePlaceholders();
+  }
 }
 
 // ===== Browser-side preamble (constants embedded as raw JS source) =====
@@ -3865,6 +4075,7 @@ const HELPER_FNS = [
   roundPx,
   px,
   formatFlexGrow,
+  canForwardFlexGrow,
   escapeHtml,
   joinStyles,
   withNowrap,
@@ -3889,6 +4100,9 @@ const HELPER_FNS = [
   pseudoText,
   hasPseudoContent,
   imgSrc,
+  normalizeEmptyImagePlaceholders,
+  restoreEmptyImagePlaceholders,
+  imgAlt,
   syntheticText,
   applyTextTransform,
   classify,
@@ -3940,6 +4154,7 @@ const HELPER_FNS = [
   isMultiLineTextLeafItem,
   flexItemChildren,
   isFlexLayoutFaithful,
+  shouldPinFlexGrowItems,
   effectiveFlexAlignItems,
   flexItemCrossMargins,
   isFlexCrossAxisFaithful,
@@ -3964,6 +4179,7 @@ const HELPER_FNS = [
   render,
   prepareBodyForSnapshot,
   measureCanvas,
+  snapshotMainImpl,
   snapshotMain,
 ];
 
@@ -4481,6 +4697,9 @@ export {
   TAKE_SNAPSHOT_EXPR,
   MEASURE_CANVAS_EXPR,
   inlineExternalImages,
+  normalizeEmptyImagePlaceholders,
+  restoreEmptyImagePlaceholders,
+  imgAlt,
   inlineCanvases,
   materializeDecorativePseudoElements,
   mergeRectsOnSameLine,
@@ -4491,6 +4710,8 @@ export {
   forwardDataAttrs,
   applyLayerName,
   normalizeBackgroundImage,
+  canForwardFlexGrow,
+  shouldPinFlexGrowItems,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
