@@ -66,6 +66,7 @@ function loadMonaco(): Promise<Monaco> {
                 }
                 pruneBuiltInContextMenuItems(amdRequire);
                 definePagxTheme(m);
+                installShadowMenuStyles();
                 monacoInstance = m;
                 resolve(m);
             });
@@ -142,6 +143,57 @@ function pruneBuiltInContextMenuItems(
         const list = menuItems.get(menuId) as { clear?: () => void } | undefined;
         list?.clear?.();
     });
+}
+
+// Monaco 0.47.0 renders its context menu inside a Shadow DOM (div.shadow-root-host attached to
+// <body>). Styles injected into document.head cannot cross that shadow boundary, so the plain
+// EDITOR_STYLES sheet has no effect on menu items like span.keybinding. To style the shortcut
+// column we watch for the shadow host to appear and adopt an extra sheet into its shadowRoot;
+// the observer stops itself once the sheet is installed. Idempotent — subsequent Monaco loads
+// (there is only ever one) short-circuit via the module-level flag.
+let shadowMenuStylesInstalled = false;
+
+function installShadowMenuStyles(): void {
+    if (shadowMenuStylesInstalled || typeof document === 'undefined') {
+        return;
+    }
+    const css = '.monaco-menu-container span.keybinding { color: #8A8A8A !important; }';
+    const tryInstall = (host: Element): boolean => {
+        const root = (host as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (root === null || root === undefined) {
+            return false;
+        }
+        // Skip if we've already added the sheet to this root (Monaco reuses one shadow host).
+        for (const child of Array.from(root.children)) {
+            if (child instanceof HTMLStyleElement && child.dataset.pagxMenuStyles === 'true') {
+                return true;
+            }
+        }
+        const style = document.createElement('style');
+        style.dataset.pagxMenuStyles = 'true';
+        style.textContent = css;
+        root.appendChild(style);
+        return true;
+    };
+    // The host may already exist by the time Monaco resolves. Try synchronously first.
+    for (const host of Array.from(document.querySelectorAll('.shadow-root-host'))) {
+        if (tryInstall(host)) {
+            shadowMenuStylesInstalled = true;
+            return;
+        }
+    }
+    // Otherwise wait for it to be appended to <body>. Monaco creates the host lazily the first
+    // time the context menu opens; the observer disconnects as soon as we succeed.
+    const observer = new MutationObserver(() => {
+        for (const host of Array.from(document.querySelectorAll('.shadow-root-host'))) {
+            if (tryInstall(host)) {
+                shadowMenuStylesInstalled = true;
+                observer.disconnect();
+                return;
+            }
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // Clipboard write for the tag-block and whole-file copy actions. navigator.clipboard is only
@@ -519,10 +571,16 @@ export class SourceEditor {
         editor.addCommand(m.KeyMod.Shift | m.KeyCode.Enter, () => {
             editor.trigger('keyboard', 'type', { text: '\n' });
         }, EDITING_CONTEXT_KEY);
+        // Keybindings mirror the shortcut hints shown in the context menu. CtrlCmd resolves to
+        // Cmd on macOS and Ctrl elsewhere, so a single binding is cross-platform. Copy/Cut/Paste
+        // reuse Monaco's built-in clipboard shortcuts (Cmd/Ctrl+C/X/V), which stay active because
+        // the built-in commands are still registered; the keybindings here only opt the pagx
+        // custom actions into the menu's shortcut column and never intercept the native handling.
         this.disposers.push(
             editor.addAction({
                 id: 'pagx.copy',
                 label: 'Copy',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyCode.KeyC],
                 contextMenuGroupId: '1_copy',
                 contextMenuOrder: 1,
                 run: (ed) => ed.trigger('contextMenu', 'editor.action.clipboardCopyAction', null),
@@ -532,6 +590,7 @@ export class SourceEditor {
             editor.addAction({
                 id: 'pagx.copyEntireFile',
                 label: 'Copy Entire File',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyMod.Shift | m.KeyCode.KeyC],
                 contextMenuGroupId: '1_copy',
                 contextMenuOrder: 2,
                 run: () => {
@@ -545,6 +604,7 @@ export class SourceEditor {
             editor.addAction({
                 id: 'pagx.copyTagBlock',
                 label: 'Copy Tag Block',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyMod.Alt | m.KeyCode.KeyC],
                 contextMenuGroupId: '1_copy',
                 contextMenuOrder: 3,
                 run: (ed) => {
@@ -568,6 +628,7 @@ export class SourceEditor {
             editor.addAction({
                 id: 'pagx.cut',
                 label: 'Cut',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyCode.KeyX],
                 precondition: EDITING_CONTEXT_KEY,
                 contextMenuGroupId: '2_edit',
                 contextMenuOrder: 1,
@@ -578,6 +639,7 @@ export class SourceEditor {
             editor.addAction({
                 id: 'pagx.paste',
                 label: 'Paste',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyCode.KeyV],
                 precondition: EDITING_CONTEXT_KEY,
                 contextMenuGroupId: '2_edit',
                 contextMenuOrder: 2,
@@ -588,6 +650,7 @@ export class SourceEditor {
             editor.addAction({
                 id: 'pagx.delete',
                 label: 'Delete',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyCode.Backspace],
                 contextMenuGroupId: '3_delete',
                 contextMenuOrder: 1,
                 run: (ed) => {
@@ -613,6 +676,7 @@ export class SourceEditor {
             editor.addAction({
                 id: 'pagx.deleteEntireFile',
                 label: 'Delete Entire File',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyMod.Shift | m.KeyCode.Backspace],
                 contextMenuGroupId: '3_delete',
                 contextMenuOrder: 2,
                 run: () => {
@@ -626,6 +690,7 @@ export class SourceEditor {
             editor.addAction({
                 id: 'pagx.deleteTagBlock',
                 label: 'Delete Tag Block',
+                keybindings: [m.KeyMod.CtrlCmd | m.KeyMod.Alt | m.KeyCode.Backspace],
                 contextMenuGroupId: '3_delete',
                 contextMenuOrder: 3,
                 run: (ed) => {
