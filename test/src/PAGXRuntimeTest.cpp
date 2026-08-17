@@ -766,4 +766,136 @@ PAGX_TEST(PAGXRuntimeTest, AnimationVisibleChannelWindow) {
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/AnimationVisibleChannelWindow_hidden"));
 }
 
+// Helper that builds a scene owning a single Animation with the given loop mode. The animation is
+// 60 frames at 60 fps so DurationMicros == 1_000_000 exactly, keeping the boundary math free of
+// rounding noise (an integer-only period is required for the period-boundary assertions below).
+// Helper that builds a scene owning a single Animation with the given loop mode. The animation is
+// 60 frames at 60 fps so DurationMicros == 1_000_000 exactly, keeping the boundary math free of
+// rounding noise (an integer-only period is required for the period-boundary assertions below).
+// The scene is returned alongside the animation because PAGAnimation only holds a weak reference
+// to its owning scene: without keeping the scene alive in the caller, duration()/playbackPeriod()
+// short-circuit to 0 via the owner.expired() guard and every assertion below would fire.
+struct AnimationFixture {
+  std::shared_ptr<pagx::PAGScene> scene;
+  std::shared_ptr<pagx::PAGAnimation> animation;
+};
+static AnimationFixture MakeAnimationFixture(pagx::LoopMode loop) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = loop;
+  doc->animations.push_back(anim);
+  AnimationFixture fixture;
+  fixture.scene = pagx::PAGScene::Make(doc);
+  if (fixture.scene != nullptr) {
+    fixture.animation =
+        std::static_pointer_cast<pagx::PAGAnimation>(fixture.scene->getAnimation("main"));
+  }
+  return fixture;
+}
+
+/**
+ * Test case: playbackPeriod reports one full loop period per loop mode. Once/Loop expose the
+ * animation duration; PingPong doubles it because a full loop is forward + back.
+ */
+PAGX_TEST(PAGXRuntimeTest, PlaybackPeriodByLoopMode) {
+  auto once = MakeAnimationFixture(pagx::LoopMode::Once);
+  ASSERT_TRUE(once.animation != nullptr);
+  EXPECT_EQ(once.animation->duration(), 1'000'000);
+  EXPECT_EQ(once.animation->playbackPeriod(), 1'000'000);
+
+  auto loop = MakeAnimationFixture(pagx::LoopMode::Loop);
+  ASSERT_TRUE(loop.animation != nullptr);
+  EXPECT_EQ(loop.animation->playbackPeriod(), 1'000'000);
+
+  auto pingPong = MakeAnimationFixture(pagx::LoopMode::PingPong);
+  ASSERT_TRUE(pingPong.animation != nullptr);
+  EXPECT_EQ(pingPong.animation->playbackPeriod(), 2'000'000);
+}
+
+/**
+ * Test case: playbackPosition traces a monotonic timeline across one full loop period per mode.
+ * The key invariant guarded here is the period-boundary special case: when elapsedUs is a positive
+ * integer multiple of the period, playbackPosition reports period (not 0), so a seek-to-end lands
+ * the progress bar on the right edge instead of snapping back to the start. Once clamps to the
+ * period end so post-duration reads stay at duration.
+ */
+PAGX_TEST(PAGXRuntimeTest, PlaybackPositionBoundaries) {
+  const int64_t D = 1'000'000;
+
+  auto once = MakeAnimationFixture(pagx::LoopMode::Once);
+  ASSERT_TRUE(once.animation != nullptr);
+  once.animation->setCurrentTime(0);
+  EXPECT_EQ(once.animation->playbackPosition(), 0);
+  once.animation->setCurrentTime(D / 2);
+  EXPECT_EQ(once.animation->playbackPosition(), D / 2);
+  once.animation->setCurrentTime(D);
+  EXPECT_EQ(once.animation->playbackPosition(), D);
+  // Once clamps past-the-end reads to the period end rather than wrapping.
+  once.animation->setCurrentTime(2 * D);
+  EXPECT_EQ(once.animation->playbackPosition(), D);
+
+  auto loop = MakeAnimationFixture(pagx::LoopMode::Loop);
+  ASSERT_TRUE(loop.animation != nullptr);
+  loop.animation->setCurrentTime(0);
+  EXPECT_EQ(loop.animation->playbackPosition(), 0);
+  loop.animation->setCurrentTime(D / 2);
+  EXPECT_EQ(loop.animation->playbackPosition(), D / 2);
+  // Period boundary: elapsedUs % period is 0 but the position reports period so the progress bar
+  // stays at the far right. Also holds at any positive integer multiple.
+  loop.animation->setCurrentTime(D);
+  EXPECT_EQ(loop.animation->playbackPosition(), D);
+  loop.animation->setCurrentTime(2 * D);
+  EXPECT_EQ(loop.animation->playbackPosition(), D);
+
+  auto pingPong = MakeAnimationFixture(pagx::LoopMode::PingPong);
+  ASSERT_TRUE(pingPong.animation != nullptr);
+  const int64_t P = 2 * D;
+  pingPong.animation->setCurrentTime(0);
+  EXPECT_EQ(pingPong.animation->playbackPosition(), 0);
+  pingPong.animation->setCurrentTime(D);
+  EXPECT_EQ(pingPong.animation->playbackPosition(), D);
+  // PingPong period boundary (elapsedUs == 2 * duration): same invariant as Loop, position holds
+  // at period instead of folding to 0.
+  pingPong.animation->setCurrentTime(P);
+  EXPECT_EQ(pingPong.animation->playbackPosition(), P);
+  pingPong.animation->setCurrentTime(2 * P);
+  EXPECT_EQ(pingPong.animation->playbackPosition(), P);
+}
+
+/**
+ * Test case: seek-to-end progress reading vs. currentTime (the value apply() feeds into channel
+ * evaluation). At a period boundary Loop/PingPong intentionally report a non-zero playbackPosition
+ * for the progress bar while currentTime folds to 0, because "end of a period" and "start of the
+ * next period" are the same instant on the timeline. This asserts the intended divergence so a
+ * future edit that unifies the two ends up caught here.
+ */
+PAGX_TEST(PAGXRuntimeTest, PlaybackPositionSeekEndConsistency) {
+  const int64_t D = 1'000'000;
+
+  auto once = MakeAnimationFixture(pagx::LoopMode::Once);
+  ASSERT_TRUE(once.animation != nullptr);
+  once.animation->setCurrentTime(D);
+  // Once has no wrap: progress and evaluation both stop at duration.
+  EXPECT_EQ(once.animation->playbackPosition(), D);
+  EXPECT_EQ(once.animation->currentTime(), D);
+
+  auto loop = MakeAnimationFixture(pagx::LoopMode::Loop);
+  ASSERT_TRUE(loop.animation != nullptr);
+  loop.animation->setCurrentTime(D);
+  // Loop wraps: seek-to-end shows a full progress bar, but the evaluated frame is the start
+  // (seamless loop t == duration equals t == 0).
+  EXPECT_EQ(loop.animation->playbackPosition(), D);
+  EXPECT_EQ(loop.animation->currentTime(), 0);
+
+  auto pingPong = MakeAnimationFixture(pagx::LoopMode::PingPong);
+  ASSERT_TRUE(pingPong.animation != nullptr);
+  pingPong.animation->setCurrentTime(2 * D);
+  // PingPong period boundary is the return to the start of the round trip, so evaluation is 0
+  // while the progress bar sits at period.
+  EXPECT_EQ(pingPong.animation->playbackPosition(), 2 * D);
+  EXPECT_EQ(pingPong.animation->currentTime(), 0);
+}
+
 }  // namespace pag
