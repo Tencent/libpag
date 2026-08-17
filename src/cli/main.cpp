@@ -27,6 +27,7 @@
 #include "cli/CommandImport.h"
 #include "cli/CommandLayout.h"
 #include "cli/CommandRender.h"
+#include "cli/CommandRenderFrames.h"
 #include "cli/CommandResolve.h"
 #include "cli/CommandVerify.h"
 
@@ -44,6 +45,7 @@ static void PrintUsage() {
             << "  resolve        Resolve import directives (inline SVG, external imports)\n"
             << "  layout         Display layout tree with bounds\n"
             << "  render         Render PAGX to an image file (supports crop and scale)\n"
+            << "  render-frames  Render every frame of a PAGX animation to PNG files\n"
             << "  bounds         Query rendered pixel bounds of layers (for crop regions)\n"
             << "  font           Query font metrics\n"
             << "  embed          Embed fonts and images into a PAGX file\n"
@@ -84,6 +86,9 @@ int main(int argc, char* argv[]) {
   }
   if (command == "render") {
     return pagx::cli::RunRender(argc - 1, argv + 1);
+  }
+  if (command == "render-frames") {
+    return pagx::cli::RunRenderFrames(argc - 1, argv + 1);
   }
   if (command == "bounds") {
     return pagx::cli::RunBounds(argc - 1, argv + 1);
