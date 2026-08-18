@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDrawable.h"
+#include "EGLResourceDisposer.h"
 #include "base/utils/Log.h"
 #include "tgfx/core/Surface.h"
 
@@ -37,6 +38,13 @@ GPUDrawable::GPUDrawable(ANativeWindow* nativeWindow, EGLContext eglContext)
 
 GPUDrawable::~GPUDrawable() {
   ANativeWindow_release(nativeWindow);
+  // Destroy the cached Surface and the EGLWindow on the disposer thread: the final window
+  // release runs ~EGLDevice, whose eglDestroyContext() can block for a long time on some
+  // drivers (e.g. PowerVR on MediaTek devices, which waits for the GPU to drain), and this
+  // destructor runs on the main thread when a PAGView is detached from the window (issue #3685).
+  // The ANativeWindow is safe to release here because the EGLSurface created from it holds its
+  // own reference until eglDestroySurface() runs on the disposer thread.
+  EGLResourceDisposer::DisposeAsync(std::move(surface), std::move(window));
 }
 
 void GPUDrawable::updateSize() {
