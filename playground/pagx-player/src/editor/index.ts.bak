@@ -638,7 +638,7 @@ export class EditorPanel {
         );
         if (this.editor === null || this.busy) {
             // Temporary padding-diagnostics log.
-            console.log(`[pagx] handleApply skipped: editor=${!!this.editor} busy=${this.busy}`);
+            console.debug(`[pagx] handleApply skipped: editor=${!!this.editor} busy=${this.busy}`);
             return;
         }
         const xmlText = this.editor.getContent();
@@ -653,7 +653,7 @@ export class EditorPanel {
             // Temporary padding-diagnostics log: apply blocked by schema/parse errors — this is the
             // most likely reason a large-value edit is silently ignored (no incremental log, no
             // "no changes" pill).
-            console.log(`[pagx] handleApply blocked by validation: ${validationError}`);
+            console.debug(`[pagx] handleApply blocked by validation: ${validationError}`);
             this.report(validationError, 'error');
             return;
         }
@@ -673,7 +673,7 @@ export class EditorPanel {
             } catch (error) {
                 // Falling back to the full Apply below is the intended recovery, but leave a
                 // trace so a silently-never-incremental editor stays diagnosable.
-                console.log('[pagx] incremental apply threw, falling back to full apply:', error);
+                console.debug('[pagx] incremental apply threw, falling back to full apply:', error);
                 handled = false;
             }
             if (handled) {

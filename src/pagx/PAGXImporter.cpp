@@ -173,6 +173,7 @@ static MergePath* ParseMergePath(const DOMNode* node, PAGXDocument* doc);
 static TextModifier* ParseTextModifier(const DOMNode* node, PAGXDocument* doc);
 static TextPath* ParseTextPath(const DOMNode* node, PAGXDocument* doc);
 static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc);
+static void ConvertSiblingTextLayoutToTextBox(const DOMNode* node, Layer* layer, PAGXDocument* doc);
 static Repeater* ParseRepeater(const DOMNode* node, PAGXDocument* doc);
 static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc);
 static RangeSelector* ParseRangeSelector(const DOMNode* node, PAGXDocument* doc);
@@ -595,6 +596,13 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
       layer->importDirective.content = std::move(svgText);
       continue;
     }
+    // Legacy text-box descriptor: external exporters emit the box properties as a sibling
+    // <TextLayout/> right after the <Text> it belongs to. Convert it before the generic element
+    // lookup rejects it.
+    if (current->name == "TextLayout") {
+      ConvertSiblingTextLayoutToTextBox(current.get(), layer, doc);
+      continue;
+    }
     // Try to parse as VectorElement.
     auto element = ParseElement(current.get(), doc);
     if (element) {
@@ -634,6 +642,11 @@ static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
     auto current = child;
     child = child->nextSibling;
     if (current->type != DOMNodeType::Element) {
+      continue;
+    }
+    // Legacy text-box descriptor, same conversion as in ParseLayer.
+    if (current->name == "TextLayout") {
+      ConvertSiblingTextLayoutToTextBox(current.get(), layer, doc);
       continue;
     }
     auto element = ParseElement(current.get(), doc);
@@ -1271,6 +1284,27 @@ static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
     child = child->nextSibling;
   }
   return textBox;
+}
+
+static void ConvertSiblingTextLayoutToTextBox(const DOMNode* node, Layer* layer,
+                                              PAGXDocument* doc) {
+  // <TextLayout/> is not part of the schema: some external exporters emit it as a sibling right
+  // after the <Text> it describes, carrying the box properties (width, textAlign, lineHeight...)
+  // the schema expects on a <TextBox>. Re-parse the descriptor as a TextBox (self-closing, so no
+  // child elements) and wrap the preceding Text in it, which preserves the exported layout
+  // instead of dropping it with an error.
+  if (layer->contents.empty() || layer->contents.back()->nodeType() != NodeType::Text) {
+    ReportError(doc, node,
+                "Element 'TextLayout' is not allowed in 'Layer'. It is a legacy text-box"
+                " descriptor and must directly follow a 'Text' element.");
+    return;
+  }
+  auto* textBox = ParseTextBox(node, doc);
+  if (textBox == nullptr) {
+    return;
+  }
+  textBox->elements.push_back(static_cast<Text*>(layer->contents.back()));
+  layer->contents.back() = textBox;
 }
 
 static Repeater* ParseRepeater(const DOMNode* node, PAGXDocument* doc) {
@@ -2635,13 +2669,6 @@ static std::optional<float> GetOptionalFloatAttribute(const DOMNode* node, const
     return std::nullopt;
   }
   return value;
-}
-
-static const char* SkipWhitespaceAndComma(const char* ptr, const char* end) {
-  while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ',')) {
-    ++ptr;
-  }
-  return ptr;
 }
 
 static std::pair<float, float> ParseTwoFloats(const std::string& str, bool* outValid) {

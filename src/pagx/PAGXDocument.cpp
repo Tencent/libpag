@@ -295,8 +295,8 @@ void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float contain
 }
 
 // Above this many resets the incremental path stops paying off versus a full layout, so callers
-// fall back to applyLayout. Kept small since the reset set is only the edited Layers plus their
-// ancestor chains, not their subtrees.
+// fall back to applyLayout. Kept small since the reset set covers only the edited Layers, their
+// ancestor chains and the edited Layers' content elements, never full subtrees.
 static const size_t MAX_INCREMENTAL_LAYOUT_LAYERS = 64;
 
 bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
@@ -304,9 +304,9 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
   if (!layoutApplied) {
     return false;
   }
-  // Only a pure set of this document's Layer nodes qualifies. A content-node edit collapses to its
-  // owning Layer before reaching here, which loses the measure dependency needed to invalidate the
-  // right content subtree, so any non-Layer (or foreign) dirty node forces the full path.
+  // Only a pure set of this document's Layer nodes qualifies; any non-Layer (or foreign) dirty
+  // node forces the full path. A dirty Layer stands for an edit to its own fields or to any node
+  // in its contents, so the reset below invalidates both.
   std::vector<Layer*> changedLayers;
   changedLayers.reserve(dirtyNodes.size());
   for (auto* node : dirtyNodes) {
@@ -329,23 +329,34 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
       }
     }
   }
-  // Reset set: each edited Layer plus its ancestor chain up to the root. Resetting the whole chain
-  // is required — if any ancestor kept its memo it would be skipped on the top-down pass and its
-  // edited descendant would never be revisited. Descendants and siblings are intentionally left
-  // memoized; target-size changes cascade to them through the per-node constraint memo.
-  std::unordered_set<Layer*> resetLayers = {};
+  // Reset set: each edited Layer plus its ancestor chain up to the root, plus the edited Layers'
+  // content elements. Resetting the whole chain is required — if any ancestor kept its memo it
+  // would be skipped on the top-down pass and its edited descendant would never be revisited.
+  // Content elements must be reset as well because a content-node edit is reported with the host
+  // Layer dirty; their stale preferred sizes would otherwise leak through MeasureChildNodes and
+  // the layer would keep its pre-edit geometry. Child Layers and sibling subtrees are
+  // intentionally left memoized; target-size changes cascade to them through the per-node
+  // constraint memo.
+  std::unordered_set<LayoutNode*> resetNodes = {};
   for (auto* layer : changedLayers) {
     Layer* cursor = layer;
-    while (cursor != nullptr && resetLayers.insert(cursor).second) {
-      if (resetLayers.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+    while (cursor != nullptr && resetNodes.insert(cursor).second) {
+      if (resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
         return false;
       }
       auto it = parentOf.find(cursor);
       cursor = it != parentOf.end() ? it->second : nullptr;
     }
+    for (auto* element : layer->contents) {
+      auto* contentNode = LayoutNode::AsLayoutNode(element);
+      if (contentNode != nullptr && resetNodes.insert(contentNode).second &&
+          resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+        return false;
+      }
+    }
   }
   // Snapshot layoutBounds before resetting so the post-pass can report which Layers actually moved
-  // (mirrors applyLayout). Only reset Layers lose their memo; everything else is skipped below.
+  // (mirrors applyLayout). Only reset nodes lose their memo; everything else is skipped below.
   std::unordered_map<Layer*, Rect> beforeBounds = {};
   if (changedOut != nullptr) {
     for (auto& node : nodes) {
@@ -355,8 +366,8 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
       }
     }
   }
-  for (auto* layer : resetLayers) {
-    layer->resetLayout();
+  for (auto* node : resetNodes) {
+    node->resetLayout();
   }
   // Re-run the normal top-down pass. Composition layers first (they may be referenced by document
   // layers). External documents are intentionally not recursed: their content is unchanged and they

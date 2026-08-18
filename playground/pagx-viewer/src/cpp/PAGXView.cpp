@@ -21,7 +21,12 @@
 #include <emscripten/html5.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
 #include "pagx/tgfx.h"
@@ -155,10 +160,31 @@ emscripten::val PAGXView::validatePAGX(const val& pagxData) const {
     diagnostics.call<void>("push", diagnostic);
     return diagnostics;
   }
+  // Collapse repeated messages: a single schema slip (e.g. one legacy element repeated on
+  // hundreds of lines) otherwise floods the editor with identical diagnostics. The first
+  // occurrence keeps its line and absorbs the rest into a trailing count.
+  std::vector<std::pair<size_t, std::string>> keptDiagnostics = {};
+  std::unordered_map<std::string, size_t> firstIndexByMessage = {};
+  std::unordered_map<size_t, size_t> suppressedCount = {};
   for (const auto& error : validationDocument->errors) {
+    auto message = ParseDiagnosticMessage(error);
+    auto it = firstIndexByMessage.find(message);
+    if (it == firstIndexByMessage.end()) {
+      firstIndexByMessage[message] = keptDiagnostics.size();
+      keptDiagnostics.emplace_back(ParseDiagnosticLine(error), std::move(message));
+    } else {
+      ++suppressedCount[it->second];
+    }
+  }
+  for (size_t i = 0; i < keptDiagnostics.size(); ++i) {
+    auto message = keptDiagnostics[i].second;
+    auto it = suppressedCount.find(i);
+    if (it != suppressedCount.end()) {
+      message += " (and " + std::to_string(it->second) + " more)";
+    }
     auto diagnostic = val::object();
-    diagnostic.set("message", ParseDiagnosticMessage(error));
-    diagnostic.set("line", ParseDiagnosticLine(error));
+    diagnostic.set("message", message);
+    diagnostic.set("line", keptDiagnostics[i].first);
     diagnostic.set("column", 1);
     diagnostics.call<void>("push", diagnostic);
   }
@@ -234,6 +260,13 @@ emscripten::val PAGXView::getNodeBounds(int index) const {
   if (rect.isEmpty()) {
     return emscripten::val::null();
   }
+  // Selection-outline slack for FreeType's anti-aliasing overshoot: per-glyph tight bounds stop
+  // at the geometric baseline while the rasterizer paints slightly below it, visually clipping
+  // the last row of ink. Extending the bottom by 5% of the layer height covers the overshoot,
+  // with a 0.5 root-space floor scaled by the current zoom. This is presentation-only slack,
+  // kept here so PAGScene::getGlobalBounds keeps returning tight bounds.
+  float zoom = contentScale * userZoom;
+  rect.height += std::max(0.5f * zoom, rect.height * 0.05f);
   auto obj = emscripten::val::object();
   obj.set("x", rect.x);
   obj.set("y", rect.y);
@@ -256,6 +289,12 @@ bool PAGXView::setNodeChannel(int index, const std::string& channel, const std::
   // RequiresLayout tells whether the edit only shows up after a layout pass; a render-only refresh
   // (layoutChanged=false) is the cheap path for edits that cannot move geometry (alpha/color/...).
   bool layoutChanged = RequiresLayout(node->nodeType(), channel);
+  // Temporary padding-diagnostics log: prints each accepted channel write with the layoutChanged
+  // routing. Pipe together with the classifier log in player.ts to see whether an edit ever
+  // reaches the engine and which refresh path it took. Remove once the padding regression is
+  // resolved.
+  std::printf("[pagx] setNodeChannel #%d %s=\"%s\" layoutChanged=%d\n", index, channel.c_str(),
+              value.c_str(), layoutChanged ? 1 : 0);
   document->notifyChange({node}, layoutChanged);
   presentImmediately = true;
   return true;

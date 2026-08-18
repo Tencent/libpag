@@ -321,13 +321,14 @@ int ParseHexDigit(char c) {
   return -1;
 }
 
+}  // namespace
+
 const char* SkipWhitespaceAndComma(const char* ptr, const char* end) {
   while (ptr < end && (*ptr == ' ' || *ptr == '\t' || *ptr == ',')) {
     ++ptr;
   }
   return ptr;
 }
-}  // namespace
 
 Color ParseColor(const std::string& str, bool* outValid) {
   if (str.empty()) {

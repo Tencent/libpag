@@ -1096,6 +1096,18 @@ export class SourceEditor {
         return true;
     }
 
+    /** Focuses the editor and opens Monaco's find widget. Called from the panel's global Ctrl/Cmd+F
+     *  handler so users get a working in-file search even when focus is on the canvas: the
+     *  browser's native find would only see the currently rendered viewport because Monaco
+     *  virtualises the document DOM. */
+    openFind(): void {
+        if (this.editor === null) {
+            return;
+        }
+        this.editor.focus();
+        this.editor.getAction('actions.find')?.run();
+    }
+
     /** Highlights the node's source span as the transient grey hover layer. startLine <= 0 clears. */
     highlightHover(startLine: number, endLine: number): void {
         if (this.editor === null || this.model === null) {

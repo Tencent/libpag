@@ -222,8 +222,7 @@ class PAGXDocument : public Node {
    * individually for each file when embedding multiple images.
    * @param fileDataMap a map from file path to the file content to embed
    */
-  void loadFileDataMap(
-      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+  void loadFileDataMap(const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
 
   /**
    * Returns the document's font configuration. Importers populate fallback fonts here
@@ -346,10 +345,10 @@ class PAGXDocument : public Node {
 
   // Sets runtimeImage on every Image node matching filePath in this document and its resolved
   // external documents, collecting the touched Image nodes per owning document.
-  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
-                               const std::shared_ptr<PAGImage>& image,
-                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
-                               std::unordered_set<const PAGXDocument*>& visited);
+  static void LoadImageInChain(
+      PAGXDocument* document, const std::string& filePath, const std::shared_ptr<PAGImage>& image,
+      std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+      std::unordered_set<const PAGXDocument*>& visited);
 
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
@@ -371,10 +370,11 @@ class PAGXDocument : public Node {
   // (content-node edits collapse to a Layer and lose the precise measure dependency needed to
   // invalidate their subtree, so they are not handled here). Returns false — leaving the document
   // untouched — when it cannot apply incrementally (not yet laid out, a non-Layer or foreign dirty
-  // node, or the reset set exceeds kMaxIncrementalLayoutLayers); the caller must then fall back to
+  // node, or the reset set exceeds MAX_INCREMENTAL_LAYOUT_LAYERS); the caller must then fall back to
   // a full applyLayout. On success, changedOut (when non-null) receives every Layer whose
   // layoutBounds changed, exactly like applyLayout.
-  bool applyLayoutIncremental(const std::vector<Node*>& dirtyNodes, std::vector<Layer*>* changedOut);
+  bool applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
+                              std::vector<Layer*>* changedOut);
 
   void registerNode(Node* node, const std::string& id);
 

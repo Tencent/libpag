@@ -246,6 +246,8 @@ Matrix MatrixFromString(const std::string& str);
 //==============================================================================
 // String parsing utilities
 //==============================================================================
+// Advances ptr past spaces, tabs and commas, for parsing delimiter-separated numeric tuples.
+const char* SkipWhitespaceAndComma(const char* ptr, const char* end);
 std::vector<float> ParseFloatList(const std::string& str);
 std::string FloatToString(float value);
 

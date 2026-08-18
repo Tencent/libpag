@@ -806,7 +806,7 @@ export class PAGXPlayer extends EventTarget {
         if (edits === null) {
             // Temporary padding-diagnostics log: classifier gave up (structural change or a span
             // whose round-trip serialisation did not match). Full reparse will take over.
-            console.log('[pagx] incremental skipped: classifyEdits=null (structural/mismatch)');
+            console.debug('[pagx] incremental skipped: classifyEdits=null (structural/mismatch)');
             return false;
         }
         // Temporary padding-diagnostics log: prints the classifier's decision so mis-classifications
