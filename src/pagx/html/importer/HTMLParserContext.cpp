@@ -388,7 +388,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   Layer* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
 
   Layer* contentHost = layer;
-  bool needsInnerHost = hasBgVisuals && (box.paddingSet || box.displayFlex);
+  bool needsInnerHost = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
   if (needsInnerHost) {
     contentHost = _layerBuilder->createInnerHost(layer, box);
   } else {
@@ -529,17 +529,6 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     contentHost = _layerBuilder->createInnerHost(layer, box);
   } else {
     _layerBuilder->applyLayoutAttributes(layer, box);
-  }
-
-  // CSS border-box: layout-flow content sits inside the border edge, so reserve the
-  // border width as additional padding on the layout host. Without this, children
-  // would start flush with the layer's outer edge and overlap the inside-aligned
-  // border stroke.
-  if (box.borderSet && box.borderWidthPx > 0 && contentHost->layout != LayoutMode::None) {
-    contentHost->padding.top += box.borderWidthPx;
-    contentHost->padding.right += box.borderWidthPx;
-    contentHost->padding.bottom += box.borderWidthPx;
-    contentHost->padding.left += box.borderWidthPx;
   }
 
   auto child = element->getFirstChild();
