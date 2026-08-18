@@ -63,6 +63,12 @@ export interface PlayerView {
     // the caller to fall back to a full reparse.
     setNodeChannel(index: number, channel: string, value: string): boolean;
 
+    // StateMachine input hooks (playground interaction testing). All three return false when
+    // the default timeline is not a state machine or the input name/type does not match.
+    setSMInputBool(name: string, value: boolean): boolean;
+    setSMInputNumber(name: string, value: number): boolean;
+    fireSMInputTrigger(name: string): boolean;
+
     // Lifetime
     destroy(): void;
 }

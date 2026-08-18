@@ -1096,6 +1096,23 @@ export class PAGXPlayer extends EventTarget {
         this.playbackBar.togglePlayback();
     }
 
+    /** Sets a bool input on the default state machine timeline (playground hook for testing
+     *  interactive state machines from the console). Returns false when the loaded document's
+     *  default timeline is not a state machine or the input is unknown/wrong-typed. */
+    public setSMInputBool(name: string, value: boolean): boolean {
+        return this.view?.setSMInputBool(name, value) ?? false;
+    }
+
+    /** Number-input counterpart of setSMInputBool. */
+    public setSMInputNumber(name: string, value: number): boolean {
+        return this.view?.setSMInputNumber(name, value) ?? false;
+    }
+
+    /** Trigger-input counterpart of setSMInputBool. */
+    public fireSMInputTrigger(name: string): boolean {
+        return this.view?.fireSMInputTrigger(name) ?? false;
+    }
+
     public openEditor(): void {
         this.editor?.open();
     }

@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "pagx/PAGStateMachine.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
 #include "pagx/tgfx.h"
@@ -741,6 +742,27 @@ void PAGXView::setLoop(bool loop) {
 
 bool PAGXView::isLoop() const {
   return loopEnabled;
+}
+
+bool PAGXView::setSMInputBool(const std::string& name, bool value) {
+  if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine) {
+    return false;
+  }
+  return std::static_pointer_cast<PAGStateMachine>(defaultTimeline)->setBool(name, value);
+}
+
+bool PAGXView::setSMInputNumber(const std::string& name, float value) {
+  if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine) {
+    return false;
+  }
+  return std::static_pointer_cast<PAGStateMachine>(defaultTimeline)->setNumber(name, value);
+}
+
+bool PAGXView::fireSMInputTrigger(const std::string& name) {
+  if (defaultTimeline == nullptr || defaultTimeline->type() != TimelineType::StateMachine) {
+    return false;
+  }
+  return std::static_pointer_cast<PAGStateMachine>(defaultTimeline)->fireTrigger(name);
 }
 
 }  // namespace pagx

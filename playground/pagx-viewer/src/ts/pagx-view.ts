@@ -383,10 +383,11 @@ export class PAGXView {
   }
 
   /**
-   * Returns the current-frame surface bounds { x, y, w, h } of the layer built from
-   * nodes[index], or null if the index is out of range or has no runtime layer.
+   * Returns the current-frame surface bounds { x, y, w, h } of every runtime layer instance
+   * built from nodes[index] — one array entry per instance when the node is referenced by
+   * several composition layers — or null if the index is out of range or has no runtime layer.
    */
-  public getNodeBounds(index: number): NodeBounds | null {
+  public getNodeBounds(index: number): NodeBounds[] | null {
     return this.nativeView._getNodeBounds(index);
   }
 
@@ -410,6 +411,29 @@ export class PAGXView {
    */
   public setNodeChannel(index: number, channel: string, value: string): boolean {
     return this.nativeView._setNodeChannel(index, channel, value);
+  }
+
+  /**
+   * Sets a bool input on the default state machine timeline (playground hook for testing
+   * interactive state machines from the console). Returns false when the loaded document's
+   * default timeline is not a state machine or the input is unknown/wrong-typed.
+   */
+  public setSMInputBool(name: string, value: boolean): boolean {
+    return this.nativeView._setSMInputBool(name, value);
+  }
+
+  /**
+   * Number-input counterpart of setSMInputBool.
+   */
+  public setSMInputNumber(name: string, value: number): boolean {
+    return this.nativeView._setSMInputNumber(name, value);
+  }
+
+  /**
+   * Trigger-input counterpart of setSMInputBool.
+   */
+  public fireSMInputTrigger(name: string): boolean {
+    return this.nativeView._fireSMInputTrigger(name);
   }
 
   /**

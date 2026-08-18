@@ -245,10 +245,11 @@ export interface _PAGXView {
   _getNodeSourceMap(): NodeSourceEntry[];
 
   /**
-   * Returns the current-frame surface bounds { x, y, w, h } of the layer built from
-   * nodes[index], or null if index is out of range or has no runtime layer.
+   * Returns the current-frame surface bounds { x, y, w, h } of every runtime layer instance
+   * built from nodes[index] — one array entry per instance when the node is referenced by
+   * several composition layers — or null if index is out of range or has no runtime layer.
    */
-  _getNodeBounds(index: number): NodeBounds | null;
+  _getNodeBounds(index: number): NodeBounds[] | null;
 
   /**
    * Validates UTF-8 PAGX XML without replacing the currently loaded document. Returns a plain JS
@@ -265,6 +266,14 @@ export interface _PAGXView {
    * @param value Value in PAGX attribute string form
    */
   _setNodeChannel(index: number, channel: string, value: string): boolean;
+
+  /**
+   * StateMachine input hooks (playground interaction testing). Return false when the default
+   * timeline is not a state machine or the input name/type does not match.
+   */
+  _setSMInputBool(name: string, value: boolean): boolean;
+  _setSMInputNumber(name: string, value: number): boolean;
+  _fireSMInputTrigger(name: string): boolean;
 
   /**
    * Releases the native resources. Must be called when done.

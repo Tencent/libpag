@@ -130,6 +130,16 @@ class PAGXView {
   // string cannot be parsed into the channel's type (caller should then do a full reparse).
   bool setNodeChannel(int index, const std::string& channel, const std::string& value);
 
+  // --- StateMachine input hooks (playground interaction testing) ---
+
+  // Sets a bool/number input or fires a trigger on the default state machine timeline; the scene
+  // picks the new value up on the next advance(). Returns false when the default timeline is not
+  // a state machine or the input name/type does not match. Exposed through the binding so a
+  // tester can drive interactive state machines from the browser console.
+  bool setSMInputBool(const std::string& name, bool value);
+  bool setSMInputNumber(const std::string& name, float value);
+  bool fireSMInputTrigger(const std::string& name);
+
  private:
   void updateContentTransform();
   void applyDisplayTransform();
