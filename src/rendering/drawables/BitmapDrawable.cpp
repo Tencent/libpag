@@ -20,11 +20,9 @@
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
-std::shared_ptr<BitmapDrawable> BitmapDrawable::Make(int width, int height, void* sharedContext) {
-  std::shared_ptr<tgfx::GLDevice> device = nullptr;
-  if (sharedContext != nullptr) {
-    device = tgfx::GLDevice::Make(sharedContext);
-  }
+std::shared_ptr<BitmapDrawable> BitmapDrawable::Make(int width, int height,
+                                                     std::shared_ptr<tgfx::GLDevice> sharedDevice) {
+  std::shared_ptr<tgfx::GLDevice> device = std::move(sharedDevice);
   if (device == nullptr) {
     device = tgfx::GLDevice::MakeWithFallback();
   }
