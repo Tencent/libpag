@@ -105,8 +105,9 @@ class PAGXView {
   // buildLayers(); rebuild on full reload.
   emscripten::val getNodeSourceMap() const;
 
-  // Returns the current-frame surface bounds {x,y,w,h} of the layer built from nodes[index],
-  // or null if index is out of range or has no runtime layer. For overlay box drawing.
+  // Returns the current-frame surface bounds {x,y,w,h} of every runtime layer instance built from
+  // nodes[index] — one array entry per instance when the node is referenced by several composition
+  // layers — or null if index is out of range or has no runtime layer. For overlay box drawing.
   emscripten::val getNodeBounds(int index) const;
 
   // --- Source-editor validation and incremental edit ---

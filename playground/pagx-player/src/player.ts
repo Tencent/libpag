@@ -99,16 +99,21 @@ export class PAGXPlayer extends EventTarget {
     // while unsaved source edits insert or remove lines, then reset from runtime spans on Apply/Discard.
     private sourceMap: NodeSourceEntry[] = [];
     private draftSourceMap: NodeSourceEntry[] = [];
-    private overlay: HTMLDivElement | null = null;
+    // Selection boxes painted over the canvas, one per runtime layer instance built from the
+    // bounds-bearing node — a source node referenced by N composition layers builds N instances,
+    // all of which get outlined. Kept as a reusable pool so the per-frame follow-loop only
+    // toggles styles instead of churning DOM nodes.
+    private overlayBoxes: HTMLDivElement[] = [];
     // The bounds-bearing node the overlay currently paints (resolved from the hover/select target
     // by climbing to the owning Layer for internal elements), and which visual state to render.
     // Cached by refreshOverlay so the per-frame follow-loop skips the ancestry walk.
     private overlayBoundsIndex = -1;
     private overlayKind: 'hover' | 'select' = 'hover';
-    // Bounds queried on the previous overlay tick. PAGXView.draw() double-buffers recordings, so
-    // during playback the canvas presents the frame recorded one tick earlier than the scene state
-    // getNodeBounds reads; presenting the previous tick's bounds keeps the outline on the pixels.
-    private overlayPreviousBounds: NodeBounds | null = null;
+    // Bounds queried on the previous overlay tick, one entry per instance. PAGXView.draw()
+    // double-buffers recordings, so during playback the canvas presents the frame recorded one
+    // tick earlier than the scene state getNodeBounds reads; presenting the previous tick's
+    // bounds keeps the outline on the pixels.
+    private overlayPreviousBounds: NodeBounds[] | null = null;
     private overlayRaf = 0;
     private hoverRaf = 0;
     private detachHover: (() => void) | null = null;
@@ -908,15 +913,19 @@ export class PAGXPlayer extends EventTarget {
         };
     }
 
-    private ensureOverlay(): void {
-        if (this.overlay !== null) {
-            return;
+    /** Grows or shrinks the pool of selection boxes so updateOverlay can paint one per runtime
+     *  instance; surplus boxes are hidden but kept for reuse. */
+    private setOverlayBoxCount(count: number): void {
+        while (this.overlayBoxes.length < count) {
+            const overlay = document.createElement('div');
+            overlay.className = 'pagx-select-overlay';
+            overlay.style.pointerEvents = 'none';
+            this.root.appendChild(overlay);
+            this.overlayBoxes.push(overlay);
         }
-        const overlay = document.createElement('div');
-        overlay.className = 'pagx-select-overlay';
-        overlay.style.pointerEvents = 'none';
-        this.root.appendChild(overlay);
-        this.overlay = overlay;
+        for (let i = count; i < this.overlayBoxes.length; i++) {
+            this.overlayBoxes[i].style.display = 'none';
+        }
     }
 
     /** Overlay target: a transient hover (grey) takes priority over the sticky selection (blue),
@@ -1000,23 +1009,18 @@ export class PAGXPlayer extends EventTarget {
     }
 
     private updateOverlay(): void {
-        this.ensureOverlay();
-        const overlay = this.overlay!;
         if (this.overlayBoundsIndex < 0 || !this.view) {
-            overlay.style.display = 'none';
+            this.setOverlayBoxCount(0);
             return;
         }
         // Every frame queries getNodeBounds so the overlay tracks zoom and animation in real time.
         // The hitTest snapshot bounds (hoverHit/selectHit) are NOT used here because they are a
         // point-in-time snapshot that would not follow zoom/animation; using them caused the overlay
-        // to freeze and disappear during zoom. The trade-off is that getNodeBounds goes through
-        // nodeToLayer, which maps a source node to a single runtime layer instance — when the same
-        // source node has multiple instances, the overlay may outline a different instance than the
-        // one clicked. This is a known limitation of the bounds path; the span (startLine/endLine)
-        // from hitTest still correctly points at the reference node.
+        // to freeze and disappear during zoom. getNodeBounds returns one rect per runtime instance,
+        // so a source node referenced by several composition layers gets every instance outlined.
         const bounds = this.view.getNodeBounds(this.overlayBoundsIndex);
-        if (bounds === null) {
-            overlay.style.display = 'none';
+        if (bounds === null || bounds.length === 0) {
+            this.setOverlayBoxCount(0);
             this.overlayPreviousBounds = null;
             return;
         }
@@ -1033,13 +1037,17 @@ export class PAGXPlayer extends EventTarget {
         // Surface (backing) -> CSS pixels.
         const scaleX = rect.width / this.canvas.width;
         const scaleY = rect.height / this.canvas.height;
-        overlay.style.display = 'block';
-        overlay.style.left = shown.x * scaleX + 'px';
-        overlay.style.top = shown.y * scaleY + 'px';
-        overlay.style.width = shown.w * scaleX + 'px';
-        overlay.style.height = shown.h * scaleY + 'px';
-        overlay.classList.toggle('is-selected', this.overlayKind === 'select');
-        overlay.classList.toggle('is-hover', this.overlayKind === 'hover');
+        this.setOverlayBoxCount(shown.length);
+        for (let i = 0; i < shown.length; i++) {
+            const overlay = this.overlayBoxes[i];
+            overlay.style.display = 'block';
+            overlay.style.left = shown[i].x * scaleX + 'px';
+            overlay.style.top = shown[i].y * scaleY + 'px';
+            overlay.style.width = shown[i].w * scaleX + 'px';
+            overlay.style.height = shown[i].h * scaleY + 'px';
+            overlay.classList.toggle('is-selected', this.overlayKind === 'select');
+            overlay.classList.toggle('is-hover', this.overlayKind === 'hover');
+        }
     }
 
     private startOverlayLoop(): void {
@@ -1208,10 +1216,10 @@ export class PAGXPlayer extends EventTarget {
             cancelAnimationFrame(this.hoverRaf);
             this.hoverRaf = 0;
         }
-        if (this.overlay !== null) {
-            this.overlay.remove();
-            this.overlay = null;
+        for (const overlay of this.overlayBoxes) {
+            overlay.remove();
         }
+        this.overlayBoxes = [];
         this.resizeObserver?.disconnect();
         this.resizeObserver = null;
         document.removeEventListener('visibilitychange', this.onVisibilityChange);

@@ -222,12 +222,15 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
   /**
-   * Returns the surface-space bounds of the runtime layer built from the given source Layer node,
-   * or an empty rectangle if no runtime layer maps to it (e.g. the node has no runtime layer in
-   * this scene). Used by hosts that hold a source node index (e.g. an editor selection) and need
-   * the on-screen rect without first resolving it to a PAGLayer handle.
+   * Returns the surface-space bounds of every runtime layer built from the given source Layer
+   * node. A source node referenced by multiple <Layer composition="@X"> instances builds one
+   * runtime layer per instance, so one rectangle is returned per instance (a single element for
+   * regular nodes). The vector is empty if no runtime layer maps to the node (e.g. the node has
+   * no runtime layer in this scene). Used by hosts that hold a source node index (e.g. an editor
+   * selection) and need the on-screen rects without first resolving them to PAGLayer handles.
+   * @param node the source Layer node to look up
    */
-  Rect getGlobalBoundsForNode(const Layer* node) const;
+  std::vector<Rect> getGlobalBoundsForNode(const Layer* node) const;
 
   /**
    * Returns the source node under the given surface point, resolved for editor selection. This is a
@@ -317,18 +320,22 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
-  // Maps source Layer nodes to their runtime PAGLayer for index-based bounds lookup
-  // (getGlobalBoundsForNode). Populated by PAGComposition::BuildChildLayer and kept in sync by
-  // both removal paths (syncChildren and refreshPlainContainerChildren) via
-  // eraseNodeToLayerSubtree. Property-only edits go through RefreshLayerInPlace which does NOT
-  // replace the PAGLayer, so this map stays valid across incremental attribute edits; only
-  // structural changes (handled by a full runtime-tree rebuild in buildRuntimeTree) clear and
-  // repopulate it.
-  std::unordered_map<const Layer*, PAGLayer*> nodeToLayer = {};
+  // Maps source Layer nodes to their runtime PAGLayers for index-based bounds lookup
+  // (getGlobalBoundsForNode). A multimap because the same source Layer can be built once per
+  // referencing <Layer composition="@X"> instance, each instance adding its own entry so bounds
+  // lookups can report every instance. Populated by PAGComposition::BuildChildLayer and kept in
+  // sync by both removal paths (syncChildren and refreshPlainContainerChildren) via
+  // eraseNodeToLayerSubtree, which matches entries by their (source node, PAGLayer) pair.
+  // Property-only edits go through RefreshLayerInPlace which does NOT replace the PAGLayer, so
+  // the entries stay valid across incremental attribute edits; only structural changes (handled
+  // by a full runtime-tree rebuild in buildRuntimeTree) clear and repopulate the map.
+  std::unordered_multimap<const Layer*, PAGLayer*> nodeToLayer = {};
 
-  // Erases the nodeToLayer entries of an entire PAGLayer subtree. Every removal path must call
-  // this before dropping a subtree from its parent's children so the map never holds dangling
-  // PAGLayer pointers that getGlobalBoundsForNode would dereference.
+  // Erases the nodeToLayer entries of an entire PAGLayer subtree, matching each entry by its
+  // (source node, PAGLayer) pair so other runtime instances built from the same source node
+  // survive. Every removal path must call this before dropping a subtree from its parent's
+  // children so the map never holds dangling PAGLayer pointers that getGlobalBoundsForNode
+  // would dereference.
   void eraseNodeToLayerSubtree(const PAGLayer* layer);
 
   friend class PAGXDocument;

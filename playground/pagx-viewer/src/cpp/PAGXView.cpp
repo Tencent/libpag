@@ -256,23 +256,32 @@ emscripten::val PAGXView::getNodeBounds(int index) const {
   if (scene == nullptr) {
     return emscripten::val::null();
   }
-  auto rect = scene->getGlobalBoundsForNode(static_cast<Layer*>(n));
-  if (rect.isEmpty()) {
-    return emscripten::val::null();
-  }
+  auto rects = scene->getGlobalBoundsForNode(static_cast<Layer*>(n));
   // Selection-outline slack for FreeType's anti-aliasing overshoot: per-glyph tight bounds stop
   // at the geometric baseline while the rasterizer paints slightly below it, visually clipping
   // the last row of ink. Extending the bottom by 5% of the layer height covers the overshoot,
   // with a 0.5 root-space floor scaled by the current zoom. This is presentation-only slack,
   // kept here so PAGScene::getGlobalBounds keeps returning tight bounds.
   float zoom = contentScale * userZoom;
-  rect.height += std::max(0.5f * zoom, rect.height * 0.05f);
-  auto obj = emscripten::val::object();
-  obj.set("x", rect.x);
-  obj.set("y", rect.y);
-  obj.set("w", rect.width);
-  obj.set("h", rect.height);
-  return obj;
+  auto array = emscripten::val::array();
+  size_t visibleCount = 0;
+  for (auto& rect : rects) {
+    if (rect.isEmpty()) {
+      continue;
+    }
+    rect.height += std::max(0.5f * zoom, rect.height * 0.05f);
+    auto obj = emscripten::val::object();
+    obj.set("x", rect.x);
+    obj.set("y", rect.y);
+    obj.set("w", rect.width);
+    obj.set("h", rect.height);
+    array.call<void>("push", obj);
+    ++visibleCount;
+  }
+  if (visibleCount == 0) {
+    return emscripten::val::null();
+  }
+  return array;
 }
 
 bool PAGXView::setNodeChannel(int index, const std::string& channel, const std::string& value) {

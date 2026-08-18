@@ -335,7 +335,7 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
       slot->addChild(childComposition->runtimeLayer);
     }
     if (scene != nullptr) {
-      scene->nodeToLayer[layer] = childComposition.get();
+      scene->nodeToLayer.emplace(layer, childComposition.get());
     }
     return childComposition;
   }
@@ -349,7 +349,7 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
   }
   auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
   if (scene != nullptr) {
-    scene->nodeToLayer[layer] = child.get();
+    scene->nodeToLayer.emplace(layer, child.get());
   }
   if (!layer->children.empty()) {
     BuildChildren(binding, layer->children, child->children, scene, visited, child);

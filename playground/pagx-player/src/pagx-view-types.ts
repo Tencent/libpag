@@ -54,7 +54,7 @@ export interface PlayerView {
     // Selection (phase 1, read-only canvas<->editor queries)
     hitTest(surfaceX: number, surfaceY: number): HitTestResult | null;
     getNodeSourceMap(): NodeSourceEntry[];
-    getNodeBounds(index: number): NodeBounds | null;
+    getNodeBounds(index: number): NodeBounds[] | null;
     validatePAGX(data: Uint8Array): PagxSchemaDiagnostic[];
 
     // Incremental edit (phase 2, source-editor attribute edits). Sets a channel on nodes[index]
@@ -76,7 +76,8 @@ export interface NodeSourceEntry {
     channels: string[];  // incrementable channel names (phase-2 reuse)
 }
 
-/** Surface-space bounds of a layer, returned by getNodeBounds. */
+/** Surface-space bounds of one runtime layer instance, returned by getNodeBounds. A source node
+ *  referenced by multiple composition layers yields one array entry per instance. */
 export interface NodeBounds {
     x: number;
     y: number;

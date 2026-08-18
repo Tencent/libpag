@@ -702,25 +702,39 @@ void PAGScene::eraseNodeToLayerSubtree(const PAGLayer* layer) {
     return;
   }
   if (layer->node != nullptr) {
-    nodeToLayer.erase(layer->node);
+    // Erase by (source node, PAGLayer) pair: the same source node may map to other still-alive
+    // instances, so a key-only erase would drop their entries too.
+    auto range = nodeToLayer.equal_range(layer->node);
+    auto it = range.first;
+    while (it != range.second) {
+      if (it->second == layer) {
+        it = nodeToLayer.erase(it);
+      } else {
+        ++it;
+      }
+    }
   }
   for (const auto& child : layer->children) {
     eraseNodeToLayerSubtree(child.get());
   }
 }
 
-Rect PAGScene::getGlobalBoundsForNode(const Layer* node) const {
+std::vector<Rect> PAGScene::getGlobalBoundsForNode(const Layer* node) const {
   if (node == nullptr) {
     return {};
   }
-  auto it = nodeToLayer.find(node);
-  if (it == nodeToLayer.end() || it->second == nullptr) {
-    return {};
+  std::vector<Rect> bounds = {};
+  auto range = nodeToLayer.equal_range(node);
+  for (auto it = range.first; it != range.second; ++it) {
+    if (it->second == nullptr) {
+      continue;
+    }
+    // PAGLayer inherits enable_shared_from_this; nodeToLayer holds a raw pointer valid for as long
+    // as the PAGLayer remains in the composition's children (syncChildren keeps it in sync).
+    auto pagLayer = it->second->shared_from_this();
+    bounds.push_back(getGlobalBounds(pagLayer));
   }
-  // PAGLayer inherits enable_shared_from_this; nodeToLayer holds a raw pointer valid for as long
-  // as the PAGLayer remains in the composition's children (syncChildren keeps it in sync).
-  auto pagLayer = it->second->shared_from_this();
-  return getGlobalBounds(pagLayer);
+  return bounds;
 }
 
 HitTestResult PAGScene::hitTest(float surfaceX, float surfaceY) {
