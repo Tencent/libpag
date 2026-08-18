@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <functional>  // for windows
+#include <memory>
 #include <unordered_map>
 #include "pag/decoder.h"
 #include "pag/gpu.h"
@@ -1661,8 +1662,7 @@ class PAG_API PAGDecoder {
                                                    int numFrames);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
-             float frameRate, float maxFrameRate,
-             std::shared_ptr<tgfx::GLDevice> sharedDevice = nullptr);
+             float frameRate, float maxFrameRate, std::shared_ptr<tgfx::GLDevice> sharedDevice);
 
   bool readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap);
   bool renderFrame(std::shared_ptr<PAGComposition> composition, int index,
