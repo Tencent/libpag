@@ -148,8 +148,11 @@ export class PlaybackBar {
         const totalFrames = Math.ceil((duration * rate) / 1_000_000);
         const currentFrame = Math.round((Math.max(0, view.currentTimeMicros()) * rate) / 1_000_000);
         const targetFrame = Math.max(0, Math.min(totalFrames, currentFrame + direction));
-        const clamped = Math.min(duration, (targetFrame * 1_000_000) / rate);
-        view.setCurrentTimeMicros(clamped);
+        // Clamp one microsecond short of duration: stepping onto the final frame seeks exactly
+        // `duration`, which Loop-mode WrapTime maps to `duration % duration == 0`, snapping the
+        // canvas and counters back to frame 0. duration - 1us still lands inside the final frame.
+        const clamped = Math.min(duration - 1, (targetFrame * 1_000_000) / rate);
+        view.setCurrentTimeMicros(Math.max(0, clamped));
         this.callbacks.onSeek?.(clamped);
         this.updateAll();
     }

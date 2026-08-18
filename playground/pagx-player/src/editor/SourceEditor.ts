@@ -44,24 +44,33 @@ function loadMonaco(): Promise<Monaco> {
     monacoLoadPromise = new Promise<Monaco>((resolve, reject) => {
         const script = document.createElement('script');
         script.src = `${MONACO_CDN}/loader.js`;
+        // Reset the cached promise on failure so a later open() retries the CDN load; without
+        // this, one transient network failure would leave every future loadMonaco() call stuck
+        // on the rejected promise (editor dead until a full page reload).
+        const failLoad = (message: string): void => {
+            monacoLoadPromise = null;
+            script.remove();
+            reject(new Error(message));
+        };
         script.onload = () => {
             const win = window as unknown as {
                 require?: {
                     config: (opts: { paths: { vs: string } }) => void;
-                    (deps: string[], cb: (...modules: unknown[]) => void): void;
+                    (deps: string[], cb: (...modules: unknown[]) => void,
+                     errback?: (err: unknown) => void): void;
                 };
                 monaco?: Monaco;
             };
             const amdRequire = win.require;
             if (amdRequire === undefined) {
-                reject(new Error('Monaco AMD loader failed to initialize'));
+                failLoad('Monaco AMD loader failed to initialize');
                 return;
             }
             amdRequire.config({ paths: { vs: MONACO_CDN } });
             amdRequire(['vs/editor/editor.main'], () => {
                 const m = win.monaco;
                 if (m === undefined) {
-                    reject(new Error('Monaco failed to load from CDN'));
+                    failLoad('Monaco failed to load from CDN');
                     return;
                 }
                 pruneBuiltInContextMenuItems(amdRequire);
@@ -69,9 +78,9 @@ function loadMonaco(): Promise<Monaco> {
                 installShadowMenuStyles();
                 monacoInstance = m;
                 resolve(m);
-            });
+            }, () => failLoad('Monaco modules failed to load from CDN'));
         };
-        script.onerror = () => reject(new Error('Failed to load Monaco loader script from CDN'));
+        script.onerror = () => failLoad('Failed to load Monaco loader script from CDN');
         document.head.appendChild(script);
     });
     return monacoLoadPromise;

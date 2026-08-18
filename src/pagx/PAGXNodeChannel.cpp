@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXNodeChannel.h"
 #include <climits>
+#include <cmath>
 #include <cstdlib>
 #include <optional>
 #include <string_view>
@@ -1011,7 +1012,9 @@ static bool ParseChannelValue(ChannelValueType type, const std::string& raw, Key
       const char* start = raw.c_str();
       char* endPtr = nullptr;
       float value = strtof(start, &endPtr);
-      if (endPtr == start) {
+      // Strict like ParseTypedValue<float> in PAGXImporter.cpp: the whole string must be consumed
+      // and be finite, so an incremental edit never accepts input a full reparse would reject.
+      if (endPtr == start || *endPtr != '\0' || !std::isfinite(value)) {
         return false;
       }
       *out = value;
@@ -1021,7 +1024,7 @@ static bool ParseChannelValue(ChannelValueType type, const std::string& raw, Key
       const char* start = raw.c_str();
       char* endPtr = nullptr;
       long value = strtol(start, &endPtr, 10);
-      if (endPtr == start || value < INT_MIN || value > INT_MAX) {
+      if (endPtr == start || *endPtr != '\0' || value < INT_MIN || value > INT_MAX) {
         return false;
       }
       *out = static_cast<int>(value);
