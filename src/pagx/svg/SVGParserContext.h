@@ -289,6 +289,18 @@ class SVGParserContext {
   float _viewBoxWidth = 0;
   float _viewBoxHeight = 0;
 
+ public:
+  /** Returns the document viewBox width used for unit conversions (parseLength). */
+  float getViewBoxWidth() const {
+    return _viewBoxWidth;
+  }
+  /** Returns the document viewBox height used for unit conversions (parseLength). */
+  float getViewBoxHeight() const {
+    return _viewBoxHeight;
+  }
+
+ private:
+
   // CSS class rules: key is class name (without dot), value is style properties.
   // Example: {"cls-1": "fill: #fcfae9"}
   std::unordered_map<std::string, std::string> _cssClassRules = {};

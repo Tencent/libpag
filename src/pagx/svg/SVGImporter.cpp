@@ -2903,6 +2903,16 @@ void SVGParserContext::registerFilterAnimationTarget(
   if (filterNode == nullptr) {
     return;
   }
+  // Only register the filter when at least one contributing fe* primitive carries SMIL
+  // animations. Filters without animations must stay unregistered: an id + nodeMap entry with
+  // no AnimationObject referencing it trips the verifier's unreferenced-resource check (and
+  // would needlessly bloat exported SVG with the id attribute).
+  auto hasSmilAnimation = [this](const std::shared_ptr<DOMNode>& feElement) {
+    return feElement != nullptr && _smilAnimations.find(feElement.get()) != _smilAnimations.end();
+  };
+  if (!hasSmilAnimation(blurElement) && !hasSmilAnimation(offsetElement)) {
+    return;
+  }
   // Assign an id and register so AnimationObject.target can resolve the filter node at runtime
   // and in tests. Without this, findNode(filterId) would return nullptr.
   if (filterNode->id.empty()) {

@@ -1559,6 +1559,40 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
     }
   }
 
+  // Special case: <animate attributeName="stroke-dashoffset"> on a <circle>/<ellipse> needs the
+  // same phase+direction correction that addFillStroke applies to the static Stroke.dashOffset
+  // (90-degree phase alignment with SVG's 3 o'clock start + tgfx's reverse-path dashOffset
+  // direction). Without this the animated stroke-dasharray draws in the mirror direction
+  // from the SVG side, producing symmetric arc frames rather than a matching animation.
+  if (attributeName == "stroke-dashoffset" && target.valueType == ChannelValueType::Float &&
+      target.node != nullptr) {
+    auto el = nodeInfo.domElement;
+    if (el && (el->name == "circle" || el->name == "ellipse")) {
+      float rx = 0.0f;
+      float ry = 0.0f;
+      if (el->name == "circle") {
+        rx = ry = ctx.parseLength(ctx.getAttribute(el, "r"), ctx.getViewBoxWidth());
+      } else {
+        rx = ctx.parseLength(ctx.getAttribute(el, "rx"), ctx.getViewBoxWidth());
+        ry = ctx.parseLength(ctx.getAttribute(el, "ry"), ctx.getViewBoxHeight());
+      }
+      const float sum = rx + ry;
+      if (sum > 0.0f) {
+        // Ramanujan's first approximation; exact when rx == ry.
+        const float h = (rx - ry) * (rx - ry) / (sum * sum);
+        const float perimeter = static_cast<float>(M_PI) * sum *
+                                (1.0f + 3.0f * h / (10.0f + std::sqrt(4.0f - 3.0f * h)));
+        const float correction = perimeter / 4.0f;
+        for (auto* ch : channels) {
+          auto* fch = static_cast<TypedChannel<float>*>(ch);
+          for (auto& key : fch->keyframes) {
+            key.value -= correction;
+          }
+        }
+      }
+    }
+  }
+
   // Expand repeatCount: integer N replicates the keyframe sequence N times with time offset.
   // accumulate="sum" offsets each repetition's values by k*(lastValue - firstValue).
   // "indefinite" is handled by buildAnimation (sets LoopMode::Loop), not expanded here.

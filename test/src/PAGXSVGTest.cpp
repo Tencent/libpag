@@ -5230,10 +5230,13 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_DrawStroke) {
   ASSERT_EQ(obj->channels.size(), 1u);
   EXPECT_EQ(obj->channels[0]->name, "dashOffset");
   auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
-  // 2 keyframes (from/to) + fill=freeze (no trailing base value).
+  // 2 keyframes (from/to) + fill=freeze (no trailing base value). The circle's animated
+  // dashOffset values carry the same phase+direction correction as the static Stroke.dashOffset
+  // (perimeter/4 subtraction, see SMILAnimationParser::parseAnimate's stroke-dashoffset special
+  // case): from=314 becomes 314 - perimeter/4 = 314 - 78.5398 = 235.4602, to=0 becomes -78.5398.
   ASSERT_EQ(ch->keyframes.size(), 2u);
-  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 314.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 0.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 235.46017f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, -78.539818f);
 }
 
 /**
