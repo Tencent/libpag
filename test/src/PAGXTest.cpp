@@ -90,6 +90,7 @@
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/LayoutMode.h"
 #include "pagx/types/Padding.h"
+#include "pagx/types/Size.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
@@ -169,6 +170,21 @@ static pagx::Layer* MakeTextLayer(pagx::PAGXDocument* doc, const std::string& co
   group->elements.push_back(text);
   group->elements.push_back(fill);
   layer->contents.push_back(group);
+  return layer;
+}
+
+static pagx::Layer* MakeRectLayer(pagx::PAGXDocument* doc, pagx::Point center, pagx::Size size,
+                                  pagx::Color color) {
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = center;
+  rect->size = size;
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = color;
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
   return layer;
 }
 
@@ -623,6 +639,64 @@ PAGX_TEST(PAGXTest, PrecomposedTextRender) {
   displayList.root()->addChild(tgfxLayer);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/PrecomposedTextRender"));
+}
+
+/**
+ * Test case: a Layer with an inverted mask type keeps its content visible where the mask is
+ * transparent (AlphaInverted), dark (LuminanceInverted), or outside the mask contour
+ * (ContourInverted). Covers the XML round-trip of the inverted MaskType values and the
+ * LayerBuilder wiring to tgfx::LayerMaskType.
+ */
+PAGX_TEST(PAGXTest, MaskInverted) {
+  auto doc = pagx::PAGXDocument::Make(300, 100);
+
+  // Alpha inverted: the green rect stays visible only in the right half not covered by the mask.
+  auto alphaContent = MakeRectLayer(doc.get(), {50, 50}, {100, 100}, {0, 0.6f, 0, 1});
+  auto alphaMask = MakeRectLayer(doc.get(), {25, 50}, {50, 100}, {1, 0, 0, 1});
+  alphaMask->id = "alphaMask";
+  alphaContent->mask = alphaMask;
+  alphaContent->maskType = pagx::MaskType::AlphaInverted;
+
+  // Luminance inverted: the blue rect stays visible only over the black half of the mask.
+  auto lumaContent = MakeRectLayer(doc.get(), {150, 50}, {100, 100}, {0, 0, 0.8f, 1});
+  auto lumaMask = doc->makeNode<pagx::Layer>();
+  lumaMask->id = "lumaMask";
+  lumaMask->children.push_back(MakeRectLayer(doc.get(), {125, 50}, {50, 100}, {1, 1, 1, 1}));
+  lumaMask->children.push_back(MakeRectLayer(doc.get(), {175, 50}, {50, 100}, {0, 0, 0, 1}));
+  lumaContent->mask = lumaMask;
+  lumaContent->maskType = pagx::MaskType::LuminanceInverted;
+
+  // Contour inverted: the mask fill is half transparent, but contour masking ignores fill alpha,
+  // so the yellow rect stays fully visible only outside the mask geometry.
+  auto contourContent = MakeRectLayer(doc.get(), {250, 50}, {100, 100}, {0.9f, 0.7f, 0, 1});
+  auto contourMask = MakeRectLayer(doc.get(), {225, 50}, {50, 100}, {1, 0, 0, 0.5f});
+  contourMask->id = "contourMask";
+  contourContent->mask = contourMask;
+  contourContent->maskType = pagx::MaskType::ContourInverted;
+
+  doc->layers.push_back(alphaContent);
+  doc->layers.push_back(alphaMask);
+  doc->layers.push_back(lumaContent);
+  doc->layers.push_back(lumaMask);
+  doc->layers.push_back(contourContent);
+  doc->layers.push_back(contourMask);
+
+  doc->applyLayout();
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  auto pagxPath = SavePAGXFile(xml, "PAGXTest/MaskInverted.pagx");
+
+  auto reloadedDoc = pagx::PAGXImporter::FromFile(pagxPath);
+  ASSERT_TRUE(reloadedDoc != nullptr);
+  reloadedDoc->applyLayout();
+  auto tgfxLayer = pagx::LayerBuilder::Build(reloadedDoc.get());
+  ASSERT_TRUE(tgfxLayer != nullptr);
+
+  auto surface = Surface::Make(context, 300, 100);
+  DisplayList displayList;
+  displayList.root()->addChild(tgfxLayer);
+  displayList.render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXTest/MaskInverted"));
 }
 
 /**

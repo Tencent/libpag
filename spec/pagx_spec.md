@@ -988,6 +988,9 @@ Layer child elements are automatically categorized into five collections by type
 | `alpha` | Alpha mask: Uses mask's alpha channel |
 | `luminance` | Luminance mask: Uses mask's luminance values |
 | `contour` | Contour mask: Uses mask's contour for clipping |
+| `alphaInverted` | Inverted alpha mask: Content is visible where the mask is transparent |
+| `luminanceInverted` | Inverted luminance mask: Content is visible where the mask is dark |
+| `contourInverted` | Inverted contour mask: Content is visible outside the mask's contour |
 
 **BlendMode**: See §2.9 for the complete blend mode table.
 
@@ -2888,7 +2891,7 @@ Additionally, `Layer` (but not `Group`) may contain `<svg>` as an import directi
 | Enum | Values |
 |------|--------|
 | **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
-| **MaskType** | `alpha`, `luminance`, `contour` |
+| **MaskType** | `alpha`, `luminance`, `contour`, `alphaInverted`, `luminanceInverted`, `contourInverted` |
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |

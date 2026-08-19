@@ -339,7 +339,7 @@ Write in this order: VectorElements → child Layers → LayerStyles → LayerFi
 | `blendMode` | normal | CSS `mix-blend-mode` names, camelCase |
 | `visible` | true | Whether rendered |
 | `mask` | — | `@id` reference to mask layer |
-| `maskType` | alpha | `alpha` / `luminance` / `contour` |
+| `maskType` | alpha | `alpha` / `luminance` / `contour` / `alphaInverted` / `luminanceInverted` / `contourInverted` |
 | `clipToBounds` | false | Clip content to layer bounds |
 | `composition` | — | `@id` reference to Composition |
 
@@ -366,7 +366,8 @@ Filters are the final rendering stage. They chain in document order.
 ## Masking and Clipping
 
 - **Mask**: `mask="@id"` references a mask Layer. `maskType`: alpha (soft-edge),
-  luminance (brightness-based), contour (hard-edge clipping). Mask layer is not rendered.
+  luminance (brightness-based), contour (hard-edge clipping), plus the inverted
+  variants alphaInverted / luminanceInverted / contourInverted. Mask layer is not rendered.
 - **clipToBounds**: Clips to layer bounds (GPU-accelerated). Prefer over rectangular masks.
 
 ---

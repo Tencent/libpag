@@ -988,6 +988,9 @@ Layer 的子元素按类型自动归类为五个集合：
 | `alpha` | Alpha 遮罩：使用遮罩的 alpha 通道 |
 | `luminance` | 亮度遮罩：使用遮罩的亮度值 |
 | `contour` | 轮廓遮罩：使用遮罩的轮廓进行裁剪 |
+| `alphaInverted` | 反转 Alpha 遮罩：遮罩透明处显示内容 |
+| `luminanceInverted` | 反转亮度遮罩：遮罩暗处显示内容 |
+| `contourInverted` | 反转轮廓遮罩：遮罩轮廓外显示内容 |
 
 **BlendMode**：见 2.9 节混合模式完整表格。
 
@@ -2880,7 +2883,7 @@ Layer / Group
 | 枚举 | 值 |
 |------|------|
 | **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
-| **MaskType** | `alpha`, `luminance`, `contour` |
+| **MaskType** | `alpha`, `luminance`, `contour`, `alphaInverted`, `luminanceInverted`, `contourInverted` |
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |

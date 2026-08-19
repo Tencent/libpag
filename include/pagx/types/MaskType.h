@@ -35,7 +35,22 @@ enum class MaskType {
   /**
    * Use the contour (outline) of the mask for masking.
    */
-  Contour
+  Contour,
+  /**
+   * Use the inverted alpha channel of the mask to determine visibility. The layer content is
+   * visible where the mask is transparent and hidden where the mask is opaque.
+   */
+  AlphaInverted,
+  /**
+   * Use the inverted luminance of the mask to determine visibility. The layer content is visible
+   * where the mask is dark and hidden where the mask is bright.
+   */
+  LuminanceInverted,
+  /**
+   * Use the inverted contour (outline) of the mask for masking. The layer content is visible
+   * outside the mask's contour and hidden inside it.
+   */
+  ContourInverted
 };
 
 }  // namespace pagx

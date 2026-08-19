@@ -1705,6 +1705,22 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 // SVGWriter – mask / clip-path defs
 //==============================================================================
 
+// Inverted mask types degrade to their base type for best-effort vector output: SVG masks
+// cannot express inversion, so the inversion is dropped here (the feature probe rasterizes
+// the layer instead when baking is enabled).
+static MaskType DegradeInvertedMaskType(MaskType type) {
+  switch (type) {
+    case MaskType::AlphaInverted:
+      return MaskType::Alpha;
+    case MaskType::LuminanceInverted:
+      return MaskType::Luminance;
+    case MaskType::ContourInverted:
+      return MaskType::Contour;
+    default:
+      return type;
+  }
+}
+
 std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType) {
   // Reuse a previously-emitted def for the same (maskLayer, maskType). Without this cache, a
   // single mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements
@@ -1712,13 +1728,14 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
   // the first and silently ignore the rest, but a regression that changes emission order would
   // re-wire all owners to a different copy.
   //
-  // MaskType participates in the key because the three values map to materially different SVG
+  // MaskType participates in the key because the values map to materially different SVG
   // output: Alpha and Luminance both emit `<mask>` but differ in `mask-type` (alpha channel vs
   // luminance, the SVG default), while Contour emits `<clipPath>` (geometry-only inside/outside
   // test). Without keying on MaskType, the second reference for a layer used in two roles
   // would silently inherit the first role's def — a luminance owner would render an alpha
   // mask, or a contour owner would receive a path mask — with no warning.
-  bool isClipPath = (maskType == MaskType::Contour);
+  auto baseType = DegradeInvertedMaskType(maskType);
+  bool isClipPath = (baseType == MaskType::Contour);
   const char* tag = isClipPath ? "clipPath" : "mask";
   const char* idPrefix = isClipPath ? "clip" : "mask";
   ContentWriter writer =
@@ -1749,12 +1766,21 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
       case MaskType::Contour:
         defId += "_c";
         break;
+      case MaskType::AlphaInverted:
+        defId += "_ai";
+        break;
+      case MaskType::LuminanceInverted:
+        defId += "_li";
+        break;
+      case MaskType::ContourInverted:
+        defId += "_ci";
+        break;
     }
   }
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
-  if (maskType == MaskType::Alpha) {
+  if (baseType == MaskType::Alpha) {
     _defs->addAttribute("style", "mask-type:alpha");
   }
   _defs->closeElementStart();
@@ -3269,8 +3295,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     if (features.needsRasterization()) {
       addWarning("layer '" + (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
                  "' uses SVG-unsupported features (TextPath / TextModifier / diamond or conic "
-                 "gradient) and bakeUnsupported is false; emitting as best-effort vector with "
-                 "those features dropped or downgraded to radial.");
+                 "gradient / inverted mask) and bakeUnsupported is false; emitting as best-effort"
+                 " vector with those features dropped or downgraded to radial.");
     }
   }
 
@@ -3435,7 +3461,7 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
   }
 
   if (layer->mask != nullptr) {
-    if (layer->maskType == MaskType::Contour) {
+    if (layer->maskType == MaskType::Contour || layer->maskType == MaskType::ContourInverted) {
       // Contour masking uses <clipPath> which only supports geometry clipping.
       auto clipId = writeClipPathDef(layer->mask, layer);
       out.addAttribute("clip-path", "url(#" + clipId + ")");
