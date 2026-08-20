@@ -331,6 +331,15 @@ export class PAGXView {
   }
 
   /**
+   * Returns true when the loaded document has a default timeline — even one without a queryable
+   * duration (e.g. a state machine). Used to keep the playback bar visible in a greyed-out
+   * fallback mode instead of hiding it entirely.
+   */
+  public hasTimeline(): boolean {
+    return this.nativeView._hasTimeline();
+  }
+
+  /**
    * Returns the frame rate of the animation. Returns 0 if no content is loaded.
    */
   public frameRate(): number {

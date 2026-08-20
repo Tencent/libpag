@@ -308,6 +308,22 @@ const CSS = `
     transform: scale(1.2);
 }
 
+/* Fallback mode (a default timeline without a queryable duration, e.g. a state machine):
+   the slider and loop toggle are disabled and dimmed, while play/pause and frame stepping
+   stay fully styled and usable. */
+.pagx-player-playback-bar.is-untimed .progress-slider {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.pagx-player-playback-bar.is-untimed .time-display {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.pagx-player-playback-bar.is-untimed .progress-slider::-webkit-slider-thumb {
+    cursor: default;
+}
+
 .pagx-player-playback-bar .progress-slider::-moz-range-thumb {
     width: 12px;
     height: 12px;

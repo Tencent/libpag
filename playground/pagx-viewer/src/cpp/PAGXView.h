@@ -86,6 +86,10 @@ class PAGXView {
   int64_t currentTimeMicros() const;
   int64_t durationMicros() const;
   float frameRate() const;
+  // Returns true when the loaded document has a default timeline at all — even one without a
+  // queryable duration (e.g. a state machine). The playback bar uses this to stay visible in a
+  // greyed-out fallback mode instead of hiding entirely.
+  bool hasTimeline() const;
   void setCurrentTimeMicros(int64_t micros);
   void setLoop(bool loop);
   bool isLoop() const;
@@ -147,6 +151,7 @@ class PAGXView {
   bool ensureWindow();
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
+  void advanceFallbackTimeline(int64_t deltaUs);
   void onZoomEnd();
   void updatePerformanceState(double frameDurationMs);
   void updateAdaptiveTileRefinement();
@@ -163,6 +168,11 @@ class PAGXView {
   // PAGTimeline base, so they are routed through this pointer. Null when there is no default
   // timeline or it is not an animation.
   std::shared_ptr<PAGAnimation> defaultAnimation = nullptr;
+  // Virtual clock for a default timeline without a queryable duration (e.g. a state machine):
+  // accumulated from frame deltas while playing and moved by seek-equivalent relative steps, so
+  // the playback bar can offer play/pause and frame stepping even though no total duration or
+  // absolute seek exists.
+  int64_t fallbackClockUs = 0;
   // Playback state maintained by the view itself. The timeline API no longer carries play/pause
   // state, and PAGComposition::pauseTimeline cannot gate the top-level timeline driven here, so the
   // view gates advancement on this flag.

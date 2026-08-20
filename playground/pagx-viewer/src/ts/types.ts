@@ -209,6 +209,13 @@ export interface _PAGXView {
   _durationMicros(): number;
 
   /**
+   * Returns true when the document has a default timeline at all — even one without a queryable
+   * duration (e.g. a state machine). Used to keep the playback bar visible in a greyed-out
+   * fallback mode instead of hiding it entirely.
+   */
+  _hasTimeline(): boolean;
+
+  /**
    * Returns the frame rate of the animation.
    */
   _frameRate(): number;

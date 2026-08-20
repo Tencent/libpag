@@ -484,8 +484,15 @@ export class PAGXPlayer extends EventTarget {
 
             this.canvas.classList.remove('hidden');
             setToolbarVisible(this.toolbarRoot, true);
-            const hasAnimation = view.durationMicros() > 0;
-            this.playbackBar.setVisible(hasAnimation);
+            // A document without a queryable duration still gets the bar in its greyed-out
+            // fallback mode, as long as it has a default timeline at all.
+            if (view.durationMicros() > 0) {
+                this.playbackBar.setVisible(true);
+            } else if (view.hasTimeline()) {
+                this.playbackBar.showUntimed();
+            } else {
+                this.playbackBar.setVisible(false);
+            }
 
             // Feed the editor with the freshly loaded XML. If the host pre-decoded it, we use
             // that; otherwise we decode the bytes so the editor always has something to show
@@ -512,7 +519,7 @@ export class PAGXPlayer extends EventTarget {
             const detail: LoadedEventDetail = {
                 duration: view.durationMicros(),
                 frameRate: view.frameRate(),
-                hasAnimation,
+                hasAnimation: view.hasTimeline(),
                 xmlText,
             };
             this.dispatchEvent(new CustomEvent('loaded', { detail }));
@@ -551,8 +558,12 @@ export class PAGXPlayer extends EventTarget {
     public show(): void {
         this.canvas.classList.remove('hidden');
         setToolbarVisible(this.toolbarRoot, true);
-        if (this.view && this.view.durationMicros() > 0) {
-            this.playbackBar.setVisible(true);
+        if (this.view) {
+            if (this.view.durationMicros() > 0) {
+                this.playbackBar.setVisible(true);
+            } else if (this.view.hasTimeline()) {
+                this.playbackBar.showUntimed();
+            }
         }
     }
 

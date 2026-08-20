@@ -668,7 +668,9 @@ async function loadPAGXFile(file: File): Promise<void> {
         currentPlayingFile = null;
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
-        console.error('Failed to load PAGX file:', error);
+        // Temporary diagnostic for the nested-composition-Timelines wasm trap: log the full
+        // stack so the aborting wasm frame offsets are preserved. Remove once the trap is fixed.
+        console.error('Failed to load PAGX file:', (error as Error)?.stack ?? error);
         // Load failed: the player has already torn down its own UI via its failure path, but
         // we still own the outer chrome (nav-btns overlay + currentPlayingFile pointer for
         // downstream resource resolution). Restore both so the user can navigate to Samples

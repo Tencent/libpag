@@ -27,6 +27,8 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "pagx/PAGComposition.h"
+#include "pagx/PAGLayer.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
@@ -391,14 +393,20 @@ void PAGXView::advanceTimelines(double frameStartMs) {
         playing = false;
       }
     } else if (defaultTimeline != nullptr) {
-      // Non-animation timelines (state machines) have no seekable duration to gate; drive as-is.
-      defaultTimeline->advanceAndApply(deltaUs);
+      // Non-animation timelines (state machines) have no queryable duration to gate; drive
+      // as-is and accumulate the fallback clock so the playback bar stays functional.
+      advanceFallbackTimeline(deltaUs);
     }
     // Drive the scene inside the playing gate so pausing freezes the whole picture: this advances
     // the auto-playing nested compositions, which would otherwise keep animating (and keep
     // hasContentChanged() true) even while the top-level animation is paused.
     if (scene != nullptr) {
       scene->advanceAndApply(deltaUs);
+      // Track the fallback clock for documents whose only animations are nested (no top-level
+      // timeline at all), so frame stepping has a position reference.
+      if (defaultTimeline == nullptr) {
+        fallbackClockUs += deltaUs;
+      }
     }
   }
 }
@@ -679,6 +687,11 @@ void PAGXView::updateAdaptiveTileRefinement() {
   }
 }
 
+void PAGXView::advanceFallbackTimeline(int64_t deltaUs) {
+  defaultTimeline->advanceAndApply(deltaUs);
+  fallbackClockUs += deltaUs;
+}
+
 void PAGXView::play() {
   playing = true;
 }
@@ -699,6 +712,10 @@ int64_t PAGXView::currentTimeMicros() const {
     // the progress bar run backward on the return half.
     return defaultAnimation->playbackPosition();
   }
+  if (defaultTimeline != nullptr) {
+    // Duration-less timeline (e.g. a state machine): the fallback clock is the only position.
+    return fallbackClockUs;
+  }
   return 0;
 }
 
@@ -715,7 +732,36 @@ float PAGXView::frameRate() const {
   if (defaultAnimation != nullptr) {
     return defaultAnimation->frameRate();
   }
+  if (hasTimeline()) {
+    // Duration-less timelines (state machines, nested-only animations) have no single frame
+    // rate. Return the PAGX default so frame stepping still has a sane step unit.
+    return 60.0f;
+  }
   return 0.0f;
+}
+
+// Returns true when any composition in the runtime subtree has spawned timelines, i.e. there is
+// animated content even without a top-level default timeline (all animations are
+// composition-scoped and driven purely through <Timelines> references).
+static bool HasAnySpawnedTimeline(const std::shared_ptr<PAGLayer>& layer) {
+  if (layer == nullptr) {
+    return false;
+  }
+  if (layer->layerType() == LayerType::Composition &&
+      static_cast<PAGComposition*>(layer.get())->hasTimelines()) {
+    return true;
+  }
+  for (const auto& child : layer->getChildren()) {
+    if (HasAnySpawnedTimeline(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PAGXView::hasTimeline() const {
+  return defaultTimeline != nullptr ||
+         (scene != nullptr && HasAnySpawnedTimeline(scene->rootComposition()));
 }
 
 // Known limitation: seek only repositions the default (top-level) animation. Nested
@@ -733,6 +779,25 @@ void PAGXView::setCurrentTimeMicros(int64_t micros) {
     defaultAnimation->apply();
     lastAnimationTimeMs = -1.0;
     presentImmediately = true;
+  } else if (defaultTimeline != nullptr) {
+    // Fallback mode (duration-less timeline): the caller always sends current + signed delta
+    // because the slider is disabled in this mode and only relative frame steps come through.
+    int64_t delta = micros - fallbackClockUs;
+    if (delta != 0) {
+      advanceFallbackTimeline(delta);
+      lastAnimationTimeMs = -1.0;
+      presentImmediately = true;
+    }
+  } else if (scene != nullptr) {
+    // Nested-only animations: no top-level timeline to drive, so frame stepping advances the
+    // scene directly (same relative-delta convention as the fallback branch above).
+    int64_t delta = micros - fallbackClockUs;
+    if (delta != 0) {
+      scene->advanceAndApply(delta);
+      fallbackClockUs += delta;
+      lastAnimationTimeMs = -1.0;
+      presentImmediately = true;
+    }
   }
 }
 

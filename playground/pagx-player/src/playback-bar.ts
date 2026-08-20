@@ -72,6 +72,12 @@ export class PlaybackBar {
     private isDraggingSlider = false;
     private wasPlayingBeforeDrag = false;
     private wasPlaying = false;
+    // Fallback mode: the loaded document has a default timeline but no queryable duration
+    // (e.g. a state machine). The bar stays visible greyed out; play/pause and frame stepping
+    // keep working while the slider and loop toggle are disabled.
+    private untimed = false;
+    // Frame rate used for stepping in fallback mode (the view reports a default one).
+    private fallbackRate = 60;
     // Handle of the pending requestAnimationFrame callback; null when the tick loop is stopped.
     private tickHandle: number | null = null;
 
@@ -90,14 +96,43 @@ export class PlaybackBar {
         return !this.root.classList.contains('hidden');
     }
 
-    /** Force the bar visible / hidden. Called by the player based on the loaded document's
-     *  duration (>0 = visible). */
+    /** Normal mode shows a fully interactive bar; fallback mode (a default timeline without a
+     *  queryable duration) keeps the bar visible but greyed out, disabling scrubbing and the
+     *  loop toggle while play/pause and frame stepping keep working. */
+    /** Normal mode shows a fully interactive bar; fallback mode (untimed) keeps the bar visible
+     *  but greyed out. Private: hosts use setVisible / showUntimed. */
+    private setTimelineEnabled(enabled: boolean): void {
+        this.untimed = !enabled;
+        this.root.classList.remove('hidden');
+        this.root.classList.toggle('is-untimed', this.untimed);
+        this.progressSlider.disabled = this.untimed;
+        this.loopBtn.disabled = this.untimed;
+        this.updateAll();
+        this.updateLoopIcon();
+    }
+
+    /** Force the bar visible / hidden. Called by the player on load success/failure and on
+     *  host-driven show/hide. Hiding also leaves fallback mode. */
     public setVisible(visible: boolean): void {
         this.root.classList.toggle('hidden', !visible);
         if (visible) {
-            this.updateAll();
-            this.updateLoopIcon();
+            this.setTimelineEnabled(true);
+        } else {
+            this.untimed = false;
+            this.root.classList.remove('is-untimed');
         }
+    }
+
+    /** Enters the greyed-out fallback mode: the document has a default timeline but no
+     *  queryable duration (e.g. a state machine). The bar stays visible; scrubbing and the
+     *  loop toggle are disabled while play/pause and frame stepping keep working. */
+    public showUntimed(): void {
+        const view = this.getView();
+        this.fallbackRate = view ? view.frameRate() : 60;
+        if (this.fallbackRate <= 0) {
+            this.fallbackRate = 60;
+        }
+        this.setTimelineEnabled(false);
     }
 
     /** Push all current PAGXView state onto the DOM. Called on visibility change and after
@@ -112,14 +147,16 @@ export class PlaybackBar {
      *  playthrough that ended at the tail becomes replay-able. */
     public togglePlayback(): void {
         const view = this.getView();
-        if (!view || view.durationMicros() <= 0) {
+        if (!view || (!this.untimed && view.durationMicros() <= 0)) {
             return;
         }
         if (view.isPlaying()) {
             view.pause();
             this.callbacks.onPause?.();
         } else {
-            if (view.currentTimeMicros() >= view.durationMicros()) {
+            // Wrap-around replay only applies to timed timelines; an untimed one has no end to
+            // wrap from, and seeking to 0 would rewind its absolute position.
+            if (!this.untimed && view.currentTimeMicros() >= view.durationMicros()) {
                 view.setCurrentTimeMicros(0);
             }
             view.play();
@@ -136,6 +173,19 @@ export class PlaybackBar {
     public stepFrame(direction: number): void {
         const view = this.getView();
         if (!view) {
+            return;
+        }
+        if (this.untimed) {
+            // Fallback mode: no total frame count to clamp against; step relative to the
+            // fallback clock and let the view translate it into a signed delta.
+            view.pause();
+            this.callbacks.onPause?.();
+            const currentFrame = Math.round(
+                (Math.max(0, view.currentTimeMicros()) * this.fallbackRate) / 1_000_000);
+            const targetFrame = Math.max(0, currentFrame + direction);
+            view.setCurrentTimeMicros((targetFrame * 1_000_000) / this.fallbackRate);
+            this.callbacks.onSeek?.(view.currentTimeMicros());
+            this.updateAll();
             return;
         }
         const rate = view.frameRate();
@@ -384,6 +434,13 @@ export class PlaybackBar {
     private updateTimeDisplay(): void {
         const view = this.getView();
         if (!view) return;
+        if (this.untimed) {
+            // Fallback mode: no position is meaningful without a total duration — show
+            // placeholders only.
+            this.timeText.textContent = '--:--';
+            this.frameText.textContent = '--';
+            return;
+        }
         const rate = view.frameRate();
         const duration = view.durationMicros();
         const currentFrame = getCurrentFrame(view);

@@ -47,6 +47,7 @@ export interface PlayerView {
     currentTimeMicros(): number;
     setCurrentTimeMicros(micros: number): void;
     durationMicros(): number;
+    hasTimeline(): boolean;
     frameRate(): number;
     setLoop(loop: boolean): void;
     isLoop(): boolean;
