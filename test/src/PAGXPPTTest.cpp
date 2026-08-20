@@ -6791,7 +6791,9 @@ PAGX_TEST(PAGXPPTTest, MultiPage_EmptyListFails) {
   std::vector<pagx::PAGXDocument*> docs;
   auto path = PPTOutDir() + "/multi_page_empty.pptx";
   EXPECT_FALSE(pagx::PPTExporter::ToFile(docs, path));
-  EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
+  std::string error;
+  EXPECT_EQ(pagx::PPTExporter::ToData(docs, {}, &error), nullptr);
+  EXPECT_FALSE(error.empty());
 }
 
 PAGX_TEST(PAGXPPTTest, MultiPage_NullEntryFails) {

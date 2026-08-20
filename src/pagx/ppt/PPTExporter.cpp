@@ -1120,9 +1120,12 @@ bool PPTExporter::ToFile(const std::vector<PAGXDocument*>& documents, const std:
 //==============================================================================
 
 std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& documents,
-                                          const Options& options) {
+                                          const Options& options, std::string* errorMsg) {
   auto slides = BuildSlides(documents, options);
   if (slides.empty()) {
+    if (errorMsg) {
+      *errorMsg = "failed to build PPTX slides from the supplied documents.";
+    }
     return nullptr;
   }
 
@@ -1131,14 +1134,24 @@ std::shared_ptr<Data> PPTExporter::ToData(const std::vector<PAGXDocument*>& docu
   zlib_filefunc_def fileFunc = MakeMemZipFileFunc(&memBuffer);
   zipFile zf = zipOpen2("in-memory.pptx", APPEND_STATUS_CREATE, nullptr, &fileFunc);
   if (!zf) {
+    if (errorMsg) {
+      *errorMsg = "failed to create the in-memory PPTX archive.";
+    }
     return nullptr;
   }
 
   bool ok = WriteZipEntries(zf, slides, documents.front()->width, documents.front()->height);
-  if (zipClose(zf, nullptr) != ZIP_OK) {
-    ok = false;
-  }
+  bool closeOK = zipClose(zf, nullptr) == ZIP_OK;
   if (!ok) {
+    if (errorMsg) {
+      *errorMsg = "failed to write the in-memory PPTX archive.";
+    }
+    return nullptr;
+  }
+  if (!closeOK) {
+    if (errorMsg) {
+      *errorMsg = "failed to close the in-memory PPTX archive.";
+    }
     return nullptr;
   }
 

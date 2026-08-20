@@ -25,7 +25,9 @@
 #include "pagx/html/HTMLBuilder.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
 #include "pagx/html/HTMLZipWriter.h"
+#endif
 #include "pagx/nodes/Font.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
@@ -350,6 +352,7 @@ bool HTMLExporter::ToFile(PAGXDocument& document, const std::string& filePath,
 
 std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options& options,
                                            std::string* errorMsg) {
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
   HTMLZipWriter zipWriter;
   HTMLWriterContext ctx;
   ctx.docWidth = document.width;
@@ -375,6 +378,14 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
     return nullptr;
   }
   return zipWriter.finish(errorMsg);
+#else
+  (void)document;
+  (void)options;
+  if (errorMsg) {
+    *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
+  }
+  return nullptr;
+#endif
 }
 
 }  // namespace pagx

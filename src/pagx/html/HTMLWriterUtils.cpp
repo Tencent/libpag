@@ -26,7 +26,9 @@
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/HTMLWriter.h"
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
 #include "pagx/html/HTMLZipWriter.h"
+#endif
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -50,6 +52,7 @@ using pag::FloatNearlyZero;
 bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
                                       size_t size, std::string* errorMsg) {
   if (zipWriter != nullptr) {
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
     std::string error;
     bool ok = zipWriter->write(staticImgUrlPrefix + relativePath, bytes, size, &error);
     if (!ok) {
@@ -61,6 +64,12 @@ bool HTMLWriterContext::writeResource(const std::string& relativePath, const voi
       }
     }
     return ok;
+#else
+    if (errorMsg) {
+      *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
+    }
+    return false;
+#endif
   }
   if (staticImgDir.empty()) {
     return false;
