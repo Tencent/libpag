@@ -2048,6 +2048,53 @@ PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfter
   EXPECT_GT(row->layoutWidth, originalRowWidth);
 }
 
+// A centered flattened line is not a fixed-width authored box: its width follows the editable
+// glyphs, while its center remains anchored to the fixed host. The `center` marker must therefore
+// clear both the browser-measured width and left offset and turn them into a PAGX centerX
+// constraint. This is the shape emitted for a centered footer line such as
+// "Product Intern · Reporting period 2026.06.01 - 07.01".
+PAG_TEST(PAGXHTMLImporterTest, SnapshotCenteredTextLineKeepsAdaptiveWidthAndCenterAnchor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:500px;height:80px">
+      <div style="position:absolute;left:20px;top:20px;width:400px;height:20.8px">
+        <span data-pagx-intrinsic-width="center"
+              style="position:absolute;left:64.4px;top:0px;width:271.2px;height:20.8px;font-size:13px;line-height:20.8px;text-align:center;white-space:nowrap">Product Intern · Reporting period</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* host = doc->layers.front()->children.front();
+  ASSERT_NE(host, nullptr);
+  ASSERT_EQ(host->children.size(), 1u);
+  auto* line = host->children.front();
+  ASSERT_NE(line, nullptr);
+  EXPECT_TRUE(std::isnan(line->width));
+  EXPECT_TRUE(std::isnan(line->left));
+  EXPECT_TRUE(std::isnan(line->right));
+  EXPECT_FLOAT_EQ(line->centerX, 0.0f);
+  EXPECT_FALSE(line->includeInLayout);
+  EXPECT_EQ(line->customData.count("pagx-intrinsic-width"), 0u);
+
+  doc->applyLayout();
+  auto originalBounds = line->layoutBounds();
+  float originalCenter = originalBounds.x + originalBounds.width * 0.5f;
+  auto* textBox = FindElementOfType<pagx::TextBox>(line);
+  ASSERT_NE(textBox, nullptr);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(textBox->elements, &texts, &fills);
+  ASSERT_EQ(texts.size(), 1u);
+  texts.front()->text += " with substantially longer editable content";
+  doc->applyLayout();
+  auto editedBounds = line->layoutBounds();
+  float editedCenter = editedBounds.x + editedBounds.width * 0.5f;
+  EXPECT_GT(editedBounds.width, originalBounds.width);
+  // Text shaping is sub-pixel and can shift the measured line box by a fraction of a pixel, but
+  // both versions must remain visually centered instead of accumulating half the width delta.
+  EXPECT_NEAR(originalCenter, 200.0f, 0.5f);
+  EXPECT_NEAR(editedCenter, 200.0f, 0.5f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextDecorationUnderlineOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">

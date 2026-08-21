@@ -640,9 +640,12 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   // The marker is deliberately exact and private; arbitrary author data-* attributes retain
   // their normal customData behaviour.
   const auto* intrinsicWidth = element->findAttribute("data-pagx-intrinsic-width");
-  if (intrinsicWidth != nullptr && ToLower(Trim(*intrinsicWidth)) == "true") {
-    box.widthPx = NAN;
-    box.widthPct = NAN;
+  if (intrinsicWidth != nullptr) {
+    auto mode = ToLower(Trim(*intrinsicWidth));
+    if (mode == "true" || mode == "center") {
+      box.widthPx = NAN;
+      box.widthPct = NAN;
+    }
   }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);

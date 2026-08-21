@@ -59,7 +59,7 @@ const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 // Internal bridge to the HTML importer for a measured width that must remain available while
 // the subset transformer recovers flex geometry, but must not become an authored PAGX width.
 // See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
-const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width="true"';
+const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
 
 /* eslint-disable no-undef, no-inner-declarations */
 
@@ -2566,7 +2566,10 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     // inline sibling: leading on the first line, trailing on the last.
     if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
     if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
-    const intrinsicWidth = opts && opts.intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}` : '';
+    const intrinsicMode = opts && opts.intrinsicWidth;
+    const intrinsicWidth = intrinsicMode
+      ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
+      : '';
     out.push(`<span${intrinsicWidth} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
@@ -3985,8 +3988,15 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   }
 
   const textNode = firstTextNodeChild(el);
+  // Every span emitted here represents a measured visual line, not an authored box. For
+  // centered text its width therefore belongs to the glyph content while its center belongs to
+  // the fixed host box. Preserve both facts explicitly: the importer drops the measured
+  // Chromium width and replaces the baked `left` offset with a PAGX centerX constraint. Merely
+  // dropping width would make an edited line grow only to the right and cease to be centered.
+  const textAlign = String(computed.getPropertyValue('text-align') || '').trim().toLowerCase();
+  const intrinsicWidth = textAlign === 'center' ? 'center' : false;
   const lineSpans = textNode
-    ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+    ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed, { intrinsicWidth })
     : [];
   // Wrapped inline box (e.g. a `<mark>` spanning two lines): paint the box
   // visuals once per line fragment behind a transparent positioning wrapper so
@@ -4216,7 +4226,7 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
     intrinsicWidth,
   });
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-  const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}` : '';
+  const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
   // Wrapped inline box with element children (e.g. a `<mark>` containing nested
   // styling that spans multiple lines): paint the box visuals per line fragment
   // behind a transparent positioning wrapper, matching how the browser paints a

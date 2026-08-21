@@ -618,6 +618,19 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
 
 void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
                                             const HTMLBoxAttributes& box) {
+  // A centered line fragment emitted by html-snapshot is intrinsically sized text inside a
+  // fixed-width host. Its measured CSS left/width only describe Chromium's current font metrics;
+  // PAGX must measure the editable text itself and keep that result centered as it changes.
+  // centerX has higher constraint priority than left, but clear both edge anchors as well so the
+  // serialized PAGX expresses the intended layout without stale geometry.
+  if (element != nullptr) {
+    const auto* intrinsicWidth = element->findAttribute("data-pagx-intrinsic-width");
+    if (intrinsicWidth != nullptr && ToLower(Trim(*intrinsicWidth)) == "center") {
+      layer->left = NAN;
+      layer->right = NAN;
+      layer->centerX = 0.0f;
+    }
+  }
   if (box.opacitySet) layer->alpha = box.opacity;
   if (!box.mixBlendMode.empty()) {
     // CSS `mix-blend-mode` uses hyphenated keywords (e.g. `color-dodge`, `hard-light`,
