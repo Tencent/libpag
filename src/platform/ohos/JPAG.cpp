@@ -66,10 +66,10 @@ EXTERN_C_START
 // share the same napi_env. The napi_refs created during init are not safe to be released from a
 // different thread, so the whole init sequence is serialized to keep all napi_ref operations on
 // a single thread at a time.
-static std::mutex PagModuleInitMutex;
+static std::mutex PAGInitMutex;
 
 static napi_value Init(napi_env env, napi_value exports) {
-  std::lock_guard<std::mutex> autoLock(PagModuleInitMutex);
+  std::lock_guard<std::mutex> autoLock(PAGInitMutex);
   bool result = pag::JPAG::Init(env, exports) && pag::JPAGLayerHandle::Init(env, exports) &&
                 pag::JPAGImage::Init(env, exports) && pag::JPAGPlayer::Init(env, exports) &&
                 pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
