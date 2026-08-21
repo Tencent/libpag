@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAG.h"
+#include <mutex>
 #include "base/utils/Log.h"
 #include "pag/pag.h"
 #include "platform/ohos/JPAG.h"
@@ -61,13 +62,19 @@ bool JPAG::Init(napi_env env, napi_value exports) {
 
 EXTERN_C_START
 
+// The napi module init can be triggered concurrently by multiple taskpool worker threads that
+// share the same napi_env. The napi_refs created during init are not safe to be released from a
+// different thread, so the whole init sequence is serialized to keep all napi_ref operations on
+// a single thread at a time.
+static std::mutex PAGInitMutex;
+
 static napi_value Init(napi_env env, napi_value exports) {
+  std::lock_guard<std::mutex> autoLock(PAGInitMutex);
   bool result = pag::JPAG::Init(env, exports) && pag::JPAGLayerHandle::Init(env, exports) &&
                 pag::JPAGImage::Init(env, exports) && pag::JPAGPlayer::Init(env, exports) &&
                 pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
-                pag::JPAGText::Init(env, exports) && pag::JPAGImage::Init(env, exports) &&
-                pag::JPAGView::Init(env, exports) && pag::JPAGImageView::Init(env, exports) &&
-                pag::JPAGDiskCache::Init(env, exports) &&
+                pag::JPAGText::Init(env, exports) && pag::JPAGView::Init(env, exports) &&
+                pag::JPAGImageView::Init(env, exports) && pag::JPAGDiskCache::Init(env, exports) &&
                 pag::XComponentHandler::Init(env, exports) &&
                 pag::NativeDisplayLink::InitThreadSafeFunction(env);
   if (!result) {
