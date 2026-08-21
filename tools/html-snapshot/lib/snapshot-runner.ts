@@ -245,7 +245,20 @@ async function scrollThroughPage(page: any, settleMs: number, finalWaitMs: numbe
     // Let the last batch of reveals/transitions settle at the bottom, then
     // return to the top so geometry is measured from the natural origin.
     await sleep(perStepMs);
-    window.scrollTo(0, 0);
+    const snapshotTools = (window as unknown as {
+      __pagxSnapshot?: { resetRootScroll?: () => void };
+    }).__pagxSnapshot;
+    if (snapshotTools && typeof snapshotTools.resetRootScroll === 'function') {
+      snapshotTools.resetRootScroll();
+    } else {
+      // Defensive fallback for callers that did not install SNAPSHOT_INIT_SCRIPT.
+      const root = document.scrollingElement || document.documentElement || document.body;
+      try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
+      if (root) {
+        try { root.scrollLeft = 0; } catch (_) { /* ignore */ }
+        try { root.scrollTop = 0; } catch (_) { /* ignore */ }
+      }
+    }
   }, settleMs);
   if (finalWaitMs > 0) {
     await new Promise((r) => setTimeout(r, finalWaitMs));

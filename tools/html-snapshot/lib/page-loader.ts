@@ -35,6 +35,36 @@ import { MAX_CAPTURE_HEIGHT_PX } from './common';
 const ROOT_HAS_CHILDREN_SCRIPT =
   'document.querySelector("#root") ? document.querySelector("#root").children.length > 0 : true';
 
+// Browser-side helper shared by every lazy-scroll reset below. Assigning the root DOM
+// scrollers directly is important: `window.scrollTo(0, 0)` alone may start an asynchronous
+// smooth-scroll, or a page may replace it entirely. The trailing direct assignment wins over
+// either case and leaves downstream `getBoundingClientRect()` measurements at the document
+// origin. Kept as source text because page-loader is engine-agnostic and both adapters accept
+// string expressions in `page.evaluate()`.
+const ROOT_SCROLL_RESET_FN = `function pagxResetRootScroll() {
+  var d = document.documentElement, b = document.body;
+  if (d && d.style) d.style.setProperty('scroll-behavior', 'auto', 'important');
+  if (b && b.style) b.style.setProperty('scroll-behavior', 'auto', 'important');
+  var roots = [], add = function (el) {
+    if (el && roots.indexOf(el) < 0) roots.push(el);
+  };
+  add(document.scrollingElement); add(d); add(b);
+  var assign = function () {
+    for (var i = 0; i < roots.length; i++) {
+      try { roots[i].scrollLeft = 0; } catch (_) {}
+      try { roots[i].scrollTop = 0; } catch (_) {}
+    }
+  };
+  assign();
+  try { window.scrollTo(0, 0); } catch (_) {}
+  assign();
+}`;
+
+const ROOT_SCROLL_RESET_EXPR = `(() => {
+  ${ROOT_SCROLL_RESET_FN}
+  pagxResetRootScroll();
+})()`;
+
 // Many corpus pages defer below-the-fold content: cards, images, and whole
 // sections mount lazily via `IntersectionObserver`, legacy `scroll` listeners,
 // or native `<img loading="lazy">`. None of those fire while the page sits
@@ -92,6 +122,7 @@ const AUTO_SCROLL_SWEEP_SCRIPT = `(async (cfg) => {
 // paint, then return to the origin so downstream rect measurement / screenshot
 // framing (which also resets scroll) starts clean, and flush layout.
 const AUTO_SCROLL_FINALIZE_SCRIPT = `(async (cfg) => {
+  ${ROOT_SCROLL_RESET_FN}
   // Native setTimeout (see AUTO_SCROLL_SWEEP_SCRIPT) — the virtual clock freezes
   // the page's own setTimeout, so the image-decode race below must use the real
   // timer or it would never time out.
@@ -105,8 +136,11 @@ const AUTO_SCROLL_FINALIZE_SCRIPT = `(async (cfg) => {
       sleep(cfg.imageWaitMs),
     ]);
   } catch (_) { /* non-fatal */ }
-  try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
+  pagxResetRootScroll();
   if (document.body) { void document.body.offsetHeight; }
+  // A layout flush can engage scroll anchoring; pin the root once more immediately
+  // before returning control to the snapshot/baseline caller.
+  pagxResetRootScroll();
 })`;
 
 // Many corpus pages mount a React app via `@babel/standalone` loaded from a CDN
@@ -215,11 +249,7 @@ async function settleLazyContent(page: Page, engine: EngineName): Promise<void> 
     // triggers never actually enter view) and the finalize `scrollTo(0, 0)`
     // would leave the page mid-animation away from the origin. Forcing
     // `auto !important` on <html>/<body> makes every scroll here synchronous.
-    await page.evaluate(`(() => {
-      var d = document.documentElement, b = document.body;
-      if (d && d.style) d.style.setProperty('scroll-behavior', 'auto', 'important');
-      if (b && b.style) b.style.setProperty('scroll-behavior', 'auto', 'important');
-    })()`);
+    await page.evaluate(ROOT_SCROLL_RESET_EXPR);
     for (let round = 0; round < cfg.maxRounds; round++) {
       if (Date.now() - startedAt >= cfg.maxTotalMs) break;
       const height: number = await page.evaluate(
@@ -242,7 +272,7 @@ async function settleLazyContent(page: Page, engine: EngineName): Promise<void> 
     // Best-effort: still try to return the page to the origin so later framing
     // isn't thrown off by a mid-scroll failure.
     try {
-      await page.evaluate('try { window.scrollTo(0, 0); } catch (e) {}');
+      await page.evaluate(ROOT_SCROLL_RESET_EXPR);
     } catch (_e) { /* ignore */ }
   }
 }

@@ -4409,6 +4409,82 @@ function renderElementBox(el, parentRect, opts, precomputed) {
 
 // ===== Main snapshot entry =====
 
+// Read the root scroll position from the actual scrolling element. `window.scrollX/Y`
+// normally report the same values, but the element is the more reliable source after a
+// direct `scrollTop` / `scrollLeft` assignment and is also available in browser-bundle
+// callers that replace `window.scrollTo`.
+function readRootScrollOffset() {
+  const docEl = document.documentElement;
+  const body = document.body;
+  const root = document.scrollingElement || docEl || body;
+  const finite = (value) => typeof value === 'number' && isFinite(value);
+  const windowX = typeof window !== 'undefined'
+    ? (finite(window.scrollX) ? window.scrollX : window.pageXOffset)
+    : 0;
+  const windowY = typeof window !== 'undefined'
+    ? (finite(window.scrollY) ? window.scrollY : window.pageYOffset)
+    : 0;
+  return {
+    left: root && finite(root.scrollLeft) ? root.scrollLeft : (finite(windowX) ? windowX : 0),
+    top: root && finite(root.scrollTop) ? root.scrollTop : (finite(windowY) ? windowY : 0),
+  };
+}
+
+// Put the document viewport at its geometric origin without depending solely on
+// `window.scrollTo`. A page may enable smooth scrolling, replace that method, or leave a
+// pending smooth-scroll animation running after the lazy-content sweep. Directly assigning
+// every plausible root scroller is synchronous in Chromium and cancels that residual state.
+// The second assignment deliberately follows `window.scrollTo`: if a page replaced the
+// method with a no-op (or redirected it elsewhere), the DOM properties remain authoritative.
+// Returns the residual offset so the tree walk can still normalise ordinary document-flow
+// geometry if a browser refuses the reset for any reason.
+function resetRootScroll() {
+  const docEl = document.documentElement;
+  const body = document.body;
+  if (docEl && docEl.style) docEl.style.setProperty('scroll-behavior', 'auto', 'important');
+  if (body && body.style) body.style.setProperty('scroll-behavior', 'auto', 'important');
+
+  const roots = [];
+  const addRoot = (root) => {
+    if (root && roots.indexOf(root) === -1) roots.push(root);
+  };
+  addRoot(document.scrollingElement);
+  addRoot(docEl);
+  addRoot(body);
+  const assignOrigin = () => {
+    for (let i = 0; i < roots.length; i++) {
+      try { roots[i].scrollLeft = 0; } catch (_) { /* ignore a read-only host object */ }
+      try { roots[i].scrollTop = 0; } catch (_) { /* ignore a read-only host object */ }
+    }
+  };
+
+  assignOrigin();
+  if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+    try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
+  }
+  assignOrigin();
+  return readRootScrollOffset();
+}
+
+// `getBoundingClientRect()` is viewport-relative. The normal path resets the root scroll and
+// therefore returns the familiar `(0,0,width,height)` rect; using the residual offset here is
+// a last-line defence for ordinary flow/absolute content when a hostile host prevents the
+// scroll reset. Child rect subtraction remains unchanged because both parent and child are in
+// the same viewport coordinate space.
+function canvasRootRect(canvasWidth, canvasHeight) {
+  const scroll = resetRootScroll();
+  return {
+    left: -scroll.left,
+    top: -scroll.top,
+    right: canvasWidth - scroll.left,
+    bottom: canvasHeight - scroll.top,
+    width: canvasWidth,
+    height: canvasHeight,
+    x: -scroll.left,
+    y: -scroll.top,
+  };
+}
+
 // Neutralise the <html>/<body> boxes exactly as baseline.js does before it
 // captures ground truth: zero <body>'s margin/padding, then zero <html>'s
 // margin/padding and force `display: block`. `pagx render` roots at <body> and
@@ -4444,21 +4520,9 @@ function prepareBodyForSnapshot() {
     docEl.style.padding = '0';
     docEl.style.display = 'block';
   }
-  // Force the scroll reset to be instant. A page that sets
-  // `html { scroll-behavior: smooth }` (increasingly common) turns the
-  // `window.scrollTo(0, 0)` below into an ASYNCHRONOUS animation: it does not
-  // jump to the origin, it eases there over several hundred ms. The very next
-  // `getBoundingClientRect` / `body.offsetHeight` runs mid-animation while the
-  // page is still scrolled down, so every element's measured `top` is offset by
-  // the residual scroll (e.g. a whole page rendered at `top: -1542px`, with a
-  // matching blank band at the bottom of the canvas). Overriding
-  // `scroll-behavior: auto !important` on <html> and <body> makes the reset the
-  // synchronous jump this function assumes.
-  if (docEl && docEl.style) docEl.style.setProperty('scroll-behavior', 'auto', 'important');
-  if (body && body.style) body.style.setProperty('scroll-behavior', 'auto', 'important');
-  if (typeof window.scrollTo === 'function') {
-    try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
-  }
+  // Reset before changing animation state, then once more after the layout flush below.
+  // The second pass handles scroll anchoring caused by those style/layout changes.
+  resetRootScroll();
   // Cancel every running CSS animation so the snapshot measures the element
   // in its base (un-animated) state. Without this, `direction: reverse` and
   // any other non-zero starting phase would shift the element away from its
@@ -4498,6 +4562,7 @@ function prepareBodyForSnapshot() {
   } catch (_) { /* ignore */ }
   // Force layout flush.
   void body.offsetHeight;
+  resetRootScroll();
 }
 
 // Neutralise the page and return the canvas dimensions the subset will use.
@@ -4555,6 +4620,7 @@ function measureCanvas() {
   );
   body.style.position = savedPosition;
   void body.offsetHeight;
+  resetRootScroll();
   return { width, height };
 }
 
@@ -4587,12 +4653,7 @@ function snapshotMainImpl(opts) {
   // the canvas origin reproduces the collapsed margin as leading space and
   // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
   // here (block body, zeroed margin), so the horizontal axis is unaffected.
-  const rootOrigin = {
-    left: 0, top: 0,
-    right: canvasWidth, bottom: canvasHeight,
-    width: canvasWidth, height: canvasHeight,
-    x: 0, y: 0,
-  };
+  const rootOrigin = canvasRootRect(canvasWidth, canvasHeight);
   const parts = [];
   for (const c of body.children) {
     parts.push(render(c, rootOrigin));
@@ -4955,6 +5016,9 @@ const HELPER_FNS = [
   applyLayerName,
   renderElementBox,
   render,
+  readRootScrollOffset,
+  resetRootScroll,
+  canvasRootRect,
   prepareBodyForSnapshot,
   measureCanvas,
   snapshotMainImpl,
@@ -4987,6 +5051,7 @@ ${PAYLOAD_CONSTANTS_SRC}
 window.__pagxSnapshot = {
   takeSnapshot: snapshotMain,
   measureCanvas: measureCanvas,
+  resetRootScroll: resetRootScroll,
 };
 })();`;
 
@@ -5563,6 +5628,9 @@ export {
   normalizeBackgroundImage,
   canForwardFlexGrow,
   shouldPinFlexGrowItems,
+  readRootScrollOffset,
+  resetRootScroll,
+  canvasRootRect,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
