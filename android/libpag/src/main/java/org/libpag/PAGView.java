@@ -587,6 +587,13 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         checkVisible();
         super.onDetachedFromWindow();
         synchronized (renderLock) {
+            // Detach the PAGSurface from the PAGPlayer before releasing it: the release path then
+            // skips RenderCache cleanup, which deletes GPU snapshot caches and can block the main
+            // thread for tens of milliseconds on low-end GPUs (issue #3685). The render cache is
+            // cleaned up when the player renders its next frame or is destroyed. Note that
+            // onSurfaceTextureDestroyed() is posted after this method on modern Android versions,
+            // so the setSurface(null) there may not have run yet when we get here.
+            pagPlayer.setSurface(null);
             if (pagSurface != null) {
                 pagSurface.release();
                 pagSurface = null;
