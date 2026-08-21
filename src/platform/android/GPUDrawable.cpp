@@ -52,6 +52,17 @@ void GPUDrawable::updateSize() {
   _height = ANativeWindow_getHeight(nativeWindow);
 }
 
+void GPUDrawable::freeSurface() {
+  // Drop the cached Surface reference on the disposer thread instead of destroying it inline.
+  // Dropping the last reference can block the calling thread for tens of milliseconds on some
+  // devices (measured 35~85ms on a PowerVR GE8320 phone), and this method runs on the main
+  // thread when a PAGView is detached from the window or its surface is resized (issue #3685).
+  // The window reference is kept here: the EGL context is only destroyed when the GPUDrawable
+  // itself is destroyed. The disposer processes tasks in FIFO order, so a Surface enqueued
+  // earlier is always destroyed before a window enqueued later, keeping its Context alive.
+  EGLResourceDisposer::DisposeAsync(std::move(surface), nullptr);
+}
+
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
