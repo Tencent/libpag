@@ -56,6 +56,11 @@ import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 // Node-side helpers (and their unit tests) resolve it here.
 const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 
+// Internal bridge to the HTML importer for a measured width that must remain available while
+// the subset transformer recovers flex geometry, but must not become an authored PAGX width.
+// See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
+const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width="true"';
+
 /* eslint-disable no-undef, no-inner-declarations */
 
 // ===== Style-value normalisers =====
@@ -2527,7 +2532,7 @@ const BOUNDARY_SPACE = '\u00a0';
 //
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
-function emitTextSpans(textNode, parentRect, computed) {
+function emitTextSpans(textNode, parentRect, computed, opts) {
   const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
@@ -2561,7 +2566,8 @@ function emitTextSpans(textNode, parentRect, computed) {
     // inline sibling: leading on the first line, trailing on the last.
     if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
     if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
-    out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    const intrinsicWidth = opts && opts.intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}` : '';
+    out.push(`<span${intrinsicWidth} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -3445,6 +3451,32 @@ function isInlineRunChild(el) {
   return true;
 }
 
+// Narrower companion used only to recognise a content-sized inline row that could not be merged
+// into one TextBox because one of its runs carries margin. It intentionally allows margin (the
+// absolute-to-flex pass recovers it as `gap`) while retaining every other safety condition from
+// `isInlineRunChild`.
+function isIntrinsicWidthInlineRunChild(el) {
+  if (el.nodeType !== Node.ELEMENT_NODE) return false;
+  const tag = el.tagName.toLowerCase();
+  if (!INLINE_RUN_TAGS.has(tag)) return false;
+  const cs = getComputedStyle(el);
+  if (!isVisible(cs, el) || hasPagxAnimation(cs)) return false;
+  if (cs.display !== 'inline' && cs.display !== 'inline-block') return false;
+  if (cs.position !== 'static') return false;
+  const transform = cs.transform;
+  if (transform && transform !== 'none' && transform !== 'matrix(1, 0, 0, 1, 0, 0)') {
+    return false;
+  }
+  if (hasBoxVisualsForInline(cs)) return false;
+  const pad = readPadding(cs);
+  if (pad.top || pad.right || pad.bottom || pad.left) return false;
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) continue;
+    if (!isIntrinsicWidthInlineRunChild(child)) return false;
+  }
+  return true;
+}
+
 // Detect the `<p>NN<span class="text-[28px]">unit</span></p>` family: a
 // container whose visible content is one single line of inline text mixed
 // with inline-styled spans (different font-size / color / weight). The
@@ -4101,6 +4133,64 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
   return `<div style="${style}">${childParts.join('')}</div>`;
 }
 
+// Returns true when a flex item is a single line of ordinary inline content whose used width is
+// exactly its content width and whose authored CSS width is `auto`. The snapshot must retain the
+// browser-measured width long enough for HTMLFlexInference to recover margins as flex gaps, but
+// the final PAGX Layer must remain content-sized so editing a text run reflows the whole row.
+//
+// CSS Typed OM is important here: getComputedStyle().width exposes the *used* pixel width for a
+// flex item, while computedStyleMap().get('width') preserves the computed `auto` keyword. Requiring
+// that keyword keeps a coincidentally equal authored pixel width fixed. The geometric equality
+// checks then reject `min-width`, flex-basis, stretch, and other constraints that expand an auto
+// box beyond its contents.
+function isIntrinsicInlineContentWidth(el, computed, rect, opts) {
+  if (!opts || !opts.flexItem || opts.flexMainSizePinned || opts.transform) return false;
+  if (readNum(computed, 'flex-grow') > 0) return false;
+  if (hasPagxAnimation(computed) || hasBoxVisualsForInline(computed)) return false;
+  const overflowX = String(computed.getPropertyValue('overflow-x') || '').trim().toLowerCase();
+  if (overflowX && overflowX !== 'visible') return false;
+  const pad = readPadding(computed);
+  if (pad.left || pad.right) return false;
+
+  // Only the margin-bearing inline-run family is handled here. Plain mixed inline runs already
+  // take renderInlineTextLeaf's single-TextBox path; block/replaced descendants need their
+  // measured container width for positioning or paint.
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) continue;
+    if (child.nodeType !== Node.ELEMENT_NODE || !isIntrinsicWidthInlineRunChild(child)) {
+      return false;
+    }
+  }
+
+  let typedWidth;
+  try {
+    const styleMap = typeof el.computedStyleMap === 'function' ? el.computedStyleMap() : null;
+    const value = styleMap && styleMap.get ? styleMap.get('width') : null;
+    typedWidth = value && value.value != null ? String(value.value).trim().toLowerCase() : '';
+  } catch (_) {
+    return false;
+  }
+  if (typedWidth !== 'auto') return false;
+
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const contentRect = range.getBoundingClientRect();
+  range.detach && range.detach();
+  if (!contentRect || contentRect.width <= 0 || contentRect.height <= 0) return false;
+
+  // The range must occupy the complete horizontal box (within sub-pixel rounding). A wider host
+  // is reserved/stretched space; a narrower host is a clipping or wrapping boundary.
+  const tolerance = 1.0;
+  if (Math.abs(contentRect.left - rect.left) > tolerance ||
+      Math.abs(contentRect.right - rect.right) > tolerance ||
+      Math.abs(contentRect.width - rect.width) > tolerance) {
+    return false;
+  }
+  const lineHeight = readNum(computed, 'line-height');
+  if (lineHeight > 0 && contentRect.height > lineHeight * 1.5) return false;
+  return true;
+}
+
 // Container with element children (and optionally direct text). Per direct
 // text node we measure the actual rendered rect via Range, so the text
 // lands where the browser put it (next to an <svg>, inside a flex row, …)
@@ -4121,8 +4211,12 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
 // Asymmetric border overlays paint *on top* of all children to match
 // CSS, which renders borders after content.
 function renderContainer(el, parentRect, rect, left, top, computed, opts) {
-  const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed);
+  const intrinsicWidth = isIntrinsicInlineContentWidth(el, computed, rect, opts);
+  const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed, {
+    intrinsicWidth,
+  });
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}` : '';
   // Wrapped inline box with element children (e.g. a `<mark>` containing nested
   // styling that spans multiple lines): paint the box visuals per line fragment
   // behind a transparent positioning wrapper, matching how the browser paints a
@@ -4132,19 +4226,19 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { ...opts });
     // The leading tag here is a visuals-only line fragment, not this element's box; mark the
     // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
-    return `${fragments}<div ${NAME_ANCHOR_ATTR} style="${wrapperStyle}">${childHTML}</div>`;
+    return `${fragments}<div ${NAME_ANCHOR_ATTR}${intrinsicAttr} style="${wrapperStyle}">${childHTML}</div>`;
   }
   const style = buildStyle(left, top, rect.width, rect.height, computed, {
     box: true, ...opts,
   });
-  return `<div style="${style}">${childHTML}${overlays}</div>`;
+  return `<div${intrinsicAttr} style="${style}">${childHTML}${overlays}</div>`;
 }
 
 // Emit every visible child of `el` (elements + non-empty text nodes) into a
 // single HTML string, replaying browser paint order (flow-then-positioned,
 // both in DOM order). The host's computed style is passed in so we don't
 // have to ask the engine for it again.
-function renderChildrenInto(el, parentRect, hostComputed) {
+function renderChildrenInto(el, parentRect, hostComputed, opts) {
   const items = [];
   let domIndex = 0;
   const computedFor = hostComputed || getComputedStyle(el);
@@ -4173,7 +4267,7 @@ function renderChildrenInto(el, parentRect, hostComputed) {
         html: render(n, parentRect, undefined, childComputed),
       });
     } else if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim()) {
-      const spans = emitTextSpans(n, parentRect, computedFor);
+      const spans = emitTextSpans(n, parentRect, computedFor, opts);
       if (spans.length > 0) {
         items.push({
           stackable: false,
@@ -4787,6 +4881,8 @@ const BOUNDARY_SPACE = '\\u00a0';
 
 const NAME_ANCHOR_ATTR = '${NAME_ANCHOR_ATTR}';
 
+const INTRINSIC_WIDTH_ATTR = '${INTRINSIC_WIDTH_ATTR}';
+
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
 const INLINE_BY_DEFAULT_TAGS = new Set([
@@ -4976,6 +5072,7 @@ const HELPER_FNS = [
   multiplyColorAlpha,
   resolveInlineTextValue,
   isInlineRunChild,
+  isIntrinsicWidthInlineRunChild,
   isInlineTextLeafCandidate,
   flexCharCarriesReveal,
   emitInlineRunMarkup,
@@ -5010,6 +5107,7 @@ const HELPER_FNS = [
   renderPseudoTextLeaf,
   renderFlexTextItem,
   renderFlexContainer,
+  isIntrinsicInlineContentWidth,
   renderContainer,
   renderChildrenInto,
   stripNameAnchor,
@@ -5628,6 +5726,7 @@ export {
   normalizeBackgroundImage,
   canForwardFlexGrow,
   shouldPinFlexGrowItems,
+  isIntrinsicInlineContentWidth,
   readRootScrollOffset,
   resetRootScroll,
   canvasRootRect,

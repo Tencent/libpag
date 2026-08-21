@@ -634,6 +634,16 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
+  // html-snapshot keeps Chromium's measured width in CSS while flex inference runs, then marks
+  // boxes whose source `width:auto` was genuinely content-sized. Consume that internal marker
+  // only at Layer construction time so inference can still use the measured child geometry.
+  // The marker is deliberately exact and private; arbitrary author data-* attributes retain
+  // their normal customData behaviour.
+  const auto* intrinsicWidth = element->findAttribute("data-pagx-intrinsic-width");
+  if (intrinsicWidth != nullptr && ToLower(Trim(*intrinsicWidth)) == "true") {
+    box.widthPx = NAN;
+    box.widthPct = NAN;
+  }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
   parseBoxVisuals(box, props);

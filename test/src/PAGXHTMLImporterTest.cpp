@@ -1998,6 +1998,56 @@ PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapFlexGrowTextLeafKeepsWidth) {
   EXPECT_FLOAT_EQ(leaf->width, 305.0f);
 }
 
+// html-snapshot must keep measured widths while flex inference reconstructs the two margins on
+// the middle dot as a 14px gap, but those widths represent source `width:auto` rather than authored
+// constraints. The internal intrinsic-width marker clears them only after inference, leaving both
+// the row and its editable text children content-sized in PAGX.
+PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfterFlexInference) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:1120px;height:80px">
+      <div style="width:1120px;height:76.8px;display:flex;flex-direction:column;align-items:center">
+        <div data-pagx-intrinsic-width="true"
+             style="position:relative;width:509.8px;height:41.6px;flex-shrink:0">
+          <span data-pagx-intrinsic-width="true"
+                style="position:absolute;left:0px;top:0px;width:289.9px;height:41.6px;font-size:26px;line-height:41.6px;text-align:center;white-space:nowrap">Reporter Name</span>
+          <div style="position:absolute;left:303.9px;top:5.5px;width:6.4px;height:30.5px;opacity:0.5">
+            <span style="position:absolute;left:0px;top:-5.6px;width:6.4px;height:41.6px;font-size:26px;line-height:41.6px;text-align:center;white-space:nowrap">·</span>
+          </div>
+          <span data-pagx-intrinsic-width="true"
+                style="position:absolute;left:324.3px;top:0px;width:185.5px;height:41.6px;font-size:26px;line-height:41.6px;text-align:center;white-space:nowrap">Product Intern</span>
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* column = doc->layers.front()->children.front();
+  ASSERT_NE(column, nullptr);
+  ASSERT_EQ(column->children.size(), 1u);
+  auto* row = column->children.front();
+  ASSERT_NE(row, nullptr);
+  EXPECT_EQ(row->layout, pagx::LayoutMode::Horizontal);
+  EXPECT_FLOAT_EQ(row->gap, 14.0f);
+  EXPECT_TRUE(std::isnan(row->width));
+  ASSERT_EQ(row->children.size(), 3u);
+  EXPECT_TRUE(std::isnan(row->children[0]->width));
+  EXPECT_FLOAT_EQ(row->children[1]->width, 6.4f);
+  EXPECT_TRUE(std::isnan(row->children[2]->width));
+  EXPECT_EQ(row->customData.count("pagx-intrinsic-width"), 0u);
+  EXPECT_EQ(row->children[0]->customData.count("pagx-intrinsic-width"), 0u);
+
+  doc->applyLayout();
+  float originalRowWidth = row->layoutWidth;
+  auto* firstTextBox = FindElementOfType<pagx::TextBox>(row->children[0]);
+  ASSERT_NE(firstTextBox, nullptr);
+  std::vector<pagx::Text*> texts;
+  std::vector<pagx::Fill*> fills;
+  GatherTextRuns(firstTextBox->elements, &texts, &fills);
+  ASSERT_EQ(texts.size(), 1u);
+  texts.front()->text += " with a much longer editable name";
+  doc->applyLayout();
+  EXPECT_GT(row->layoutWidth, originalRowWidth);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, TextDecorationUnderlineOverlay) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
