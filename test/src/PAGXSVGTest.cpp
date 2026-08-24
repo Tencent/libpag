@@ -4535,25 +4535,30 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate) {
   ASSERT_EQ(doc->animations.size(), 1u);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
   EXPECT_EQ(anim->duration, 120);
-  // Expect two AnimationObjects: one for the Layer (empty, no <animate>/<set>), one for the Group.
   ASSERT_EQ(anim->objects.size(), 1u);
-  auto* groupObj = anim->objects[0];
-  // target should be the anim_group id, not the rect id.
-  EXPECT_NE(groupObj->target, "r");
-  EXPECT_EQ(groupObj->channels.size(), 1u);
-  auto* channel = groupObj->channels[0];
-  EXPECT_EQ(channel->name, "rotation");
-  auto* floatChannel = static_cast<pagx::TypedChannel<float>*>(channel);
-  ASSERT_EQ(floatChannel->keyframes.size(), 2u);
-  EXPECT_EQ(floatChannel->keyframes[0].time, 0);
-  EXPECT_FLOAT_EQ(floatChannel->keyframes[0].value, 0.0f);
-  EXPECT_EQ(floatChannel->keyframes[1].time, 120);
-  EXPECT_FLOAT_EQ(floatChannel->keyframes[1].value, 360.0f);
+  auto* obj = anim->objects[0];
+  // Transform animations drive the Layer's "matrix" channel; target is the Layer id.
+  EXPECT_EQ(obj->target, "r");
+  ASSERT_EQ(obj->channels.size(), 1u);
+  auto* channel = obj->channels[0];
+  EXPECT_EQ(channel->name, "matrix");
+  EXPECT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix);
+  auto* matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+  ASSERT_EQ(matrixChannel->keyframes.size(), 2u);
+  EXPECT_EQ(matrixChannel->keyframes[0].time, 0);
+  EXPECT_TRUE(matrixChannel->keyframes[0].value.isIdentity());
+  EXPECT_EQ(matrixChannel->keyframes[1].time, 120);
+  // rotate(360) composes to the identity matrix.
+  auto expected = pagx::Matrix::Rotate(360.0f);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.a, expected.a);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.b, expected.b);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.c, expected.c);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.d, expected.d);
 }
 
 /**
- * Test SVG import: <animateTransform type="translate"> produces position.x and position.y
- * channels on the Group.
+ * Test SVG import: <animateTransform type="translate"> bakes Translate matrices onto the Layer's
+ * matrix channel.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformTranslate) {
   std::string svg =
@@ -4565,22 +4570,19 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformTranslate) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  auto* groupObj = anim->objects[0];
-  ASSERT_EQ(groupObj->channels.size(), 2u);
-  EXPECT_EQ(groupObj->channels[0]->name, "position.x");
-  EXPECT_EQ(groupObj->channels[1]->name, "position.y");
-  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
-  auto* chY = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[1]);
-  ASSERT_EQ(chX->keyframes.size(), 2u);
-  EXPECT_FLOAT_EQ(chX->keyframes[0].value, 0.0f);
-  EXPECT_FLOAT_EQ(chX->keyframes[1].value, 100.0f);
-  EXPECT_FLOAT_EQ(chY->keyframes[0].value, 0.0f);
-  EXPECT_FLOAT_EQ(chY->keyframes[1].value, 50.0f);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, 100.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.ty, 50.0f);
 }
 
 /**
- * Test SVG import: <animateTransform type="scale"> produces scale.x and scale.y channels.
- * Single-value scale treats sy=sx.
+ * Test SVG import: <animateTransform type="scale"> bakes Scale matrices onto the Layer's matrix
+ * channel. Single-value scale treats sy=sx.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformScale) {
   std::string svg =
@@ -4592,20 +4594,19 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformScale) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  auto* groupObj = anim->objects[0];
-  ASSERT_EQ(groupObj->channels.size(), 2u);
-  EXPECT_EQ(groupObj->channels[0]->name, "scale.x");
-  EXPECT_EQ(groupObj->channels[1]->name, "scale.y");
-  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
-  auto* chY = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[1]);
-  ASSERT_EQ(chX->keyframes.size(), 2u);
-  EXPECT_FLOAT_EQ(chX->keyframes[1].value, 2.0f);
-  EXPECT_FLOAT_EQ(chY->keyframes[1].value, 3.0f);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, 2.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.d, 3.0f);
 }
 
 /**
- * Test SVG import: <animateTransform type="skewX"> produces a skew channel and sets skewAxis=0
- * on the Group.
+ * Test SVG import: <animateTransform type="skewX"> bakes a skew matrix (c = tan(angle)) onto the
+ * Layer's matrix channel.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformSkewX) {
   std::string svg =
@@ -4617,18 +4618,19 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformSkewX) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  auto* groupObj = anim->objects[0];
-  ASSERT_EQ(groupObj->channels.size(), 1u);
-  EXPECT_EQ(groupObj->channels[0]->name, "skew");
-  auto* ch = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
   ASSERT_EQ(ch->keyframes.size(), 2u);
-  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 45.0f);
+  EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
+  // skewX(45): c = tan(45deg) = 1.
+  EXPECT_NEAR(ch->keyframes[1].value.c, 1.0f, 1e-5f);
 }
 
 /**
  * Test SVG import: <animateTransform type="rotate"> with "angle cx cy" three-parameter form
- * sets the Group's anchor so rotation pivots around (cx, cy).
+ * bakes Translate(cx,cy) * Rotate(angle) * Translate(-cx,-cy) into each matrix keyframe.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateWithCenter) {
   std::string svg =
@@ -4640,18 +4642,25 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateWithCenter) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  auto* groupObj = anim->objects[0];
-  ASSERT_EQ(groupObj->channels.size(), 1u);
-  // Verify the Group's anchor was set to (25, 25). Find the Group by target id.
-  auto* groupNode = doc->findNode<pagx::Group>(groupObj->target);
-  ASSERT_NE(groupNode, nullptr);
-  EXPECT_FLOAT_EQ(groupNode->anchor.x, 25.0f);
-  EXPECT_FLOAT_EQ(groupNode->anchor.y, 25.0f);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
+  auto expected = pagx::Matrix::Translate(25.0f, 25.0f) * pagx::Matrix::Rotate(360.0f) *
+                  pagx::Matrix::Translate(-25.0f, -25.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.b, expected.b);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.c, expected.c);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.d, expected.d);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, expected.tx);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.ty, expected.ty);
 }
 
 /**
- * Test SVG import: an element with both <animate> (targeting Layer) and <animateTransform>
- * (targeting Group) produces two AnimationObjects.
+ * Test SVG import: an element with both <animate> (opacity) and <animateTransform> shares one
+ * AnimationObject targeting the Layer (alpha + matrix channels).
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateAndAnimateTransformCoexist) {
   std::string svg =
@@ -4664,14 +4673,25 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateAndAnimateTransformCoexist) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  // Two objects: one targeting the Layer (alpha), one targeting the Group (rotation).
-  ASSERT_EQ(anim->objects.size(), 2u);
+  // One object targeting the Layer with two channels: alpha + matrix.
+  ASSERT_EQ(anim->objects.size(), 1u);
   EXPECT_EQ(anim->duration, 120);  // max(60, 120)
+  auto* obj = anim->objects[0];
+  EXPECT_EQ(obj->target, "r");
+  ASSERT_EQ(obj->channels.size(), 2u);
+  bool hasAlpha = false;
+  bool hasMatrix = false;
+  for (auto* ch : obj->channels) {
+    if (ch->name == "alpha") hasAlpha = true;
+    if (ch->name == "matrix") hasMatrix = true;
+  }
+  EXPECT_TRUE(hasAlpha);
+  EXPECT_TRUE(hasMatrix);
 }
 
 /**
- * Test SVG import: <animateMotion> with a path attribute samples the path and drives the Group's
- * position.x/y channels.
+ * Test SVG import: <animateMotion> with a path attribute samples the path and bakes Translate
+ * matrices onto the Layer's matrix channel.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionPath) {
   std::string svg =
@@ -4685,25 +4705,21 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionPath) {
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
   EXPECT_EQ(anim->duration, 180);
   ASSERT_EQ(anim->objects.size(), 1u);
-  auto* groupObj = anim->objects[0];
-  ASSERT_EQ(groupObj->channels.size(), 2u);
-  EXPECT_EQ(groupObj->channels[0]->name, "position.x");
-  EXPECT_EQ(groupObj->channels[1]->name, "position.y");
-  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
-  auto* chY = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[1]);
-  EXPECT_EQ(chX->keyframes.size(), chY->keyframes.size());
-  EXPECT_GE(chX->keyframes.size(), 2u);
-  // First sample should be at (0, 0).
-  EXPECT_FLOAT_EQ(chX->keyframes.front().value, 0.0f);
-  EXPECT_FLOAT_EQ(chY->keyframes.front().value, 0.0f);
-  // Last sample should be at (100, 100).
-  EXPECT_FLOAT_EQ(chX->keyframes.back().value, 100.0f);
-  EXPECT_FLOAT_EQ(chY->keyframes.back().value, 100.0f);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  EXPECT_GE(ch->keyframes.size(), 2u);
+  // First sample should be a translation to (0, 0), i.e. the identity.
+  EXPECT_TRUE(ch->keyframes.front().value.isIdentity());
+  // Last sample should be a translation to (100, 100).
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.tx, 100.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.ty, 100.0f);
 }
 
 /**
- * Test SVG import: <animateMotion> with rotate="auto" produces an additional rotation channel
- * whose values follow the path tangent angle.
+ * Test SVG import: <animateMotion> with rotate="auto" bakes Translate(pos) * Rotate(tangent)
+ * matrices; a straight rightward path yields 0-degree tangents.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionRotateAuto) {
   std::string svg =
@@ -4714,15 +4730,18 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionRotateAuto) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  auto* groupObj = anim->objects[0];
-  // Three channels: position.x, position.y, rotation.
-  ASSERT_EQ(groupObj->channels.size(), 3u);
-  EXPECT_EQ(groupObj->channels[2]->name, "rotation");
-  auto* chR = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[2]);
-  ASSERT_GE(chR->keyframes.size(), 2u);
-  // Path goes right (0,0 → 100,0), so tangent angle is 0 degrees.
-  EXPECT_FLOAT_EQ(chR->keyframes.front().value, 0.0f);
-  EXPECT_FLOAT_EQ(chR->keyframes.back().value, 0.0f);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  // Path goes right (0,0 → 100,0): first keyframe is identity (translate 0, rotate 0), the last
+  // is a pure translation to (100, 0) with no rotation.
+  EXPECT_TRUE(ch->keyframes.front().value.isIdentity());
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.tx, 100.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.ty, 0.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.a, 1.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.b, 0.0f);
 }
 
 /**
@@ -4738,11 +4757,13 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateMotionMpath) {
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  auto* groupObj = anim->objects[0];
-  ASSERT_EQ(groupObj->channels.size(), 2u);
-  auto* chX = static_cast<pagx::TypedChannel<float>*>(groupObj->channels[0]);
-  EXPECT_FLOAT_EQ(chX->keyframes.front().value, 0.0f);
-  EXPECT_FLOAT_EQ(chX->keyframes.back().value, 50.0f);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  EXPECT_TRUE(ch->keyframes.front().value.isIdentity());
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.tx, 50.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes.back().value.ty, 50.0f);
 }
 
 /**
@@ -4953,7 +4974,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimationFilesBasic) {
 
 /**
  * loading_spinner.svg: animateTransform rotate with repeatCount=indefinite.
- * Verifies LoopMode::Loop and rotation channel with 3-parameter rotate form (angle cx cy).
+ * Verifies LoopMode::Loop and a matrix channel with 3-parameter rotate baked per keyframe.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_LoadingSpinner) {
   auto doc = pagx::SVGImporter::Parse(
@@ -4963,28 +4984,24 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_LoadingSpinner) {
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
   ASSERT_EQ(anim->objects.size(), 1u);
   auto* obj = anim->objects[0];
-  // Group target (animateTransform drives the Group).
-  auto* groupNode = doc->findNode<pagx::Group>(obj->target);
-  ASSERT_NE(groupNode, nullptr);
   ASSERT_EQ(obj->channels.size(), 1u);
-  EXPECT_EQ(obj->channels[0]->name, "rotation");
-  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
   ASSERT_GE(ch->keyframes.size(), 2u);
-  // rotate from="0 50 50" to="360 50 50": anchor should be set to (50, 50).
-  EXPECT_FLOAT_EQ(groupNode->anchor.x, 50.0f);
-  EXPECT_FLOAT_EQ(groupNode->anchor.y, 50.0f);
-  // Default fill=remove adds a base value keyframe at endFrame+1.
-  // Check first and last animation keyframes.
-  EXPECT_FLOAT_EQ(ch->keyframes.front().value, 0.0f);
-  // Find the keyframe with value 360 (the animation end value, not the base value).
-  bool has360 = false;
+  // rotate from="0 50 50": first keyframe is the identity (rotate 0 around any center).
+  EXPECT_TRUE(ch->keyframes.front().value.isIdentity());
+  // The animation end bakes rotate(360) around (50, 50): also the identity matrix.
+  auto expected = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(360.0f) *
+                  pagx::Matrix::Translate(-50.0f, -50.0f);
+  bool hasEnd = false;
   for (const auto& key : ch->keyframes) {
-    if (std::abs(key.value - 360.0f) < 0.1f) {
-      has360 = true;
+    if (std::abs(key.value.a - expected.a) < 0.001f &&
+        std::abs(key.value.tx - expected.tx) < 0.001f) {
+      hasEnd = true;
       break;
     }
   }
-  EXPECT_TRUE(has360);
+  EXPECT_TRUE(hasEnd);
 }
 
 /**
@@ -5015,7 +5032,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_PulseHeartbeat) {
 
 /**
  * motion_path_curve.svg: animateMotion with mpath and rotate="auto".
- * Verifies path sampling produces position.x/y and rotation channels.
+ * Verifies path sampling bakes Translate * Rotate matrices onto the Layer matrix channel.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_MotionPathCurve) {
   auto doc = pagx::SVGImporter::Parse(
@@ -5025,22 +5042,19 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_MotionPathCurve) {
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
   ASSERT_EQ(anim->objects.size(), 1u);
   auto* obj = anim->objects[0];
-  // Three channels: position.x, position.y, rotation (rotate="auto").
-  ASSERT_EQ(obj->channels.size(), 3u);
-  EXPECT_EQ(obj->channels[0]->name, "position.x");
-  EXPECT_EQ(obj->channels[1]->name, "position.y");
-  EXPECT_EQ(obj->channels[2]->name, "rotation");
+  // A single matrix channel; rotate="auto" is baked into each keyframe's matrix.
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
   // Verify sampled positions: first ~ (10, 30). The last animation keyframe should be near
-  // (190, 30). Note: keyframes.back() may be a fill=remove base value keyframe (position 0,0),
+  // (190, 30). Note: keyframes.back() may be a fill=remove base value keyframe (identity),
   // so we check the second-to-last keyframe for the animation end value.
-  auto* chX = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
-  auto* chY = static_cast<pagx::TypedChannel<float>*>(obj->channels[1]);
-  EXPECT_NEAR(chX->keyframes.front().value, 10.0f, 1.0f);
-  EXPECT_NEAR(chY->keyframes.front().value, 30.0f, 5.0f);
-  // Find the last non-base-value keyframe (largest value, should be near path end).
+  EXPECT_NEAR(ch->keyframes.front().value.tx, 10.0f, 1.0f);
+  EXPECT_NEAR(ch->keyframes.front().value.ty, 30.0f, 5.0f);
+  // Find the last non-base-value keyframe (largest tx, should be near path end).
   float lastAnimX = 0.0f;
-  for (const auto& key : chX->keyframes) {
-    if (key.value > lastAnimX) lastAnimX = key.value;
+  for (const auto& key : ch->keyframes) {
+    if (key.value.tx > lastAnimX) lastAnimX = key.value.tx;
   }
   EXPECT_NEAR(lastAnimX, 190.0f, 5.0f);
 }
@@ -5074,33 +5088,26 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_StaggeredFadeIn) {
 
 /**
  * additive_transform.svg: two animateTransform on the same element with additive="sum".
- * Verifies the two transform channels are merged into one per channel name.
+ * Verifies the two transform animations merge into a single matrix channel on the Layer object.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_AdditiveTransform) {
   auto doc = pagx::SVGImporter::Parse(
       ProjectPath::Absolute("resources/svg/animation/additive_transform.svg"));
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
-  // Two AnimationObjects: one for Layer (alpha from <animate>), one for Group (rotation +
-  // scale from <animateTransform>).
-  ASSERT_EQ(anim->objects.size(), 2u);
-  // Verify channel names across both objects.
+  // One AnimationObject targeting the Layer: alpha + a merged matrix channel (the additive
+  // rotate and scale animations compose via MergeAdditiveMatrix).
+  ASSERT_EQ(anim->objects.size(), 1u);
   bool hasAlpha = false;
-  bool hasRotation = false;
-  bool hasScaleX = false;
-  bool hasScaleY = false;
+  bool hasMatrix = false;
   for (auto* obj : anim->objects) {
     for (auto* ch : obj->channels) {
       if (ch->name == "alpha") hasAlpha = true;
-      if (ch->name == "rotation") hasRotation = true;
-      if (ch->name == "scale.x") hasScaleX = true;
-      if (ch->name == "scale.y") hasScaleY = true;
+      if (ch->name == "matrix") hasMatrix = true;
     }
   }
   EXPECT_TRUE(hasAlpha);
-  EXPECT_TRUE(hasRotation);
-  EXPECT_TRUE(hasScaleX);
-  EXPECT_TRUE(hasScaleY);
+  EXPECT_TRUE(hasMatrix);
 }
 
 /**
@@ -5134,12 +5141,11 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_OrbitSystem) {
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
-  // 3 animated circles, each with position.x and position.y channels.
+  // 3 animated circles, each with a baked matrix channel.
   EXPECT_GE(anim->objects.size(), 3u);
   for (auto* obj : anim->objects) {
-    ASSERT_GE(obj->channels.size(), 2u);
-    EXPECT_EQ(obj->channels[0]->name, "position.x");
-    EXPECT_EQ(obj->channels[1]->name, "position.y");
+    ASSERT_GE(obj->channels.size(), 1u);
+    EXPECT_EQ(obj->channels[0]->name, "matrix");
   }
 }
 
@@ -5192,7 +5198,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_ColorCycle) {
 
 /**
  * compound_rotate_fade.svg: same element with animateTransform rotate + animate opacity.
- * Verifies Layer-level (alpha) and Group-level (rotation) AnimationObjects are both created.
+ * Verifies both the alpha and matrix channels land on the Layer-targeted AnimationObject.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_CompoundRotateFade) {
   auto doc = pagx::SVGImporter::Parse(
@@ -5200,18 +5206,18 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_CompoundRotateFade) {
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
-  // Two AnimationObjects: one for Layer (alpha), one for Group (rotation).
-  ASSERT_EQ(anim->objects.size(), 2u);
+  // One AnimationObject targeting the Layer: alpha + matrix.
+  ASSERT_EQ(anim->objects.size(), 1u);
   bool hasAlphaChannel = false;
-  bool hasRotationChannel = false;
+  bool hasMatrixChannel = false;
   for (auto* obj : anim->objects) {
     for (auto* ch : obj->channels) {
       if (ch->name == "alpha") hasAlphaChannel = true;
-      if (ch->name == "rotation") hasRotationChannel = true;
+      if (ch->name == "matrix") hasMatrixChannel = true;
     }
   }
   EXPECT_TRUE(hasAlphaChannel);
-  EXPECT_TRUE(hasRotationChannel);
+  EXPECT_TRUE(hasMatrixChannel);
 }
 
 /**
@@ -5241,7 +5247,7 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_DrawStroke) {
 
 /**
  * scale_bounce.svg: animateTransform scale with 5-value keyframes.
- * Verifies scale.x and scale.y channels with multi-keyframe values.
+ * Verifies the matrix channel with multi-keyframe values.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_ScaleBounce) {
   auto doc =
@@ -5251,18 +5257,17 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_ScaleBounce) {
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
   ASSERT_EQ(anim->objects.size(), 1u);
   auto* obj = anim->objects[0];
-  // Two channels: scale.x and scale.y.
-  ASSERT_EQ(obj->channels.size(), 2u);
-  EXPECT_EQ(obj->channels[0]->name, "scale.x");
-  EXPECT_EQ(obj->channels[1]->name, "scale.y");
-  auto* chX = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // One matrix channel with the baked scale keyframes.
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
   // 5 keyframes from values + fill=remove base value = 6 total.
-  EXPECT_GE(chX->keyframes.size(), 5u);
+  EXPECT_GE(ch->keyframes.size(), 5u);
 }
 
 /**
  * skew_swing.svg: animateTransform skewX and skewY on separate elements.
- * Verifies skew channel and skewAxis setting on Group.
+ * Verifies each element gets a matrix channel with baked skew matrices.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_File_SkewSwing) {
   auto doc =
@@ -5270,21 +5275,15 @@ PAGX_TEST(PAGXSVGTest, SVGImport_File_SkewSwing) {
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
   EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
-  // Two animated elements (skewX and skewY).
+  // Two animated elements (skewX and skewY), each with a matrix channel.
   EXPECT_GE(anim->objects.size(), 2u);
-  bool hasSkew = false;
+  int matrixChannels = 0;
   for (auto* obj : anim->objects) {
     for (auto* ch : obj->channels) {
-      if (ch->name == "skew") {
-        hasSkew = true;
-        auto* groupNode = doc->findNode<pagx::Group>(obj->target);
-        ASSERT_NE(groupNode, nullptr);
-        // skewAxis should be 0 (skewX) or 90 (skewY).
-        EXPECT_TRUE(groupNode->skewAxis == 0.0f || groupNode->skewAxis == 90.0f);
-      }
+      if (ch->name == "matrix") matrixChannels++;
     }
   }
-  EXPECT_TRUE(hasSkew);
+  EXPECT_GE(matrixChannels, 2);
 }
 
 /**
@@ -5681,39 +5680,26 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateVaryingCenter) {
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
   auto* obj = anim->objects[0];
-  // Three channels: rotation + anchor.x + anchor.y.
-  ASSERT_EQ(obj->channels.size(), 3u);
-  bool hasRotation = false;
-  bool hasAnchorX = false;
-  bool hasAnchorY = false;
-  for (auto* ch : obj->channels) {
-    if (ch->name == "rotation") hasRotation = true;
-    if (ch->name == "anchor.x") hasAnchorX = true;
-    if (ch->name == "anchor.y") hasAnchorY = true;
-  }
-  EXPECT_TRUE(hasRotation);
-  EXPECT_TRUE(hasAnchorX);
-  EXPECT_TRUE(hasAnchorY);
-  // Verify anchor.x keyframes: 50 at frame 0, 100 at frame 60.
-  for (auto* ch : obj->channels) {
-    if (ch->name == "anchor.x") {
-      auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
-      ASSERT_EQ(fch->keyframes.size(), 2u);
-      EXPECT_FLOAT_EQ(fch->keyframes[0].value, 50.0f);
-      EXPECT_FLOAT_EQ(fch->keyframes[1].value, 100.0f);
-    }
-    if (ch->name == "anchor.y") {
-      auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
-      ASSERT_EQ(fch->keyframes.size(), 2u);
-      EXPECT_FLOAT_EQ(fch->keyframes[0].value, 50.0f);
-      EXPECT_FLOAT_EQ(fch->keyframes[1].value, 100.0f);
-    }
-  }
+  // A single matrix channel; each keyframe bakes its own pivot via
+  // Translate(cx,cy) * Rotate(angle) * Translate(-cx,-cy).
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
+  auto expected = pagx::Matrix::Translate(100.0f, 100.0f) * pagx::Matrix::Rotate(180.0f) *
+                  pagx::Matrix::Translate(-100.0f, -100.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.b, expected.b);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.c, expected.c);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.d, expected.d);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, expected.tx);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.ty, expected.ty);
 }
 
 /**
  * Test SVG import: <animateTransform type="rotate"> with the same cx/cy across all keyframes
- * sets a static anchor on the Group (no anchor channels).
+ * bakes each keyframe around that shared center.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateSameCenter) {
   std::string svg =
@@ -5726,9 +5712,16 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateSameCenter) {
   ASSERT_NE(doc, nullptr);
   auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
   auto* obj = anim->objects[0];
-  // Only rotation channel; anchor is static (same cx/cy for all keyframes).
+  // Single matrix channel; both keyframes pivot around (50, 50).
   ASSERT_EQ(obj->channels.size(), 1u);
-  EXPECT_EQ(obj->channels[0]->name, "rotation");
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
+  auto expected = pagx::Matrix::Translate(50.0f, 50.0f) * pagx::Matrix::Rotate(180.0f) *
+                  pagx::Matrix::Translate(-50.0f, -50.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, expected.tx);
 }
 
 /**

@@ -3460,7 +3460,6 @@ std::string SVGParserContext::registerAnimatedElement(const std::shared_ptr<DOMN
   if (it == _smilAnimations.end()) {
     return {};
   }
-  const auto& group = it->second;
 
   // Ensure the Layer has an id so AnimationObject.target can reference it. SVG elements with an
   // explicit id attribute set layer->id directly during convertToLayer, but that path does not
@@ -3475,29 +3474,9 @@ std::string SVGParserContext::registerAnimatedElement(const std::shared_ptr<DOMN
   info.targetLayer = layer;
   info.targetId = layer->id;
   info.domElement = element;
-
-  // When animateTransform or animateMotion is present, create a Group to host the scalar
-  // transform channels (Layer has no rotation/scale/skew channels). The Group wraps the Layer's
-  // existing contents so the animated transform applies to the geometry.
-  bool needsGroup = !group.animateTransforms.empty() || !group.animateMotions.empty();
-  if (needsGroup && !layer->contents.empty()) {
-    auto* animGroup = _document->makeNode<Group>();
-    animGroup->elements = std::move(layer->contents);
-    layer->contents.clear();
-    layer->contents.push_back(animGroup);
-    animGroup->id = generateUniqueId("anim_group");
-    _document->registerNode(animGroup, animGroup->id);
-    info.animGroup = animGroup;
-    info.animGroupId = animGroup->id;
-
-    // Decompose the Layer's static transform so components targeted by animateTransform can be
-    // moved onto the Group as base values later. For now we keep the full transform on Layer and
-    // store the component list for reference; a later refinement will split it.
-    auto transformStr = getAttribute(element, "transform");
-    if (!transformStr.empty()) {
-      info.transformComponents = SMILAnimationParser::parseTransformComponents(transformStr);
-    }
-  }
+  // animateTransform/animateMotion bake their keyframes into Matrix values on the Layer's
+  // runtime "matrix" channel (see SMILAnimationParser::parseAnimateTransform), so no Group host
+  // node is needed — the Layer itself carries the transform animation.
 
   _animatedNodeMap[element.get()] = std::move(info);
   return layer->id;

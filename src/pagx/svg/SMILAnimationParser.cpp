@@ -44,17 +44,6 @@ static void SkipWhitespaceAndComma(const char*& ptr, const char* end) {
   }
 }
 
-static float ReadNumber(const char*& ptr, const char* end) {
-  SkipWhitespaceAndComma(ptr, end);
-  char* endPtr = nullptr;
-  float num = std::strtof(ptr, &endPtr);
-  if (endPtr == ptr) {
-    return 0.0f;
-  }
-  ptr = endPtr;
-  return num;
-}
-
 double SMILAnimationParser::parseSMILClockValue(const std::string& value) {
   if (value.empty()) {
     return 0.0;
@@ -185,85 +174,6 @@ std::vector<BezierControlPoints> SMILAnimationParser::parseKeySplines(const std:
       ++pos;
     }
   }
-  return result;
-}
-
-std::vector<TransformComponent> SMILAnimationParser::parseTransformComponents(
-    const std::string& value) {
-  std::vector<TransformComponent> result = {};
-  if (value.empty()) {
-    return result;
-  }
-
-  const char* ptr = value.c_str();
-  const char* end = ptr + value.length();
-
-  while (ptr < end) {
-    SkipWhitespaceAndComma(ptr, end);
-    if (ptr >= end) {
-      break;
-    }
-
-    const char* funcStart = ptr;
-    while (ptr < end && std::isalpha(static_cast<unsigned char>(*ptr)) != 0) {
-      ++ptr;
-    }
-    size_t funcLen = static_cast<size_t>(ptr - funcStart);
-
-    SkipWhitespaceAndComma(ptr, end);
-    if (ptr >= end || *ptr != '(') {
-      break;
-    }
-    ++ptr;
-
-    TransformComponent component = {};
-    if (funcLen == 9 && std::memcmp(funcStart, "translate", 9) == 0) {
-      component.type = TransformComponent::Type::Translate;
-      component.params[0] = ReadNumber(ptr, end);
-      component.params[1] = ReadNumber(ptr, end);
-    } else if (funcLen == 5 && std::memcmp(funcStart, "scale", 5) == 0) {
-      component.type = TransformComponent::Type::Scale;
-      component.params[0] = ReadNumber(ptr, end);
-      SkipWhitespaceAndComma(ptr, end);
-      if (ptr < end && *ptr != ')') {
-        component.params[1] = ReadNumber(ptr, end);
-      } else {
-        component.params[1] = component.params[0];
-      }
-    } else if (funcLen == 6 && std::memcmp(funcStart, "rotate", 6) == 0) {
-      component.type = TransformComponent::Type::Rotate;
-      component.params[0] = ReadNumber(ptr, end);
-      SkipWhitespaceAndComma(ptr, end);
-      if (ptr < end && *ptr != ')') {
-        component.params[1] = ReadNumber(ptr, end);
-        component.params[2] = ReadNumber(ptr, end);
-      }
-    } else if (funcLen == 5 && std::memcmp(funcStart, "skewX", 5) == 0) {
-      component.type = TransformComponent::Type::SkewX;
-      component.params[0] = ReadNumber(ptr, end);
-    } else if (funcLen == 5 && std::memcmp(funcStart, "skewY", 5) == 0) {
-      component.type = TransformComponent::Type::SkewY;
-      component.params[0] = ReadNumber(ptr, end);
-    } else if (funcLen == 6 && std::memcmp(funcStart, "matrix", 6) == 0) {
-      component.type = TransformComponent::Type::Matrix;
-      for (int i = 0; i < 6; ++i) {
-        component.params[i] = ReadNumber(ptr, end);
-      }
-    } else {
-      // Unknown function: skip to the matching closing paren.
-      while (ptr < end && *ptr != ')') {
-        ++ptr;
-      }
-    }
-
-    SkipWhitespaceAndComma(ptr, end);
-    if (ptr < end && *ptr == ')') {
-      ++ptr;
-    }
-
-    result.push_back(component);
-  }
-
   return result;
 }
 
@@ -939,24 +849,6 @@ static KeyValue ReadBaseValue(const ChannelTarget& target) {
   return 0.0f;
 }
 
-// Reads the static (base) value of a Group transform channel (position/rotation/scale/skew).
-// Returns 0 for unknown channels; callers that need scale base should handle the {1,1} default
-// by reading the Group directly when channelName is scale.x/scale.y.
-static float ReadGroupBaseValue(Group* group, const std::string& channelName) {
-  if (group == nullptr) {
-    return 0.0f;
-  }
-  if (channelName == "position.x") return group->position.x;
-  if (channelName == "position.y") return group->position.y;
-  if (channelName == "rotation") return group->rotation;
-  if (channelName == "scale.x") return group->scale.x;
-  if (channelName == "scale.y") return group->scale.y;
-  if (channelName == "skew") return group->skew;
-  if (channelName == "anchor.x") return group->anchor.x;
-  if (channelName == "anchor.y") return group->anchor.y;
-  return 0.0f;
-}
-
 static bool FloatKeyframeTimeLess(const Keyframe<float>& a, const Keyframe<float>& b) {
   return a.time < b.time;
 }
@@ -1031,16 +923,10 @@ static void AddBaseValueKeyframes(Channel* channel, ChannelValueType valueType, 
   }
 }
 
-// Finds the first element of the given NodeType in a Layer's contents (or its animGroup's
-// elements when present). Returns nullptr when not found.
+// Finds the first element of the given NodeType in a Layer's contents. Returns nullptr when not
+// found.
 Element* SMILAnimationParser::findContentNode(const AnimatedNodeInfo& nodeInfo, NodeType type) {
-  if (nodeInfo.animGroup != nullptr) {
-    for (auto* el : nodeInfo.animGroup->elements) {
-      if (el != nullptr && el->nodeType() == type) {
-        return el;
-      }
-    }
-  } else if (nodeInfo.targetLayer != nullptr) {
+  if (nodeInfo.targetLayer != nullptr) {
     for (auto* el : nodeInfo.targetLayer->contents) {
       if (el != nullptr && el->nodeType() == type) {
         return el;
@@ -1687,22 +1573,19 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
     const AnimatedNodeInfo& nodeInfo, float frameRate, Frame& outEndFrame) {
   std::vector<Channel*> channels = {};
-  if (!animElement) {
+  if (!animElement || nodeInfo.targetLayer == nullptr) {
     return channels;
   }
 
-  // <g> elements carry their renderable children in layer->children, which Group.elements cannot
-  // hold (Group is an Element, children are Layers). So no animGroup is created for <g> in
-  // registerAnimatedElement, and transform animations cannot drive Group scalar channels. The
-  // Layer node exposes a runtime "matrix" channel (TypedChannel<Matrix>) that replaces the
+  // The Layer node exposes a runtime "matrix" channel (TypedChannel<Matrix>) that replaces the
   // layer's static matrix when applied, affecting both contents and children. Bake each
-  // animateTransform keyframe into a full Matrix and drive the Layer's matrix channel directly.
-  // This also matches SMIL additive="replace" (default) semantics: the baked matrix replaces the
-  // layer's static transform. additive="sum" composition across multiple animateTransform elements
-  // is handled by MergeAdditiveMatrix in buildAnimation; a single additive="sum" animateTransform
-  // does not pre-compose the static matrix (known limitation).
-  bool useLayerMatrix = (nodeInfo.animGroup == nullptr && nodeInfo.targetLayer != nullptr);
-
+  // animateTransform keyframe into a full Matrix and drive the Layer's matrix channel directly —
+  // for shape elements as well as <g> elements. This matches SMIL additive="replace" (default)
+  // semantics: the baked matrix replaces the layer's static transform. For additive="sum" each
+  // keyframe is pre-composed with the layer's static matrix (static * animated) so the animation
+  // adds on top of it. Multiple animateTransform elements with additive="sum" are composed by
+  // MergeAdditiveMatrix in buildAnimation. Known limitation: matrix decomposition interpolation
+  // cannot recover multi-turn rotation (rotate 0->720 collapses to the shortest arc).
   auto type = ctx.getAttribute(animElement, "type");
   if (type.empty()) {
     return channels;
@@ -1763,163 +1646,42 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     splines = parseKeySplines(ctx.getAttribute(animElement, "keySplines"));
   }
 
-  if (useLayerMatrix) {
-    // Bake each keyframe's transform params into a full Matrix on a single "matrix" channel
-    // targeting the Layer. Bezier handles are recorded for completeness but the runtime matrix
-    // interpolation (MixTGFXMatrix) does not consume them; Linear/Hold is used effectively.
-    auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
-    for (size_t i = 0; i < paramSets.size(); ++i) {
-      Matrix m = TransformParamsToMatrix(type, paramSets[i]);
-      Point bo = {}, bi = {};
-      ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
-      Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
-      AppendKeyframe(ch, ChannelValueType::Matrix, time, m, interpolation, bo, bi);
+  // Bake each keyframe's transform params into a full Matrix on a single "matrix" channel
+  // targeting the Layer. The runtime evaluates Matrix keyframes with decomposition interpolation
+  // (LerpKeyframeValue<Matrix>) and applies keySplines bezier easing through the same
+  // EvaluateKeyframeSequence path as scalar channels.
+  bool additive = (ctx.getAttribute(animElement, "additive") == "sum");
+  const auto& staticMatrix = nodeInfo.targetLayer->matrix;
+  auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
+  for (size_t i = 0; i < paramSets.size(); ++i) {
+    Matrix m = TransformParamsToMatrix(type, paramSets[i]);
+    if (additive) {
+      // SMIL additive="sum": the animated transform post-multiplies the base value, so each
+      // keyframe composes as static * animated.
+      m = staticMatrix * m;
     }
-    channels.push_back(ch);
-
-    auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-    double repeatCount = ParseRepeatCount(repeatCountStr);
-    if (repeatCount > 1.0) {
-      ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
-      outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
-    } else {
-      outEndFrame = beginFrames + durFrames;
-    }
-
-    // Base value is the layer's static matrix so fill="remove" reverts to the pre-animation
-    // transform and begin-offset holds the static state before the animation starts.
-    auto fillStr = ctx.getAttribute(animElement, "fill");
-    bool fillFreeze = (fillStr == "freeze");
-    AddBaseValueKeyframes(ch, ChannelValueType::Matrix, nodeInfo.targetLayer->matrix, beginFrames,
-                          outEndFrame, fillFreeze);
-    return channels;
+    Point bo = {}, bi = {};
+    ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
+    Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
+    AppendKeyframe(ch, ChannelValueType::Matrix, time, m, interpolation, bo, bi);
   }
+  channels.push_back(ch);
 
-  if (type == "translate") {
-    auto* chX = CreateChannelForType(doc, ChannelValueType::Float, "position.x");
-    auto* chY = CreateChannelForType(doc, ChannelValueType::Float, "position.y");
-    for (size_t i = 0; i < paramSets.size(); ++i) {
-      float tx = (paramSets[i].size() > 0) ? paramSets[i][0] : 0.0f;
-      float ty = (paramSets[i].size() > 1) ? paramSets[i][1] : 0.0f;
-      Point bo = {}, bi = {};
-      ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
-      Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
-      AppendKeyframe(chX, ChannelValueType::Float, time, tx, interpolation, bo, bi);
-      AppendKeyframe(chY, ChannelValueType::Float, time, ty, interpolation, bo, bi);
-    }
-    channels.push_back(chX);
-    channels.push_back(chY);
-  } else if (type == "scale") {
-    auto* chX = CreateChannelForType(doc, ChannelValueType::Float, "scale.x");
-    auto* chY = CreateChannelForType(doc, ChannelValueType::Float, "scale.y");
-    for (size_t i = 0; i < paramSets.size(); ++i) {
-      float sx = (paramSets[i].size() > 0) ? paramSets[i][0] : 1.0f;
-      float sy = (paramSets[i].size() > 1) ? paramSets[i][1] : sx;
-      Point bo = {}, bi = {};
-      ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
-      Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
-      AppendKeyframe(chX, ChannelValueType::Float, time, sx, interpolation, bo, bi);
-      AppendKeyframe(chY, ChannelValueType::Float, time, sy, interpolation, bo, bi);
-    }
-    channels.push_back(chX);
-    channels.push_back(chY);
-  } else if (type == "rotate") {
-    auto* chR = CreateChannelForType(doc, ChannelValueType::Float, "rotation");
-    // SVG rotate accepts "angle cx cy" three-parameter form: rotation pivots around (cx, cy).
-    // Collect cx/cy from every keyframe that has them; when keyframes carry different centers
-    // we drive Group.anchor.x/y via dedicated channels so each keyframe pivots correctly,
-    // instead of the previous limitation of only using the first keyframe's center.
-    std::vector<std::pair<float, float>> centers = {};
-    centers.resize(paramSets.size(), {0.0f, 0.0f});
-    bool anyCenter = false;
-    bool centerVaries = false;
-    float firstCX = 0.0f;
-    float firstCY = 0.0f;
-    for (size_t i = 0; i < paramSets.size(); ++i) {
-      if (paramSets[i].size() >= 3) {
-        centers[i] = {paramSets[i][1], paramSets[i][2]};
-        if (!anyCenter) {
-          firstCX = paramSets[i][1];
-          firstCY = paramSets[i][2];
-          anyCenter = true;
-        } else if (centers[i].first != firstCX || centers[i].second != firstCY) {
-          centerVaries = true;
-        }
-      }
-    }
-    for (size_t i = 0; i < paramSets.size(); ++i) {
-      float angle = (paramSets[i].size() > 0) ? paramSets[i][0] : 0.0f;
-      Point bo = {}, bi = {};
-      ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
-      Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
-      AppendKeyframe(chR, ChannelValueType::Float, time, angle, interpolation, bo, bi);
-    }
-    channels.push_back(chR);
-    if (anyCenter) {
-      if (centerVaries) {
-        // Different keyframes pivot around different centers: drive anchor.x/y as channels so each
-        // keyframe uses its own cx/cy. The static anchor is seeded from the first center so
-        // fill="remove"/begin-offset base values match.
-        nodeInfo.animGroup->anchor = {firstCX, firstCY};
-        auto* chAX = CreateChannelForType(doc, ChannelValueType::Float, "anchor.x");
-        auto* chAY = CreateChannelForType(doc, ChannelValueType::Float, "anchor.y");
-        if (chAX != nullptr && chAY != nullptr) {
-          for (size_t i = 0; i < paramSets.size(); ++i) {
-            Point bo = {}, bi = {};
-            ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
-            Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
-            AppendKeyframe(chAX, ChannelValueType::Float, time, centers[i].first, interpolation, bo,
-                           bi);
-            AppendKeyframe(chAY, ChannelValueType::Float, time, centers[i].second, interpolation,
-                           bo, bi);
-          }
-          channels.push_back(chAX);
-          channels.push_back(chAY);
-        }
-      } else {
-        // All keyframes share the same center: set it as a static anchor on the Group.
-        nodeInfo.animGroup->anchor = {firstCX, firstCY};
-      }
-    }
-  } else if (type == "skewX" || type == "skewY") {
-    auto* chS = CreateChannelForType(doc, ChannelValueType::Float, "skew");
-    for (size_t i = 0; i < paramSets.size(); ++i) {
-      float angle = (paramSets[i].size() > 0) ? paramSets[i][0] : 0.0f;
-      Point bo = {}, bi = {};
-      ComputeBezierHandles(interpolation, splines, i, paramSets.size(), &bo, &bi);
-      Frame time = beginFrames + static_cast<Frame>(std::round(keyTimes[i] * durFrames));
-      AppendKeyframe(chS, ChannelValueType::Float, time, angle, interpolation, bo, bi);
-    }
-    // skewAxis is a static property of the Group: 0 degrees for skewX, 90 for skewY.
-    nodeInfo.animGroup->skewAxis = (type == "skewX") ? 0.0f : 90.0f;
-    channels.push_back(chS);
-  } else {
-    // Unsupported transform type.
-    return channels;
-  }
-
-  // Expand repeatCount for transform channels (all float-typed).
   auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
   double repeatCount = ParseRepeatCount(repeatCountStr);
-  bool accumulate = (ctx.getAttribute(animElement, "accumulate") == "sum");
   if (repeatCount > 1.0) {
-    for (auto* ch : channels) {
-      ExpandRepeatCount(ch, ChannelValueType::Float, durFrames, repeatCount, accumulate);
-    }
+    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
   }
 
-  // Add base-value keyframes for begin-offset and fill="remove" semantics. Each channel's base
-  // value is read from the Group's current static transform property.
+  // Base value is the layer's static matrix so fill="remove" reverts to the pre-animation
+  // transform and begin-offset holds the static state before the animation starts.
   auto fillStr = ctx.getAttribute(animElement, "fill");
   bool fillFreeze = (fillStr == "freeze");
-  for (auto* ch : channels) {
-    float baseFloat = ReadGroupBaseValue(nodeInfo.animGroup, ch->name);
-    AddBaseValueKeyframes(ch, ChannelValueType::Float, baseFloat, beginFrames, outEndFrame,
-                          fillFreeze);
-  }
+  AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
+                        fillFreeze);
   return channels;
 }
 
@@ -1927,13 +1689,13 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
     const AnimatedNodeInfo& nodeInfo, float frameRate, Frame& outEndFrame) {
   std::vector<Channel*> channels = {};
-  if (!animElement) {
+  if (!animElement || nodeInfo.targetLayer == nullptr) {
     return channels;
   }
 
-  // Like parseAnimateTransform, <g> targets use the Layer's "matrix" channel instead of Group
-  // scalar channels. Path position (and optional rotation) are baked into a Matrix per keyframe.
-  bool useLayerMatrix = (nodeInfo.animGroup == nullptr && nodeInfo.targetLayer != nullptr);
+  // Like parseAnimateTransform, motion animations bake path position (and optional rotation)
+  // into a Matrix per keyframe on the Layer's runtime "matrix" channel — for shape elements as
+  // well as <g> elements. additive="sum" pre-composes the layer's static matrix.
 
   // Resolve the motion path: either the `path` attribute on <animateMotion> itself, or an
   // <mpath href="#id"> child referencing a <path> element in defs.
@@ -2019,65 +1781,12 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     hasFixedRotation = true;
   }
 
-  if (useLayerMatrix) {
-    // Bake each path sample into Translate(pos) * Rotate(angle) (rotation only when auto/auto-
-    // reverse; fixed rotation is also baked into each keyframe's matrix). A single "matrix"
-    // channel targets the Layer; fill="remove" reverts to the layer's static matrix.
-    auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
-    for (int i = 0; i < sampleCount; ++i) {
-      double normalizedTime = static_cast<double>(i) / static_cast<double>(sampleCount - 1);
-      double pathProgress = normalizedTime;
-      if (!keyPoints.empty()) {
-        pathProgress = keyPoints[i];
-      }
-      float distance = static_cast<float>(pathProgress) * totalLength;
-      tgfx::Point pos = {};
-      tgfx::Point tan = {};
-      if (!pathMeasure->getPosTan(distance, &pos, &tan)) {
-        continue;
-      }
-      Matrix m = Matrix::Translate(pos.x, pos.y);
-      if (rotateAuto || rotateAutoReverse) {
-        float angle = atan2f(tan.y, tan.x) * 180.0f / static_cast<float>(M_PI);
-        if (rotateAutoReverse) {
-          angle += 180.0f;
-        }
-        m = m * Matrix::Rotate(angle);
-      } else if (hasFixedRotation) {
-        m = m * Matrix::Rotate(fixedRotation);
-      }
-      Frame time = beginFrames + static_cast<Frame>(std::round(normalizedTime * durFrames));
-      AppendKeyframe(ch, ChannelValueType::Matrix, time, m, KeyframeInterpolationType::Linear, {},
-                     {});
-    }
-    channels.push_back(ch);
-
-    auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-    double repeatCount = ParseRepeatCount(repeatCountStr);
-    if (repeatCount > 1.0) {
-      ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
-      outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
-    } else {
-      outEndFrame = beginFrames + durFrames;
-    }
-    auto fillStr = ctx.getAttribute(animElement, "fill");
-    bool fillFreeze = (fillStr == "freeze");
-    AddBaseValueKeyframes(ch, ChannelValueType::Matrix, nodeInfo.targetLayer->matrix, beginFrames,
-                          outEndFrame, fillFreeze);
-    return channels;
-  }
-
-  // Sample the path and build keyframe values for position.x, position.y, and optionally rotation.
-  auto* chX = CreateChannelForType(doc, ChannelValueType::Float, "position.x");
-  auto* chY = CreateChannelForType(doc, ChannelValueType::Float, "position.y");
-  Channel* chR = nullptr;
-  if (rotateAuto || rotateAutoReverse) {
-    chR = CreateChannelForType(doc, ChannelValueType::Float, "rotation");
-  } else if (hasFixedRotation) {
-    // Fixed rotation: set as a static base value on the Group instead of animating.
-    nodeInfo.animGroup->rotation = fixedRotation;
-  }
-
+  // Bake each path sample into Translate(pos) * Rotate(angle) (rotation only when auto/auto-
+  // reverse; fixed rotation is also baked into each keyframe's matrix). A single "matrix"
+  // channel targets the Layer; fill="remove" reverts to the layer's static matrix.
+  bool additive = (ctx.getAttribute(animElement, "additive") == "sum");
+  const auto& staticMatrix = nodeInfo.targetLayer->matrix;
+  auto* ch = CreateChannelForType(doc, ChannelValueType::Matrix, "matrix");
   for (int i = 0; i < sampleCount; ++i) {
     double normalizedTime = static_cast<double>(i) / static_cast<double>(sampleCount - 1);
     double pathProgress = normalizedTime;
@@ -2090,49 +1799,37 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     if (!pathMeasure->getPosTan(distance, &pos, &tan)) {
       continue;
     }
-    Frame time = beginFrames + static_cast<Frame>(std::round(normalizedTime * durFrames));
-    AppendKeyframe(chX, ChannelValueType::Float, time, pos.x, KeyframeInterpolationType::Linear, {},
-                   {});
-    AppendKeyframe(chY, ChannelValueType::Float, time, pos.y, KeyframeInterpolationType::Linear, {},
-                   {});
-    if (chR != nullptr) {
+    Matrix m = Matrix::Translate(pos.x, pos.y);
+    if (rotateAuto || rotateAutoReverse) {
       float angle = atan2f(tan.y, tan.x) * 180.0f / static_cast<float>(M_PI);
       if (rotateAutoReverse) {
         angle += 180.0f;
       }
-      AppendKeyframe(chR, ChannelValueType::Float, time, angle, KeyframeInterpolationType::Linear,
-                     {}, {});
+      m = m * Matrix::Rotate(angle);
+    } else if (hasFixedRotation) {
+      m = m * Matrix::Rotate(fixedRotation);
     }
+    if (additive) {
+      m = staticMatrix * m;
+    }
+    Frame time = beginFrames + static_cast<Frame>(std::round(normalizedTime * durFrames));
+    AppendKeyframe(ch, ChannelValueType::Matrix, time, m, KeyframeInterpolationType::Linear, {},
+                   {});
   }
-  channels.push_back(chX);
-  channels.push_back(chY);
-  if (chR != nullptr) {
-    channels.push_back(chR);
-  }
+  channels.push_back(ch);
 
-  // Expand repeatCount for motion channels (all float-typed). Motion paths do not support
-  // accumulate="sum" in a meaningful way (the path repeats, values don't accumulate), so
-  // accumulate is ignored here.
   auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
   double repeatCount = ParseRepeatCount(repeatCountStr);
   if (repeatCount > 1.0) {
-    for (auto* ch : channels) {
-      ExpandRepeatCount(ch, ChannelValueType::Float, durFrames, repeatCount, false);
-    }
+    ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
   }
-
-  // Add base-value keyframes for begin-offset and fill="remove" semantics. Each channel's base
-  // value is read from the Group's current static transform property (position/rotation).
   auto fillStr = ctx.getAttribute(animElement, "fill");
   bool fillFreeze = (fillStr == "freeze");
-  for (auto* ch : channels) {
-    float baseFloat = ReadGroupBaseValue(nodeInfo.animGroup, ch->name);
-    AddBaseValueKeyframes(ch, ChannelValueType::Float, baseFloat, beginFrames, outEndFrame,
-                          fillFreeze);
-  }
+  AddBaseValueKeyframes(ch, ChannelValueType::Matrix, staticMatrix, beginFrames, outEndFrame,
+                        fillFreeze);
   return channels;
 }
 
@@ -2198,11 +1895,11 @@ Animation* SMILAnimationParser::buildAnimation(
       }
     }
 
-    // <g> elements (animGroup == nullptr, targetLayer != nullptr) drive the Layer's "matrix"
-    // channel via baked Matrix keyframes instead of Group scalar channels. Collect them into
-    // layerEntries so they share the Layer-targeted AnimationObject with <animate>/<set> channels
-    // (e.g. opacity), and MergeAdditiveChannels composes multiple additive matrix channels.
-    if (nodeInfo.animGroup == nullptr && nodeInfo.targetLayer != nullptr &&
+    // animateTransform/animateMotion bake Matrix keyframes onto the Layer's runtime "matrix"
+    // channel. Collect them into layerEntries so they share the Layer-targeted AnimationObject
+    // with <animate>/<set> channels (e.g. opacity), and MergeAdditiveChannels composes multiple
+    // additive matrix channels.
+    if (nodeInfo.targetLayer != nullptr &&
         (!group.animateTransforms.empty() || !group.animateMotions.empty())) {
       for (const auto& transformEl : group.animateTransforms) {
         Frame endFrame = 0;
@@ -2252,56 +1949,6 @@ Animation* SMILAnimationParser::buildAnimation(
     }
     if (layerEndFrame > maxEndFrame) {
       maxEndFrame = layerEndFrame;
-    }
-
-    // AnimationObject for the Group (drives position/scale/rotation/skew via
-    // <animateTransform> and position/rotation via <animateMotion>). Separate from the Layer
-    // object because PAGX requires each AnimationObject to target a single node.
-    bool hasGroupAnimations = nodeInfo.animGroup != nullptr &&
-                              (!group.animateTransforms.empty() || !group.animateMotions.empty());
-    if (hasGroupAnimations) {
-      auto* groupObject = doc->makeNode<AnimationObject>();
-      groupObject->target = nodeInfo.animGroupId;
-      Frame groupEndFrame = 0;
-      std::vector<ChannelWithAdditive> groupChannels = {};
-      for (const auto& transformEl : group.animateTransforms) {
-        Frame endFrame = 0;
-        bool additive = (ctx.getAttribute(transformEl, "additive") == "sum");
-        auto parsedChannels =
-            parseAnimateTransform(ctx, doc, transformEl, nodeInfo, frameRate, endFrame);
-        for (auto* ch : parsedChannels) {
-          groupChannels.push_back({ch, additive});
-        }
-        if (endFrame > groupEndFrame) {
-          groupEndFrame = endFrame;
-        }
-        auto repeatCount = ctx.getAttribute(transformEl, "repeatCount");
-        if (repeatCount == "indefinite") {
-          hasIndefiniteLoop = true;
-        }
-      }
-      for (const auto& motionEl : group.animateMotions) {
-        Frame endFrame = 0;
-        bool additive = (ctx.getAttribute(motionEl, "additive") == "sum");
-        auto parsedChannels = parseAnimateMotion(ctx, doc, motionEl, nodeInfo, frameRate, endFrame);
-        for (auto* ch : parsedChannels) {
-          groupChannels.push_back({ch, additive});
-        }
-        if (endFrame > groupEndFrame) {
-          groupEndFrame = endFrame;
-        }
-        auto repeatCount = ctx.getAttribute(motionEl, "repeatCount");
-        if (repeatCount == "indefinite") {
-          hasIndefiniteLoop = true;
-        }
-      }
-      groupObject->channels = MergeAdditiveChannels(&groupChannels);
-      if (!groupObject->channels.empty()) {
-        animation->objects.push_back(groupObject);
-      }
-      if (groupEndFrame > maxEndFrame) {
-        maxEndFrame = groupEndFrame;
-      }
     }
   }
 
