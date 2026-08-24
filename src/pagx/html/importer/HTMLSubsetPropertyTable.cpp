@@ -392,10 +392,13 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"background-position", PropAction::Keep, nullptr, nullptr},
     // Alpha / luminance masks. `mask-image` carries a `url(data:image/svg+xml,...)` whose SVG the
     // importer turns back into a PAGX mask layer; `mask-mode` selects Alpha vs Luminance and
-    // `mask-size` / `mask-position` drive the mask layer's scale / offset. Kept verbatim and
-    // consumed in HTMLStyleCascade::parseBoxVisuals (the inverse of HTMLWriter::writeMaskCSS).
+    // `mask-size` / `mask-position` drive the mask layer's scale / offset. `mask-composite`
+    // (exclude) marks the inverted variants, which the exporter emits as a two-layer mask.
+    // Kept verbatim and consumed in HTMLStyleCascade::parseBoxVisuals (the inverse of
+    // HTMLWriter::writeMaskCSS).
     {"mask-image", PropAction::Keep, nullptr, nullptr},
     {"mask-mode", PropAction::Keep, nullptr, nullptr},
+    {"mask-composite", PropAction::Keep, nullptr, nullptr},
     {"mask-size", PropAction::Keep, nullptr, nullptr},
     {"mask-position", PropAction::Keep, nullptr, nullptr},
     {"mask-repeat", PropAction::Keep, nullptr, nullptr},

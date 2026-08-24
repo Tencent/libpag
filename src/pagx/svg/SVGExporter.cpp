@@ -1721,7 +1721,13 @@ static MaskType DegradeInvertedMaskType(MaskType type) {
   }
 }
 
-std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType) {
+std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType requestedType) {
+  // SVG cannot express mask inversion, so inverted types are normalised to their base type up
+  // front: the emitted def, its cache key and its id suffix all key off the base type. Two owners
+  // referencing the same mask layer as Alpha and AlphaInverted therefore share one def instead of
+  // emitting two byte-identical `<mask>` elements.
+  auto maskType = DegradeInvertedMaskType(requestedType);
+
   // Reuse a previously-emitted def for the same (maskLayer, maskType). Without this cache, a
   // single mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements
   // with the same id in <defs>, which is undefined per the SVG spec — browsers typically use
@@ -1734,8 +1740,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
   // test). Without keying on MaskType, the second reference for a layer used in two roles
   // would silently inherit the first role's def — a luminance owner would render an alpha
   // mask, or a contour owner would receive a path mask — with no warning.
-  auto baseType = DegradeInvertedMaskType(maskType);
-  bool isClipPath = (baseType == MaskType::Contour);
+  bool isClipPath = (maskType == MaskType::Contour);
   const char* tag = isClipPath ? "clipPath" : "mask";
   const char* idPrefix = isClipPath ? "clip" : "mask";
   ContentWriter writer =
@@ -1756,6 +1761,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
     defId = generateId(idPrefix);
   } else {
     defId = maskLayer->id;
+    // maskType is already normalised to a base type, so the inverted values never reach here.
     switch (maskType) {
       case MaskType::Alpha:
         defId += "_a";
@@ -1764,23 +1770,15 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
         defId += "_l";
         break;
       case MaskType::Contour:
+      default:
         defId += "_c";
-        break;
-      case MaskType::AlphaInverted:
-        defId += "_ai";
-        break;
-      case MaskType::LuminanceInverted:
-        defId += "_li";
-        break;
-      case MaskType::ContourInverted:
-        defId += "_ci";
         break;
     }
   }
   SVGBuilder paintDefs(true, _indentSpaces);
   _defs->openElement(tag);
   _defs->addAttribute("id", defId);
-  if (baseType == MaskType::Alpha) {
+  if (maskType == MaskType::Alpha) {
     _defs->addAttribute("style", "mask-type:alpha");
   }
   _defs->closeElementStart();

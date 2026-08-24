@@ -791,6 +791,105 @@ CLI_TEST(PAGXHtmlTest, MaskAsChildNotEmittedAsContent) {
       << "the mask layer must not appear as visible content";
 }
 
+// Inverted mask types have no CSS inversion operator, so the exporter emits a two-layer mask:
+// the shape layer composited with a fully opaque cover layer via mask-composite:exclude
+// (webkit: destination-out), which computes cover minus shape — the inverted mask.
+CLI_TEST(PAGXHtmlTest, InvertedMaskUsesMaskComposite) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer mask=\"@mask\" maskType=\"alphaInverted\">"
+      "    <Rectangle width=\"180\" height=\"180\"/>"
+      "    <Fill color=\"#3399EE\"/>"
+      "  </Layer>"
+      "  <Layer id=\"mask\" left=\"10\" top=\"10\" width=\"50\" height=\"50\">"
+      "    <Rectangle width=\"50\" height=\"50\"/>"
+      "    <Fill color=\"#FFFFFF\"/>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("mask-composite:exclude"), std::string::npos)
+      << "inverted mask must use mask-composite:exclude";
+  EXPECT_NE(html.find("-webkit-mask-composite:destination-out"), std::string::npos)
+      << "inverted mask must carry the webkit destination-out fallback";
+  EXPECT_NE(html.find("linear-gradient(#fff,#fff)"), std::string::npos)
+      << "inverted mask must add a fully opaque cover layer";
+  EXPECT_NE(html.find(",100% 100%"), std::string::npos)
+      << "the cover layer must be sized to fill the element";
+  // mask-position and mask-size must both carry two comma-separated values, otherwise the shape
+  // and cover layers stop lining up.
+  EXPECT_NE(html.find("mask-position:"), std::string::npos)
+      << "inverted mask must pin mask-position for both layers";
+  auto posStart = html.find("mask-position:");
+  auto posEnd = html.find(';', posStart);
+  ASSERT_NE(posEnd, std::string::npos);
+  auto posValue = html.substr(posStart, posEnd - posStart);
+  EXPECT_NE(posValue.find(','), std::string::npos)
+      << "mask-position must pair the shape and cover layers: " << posValue;
+}
+
+// luminanceInverted and contourInverted must also emit the two-layer composite. Luminance keeps
+// mask-mode:luminance; contour has no CSS clip-path inversion so it goes through the alpha path
+// with a solid opaque shape, which is geometry-equivalent for contour semantics.
+CLI_TEST(PAGXHtmlTest, InvertedMaskCoversLuminanceAndContour) {
+  auto build = [](const char* maskType) {
+    return std::string(
+               "<pagx width=\"200\" height=\"200\">"
+               "  <Layer mask=\"@mask\" maskType=\"") +
+           maskType +
+           "\">"
+           "    <Rectangle width=\"180\" height=\"180\"/>"
+           "    <Fill color=\"#3399EE\"/>"
+           "  </Layer>"
+           "  <Layer id=\"mask\" left=\"10\" top=\"10\" width=\"50\" height=\"50\">"
+           "    <Rectangle width=\"50\" height=\"50\"/>"
+           "    <Fill color=\"#FFFFFF\"/>"
+           "  </Layer>"
+           "</pagx>";
+  };
+
+  auto luma = LoadXMLAndConvert(build("luminanceInverted"));
+  ASSERT_FALSE(luma.empty());
+  EXPECT_NE(luma.find("mask-composite:exclude"), std::string::npos)
+      << "luminanceInverted must composite via exclude";
+  EXPECT_NE(luma.find("mask-mode:luminance"), std::string::npos)
+      << "luminanceInverted must stay in luminance mode";
+
+  auto contour = LoadXMLAndConvert(build("contourInverted"));
+  ASSERT_FALSE(contour.empty());
+  EXPECT_NE(contour.find("mask-composite:exclude"), std::string::npos)
+      << "contourInverted must composite via exclude";
+  EXPECT_NE(contour.find("mask-mode:alpha"), std::string::npos)
+      << "contourInverted has no CSS clip-path inversion, so it uses the alpha path";
+  EXPECT_EQ(contour.find("clip-path:url("), std::string::npos)
+      << "contourInverted must not fall back to a non-inverted clip-path";
+}
+
+// The mask SVG's intrinsic size spans the mask geometry's bounds (min..max) and its viewBox starts
+// at (minX, minY), so mask-size must be that span and mask-position must offset by min. Masks whose
+// geometry starts at the document origin make min=0, where the wrong formulas (max as the size, no
+// min compensation) happen to be identical — this case keeps a non-zero min so they stay apart.
+CLI_TEST(PAGXHtmlTest, MaskSizeAndPositionFollowMaskBounds) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"120\">"
+      "  <Layer id=\"offMask\" visible=\"false\">"
+      "    <Ellipse position=\"120,60\" size=\"60,60\"/>"
+      "    <Fill color=\"#FFFFFF\"/>"
+      "  </Layer>"
+      "  <Layer mask=\"@offMask\" maskType=\"alpha\">"
+      "    <Rectangle position=\"100,60\" size=\"200,120\"/>"
+      "    <Fill color=\"#E11D48\"/>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // The ellipse spans x 90..150 and y 30..90, so the mask SVG is 60x60 at (90, 30).
+  EXPECT_NE(html.find("mask-size:60px 60px"), std::string::npos)
+      << "mask-size must match the mask SVG's intrinsic size, not its max extent";
+  EXPECT_NE(html.find("mask-position:90px 30px"), std::string::npos)
+      << "mask-position must offset by the mask bounds' min corner";
+}
+
 CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;

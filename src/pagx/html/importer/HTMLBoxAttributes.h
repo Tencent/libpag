@@ -283,14 +283,16 @@ struct HTMLBoxAttributes {
   std::string filter = {};
   std::string backdropFilter = {};
 
-  // CSS `mask-image` / `mask-mode` / `mask-size` / `mask-position` for alpha and luminance masks.
-  // `maskImage` is the raw `url(data:image/svg+xml,...)` the HTML exporter emitted; the importer
-  // decodes the embedded SVG and rebuilds a PAGX mask layer from it (the inverse of
-  // `HTMLWriter::writeMaskCSS`). `maskMode` is the lower-cased keyword (`alpha` / `luminance`);
-  // `maskSize` / `maskPosition` are lower-cased and trimmed and drive the mask layer's scale /
-  // offset. All empty means "no mask authored".
+  // CSS `mask-image` / `mask-mode` / `mask-composite` / `mask-size` / `mask-position` for alpha,
+  // luminance and inverted masks. `maskImage` is the raw `url(data:image/svg+xml,...)` the HTML
+  // exporter emitted; the importer decodes the embedded SVG and rebuilds a PAGX mask layer from it
+  // (the inverse of `HTMLWriter::writeMaskCSS`). `maskMode` is the lower-cased keyword (`alpha` /
+  // `luminance`); `maskComposite` is the lower-cased compositing keyword (`exclude` marks the
+  // inverted variants); `maskSize` / `maskPosition` are lower-cased and trimmed and drive the mask
+  // layer's scale / offset. All empty means "no mask authored".
   std::string maskImage = {};
   std::string maskMode = {};
+  std::string maskComposite = {};
   std::string maskSize = {};
   std::string maskPosition = {};
 
