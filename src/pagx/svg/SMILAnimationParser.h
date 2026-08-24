@@ -53,17 +53,6 @@ struct BezierControlPoints {
 };
 
 /**
- * A single component of an SVG transform attribute (one translate/scale/rotate/skewX/skewY/matrix
- * function call). Used to decompose a static transform so that components targeted by
- * animateTransform can be moved onto a Group as base values while the rest stays on the Layer.
- */
-struct TransformComponent {
-  enum class Type { Translate, Scale, Rotate, SkewX, SkewY, Matrix };
-  Type type = Type::Matrix;
-  float params[6] = {};
-};
-
-/**
  * SMIL animation elements collected for a single SVG graphics element, grouped by tag name so
  * the parser can dispatch each kind to its dedicated handler.
  */
@@ -84,28 +73,21 @@ struct SMILAnimationGroup {
  * dashOffset channel. PAGX requires each AnimationObject to target exactly one node, so
  * buildAnimation groups channels by their resolved targetId and creates one AnimationObject per
  * target. The targetId is resolved by resolveAnimateTarget, which maps the SVG attributeName to
- * the correct PAGX node (Layer, Fill, Stroke, Ellipse, Rectangle, or Group) and allocates an id
- * for content nodes that don't already have one.
+ * the correct PAGX node (Layer, Fill, Stroke, Ellipse, or Rectangle) and allocates an id for
+ * content nodes that don't already have one.
  *
- * Transform animations (<animateTransform>, <animateMotion>) always target a Group node
- * (animGroupId) because PAGX Layer has no scalar transform channels (rotation/scale/skew).
- * The Group is created by registerAnimatedElement and wraps the Layer's contents so the animated
- * transform applies to the geometry. This Group is protected from PAGXOptimizer unwrapping by
- * giving it a non-empty id (see PAGXOptimizer::UnwrapRedundantFirstGroupInElements).
+ * Transform animations (<animateTransform>, <animateMotion>) bake Matrix keyframes onto the
+ * Layer's runtime "matrix" channel, so they target the Layer node itself (targetId) — no Group
+ * host node is created.
  */
 struct AnimatedNodeInfo {
   Layer* targetLayer = nullptr;
   std::string targetId = {};
 
-  Group* animGroup = nullptr;
-  std::string animGroupId = {};
-
   // Filter node targeted by <animate> on fe* primitives inside an SVG <filter>. Populated by
   // registerAnimatedElement when the element is a feGaussianBlur/feOffset recorded in
-  // _feToFilterMap. Null for shape/<g> elements whose animations target Layer/Group/content nodes.
+  // _feToFilterMap. Null for shape/<g> elements whose animations target Layer/content nodes.
   LayerFilter* targetFilter = nullptr;
-
-  std::vector<TransformComponent> transformComponents = {};
 
   std::unordered_map<Node*, std::string> contentNodeIds = {};
 
@@ -180,19 +162,12 @@ class SMILAnimationParser {
    */
   static std::vector<BezierControlPoints> parseKeySplines(const std::string& value);
 
-  /**
-   * Decomposes an SVG transform attribute into an ordered list of transform components without
-   * merging them into a single matrix. Used to split a static transform between the Layer (for
-   * components not animated) and a Group (for components driven by animateTransform).
-   */
-  static std::vector<TransformComponent> parseTransformComponents(const std::string& value);
-
  private:
   SMILAnimationParser() = default;
 
   // Resolves an <animate>/<set> attributeName to the target PAGX node, channel name, and value
-  // type. Searches Layer contents (or Group elements when an animGroup is present) for Fill /
-  // Stroke / Shape nodes and allocates ids for newly targeted content nodes.
+  // type. Searches Layer contents for Fill / Stroke / Shape nodes and allocates ids for newly
+  // targeted content nodes.
   static ChannelTarget resolveAnimateTarget(SVGParserContext& ctx, PAGXDocument* doc,
                                             const std::string& attributeName,
                                             const AnimatedNodeInfo& nodeInfo);
@@ -213,26 +188,25 @@ class SMILAnimationParser {
                                         const AnimatedNodeInfo& nodeInfo, float frameRate,
                                         Frame& outEndFrame, std::string& outTargetId);
 
-  // Parses a single <animateTransform> element into Channels driving the Group's scalar
-  // transform channels (position.x/y, scale.x/y, rotation, skew, skewAxis). Handles type
-  // dispatch (translate/scale/rotate/skewX/skewY), from/to/by/values, keyTimes/keySplines,
-  // and rotate's "angle cx cy" three-parameter form (cx/cy become Group.anchor).
+  // Parses a single <animateTransform> element into a single Matrix channel driving the Layer's
+  // runtime "matrix" channel. Each keyframe's transform params (translate/scale/rotate/skewX/
+  // skewY, including rotate's "angle cx cy" form) are baked into a full Matrix. additive="sum"
+  // pre-composes the layer's static matrix; fill="remove" reverts to it.
   static std::vector<Channel*> parseAnimateTransform(SVGParserContext& ctx, PAGXDocument* doc,
                                                      const std::shared_ptr<DOMNode>& animElement,
                                                      const AnimatedNodeInfo& nodeInfo,
                                                      float frameRate, Frame& outEndFrame);
 
-  // Parses a single <animateMotion> element into Channels driving the Group's position.x/y
-  // (and optionally rotation). Samples the referenced path via PathMeasure with an adaptive
-  // density (clamp(totalLength/10, 32, 256)). Handles rotate="auto"/"auto-reverse"/<number>
-  // and keyPoints for non-uniform path progression.
+  // Parses a single <animateMotion> element into a single Matrix channel driving the Layer's
+  // runtime "matrix" channel. Samples the referenced path via PathMeasure with an adaptive
+  // density (clamp(totalLength/10, 32, 256)) and bakes Translate(pos) * Rotate(angle) per
+  // keyframe. Handles rotate="auto"/"auto-reverse"/<number> and keyPoints.
   static std::vector<Channel*> parseAnimateMotion(SVGParserContext& ctx, PAGXDocument* doc,
                                                   const std::shared_ptr<DOMNode>& animElement,
                                                   const AnimatedNodeInfo& nodeInfo, float frameRate,
                                                   Frame& outEndFrame);
 
-  // Finds the first element of the given NodeType in the target Layer's contents (or its
-  // animGroup's elements when present).
+  // Finds the first element of the given NodeType in the target Layer's contents.
   static Element* findContentNode(const AnimatedNodeInfo& nodeInfo, NodeType type);
 
   // Ensures the given content node has an id, allocating one via ctx when missing, and records
