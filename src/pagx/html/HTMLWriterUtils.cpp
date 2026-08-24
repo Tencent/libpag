@@ -26,6 +26,9 @@
 #include "base/utils/MathUtil.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/HTMLWriter.h"
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
+#include "pagx/html/HTMLZipWriter.h"
+#endif
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -45,6 +48,63 @@ namespace pagx {
 
 using pag::DegreesToRadians;
 using pag::FloatNearlyZero;
+
+bool HTMLWriterContext::writeResource(const std::string& relativePath, const void* bytes,
+                                      size_t size, std::string* errorMsg) {
+  if (zipWriter != nullptr) {
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
+    std::string error;
+    bool ok = zipWriter->write(staticImgUrlPrefix + relativePath, bytes, size, &error);
+    if (!ok) {
+      if (zipWriteError.empty()) {
+        zipWriteError = error.empty() ? "failed to write ZIP entry: " + relativePath : error;
+      }
+      if (errorMsg) {
+        *errorMsg = error;
+      }
+    }
+    return ok;
+#else
+    if (errorMsg) {
+      *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
+    }
+    return false;
+#endif
+  }
+  if (staticImgDir.empty()) {
+    return false;
+  }
+  std::string dir = staticImgDir;
+  std::string name = relativePath;
+  size_t slash = relativePath.find_last_of('/');
+  if (slash != std::string::npos) {
+    dir += "/" + relativePath.substr(0, slash);
+    name = relativePath.substr(slash + 1);
+  }
+  std::error_code ec;
+  std::filesystem::create_directories(dir, ec);
+  if (ec) {
+    if (errorMsg) {
+      *errorMsg = "failed to create directory: " + dir;
+    }
+    return false;
+  }
+  std::ofstream f(dir + "/" + name, std::ios::binary);
+  if (!f.is_open()) {
+    if (errorMsg) {
+      *errorMsg = "failed to open output file: " + dir + "/" + name;
+    }
+    return false;
+  }
+  f.write(reinterpret_cast<const char*>(bytes), static_cast<std::streamsize>(size));
+  if (!f.good()) {
+    if (errorMsg) {
+      *errorMsg = "write error after opening file: " + dir + "/" + name;
+    }
+    return false;
+  }
+  return true;
+}
 
 //==============================================================================
 // Color Conversion
@@ -220,7 +280,56 @@ static std::string CopyExternalImageToStaticDir(const std::string& srcPath,
   return ctx->staticImgUrlPrefix + candidate;
 }
 
+namespace {
+
+// Image::data takes precedence. A base64 data URI in filePath is decoded before
+// a non-empty filePath is read from disk.
+std::shared_ptr<tgfx::Data> GetImageBytes(const Image* image) {
+  if (image == nullptr) {
+    return nullptr;
+  }
+  if (image->data) {
+    return tgfx::Data::MakeWithoutCopy(image->data->bytes(), image->data->size());
+  }
+  if (!image->filePath.empty()) {
+    auto decoded = DecodeBase64DataURI(image->filePath);
+    if (decoded) {
+      return tgfx::Data::MakeWithCopy(decoded->bytes(), decoded->size());
+    }
+    return tgfx::Data::MakeFromFile(image->filePath);
+  }
+  return nullptr;
+}
+
+const char* MimeToExt(const std::string& mime) {
+  if (mime == "image/jpeg") return "jpeg";
+  if (mime == "image/webp") return "webp";
+  if (mime == "image/gif") return "gif";
+  return "png";  // image/png and any unknown input
+}
+
+}  // namespace
+
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx) {
+  if (ctx != nullptr && ctx->zipWriter != nullptr) {
+    auto cached = ctx->externalImageAssets.find(image);
+    if (cached != ctx->externalImageAssets.end()) {
+      return ctx->staticImgUrlPrefix + cached->second;
+    }
+    auto bytes = GetImageBytes(image);
+    if (bytes && bytes->size() > 0) {
+      auto mime = DetectImageMime(bytes->bytes(), bytes->size());
+      if (mime != nullptr) {
+        std::string filename = ctx->nextId("img") + "." + MimeToExt(mime);
+        std::string error;
+        if (ctx->writeResource(filename, bytes->bytes(), bytes->size(), &error)) {
+          ctx->externalImageAssets[image] = filename;
+          return ctx->staticImgUrlPrefix + filename;
+        }
+      }
+    }
+    return {};  // No bytes readable or unrecognized format → empty src degrade
+  }
   if (image->data) {
     auto mime = DetectImageMime(image->data->bytes(), image->data->size());
     if (!mime) {

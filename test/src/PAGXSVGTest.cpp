@@ -71,6 +71,7 @@
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 #include "utils/Baseline.h"
+#include "utils/PAGXImageTestUtils.h"
 #include "utils/PAGXTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
@@ -1380,93 +1381,6 @@ PAGX_TEST(PAGXSVGTest, SVGExport_RenderPositionFromConstraint) {
   EXPECT_NE(svg.find("height=\"80\""), std::string::npos);
   EXPECT_EQ(svg.find("width=\"10\""), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_render_position.svg");
-}
-
-// Helper function to create a minimal PNG image
-static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
-  // Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced)
-  static const uint8_t MINIMAL_PNG[] = {
-      0x89,
-      0x50,
-      0x4E,
-      0x47,
-      0x0D,
-      0x0A,
-      0x1A,
-      0x0A,  // PNG signature
-      // IHDR
-      0x00,
-      0x00,
-      0x00,
-      0x0D,
-      0x49,
-      0x48,
-      0x44,
-      0x52,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x08,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0xFD,
-      0xD4,
-      0x9A,
-      0x73,
-      // IDAT (compressed pixel data)
-      0x00,
-      0x00,
-      0x00,
-      0x14,
-      0x49,
-      0x44,
-      0x41,
-      0x54,
-      0x78,
-      0x9C,
-      0x62,
-      0xF8,
-      0xCF,
-      0xC0,
-      0xF0,
-      0x1F,
-      0x01,
-      0x18,
-      0x18,
-      0x18,
-      0x00,
-      0x09,
-      0x04,
-      0x01,
-      0x01,
-      0xE2,
-      0x2D,
-      0x42,
-      0xA3,
-      // IEND
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x49,
-      0x45,
-      0x4E,
-      0x44,
-      0xAE,
-      0x42,
-      0x60,
-      0x82,
-  };
-  auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(MINIMAL_PNG, sizeof(MINIMAL_PNG));
-  return image;
 }
 
 /**
