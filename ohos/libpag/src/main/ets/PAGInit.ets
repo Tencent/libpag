@@ -93,10 +93,18 @@ export class PAGInit {
           continue;
         }
         let path = systemFontDir + fileName;
-        // listFileSync also returns subdirectory names; skip anything that is not a
-        // regular file so a directory named like a font is not registered as a path.
-        if (fileIo.statSync(path).isDirectory()) {
-          continue;
+        // listFileSync also returns subdirectory names. Guard statSync per file:
+        // some protected entries under /system/fonts throw "Permission denied",
+        // which must not abort scanning the whole directory. Only skip confirmed
+        // directories; when stat is unavailable, keep the path since the ArkTS
+        // stat permission differs from the native file read permission, and let
+        // the native loader safely reject anything it cannot open.
+        try {
+          if (fileIo.statSync(path).isDirectory()) {
+            continue;
+          }
+        } catch (e) {
+          // Keep the path; native Typeface loading will skip unreadable files.
         }
         if (lowerCaseName.includes('emoji')) {
           emojiPathSet.add(path);
@@ -113,10 +121,6 @@ export class PAGInit {
 
   // Use the new text module API (API14+) to register the curated, ordered fallback list.
   private static InitFontFallbackWithTextModule() {
-    if (!text) {
-      console.warn('[PAGInit] text module is not available, skip font fallback initialization');
-      return;
-    }
     text.getSystemFontFullNamesByType(text.SystemFontType.ALL).then((fontNames: string[]) => {
       if (!fontNames || fontNames.length === 0) {
         return;
@@ -147,10 +151,6 @@ export class PAGInit {
 
   // Use the legacy font module API (below API14).
   private static InitFontFallbackWithFontModule() {
-    if (!font) {
-      console.warn('[PAGInit] font module is not available, skip font fallback initialization');
-      return;
-    }
     let fontConfig = font.getUIFontConfig();
     if (!fontConfig || !fontConfig.fallbackGroups) {
       console.warn('[PAGInit] fontConfig is not available, skip font fallback initialization');
