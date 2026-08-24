@@ -121,63 +121,77 @@ export class PAGInit {
 
   // Use the new text module API (API14+) to register the curated, ordered fallback list.
   private static InitFontFallbackWithTextModule() {
-    text.getSystemFontFullNamesByType(text.SystemFontType.ALL).then((fontNames: string[]) => {
-      if (!fontNames || fontNames.length === 0) {
-        return;
-      }
-      // Return the inner promise so a rejection propagates to the outer catch instead
-      // of becoming an unhandled promise rejection.
-      return Promise.all(fontNames.map(fontName =>
-        text.getFontDescriptorByFullName(fontName, text.SystemFontType.ALL)
-      )).then((descriptors) => {
-        let pathSet = new Set<string>();
-        let emojiPathSet = new Set<string>();
-        for (const descriptor of descriptors) {
-          if (!descriptor || !descriptor.path) {
-            continue;
-          }
-          if ((descriptor.fullName || '').toLowerCase().includes('emoji')) {
-            emojiPathSet.add(descriptor.path);
-          } else {
-            pathSet.add(descriptor.path);
-          }
+    try {
+      // Wrap the entry call: the text module object can occasionally be undefined at
+      // runtime, and getSystemFontFullNamesByType then throws a synchronous TypeError
+      // that the promise .catch below cannot intercept and would escape Init().
+      text.getSystemFontFullNamesByType(text.SystemFontType.ALL).then((fontNames: string[]) => {
+        if (!fontNames || fontNames.length === 0) {
+          return;
         }
-        PAGInit.RegisterFallbackPaths(pathSet, emojiPathSet);
+        // Return the inner promise so a rejection propagates to the outer catch instead
+        // of becoming an unhandled promise rejection.
+        return Promise.all(fontNames.map(fontName =>
+          text.getFontDescriptorByFullName(fontName, text.SystemFontType.ALL)
+        )).then((descriptors) => {
+          let pathSet = new Set<string>();
+          let emojiPathSet = new Set<string>();
+          for (const descriptor of descriptors) {
+            if (!descriptor || !descriptor.path) {
+              continue;
+            }
+            if ((descriptor.fullName || '').toLowerCase().includes('emoji')) {
+              emojiPathSet.add(descriptor.path);
+            } else {
+              pathSet.add(descriptor.path);
+            }
+          }
+          PAGInit.RegisterFallbackPaths(pathSet, emojiPathSet);
+        });
+      }).catch((e: Object) => {
+        console.warn('[PAGInit] InitFontFallbackWithTextModule failed: ' + e);
       });
-    }).catch((e: Object) => {
-      console.warn('[PAGInit] InitFontFallbackWithTextModule failed: ' + e);
-    });
+    } catch (e) {
+      console.warn('[PAGInit] text module is not available: ' + e);
+    }
   }
 
   // Use the legacy font module API (below API14).
   private static InitFontFallbackWithFontModule() {
-    let fontConfig = font.getUIFontConfig();
-    if (!fontConfig || !fontConfig.fallbackGroups) {
-      console.warn('[PAGInit] fontConfig is not available, skip font fallback initialization');
-      return;
-    }
-
-    let pathSet = new Set<string>();
-    let emojiPathSet = new Set<string>();
-    for (const element of fontConfig.fallbackGroups) {
-      if (!element || !element.fallback) {
-        continue;
+    try {
+      // font.getUIFontConfig() throws when the font module object is undefined at
+      // runtime (the root cause of the historical #3232 crash), so guard the call
+      // to keep the exception from escaping Init().
+      let fontConfig = font.getUIFontConfig();
+      if (!fontConfig || !fontConfig.fallbackGroups) {
+        console.warn('[PAGInit] fontConfig is not available, skip font fallback initialization');
+        return;
       }
-      for (const fallback of element.fallback) {
-        let fontInfo = font.getFontByName(fallback.family);
-        if (fontInfo == null) {
-          fontInfo = font.getFontByName(fallback.family + " Regular");
+
+      let pathSet = new Set<string>();
+      let emojiPathSet = new Set<string>();
+      for (const element of fontConfig.fallbackGroups) {
+        if (!element || !element.fallback) {
+          continue;
         }
-        if (fontInfo != null) {
-          if (fontInfo.fullName.toLowerCase().includes("emoji")) {
-            emojiPathSet.add(fontInfo.path);
-          } else {
-            pathSet.add(fontInfo.path);
+        for (const fallback of element.fallback) {
+          let fontInfo = font.getFontByName(fallback.family);
+          if (fontInfo == null) {
+            fontInfo = font.getFontByName(fallback.family + " Regular");
+          }
+          if (fontInfo != null) {
+            if (fontInfo.fullName.toLowerCase().includes("emoji")) {
+              emojiPathSet.add(fontInfo.path);
+            } else {
+              pathSet.add(fontInfo.path);
+            }
           }
         }
       }
+      PAGInit.RegisterFallbackPaths(pathSet, emojiPathSet);
+    } catch (e) {
+      console.warn('[PAGInit] font module is not available: ' + e);
     }
-    PAGInit.RegisterFallbackPaths(pathSet, emojiPathSet);
   }
 
   private static InitCacheDir() {
