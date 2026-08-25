@@ -22,6 +22,7 @@
 #include <QFile>
 #include <QFontMetrics>
 #include <QMetaObject>
+#include <QPlainTextDocumentLayout>
 #include <QQuickTextDocument>
 #include <QQuickWindow>
 #include <QTextCursor>
@@ -507,6 +508,12 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   // A previous highlighter can only belong to a previous editor instance's document; replace
   // it so a recreated editor is never left unhighlighted.
   EditorLog("attachHighlighter: attaching to a new document");
+  // Plain-text layout: it sizes the document from block count * line height and only lays out
+  // a block's content when the block actually enters the viewport. The default rich-text
+  // layout instead lays out every block during document-size passes, so megabyte-long base64
+  // lines each cost a multi-second synchronous layout while loading (and again whenever the
+  // document size is queried after edits).
+  document->setDocumentLayout(new QPlainTextDocumentLayout(document));
   delete highlighter;
   highlighter = new XmlDocumentHighlighter(document);
   // Diagnostic probe: every emission means the text backend finished a document-size layout
