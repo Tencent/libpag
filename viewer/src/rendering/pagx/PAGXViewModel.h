@@ -34,6 +34,13 @@ class QTimer;
 
 namespace pag {
 
+// A long data line folded out of the editor: the exact placeholder line shown in the editor
+// plus the original full line it stands for.
+struct ElidedLine {
+  QString placeholder = {};
+  QString fullLine = {};
+};
+
 /**
  * ViewModel for PAGX format content. Owns PAGXDocument and PAGScene with PAGTimeline,
  * and manages playback state for PAGX content.
@@ -96,9 +103,24 @@ class PAGXViewModel : public ContentViewModel {
    * Replaces the editor document's text. Large documents are appended in chunks driven by a
    * zero-interval timer so the attached highlighter only ever rehighlights one chunk at a
    * time and the UI thread is never blocked for long. editorLoadFinished() is emitted when
-   * the document is ready for editing.
+   * the document is ready for editing. Lines longer than FoldLineThreshold are folded into
+   * short placeholders (see ElidedLine) before loading, so megabyte-long base64 lines never
+   * reach the text layout engine.
    */
   Q_INVOKABLE void loadEditorText(QObject* quickTextDocument, const QString& text);
+
+  /**
+   * Returns true if the editor text contains a line that looks like a folded-data marker but
+   * does not exactly match a known placeholder, i.e. the user modified a folded line. Apply
+   * and Save refuse to run in that state; the user must Discard to restore the line.
+   */
+  Q_INVOKABLE bool elideBroken(const QString& editorText) const;
+
+  /**
+   * Rebuilds the full source text by substituting every intact folded placeholder back with
+   * its original line content.
+   */
+  Q_INVOKABLE QString restoreElidedLines(const QString& editorText) const;
 
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
@@ -200,6 +222,8 @@ class PAGXViewModel : public ContentViewModel {
   QString documentXmlText = {};
   QString pendingXmlContent = {};
   QPointer<XmlDocumentHighlighter> highlighter = {};
+  // Folded long lines of the currently loaded document.
+  QList<ElidedLine> elidedLines = {};
   // Chunked editor-loading state; loading lives here so it survives QML rebinding of the editor.
   QPointer<QTextDocument> loaderDocument = {};
   QString loaderText = {};

@@ -104,8 +104,15 @@ Rectangle {
         }
         const start = Date.now();
         // Read the text once: each access copies the whole document out of the text backend.
-        const text = textArea.text;
-        log("handleApply: start, textLength=" + text.length);
+        const editorText = textArea.text;
+        log("handleApply: start, editorLength=" + editorText.length);
+        // Folded long data lines must round-trip back to their original content; a modified
+        // marker cannot be restored safely, so refuse instead of silently losing data.
+        if (viewModel.elideBroken(editorText)) {
+            showToast(qsTr("A folded data line was modified. Discard to restore it."), false);
+            return;
+        }
+        const text = viewModel.restoreElidedLines(editorText);
         const validationError = viewModel.validateXml(text);
         if (validationError !== "") {
             showToast(validationError, false);
@@ -129,8 +136,13 @@ Rectangle {
         }
         const start = Date.now();
         // Read the text once: each access copies the whole document out of the text backend.
-        const text = textArea.text;
-        log("handleSave: start, textLength=" + text.length);
+        const editorText = textArea.text;
+        log("handleSave: start, editorLength=" + editorText.length);
+        if (viewModel.elideBroken(editorText)) {
+            showToast(qsTr("A folded data line was modified. Discard to restore it."), false);
+            return;
+        }
+        const text = viewModel.restoreElidedLines(editorText);
         const validationError = viewModel.validateXml(text);
         if (validationError !== "") {
             showToast(validationError, false);

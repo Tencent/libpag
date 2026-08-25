@@ -18,11 +18,11 @@
 
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QAbstractTextDocumentLayout>
+#include <QCryptographicHash>
 #include <QDebug>
 #include <QFile>
 #include <QFontMetrics>
 #include <QMetaObject>
-#include <QPlainTextDocumentLayout>
 #include <QQuickTextDocument>
 #include <QQuickWindow>
 #include <QTextCursor>
@@ -37,6 +37,48 @@ namespace pag {
 
 static void EditorLog(const QString& message) {
   qDebug().noquote() << "[PAGXEditor]" << QTime::currentTime().toString("hh:mm:ss.zzz") << message;
+}
+
+// Long data lines (e.g. embedded base64 images) are folded into short placeholders in the
+// editor: the text layout engine chokes on megabyte-long lines with multi-second synchronous
+// layouts, and they are useless to read or edit by hand anyway. Thresholds and marker format
+// live next to the folding implementation.
+constexpr qsizetype FoldLineThreshold = 4096;
+constexpr qsizetype FoldVisibleEdge = 1024;
+constexpr const char* FoldMarkerPrefix = "<!--FOLDED-";
+
+static QString BuildFoldMarker(const QString& fullLine) {
+  const auto hash = QCryptographicHash::hash(fullLine.toUtf8(), QCryptographicHash::Sha1);
+  return QString(FoldMarkerPrefix) + QString::fromLatin1(hash.toHex().left(16)) + "-->";
+}
+
+static void BuildElidedText(const QString& text, QString* elidedText,
+                            QList<ElidedLine>* elidedLines) {
+  elidedText->clear();
+  elidedText->reserve(text.size());
+  elidedLines->clear();
+  qsizetype start = 0;
+  while (start < text.size()) {
+    auto end = text.indexOf(u'\n', start);
+    if (end < 0) {
+      end = text.size();
+    }
+    const auto lineLength = end - start;
+    if (lineLength > FoldLineThreshold) {
+      const auto fullLine = text.mid(start, lineLength);
+      const auto placeholder = text.mid(start, FoldVisibleEdge) + BuildFoldMarker(fullLine) +
+                               text.mid(end - FoldVisibleEdge, FoldVisibleEdge);
+      elidedLines->append({placeholder, fullLine});
+      elidedText->append(placeholder);
+    } else {
+      elidedText->append(QStringView(text).mid(start, lineLength));
+    }
+    if (end >= text.size()) {
+      break;
+    }
+    elidedText->append(u'\n');
+    start = end + 1;
+  }
 }
 
 // Measures the widest line with the document's font so the QML editor can size its content
@@ -508,12 +550,6 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   // A previous highlighter can only belong to a previous editor instance's document; replace
   // it so a recreated editor is never left unhighlighted.
   EditorLog("attachHighlighter: attaching to a new document");
-  // Plain-text layout: it sizes the document from block count * line height and only lays out
-  // a block's content when the block actually enters the viewport. The default rich-text
-  // layout instead lays out every block during document-size passes, so megabyte-long base64
-  // lines each cost a multi-second synchronous layout while loading (and again whenever the
-  // document size is queried after edits).
-  document->setDocumentLayout(new QPlainTextDocumentLayout(document));
   delete highlighter;
   highlighter = new XmlDocumentHighlighter(document);
   // Diagnostic probe: every emission means the text backend finished a document-size layout
@@ -531,14 +567,21 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
     return;
   }
   auto* document = quickDocument->textDocument();
+  QString textToLoad = text;
+  BuildElidedText(text, &textToLoad, &elidedLines);
+  if (!elidedLines.isEmpty()) {
+    EditorLog(QString("loadEditorText: folded %1 long lines, editor size=%2")
+                  .arg(elidedLines.size())
+                  .arg(textToLoad.size()));
+  }
   constexpr qsizetype SmallDocumentThreshold = 256 * 1024;
-  if (text.size() <= SmallDocumentThreshold) {
+  if (textToLoad.size() <= SmallDocumentThreshold) {
     QElapsedTimer timer;
     timer.start();
-    document->setPlainText(text);
+    document->setPlainText(textToLoad);
     const auto setMs = timer.restart();
     document->clearUndoRedoStacks();
-    const auto maxLineWidth = MeasureMaxLineWidth(document, text);
+    const auto maxLineWidth = MeasureMaxLineWidth(document, textToLoad);
     EditorLog(QString("loadEditorText: small path done, setPlainText=%1ms measure=%2ms "
                       "maxLineWidth=%3")
                   .arg(setMs)
@@ -553,7 +596,7 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   EditorLog("loadEditorText: chunked path starting");
   loaderElapsed.start();
   loaderDocument = document;
-  loaderText = text;
+  loaderText = textToLoad;
   loaderOffset = 0;
   loaderChunkCount = 0;
   loaderMaxLineWidth = 0;
@@ -633,6 +676,71 @@ void PAGXViewModel::appendEditorChunk() {
 
 void PAGXViewModel::onDocumentSizeChanged(const QSizeF& size) {
   EditorLog(QString("documentSizeChanged: %1x%2").arg(size.width()).arg(size.height()));
+}
+
+bool PAGXViewModel::elideBroken(const QString& editorText) const {
+  if (elidedLines.isEmpty()) {
+    return false;
+  }
+  qsizetype start = 0;
+  while (start < editorText.size()) {
+    auto end = editorText.indexOf(u'\n', start);
+    if (end < 0) {
+      end = editorText.size();
+    }
+    const auto line = QStringView(editorText).mid(start, end - start);
+    // Deleting a whole folded line is a legitimate edit (its marker simply disappears);
+    // only a line that still carries the marker but no longer matches the placeholder
+    // verbatim means the folded payload can no longer be restored safely.
+    if (line.contains(QLatin1String(FoldMarkerPrefix))) {
+      auto intact = false;
+      for (const auto& elided : elidedLines) {
+        if (line == QStringView(elided.placeholder)) {
+          intact = true;
+          break;
+        }
+      }
+      if (!intact) {
+        return true;
+      }
+    }
+    start = end + 1;
+  }
+  return false;
+}
+
+QString PAGXViewModel::restoreElidedLines(const QString& editorText) const {
+  if (elidedLines.isEmpty()) {
+    return editorText;
+  }
+  QString result;
+  result.reserve(editorText.size() * 2);
+  qsizetype start = 0;
+  while (start < editorText.size()) {
+    auto end = editorText.indexOf(u'\n', start);
+    if (end < 0) {
+      end = editorText.size();
+    }
+    const auto line = QStringView(editorText).mid(start, end - start);
+    const ElidedLine* match = nullptr;
+    for (const auto& elided : elidedLines) {
+      if (line == QStringView(elided.placeholder)) {
+        match = &elided;
+        break;
+      }
+    }
+    if (match != nullptr) {
+      result.append(match->fullLine);
+    } else {
+      result.append(line);
+    }
+    if (end >= editorText.size()) {
+      break;
+    }
+    result.append(u'\n');
+    start = end + 1;
+  }
+  return result;
 }
 
 void PAGXViewModel::clearDocumentXml() {
