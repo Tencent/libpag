@@ -51,8 +51,18 @@ SplitView {
     // Reset XML editor when switching view types
     onCurrentViewTypeChanged: {
         if (rightItemLoader.item && rightItemLoader.item.xmlSourceEditor) {
-            rightItemLoader.item.xmlSourceEditor.reset("");
+            rightItemLoader.item.xmlSourceEditor.reset();
         }
+    }
+
+    // Mirror of the web playground's bare-L shortcut that toggles the source editor panel.
+    // Disabled while the editor holds focus so typing "l" in the text is never swallowed.
+    Shortcut {
+        sequence: "L"
+        enabled: currentViewType === "pagx" && hasPAGFile &&
+                  !(rightItemLoader.item && rightItemLoader.item.xmlSourceEditor &&
+                    rightItemLoader.item.xmlSourceEditor.editorFocused)
+        onActivated: tabBar.currentIndex = tabBar.currentIndex === 1 ? 0 : 1
     }
 
     anchors.fill: parent
@@ -689,178 +699,12 @@ SplitView {
                         }
 
                         // XML Source Editor (for PAGX files)
-                        Column {
-                            id: xmlEditorContainer
-                            anchors.fill: parent
+                        XMLSourceEditor {
+                            id: xmlSourceEditor
+                            width: parent.width
+                            height: parent.height
                             visible: currentViewType === "pagx"
-                            spacing: 0
-
-                            // Monitor lineCount changes for file switching detection
-                            Connections {
-                                target: contentView && contentView.viewModel.linesModel ? contentView.viewModel.linesModel : null
-                                function onLineCountChanged() {
-                                    // lineCount change indicates a new file was loaded
-                                    // Reset editor to show new content from the beginning
-                                    if (!xmlSourceEditor.editMode) {
-                                        xmlSourceEditor.reset("");
-                                    }
-                                }
-                            }
-
-                            XMLSourceEditor {
-                                id: xmlSourceEditor
-                                width: parent.width
-                                height: parent.height - (xmlSourceEditor.editMode ? xmlButtonBar.height : 0)
-                                linesModel: contentView && contentView.viewModel.linesModel ? contentView.viewModel.linesModel : null
-
-                                // Initialize when component is created
-                                Component.onCompleted: {
-                                    if (linesModel && linesModel.lineCount > 0) {
-                                        reset("");
-                                    }
-                                }
-
-                                onContentEdited: function(newText) {
-                                    // Content is being edited - handled in apply
-                                }
-                            }
-
-                            // Button bar for edit mode
-                            Rectangle {
-                                id: xmlButtonBar
-                                width: parent.width
-                                height: xmlSourceEditor.editMode ? 48 : 0
-                                color: "#16161D"
-                                visible: height > 0
-
-                                Behavior on height {
-                                    NumberAnimation { duration: 150 }
-                                }
-
-                                Row {
-                                    anchors.centerIn: parent
-                                    spacing: 12
-
-                                    Button {
-                                        id: discardButton
-                                        text: qsTr("Discard")
-                                        scale: hovered ? 1.05 : 1.0
-
-                                        Behavior on scale {
-                                            NumberAnimation { duration: 100 }
-                                        }
-
-                                        background: Rectangle {
-                                            implicitWidth: 80
-                                            implicitHeight: 32
-                                            color: discardButton.hovered ? "#5C5C6A" : "#3C3C3C"
-                                            border.color: discardButton.hovered ? "#8B8B9A" : "#4B4B5A"
-                                            border.width: 1
-                                            radius: 4
-                                        }
-
-                                        contentItem: Text {
-                                            text: discardButton.text
-                                            color: "#FFFFFF"
-                                            horizontalAlignment: Text.AlignHCenter
-                                            verticalAlignment: Text.AlignVCenter
-                                            font.pixelSize: 12
-                                        }
-
-                                        onClicked: {
-                                            // Reset to original content - reload from file would be needed
-                                            // For now, just exit edit mode (content was already committed line by line)
-                                            xmlSourceEditor.exitEditMode(false);
-                                            xmlSourceEditor.showToast(qsTr("Changes discarded"), true);
-                                        }
-                                    }
-
-                                    Button {
-                                        id: applyButton
-                                        text: qsTr("Apply")
-                                        scale: hovered ? 1.05 : 1.0
-
-                                        Behavior on scale {
-                                            NumberAnimation { duration: 100 }
-                                        }
-
-                                        background: Rectangle {
-                                            implicitWidth: 80
-                                            implicitHeight: 32
-                                            color: applyButton.hovered ? "#5BA3FF" : "#448EF9"
-                                            border.color: applyButton.hovered ? "#8BC4FF" : "#5BA3FF"
-                                            border.width: 1
-                                            radius: 4
-                                        }
-
-                                        contentItem: Text {
-                                            text: applyButton.text
-                                            color: "#FFFFFF"
-                                            horizontalAlignment: Text.AlignHCenter
-                                            verticalAlignment: Text.AlignVCenter
-                                            font.pixelSize: 12
-                                        }
-
-                                        onClicked: {
-                                            if (!contentView || !contentView.viewModel)
-                                                return;
-                                            let newXml = xmlSourceEditor.getText();
-                                            let error = contentView.viewModel.applyXmlChanges(newXml);
-                                            if (error === "") {
-                                                xmlSourceEditor.exitEditMode(false);
-                                                xmlSourceEditor.showToast(qsTr("Changes applied"), true);
-                                            } else {
-                                                xmlSourceEditor.showToast(error, false);
-                                            }
-                                        }
-                                    }
-
-                                    Button {
-                                        id: saveButton
-                                        text: qsTr("Save")
-                                        scale: hovered ? 1.05 : 1.0
-
-                                        Behavior on scale {
-                                            NumberAnimation { duration: 100 }
-                                        }
-
-                                        background: Rectangle {
-                                            implicitWidth: 80
-                                            implicitHeight: 32
-                                            color: saveButton.hovered ? "#4CAF50" : "#388E3C"
-                                            border.color: saveButton.hovered ? "#81C784" : "#4CAF50"
-                                            border.width: 1
-                                            radius: 4
-                                        }
-
-                                        contentItem: Text {
-                                            text: saveButton.text
-                                            color: "#FFFFFF"
-                                            horizontalAlignment: Text.AlignHCenter
-                                            verticalAlignment: Text.AlignVCenter
-                                            font.pixelSize: 12
-                                        }
-
-                                        onClicked: {
-                                            let newXml = xmlSourceEditor.getText();
-                                            // First apply changes to preview
-                                            let applyError = contentView.viewModel.applyXmlChanges(newXml);
-                                            if (applyError === "") {
-                                                // Then save to file
-                                                let saveError = contentView.viewModel.saveXmlToFile(newXml);
-                                                xmlSourceEditor.exitEditMode(false);
-                                                if (saveError === "") {
-                                                    xmlSourceEditor.showToast(qsTr("File saved"), true);
-                                                } else {
-                                                    xmlSourceEditor.showToast(saveError, false);
-                                                }
-                                            } else {
-                                                xmlSourceEditor.showToast(applyError, false);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            viewModel: contentView ? contentView.viewModel : null
                         }
                     }
                 }

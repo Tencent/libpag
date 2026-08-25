@@ -18,13 +18,14 @@
 
 #pragma once
 
+#include <QPointer>
 #include <atomic>
 #include <mutex>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
-#include "rendering/pagx/XmlLinesModel.h"
+#include "rendering/pagx/XmlDocumentHighlighter.h"
 
 class QQuickWindow;
 
@@ -36,7 +37,7 @@ namespace pag {
  */
 class PAGXViewModel : public ContentViewModel {
   Q_OBJECT
-  Q_PROPERTY(XmlLinesModel* linesModel READ linesModel CONSTANT)
+  Q_PROPERTY(QString documentXml READ documentXml NOTIFY documentXmlChanged)
  public:
   explicit PAGXViewModel(QObject* parent = nullptr);
 
@@ -67,9 +68,26 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE void nextFrame() override;
   Q_INVOKABLE void previousFrame() override;
 
-  XmlLinesModel* linesModel() const;
+  /**
+   * Returns the XML text of the most recently loaded file. Emitted only from the file-load
+   * path (deferred to onRenderCompleted); Apply/Save flows never touch it, so an in-progress
+   * edit session is never overwritten by its own applied content.
+   */
+  QString documentXml() const;
   Q_INVOKABLE QString applyXmlChanges(const QString& newXml);
   Q_INVOKABLE QString saveXmlToFile(const QString& xml);
+
+  /**
+   * Checks XML well-formedness without building a scene, so Apply can report syntax errors
+   * quickly. Returns an empty string on success, or a localized error message.
+   */
+  Q_INVOKABLE QString validateXml(const QString& xml) const;
+
+  /**
+   * Attaches the shared XML syntax highlighter to a QML TextEdit/TextArea document. The
+   * quickTextDocument argument is the edit element's textDocument property value.
+   */
+  Q_INVOKABLE void attachHighlighter(QObject* quickTextDocument);
 
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
@@ -118,10 +136,11 @@ class PAGXViewModel : public ContentViewModel {
   void notifyPlaybackFinished(uint64_t generation);
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
+  Q_SIGNAL void documentXmlChanged();
 
   /**
    * Called by PAGXView when the render thread completes a render.
-   * This is used to defer XmlLinesModel updates until the first render is done.
+   * This is used to defer documentXml updates until the first render is done.
    */
   Q_SLOT void onRenderCompleted();
 
@@ -130,6 +149,7 @@ class PAGXViewModel : public ContentViewModel {
 
  private:
   void clearContent();
+  void clearDocumentXml();
   void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
@@ -160,8 +180,10 @@ class PAGXViewModel : public ContentViewModel {
   int pagxWidth = 0;
   int pagxHeight = 0;
   std::string currentFilePath = {};
-  XmlLinesModel* xmlLinesModel = nullptr;
+  // XML text of the loaded file, published to the editor through documentXmlChanged.
+  QString documentXmlText = {};
   QString pendingXmlContent = {};
+  QPointer<XmlDocumentHighlighter> highlighter = {};
   int64_t totalFrames = 1;
   float frameRate = 0.0f;
   std::atomic<double> progress = 0.0;

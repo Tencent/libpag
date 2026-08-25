@@ -19,7 +19,9 @@
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QFile>
 #include <QMetaObject>
+#include <QQuickTextDocument>
 #include <QQuickWindow>
+#include <QXmlStreamReader>
 #include <cmath>
 #include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
@@ -27,7 +29,6 @@
 namespace pag {
 
 PAGXViewModel::PAGXViewModel(QObject* parent) : ContentViewModel(parent) {
-  xmlLinesModel = new XmlLinesModel(this);
 }
 
 int PAGXViewModel::getWidth() const {
@@ -244,12 +245,14 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
+    clearDocumentXml();
     Q_EMIT filePathChanged("");
     return false;
   }
 
   auto document = pagx::PAGXImporter::FromXML(byteData->data(), byteData->length());
   if (document == nullptr) {
+    clearDocumentXml();
     Q_EMIT filePathChanged("");
     return false;
   }
@@ -264,6 +267,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
       // null timeline this stops playback, zeroes the frame counters, and bumps the generation.
       updateAnimationState();
     }
+    clearDocumentXml();
     Q_EMIT filePathChanged("");
     Q_EMIT pagxDocumentChanged(nullptr);
     emitContentStateReset();
@@ -298,9 +302,9 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   // happens asynchronously and won't block the render.
   Q_EMIT pagxDocumentChanged(pagxDocument);
 
-  // Save XML content for deferred update. The actual XmlLinesModel::setContent()
-  // will be called from onRenderCompleted() after the first render finishes.
-  // This avoids race conditions between ListView updates and texture presentation.
+  // Save XML content for deferred update. The actual documentXmlText assignment happens in
+  // onRenderCompleted() after the first render finishes, avoiding races between editor updates
+  // and texture presentation.
   pendingXmlContent = xmlString;
 
   resetView();
@@ -387,8 +391,8 @@ void PAGXViewModel::updateAnimationState() {
   isPlaying_ = hasAnimation();
 }
 
-XmlLinesModel* PAGXViewModel::linesModel() const {
-  return xmlLinesModel;
+QString PAGXViewModel::documentXml() const {
+  return documentXmlText;
 }
 
 QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
@@ -444,13 +448,48 @@ QString PAGXViewModel::saveXmlToFile(const QString& xml) {
   return {};  // Empty string means success
 }
 
+QString PAGXViewModel::validateXml(const QString& xml) const {
+  QXmlStreamReader reader(xml);
+  while (!reader.atEnd()) {
+    reader.readNext();
+    if (reader.hasError()) {
+      return tr("Line %1, column %2: %3")
+          .arg(reader.lineNumber())
+          .arg(reader.columnNumber())
+          .arg(reader.errorString());
+    }
+  }
+  return {};  // Empty string means the XML is well-formed
+}
+
+void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
+  auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
+  if (quickDocument == nullptr) {
+    return;
+  }
+  auto* document = quickDocument->textDocument();
+  if (highlighter != nullptr && highlighter->document() == document) {
+    return;
+  }
+  // A previous highlighter can only belong to a previous editor instance's document; replace
+  // it so a recreated editor is never left unhighlighted.
+  delete highlighter;
+  highlighter = new XmlDocumentHighlighter(document);
+}
+
+void PAGXViewModel::clearDocumentXml() {
+  documentXmlText.clear();
+  pendingXmlContent.clear();
+  Q_EMIT documentXmlChanged();
+}
+
 void PAGXViewModel::onRenderCompleted() {
   if (pendingXmlContent.isEmpty()) {
     return;
   }
-  auto xmlContent = std::move(pendingXmlContent);
+  documentXmlText = std::move(pendingXmlContent);
   pendingXmlContent.clear();
-  xmlLinesModel->setContent(xmlContent);
+  Q_EMIT documentXmlChanged();
 }
 
 }  // namespace pag
