@@ -34,6 +34,10 @@ Rectangle {
     // Set while a large document is being loaded into the editor chunk by chunk.
     property bool busy: false
 
+    // Viewport position to restore once loading finishes: kept for Discard (stay where the
+    // user was editing), zero for fresh file loads.
+    property real savedScrollY: 0
+
     // Exposed so the host's plain-"L" toggle shortcut can avoid swallowing keystrokes while typing.
     readonly property bool editorFocused: textArea.activeFocus
 
@@ -74,17 +78,21 @@ Rectangle {
     onVisibleChanged: log("editor visible: " + visible + " lineCount: " + documentLineCount
                           + " length: " + textArea.length)
 
-    function loadXml(xml) {
+    function loadXml(xml, keepScrollPosition) {
         log("loadXml: length=" + xml.length);
         baselineXml = xml;
         maxLineWidth = 0;
-        flick.contentX = 0;
-        flick.contentY = 0;
+        savedScrollY = (keepScrollPosition === true) ? flick.contentY : 0;
+        if (keepScrollPosition !== true) {
+            flick.contentX = 0;
+            flick.contentY = 0;
+        }
         if (viewModel) {
-            // Large texts are appended asynchronously in chunks; the editor stays read-only
-            // until editorLoadFinished() arrives so Apply/Save never see a partial document.
+            // Large texts are appended asynchronously in chunks; keyboard input is blocked
+            // while busy (see Keys.onPressed in textArea) so Apply/Save never see partial
+            // content. readOnly is deliberately NOT used: setting it makes Qt move the
+            // cursor to the document end, which scrolls the Flickable to the bottom.
             busy = true;
-            textArea.readOnly = true;
             viewModel.loadEditorText(textArea.textDocument, xml);
         } else {
             textArea.text = xml;
@@ -107,10 +115,9 @@ Rectangle {
             return;
         }
         // Restoring through the chunked loader too: assigning the text directly would make
-        // the highlighter rehighlight the whole baseline synchronously.
-        busy = true;
-        textArea.readOnly = true;
-        viewModel.loadEditorText(textArea.textDocument, baselineXml);
+        // the highlighter rehighlight the whole baseline synchronously. Keep the viewport
+        // where the user was editing.
+        loadXml(baselineXml, true);
         showToast(qsTr("Changes discarded"), true);
     }
 
@@ -189,7 +196,10 @@ Rectangle {
             log("editorLoadFinished: maxLineWidth=" + maxLineWidth
                 + " lineCount=" + root.documentLineCount);
             root.maxLineWidth = maxLineWidth;
-            textArea.readOnly = false;
+            // Clearing the document pulls the caret to position 0, which drags the viewport
+            // to the top; restore the saved position after the content is complete.
+            flick.contentX = 0;
+            flick.contentY = root.savedScrollY;
             dirty = false;
             busy = false;
         }
@@ -345,6 +355,15 @@ Rectangle {
                     // document on every change notification.
                     root.log("textChanged: length=" + textArea.length
                              + " lineCount=" + root.documentLineCount);
+                }
+
+                // Block keyboard editing while a document is loading; Keys runs before the
+                // text control sees the event. readOnly is not an option: Qt moves the caret
+                // to the document end whenever it is toggled, scrolling the view to bottom.
+                Keys.onPressed: (event) => {
+                    if (root.busy) {
+                        event.accepted = true;
+                    }
                 }
 
                 onCursorRectangleChanged: {
