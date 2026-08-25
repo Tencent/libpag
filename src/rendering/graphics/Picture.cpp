@@ -20,9 +20,9 @@
 #include <unordered_set>
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
@@ -260,8 +260,8 @@ class DefaultImageProxy : public ImageProxy {
 class BackendTextureProxy : public ImageProxy {
  public:
   BackendTextureProxy(ID assetID, const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin,
-                      void* sharedContext)
-      : assetID(assetID), backendTexture(texture), origin(origin), sharedContext(sharedContext) {
+                      std::shared_ptr<ExternalDeviceRef> deviceRef)
+      : assetID(assetID), backendTexture(texture), origin(origin), deviceRef(std::move(deviceRef)) {
   }
 
   int width() const override {
@@ -296,11 +296,10 @@ class BackendTextureProxy : public ImageProxy {
   ID assetID = 0;
   tgfx::BackendTexture backendTexture = {};
   tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
-  void* sharedContext = nullptr;
+  std::shared_ptr<ExternalDeviceRef> deviceRef;
 
   bool checkContext(tgfx::Context* context) const {
-    auto glDevice = static_cast<tgfx::GLDevice*>(context->device());
-    if (!glDevice->sharableWith(sharedContext)) {
+    if (!Devices::CanSampleFrom(context, deviceRef.get())) {
       LOGE(
           "A Graphic made from a texture can not be drawn on to a PAGSurface"
           " if its GPU context is not a share context to the PAGSurface.");
@@ -335,11 +334,16 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTextur
   if (!texture.isValid()) {
     return nullptr;
   }
-  auto context = tgfx::GLDevice::CurrentNativeHandle();
-  if (context == nullptr) {
+  // Capture the current host GPU context identity so BackendTextureProxy can verify at render
+  // time that the render surface's device shares GPU resources with this external texture. On
+  // backends without a "current context" concept (non-GL), CaptureCurrent() returns nullptr and
+  // the verification is bypassed by Devices::CanSampleFrom().
+  auto deviceRef = Devices::CaptureCurrent();
+  if (deviceRef == nullptr) {
     return nullptr;
   }
-  auto proxy = std::make_shared<BackendTextureProxy>(assetID, texture, origin, context);
+  auto proxy =
+      std::make_shared<BackendTextureProxy>(assetID, texture, origin, std::move(deviceRef));
   return std::make_shared<ImageProxyPicture>(assetID, proxy);
 }
 

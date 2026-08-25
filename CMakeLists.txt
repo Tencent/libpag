@@ -25,6 +25,10 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building libpag
 option(PAG_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
+option(PAG_USE_METAL "Use Metal as the GPU backend on Apple platforms" OFF)
+option(PAG_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
+option(PAG_USE_D3D12 "Use D3D12 as the GPU backend on Windows" OFF)
+option(PAG_USE_WEBGPU "Use WebGPU as the GPU backend on Web" OFF)
 option(PAG_USE_SWIFTSHADER "Allow build with the SwiftShader library" OFF)
 option(PAG_USE_ANGLE "Allow build with the ANGLE library" OFF)
 option(PAG_USE_QT "Allow build with QT frameworks" OFF)
@@ -87,6 +91,26 @@ if (MACOS AND CLION_IDE AND NOT HasParent)
     option(PAG_BUILD_TESTS "Build libpag tests" ON)
 endif ()
 
+# Non-GL backends (Metal / Vulkan / D3D12 / WebGPU) are mutually exclusive with each other and
+# with OpenGL. If any non-GL backend is enabled, disable OpenGL and all GL-only variants
+# (QT / SwiftShader / ANGLE). This mirrors the mutual-exclusion contract enforced in
+# third_party/tgfx/CMakeLists.txt, and must run BEFORE the existing QT / SwiftShader mutual-
+# exclusion block so the "if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE) set(PAG_USE_OPENGL ON)"
+# fixup further down does not accidentally re-enable GL.
+if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
+    set(PAG_USE_OPENGL OFF)
+    set(PAG_USE_QT OFF)
+    set(PAG_USE_SWIFTSHADER OFF)
+    set(PAG_USE_ANGLE OFF)
+endif ()
+
+if (NOT PAG_USE_OPENGL AND NOT PAG_USE_METAL AND NOT PAG_USE_VULKAN
+        AND NOT PAG_USE_D3D12 AND NOT PAG_USE_WEBGPU)
+    message(FATAL_ERROR
+            "At least one GPU backend must be enabled "
+            "(PAG_USE_OPENGL / PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
+endif ()
+
 if (PAG_USE_QT)
     set(PAG_USE_SWIFTSHADER OFF)
     set(PAG_USE_ANGLE OFF)
@@ -118,6 +142,26 @@ endif ()
 
 if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE)
     set(PAG_USE_OPENGL ON)
+endif ()
+
+# Expose the selected tgfx backend to libpag sources. Devices.cpp dispatches on this macro to
+# pick the right tgfx backend headers; kept in sync with the TGFX_USE_* variables passed to tgfx
+# further down. libpag defines its own copy instead of relying on tgfx's PRIVATE compile
+# definitions, so tgfx can change its visibility policy without breaking libpag.
+if (PAG_USE_OPENGL)
+    list(APPEND PAG_DEFINES TGFX_USE_OPENGL)
+endif ()
+if (PAG_USE_METAL)
+    list(APPEND PAG_DEFINES TGFX_USE_METAL)
+endif ()
+if (PAG_USE_VULKAN)
+    list(APPEND PAG_DEFINES TGFX_USE_VULKAN)
+endif ()
+if (PAG_USE_D3D12)
+    list(APPEND PAG_DEFINES TGFX_USE_D3D12)
+endif ()
+if (PAG_USE_WEBGPU)
+    list(APPEND PAG_DEFINES TGFX_USE_WEBGPU)
 endif ()
 
 if (PAG_USE_FFAVC)
@@ -650,6 +694,10 @@ elseif (HAS_CUSTOM_TGFX_DIR)
     message("TGFX_DIR: ${TGFX_DIR}")
     list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
     set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+    set(TGFX_USE_METAL ${PAG_USE_METAL})
+    set(TGFX_USE_VULKAN ${PAG_USE_VULKAN})
+    set(TGFX_USE_D3D12 ${PAG_USE_D3D12})
+    set(TGFX_USE_WEBGPU ${PAG_USE_WEBGPU})
     set(TGFX_USE_QT ${PAG_USE_QT})
     set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
     set(TGFX_USE_ANGLE ${PAG_USE_ANGLE})
@@ -674,6 +722,10 @@ else ()
     if (EXISTS ${TGFX_CACHE_DIR})
         message("TGFX_CACHE_DIR: ${TGFX_CACHE_DIR}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_OPENGL=${PAG_USE_OPENGL}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_METAL=${PAG_USE_METAL}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_VULKAN=${PAG_USE_VULKAN}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_D3D12=${PAG_USE_D3D12}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBGPU=${PAG_USE_WEBGPU}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_QT=${PAG_USE_QT}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_SWIFTSHADER=${PAG_USE_SWIFTSHADER}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_ANGLE=${PAG_USE_ANGLE}")
@@ -708,6 +760,10 @@ else ()
     else ()
         message("TGFX_DIR: ${TGFX_DIR}")
         set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+        set(TGFX_USE_METAL ${PAG_USE_METAL})
+        set(TGFX_USE_VULKAN ${PAG_USE_VULKAN})
+        set(TGFX_USE_D3D12 ${PAG_USE_D3D12})
+        set(TGFX_USE_WEBGPU ${PAG_USE_WEBGPU})
         set(TGFX_USE_QT ${PAG_USE_QT})
         set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
         set(TGFX_USE_ANGLE ${PAG_USE_ANGLE})

@@ -21,8 +21,8 @@
 #include "pagx/tgfx.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/ToTGFX.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -64,7 +64,7 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
 
 std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& texture,
                                                     pag::ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
+  auto device = pag::Devices::AdoptCurrent().device;
   if (device == nullptr) {
     return nullptr;
   }

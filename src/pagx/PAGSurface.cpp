@@ -23,8 +23,8 @@
 #include "pagx/runtime/RenderTargetDrawable.h"
 #include "pagx/runtime/TextureDrawable.h"
 #include "pagx/tgfx.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -42,14 +42,14 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendTexture& texture,
                                                  pag::ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
+  auto device = pag::Devices::AdoptCurrent().device;
   auto drawable = TextureDrawable::MakeFrom(device, pag::ToTGFX(texture), pag::ToTGFX(origin));
   return MakeFrom(drawable);
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendRenderTarget& renderTarget,
                                                  pag::ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
+  auto device = pag::Devices::AdoptCurrent().device;
   auto drawable =
       RenderTargetDrawable::MakeFrom(device, pag::ToTGFX(renderTarget), pag::ToTGFX(origin));
   return MakeFrom(drawable);

@@ -21,9 +21,9 @@
 #include "base/utils/UniqueID.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/gpu/Devices.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Picture.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {
@@ -61,8 +61,12 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> im
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
-  auto context = tgfx::GLDevice::CurrentNativeHandle();
-  if (context == nullptr) {
+  // Verify the caller has a current host GPU context; on GL this records the native handle and
+  // Picture::BackendTextureProxy uses it later to check the render surface's device is share-
+  // compatible. On backends without a "current context" concept (non-GL), CaptureCurrent()
+  // returns nullptr and the check is bypassed — see Devices::CanSampleFrom().
+  auto deviceRef = Devices::CaptureCurrent();
+  if (deviceRef == nullptr) {
     LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
     return nullptr;
   }

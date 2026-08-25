@@ -23,7 +23,7 @@
 #include "rendering/drawables/OffscreenDrawable.h"
 #include "rendering/drawables/RenderTargetDrawable.h"
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 
 namespace pag {
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
@@ -35,12 +35,13 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
-  auto drawable = RenderTargetDrawable::MakeFrom(device, ToTGFX(renderTarget), ToTGFX(origin));
+  auto adopted = Devices::AdoptCurrent();
+  auto drawable =
+      RenderTargetDrawable::MakeFrom(adopted.device, ToTGFX(renderTarget), ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), true));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), adopted.externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
@@ -48,12 +49,19 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
   std::shared_ptr<tgfx::Device> device = nullptr;
   bool externalContext = false;
   if (forAsyncThread) {
-    auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
-    device = tgfx::GLDevice::Make(sharedContext);
+    // Prefer a share-context device derived from the caller's current host context so the async
+    // worker can access the caller's external texture; if no host context is current on this
+    // thread, fall back to a standalone default device (matches the original behavior of
+    // GLDevice::Make(nullptr), which returned an independent device).
+    device = Devices::MakeForAsyncThread();
+    if (device == nullptr) {
+      device = Devices::MakeDefault();
+    }
   }
   if (device == nullptr) {
-    device = tgfx::GLDevice::Current();
-    externalContext = true;
+    auto adopted = Devices::AdoptCurrent();
+    device = std::move(adopted.device);
+    externalContext = adopted.externalContext;
   }
   auto drawable = TextureDrawable::MakeFrom(device, ToTGFX(texture), ToTGFX(origin));
   if (drawable == nullptr) {

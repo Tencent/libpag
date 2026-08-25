@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OffscreenDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 
 namespace pag {
 std::shared_ptr<OffscreenDrawable> OffscreenDrawable::Make(int width, int height) {
-  auto device = tgfx::GLDevice::MakeWithFallback();
+  auto device = Devices::MakeDefault();
   if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }

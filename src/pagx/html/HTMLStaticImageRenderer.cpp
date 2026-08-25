@@ -28,11 +28,11 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
 #include "renderer/LayerBuilder.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -124,7 +124,7 @@ std::shared_ptr<tgfx::Data> RenderTileToPng(PAGXDocument* doc, int cssWidth, int
   }
   doc->applyLayout();
 
-  auto device = tgfx::GLDevice::Make();
+  auto device = pag::Devices::MakeDefault();
   if (!device) {
     return nullptr;
   }
