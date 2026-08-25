@@ -33,6 +33,20 @@ static QTextCharFormat MakeColorFormat(const char* hexColor) {
   return format;
 }
 
+// Allocation-free prefix check; QString::mid would allocate on every scanned character and
+// dominate rehighlight time when large ranges are reformatted (e.g. big multi-line deletions).
+static bool StartsWithAt(const QString& text, qsizetype index, QLatin1StringView prefix) {
+  if (index + prefix.size() > text.size()) {
+    return false;
+  }
+  for (auto i = 0; i < prefix.size(); ++i) {
+    if (text.at(index + i) != prefix.at(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 XmlDocumentHighlighter::XmlDocumentHighlighter(QTextDocument* document)
     : QSyntaxHighlighter(document) {
   tagFormat = MakeColorFormat("#569CD6");
@@ -92,7 +106,7 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
       continue;
     }
 
-    if (text.mid(index, 4) == QLatin1String("<!--")) {
+    if (StartsWithAt(text, index, QLatin1String("<!--"))) {
       const auto end = text.indexOf(QLatin1String("-->"), index);
       if (end < 0) {
         setFormat(index, length - index, commentFormat);
@@ -104,7 +118,7 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
       continue;
     }
 
-    if (text.mid(index, 9) == QLatin1String("<![CDATA[")) {
+    if (StartsWithAt(text, index, QLatin1String("<![CDATA["))) {
       const auto end = text.indexOf(QLatin1String("]]>"), index);
       if (end < 0) {
         setFormat(index, length - index, grayFormat);
@@ -116,7 +130,7 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
       continue;
     }
 
-    if (text.mid(index, 2) == QLatin1String("<?")) {
+    if (StartsWithAt(text, index, QLatin1String("<?"))) {
       const auto end = text.indexOf(QLatin1String("?>"), index);
       if (end < 0) {
         setFormat(index, length - index, grayFormat);
@@ -152,7 +166,7 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
 }
 
 void XmlDocumentHighlighter::highlightTag(const QString& text, int start, int end) {
-  if (text.mid(start, 2) == QLatin1String("</")) {
+  if (StartsWithAt(text, start, QLatin1String("</"))) {
     // Closing tags keep a single tag color for the whole region, matching the web editor.
     setFormat(start, end - start + 1, tagFormat);
     return;

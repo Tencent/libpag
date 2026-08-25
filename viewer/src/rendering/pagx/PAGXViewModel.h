@@ -19,6 +19,7 @@
 #pragma once
 
 #include <QPointer>
+#include <QTextDocument>
 #include <atomic>
 #include <mutex>
 #include "pagx/PAGAnimation.h"
@@ -28,6 +29,7 @@
 #include "rendering/pagx/XmlDocumentHighlighter.h"
 
 class QQuickWindow;
+class QTimer;
 
 namespace pag {
 
@@ -89,6 +91,14 @@ class PAGXViewModel : public ContentViewModel {
    */
   Q_INVOKABLE void attachHighlighter(QObject* quickTextDocument);
 
+  /**
+   * Replaces the editor document's text. Large documents are appended in chunks driven by a
+   * zero-interval timer so the attached highlighter only ever rehighlights one chunk at a
+   * time and the UI thread is never blocked for long. editorLoadFinished() is emitted when
+   * the document is ready for editing.
+   */
+  Q_INVOKABLE void loadEditorText(QObject* quickTextDocument, const QString& text);
+
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
     std::shared_ptr<pagx::PAGAnimation> animation;
@@ -137,6 +147,7 @@ class PAGXViewModel : public ContentViewModel {
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
   Q_SIGNAL void documentXmlChanged();
+  Q_SIGNAL void editorLoadFinished();
 
   /**
    * Called by PAGXView when the render thread completes a render.
@@ -150,6 +161,7 @@ class PAGXViewModel : public ContentViewModel {
  private:
   void clearContent();
   void clearDocumentXml();
+  Q_SLOT void appendEditorChunk();
   void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
@@ -184,6 +196,11 @@ class PAGXViewModel : public ContentViewModel {
   QString documentXmlText = {};
   QString pendingXmlContent = {};
   QPointer<XmlDocumentHighlighter> highlighter = {};
+  // Chunked editor-loading state; loading lives here so it survives QML rebinding of the editor.
+  QPointer<QTextDocument> loaderDocument = {};
+  QString loaderText = {};
+  qsizetype loaderOffset = 0;
+  QTimer* loaderTimer = nullptr;
   int64_t totalFrames = 1;
   float frameRate = 0.0f;
   std::atomic<double> progress = 0.0;

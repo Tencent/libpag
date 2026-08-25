@@ -21,6 +21,8 @@
 #include <QMetaObject>
 #include <QQuickTextDocument>
 #include <QQuickWindow>
+#include <QTextCursor>
+#include <QTimer>
 #include <QXmlStreamReader>
 #include <cmath>
 #include "pag/pag.h"
@@ -475,6 +477,66 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   // it so a recreated editor is never left unhighlighted.
   delete highlighter;
   highlighter = new XmlDocumentHighlighter(document);
+}
+
+void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
+  auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
+  if (quickDocument == nullptr) {
+    Q_EMIT editorLoadFinished();
+    return;
+  }
+  auto* document = quickDocument->textDocument();
+  constexpr qsizetype SmallDocumentThreshold = 256 * 1024;
+  if (text.size() <= SmallDocumentThreshold) {
+    document->setPlainText(text);
+    document->clearUndoRedoStacks();
+    Q_EMIT editorLoadFinished();
+    return;
+  }
+  // Replacing the whole text at once would make the attached highlighter rehighlight every
+  // block synchronously and freeze the UI for seconds on large files, so large documents are
+  // appended in chunks instead: each insert only rehighlights its own range.
+  loaderDocument = document;
+  loaderText = text;
+  loaderOffset = 0;
+  document->clear();
+  if (loaderTimer == nullptr) {
+    loaderTimer = new QTimer(this);
+    loaderTimer->setInterval(0);
+    connect(loaderTimer, &QTimer::timeout, this, &PAGXViewModel::appendEditorChunk);
+  }
+  loaderTimer->start();
+}
+
+void PAGXViewModel::appendEditorChunk() {
+  if (loaderDocument == nullptr) {
+    loaderTimer->stop();
+    loaderText.clear();
+    Q_EMIT editorLoadFinished();
+    return;
+  }
+  constexpr qsizetype ChunkSize = 128 * 1024;
+  auto end = qMin(loaderText.size(), loaderOffset + ChunkSize);
+  if (end < loaderText.size()) {
+    // Cut on a line boundary so every chunk holds complete lines and the highlighter's
+    // cross-line states stay consistent.
+    const auto newLine = loaderText.lastIndexOf(u'\n', end);
+    if (newLine > loaderOffset) {
+      end = newLine + 1;
+    }
+  }
+  QTextCursor cursor(loaderDocument);
+  cursor.movePosition(QTextCursor::End);
+  cursor.beginEditBlock();
+  cursor.insertText(QStringView(loaderText).mid(loaderOffset, end - loaderOffset).toString());
+  cursor.endEditBlock();
+  loaderOffset = end;
+  if (loaderOffset >= loaderText.size()) {
+    loaderTimer->stop();
+    loaderText.clear();
+    loaderDocument->clearUndoRedoStacks();
+    Q_EMIT editorLoadFinished();
+  }
 }
 
 void PAGXViewModel::clearDocumentXml() {

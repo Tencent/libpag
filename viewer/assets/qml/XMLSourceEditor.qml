@@ -21,6 +21,8 @@ Rectangle {
 
     readonly property bool modified: textArea.text !== baselineXml
     readonly property bool hasDocument: textArea.text.length > 0
+    // True while a large document is being loaded into the editor chunk by chunk.
+    property bool busy: false
     // Exposed so the host's plain-"L" toggle shortcut can avoid swallowing keystrokes while typing.
     readonly property bool editorFocused: textArea.activeFocus
 
@@ -28,9 +30,17 @@ Rectangle {
 
     function loadXml(xml) {
         baselineXml = xml;
-        textArea.text = xml;
         flick.contentX = 0;
         flick.contentY = 0;
+        if (viewModel) {
+            // Large texts are appended asynchronously in chunks; the editor stays read-only
+            // until editorLoadFinished() arrives so Apply/Save never see a partial document.
+            busy = true;
+            textArea.readOnly = true;
+            viewModel.loadEditorText(textArea.textDocument, xml);
+        } else {
+            textArea.text = xml;
+        }
     }
 
     // Clears the editor, e.g. when the view type switches away from PAGX.
@@ -97,6 +107,10 @@ Rectangle {
         target: viewModel
         function onDocumentXmlChanged() {
             loadXml(viewModel.documentXml);
+        }
+        function onEditorLoadFinished() {
+            textArea.readOnly = false;
+            busy = false;
         }
     }
 
@@ -244,6 +258,22 @@ Rectangle {
                 topInset: 0
                 bottomInset: 0
                 background: null
+
+                onCursorRectangleChanged: {
+                    // Keep the caret inside the viewport after big deletions or cursor jumps;
+                    // the TextArea.flickable combination does not scroll to the caret on its own.
+                    const rect = textArea.cursorRectangle;
+                    if (rect.y < flick.contentY) {
+                        flick.contentY = rect.y;
+                    } else if (rect.y + rect.height > flick.contentY + flick.height) {
+                        flick.contentY = rect.y + rect.height - flick.height;
+                    }
+                    if (rect.x < flick.contentX) {
+                        flick.contentX = Math.max(0, rect.x - 24);
+                    } else if (rect.x + rect.width > flick.contentX + flick.width) {
+                        flick.contentX = rect.x + rect.width - flick.width + 24;
+                    }
+                }
             }
         }
     }
@@ -265,7 +295,7 @@ Rectangle {
                 label: qsTr("Discard")
                 normalColor: "#3C3C3C"
                 hoverColor: "#8B8B9A"
-                enabled: root.hasDocument
+                enabled: root.hasDocument && !root.busy
                 onClicked: root.handleDiscard()
             }
 
@@ -273,7 +303,7 @@ Rectangle {
                 label: qsTr("Apply")
                 normalColor: "#448EF9"
                 hoverColor: "#8BC4FF"
-                enabled: root.hasDocument
+                enabled: root.hasDocument && !root.busy
                 onClicked: root.handleApply()
             }
 
@@ -281,7 +311,7 @@ Rectangle {
                 label: qsTr("Save")
                 normalColor: "#388E3C"
                 hoverColor: "#81C784"
-                enabled: root.hasDocument
+                enabled: root.hasDocument && !root.busy
                 onClicked: root.handleSave()
             }
         }
