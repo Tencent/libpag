@@ -38,6 +38,9 @@ Rectangle {
     // user was editing), zero for fresh file loads.
     property real savedScrollY: 0
 
+    // Chunked loading progress in the 0..1 range, fed by editorLoadProgress.
+    property real loadProgress: 0
+
     // Exposed so the host's plain-"L" toggle shortcut can avoid swallowing keystrokes while typing.
     readonly property bool editorFocused: textArea.activeFocus
 
@@ -82,6 +85,7 @@ Rectangle {
         log("loadXml: length=" + xml.length);
         baselineXml = xml;
         maxLineWidth = 0;
+        loadProgress = 0;
         savedScrollY = (keepScrollPosition === true) ? flick.contentY : 0;
         if (keepScrollPosition !== true) {
             flick.contentX = 0;
@@ -192,6 +196,10 @@ Rectangle {
         function onDocumentXmlChanged() {
             loadXml(viewModel.documentXml);
         }
+        function onEditorLoadProgress(progress) {
+            root.loadProgress = progress;
+        }
+
         function onEditorLoadFinished(maxLineWidth) {
             log("editorLoadFinished: maxLineWidth=" + maxLineWidth
                 + " lineCount=" + root.documentLineCount);
@@ -386,6 +394,38 @@ Rectangle {
                         flick.contentX = Math.max(0, rect.x + rect.width - flick.width + 24);
                     }
                 }
+            }
+        }
+    }
+
+    // Blocking overlay while a document is loading: the content is filled chunk by chunk
+    // over several seconds and the viewport is restored afterwards, and showing that raw
+    // process (lines growing in, view jumping around) reads as glitching. Cover it instead.
+    Rectangle {
+        anchors.fill: editorArea
+        color: root.backgroundColor
+        visible: root.busy
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 12
+
+            ProgressBar {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 220
+                from: 0
+                to: 1
+                value: root.loadProgress
+                indeterminate: root.loadProgress <= 0
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.loadProgress > 0
+                          ? qsTr("Loading source... %1%").arg(Math.round(root.loadProgress * 100))
+                          : qsTr("Loading source...")
+                color: "#9CDCFE"
+                font.pixelSize: 13
             }
         }
     }

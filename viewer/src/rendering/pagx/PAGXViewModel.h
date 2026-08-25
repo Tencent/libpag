@@ -171,6 +171,8 @@ class PAGXViewModel : public ContentViewModel {
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
   Q_SIGNAL void documentXmlChanged();
   Q_SIGNAL void editorLoadFinished(double maxLineWidth);
+  // Loading progress in the 0..1 range, emitted once per inserted chunk.
+  Q_SIGNAL void editorLoadProgress(double progress);
 
   /**
    * Called by PAGXView when the render thread completes a render.

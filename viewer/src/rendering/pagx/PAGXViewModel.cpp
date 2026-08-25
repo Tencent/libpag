@@ -611,7 +611,10 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   document->clear();
   if (loaderTimer == nullptr) {
     loaderTimer = new QTimer(this);
-    loaderTimer->setInterval(0);
+    // A 16ms gap between chunks keeps the UI (loading overlay animation, canvas) at ~60fps
+    // while the load is running on the main thread; QTextDocument is not thread-safe so the
+    // inserts cannot move to a worker thread.
+    loaderTimer->setInterval(16);
     connect(loaderTimer, &QTimer::timeout, this, &PAGXViewModel::appendEditorChunk);
   }
   loaderTimer->start();
@@ -657,6 +660,7 @@ void PAGXViewModel::appendEditorChunk() {
   cursor.endEditBlock();
   const auto insertMs = timer.elapsed();
   ++loaderChunkCount;
+  Q_EMIT editorLoadProgress(static_cast<double>(end) / static_cast<double>(loaderText.size()));
   if (loaderChunkCount % 8 == 0 || end >= loaderText.size()) {
     EditorLog(QString("appendEditorChunk: chunk=%1 bytes=%2/%3 measureMs=%4 insertMs=%5 "
                       "totalMs=%6 maxLineWidth=%7")
