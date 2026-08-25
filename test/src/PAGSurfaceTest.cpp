@@ -17,8 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
+
+// This entire file exercises GL-specific behavior (external GLTextureInfo binding, share-context
+// verification via GLDevice::sharableWith, and the GLRestorer external-state guard). None of
+// these have Metal / Vulkan / D3D12 / WebGPU equivalents in libpag's public API, so the whole
+// file is gated on TGFX_USE_OPENGL. Non-GL backends simply skip these test cases.
+#ifdef TGFX_USE_OPENGL
+
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
@@ -256,3 +263,5 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
   device->unlock();
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

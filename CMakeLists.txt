@@ -75,6 +75,12 @@ endif ()
 if (MACOS OR IOS)
     option(PAG_BUILD_FRAMEWORK "Allow build framework" ON)
     option(PAG_USE_SYSTEM_LZ4 "Allow use of system lz4 library" ON)
+    # Framework builds pull in the iOS/mac platform Objective-C wrappers (PAGSurfaceImpl,
+    # GPUDrawable, PAGImage OC bridge) which currently only exist for the GL backend. Force
+    # framework off on non-GL Apple builds; a future Metal platform layer PR can re-enable it.
+    if (NOT PAG_USE_OPENGL)
+        set(PAG_BUILD_FRAMEWORK OFF)
+    endif ()
 else ()
     set(PAG_BUILD_FRAMEWORK OFF)
     set(PAG_USE_SYSTEM_LZ4 OFF)
@@ -509,6 +515,16 @@ elseif (IOS)
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
+        if (NOT PAG_USE_OPENGL)
+            # A subset of iOS platform files pulls in GL-only tgfx headers (EAGLDevice /
+            # EAGLWindow / GPUDrawable) or is transitively wired to it via the ObjC surface
+            # bridges. Exclude just those on non-GL builds so libpag core & CoreVideo utils under
+            # cocoa/ still link. A future Metal platform layer PR should replace them. See
+            # docs/gpu-backend-decoupling.md §8.1.
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/ios/private/GPUDrawable\\.")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/ios/private/PAGSurfaceImpl\\.")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/ios/PAGSurface\\.")
+        endif ()
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
@@ -548,6 +564,13 @@ elseif (MACOS)
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
+        if (NOT PAG_USE_OPENGL)
+            # See the matching iOS branch above: only the GL-bound platform surface bridges are
+            # excluded; NativePlatform.mm and CoreVideo utils remain so libpag core links.
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/mac/private/GPUDrawable\\.")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/mac/private/PAGSurfaceImpl\\.")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/mac/PAGSurface\\.")
+        endif ()
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
@@ -970,17 +993,50 @@ endif ()
 
 if (PAG_BUILD_TESTS)
 
+    # Determine backend name for baseline cache isolation (aligned with tgfx). Each backend keeps
+    # its own .cache/{backend}/ subdirectory so switching backends never clobbers the other
+    # backend's md5/version snapshots. Also drives the *_{Backend} target suffix below and gets
+    # forwarded to test sources as the PAG_BACKEND_NAME preprocessor macro so
+    # test/src/utils/Baseline.cpp can locate the per-backend cache at runtime.
+    if (PAG_USE_SWIFTSHADER)
+        set(BACKEND_SUFFIX "-swiftshader")
+    else ()
+        set(BACKEND_SUFFIX "")
+    endif ()
+    if (PAG_USE_METAL)
+        set(PAG_BACKEND_NAME "metal")
+        set(TEST_TARGET_SUFFIX "Metal")
+    elseif (PAG_USE_VULKAN)
+        set(PAG_BACKEND_NAME "vulkan${BACKEND_SUFFIX}")
+        set(TEST_TARGET_SUFFIX "Vulkan")
+    elseif (PAG_USE_D3D12)
+        set(PAG_BACKEND_NAME "d3d12")
+        set(TEST_TARGET_SUFFIX "D3D12")
+    elseif (PAG_USE_WEBGPU)
+        set(PAG_BACKEND_NAME "webgpu")
+        set(TEST_TARGET_SUFFIX "WebGPU")
+    else ()
+        set(PAG_BACKEND_NAME "opengl${BACKEND_SUFFIX}")
+        set(TEST_TARGET_SUFFIX "OpenGL")
+    endif ()
+    message("PAG_BACKEND_NAME: ${PAG_BACKEND_NAME}")
+
+    set(BASELINE_CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/${PAG_BACKEND_NAME})
+    file(MAKE_DIRECTORY ${BASELINE_CACHE_DIR})
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
-    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/HEAD "${HEAD_COMMIT}")
+    file(WRITE ${BASELINE_CACHE_DIR}/HEAD "${HEAD_COMMIT}")
     if (NOT PAG_SKIP_BASELINE_CHECK)
-        set(CacheVersionFile ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/version.json)
+        set(CacheVersionFile ${BASELINE_CACHE_DIR}/version.json)
         if (EXISTS ${CacheVersionFile})
             execute_process(COMMAND git diff -G. --name-only origin/main:test/baseline/version.json ${CacheVersionFile} OUTPUT_VARIABLE HAS_DIFF)
         else ()
             set(HAS_DIFF ON)
         endif ()
         if (HAS_DIFF)
-            message(WARNING "The local md5 cache is out of date! Please run the 'update_baseline.sh' to regenerate the cache.")
+            string(REPLACE "-" "_" BACKEND_ARG_NAME "${PAG_BACKEND_NAME}")
+            string(TOUPPER "${BACKEND_ARG_NAME}" BACKEND_ARG_NAME)
+            message(WARNING "The local md5 cache for '${PAG_BACKEND_NAME}' is out of date! "
+                    "Please run './update_baseline.sh USE_${BACKEND_ARG_NAME}' to regenerate the cache.")
         endif ()
     endif ()
 
@@ -1006,7 +1062,10 @@ if (PAG_BUILD_TESTS)
     list(APPEND PAG_TEST_INCLUDES vendor/ffavc/include)
 
     list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control)
-    list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES})
+    # PAG_BACKEND_NAME is consumed by test/src/utils/Baseline.cpp to root the per-backend cache
+    # directory. Keep it as a PUBLIC macro on every test target so downstream tests / utilities
+    # can also reference it if needed.
+    list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES} PAG_BACKEND_NAME="${PAG_BACKEND_NAME}")
 
     foreach (FILE_PATH ${PAG_TEST_FILES})
         get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
@@ -1023,30 +1082,32 @@ if (PAG_BUILD_TESTS)
     if (NOT PAG_SKIP_GENERATE_BASELINE_IMAGES)
         list(APPEND PAG_BASELINE_DEFINES GENERATE_BASELINE_IMAGES)
     endif ()
-    # used to update the local md5 data for baseline testing and generate baseline images to the
-    # out/ directory. each image has a "_base" suffix.
-    add_executable(UpdateBaseline ${PAG_TEST_FILES})
-    add_dependencies(UpdateBaseline test-vendor)
-    target_include_directories(UpdateBaseline PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(UpdateBaseline PUBLIC ${PAG_BASELINE_DEFINES})
-    target_compile_options(UpdateBaseline PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(UpdateBaseline PRIVATE ${PAG_TEST_LINK_OPTIONS})
-    target_link_libraries(UpdateBaseline ${PAG_TEST_LIBS})
+    # UpdateBaseline_{Backend}: refresh the per-backend .cache and (optionally) generate baseline
+    # images to the out/ directory (each image has a "_base" suffix). Named with a backend
+    # suffix so `accept_baseline.sh` can build the right binary for each backend on the same
+    # source tree.
+    add_executable(UpdateBaseline_${TEST_TARGET_SUFFIX} ${PAG_TEST_FILES})
+    add_dependencies(UpdateBaseline_${TEST_TARGET_SUFFIX} test-vendor)
+    target_include_directories(UpdateBaseline_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_INCLUDES})
+    target_compile_definitions(UpdateBaseline_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_BASELINE_DEFINES})
+    target_compile_options(UpdateBaseline_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
+    target_link_options(UpdateBaseline_${TEST_TARGET_SUFFIX} PRIVATE ${PAG_TEST_LINK_OPTIONS})
+    target_link_libraries(UpdateBaseline_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
-    add_executable(PAGUnitTest ${PAG_TEST_FILES})
-    add_dependencies(PAGUnitTest test-vendor)
-    target_include_directories(PAGUnitTest PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(PAGUnitTest PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
-    target_compile_options(PAGUnitTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGUnitTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
-    target_link_libraries(PAGUnitTest ${PAG_TEST_LIBS})
+    add_executable(PAGUnitTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_FILES})
+    add_dependencies(PAGUnitTest_${TEST_TARGET_SUFFIX} test-vendor)
+    target_include_directories(PAGUnitTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_INCLUDES})
+    target_compile_definitions(PAGUnitTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
+    target_compile_options(PAGUnitTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
+    target_link_options(PAGUnitTest_${TEST_TARGET_SUFFIX} PRIVATE ${PAG_TEST_LINK_OPTIONS})
+    target_link_libraries(PAGUnitTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
-    add_executable(PAGFullTest ${PAG_TEST_FILES})
-    add_dependencies(PAGFullTest test-vendor)
-    target_include_directories(PAGFullTest PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(PAGFullTest PUBLIC ${PAG_TEST_DEFINES})
-    target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
-    target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
+    add_executable(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_FILES})
+    add_dependencies(PAGFullTest_${TEST_TARGET_SUFFIX} test-vendor)
+    target_include_directories(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_INCLUDES})
+    target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
+    target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
+    target_link_options(PAGFullTest_${TEST_TARGET_SUFFIX} PRIVATE ${PAG_TEST_LINK_OPTIONS})
+    target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
 endif ()

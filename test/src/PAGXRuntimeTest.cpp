@@ -34,6 +34,7 @@
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
+#ifdef TGFX_USE_OPENGL
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
 #else
@@ -42,6 +43,7 @@
 #endif
 #include <OpenGL/gl3.h>
 #endif
+#endif  // TGFX_USE_OPENGL
 
 namespace pag {
 
@@ -278,7 +280,13 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
 /**
  * Test case: PAGSurface::MakeFrom(BackendTexture) creates a surface that can render PAGScene
  * content and produce a correct screenshot.
+ *
+ * GL-specific: this exercises the GL-backed BackendTexture path (external GLTextureInfo + share-
+ * context adoption). No equivalent public API exists yet on non-GL backends; see
+ * docs/gpu-backend-decoupling.md §8.1 for the roadmap. The following two test cases are gated
+ * on TGFX_USE_OPENGL until Metal-friendly BackendTexture APIs are introduced.
  */
+#ifdef TGFX_USE_OPENGL
 PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
   const int width = 100;
   const int height = 100;
@@ -409,6 +417,7 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   glDeleteFramebuffers(1, &fbo);
   glDeleteTextures(1, &textureInfo.id);
 }
+#endif  // TGFX_USE_OPENGL
 
 /**
  * Test case: EvaluateKeyframeSequence treats KeyframeInterpolationType::None identically to Hold,

@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# Build + run PAGFullTest for one GPU backend.
+#
+# Usage:
+#   ./autotest.sh [USE_OPENGL|USE_OPENGL_SWIFTSHADER|USE_METAL]
+#
+# Default is USE_OPENGL when no backend is specified. Aligned with update_baseline.sh so both
+# scripts speak the same backend vocabulary and the per-backend cache under
+# test/baseline/.cache/<backend>/ stays consistent.
+
 function make_dir() {
   rm -rf $1
   mkdir -p $1
@@ -21,15 +30,35 @@ if test $? -ne 0; then
 fi
 cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
+# Determine cmake args and target suffix from the requested backend keyword.
+case "$1" in
+  USE_OPENGL_SWIFTSHADER)
+    CMAKE_BACKEND_ARGS="-DPAG_USE_SWIFTSHADER=ON"
+    TARGET_SUFFIX="OpenGL" ;;
+  USE_METAL)
+    CMAKE_BACKEND_ARGS="-DPAG_USE_METAL=ON -DPAG_USE_OPENGL=OFF"
+    TARGET_SUFFIX="Metal" ;;
+  USE_VULKAN)
+    CMAKE_BACKEND_ARGS="-DPAG_USE_VULKAN=ON -DPAG_USE_OPENGL=OFF"
+    TARGET_SUFFIX="Vulkan" ;;
+  USE_D3D12)
+    CMAKE_BACKEND_ARGS="-DPAG_USE_D3D12=ON -DPAG_USE_OPENGL=OFF"
+    TARGET_SUFFIX="D3D12" ;;
+  USE_OPENGL|"")
+    CMAKE_BACKEND_ARGS=""
+    TARGET_SUFFIX="OpenGL" ;;
+  *)
+    echo "Error: unknown backend '$1'."
+    echo "Supported: USE_OPENGL (default), USE_OPENGL_SWIFTSHADER, USE_METAL, USE_VULKAN, USE_D3D12."
+    exit 1 ;;
+esac
+
 make_dir result
 make_dir build
 cd build
 
-if [[ "$1" == "USE_SWIFTSHADER" ]]; then
-  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
-else
-  cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
-fi
+cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" $CMAKE_BACKEND_ARGS \
+      -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug ../
 if test $? -eq 0; then
   echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
 else
@@ -37,20 +66,20 @@ else
   exit
 fi
 
-cmake --build . --target PAGFullTest -- -j 12
+cmake --build . --target PAGFullTest_${TARGET_SUFFIX} -- -j 12
 if test $? -eq 0; then
-  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest_${TARGET_SUFFIX} make successed~~~~~~~~~~~~~~~~~~"
 else
-  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest_${TARGET_SUFFIX} make error~~~~~~~~~~~~~~~~~~"
   exit 1
 fi
 
-./PAGFullTest --gtest_output=json:PAGFullTest.json
+./PAGFullTest_${TARGET_SUFFIX} --gtest_output=json:PAGFullTest.json
 
 if test $? -eq 0; then
-  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest_${TARGET_SUFFIX} successed~~~~~~~~~~~~~~~~~~"
 else
-  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest_${TARGET_SUFFIX} Failed~~~~~~~~~~~~~~~~~~"
   COMPLIE_RESULT=false
 fi
 

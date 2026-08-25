@@ -17,16 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DevicePool.h"
-#include <thread>
-#include <unordered_map>
+#include "rendering/gpu/Devices.h"
 
 namespace pag {
-thread_local std::shared_ptr<tgfx::GLDevice> cachedDevice = nullptr;
+thread_local std::shared_ptr<tgfx::Device> cachedDevice = nullptr;
 
-std::shared_ptr<tgfx::GLDevice> DevicePool::Make() {
+std::shared_ptr<tgfx::Device> DevicePool::Make() {
   auto device = cachedDevice;
   if (device == nullptr) {
-    device = tgfx::GLDevice::Make();
+    device = Devices::MakeDefault();
     cachedDevice = device;
   }
   return device;

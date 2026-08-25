@@ -139,6 +139,16 @@ class Devices {
   static std::shared_ptr<ExternalDeviceRef> CaptureCurrent();
 
   /**
+   * Returns true when Devices::CaptureCurrent() being nullptr is treated as an error condition
+   * for the current backend, false otherwise. Only OpenGL (which has a thread-local "current
+   * context" concept) returns true — callers such as PAGImage::FromTexture use this to decide
+   * whether a null capture should be reported as a missing GPU context or accepted silently.
+   * Metal / Vulkan / D3D12 / WebGPU have no thread-local context, so a null capture is normal
+   * and must not fail the caller.
+   */
+  static bool RequiresCapturedIdentity();
+
+  /**
    * Returns true when `context` can safely sample a resource whose device identity was previously
    * captured as `deviceRef`. When deviceRef is null (Vulkan/WebGPU capture, or a call site that
    * did not capture identity) the result is unconditionally true.

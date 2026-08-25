@@ -16,8 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
+
+// This entire file constructs external GL textures via tgfx::GLTextureInfo and feeds them into
+// PAGImage::FromTexture / PAGImage::setMatrix workflows. Metal / Vulkan / D3D12 / WebGPU cannot
+// consume GLTextureInfo, so the whole file is gated on TGFX_USE_OPENGL.
+#ifdef TGFX_USE_OPENGL
+
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
@@ -173,3 +179,5 @@ PAG_TEST(PAGBlendTest, BothBottomLeft) {
   device->unlock();
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

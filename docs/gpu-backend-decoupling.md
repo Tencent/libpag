@@ -650,13 +650,13 @@ src/rendering/utils/GLRestorer.cpp  # 挪走
 5. `StillImage.cpp` —— 用 `Devices::CaptureCurrent()`；`PAGImage::FromTexture` 隐式推断用 `Devices::MakeForTexture()`
 6. Drawable 层（`Offscreen/HardwareBuffer/Bitmap/CompositionReader`）—— 签名和实现改用 `Devices::MakeDefault()`
 
-**编译 + 运行 `PAGFullTest` 全通过**才能进 Step 3。
+**编译 + 运行 `PAGFullTest_OpenGL` 全通过**才能进 Step 3。
 
 ### Step 3：pagx / cli 去 GL 化
 
 替换剩余的 8 + 1 处调用点。
 
-**编译 + 运行 `PAGFullTest` + `HTMLTest` 全通过**。
+**编译 + 运行 `PAGFullTest_OpenGL` + `HTMLTest` 全通过**。
 
 ### Step 4：CMake 后端开关
 
@@ -680,12 +680,12 @@ src/rendering/utils/GLRestorer.cpp  # 挪走
 ```bash
 ./codeformat.sh 2>/dev/null; true
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target PAGFullTest
+cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ```
 
 ### 7.2 测试验证
 
-- 运行 `PAGFullTest`，全部用例通过
+- 运行 `PAGFullTest_OpenGL`（Metal 后端则运行 `PAGFullTest_Metal`），全部用例通过
 - 运行 `HTMLTest`，均值 SSIM / 像素差 / RGB 偏差不退化
 - 视觉回归测试：任何截图基准变更都不应该发生（本次是纯重构）
 

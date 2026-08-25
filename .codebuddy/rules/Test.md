@@ -10,14 +10,15 @@ alwaysApply: true
 ```bash
 ./codeformat.sh 2>/dev/null; true
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target PAGFullTest
+cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 ```
 
 ## 测试框架
 
 - 测试用例位于 `test/src/`，基于 Google Test 框架
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
-- 运行测试：按上述编译验证步骤构建并执行 `PAGFullTest`
+- 运行测试：按上述编译验证步骤构建并执行 `PAGFullTest_OpenGL`（Metal 后端则运行 `PAGFullTest_Metal`）
+- test target 按后端后缀命名：`PAGFullTest_{OpenGL,Metal,Vulkan,D3D12}` / `PAGUnitTest_{...}` / `UpdateBaseline_{...}`
 - 测试命令返回非零退出码表示测试失败，这是正常行为，不要重复执行同一命令
 - 测试用例构造时，所有字号、坐标、矩阵等数值尽可能使用整数，避免小数点，以确保清晰度
 
@@ -69,5 +70,5 @@ cmake --build cmake-build-debug --target HTMLTest   # 依赖并先构建 pagx
 
 ```bash
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DTGFX_DIR=../tgfx -B cmake-build-debuglocal
-cmake --build cmake-build-debuglocal --target PAGFullTest
+cmake --build cmake-build-debuglocal --target PAGFullTest_OpenGL
 ```

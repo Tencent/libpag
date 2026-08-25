@@ -80,6 +80,10 @@ std::shared_ptr<ExternalDeviceRef> Devices::CaptureCurrent() {
   return std::make_shared<GLExternalDeviceRef>(handle);
 }
 
+bool Devices::RequiresCapturedIdentity() {
+  return true;
+}
+
 bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef) {
   if (deviceRef == nullptr) {
     return true;
@@ -103,35 +107,5 @@ std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
 }
 
 }  // namespace pag
-
-#elif defined(TGFX_USE_METAL)
-
-#error \
-    "Metal backend for libpag is not yet implemented. Add a Metal branch to Devices.cpp " \
-    "(see docs/gpu-backend-decoupling.md §3.3 and §6 Step 5) and re-run CMake."
-
-#elif defined(TGFX_USE_VULKAN)
-
-#error \
-    "Vulkan backend for libpag is not yet implemented. Add a Vulkan branch to Devices.cpp " \
-    "(see docs/gpu-backend-decoupling.md §3.3 and §6 Step 5) and re-run CMake."
-
-#elif defined(TGFX_USE_D3D12)
-
-#error \
-    "D3D12 backend for libpag is not yet implemented. Add a D3D12 branch to Devices.cpp " \
-    "(see docs/gpu-backend-decoupling.md §3.3 and §6 Step 5) and re-run CMake."
-
-#elif defined(TGFX_USE_WEBGPU)
-
-#error \
-    "WebGPU backend for libpag is not yet implemented. Add a WebGPU branch to Devices.cpp " \
-    "(see docs/gpu-backend-decoupling.md §3.3 and §6 Step 5) and re-run CMake."
-
-#else
-
-#error \
-    "No supported tgfx GPU backend is enabled for libpag. Set one of PAG_USE_OPENGL / " \
-    "PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU to ON."
 
 #endif  // TGFX_USE_OPENGL

@@ -336,10 +336,12 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTextur
   }
   // Capture the current host GPU context identity so BackendTextureProxy can verify at render
   // time that the render surface's device shares GPU resources with this external texture. On
-  // backends without a "current context" concept (non-GL), CaptureCurrent() returns nullptr and
-  // the verification is bypassed by Devices::CanSampleFrom().
+  // backends without a "current context" concept (Metal / D3D12 / Vulkan / WebGPU),
+  // CaptureCurrent() returns nullptr — the verification is bypassed by Devices::CanSampleFrom()
+  // (which trusts a null ref). Only report the missing context as an error on backends where a
+  // captured identity is genuinely required (GL).
   auto deviceRef = Devices::CaptureCurrent();
-  if (deviceRef == nullptr) {
+  if (deviceRef == nullptr && Devices::RequiresCapturedIdentity()) {
     return nullptr;
   }
   auto proxy =

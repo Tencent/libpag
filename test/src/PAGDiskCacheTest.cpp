@@ -23,8 +23,11 @@
 #include "rendering/caches/DiskCache.h"
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/Directory.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
+
+#ifdef TGFX_USE_OPENGL
+#include "tgfx/gpu/opengl/GLDevice.h"
+#endif
 
 namespace pag {
 
@@ -361,12 +364,19 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoder) {
  * caller's context and dereferenced it later in readFrame(), causing a use-after-free once the
  * caller context was released.
  */
+#ifdef TGFX_USE_OPENGL
 static void ReadFirstFrame(PAGDecoder* decoder, bool* success) {
   tgfx::Bitmap bitmap(decoder->width(), decoder->height(), false, false);
   tgfx::Pixmap pixmap(bitmap);
   *success = decoder->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes());
 }
+#endif  // TGFX_USE_OPENGL
 
+// GL-specific: validates that PAGDecoder::MakeFrom() captures the caller's GL context via
+// GLDevice::CurrentNativeHandle() and keeps working after the caller destroys that context.
+// Metal / Vulkan / D3D12 / WebGPU have no thread-local "current context" concept, so the same
+// scenario does not apply; skip the case on non-GL backends.
+#ifdef TGFX_USE_OPENGL
 PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   pag::PAGDiskCache::RemoveAll();
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
@@ -397,6 +407,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderContextDestroyed) {
   decoder = nullptr;
   pag::PAGDiskCache::RemoveAll();
 }
+#endif  // TGFX_USE_OPENGL
 
 PAG_TEST(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   pag::PAGDiskCache::RemoveAll();
