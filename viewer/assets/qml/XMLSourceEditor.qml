@@ -52,6 +52,12 @@ Rectangle {
     readonly property real lineHeight: textArea.cursorRectangle.height > 0
                                            ? textArea.cursorRectangle.height : 17
 
+    // Cached line count. QQuickTextEdit::lineCount walks every document block on each read
+    // (O(blockCount)), so it must never be referenced from per-line bindings: with the line
+    // number pool that meant an O(blocks * visibleLines) storm on every scroll frame, which
+    // froze the editor. This single binding is re-evaluated only on lineCountChanged.
+    readonly property int documentLineCount: textArea.lineCount
+
     readonly property bool modified: dirty
     readonly property bool hasDocument: textArea.length > 0
 
@@ -65,7 +71,7 @@ Rectangle {
         console.log("[PAGXEditor] " + d.toTimeString().slice(0, 8) + "." + ms + " " + message);
     }
 
-    onVisibleChanged: log("editor visible: " + visible + " lineCount: " + textArea.lineCount
+    onVisibleChanged: log("editor visible: " + visible + " lineCount: " + documentLineCount
                           + " length: " + textArea.length)
 
     function loadXml(xml) {
@@ -181,7 +187,7 @@ Rectangle {
         }
         function onEditorLoadFinished(maxLineWidth) {
             log("editorLoadFinished: maxLineWidth=" + maxLineWidth
-                + " lineCount=" + textArea.lineCount);
+                + " lineCount=" + root.documentLineCount);
             root.maxLineWidth = maxLineWidth;
             textArea.readOnly = false;
             dirty = false;
@@ -256,7 +262,7 @@ Rectangle {
                     width: gutter.width - 10
                     height: root.lineHeight
                     y: (gutter.firstLine + index) * root.lineHeight - flick.contentY
-                    text: gutter.firstLine + index < textArea.lineCount
+                    text: gutter.firstLine + index < root.documentLineCount
                               ? String(gutter.firstLine + index + 1) : ""
                     color: (gutter.firstLine + index) === gutter.caretLine
                                ? root.gutterActiveTextColor : root.gutterTextColor
@@ -278,7 +284,7 @@ Rectangle {
             // Estimated from line metrics: reading the document's content size here would
             // force a full layout pass over every block and freeze the UI on large files.
             contentWidth: Math.max(width, root.maxLineWidth)
-            contentHeight: Math.max(height, textArea.lineCount * root.lineHeight)
+            contentHeight: Math.max(height, root.documentLineCount * root.lineHeight)
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.HorizontalAndVerticalFlick
@@ -315,7 +321,7 @@ Rectangle {
             TextArea {
                 id: textArea
                 width: Math.max(flick.width, root.maxLineWidth)
-                height: Math.max(flick.height, textArea.lineCount * root.lineHeight)
+                height: Math.max(flick.height, root.documentLineCount * root.lineHeight)
 
                 textFormat: TextEdit.PlainText
                 wrapMode: TextEdit.NoWrap
@@ -338,7 +344,7 @@ Rectangle {
                     // O(1) reads only: touching textArea.text here would copy the whole
                     // document on every change notification.
                     root.log("textChanged: length=" + textArea.length
-                             + " lineCount=" + textArea.lineCount);
+                             + " lineCount=" + root.documentLineCount);
                 }
 
                 onCursorRectangleChanged: {
