@@ -32,6 +32,7 @@
   return _surface;
 }
 
+#if defined(TGFX_USE_OPENGL)
 + (PAGSurface*)FromLayer:(CAEAGLLayer*)layer {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromLayer:layer];
   if (surface == nil) {
@@ -41,6 +42,29 @@
   pagSurface.surface = surface;
   return pagSurface;
 }
+#endif
+
+#if defined(TGFX_USE_METAL)
++ (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMetalLayer:metalLayer];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
++ (PAGSurface*)FromMTKView:(MTKView*)view {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMTKView:view];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+#endif
 
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer];
@@ -52,6 +76,7 @@
   return pagSurface;
 }
 
+#if defined(TGFX_USE_OPENGL)
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:eaglContext];
   if (surface == nil) {
@@ -61,6 +86,19 @@
   pagSurface.surface = surface;
   return pagSurface;
 }
+#endif
+
+#if defined(TGFX_USE_METAL)
++ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:device];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+#endif
 
 + (PAGSurface*)MakeFromGPU:(CGSize)size {
   return [PAGSurface MakeOffscreen:size];

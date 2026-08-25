@@ -20,6 +20,12 @@
 #import "PAGImage.h"
 #import "PAGLayer.h"
 
+// PAGView is a UIView-backed UI wrapper that uses the OpenGL-only GPUDrawable(CAEAGLLayer)
+// path. Metal clients render directly into a CAMetalLayer or MTKView via
+// [PAGSurface FromMetalLayer:] / [PAGSurface FromMTKView:], so the whole PAGView class is
+// gated out of Metal builds.
+#if defined(TGFX_USE_OPENGL)
+
 @class PAGView;
 
 @protocol PAGViewListener <NSObject>
@@ -279,3 +285,5 @@ PAG_API @interface PAGView : UIView
  */
 - (CGRect)getBounds:(PAGLayer*)pagLayer;
 @end
+
+#endif  // TGFX_USE_OPENGL

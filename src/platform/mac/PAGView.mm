@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGView.h"
+
+#if defined(TGFX_USE_OPENGL)
+
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/mac/private/GPUDrawable.h"
@@ -362,3 +365,5 @@
   [animator update];
 }
 @end
+
+#endif  // TGFX_USE_OPENGL

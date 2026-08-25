@@ -68,11 +68,9 @@ print(f'  Baseline now has {sum(len(v) for v in sorted_baseline.values())} total
 OS=$(uname -s)
 case "$OS" in
   Darwin)
-    # OpenGL is the default macOS backend; Metal builds cleanly on modern macOS/iOS but the
-    # platform surface API (MetalGPUDrawable) is still landing — keep the entry commented until
-    # it's wired up end-to-end so casual `accept_baseline.sh` runs do not fail here.
-    BACKENDS=("OpenGL:")
-    # BACKENDS+=("Metal:-DPAG_USE_METAL=ON -DPAG_USE_OPENGL=OFF")
+    # macOS supports both OpenGL and Metal via the pag::Devices glue layer. Each backend keeps
+    # its own .cache/<backend>/ so refreshing both here does not conflict.
+    BACKENDS=("OpenGL:" "Metal:-DPAG_USE_METAL=ON -DPAG_USE_OPENGL=OFF")
     ;;
   MINGW*|MSYS*|CYGWIN*|Windows_NT)
     BACKENDS=("OpenGL:")

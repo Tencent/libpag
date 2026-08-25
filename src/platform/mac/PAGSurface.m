@@ -28,6 +28,7 @@
 @implementation PAGSurface {
 }
 
+#if defined(TGFX_USE_OPENGL)
 + (PAGSurface*)FromView:(NSView*)view {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromView:view];
   if (surface == nil) {
@@ -37,6 +38,29 @@
   pagSurface.surface = surface;
   return pagSurface;
 }
+#endif
+
+#if defined(TGFX_USE_METAL)
++ (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMetalLayer:metalLayer];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
++ (PAGSurface*)FromMTKView:(MTKView*)view {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMTKView:view];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+#endif
 
 + (PAGSurface*)MakeFromGPU:(CGSize)size {
   return [PAGSurface MakeOffscreen:size];

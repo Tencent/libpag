@@ -75,12 +75,6 @@ endif ()
 if (MACOS OR IOS)
     option(PAG_BUILD_FRAMEWORK "Allow build framework" ON)
     option(PAG_USE_SYSTEM_LZ4 "Allow use of system lz4 library" ON)
-    # Framework builds pull in the iOS/mac platform Objective-C wrappers (PAGSurfaceImpl,
-    # GPUDrawable, PAGImage OC bridge) which currently only exist for the GL backend. Force
-    # framework off on non-GL Apple builds; a future Metal platform layer PR can re-enable it.
-    if (NOT PAG_USE_OPENGL)
-        set(PAG_BUILD_FRAMEWORK OFF)
-    endif ()
 else ()
     set(PAG_BUILD_FRAMEWORK OFF)
     set(PAG_USE_SYSTEM_LZ4 OFF)
@@ -212,7 +206,15 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
         endif ()
     elseif (IOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+        # tgfx's Metal backend requires MTLSharedEvent / MTLBinaryArchive symbols introduced in
+        # iOS 13. Auto-raise the deployment target when Metal is selected; keep 9.0 for the GL
+        # backend so existing GL clients are unaffected. Callers wanting a different target can
+        # still pass -DDEPLOYMENT_TARGET=... explicitly to override this default.
+        if (PAG_USE_METAL)
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
+        else ()
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+        endif ()
     endif ()
 endif ()
 
@@ -509,22 +511,13 @@ elseif (IOS)
             list(APPEND PAG_SHARED_LIBS ${OpenGLES_LIBS})
             list(APPEND PAG_DEFINES GLES_SILENCE_DEPRECATION)
         else ()
-            # Uses Metal instead.
+            # Uses Metal instead. MetalKit is needed for MTKView bindings in MetalGPUDrawable.
             find_library(Metal_LIBS Metal REQUIRED)
-            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
+            find_library(MetalKit_LIBS MetalKit REQUIRED)
+            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS} ${MetalKit_LIBS})
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
-        if (NOT PAG_USE_OPENGL)
-            # A subset of iOS platform files pulls in GL-only tgfx headers (EAGLDevice /
-            # EAGLWindow / GPUDrawable) or is transitively wired to it via the ObjC surface
-            # bridges. Exclude just those on non-GL builds so libpag core & CoreVideo utils under
-            # cocoa/ still link. A future Metal platform layer PR should replace them. See
-            # docs/gpu-backend-decoupling.md §8.1.
-            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/ios/private/GPUDrawable\\.")
-            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/ios/private/PAGSurfaceImpl\\.")
-            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/ios/PAGSurface\\.")
-        endif ()
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
@@ -558,19 +551,13 @@ elseif (MACOS)
             list(APPEND PAG_SHARED_LIBS ${OpenGL_LIBS})
             list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
         else ()
-            # Uses Metal instead.
+            # Uses Metal instead. MetalKit is needed for MTKView bindings in MetalGPUDrawable.
             find_library(Metal_LIBS Metal REQUIRED)
-            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
+            find_library(MetalKit_LIBS MetalKit REQUIRED)
+            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS} ${MetalKit_LIBS})
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
-        if (NOT PAG_USE_OPENGL)
-            # See the matching iOS branch above: only the GL-bound platform surface bridges are
-            # excluded; NativePlatform.mm and CoreVideo utils remain so libpag core links.
-            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/mac/private/GPUDrawable\\.")
-            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/mac/private/PAGSurfaceImpl\\.")
-            list(FILTER PLATFORM_FILES EXCLUDE REGEX "src/platform/mac/PAGSurface\\.")
-        endif ()
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
