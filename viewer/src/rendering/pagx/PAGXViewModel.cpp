@@ -575,6 +575,16 @@ void PAGXViewModel::appendEditorChunk() {
     const auto newLine = loaderText.lastIndexOf(u'\n', end);
     if (newLine > loaderOffset) {
       end = newLine + 1;
+    } else {
+      // No line boundary within the window: a single line longer than ChunkSize (e.g. an
+      // embedded base64 payload). Extend the chunk to the end of that line so the line is
+      // inserted in ONE piece; growing it across chunks would relayout the whole line after
+      // every insert, which is quadratic in the line length (multi-second stalls per chunk
+      // for megabyte-long lines, as seen in the [PAGXEditor] logs).
+      const auto nextNewLine = loaderText.indexOf(u'\n', end);
+      end = nextNewLine < 0 ? loaderText.size() : nextNewLine + 1;
+      EditorLog(
+          QString("appendEditorChunk: huge line detected, chunkBytes=%1").arg(end - loaderOffset));
     }
   }
   QElapsedTimer timer;

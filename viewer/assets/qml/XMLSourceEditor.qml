@@ -174,10 +174,15 @@ Rectangle {
     onViewModelChanged: connectViewModel()
     Component.onCompleted: connectViewModel()
 
+    // Remembers the view model already wired up so the initial binding evaluation and the
+    // onCompleted pass do not both trigger a (duplicate) content load.
+    property var connectedViewModel: null
+
     function connectViewModel() {
-        if (!viewModel || !textArea) {
+        if (!viewModel || !textArea || connectedViewModel === viewModel) {
             return;
         }
+        connectedViewModel = viewModel;
         log("connectViewModel: attaching highlighter");
         viewModel.attachHighlighter(textArea.textDocument);
         if (viewModel.documentXml !== "") {
