@@ -147,7 +147,7 @@ class PAGXViewModel : public ContentViewModel {
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
   Q_SIGNAL void documentXmlChanged();
-  Q_SIGNAL void editorLoadFinished();
+  Q_SIGNAL void editorLoadFinished(double maxLineWidth);
 
   /**
    * Called by PAGXView when the render thread completes a render.
@@ -200,6 +200,7 @@ class PAGXViewModel : public ContentViewModel {
   QPointer<QTextDocument> loaderDocument = {};
   QString loaderText = {};
   qsizetype loaderOffset = 0;
+  double loaderMaxLineWidth = 0;
   QTimer* loaderTimer = nullptr;
   int64_t totalFrames = 1;
   float frameRate = 0.0f;

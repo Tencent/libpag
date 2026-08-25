@@ -18,6 +18,7 @@
 
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QFile>
+#include <QFontMetrics>
 #include <QMetaObject>
 #include <QQuickTextDocument>
 #include <QQuickWindow>
@@ -29,6 +30,29 @@
 #include "pagx/PAGXImporter.h"
 
 namespace pag {
+
+// Measures the widest line with the document's font so the QML editor can size its content
+// without ever asking QTextDocumentLayout for the ideal width, which would force a full
+// layout pass over every block and freeze the UI on large files.
+static double MeasureMaxLineWidth(const QTextDocument* document, const QString& text) {
+  const QFontMetrics metrics(document->defaultFont());
+  double maxWidth = 0;
+  qsizetype start = 0;
+  while (start < text.size()) {
+    auto end = text.indexOf(u'\n', start);
+    if (end < 0) {
+      end = text.size();
+    }
+    const auto width =
+        metrics.horizontalAdvance(QStringView(text).mid(start, end - start).toString());
+    maxWidth = qMax(maxWidth, static_cast<double>(width));
+    if (end >= text.size()) {
+      break;
+    }
+    start = end + 1;
+  }
+  return maxWidth;
+}
 
 PAGXViewModel::PAGXViewModel(QObject* parent) : ContentViewModel(parent) {
 }
@@ -482,7 +506,7 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
   auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
   if (quickDocument == nullptr) {
-    Q_EMIT editorLoadFinished();
+    Q_EMIT editorLoadFinished(0);
     return;
   }
   auto* document = quickDocument->textDocument();
@@ -490,7 +514,7 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   if (text.size() <= SmallDocumentThreshold) {
     document->setPlainText(text);
     document->clearUndoRedoStacks();
-    Q_EMIT editorLoadFinished();
+    Q_EMIT editorLoadFinished(MeasureMaxLineWidth(document, text));
     return;
   }
   // Replacing the whole text at once would make the attached highlighter rehighlight every
@@ -499,6 +523,7 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   loaderDocument = document;
   loaderText = text;
   loaderOffset = 0;
+  loaderMaxLineWidth = 0;
   document->clear();
   if (loaderTimer == nullptr) {
     loaderTimer = new QTimer(this);
@@ -512,7 +537,7 @@ void PAGXViewModel::appendEditorChunk() {
   if (loaderDocument == nullptr) {
     loaderTimer->stop();
     loaderText.clear();
-    Q_EMIT editorLoadFinished();
+    Q_EMIT editorLoadFinished(loaderMaxLineWidth);
     return;
   }
   constexpr qsizetype ChunkSize = 128 * 1024;
@@ -525,17 +550,19 @@ void PAGXViewModel::appendEditorChunk() {
       end = newLine + 1;
     }
   }
+  const auto chunk = QStringView(loaderText).mid(loaderOffset, end - loaderOffset).toString();
+  loaderMaxLineWidth = qMax(loaderMaxLineWidth, MeasureMaxLineWidth(loaderDocument, chunk));
   QTextCursor cursor(loaderDocument);
   cursor.movePosition(QTextCursor::End);
   cursor.beginEditBlock();
-  cursor.insertText(QStringView(loaderText).mid(loaderOffset, end - loaderOffset).toString());
+  cursor.insertText(chunk);
   cursor.endEditBlock();
   loaderOffset = end;
   if (loaderOffset >= loaderText.size()) {
     loaderTimer->stop();
     loaderText.clear();
     loaderDocument->clearUndoRedoStacks();
-    Q_EMIT editorLoadFinished();
+    Q_EMIT editorLoadFinished(loaderMaxLineWidth);
   }
 }
 
