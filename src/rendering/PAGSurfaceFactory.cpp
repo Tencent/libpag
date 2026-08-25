@@ -36,12 +36,21 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
   auto adopted = Devices::AdoptCurrent();
-  auto drawable =
-      RenderTargetDrawable::MakeFrom(adopted.device, ToTGFX(renderTarget), ToTGFX(origin));
+  auto device = std::move(adopted.device);
+  bool externalContext = adopted.externalContext;
+  if (device == nullptr) {
+    // AdoptCurrent() only returns a device on backends with a thread-local "current context"
+    // concept (OpenGL). Other backends (Metal / D3D12) reach the render device by walking back
+    // from the caller's external render target itself. Vulkan / WebGPU do not carry a device
+    // reference on their target types and fall back to Devices::MakeDefault() inside
+    // MakeCompatibleWith*.
+    device = Devices::MakeForTexture(ToTGFX(renderTarget));
+  }
+  auto drawable = RenderTargetDrawable::MakeFrom(device, ToTGFX(renderTarget), ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), adopted.externalContext));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
@@ -62,6 +71,11 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
     auto adopted = Devices::AdoptCurrent();
     device = std::move(adopted.device);
     externalContext = adopted.externalContext;
+  }
+  if (device == nullptr) {
+    // Backends without a thread-local "current context" (Metal / D3D12) derive the device from
+    // the external texture itself; Vulkan / WebGPU fall back to MakeDefault() internally.
+    device = Devices::MakeForTexture(ToTGFX(texture));
   }
   auto drawable = TextureDrawable::MakeFrom(device, ToTGFX(texture), ToTGFX(origin));
   if (drawable == nullptr) {

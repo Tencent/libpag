@@ -72,6 +72,12 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendTexture
   return tgfx::GLDevice::Current();
 }
 
+std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendRenderTarget&) {
+  // GL cannot walk from an FBO id back to its owning context either — same contract as the
+  // BackendTexture overload.
+  return tgfx::GLDevice::Current();
+}
+
 std::shared_ptr<ExternalDeviceRef> Devices::CaptureCurrent() {
   auto handle = tgfx::GLDevice::CurrentNativeHandle();
   if (handle == nullptr) {

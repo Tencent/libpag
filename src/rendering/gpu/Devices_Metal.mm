@@ -80,6 +80,22 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendTexture
   return tgfx::MetalDevice::MakeFrom((__bridge void*)mtlDevice);
 }
 
+std::shared_ptr<tgfx::Device> Devices::MakeForTexture(
+    const tgfx::BackendRenderTarget& renderTarget) {
+  // Same reasoning as the BackendTexture overload — Metal render targets are just MTLTextures
+  // under the hood, so ask the texture for its device.
+  tgfx::MetalTextureInfo mtlInfo = {};
+  if (!renderTarget.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+    return nullptr;
+  }
+  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
+  id<MTLDevice> mtlDevice = mtlTexture.device;
+  if (mtlDevice == nil) {
+    return nullptr;
+  }
+  return tgfx::MetalDevice::MakeFrom((__bridge void*)mtlDevice);
+}
+
 std::shared_ptr<ExternalDeviceRef> Devices::CaptureCurrent() {
   // Metal has no thread-local "current device", so there is nothing to capture. Returning
   // nullptr is the intended sentinel — CanSampleFrom() treats a null ref as "trust the caller",

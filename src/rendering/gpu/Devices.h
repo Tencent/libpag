@@ -129,6 +129,15 @@ class Devices {
   static std::shared_ptr<tgfx::Device> MakeForTexture(const tgfx::BackendTexture& texture);
 
   /**
+   * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
+   * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
+   * render target to locate the owning GPU device (Metal, D3D12). GL adopts the current context
+   * as usual; Vulkan / WebGPU fall back to MakeDefault().
+   */
+  static std::shared_ptr<tgfx::Device> MakeForTexture(
+      const tgfx::BackendRenderTarget& renderTarget);
+
+  /**
    * Captures an identity tag for the calling thread's current host GPU context, to be stored
    * alongside an external resource and verified later via CanSampleFrom().
    *   OpenGL: Records GLDevice::CurrentNativeHandle().

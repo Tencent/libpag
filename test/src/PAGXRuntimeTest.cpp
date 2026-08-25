@@ -419,6 +419,136 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
 }
 #endif  // TGFX_USE_OPENGL
 
+// Metal-backend equivalents of the two BackendTexture / BackendRenderTarget cases above. They
+// source their external target from an id<MTLTexture> (created via CreateMetalTexture from the
+// current pagx::PAGSurface's tgfx::Context) instead of a GL texture id, exercising the Metal
+// path of pagx::PAGSurface::MakeFrom(BackendTexture) and MakeFrom(BackendRenderTarget).
+#ifdef TGFX_USE_METAL
+/**
+ * Test case: pagx::PAGSurface::MakeFrom(BackendTexture) on Metal creates a surface that can
+ * render PAGScene content and produce a correct screenshot.
+ */
+PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendTexture) {
+  const int width = 100;
+  const int height = 100;
+
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+
+  auto surface = pagx::PAGSurface::MakeFrom(backendTexture, pag::ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(surface->width(), width);
+  EXPECT_EQ(surface->height(), height);
+
+  device->unlock();
+
+  auto doc = pagx::PAGXDocument::Make(width, height);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = width;
+  layer->height = height;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = width;
+  rect->size.height = height;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  prop->name = "color";
+  pagx::Color blue{0.0f, 0.0f, 1.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, blue, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(prop);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/MetalPAGSurfaceFromBackendTexture"));
+
+  context = device->lockContext();
+  pag::ReleaseMetalTexture(&textureInfo);
+}
+
+/**
+ * Test case: pagx::PAGSurface::MakeFrom(BackendRenderTarget) on Metal — same as above but goes
+ * through the BackendRenderTarget path (MTLTexture wrapped as a render target).
+ */
+PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendRenderTarget) {
+  const int width = 100;
+  const int height = 100;
+
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  auto backendRT = ToBackendRenderTarget(textureInfo, width, height);
+
+  auto surface = pagx::PAGSurface::MakeFrom(backendRT, pag::ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_EQ(surface->width(), width);
+  EXPECT_EQ(surface->height(), height);
+
+  device->unlock();
+
+  auto doc = pagx::PAGXDocument::Make(width, height);
+  auto layer = doc->makeNode<pagx::Layer>("L");
+  layer->width = width;
+  layer->height = height;
+  doc->layers.push_back(layer);
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->size.width = width;
+  rect->size.height = height;
+  layer->contents.push_back(rect);
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>("S");
+  solid->color = {0.0f, 0.0f, 0.0f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(fill);
+
+  auto anim = doc->makeNode<pagx::Animation>("main");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  doc->animations.push_back(anim);
+  auto* obj = doc->makeNode<pagx::AnimationObject>();
+  obj->target = "S";
+  anim->objects.push_back(obj);
+  auto* prop = doc->makeNode<pagx::TypedChannel<pagx::Color>>();
+  prop->name = "color";
+  pagx::Color green{0.0f, 1.0f, 0.0f, 1.0f, pagx::ColorSpace::SRGB};
+  prop->keyframes.push_back({0, green, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  obj->channels.push_back(prop);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/MetalPAGSurfaceFromBackendRenderTarget"));
+
+  context = device->lockContext();
+  pag::ReleaseMetalTexture(&textureInfo);
+}
+#endif  // TGFX_USE_METAL
+
 /**
  * Test case: EvaluateKeyframeSequence treats KeyframeInterpolationType::None identically to Hold,
  * holding the left keyframe value across the segment instead of interpolating linearly toward the
