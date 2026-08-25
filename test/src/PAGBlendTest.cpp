@@ -18,27 +18,12 @@
 
 #include "utils/TestUtils.h"
 
-// This entire file constructs external GL textures via tgfx::GLTextureInfo and feeds them into
-// PAGImage::FromTexture / PAGImage::setMatrix workflows. Metal / Vulkan / D3D12 / WebGPU cannot
-// consume GLTextureInfo, so the whole file is gated on TGFX_USE_OPENGL.
-#ifdef TGFX_USE_OPENGL
-
-#include "tgfx/gpu/opengl/GLDevice.h"
-
-#ifdef PAG_USE_SWIFTSHADER
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
-
 namespace pag {
 using namespace tgfx;
 
 /**
  * 用例描述: 测试基础混合模式
+ * Backend-agnostic: only touches OffscreenSurface + Baseline::Compare, no GL/Metal specifics.
  */
 PAG_TEST(PAGBlendTest, Blend) {
   auto files = GetAllPAGFiles("resources/blend");
@@ -58,6 +43,28 @@ PAG_TEST(PAGBlendTest, Blend) {
     EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/Blend_" + fileName));
   }
 }
+
+}  // namespace pag
+
+// The remaining cases construct external GL textures via tgfx::GLTextureInfo and feed them into
+// PAGImage::FromTexture / PAGImage::setMatrix workflows. Metal / Vulkan / D3D12 / WebGPU cannot
+// consume GLTextureInfo, so the rest of the GL section is gated on TGFX_USE_OPENGL. Metal
+// equivalents live in the TGFX_USE_METAL section at the bottom of this file.
+#ifdef TGFX_USE_OPENGL
+
+#include "tgfx/gpu/opengl/GLDevice.h"
+
+#ifdef PAG_USE_SWIFTSHADER
+#include <GLES3/gl3.h>
+#else
+#ifndef GL_SILENCE_DEPRECATION
+#define GL_SILENCE_DEPRECATION
+#endif
+#include <OpenGL/gl3.h>
+#endif
+
+namespace pag {
+using namespace tgfx;
 
 tgfx::GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
   auto context = device->lockContext();
@@ -181,3 +188,141 @@ PAG_TEST(PAGBlendTest, BothBottomLeft) {
 }  // namespace pag
 
 #endif  // TGFX_USE_OPENGL
+
+// Metal-backend equivalents of the GL BottomLeft blend cases above. They source their external
+// textures from an id<MTLTexture> instead of a GLuint texture id, exercising the Metal path of
+// PAGSurface::MakeFrom(BackendTexture) + PAGImage::FromTexture(BackendTexture) with BottomLeft
+// origin handling in the blend pipeline.
+#ifdef TGFX_USE_METAL
+
+namespace pag {
+using namespace tgfx;
+
+// Metal equivalent of GetBottomLeftImage: creates a BottomLeft-oriented MTLTexture, renders
+// mountain.jpg onto it, and returns the texture info. The caller owns the +1 retain on the
+// MTLTexture handle and must release it via ReleaseMetalTexture().
+tgfx::MetalTextureInfo GetBottomLeftMetalImage(std::shared_ptr<Device> device, int width,
+                                               int height) {
+  auto context = device->lockContext();
+  tgfx::MetalTextureInfo textureInfo = {};
+  CreateMetalTexture(context, width, height, &textureInfo);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto surface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  device->unlock();
+  auto composition = PAGComposition::Make(1080, 1920);
+  auto imageLayer = PAGImageLayer::Make(1080, 1920, 1000000);
+  imageLayer->replaceImage(MakePAGImage("assets/mountain.jpg"));
+  composition->addLayer(imageLayer);
+  auto player = std::make_shared<PAGPlayer>();
+  player->setSurface(surface);
+  player->setComposition(composition);
+  player->flush();
+  return textureInfo;
+}
+
+/**
+ * 用例描述: Metal backend equivalent of PAGBlendTest.CopyDstTexture. Uses a BottomLeft
+ * MTLTexture as the render target to exercise the copy-dst-texture path in the Metal blend
+ * pipeline.
+ */
+PAG_TEST(PAGBlendMetalTest, CopyDstTexture) {
+  auto width = 400;
+  auto height = 400;
+  auto device = DevicePool::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  device->unlock();
+  ASSERT_TRUE(pagSurface != nullptr);
+
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  auto pagFile = LoadPAGFile("resources/blend/Multiply.pag");
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(Matrix::I());
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendMetalTest/CopyDstTexture"));
+
+  ReleaseMetalTexture(&textureInfo);
+}
+
+/**
+ * 用例描述: Metal backend equivalent of PAGBlendTest.TextureBottomLeft. Replace-image texture
+ * is BottomLeft, render target is TopLeft.
+ */
+PAG_TEST(PAGBlendMetalTest, TextureBottomLeft) {
+  auto width = 720;
+  auto height = 1280;
+  auto device = DevicePool::Make();
+  auto replaceTextureInfo = GetBottomLeftMetalImage(device, width, height);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto replaceBackendTexture = ToBackendTexture(replaceTextureInfo, width, height);
+  auto replaceImage = PAGImage::FromTexture(replaceBackendTexture, ImageOrigin::BottomLeft);
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
+  device->unlock();
+  ASSERT_TRUE(pagSurface != nullptr);
+
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  auto pagFile = LoadPAGFile("resources/apitest/texture_bottom_left.pag");
+  pagFile->replaceImage(3, replaceImage);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(Matrix::I());
+  pagPlayer->setProgress(0.34);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendMetalTest/TextureBottomLeft"));
+
+  ReleaseMetalTexture(&replaceTextureInfo);
+  ReleaseMetalTexture(&textureInfo);
+}
+
+/**
+ * 用例描述: Metal backend equivalent of PAGBlendTest.BothBottomLeft. Both the replace-image
+ * texture and the render target are BottomLeft-oriented MTLTextures.
+ */
+PAG_TEST(PAGBlendMetalTest, BothBottomLeft) {
+  auto width = 720;
+  auto height = 1280;
+  auto device = DevicePool::Make();
+  auto replaceTextureInfo = GetBottomLeftMetalImage(device, width, height);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto replaceBackendTexture = ToBackendTexture(replaceTextureInfo, width / 2, height / 2);
+  auto replaceImage = PAGImage::FromTexture(replaceBackendTexture, ImageOrigin::BottomLeft);
+  replaceImage->setMatrix(
+      Matrix::MakeTrans(static_cast<float>(width) * 0.1f, static_cast<float>(height) * 0.2f));
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  device->unlock();
+  ASSERT_TRUE(pagSurface != nullptr);
+
+  auto composition = PAGComposition::Make(width, height);
+  auto imageLayer = PAGImageLayer::Make(width, height, 1000000);
+  imageLayer->replaceImage(replaceImage);
+  composition->addLayer(imageLayer);
+
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(composition);
+  pagPlayer->setMatrix(Matrix::I());
+  pagPlayer->setProgress(0.3);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendMetalTest/BothBottomLeft"));
+
+  ReleaseMetalTexture(&replaceTextureInfo);
+  ReleaseMetalTexture(&textureInfo);
+}
+
+}  // namespace pag
+
+#endif  // TGFX_USE_METAL
