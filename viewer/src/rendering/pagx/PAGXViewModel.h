@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <QElapsedTimer>
 #include <QPointer>
 #include <QTextDocument>
 #include <atomic>
@@ -162,6 +163,9 @@ class PAGXViewModel : public ContentViewModel {
   void clearContent();
   void clearDocumentXml();
   Q_SLOT void appendEditorChunk();
+  // Diagnostics: fires whenever the document layout finishes a size pass, which exposes
+  // full-document layouts triggered inside the text backend.
+  Q_SLOT void onDocumentSizeChanged(const QSizeF& size);
   void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
@@ -200,7 +204,9 @@ class PAGXViewModel : public ContentViewModel {
   QPointer<QTextDocument> loaderDocument = {};
   QString loaderText = {};
   qsizetype loaderOffset = 0;
+  qsizetype loaderChunkCount = 0;
   double loaderMaxLineWidth = 0;
+  QElapsedTimer loaderElapsed;
   QTimer* loaderTimer = nullptr;
   int64_t totalFrames = 1;
   float frameRate = 0.0f;

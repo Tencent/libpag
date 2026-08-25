@@ -17,9 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/XmlDocumentHighlighter.h"
+#include <QDebug>
 #include <QRegularExpression>
+#include <QTime>
 
 namespace pag {
+
+static void EditorLog(const QString& message) {
+  qDebug().noquote() << "[PAGXEditor]" << QTime::currentTime().toString("hh:mm:ss.zzz") << message;
+}
 
 // Matches name="value" / name='value' / bare name inside a tag. Kept in the .cpp file because
 // moc's lexer cannot handle C++ raw string literals, which corrupted namespace tracking for
@@ -49,6 +55,7 @@ static bool StartsWithAt(const QString& text, qsizetype index, QLatin1StringView
 
 XmlDocumentHighlighter::XmlDocumentHighlighter(QTextDocument* document)
     : QSyntaxHighlighter(document) {
+  EditorLog("highlighter: constructed");
   tagFormat = MakeColorFormat("#569CD6");
   attrNameFormat = MakeColorFormat("#9CDCFE");
   attrValueFormat = MakeColorFormat("#CE9178");
@@ -57,7 +64,23 @@ XmlDocumentHighlighter::XmlDocumentHighlighter(QTextDocument* document)
   textFormat = MakeColorFormat("#D4D4D4");
 }
 
+XmlDocumentHighlighter::~XmlDocumentHighlighter() {
+  EditorLog(QString("highlighter: destroyed after %1 blocks, %2ms cumulative")
+                .arg(highlightBlockCount)
+                .arg(highlightTimerStarted ? highlightElapsed.elapsed() : 0));
+}
+
 void XmlDocumentHighlighter::highlightBlock(const QString& text) {
+  ++highlightBlockCount;
+  if (!highlightTimerStarted) {
+    highlightElapsed.start();
+    highlightTimerStarted = true;
+  }
+  if (highlightBlockCount % 10000 == 0) {
+    EditorLog(QString("highlighter: %1 blocks highlighted, %2ms cumulative")
+                  .arg(highlightBlockCount)
+                  .arg(highlightElapsed.elapsed()));
+  }
   const auto length = static_cast<int>(text.length());
   auto state = previousBlockState();
   if (state < StateNormal || state > StateInTag) {

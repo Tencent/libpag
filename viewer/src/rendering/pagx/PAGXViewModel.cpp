@@ -17,12 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/PAGXViewModel.h"
+#include <QAbstractTextDocumentLayout>
+#include <QDebug>
 #include <QFile>
 #include <QFontMetrics>
 #include <QMetaObject>
 #include <QQuickTextDocument>
 #include <QQuickWindow>
 #include <QTextCursor>
+#include <QTime>
 #include <QTimer>
 #include <QXmlStreamReader>
 #include <cmath>
@@ -30,6 +33,10 @@
 #include "pagx/PAGXImporter.h"
 
 namespace pag {
+
+static void EditorLog(const QString& message) {
+  qDebug().noquote() << "[PAGXEditor]" << QTime::currentTime().toString("hh:mm:ss.zzz") << message;
+}
 
 // Measures the widest line with the document's font so the QML editor can size its content
 // without ever asking QTextDocumentLayout for the ideal width, which would force a full
@@ -499,30 +506,49 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   }
   // A previous highlighter can only belong to a previous editor instance's document; replace
   // it so a recreated editor is never left unhighlighted.
+  EditorLog("attachHighlighter: attaching to a new document");
   delete highlighter;
   highlighter = new XmlDocumentHighlighter(document);
+  // Diagnostic probe: every emission means the text backend finished a document-size layout
+  // pass, which is where hidden full-document layouts show up.
+  connect(document->documentLayout(), &QAbstractTextDocumentLayout::documentSizeChanged, this,
+          &PAGXViewModel::onDocumentSizeChanged);
 }
 
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
+  EditorLog(QString("loadEditorText: text.size=%1").arg(text.size()));
   auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
   if (quickDocument == nullptr) {
+    EditorLog("loadEditorText: invalid quick document, finishing immediately");
     Q_EMIT editorLoadFinished(0);
     return;
   }
   auto* document = quickDocument->textDocument();
   constexpr qsizetype SmallDocumentThreshold = 256 * 1024;
   if (text.size() <= SmallDocumentThreshold) {
+    QElapsedTimer timer;
+    timer.start();
     document->setPlainText(text);
+    const auto setMs = timer.restart();
     document->clearUndoRedoStacks();
-    Q_EMIT editorLoadFinished(MeasureMaxLineWidth(document, text));
+    const auto maxLineWidth = MeasureMaxLineWidth(document, text);
+    EditorLog(QString("loadEditorText: small path done, setPlainText=%1ms measure=%2ms "
+                      "maxLineWidth=%3")
+                  .arg(setMs)
+                  .arg(timer.elapsed())
+                  .arg(maxLineWidth));
+    Q_EMIT editorLoadFinished(maxLineWidth);
     return;
   }
   // Replacing the whole text at once would make the attached highlighter rehighlight every
   // block synchronously and freeze the UI for seconds on large files, so large documents are
   // appended in chunks instead: each insert only rehighlights its own range.
+  EditorLog("loadEditorText: chunked path starting");
+  loaderElapsed.start();
   loaderDocument = document;
   loaderText = text;
   loaderOffset = 0;
+  loaderChunkCount = 0;
   loaderMaxLineWidth = 0;
   document->clear();
   if (loaderTimer == nullptr) {
@@ -537,6 +563,7 @@ void PAGXViewModel::appendEditorChunk() {
   if (loaderDocument == nullptr) {
     loaderTimer->stop();
     loaderText.clear();
+    EditorLog("appendEditorChunk: document gone, finishing");
     Q_EMIT editorLoadFinished(loaderMaxLineWidth);
     return;
   }
@@ -550,20 +577,45 @@ void PAGXViewModel::appendEditorChunk() {
       end = newLine + 1;
     }
   }
+  QElapsedTimer timer;
+  timer.start();
   const auto chunk = QStringView(loaderText).mid(loaderOffset, end - loaderOffset).toString();
   loaderMaxLineWidth = qMax(loaderMaxLineWidth, MeasureMaxLineWidth(loaderDocument, chunk));
+  const auto measureMs = timer.restart();
   QTextCursor cursor(loaderDocument);
   cursor.movePosition(QTextCursor::End);
   cursor.beginEditBlock();
   cursor.insertText(chunk);
   cursor.endEditBlock();
+  const auto insertMs = timer.elapsed();
+  ++loaderChunkCount;
+  if (loaderChunkCount % 8 == 0 || end >= loaderText.size()) {
+    EditorLog(QString("appendEditorChunk: chunk=%1 bytes=%2/%3 measureMs=%4 insertMs=%5 "
+                      "totalMs=%6 maxLineWidth=%7")
+                  .arg(loaderChunkCount)
+                  .arg(end)
+                  .arg(loaderText.size())
+                  .arg(measureMs)
+                  .arg(insertMs)
+                  .arg(loaderElapsed.elapsed())
+                  .arg(loaderMaxLineWidth));
+  }
   loaderOffset = end;
   if (loaderOffset >= loaderText.size()) {
     loaderTimer->stop();
     loaderText.clear();
     loaderDocument->clearUndoRedoStacks();
+    EditorLog(QString("appendEditorChunk: chunked load finished, chunks=%1 totalMs=%2 "
+                      "maxLineWidth=%3")
+                  .arg(loaderChunkCount)
+                  .arg(loaderElapsed.elapsed())
+                  .arg(loaderMaxLineWidth));
     Q_EMIT editorLoadFinished(loaderMaxLineWidth);
   }
+}
+
+void PAGXViewModel::onDocumentSizeChanged(const QSizeF& size) {
+  EditorLog(QString("documentSizeChanged: %1x%2").arg(size.width()).arg(size.height()));
 }
 
 void PAGXViewModel::clearDocumentXml() {

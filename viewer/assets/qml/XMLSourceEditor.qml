@@ -47,7 +47,19 @@ Rectangle {
 
     color: backgroundColor
 
+    // Diagnostics helper matching the C++ [PAGXEditor] log format; remove once the
+    // large-file performance work settles.
+    function log(message) {
+        const d = new Date();
+        const ms = String(d.getMilliseconds()).padStart(3, "0");
+        console.log("[PAGXEditor] " + d.toTimeString().slice(0, 8) + "." + ms + " " + message);
+    }
+
+    onVisibleChanged: log("editor visible: " + visible + " lineCount: " + textArea.lineCount
+                          + " length: " + textArea.length)
+
     function loadXml(xml) {
+        log("loadXml: length=" + xml.length);
         baselineXml = xml;
         maxLineWidth = 0;
         flick.contentX = 0;
@@ -73,6 +85,7 @@ Rectangle {
     }
 
     function handleDiscard() {
+        log("handleDiscard");
         if (!dirty) {
             showToast(qsTr("Nothing to discard"), true);
             return;
@@ -89,14 +102,17 @@ Rectangle {
         if (!viewModel) {
             return;
         }
+        const start = Date.now();
         // Read the text once: each access copies the whole document out of the text backend.
         const text = textArea.text;
+        log("handleApply: start, textLength=" + text.length);
         const validationError = viewModel.validateXml(text);
         if (validationError !== "") {
             showToast(validationError, false);
             return;
         }
         const error = viewModel.applyXmlChanges(text);
+        log("handleApply: done, validateAndApplyMs=" + (Date.now() - start));
         if (error === "") {
             // Advance the baseline so a later Discard restores what the canvas now shows.
             baselineXml = text;
@@ -111,8 +127,10 @@ Rectangle {
         if (!viewModel) {
             return;
         }
+        const start = Date.now();
         // Read the text once: each access copies the whole document out of the text backend.
         const text = textArea.text;
+        log("handleSave: start, textLength=" + text.length);
         const validationError = viewModel.validateXml(text);
         if (validationError !== "") {
             showToast(validationError, false);
@@ -124,6 +142,7 @@ Rectangle {
             return;
         }
         const saveError = viewModel.saveXmlToFile(text);
+        log("handleSave: done, validateApplySaveMs=" + (Date.now() - start));
         if (saveError === "") {
             baselineXml = text;
             dirty = false;
@@ -139,6 +158,8 @@ Rectangle {
             loadXml(viewModel.documentXml);
         }
         function onEditorLoadFinished(maxLineWidth) {
+            log("editorLoadFinished: maxLineWidth=" + maxLineWidth
+                + " lineCount=" + textArea.lineCount);
             root.maxLineWidth = maxLineWidth;
             textArea.readOnly = false;
             dirty = false;
@@ -157,6 +178,7 @@ Rectangle {
         if (!viewModel || !textArea) {
             return;
         }
+        log("connectViewModel: attaching highlighter");
         viewModel.attachHighlighter(textArea.textDocument);
         if (viewModel.documentXml !== "") {
             loadXml(viewModel.documentXml);
@@ -293,7 +315,13 @@ Rectangle {
                 bottomInset: 0
                 background: null
 
-                onTextChanged: root.dirty = true
+                onTextChanged: {
+                    root.dirty = true;
+                    // O(1) reads only: touching textArea.text here would copy the whole
+                    // document on every change notification.
+                    root.log("textChanged: length=" + textArea.length
+                             + " lineCount=" + textArea.lineCount);
+                }
 
                 onCursorRectangleChanged: {
                     // Keep the caret inside the viewport after big deletions or cursor jumps;
