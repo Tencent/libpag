@@ -219,58 +219,51 @@ Rectangle {
         height: root.layoutHeight - buttonBar.height
         clip: true
 
-        Canvas {
+        // Line-number gutter. Numbers are a small pool of reused Text items positioned by the
+        // scroll offset: scrolling only updates text and y bindings, so glyphs come from the
+        // scene graph's texture atlas and no canvas texture is re-uploaded per frame (a full
+        // Canvas redraw per scroll frame was a major contributor to GPU buffer churn).
+        Item {
             id: gutter
             width: 50
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.left: parent.left
 
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
-
-            Connections {
-                target: flick
-                function onContentYChanged() {
-                    gutter.requestPaint();
-                }
+            Rectangle {
+                anchors.fill: parent
+                color: root.backgroundColor
             }
 
-            Connections {
-                target: textArea
-                function onLineCountChanged() {
-                    gutter.requestPaint();
-                }
-                function onCursorRectangleChanged() {
-                    gutter.requestPaint();
-                }
+            Rectangle {
+                width: 1
+                height: parent.height
+                anchors.right: parent.right
+                color: root.separatorColor
             }
 
-            onPaint: {
-                const context = getContext("2d");
-                context.fillStyle = root.backgroundColor;
-                context.fillRect(0, 0, width, height);
-                context.fillStyle = root.separatorColor;
-                context.fillRect(width - 1, 0, 1, height);
+            // One extra line above/below the viewport keeps numbers ahead of fast scrolls.
+            readonly property int visibleLineCount: Math.ceil(height / root.lineHeight) + 2
+            readonly property int firstLine: Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1)
+            // cursorRectangle is in content coordinates, so it identifies the caret line.
+            readonly property int caretLine: Math.round(textArea.cursorRectangle.y / root.lineHeight)
 
-                const lineH = root.lineHeight;
-                if (lineH <= 0 || textArea.lineCount <= 0) {
-                    return;
-                }
-                // One extra line above/below the viewport keeps numbers ahead of fast scrolls.
-                const firstLine = Math.max(0, Math.floor(flick.contentY / lineH) - 1);
-                const lastLine = Math.min(textArea.lineCount,
-                                          Math.ceil((flick.contentY + height) / lineH) + 1);
-                // cursorRectangle is in content coordinates, so it identifies the caret line.
-                const caretLine = Math.round(textArea.cursorRectangle.y / lineH);
+            Repeater {
+                model: gutter.visibleLineCount
 
-                context.font = "12px Menlo";
-                context.textAlign = "right";
-                for (let line = firstLine; line < lastLine; ++line) {
-                    const y = line * lineH - flick.contentY;
-                    context.fillStyle = (line === caretLine) ? root.gutterActiveTextColor
-                                                             : root.gutterTextColor;
-                    context.fillText(String(line + 1), width - 10, y + lineH * 0.5 + 4);
+                Text {
+                    x: 0
+                    width: gutter.width - 10
+                    height: root.lineHeight
+                    y: (gutter.firstLine + index) * root.lineHeight - flick.contentY
+                    text: gutter.firstLine + index < textArea.lineCount
+                              ? String(gutter.firstLine + index + 1) : ""
+                    color: (gutter.firstLine + index) === gutter.caretLine
+                               ? root.gutterActiveTextColor : root.gutterTextColor
+                    font.family: "Menlo"
+                    font.pixelSize: 12
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
         }
