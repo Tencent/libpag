@@ -236,9 +236,15 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   } else {
     tgfx::BackendSemaphore semaphore = {};
     recording = context->flush(&semaphore);
-    tgfx::GLSyncInfo signalInfo = {};
-    if (semaphore.getGLSync(&signalInfo)) {
-      signalSemaphore->initGL(signalInfo.sync);
+    // The context may hand back a semaphore for whichever backend it was built on. Peek at each
+    // supported variant; the first one that unpacks successfully wins and gets forwarded to the
+    // caller's pag::BackendSemaphore. Non-matching variants silently no-op.
+    tgfx::GLSyncInfo glInfo = {};
+    tgfx::MetalSyncInfo mtlInfo = {};
+    if (semaphore.getGLSync(&glInfo)) {
+      signalSemaphore->initGL(glInfo.sync);
+    } else if (semaphore.getMetalSync(&mtlInfo)) {
+      signalSemaphore->initMetal(const_cast<void*>(mtlInfo.event), mtlInfo.value);
     }
   }
   cache->detachFromContext();

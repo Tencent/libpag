@@ -173,11 +173,9 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
       if (!texture.getMtlTextureInfo(&mtlInfo)) {
         return {};
       }
-      // pag::MtlTextureInfo currently exposes only the id<MTLTexture> pointer; the pixel format
-      // defaults to tgfx's built-in (MTLPixelFormatRGBA8Unorm = 70). If a future pag public API
-      // extension adds a format field, wire it here alongside the texture pointer.
       tgfx::MetalTextureInfo sampler = {};
       sampler.texture = mtlInfo.texture;
+      sampler.format = mtlInfo.format;
       return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
     }
     case Backend::VULKAN:
@@ -210,6 +208,7 @@ BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
       // pag::MtlTextureInfo predates that and uses void*. The pointer is treated as an opaque
       // handle by libpag — the const_cast is safe because no writer path exists downstream.
       sampler.texture = const_cast<void*>(mtlInfo.texture);
+      sampler.format = mtlInfo.format;
       return {sampler, texture.width(), texture.height()};
     }
     default:
@@ -236,6 +235,7 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
       }
       tgfx::MetalTextureInfo sampler = {};
       sampler.texture = mtlInfo.texture;
+      sampler.format = mtlInfo.format;
       return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
     }
     case Backend::VULKAN:
@@ -246,11 +246,21 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
 }
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
-  // pag::BackendSemaphore's public API currently only exposes GL sync objects (initGL/glSync);
-  // Metal / Vulkan / D3D12 / WebGPU sync ABI extensions are deferred to the specific backend
-  // PRs that introduce user-facing sync APIs. Until then, non-GL callers get a default-
-  // constructed (uninitialized) tgfx::BackendSemaphore, which is a no-op at the tgfx layer.
-  tgfx::GLSyncInfo syncInfo = {semaphore.glSync()};
-  return tgfx::BackendSemaphore(syncInfo);
+  // Dispatch on the pag-side backend tag so the returned tgfx::BackendSemaphore carries the
+  // right variant. Non-initialized semaphores return a default-constructed tgfx one, which is
+  // a no-op at the tgfx layer. Vulkan / D3D12 / WebGPU sync ABI extensions are deferred to
+  // the specific backend PRs that introduce user-facing sync APIs.
+  if (!semaphore.isInitialized()) {
+    return {};
+  }
+  if (auto glSync = semaphore.glSync()) {
+    tgfx::GLSyncInfo syncInfo = {glSync};
+    return tgfx::BackendSemaphore(syncInfo);
+  }
+  if (auto mtlEvent = semaphore.mtlEvent()) {
+    tgfx::MetalSyncInfo syncInfo = {mtlEvent, semaphore.mtlValue()};
+    return tgfx::BackendSemaphore(syncInfo);
+  }
+  return {};
 }
 }  // namespace pag
