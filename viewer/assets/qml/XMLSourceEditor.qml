@@ -37,6 +37,16 @@ Rectangle {
     // Exposed so the host's plain-"L" toggle shortcut can avoid swallowing keystrokes while typing.
     readonly property bool editorFocused: textArea.activeFocus
 
+    // StackLayout zeroes the geometry of inactive tabs. Resizing the editor stack on every tab
+    // switch forces the text backend to re-layout and rebuild render nodes, so the last
+    // non-zero size is cached and used while the panel is hidden.
+    property real cachedWidth: 0
+    property real cachedHeight: 0
+    onWidthChanged: if (width > 0) cachedWidth = width
+    onHeightChanged: if (height > 0) cachedHeight = height
+    readonly property real layoutWidth: width > 0 ? width : (cachedWidth > 0 ? cachedWidth : 1)
+    readonly property real layoutHeight: height > 0 ? height : (cachedHeight > 0 ? cachedHeight : 1)
+
     // Single-line height in pixels; falls back to the Menlo 13px metric until the first
     // cursor rectangle is available. Constant for the fixed-pitch NoWrap editor.
     readonly property real lineHeight: textArea.cursorRectangle.height > 0
@@ -205,10 +215,8 @@ Rectangle {
     // Editor area: line-number gutter plus the scrollable text content.
     Item {
         id: editorArea
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: buttonBar.top
+        width: root.layoutWidth
+        height: root.layoutHeight - buttonBar.height
         clip: true
 
         Canvas {
@@ -368,9 +376,8 @@ Rectangle {
     Rectangle {
         id: buttonBar
         height: 48
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        width: root.layoutWidth
+        y: root.layoutHeight - height
         color: root.buttonBarColor
 
         Row {
