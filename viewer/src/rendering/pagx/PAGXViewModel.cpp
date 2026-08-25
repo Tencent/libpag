@@ -23,6 +23,7 @@
 #include <QFile>
 #include <QFontMetrics>
 #include <QMetaObject>
+#include <QQuickItem>
 #include <QQuickTextDocument>
 #include <QQuickWindow>
 #include <QTextCursor>
@@ -550,6 +551,13 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   // A previous highlighter can only belong to a previous editor instance's document; replace
   // it so a recreated editor is never left unhighlighted.
   EditorLog("attachHighlighter: attaching to a new document");
+  // QQuickTextEdit only builds text nodes for blocks inside the viewport when this flag is
+  // set, and Qt sets it in setText() only for documents over 10000 characters. The chunked
+  // loader bypasses setText, so enable it explicitly: without the flag every scroll frame
+  // rebuilds text nodes for the ENTIRE document, which stalls the UI for seconds.
+  if (auto* editorItem = qobject_cast<QQuickItem*>(quickDocument->parent())) {
+    editorItem->setFlag(QQuickItem::ItemObservesViewport, true);
+  }
   delete highlighter;
   highlighter = new XmlDocumentHighlighter(document);
   // Diagnostic probe: every emission means the text backend finished a document-size layout
