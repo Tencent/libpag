@@ -122,6 +122,15 @@ class PAGXViewModel : public ContentViewModel {
    */
   Q_INVOKABLE QString restoreElidedLines(const QString& editorText) const;
 
+  /**
+   * Discards all edits by undoing them: the undo stack is cleared right after loading, so it
+   * starts at the baseline and every user edit is on it. Undoing costs only as much as the
+   * edits themselves, unlike reloading the whole document (seconds for large files). Returns
+   * false when the stack cannot restore the baseline, in which case the caller should fall
+   * back to a full reload.
+   */
+  Q_INVOKABLE bool discardToBaseline(QObject* quickTextDocument);
+
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
     std::shared_ptr<pagx::PAGAnimation> animation;

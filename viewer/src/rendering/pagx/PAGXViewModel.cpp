@@ -755,6 +755,22 @@ QString PAGXViewModel::restoreElidedLines(const QString& editorText) const {
   return result;
 }
 
+bool PAGXViewModel::discardToBaseline(QObject* quickTextDocument) {
+  auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
+  if (quickDocument == nullptr) {
+    return false;
+  }
+  auto* document = quickDocument->textDocument();
+  if (!document->isUndoAvailable()) {
+    return false;
+  }
+  EditorLog("discardToBaseline: undoing edits back to the baseline");
+  while (document->isUndoAvailable()) {
+    document->undo();
+  }
+  return true;
+}
+
 void PAGXViewModel::clearDocumentXml() {
   documentXmlText.clear();
   pendingXmlContent.clear();

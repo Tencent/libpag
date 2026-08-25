@@ -118,9 +118,14 @@ Rectangle {
             showToast(qsTr("Nothing to discard"), true);
             return;
         }
-        // Restoring through the chunked loader too: assigning the text directly would make
-        // the highlighter rehighlight the whole baseline synchronously. Keep the viewport
-        // where the user was editing.
+        // Fast path: the undo stack starts at the baseline (cleared after loading), so
+        // undoing all edits restores it in time proportional to the edit size, keeping the
+        // caret and viewport in place. Falls back to a chunked reload if the stack is gone.
+        if (viewModel && viewModel.discardToBaseline(textArea.textDocument)) {
+            dirty = false;
+            showToast(qsTr("Changes discarded"), true);
+            return;
+        }
         loadXml(baselineXml, true);
         showToast(qsTr("Changes discarded"), true);
     }
@@ -400,32 +405,54 @@ Rectangle {
 
     // Blocking overlay while a document is loading: the content is filled chunk by chunk
     // over several seconds and the viewport is restored afterwards, and showing that raw
-    // process (lines growing in, view jumping around) reads as glitching. Cover it instead.
+    // process (lines growing in, view jumping around) reads as glitching. The centered panel
+    // mirrors the web player's visual language (dark rounded panel, 4px rounded progress
+    // rail with a white fill, 13px white text).
     Rectangle {
         anchors.fill: editorArea
         color: root.backgroundColor
         visible: root.busy
 
-        Column {
+        Rectangle {
             anchors.centerIn: parent
-            spacing: 12
+            width: 280
+            height: 96
+            radius: 8
+            color: "#20202A"
 
-            ProgressBar {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: 220
-                from: 0
-                to: 1
-                value: root.loadProgress
-                indeterminate: root.loadProgress <= 0
-            }
+            Column {
+                anchors.centerIn: parent
+                spacing: 16
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: root.loadProgress > 0
-                          ? qsTr("Loading source... %1%").arg(Math.round(root.loadProgress * 100))
-                          : qsTr("Loading source...")
-                color: "#9CDCFE"
-                font.pixelSize: 13
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.loadProgress > 0
+                              ? qsTr("Loading source... %1%").arg(Math.round(root.loadProgress * 100))
+                              : qsTr("Loading source...")
+                    color: "#FFFFFF"
+                    font.pixelSize: 13
+                }
+
+                Item {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 200
+                    height: 4
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 2
+                        color: Qt.rgba(1, 1, 1, 0.18)
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: parent.width * root.loadProgress
+                        radius: 2
+                        color: "#FFFFFF"
+                    }
+                }
             }
         }
     }
