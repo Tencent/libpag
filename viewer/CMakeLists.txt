@@ -256,8 +256,8 @@ if (APPLE)
             COMMAND /bin/sh -c "mkdir -p '${VIEWER_RESOURCES_DIR}' && cp -f '${CMAKE_SOURCE_DIR}/assets/images/appIcon.icns' '${VIEWER_RESOURCES_DIR}/' && cp -f '${CMAKE_SOURCE_DIR}/assets/images/pagIcon.icns' '${VIEWER_RESOURCES_DIR}/'"
             # Copy Info.plist
             COMMAND /bin/sh -c "cp -f '${CMAKE_SOURCE_DIR}/package/templates/Info.plist' '${VIEWER_BUNDLE_DIR}/Contents/'"
-            # Deploy Qt (skip if already deployed)
-            COMMAND /bin/sh -c "[ -d '${VIEWER_FRAMEWORKS_DIR}/QtCore.framework' ] || '${DEPLOYQT_EXECUTABLE}' '${VIEWER_BUNDLE_DIR}' -qmldir='${CMAKE_SOURCE_DIR}/assets/qml'"
+            # Deploy Qt
+            COMMAND /bin/sh -c "'${DEPLOYQT_EXECUTABLE}' '${VIEWER_BUNDLE_DIR}' -qmldir='${CMAKE_SOURCE_DIR}/assets/qml' -always-overwrite"
             COMMENT "Deploying runtime dependencies into PAGViewer.app"
             VERBATIM
     )
