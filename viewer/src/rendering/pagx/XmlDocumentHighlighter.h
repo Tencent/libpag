@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <QElapsedTimer>
 #include <QSyntaxHighlighter>
 #include <QTextCharFormat>
 
@@ -34,7 +33,6 @@ class XmlDocumentHighlighter : public QSyntaxHighlighter {
   Q_OBJECT
  public:
   explicit XmlDocumentHighlighter(QTextDocument* document);
-  ~XmlDocumentHighlighter() override;
 
  protected:
   void highlightBlock(const QString& text) override;
@@ -57,12 +55,6 @@ class XmlDocumentHighlighter : public QSyntaxHighlighter {
   // Lines longer than this skip token-level highlighting (e.g. embedded base64 payloads),
   // matching the previous per-line highlighter's performance guard.
   static constexpr qsizetype MaxHighlightLength = 10000;
-
-  // Diagnostics: counting highlightBlock calls makes full-document rehighlights visible in
-  // the [PAGXEditor] logs. Remove once the large-file performance work settles.
-  qsizetype highlightBlockCount = 0;
-  QElapsedTimer highlightElapsed;
-  bool highlightTimerStarted = false;
 
   QTextCharFormat tagFormat;
   QTextCharFormat attrNameFormat;
