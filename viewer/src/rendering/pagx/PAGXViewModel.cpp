@@ -569,6 +569,19 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
 
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
   EditorLog(QString("loadEditorText: text.size=%1").arg(text.size()));
+  // A new load must abort any in-progress chunked load; otherwise a pending timer tick would
+  // append the previous file's remaining chunk onto the new content (loaderDocument is the same
+  // persistent document). Reset the loader state so appendEditorChunk cannot resume with it.
+  if (loaderTimer != nullptr) {
+    loaderTimer->stop();
+  }
+  loaderText.clear();
+  loaderOffset = 0;
+  loaderChunkCount = 0;
+  loaderMaxLineWidth = 0;
+  loaderDocument = nullptr;
+  warmupDocument = nullptr;
+  warmupBlockNumber = 0;
   auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
   if (quickDocument == nullptr) {
     EditorLog("loadEditorText: invalid quick document, finishing immediately");
