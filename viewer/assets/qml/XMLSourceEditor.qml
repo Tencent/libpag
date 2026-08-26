@@ -52,9 +52,6 @@ Rectangle {
     // Chunked loading progress in the 0..1 range, fed by editorLoadProgress.
     property real loadProgress: 0
 
-    // Exposed so the host's plain-"L" toggle shortcut can avoid swallowing keystrokes while typing.
-    readonly property bool editorFocused: textArea.activeFocus
-
     // StackLayout zeroes the geometry of inactive tabs. Resizing the editor stack on every tab
     // switch forces the text backend to re-layout and rebuild render nodes, so the last
     // non-zero size is cached and used while the panel is hidden.
