@@ -1142,9 +1142,7 @@ export class PAGXPlayer extends EventTarget {
      *  machine reports no duration, so the playback bar's toggle (and play()) would bail out
      *  early. The blueprint panel's button drives the view directly instead - an SM has no
      *  wrap-around semantics to honor anyway. On resume from pause, the SM restarts from its
-     *  initial states (matches parkPreview's "restart from head" contract): select the
-     *  default SM then clear the selection - the engine's clear-with-previous-selection path
-     *  runs SM.reset() + apply() + playing=true in one shot, no lingering selection. */
+     *  initial states (same contract as parkPreview - see restartDefaultSM). */
     public toggleRawPlayback(): void {
         const view = this.view;
         if (!view) {
@@ -1154,15 +1152,32 @@ export class PAGXPlayer extends EventTarget {
             view.pause();
             this.dispatchEvent(new CustomEvent('pause'));
         } else {
+            this.restartDefaultSM();
+            this.dispatchEvent(new CustomEvent('play'));
+        }
+    }
+
+    /** Resets the default state machine to its initial states and starts it playing. Works by
+     *  routing through selectTimelineUnit's "clear-with-previous-selection" branch, which is
+     *  the only public path that triggers PAGStateMachine::reset() from JS today; when there
+     *  is no active selection we briefly synthesize one on the default SM so the clear branch
+     *  fires. Callable from anywhere that needs the SM to (re)start from frame 0 - the
+     *  blueprint play button on resume and parkPreview both go through here. */
+    private restartDefaultSM(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        const hasSelection = view.getSelectedTimelineUnit() != null;
+        if (!hasSelection) {
             const defaultSM = view.getTimelineTree()
                 .find((node) => node.kind === 'stateMachine' && node.isDefault);
             if (defaultSM != null) {
                 view.selectTimelineUnit('stateMachine', defaultSM.id);
-                view.selectTimelineUnit('', '');
             }
-            view.play();
-            this.dispatchEvent(new CustomEvent('play'));
         }
+        view.selectTimelineUnit('', '');
+        view.play();
     }
 
     /** Sets a bool input on the default state machine timeline (playground hook for testing
@@ -1229,10 +1244,9 @@ export class PAGXPlayer extends EventTarget {
         // from the top rather than resuming wherever the park happened.
         view.pause();
         view.setCurrentTimeMicros(0);
-        // Hand the render loop back to the SM. The engine's selectTimelineUnit('', '') path
-        // resets the SM to its initial states and sets playing=true, so no extra play() call
-        // is needed here - the SM starts running on its own.
-        view.selectTimelineUnit('', '');
+        // Hand the render loop back to the SM. restartDefaultSM triggers the same
+        // clear-with-previous-selection reset path used by the blueprint play button.
+        this.restartDefaultSM();
         this.dispatchEvent(new CustomEvent('play'));
         // Keep the playback bar visible with the preview's static "0/duration" poster and
         // dim it so the user cannot interact. updatePlaybackBarMode sees parkedPreviewId and
