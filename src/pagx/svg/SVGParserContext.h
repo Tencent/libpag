@@ -300,7 +300,6 @@ class SVGParserContext {
   }
 
  private:
-
   // CSS class rules: key is class name (without dot), value is style properties.
   // Example: {"cls-1": "fill: #fcfae9"}
   std::unordered_map<std::string, std::string> _cssClassRules = {};
