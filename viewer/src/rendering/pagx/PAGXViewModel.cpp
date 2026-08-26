@@ -557,7 +557,6 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   }
   // A previous highlighter can only belong to a previous editor instance's document; replace
   // it so a recreated editor is never left unhighlighted.
-  EditorLog("attachHighlighter: attaching to a new document");
   // QQuickTextEdit only builds text nodes for blocks inside the viewport when this flag is
   // set, and Qt sets it in setText() only for documents over 10000 characters. The chunked
   // loader bypasses setText, so enable it explicitly: without the flag every scroll frame
@@ -567,14 +566,9 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   }
   delete highlighter;
   highlighter = new XmlDocumentHighlighter(document);
-  // Diagnostic probe: every emission means the text backend finished a document-size layout
-  // pass, which is where hidden full-document layouts show up.
-  connect(document->documentLayout(), &QAbstractTextDocumentLayout::documentSizeChanged, this,
-          &PAGXViewModel::onDocumentSizeChanged);
 }
 
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
-  EditorLog(QString("loadEditorText: text.size=%1").arg(text.size()));
   // A new load must abort any in-progress chunked load; otherwise a pending timer tick would
   // append the previous file's remaining chunk onto the new content (loaderDocument is the same
   // persistent document). Reset the loader state so appendEditorChunk cannot resume with it.
@@ -590,18 +584,12 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   warmupBlockNumber = 0;
   auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
   if (quickDocument == nullptr) {
-    EditorLog("loadEditorText: invalid quick document, finishing immediately");
     Q_EMIT editorLoadFinished(0);
     return;
   }
   auto* document = quickDocument->textDocument();
   QString textToLoad = text;
   BuildElidedText(text, &textToLoad, &elidedLines);
-  if (!elidedLines.isEmpty()) {
-    EditorLog(QString("loadEditorText: folded %1 long lines, editor size=%2")
-                  .arg(elidedLines.size())
-                  .arg(textToLoad.size()));
-  }
   constexpr qsizetype SmallDocumentThreshold = 256 * 1024;
   if (textToLoad.size() <= SmallDocumentThreshold) {
     QElapsedTimer timer;
@@ -621,7 +609,6 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   // Replacing the whole text at once would make the attached highlighter rehighlight every
   // block synchronously and freeze the UI for seconds on large files, so large documents are
   // appended in chunks instead: each insert only rehighlights its own range.
-  EditorLog("loadEditorText: chunked path starting");
   loaderElapsed.start();
   loaderDocument = document;
   warmupDocument = document;
@@ -646,7 +633,6 @@ void PAGXViewModel::appendEditorChunk() {
   if (loaderDocument == nullptr) {
     loaderTimer->stop();
     loaderText.clear();
-    EditorLog("appendEditorChunk: document gone, finishing");
     Q_EMIT editorLoadFinished(loaderMaxLineWidth);
     return;
   }
@@ -667,34 +653,17 @@ void PAGXViewModel::appendEditorChunk() {
       // for megabyte-long lines, as seen in the [PAGXEditor] logs).
       const auto nextNewLine = loaderText.indexOf(u'\n', end);
       end = nextNewLine < 0 ? loaderText.size() : nextNewLine + 1;
-      EditorLog(
-          QString("appendEditorChunk: huge line detected, chunkBytes=%1").arg(end - loaderOffset));
     }
   }
-  QElapsedTimer timer;
-  timer.start();
   const auto chunk = QStringView(loaderText).mid(loaderOffset, end - loaderOffset).toString();
   loaderMaxLineWidth = qMax(loaderMaxLineWidth, MeasureMaxLineWidth(loaderDocument, chunk));
-  const auto measureMs = timer.restart();
   QTextCursor cursor(loaderDocument);
   cursor.movePosition(QTextCursor::End);
   cursor.beginEditBlock();
   cursor.insertText(chunk);
   cursor.endEditBlock();
-  const auto insertMs = timer.elapsed();
   ++loaderChunkCount;
   Q_EMIT editorLoadProgress(static_cast<double>(end) / static_cast<double>(loaderText.size()));
-  if (loaderChunkCount % 8 == 0 || end >= loaderText.size()) {
-    EditorLog(QString("appendEditorChunk: chunk=%1 bytes=%2/%3 measureMs=%4 insertMs=%5 "
-                      "totalMs=%6 maxLineWidth=%7")
-                  .arg(loaderChunkCount)
-                  .arg(end)
-                  .arg(loaderText.size())
-                  .arg(measureMs)
-                  .arg(insertMs)
-                  .arg(loaderElapsed.elapsed())
-                  .arg(loaderMaxLineWidth));
-  }
   loaderOffset = end;
   // Viewport-observing rendering only lays out blocks that enter the viewport, but
   // QTextDocumentLayout::hitTest walks blocks sequentially and lays out every one it passes,
@@ -740,10 +709,6 @@ void PAGXViewModel::warmupLayouts(int maxBlocks) {
     layout->blockBoundingRect(block);
     ++warmupBlockNumber;
   }
-}
-
-void PAGXViewModel::onDocumentSizeChanged(const QSizeF& size) {
-  EditorLog(QString("documentSizeChanged: %1x%2").arg(size.width()).arg(size.height()));
 }
 
 bool PAGXViewModel::elideBroken(const QString& editorText) const {
@@ -820,7 +785,6 @@ bool PAGXViewModel::discardToBaseline(QObject* quickTextDocument) {
   if (!document->isUndoAvailable()) {
     return false;
   }
-  EditorLog("discardToBaseline: undoing edits back to the baseline");
   while (document->isUndoAvailable()) {
     document->undo();
   }
