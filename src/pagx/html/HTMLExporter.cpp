@@ -135,8 +135,44 @@ static std::string WrapAsHTMLDocument(const std::string& fragment, float width, 
   auto h = CssFloatToString(height);
   std::string bodyStyle = "margin:0;padding:0;width:" + w + "px;height:" + h +
                           "px;overflow:hidden;font-family:sans-serif";
-  return "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<style>\nbody { " + bodyStyle +
-         " }\n</style>\n</head>\n<body>\n" + fragment + "\n</body>\n</html>\n";
+  std::string viewportStyle = "position:relative;width:100%;height:" + h + "px;overflow:hidden";
+  std::string result = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n";
+  result += "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n";
+  // Keep the absolute body dimensions as the non-screen fallback so an exported document remains
+  // importable by the HTML subset parser. Browsers apply the media rule and use the responsive
+  // viewport below instead.
+  result += "<style>\nbody { " + bodyStyle + " }\n";
+  result += "@media screen {\n";
+  result += "html { width:100%;min-height:100% }\n";
+  result += "body { width:100%;height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto }\n";
+  result += "}\n</style>\n</head>\n<body>\n";
+  result += "<div data-pagx-viewport style=\"" + viewportStyle + "\">\n";
+  result += fragment + "\n</div>\n";
+  result += "<script>\n";
+  result += "(()=>{\n";
+  result += "const viewport=document.querySelector('[data-pagx-viewport]');\n";
+  result += "const canvas=viewport&&viewport.querySelector('[data-pagx-version]');\n";
+  result += "if(!viewport||!canvas)return;\n";
+  result += "const designWidth=" + w + ";\n";
+  result += "const designHeight=" + h + ";\n";
+  result += "let lastWidth=-1;\n";
+  result += "const resize=()=>{\n";
+  result += "const availableWidth=viewport.clientWidth;\n";
+  result += "if(availableWidth<=0||availableWidth===lastWidth)return;\n";
+  result += "lastWidth=availableWidth;\n";
+  result += "const scale=availableWidth/designWidth;\n";
+  result += "canvas.style.transformOrigin='0 0';\n";
+  result += "canvas.style.transform='scale('+scale+')';\n";
+  result += "viewport.style.height=designHeight*scale+'px';\n";
+  result += "};\n";
+  result += "resize();\n";
+  result += "window.addEventListener('resize',resize,{passive:true});\n";
+  result +=
+      "if(typeof ResizeObserver!=='undefined')new ResizeObserver(resize).observe(viewport);\n";
+  result += "})();\n";
+  result += "</script>\n";
+  result += "</body>\n</html>\n";
+  return result;
 }
 
 namespace {

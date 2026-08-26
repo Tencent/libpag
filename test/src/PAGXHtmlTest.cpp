@@ -23,12 +23,16 @@
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
 #include "pagx/HTMLImporter.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/PathData.h"
+#include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Path.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 
@@ -187,6 +191,24 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
   EXPECT_NE(html.find("overflow: hidden"), std::string::npos);
   EXPECT_NE(html.find("position: relative"), std::string::npos);
   EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, FullDocumentFitsViewportWidthAndScrollsVertically) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
+  ASSERT_TRUE(doc != nullptr);
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/tmp-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::FullDocument);
+  ASSERT_FALSE(html.empty());
+
+  EXPECT_NE(html.find("name=\"viewport\""), std::string::npos);
+  EXPECT_NE(html.find("data-pagx-viewport"), std::string::npos);
+  EXPECT_NE(html.find("width:100%;height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto"),
+            std::string::npos);
+  EXPECT_NE(html.find("const scale=availableWidth/designWidth"), std::string::npos);
+  EXPECT_NE(html.find("canvas.style.transform='scale('+scale+')'"), std::string::npos);
+  EXPECT_NE(html.find("viewport.style.height=designHeight*scale+'px'"), std::string::npos);
+  EXPECT_NE(html.find("new ResizeObserver(resize).observe(viewport)"), std::string::npos);
 }
 
 // =============================================================================
@@ -655,6 +677,30 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
   auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
   ASSERT_TRUE(std::filesystem::exists(fontPath));
   EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontRemovesOverlappingContours) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  // A plus sign assembled from two same-winding rectangles. Leaving the contours overlapped makes
+  // parity-based CFF rasterizers punch a hole through the centre where the two strokes intersect.
+  *glyph->path = pagx::PathDataFromSVGString(
+      "M400 0L600 0L600 1000L400 1000Z M0 400L1000 400L1000 600L0 600Z");
+  glyph->advance = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto resolvedPath = pagx::ResolveWoff2GlyphPath(*glyph->path);
+  ASSERT_FALSE(resolvedPath.isEmpty());
+  auto bounds = resolvedPath.getBounds();
+  resolvedPath.setFillType(tgfx::PathFillType::EvenOdd);
+  EXPECT_TRUE(resolvedPath.contains(bounds.x() + bounds.width() * 0.5f,
+                                    bounds.y() + bounds.height() * 0.5f));
+
+  auto fontResult = pagx::BuildWoff2FromFont(font, "overlap");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
 }
 
 CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {

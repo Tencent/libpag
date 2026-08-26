@@ -26,8 +26,10 @@
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
+#include "renderer/ToTGFX.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Path.h"
 
 namespace pagx {
 
@@ -331,91 +333,100 @@ struct CFFCharStringVisitor {
       : cs(output), designScale(designScale), curX(0.0f), curY(0.0f) {
   }
 
-  float x(const Point& point) const {
-    return point.x * designScale;
+  void moveTo(float sourceX, float sourceY) {
+    float targetX = sourceX * designScale;
+    float targetY = -sourceY * designScale;
+    float dx = targetX - curX;
+    float dy = targetY - curY;
+    EncodeCharStringNumber(cs, dx);
+    EncodeCharStringNumber(cs, dy);
+    WriteU8(cs, 21);  // rmoveto
+    curX = targetX;
+    curY = targetY;
   }
 
-  float y(const Point& point) const {
-    return -point.y * designScale;
+  void lineTo(float sourceX, float sourceY) {
+    float targetX = sourceX * designScale;
+    float targetY = -sourceY * designScale;
+    float dx = targetX - curX;
+    float dy = targetY - curY;
+    EncodeCharStringNumber(cs, dx);
+    EncodeCharStringNumber(cs, dy);
+    WriteU8(cs, 5);  // rlineto
+    curX = targetX;
+    curY = targetY;
+  }
+
+  void quadTo(float sourceControlX, float sourceControlY, float sourceEndX, float sourceEndY) {
+    // Degree-elevate quadratic to cubic:
+    // CP1 = P0 + 2/3 * (QCP - P0)
+    // CP2 = P2 + 2/3 * (QCP - P2)
+    float qcpX = sourceControlX * designScale;
+    float qcpY = -sourceControlY * designScale;
+    float endX = sourceEndX * designScale;
+    float endY = -sourceEndY * designScale;
+    float cp1X = curX + (2.0f / 3.0f) * (qcpX - curX);
+    float cp1Y = curY + (2.0f / 3.0f) * (qcpY - curY);
+    float cp2X = endX + (2.0f / 3.0f) * (qcpX - endX);
+    float cp2Y = endY + (2.0f / 3.0f) * (qcpY - endY);
+    float dx1 = cp1X - curX;
+    float dy1 = cp1Y - curY;
+    float dx2 = cp2X - cp1X;
+    float dy2 = cp2Y - cp1Y;
+    float dx3 = endX - cp2X;
+    float dy3 = endY - cp2Y;
+    EncodeCharStringNumber(cs, dx1);
+    EncodeCharStringNumber(cs, dy1);
+    EncodeCharStringNumber(cs, dx2);
+    EncodeCharStringNumber(cs, dy2);
+    EncodeCharStringNumber(cs, dx3);
+    EncodeCharStringNumber(cs, dy3);
+    WriteU8(cs, 8);  // rrcurveto
+    curX = endX;
+    curY = endY;
+  }
+
+  void cubicTo(float sourceControl1X, float sourceControl1Y, float sourceControl2X,
+               float sourceControl2Y, float sourceEndX, float sourceEndY) {
+    float cp1X = sourceControl1X * designScale;
+    float cp1Y = -sourceControl1Y * designScale;
+    float cp2X = sourceControl2X * designScale;
+    float cp2Y = -sourceControl2Y * designScale;
+    float endX = sourceEndX * designScale;
+    float endY = -sourceEndY * designScale;
+    float dx1 = cp1X - curX;
+    float dy1 = cp1Y - curY;
+    float dx2 = cp2X - cp1X;
+    float dy2 = cp2Y - cp1Y;
+    float dx3 = endX - cp2X;
+    float dy3 = endY - cp2Y;
+    EncodeCharStringNumber(cs, dx1);
+    EncodeCharStringNumber(cs, dy1);
+    EncodeCharStringNumber(cs, dx2);
+    EncodeCharStringNumber(cs, dy2);
+    EncodeCharStringNumber(cs, dx3);
+    EncodeCharStringNumber(cs, dy3);
+    WriteU8(cs, 8);  // rrcurveto
+    curX = endX;
+    curY = endY;
   }
 
   void operator()(PathVerb verb, const Point* pts) {
     switch (verb) {
       case PathVerb::Move: {
-        float targetX = x(pts[0]);
-        float targetY = y(pts[0]);
-        float dx = targetX - curX;
-        float dy = targetY - curY;
-        EncodeCharStringNumber(cs, dx);
-        EncodeCharStringNumber(cs, dy);
-        WriteU8(cs, 21);  // rmoveto
-        curX = targetX;
-        curY = targetY;
+        moveTo(pts[0].x, pts[0].y);
         break;
       }
       case PathVerb::Line: {
-        float targetX = x(pts[0]);
-        float targetY = y(pts[0]);
-        float dx = targetX - curX;
-        float dy = targetY - curY;
-        EncodeCharStringNumber(cs, dx);
-        EncodeCharStringNumber(cs, dy);
-        WriteU8(cs, 5);  // rlineto
-        curX = targetX;
-        curY = targetY;
+        lineTo(pts[0].x, pts[0].y);
         break;
       }
       case PathVerb::Quad: {
-        // Degree-elevate quadratic to cubic:
-        // CP1 = P0 + 2/3 * (QCP - P0)
-        // CP2 = P2 + 2/3 * (QCP - P2)
-        float qcpX = x(pts[0]);
-        float qcpY = y(pts[0]);
-        float endX = x(pts[1]);
-        float endY = y(pts[1]);
-        float cp1X = curX + (2.0f / 3.0f) * (qcpX - curX);
-        float cp1Y = curY + (2.0f / 3.0f) * (qcpY - curY);
-        float cp2X = endX + (2.0f / 3.0f) * (qcpX - endX);
-        float cp2Y = endY + (2.0f / 3.0f) * (qcpY - endY);
-        float dx1 = cp1X - curX;
-        float dy1 = cp1Y - curY;
-        float dx2 = cp2X - cp1X;
-        float dy2 = cp2Y - cp1Y;
-        float dx3 = endX - cp2X;
-        float dy3 = endY - cp2Y;
-        EncodeCharStringNumber(cs, dx1);
-        EncodeCharStringNumber(cs, dy1);
-        EncodeCharStringNumber(cs, dx2);
-        EncodeCharStringNumber(cs, dy2);
-        EncodeCharStringNumber(cs, dx3);
-        EncodeCharStringNumber(cs, dy3);
-        WriteU8(cs, 8);  // rrcurveto
-        curX = endX;
-        curY = endY;
+        quadTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
         break;
       }
       case PathVerb::Cubic: {
-        float cp1X = x(pts[0]);
-        float cp1Y = y(pts[0]);
-        float cp2X = x(pts[1]);
-        float cp2Y = y(pts[1]);
-        float endX = x(pts[2]);
-        float endY = y(pts[2]);
-        float dx1 = cp1X - curX;
-        float dy1 = cp1Y - curY;
-        float dx2 = cp2X - cp1X;
-        float dy2 = cp2Y - cp1Y;
-        float dx3 = endX - cp2X;
-        float dy3 = endY - cp2Y;
-        EncodeCharStringNumber(cs, dx1);
-        EncodeCharStringNumber(cs, dy1);
-        EncodeCharStringNumber(cs, dx2);
-        EncodeCharStringNumber(cs, dy2);
-        EncodeCharStringNumber(cs, dx3);
-        EncodeCharStringNumber(cs, dy3);
-        WriteU8(cs, 8);  // rrcurveto
-        curX = endX;
-        curY = endY;
+        cubicTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
         break;
       }
       case PathVerb::Close:
@@ -423,6 +434,45 @@ struct CFFCharStringVisitor {
     }
   }
 };
+
+static void WriteTGFXPathToCharString(const tgfx::Path& path, CFFCharStringVisitor* visitor) {
+  for (const auto& segment : path) {
+    switch (segment.verb) {
+      case tgfx::PathVerb::Move:
+        visitor->moveTo(segment.points[0].x, segment.points[0].y);
+        break;
+      case tgfx::PathVerb::Line:
+        visitor->lineTo(segment.points[1].x, segment.points[1].y);
+        break;
+      case tgfx::PathVerb::Quad:
+        visitor->quadTo(segment.points[1].x, segment.points[1].y, segment.points[2].x,
+                        segment.points[2].y);
+        break;
+      case tgfx::PathVerb::Conic: {
+        auto quads = tgfx::Path::ConvertConicToQuads(segment.points[0], segment.points[1],
+                                                     segment.points[2], segment.conicWeight, 1);
+        for (size_t i = 1; i + 1 < quads.size(); i += 2) {
+          visitor->quadTo(quads[i].x, quads[i].y, quads[i + 1].x, quads[i + 1].y);
+        }
+        break;
+      }
+      case tgfx::PathVerb::Cubic:
+        visitor->cubicTo(segment.points[1].x, segment.points[1].y, segment.points[2].x,
+                         segment.points[2].y, segment.points[3].x, segment.points[3].y);
+        break;
+      case tgfx::PathVerb::Close:
+      case tgfx::PathVerb::Done:
+        break;
+    }
+  }
+}
+
+tgfx::Path ResolveWoff2GlyphPath(const PathData& path) {
+  auto sourcePath = ToTGFX(path);
+  tgfx::Path normalizedPath;
+  normalizedPath.addPath(sourcePath, tgfx::PathOp::Union);
+  return normalizedPath.isEmpty() ? sourcePath : normalizedPath;
+}
 
 static std::vector<uint8_t> BuildCharString(const PathData* path,
                                             const FontExportMetrics& metrics) {
@@ -432,10 +482,17 @@ static std::vector<uint8_t> BuildCharString(const PathData* path,
     return cs;
   }
 
+  // Font glyphs can contain separate stroke contours that overlap each other. CoreText renders
+  // those overlaps with parity semantics when they are carried directly into a CFF charstring,
+  // which punches checkerboard holes out of CJK glyphs assembled from horizontal and vertical
+  // strokes. Resolve the winding fill into a non-overlapping outline before encoding so winding
+  // and parity rasterizers produce the same silhouette.
+  auto normalizedPath = ResolveWoff2GlyphPath(*path);
+
   // PAGX uses screen coordinates (Y axis points down), but CFF/OpenType uses typographic
   // coordinates (Y axis points up). Negate all Y values during charstring encoding.
   CFFCharStringVisitor visitor(cs, metrics.designScale);
-  path->forEach(std::ref(visitor));
+  WriteTGFXPathToCharString(normalizedPath, &visitor);
 
   WriteU8(cs, 14);  // endchar
   return cs;
