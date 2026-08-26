@@ -605,8 +605,8 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
 }
 
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsLargeCharstringOperands) {
-  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute(
-      "resources/pagx_to_html/unit/large_charstring_operands_font.pagx"));
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/large_charstring_operands_font.pagx"));
   ASSERT_NE(doc, nullptr);
   const pagx::Font* font = nullptr;
   for (const auto& node : doc->nodes) {
@@ -820,6 +820,67 @@ CLI_TEST(PAGXHtmlTest, MaskAsChildNotEmittedAsContent) {
   // The mask layer must NOT be emitted as a visible element in the body.
   EXPECT_EQ(html.find("id=\"coverMask\""), std::string::npos)
       << "the mask layer must not appear as visible content";
+}
+
+// Builds a frosted-glass window: an outer Layer paints the translucent window fill, a contour mask
+// rounds off its content, and inside that clip a full-cover Layer carries the BackgroundBlurStyle
+// that must blur the bar behind it. `withBackgroundBlur=false` drops only the blur style so the
+// caller can pin the unaffected clip emission.
+static std::string GlassInsideContourMaskXML(bool withBackgroundBlur) {
+  std::string blurStyle =
+      withBackgroundBlur ? "<BackgroundBlurStyle blurX=\"10\" blurY=\"10\"/>" : "";
+  return "<pagx width=\"200\" height=\"160\">"
+         "  <Layer id=\"window\" width=\"200\" height=\"160\">"
+         "    <Rectangle position=\"100,80\" size=\"200,160\" roundness=\"12\"/>"
+         "    <Fill color=\"#FFFFFF\" alpha=\"0.6\"/>"
+         "    <Layer id=\"windowMask\" visible=\"false\">"
+         "      <Rectangle position=\"100,80\" size=\"200,160\" roundness=\"12\"/>"
+         "      <Fill color=\"#FFFFFF\"/>"
+         "    </Layer>"
+         "    <Layer id=\"windowClip\" width=\"200\" height=\"160\" mask=\"@windowMask\" "
+         "maskType=\"contour\">"
+         "      <Layer id=\"bar\" width=\"200\" height=\"160\">"
+         "        <Rectangle position=\"100,30\" size=\"160,20\"/>"
+         "        <Fill color=\"#111111\"/>"
+         "      </Layer>"
+         "      <Layer id=\"glass\" width=\"200\" height=\"160\">"
+         "        <Rectangle position=\"100,80\" size=\"200,160\"/>"
+         "        <Fill color=\"#FFFFFF\" alpha=\"0.1\"/>" +
+         blurStyle +
+         "      </Layer>"
+         "    </Layer>"
+         "  </Layer>"
+         "</pagx>";
+}
+
+// A `clip-path` makes its element a CSS Backdrop Root, so a `backdrop-filter` emitted below it can
+// only sample pixels painted inside the clip — the window fill is a sibling of the clip and the page
+// behind it is outside entirely, leaving the sampled backdrop transparent and the blur a visual
+// no-op. When the contour spans exactly the layer's rounded border box, `overflow:hidden` clips
+// identically without becoming a Backdrop Root.
+CLI_TEST(PAGXHtmlTest, ContourMaskAvoidsClipPathAboveBackgroundBlur) {
+  auto html = LoadXMLAndConvert(GlassInsideContourMaskXML(true));
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("backdrop-filter:blur(10px)"), std::string::npos)
+      << "the BackgroundBlurStyle must still emit a backdrop-filter";
+  EXPECT_EQ(html.find("clip-path:url("), std::string::npos)
+      << "no clip-path may sit above the backdrop-filter, or it loses its backdrop";
+  auto clipTag = FindTagContaining(html, "id=\"windowClip\"");
+  ASSERT_FALSE(clipTag.empty());
+  EXPECT_NE(clipTag.find("overflow:hidden"), std::string::npos)
+      << "the contour mask must still clip, via overflow instead of clip-path";
+  EXPECT_NE(clipTag.find("border-radius:12px"), std::string::npos)
+      << "overflow:hidden clips the border box, so it needs the mask's corner radius";
+}
+
+// The swap above is deliberately narrow: without a BackgroundBlurStyle underneath there is no
+// Backdrop Root to avoid, so contour masks keep using clip-path.
+CLI_TEST(PAGXHtmlTest, ContourMaskKeepsClipPathWithoutBackgroundBlur) {
+  auto html = LoadXMLAndConvert(GlassInsideContourMaskXML(false));
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(html.find("backdrop-filter"), std::string::npos);
+  EXPECT_NE(html.find("clip-path:url("), std::string::npos)
+      << "contour masks must still use clip-path when no background blur sits below";
 }
 
 // The mask SVG must enclose geometry contributed by the mask layer's descendants, not just the

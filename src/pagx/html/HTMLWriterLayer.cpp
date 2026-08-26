@@ -1428,6 +1428,116 @@ static std::string LayerBoxShadowBorderRadius(const Layer* layer) {
   return {};
 }
 
+// Tests whether `bounds` occupies exactly a containerW x containerH box anchored at the origin,
+// within a half-pixel tolerance. `overflow:hidden` always clips at the element's own box, so a
+// contour mask may only be swapped for it when the mask shape spans precisely that box — a shape
+// merely covering it would clip looser than the mask does.
+static bool ShapeMatchesLayerBox(const Rect& bounds, float containerW, float containerH) {
+  return std::fabs(bounds.x) <= 0.5f && std::fabs(bounds.y) <= 0.5f &&
+         std::fabs(bounds.width - containerW) <= 0.5f &&
+         std::fabs(bounds.height - containerH) <= 0.5f;
+}
+
+// Returns a CSS border-radius value string (without the property prefix, e.g. "10px" or "50%") when
+// `layer`'s contour mask is a single Rectangle or Ellipse spanning exactly the layer's border box,
+// meaning the clip can be emitted as `overflow:hidden` plus that radius. "0" means square corners.
+// Returns an empty string for any other mask geometry.
+//
+// Used to keep a nested BackgroundBlurStyle working: `clip-path` turns the layer into a CSS Backdrop
+// Root, so a `backdrop-filter` emitted anywhere below it can only sample pixels painted inside the
+// clip. The layer's own Fill is emitted as a sibling of the mask target and the page behind it is
+// outside the clip entirely, so the sampled backdrop is almost fully transparent and the blur
+// silently degrades to a no-op. `overflow:hidden` clips the same box without becoming a Backdrop
+// Root.
+static std::string ContourMaskBorderRadius(const Layer* layer) {
+  auto* mask = layer->mask;
+  // writeClipContent also walks the mask's children and composition, contributing geometry that a
+  // border-radius box cannot reproduce.
+  if (mask == nullptr || !mask->children.empty() || mask->composition != nullptr) {
+    return {};
+  }
+  // writeClipContent folds the mask layer's own transform into the clip geometry, so only an
+  // untransformed mask leaves the shape bounds directly comparable to the layer's border box.
+  Matrix maskMatrix = mask->matrix;
+  if (mask->x != 0 || mask->y != 0) {
+    maskMatrix = Matrix::Translate(mask->x, mask->y) * maskMatrix;
+  }
+  if (!maskMatrix.isIdentity()) {
+    return {};
+  }
+  // A Repeater sizes the layer div from the union bounds of all copies instead of layoutBounds(),
+  // so the border box `overflow:hidden` would clip against is not the box validated here.
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Repeater) {
+      return {};
+    }
+  }
+  auto layerBounds = layer->layoutBounds();
+  if (layerBounds.width <= 0 || layerBounds.height <= 0) {
+    return {};
+  }
+  // writeClipContent emits one SVG shape per geometry element and ignores paint elements, so the
+  // clip reduces to a border-radius box only when a lone Rectangle or Ellipse carries it.
+  const Element* shape = nullptr;
+  for (auto* e : mask->contents) {
+    auto type = e->nodeType();
+    if (type == NodeType::Fill || type == NodeType::Stroke) {
+      continue;
+    }
+    // Path and Polystar contribute geometry of their own, while MergePath, TrimPath, RoundCorner,
+    // Repeater and Group reshape it; none of those survive a reduction to border-radius.
+    if (shape != nullptr || (type != NodeType::Rectangle && type != NodeType::Ellipse)) {
+      return {};
+    }
+    shape = e;
+  }
+  if (shape == nullptr) {
+    return {};
+  }
+  if (shape->nodeType() == NodeType::Rectangle) {
+    auto r = static_cast<const Rectangle*>(shape);
+    if (!ShapeMatchesLayerBox(r->layoutBounds(), layerBounds.width, layerBounds.height)) {
+      return {};
+    }
+    return r->roundness > 0 ? CssFloatToString(r->roundness) + "px" : "0";
+  }
+  auto el = static_cast<const Ellipse*>(shape);
+  if (!ShapeMatchesLayerBox(el->layoutBounds(), layerBounds.width, layerBounds.height)) {
+    return {};
+  }
+  return "50%";
+}
+
+// Returns true when `layer` or any descendant carries a BackgroundBlurStyle that emits a CSS
+// `backdrop-filter`, meaning no ancestor along that path may use `clip-path`.
+static bool SubtreeHasBackgroundBlur(const Layer* layer, int depth) {
+  if (depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
+    return false;
+  }
+  for (auto* ls : layer->styles) {
+    if (ls->nodeType() != NodeType::BackgroundBlurStyle) {
+      continue;
+    }
+    auto blur = static_cast<const BackgroundBlurStyle*>(ls);
+    if ((blur->blurX + blur->blurY) * 0.5f > 0) {
+      return true;
+    }
+  }
+  for (auto* child : layer->children) {
+    if (SubtreeHasBackgroundBlur(child, depth + 1)) {
+      return true;
+    }
+  }
+  if (layer->composition != nullptr) {
+    for (auto* compLayer : layer->composition->layers) {
+      if (SubtreeHasBackgroundBlur(compLayer, depth + 1)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Describes the geometry of a layer's primary fill shape (the first Rectangle or Ellipse in
 // layer->contents) in layer-local coordinates, so a sibling <div> can reproduce just that outline
 // without inheriting the alpha of the layer's other descendants or filter outputs.
@@ -2303,8 +2413,22 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   if (layer->mask != nullptr) {
     if (layer->maskType == MaskType::Contour) {
-      auto clipId = writeClipDef(layer->mask);
-      style += ";clip-path:url(#" + clipId + ")";
+      // Prefer `overflow:hidden` over `clip-path` whenever a BackgroundBlurStyle lives below this
+      // layer: `clip-path` would make the layer a Backdrop Root and starve that blur's backdrop.
+      // Only a mask spanning exactly the layer's rounded border box clips identically that way.
+      std::string maskRadius;
+      if (SubtreeHasBackgroundBlur(layer, 0)) {
+        maskRadius = ContourMaskBorderRadius(layer);
+      }
+      if (maskRadius.empty()) {
+        auto clipId = writeClipDef(layer->mask);
+        style += ";clip-path:url(#" + clipId + ")";
+      } else {
+        style += ";overflow:hidden";
+        if (maskRadius != "0") {
+          style += ";border-radius:" + maskRadius;
+        }
+      }
     } else {
       auto pos = layer->renderPosition();
       style += writeMaskCSS(layer->mask, layer->maskType, pos);
