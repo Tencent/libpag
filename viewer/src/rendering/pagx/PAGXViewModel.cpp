@@ -579,6 +579,7 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   loaderOffset = 0;
   loaderChunkCount = 0;
   loaderMaxLineWidth = 0;
+  loaderChunkSize = 64 * 1024;
   loaderDocument = nullptr;
   warmupDocument = nullptr;
   warmupBlockNumber = 0;
