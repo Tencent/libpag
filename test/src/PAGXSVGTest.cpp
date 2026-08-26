@@ -5798,4 +5798,67 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateRoundnessStrokeWidthAndShadowBlur) {
   SaveFile(pagxXml, "PAGXSVGTest/animate_roundness_stroke_width_shadow.pagx");
 }
 
+/**
+ * Test SVG import: animateTransform rotate 0→360 sampled at the midpoint decomposes to 0
+ * degrees, documenting the current shortest-arc limitation of matrix-channel interpolation.
+ *
+ * Baking an angle into a Matrix loses winding (DecomposeAffine recovers rotation via atan2,
+ * confined to (-π, π]); MixDecomposed then interpolates the shortest arc. For 0→360 both
+ * endpoints decompose to 0°, so every interpolated frame stays at 0° — the full turn is
+ * silently dropped. If the importer later splits such rotations into ≤180° segments at bake
+ * time (so each segment stays within the shortest-arc window), update this expectation to 180.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateFullTurnInterpolation) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "from=\"0\" to=\"360\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  // Endpoint keyframes: rotate(0) and rotate(360) both bake to the identity matrix.
+  EXPECT_TRUE(ch->keyframes.front().value.isIdentity());
+  EXPECT_NEAR(ch->keyframes.back().value.a, 1.0f, 1e-4f);
+  EXPECT_NEAR(ch->keyframes.back().value.b, 0.0f, 1e-4f);
+  // Midpoint (frame 60 of 120 at 60fps): the sampled matrix decomposes to ~0 degrees.
+  auto mid = std::get<pagx::Matrix>(ch->evaluateAt(60));
+  float midAngle = std::atan2(mid.b, mid.a) * 180.0f / static_cast<float>(M_PI);
+  EXPECT_NEAR(midAngle, 0.0f, 0.1f);
+}
+
+/**
+ * Test SVG import: animateTransform rotate 0→270 sampled at the midpoint decomposes to -45
+ * degrees instead of the intended +135, documenting the second face of the shortest-arc
+ * limitation. atan2 recovers 270° as -90°, so the tween runs 0→-90 and the midpoint lands at
+ * -45. If the importer later splits >180° rotations into ≤180° segments at bake time, update
+ * this expectation to 135.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate270Interpolation) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animateTransform attributeName=\"transform\" type=\"rotate\" "
+      "from=\"0\" to=\"270\" dur=\"2s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  ASSERT_EQ(obj->channels.size(), 1u);
+  EXPECT_EQ(obj->channels[0]->name, "matrix");
+  auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
+  // Endpoint: rotate(270) bakes to the matrix of -90 (cos270=0, sin270=-1).
+  EXPECT_NEAR(ch->keyframes.back().value.b, -1.0f, 1e-4f);
+  // Midpoint: shortest arc takes 0→-90, so frame 60 sits at -45 (not the intended +135).
+  auto mid = std::get<pagx::Matrix>(ch->evaluateAt(60));
+  float midAngle = std::atan2(mid.b, mid.a) * 180.0f / static_cast<float>(M_PI);
+  EXPECT_NEAR(midAngle, -45.0f, 0.1f);
+}
+
 }  // namespace pag
