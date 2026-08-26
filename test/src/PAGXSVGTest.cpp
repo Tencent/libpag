@@ -5873,4 +5873,237 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate270Interpolation) {
   EXPECT_NEAR(midAngle, 135.0f, 0.1f);
 }
 
+/**
+ * Test SVG import: negative begin (begin="-0.5s") starts the animation before the timeline
+ * origin — keyframe times go negative and evaluation at time 0 lands mid-animation.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_NegativeBegin) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"0;1\" begin=\"-0.5s\" dur=\"2s\" "
+      "fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // Keyframes at -30 and 90 (dur 2s at 60fps, offset by -0.5s).
+  ASSERT_EQ(ch->keyframes.size(), 2u);
+  EXPECT_EQ(ch->keyframes[0].time, -30);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.0f);
+  EXPECT_EQ(ch->keyframes[1].time, 90);
+  // At time 0 the animation is 25% through (0 -> 1 over [-30, 90]).
+  EXPECT_FLOAT_EQ(std::get<float>(ch->evaluateAt(0)), 0.25f);
+}
+
+/**
+ * Test SVG import: repeatDur="2.5s" with dur="1s" resolves to an equivalent repeatCount of
+ * 2.5, expanding like a fractional repeatCount.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_RepeatDur) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"1;0\" dur=\"1s\" repeatDur=\"2.5s\" "
+      "fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // 2.5 repeats of 1s at 60fps = 150 frames.
+  EXPECT_EQ(anim->duration, 150);
+  auto* obj = anim->objects[0];
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // Same expansion as repeatCount="2.5": 5 keyframes with a fractional tail at 150.
+  ASSERT_EQ(ch->keyframes.size(), 5u);
+  EXPECT_EQ(ch->keyframes[4].time, 150);
+  EXPECT_FLOAT_EQ(ch->keyframes[4].value, 0.5f);
+}
+
+/**
+ * Test SVG import: to-only animation (no from/values) approximates the base value with the
+ * target's static value.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ToOnlyAnimation) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" to=\"0.2\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // Base value (alpha defaults to 1) -> 0.2: keyframes 0(1.0) and 60(0.2).
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 1.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 0.2f);
+  EXPECT_EQ(ch->keyframes[1].time, 60);
+}
+
+/**
+ * Test SVG import: by-only animation animates from the static base value to base + by.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ByOnlyAnimation) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" by=\"-0.5\" dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // Base 1.0 -> 1.0 + (-0.5) = 0.5.
+  ASSERT_GE(ch->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 1.0f);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 0.5f);
+}
+
+/**
+ * Test SVG import: syncbase begin="id.end" chains the second animation to the first one's
+ * active end (begin + dur * repeats).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SyncbaseBeginEnd) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate id=\"first\" attributeName=\"opacity\" values=\"1;0.3\" dur=\"2s\" "
+      "fill=\"freeze\"/>"
+      "<animate attributeName=\"fill\" values=\"#FF0000;#0000FF\" begin=\"first.end\" "
+      "dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // The fill animation begins at first.end = 2s (frame 120); its color keyframes start there.
+  pagx::TypedChannel<pagx::Color>* colorChannel = nullptr;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->name == "color") {
+        colorChannel = static_cast<pagx::TypedChannel<pagx::Color>*>(ch);
+      }
+    }
+  }
+  ASSERT_NE(colorChannel, nullptr);
+  // begin=first.end=2s inserts a base-value Hold keyframe at frame 0, then the animation
+  // keyframes at 120 and 180.
+  ASSERT_GE(colorChannel->keyframes.size(), 3u);
+  EXPECT_EQ(colorChannel->keyframes[0].time, 0);
+  EXPECT_EQ(colorChannel->keyframes[1].time, 120);
+  EXPECT_EQ(colorChannel->keyframes[2].time, 180);
+  // Document duration covers the chained animation.
+  EXPECT_EQ(anim->duration, 180);
+}
+
+/**
+ * Test SVG import: syncbase begin="id.begin+0.5s" and begin="id.repeat(2)" resolve against
+ * the target's begin, dur, and repeat index.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SyncbaseBeginOffsetAndRepeat) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\" stroke=\"black\">"
+      "<animate id=\"base\" attributeName=\"opacity\" values=\"1;0.3\" dur=\"1s\" "
+      "fill=\"freeze\"/>"
+      "<animate attributeName=\"stroke-width\" from=\"2\" to=\"6\" begin=\"base.begin+0.5s\" "
+      "dur=\"0.5s\" fill=\"freeze\"/>"
+      "</rect>"
+      "<rect x=\"60\" width=\"30\" height=\"30\" fill=\"blue\" stroke=\"black\">"
+      "<animate attributeName=\"stroke-width\" from=\"1\" to=\"4\" begin=\"base.repeat(2)\" "
+      "dur=\"0.5s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // Rect 1: begin = base.begin + 0.5s → first animation keyframe at frame 30 (a base-value
+  // Hold keyframe sits at frame 0).
+  // Rect 2: begin = base.begin + dur * 2 → first animation keyframe at frame 120.
+  bool hasKeyAt30 = false;
+  bool hasKeyAt120 = false;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->name != "width") {
+        continue;
+      }
+      auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
+      for (const auto& key : fch->keyframes) {
+        if (key.time == 30 && std::abs(key.value - 2.0f) < 0.01f) {
+          hasKeyAt30 = true;
+        }
+        if (key.time == 120 && std::abs(key.value - 1.0f) < 0.01f) {
+          hasKeyAt120 = true;
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(hasKeyAt30);
+  EXPECT_TRUE(hasKeyAt120);
+}
+
+/**
+ * Test SVG import: cyclic syncbase references (a waits on b.end, b waits on a.end) fall back
+ * to begin=0 instead of deadlocking the solver.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_SyncbaseCycleFallback) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate id=\"x\" attributeName=\"opacity\" values=\"1;0.3\" begin=\"y.end\" "
+      "dur=\"1s\" fill=\"freeze\"/>"
+      "<animate id=\"y\" attributeName=\"fill\" values=\"#FF0000;#0000FF\" begin=\"x.end\" "
+      "dur=\"1s\" fill=\"freeze\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  // Both fall back to begin=0: animations parse normally with keyframes from frame 0.
+  bool hasZeroStart = false;
+  for (auto* obj : anim->objects) {
+    for (auto* ch : obj->channels) {
+      if (ch->valueType() == pagx::ChannelValueType::Float) {
+        auto* fch = static_cast<pagx::TypedChannel<float>*>(ch);
+        if (!fch->keyframes.empty() && fch->keyframes.front().time == 0) {
+          hasZeroStart = true;
+        }
+      }
+    }
+  }
+  EXPECT_TRUE(hasZeroStart);
+}
+
+/**
+ * Test SVG import: end="1s" truncates the active duration — keyframes beyond the end time are
+ * replaced by a Hold keyframe carrying the end-time value, and fill="remove" (default) reverts
+ * to the base value right after.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_EndTimeTruncation) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<rect width=\"50\" height=\"50\" fill=\"red\">"
+      "<animate attributeName=\"opacity\" values=\"0;100\" dur=\"2s\" end=\"1s\"/>"
+      "</rect></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations[0]);
+  auto* obj = anim->objects[0];
+  auto* ch = static_cast<pagx::TypedChannel<float>*>(obj->channels[0]);
+  // Truncated at frame 60: the original end keyframe (frame 120, value 100) is replaced by a
+  // Hold keyframe at 60 with the interpolated value 50, then fill=remove reverts to base (1.0)
+  // at 61.
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  EXPECT_EQ(ch->keyframes[0].time, 0);
+  EXPECT_FLOAT_EQ(ch->keyframes[0].value, 0.0f);
+  EXPECT_EQ(ch->keyframes[1].time, 60);
+  EXPECT_FLOAT_EQ(ch->keyframes[1].value, 50.0f);
+  EXPECT_EQ(ch->keyframes[1].interpolation, pagx::KeyframeInterpolationType::Hold);
+  EXPECT_EQ(ch->keyframes[2].time, 61);
+  EXPECT_FLOAT_EQ(ch->keyframes[2].value, 1.0f);
+  EXPECT_EQ(anim->duration, 60);
+}
+
 }  // namespace pag

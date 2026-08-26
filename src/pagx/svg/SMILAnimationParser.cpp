@@ -262,6 +262,383 @@ static double ParseRepeatCount(const std::string& value) {
   return count;
 }
 
+// Resolves the effective repeat count from repeatCount and repeatDur. SMIL: repeatDur specifies
+// the total duration of the repetitions, so the equivalent count is repeatDur / dur. When both
+// are set, the one that expires first wins; "indefinite" repeatCount wins outright. Returns -1.0
+// for indefinite, otherwise a count >= 1.0.
+static double ResolveRepeatCount(const std::string& repeatCountStr, const std::string& repeatDurStr,
+                                 double durSeconds) {
+  double count = ParseRepeatCount(repeatCountStr);
+  if (count < 0.0) {
+    return -1.0;
+  }
+  double repeatDurSeconds = SMILAnimationParser::parseSMILClockValue(repeatDurStr);
+  if (repeatDurSeconds > 0.0 && durSeconds > 0.0) {
+    double fromDur = repeatDurSeconds / durSeconds;
+    if (fromDur < 1.0) {
+      fromDur = 1.0;
+    }
+    // repeatCount unset (count == 1 with an empty attribute) → repeatDur alone; both set → the
+    // earlier expiry wins (the smaller count).
+    if (repeatCountStr.empty() || fromDur < count) {
+      count = fromDur;
+    }
+  }
+  return count;
+}
+
+// A single syncbase reference parsed from a begin/end list item:
+//   id                    → target's begin
+//   id.begin (+offset)    → target's begin + offset
+//   id.end   (+offset)    → target's active end (begin + dur * repeats) + offset
+//   id.repeat(n) (+offset)→ target's begin + dur * n + offset
+struct SyncBaseRef {
+  bool valid = false;
+  std::string targetId = {};
+  int eventKind = 0;  // 0 = begin, 1 = end, 2 = repeat(n)
+  int repeatIndex = 1;
+  double offsetSeconds = 0;
+};
+
+// True when the trimmed token looks like a clock value (starts with a digit, sign, or dot).
+// Interactive offsets like "click" and "accessKey(...)" fail this test.
+static bool IsClockToken(const std::string& token) {
+  auto first = token.find_first_not_of(" \t");
+  if (first == std::string::npos) {
+    return false;
+  }
+  char c = token[first];
+  return (c >= '0' && c <= '9') || c == '-' || c == '+' || c == '.';
+}
+
+// SMIL interactive event names; these have no PAGX equivalent and are ignored as begin/end
+// offsets. Without this check a bare "click" would be mistaken for a syncbase target id.
+static bool IsInteractiveEvent(const std::string& s) {
+  return s == "click" || s == "focusin" || s == "focusout" || s == "activate" || s == "mousedown" ||
+         s == "mouseup" || s == "mouseover" || s == "mousemove" || s == "mouseout" ||
+         s == "beginEvent" || s == "endEvent" || s == "repeatEvent" ||
+         s.compare(0, 10, "accessKey(") == 0;
+}
+
+// Parses one begin/end list item. Returns a valid SyncBaseRef for syncbase syntax; clock values
+// and interactive offsets (click/accessKey) are not syncbases (the caller handles those).
+static SyncBaseRef ParseSyncBase(const std::string& token) {
+  SyncBaseRef ref = {};
+  std::string s = token;
+  // Trim whitespace.
+  auto first = s.find_first_not_of(" \t");
+  if (first == std::string::npos) {
+    return ref;
+  }
+  auto last = s.find_last_not_of(" \t");
+  s = s.substr(first, last - first + 1);
+
+  // Split the trailing +/- clock offset, if any.
+  double offset = 0;
+  for (size_t i = 1; i < s.size(); ++i) {
+    if (s[i] == '+' || s[i] == '-') {
+      offset = SMILAnimationParser::parseSMILClockValue(s.substr(i));
+      s = s.substr(0, i);
+      break;
+    }
+  }
+  auto dot = s.rfind('.');
+  if (dot == std::string::npos || dot == 0 || dot + 1 >= s.size()) {
+    // A bare id (no event suffix) is a valid syncbase defaulting to the target's begin. Clock
+    // values ("1s") and interactive event names ("click") must not be mistaken for ids.
+    if (!s.empty() && s.find_first_of(" \t()") == std::string::npos && !IsClockToken(s) &&
+        !IsInteractiveEvent(s)) {
+      ref.valid = true;
+      ref.targetId = s;
+      ref.eventKind = 0;
+      ref.offsetSeconds = offset;
+    }
+    return ref;
+  }
+  ref.targetId = s.substr(0, dot);
+  auto event = s.substr(dot + 1);
+  if (event == "begin") {
+    ref.valid = true;
+    ref.eventKind = 0;
+  } else if (event == "end") {
+    ref.valid = true;
+    ref.eventKind = 1;
+  } else if (event.compare(0, 7, "repeat(") == 0 && event.back() == ')') {
+    ref.valid = true;
+    ref.eventKind = 2;
+    ref.repeatIndex = std::max(1, atoi(event.substr(7, event.size() - 8).c_str()));
+  }
+  ref.offsetSeconds = offset;
+  return ref;
+}
+
+// Truncates a channel's keyframes at endFrame: evaluates the channel at endFrame, drops
+// keyframes beyond it, and appends a Hold keyframe carrying the evaluated value so fill="freeze"
+// holds the end-time value and fill="remove" (whose base-value keyframe is added later at
+// endFrame+1 by AddBaseValueKeyframes) reverts from there.
+static void ApplyEndTimeLimit(Channel* channel, ChannelValueType valueType, Frame endFrame) {
+  switch (valueType) {
+    case ChannelValueType::Float: {
+      auto* ch = static_cast<TypedChannel<float>*>(channel);
+      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
+        return;
+      }
+      float value = std::get<float>(ch->evaluateAt(endFrame));
+      ch->keyframes.erase(
+          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
+                         [endFrame](const Keyframe<float>& k) { return k.time > endFrame; }),
+          ch->keyframes.end());
+      Keyframe<float> key = {};
+      key.time = endFrame;
+      key.value = value;
+      key.interpolation = KeyframeInterpolationType::Hold;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Color: {
+      auto* ch = static_cast<TypedChannel<Color>*>(channel);
+      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
+        return;
+      }
+      Color value = std::get<Color>(ch->evaluateAt(endFrame));
+      ch->keyframes.erase(
+          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
+                         [endFrame](const Keyframe<Color>& k) { return k.time > endFrame; }),
+          ch->keyframes.end());
+      Keyframe<Color> key = {};
+      key.time = endFrame;
+      key.value = value;
+      key.interpolation = KeyframeInterpolationType::Hold;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    case ChannelValueType::Matrix: {
+      auto* ch = static_cast<TypedChannel<Matrix>*>(channel);
+      if (ch->keyframes.empty() || ch->keyframes.back().time <= endFrame) {
+        return;
+      }
+      Matrix value = std::get<Matrix>(ch->evaluateAt(endFrame));
+      ch->keyframes.erase(
+          std::remove_if(ch->keyframes.begin(), ch->keyframes.end(),
+                         [endFrame](const Keyframe<Matrix>& k) { return k.time > endFrame; }),
+          ch->keyframes.end());
+      Keyframe<Matrix> key = {};
+      key.time = endFrame;
+      key.value = value;
+      key.interpolation = KeyframeInterpolationType::Hold;
+      ch->keyframes.push_back(key);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+// Timing info for one SMIL animation element, gathered in a pre-scan and used to solve
+// syncbase references (begin="id.end") across all elements before any parsing happens.
+struct TimingInfo {
+  const DOMNode* element = nullptr;
+  std::string id = {};
+  double durSeconds = 0;
+  double repeatCount = 1;  // >= 1, or -1 for indefinite
+  // begin list: the earliest clock item and the first syncbase item.
+  bool hasClockBegin = false;
+  double clockBegin = 0;
+  SyncBaseRef beginSync = {};
+  bool hasBeginSync = false;
+  bool beginResolved = false;
+  double resolvedBegin = 0;
+  // end: single value (first item of the list).
+  bool hasClockEnd = false;
+  double clockEnd = -1;
+  SyncBaseRef endSync = {};
+  bool hasEndSync = false;
+  bool endResolved = false;
+  double resolvedEnd = -1;
+};
+
+// The active duration of a timing target: dur * repeats. Indefinite repeats and missing dur
+// fall back to a single dur (the sync event time is approximate in those rare cases).
+static double ActiveDuration(const TimingInfo& info) {
+  if (info.durSeconds <= 0) {
+    return 0;
+  }
+  if (info.repeatCount < 0) {
+    return info.durSeconds;
+  }
+  return info.durSeconds * info.repeatCount;
+}
+
+// Computes the document time a syncbase reference points at, given its (already resolved)
+// target.
+static double SyncEventTime(const TimingInfo& target, const SyncBaseRef& ref) {
+  double base = target.resolvedBegin;
+  if (ref.eventKind == 1) {
+    base += ActiveDuration(target);
+  } else if (ref.eventKind == 2) {
+    base += target.durSeconds * static_cast<double>(ref.repeatIndex);
+  }
+  return base + ref.offsetSeconds;
+}
+
+// Pre-scans every SMIL element in the document, parses begin/end, and solves syncbase
+// references to fixed-point (chains like a.end -> b.end -> c resolve in dependency order;
+// cycles fall back to 0). Interactive offsets resolve to their clock component or 0. Returns
+// per-element resolved timing consumed by the parse functions.
+std::unordered_map<const DOMNode*, ResolvedTiming> SMILAnimationParser::ResolveAllTimings(
+    SVGParserContext& ctx,
+    const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations) {
+  std::vector<TimingInfo> infos = {};
+  std::unordered_map<std::string, size_t> idToIndex = {};
+
+  // Collect timing info for every animation element (id, dur, repeatCount, begin/end lists).
+  for (const auto& pair : smilAnimations) {
+    const auto& group = pair.second;
+    std::vector<const std::vector<std::shared_ptr<DOMNode>>*> elements = {
+        &group.animates, &group.sets, &group.animateTransforms, &group.animateMotions};
+    for (const auto* list : elements) {
+      for (const auto& el : *list) {
+        if (el == nullptr) {
+          continue;
+        }
+        TimingInfo info = {};
+        info.element = el.get();
+        info.id = ctx.getAttribute(el, "id");
+        info.durSeconds = parseSMILClockValue(ctx.getAttribute(el, "dur"));
+        info.repeatCount = ResolveRepeatCount(ctx.getAttribute(el, "repeatCount"),
+                                              ctx.getAttribute(el, "repeatDur"), info.durSeconds);
+
+        auto beginTokens = SplitSemicolons(ctx.getAttribute(el, "begin"));
+        for (const auto& token : beginTokens) {
+          SyncBaseRef sync = ParseSyncBase(token);
+          if (sync.valid) {
+            if (!info.hasBeginSync) {
+              info.beginSync = sync;
+              info.hasBeginSync = true;
+            }
+            continue;
+          }
+          if (IsClockToken(token)) {
+            double t = parseSMILClockValue(token);
+            if (!info.hasClockBegin || t < info.clockBegin) {
+              info.clockBegin = t;
+              info.hasClockBegin = true;
+            }
+          }
+          // Interactive offsets (click, accessKey) have no PAGX equivalent: skipped.
+        }
+
+        auto endTokens = SplitSemicolons(ctx.getAttribute(el, "end"));
+        if (!endTokens.empty()) {
+          SyncBaseRef sync = ParseSyncBase(endTokens.front());
+          if (sync.valid) {
+            info.endSync = sync;
+            info.hasEndSync = true;
+          } else if (IsClockToken(endTokens.front())) {
+            info.clockEnd = parseSMILClockValue(endTokens.front());
+            info.hasClockEnd = true;
+          }
+        }
+
+        if (!info.id.empty()) {
+          idToIndex[info.id] = infos.size();
+        }
+        infos.push_back(std::move(info));
+      }
+    }
+  }
+
+  // Solve begin times to a fixed point.
+  bool progress = true;
+  while (progress) {
+    progress = false;
+    for (auto& info : infos) {
+      if (info.beginResolved) {
+        continue;
+      }
+      bool blocked = false;
+      double best = 0;
+      bool hasCandidate = false;
+      if (info.hasClockBegin) {
+        best = info.clockBegin;
+        hasCandidate = true;
+      }
+      if (info.hasBeginSync) {
+        auto it = idToIndex.find(info.beginSync.targetId);
+        if (it == idToIndex.end()) {
+          // Unknown target id: treat the offset alone as the begin time.
+          double t = info.beginSync.offsetSeconds;
+          if (!hasCandidate || t < best) {
+            best = t;
+            hasCandidate = true;
+          }
+        } else if (infos[it->second].beginResolved) {
+          double t = SyncEventTime(infos[it->second], info.beginSync);
+          if (!hasCandidate || t < best) {
+            best = t;
+            hasCandidate = true;
+          }
+        } else {
+          blocked = true;
+        }
+      }
+      if (!blocked && (hasCandidate || (!info.hasClockBegin && !info.hasBeginSync))) {
+        // No begin attribute at all resolves to 0.
+        info.resolvedBegin = hasCandidate ? best : 0;
+        info.beginResolved = true;
+        progress = true;
+      }
+    }
+  }
+  // Cyclic references never resolved: fall back to 0.
+  for (auto& info : infos) {
+    if (!info.beginResolved) {
+      info.resolvedBegin = 0;
+      info.beginResolved = true;
+    }
+  }
+
+  // Solve end times (single value each: clock or syncbase).
+  progress = true;
+  while (progress) {
+    progress = false;
+    for (auto& info : infos) {
+      if (info.endResolved) {
+        continue;
+      }
+      if (info.hasClockEnd) {
+        info.resolvedEnd = info.clockEnd;
+        info.endResolved = true;
+        progress = true;
+        continue;
+      }
+      if (!info.hasEndSync) {
+        info.endResolved = true;
+        continue;
+      }
+      auto it = idToIndex.find(info.endSync.targetId);
+      if (it == idToIndex.end()) {
+        info.resolvedEnd = info.endSync.offsetSeconds;
+        info.endResolved = true;
+        progress = true;
+      } else if (infos[it->second].beginResolved) {
+        info.resolvedEnd = SyncEventTime(infos[it->second], info.endSync);
+        info.endResolved = true;
+        progress = true;
+      }
+    }
+  }
+
+  std::unordered_map<const DOMNode*, ResolvedTiming> result = {};
+  for (const auto& info : infos) {
+    ResolvedTiming timing = {};
+    timing.beginSeconds = info.resolvedBegin;
+    timing.endSeconds = info.endResolved ? info.resolvedEnd : -1;
+    result[info.element] = timing;
+  }
+  return result;
+}
+
 // Expands a float-typed channel's keyframes to repeat the animation repeatCount times. When
 // accumulate is true, each repetition's values are offset by k * (lastValue - firstValue) so the
 // animation accumulates across loops. The original keyframes are replaced by the expanded set.
@@ -1227,11 +1604,10 @@ static void AppendKeyframe(Channel* channel, ChannelValueType valueType, Frame t
   }
 }
 
-std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, PAGXDocument* doc,
-                                                        const std::shared_ptr<DOMNode>& animElement,
-                                                        const AnimatedNodeInfo& nodeInfo,
-                                                        float frameRate, Frame& outEndFrame,
-                                                        std::string& outTargetId) {
+std::vector<Channel*> SMILAnimationParser::parseAnimate(
+    SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
+    const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
+    Frame& outEndFrame, std::string& outTargetId) {
   std::vector<Channel*> channels = {};
   outTargetId = nodeInfo.targetId;
   if (!animElement) {
@@ -1259,10 +1635,10 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
 
-  auto beginStr = ctx.getAttribute(animElement, "begin");
-  double beginSeconds = parseSMILClockValue(beginStr);
-  Frame beginFrames =
-      (beginSeconds > 0.0) ? static_cast<Frame>(std::round(beginSeconds * frameRate)) : 0;
+  // begin comes pre-resolved by buildAnimation (syncbase references like "id.end" solved against
+  // their targets). Negative values keep negative keyframe times: the animation started before
+  // the timeline origin, so evaluation at time 0 lands mid-animation via the natural clamp.
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
 
   // Parse values: either explicit `values` list or from/to/by.
   auto valuesStr = ctx.getAttribute(animElement, "values");
@@ -1290,8 +1666,30 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
       // For non-numeric types, by is not meaningful; fall back to from→to semantics with by as to.
       keyValues.push_back(byValue);
     }
+  } else if (!toStr.empty()) {
+    // to-only: SMIL animates from the current base value. The true base value is a runtime
+    // sandwich-priority concept; approximate with the target node's static value.
+    keyValues.push_back(ReadBaseValue(target));
+    keyValues.push_back(parseValue(ctx, toStr, target.valueType));
+  } else if (!byStr.empty()) {
+    // by-only: from the base value to base + by (numeric additive types only).
+    KeyValue baseValue = ReadBaseValue(target);
+    KeyValue byValue = parseValue(ctx, byStr, target.valueType);
+    keyValues.push_back(baseValue);
+    if (target.valueType == ChannelValueType::Float) {
+      keyValues.push_back(std::get<float>(baseValue) + std::get<float>(byValue));
+    } else if (target.valueType == ChannelValueType::Color) {
+      Color c = std::get<Color>(baseValue);
+      const Color& by = std::get<Color>(byValue);
+      c.red += by.red;
+      c.green += by.green;
+      c.blue += by.blue;
+      c.alpha += by.alpha;
+      keyValues.push_back(c);
+    } else {
+      keyValues.push_back(byValue);
+    }
   } else {
-    // to-only / by-only without base value is not supported in this phase.
     return channels;
   }
 
@@ -1479,11 +1877,12 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
     }
   }
 
-  // Expand repeatCount: integer N replicates the keyframe sequence N times with time offset.
-  // accumulate="sum" offsets each repetition's values by k*(lastValue - firstValue).
-  // "indefinite" is handled by buildAnimation (sets LoopMode::Loop), not expanded here.
-  auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-  double repeatCount = ParseRepeatCount(repeatCountStr);
+  // Expand repeatCount (resolved against repeatDur): integer N replicates the keyframe sequence
+  // N times with time offset. accumulate="sum" offsets each repetition's values by
+  // k*(lastValue - firstValue). "indefinite" is handled by buildAnimation (sets LoopMode::Loop),
+  // not expanded here.
+  double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
+                                          ctx.getAttribute(animElement, "repeatDur"), durSeconds);
   bool accumulate = (ctx.getAttribute(animElement, "accumulate") == "sum");
   if (repeatCount > 1.0) {
     for (auto* ch : channels) {
@@ -1492,6 +1891,18 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
+  }
+
+  // end limits the active duration: keyframes beyond it are truncated and a Hold keyframe with
+  // the end-time value is appended, so freeze holds that value and remove reverts from there.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < outEndFrame) {
+      for (auto* ch : channels) {
+        ApplyEndTimeLimit(ch, target.valueType, endLimit);
+      }
+      outEndFrame = endLimit;
+    }
   }
 
   // Add base-value keyframes for begin-offset and fill="remove" semantics.
@@ -1508,8 +1919,8 @@ std::vector<Channel*> SMILAnimationParser::parseAnimate(SVGParserContext& ctx, P
 std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXDocument* doc,
                                                     const std::shared_ptr<DOMNode>& setElement,
                                                     const AnimatedNodeInfo& nodeInfo,
-                                                    float frameRate, Frame& outEndFrame,
-                                                    std::string& outTargetId) {
+                                                    float frameRate, const ResolvedTiming& timing,
+                                                    Frame& outEndFrame, std::string& outTargetId) {
   std::vector<Channel*> channels = {};
   outTargetId = nodeInfo.targetId;
   if (!setElement) {
@@ -1534,10 +1945,9 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
   }
   outTargetId = target.nodeId;
 
-  auto beginStr = ctx.getAttribute(setElement, "begin");
-  double beginSeconds = parseSMILClockValue(beginStr);
-  Frame beginFrames =
-      (beginSeconds > 0.0) ? static_cast<Frame>(std::round(beginSeconds * frameRate)) : 0;
+  // begin comes pre-resolved by buildAnimation (syncbase references solved); negative values
+  // mean the set applied before the timeline origin.
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
 
   auto durStr = ctx.getAttribute(setElement, "dur");
   double durSeconds = parseSMILClockValue(durStr);
@@ -1559,6 +1969,13 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
   if (durSeconds > 0.0) {
     endFrame = beginFrames + static_cast<Frame>(std::round(durSeconds * frameRate));
   }
+  // end limits the active duration: the set value holds until end, then remove reverts.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < endFrame) {
+      endFrame = endLimit;
+    }
+  }
   outEndFrame = endFrame;
 
   // Add base-value keyframes for begin-offset and fill="remove" semantics.
@@ -1571,7 +1988,8 @@ std::vector<Channel*> SMILAnimationParser::parseSet(SVGParserContext& ctx, PAGXD
 
 std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
-    const AnimatedNodeInfo& nodeInfo, float frameRate, Frame& outEndFrame) {
+    const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
+    Frame& outEndFrame) {
   std::vector<Channel*> channels = {};
   if (!animElement || nodeInfo.targetLayer == nullptr) {
     return channels;
@@ -1622,10 +2040,9 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
 
-  auto beginStr = ctx.getAttribute(animElement, "begin");
-  double beginSeconds = parseSMILClockValue(beginStr);
-  Frame beginFrames =
-      (beginSeconds > 0.0) ? static_cast<Frame>(std::round(beginSeconds * frameRate)) : 0;
+  // begin comes pre-resolved by buildAnimation (syncbase references solved); negative values
+  // keep negative keyframe times (the animation started before the timeline origin).
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
 
   auto keyTimesStr = ctx.getAttribute(animElement, "keyTimes");
   auto keyTimes = parseKeyTimes(keyTimesStr);
@@ -1721,13 +2138,23 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
   }
   channels.push_back(ch);
 
-  auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-  double repeatCount = ParseRepeatCount(repeatCountStr);
+  double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
+                                          ctx.getAttribute(animElement, "repeatDur"), durSeconds);
   if (repeatCount > 1.0) {
     ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
+  }
+
+  // end limits the active duration: matrix keyframes beyond it are truncated with a Hold
+  // keyframe carrying the end-time value.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < outEndFrame) {
+      ApplyEndTimeLimit(ch, ChannelValueType::Matrix, endLimit);
+      outEndFrame = endLimit;
+    }
   }
 
   // Base value is the layer's static matrix so fill="remove" reverts to the pre-animation
@@ -1741,7 +2168,8 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
 
 std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
     SVGParserContext& ctx, PAGXDocument* doc, const std::shared_ptr<DOMNode>& animElement,
-    const AnimatedNodeInfo& nodeInfo, float frameRate, Frame& outEndFrame) {
+    const AnimatedNodeInfo& nodeInfo, float frameRate, const ResolvedTiming& timing,
+    Frame& outEndFrame) {
   std::vector<Channel*> channels = {};
   if (!animElement || nodeInfo.targetLayer == nullptr) {
     return channels;
@@ -1781,10 +2209,8 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   }
   Frame durFrames = static_cast<Frame>(std::round(durSeconds * frameRate));
 
-  auto beginStr = ctx.getAttribute(animElement, "begin");
-  double beginSeconds = parseSMILClockValue(beginStr);
-  Frame beginFrames =
-      (beginSeconds > 0.0) ? static_cast<Frame>(std::round(beginSeconds * frameRate)) : 0;
+  // begin comes pre-resolved by buildAnimation (syncbase references solved).
+  Frame beginFrames = static_cast<Frame>(std::round(timing.beginSeconds * frameRate));
 
   // Build tgfx::Path from the SVG path data string.
   auto pathData = PathDataFromSVGString(pathStr);
@@ -1872,13 +2298,22 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateMotion(
   }
   channels.push_back(ch);
 
-  auto repeatCountStr = ctx.getAttribute(animElement, "repeatCount");
-  double repeatCount = ParseRepeatCount(repeatCountStr);
+  double repeatCount = ResolveRepeatCount(ctx.getAttribute(animElement, "repeatCount"),
+                                          ctx.getAttribute(animElement, "repeatDur"), durSeconds);
   if (repeatCount > 1.0) {
     ExpandRepeatCount(ch, ChannelValueType::Matrix, durFrames, repeatCount, false);
     outEndFrame = beginFrames + static_cast<Frame>(durFrames * repeatCount);
   } else {
     outEndFrame = beginFrames + durFrames;
+  }
+  // end limits the active duration: matrix keyframes beyond it are truncated with a Hold
+  // keyframe carrying the end-time value.
+  if (timing.endSeconds > timing.beginSeconds) {
+    Frame endLimit = static_cast<Frame>(std::round(timing.endSeconds * frameRate));
+    if (endLimit < outEndFrame) {
+      ApplyEndTimeLimit(ch, ChannelValueType::Matrix, endLimit);
+      outEndFrame = endLimit;
+    }
   }
   auto fillStr = ctx.getAttribute(animElement, "fill");
   bool fillFreeze = (fillStr == "freeze");
@@ -1900,6 +2335,11 @@ Animation* SMILAnimationParser::buildAnimation(
   animation->loop = LoopMode::Once;
   Frame maxEndFrame = 0;
   bool hasIndefiniteLoop = false;
+
+  // Solve begin/end timing for every SMIL element up front (syncbase references like
+  // begin="id.end" need cross-element dependency resolution before any parsing).
+  auto timings = ResolveAllTimings(ctx, smilAnimations);
+  ResolvedTiming defaultTiming = {};
 
   for (const auto& pair : animatedNodeMap) {
     const auto& nodeInfo = pair.second;
@@ -1924,7 +2364,9 @@ Animation* SMILAnimationParser::buildAnimation(
       Frame endFrame = 0;
       bool additive = (ctx.getAttribute(animEl, "additive") == "sum");
       std::string targetId;
-      auto parsedChannels = parseAnimate(ctx, doc, animEl, nodeInfo, frameRate, endFrame, targetId);
+      auto parsedChannels = parseAnimate(
+          ctx, doc, animEl, nodeInfo, frameRate,
+          timings.count(animEl.get()) ? timings[animEl.get()] : defaultTiming, endFrame, targetId);
       for (auto* ch : parsedChannels) {
         layerEntries.push_back({ch, additive, targetId});
       }
@@ -1940,7 +2382,9 @@ Animation* SMILAnimationParser::buildAnimation(
       Frame endFrame = 0;
       bool additive = (ctx.getAttribute(setEl, "additive") == "sum");
       std::string targetId;
-      auto parsedChannels = parseSet(ctx, doc, setEl, nodeInfo, frameRate, endFrame, targetId);
+      auto parsedChannels = parseSet(
+          ctx, doc, setEl, nodeInfo, frameRate,
+          timings.count(setEl.get()) ? timings[setEl.get()] : defaultTiming, endFrame, targetId);
       for (auto* ch : parsedChannels) {
         layerEntries.push_back({ch, additive, targetId});
       }
@@ -1958,8 +2402,10 @@ Animation* SMILAnimationParser::buildAnimation(
       for (const auto& transformEl : group.animateTransforms) {
         Frame endFrame = 0;
         bool additive = (ctx.getAttribute(transformEl, "additive") == "sum");
-        auto parsedChannels =
-            parseAnimateTransform(ctx, doc, transformEl, nodeInfo, frameRate, endFrame);
+        auto parsedChannels = parseAnimateTransform(
+            ctx, doc, transformEl, nodeInfo, frameRate,
+            timings.count(transformEl.get()) ? timings[transformEl.get()] : defaultTiming,
+            endFrame);
         for (auto* ch : parsedChannels) {
           layerEntries.push_back({ch, additive, nodeInfo.targetId});
         }
@@ -1974,7 +2420,9 @@ Animation* SMILAnimationParser::buildAnimation(
       for (const auto& motionEl : group.animateMotions) {
         Frame endFrame = 0;
         bool additive = (ctx.getAttribute(motionEl, "additive") == "sum");
-        auto parsedChannels = parseAnimateMotion(ctx, doc, motionEl, nodeInfo, frameRate, endFrame);
+        auto parsedChannels = parseAnimateMotion(
+            ctx, doc, motionEl, nodeInfo, frameRate,
+            timings.count(motionEl.get()) ? timings[motionEl.get()] : defaultTiming, endFrame);
         for (auto* ch : parsedChannels) {
           layerEntries.push_back({ch, additive, nodeInfo.targetId});
         }
