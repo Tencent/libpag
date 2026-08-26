@@ -1142,9 +1142,9 @@ export class PAGXPlayer extends EventTarget {
      *  machine reports no duration, so the playback bar's toggle (and play()) would bail out
      *  early. The blueprint panel's button drives the view directly instead - an SM has no
      *  wrap-around semantics to honor anyway. On resume from pause, the SM restarts from its
-     *  initial states so a second play press replays the sequence instead of resuming a stale
-     *  frozen frame; we get the reset for free from selectTimelineUnit's default-unit branch
-     *  (see PAGXView.cpp: selecting the default SM resets it, then we flip playing back on). */
+     *  initial states (matches parkPreview's "restart from head" contract): select the
+     *  default SM then clear the selection - the engine's clear-with-previous-selection path
+     *  runs SM.reset() + apply() + playing=true in one shot, no lingering selection. */
     public toggleRawPlayback(): void {
         const view = this.view;
         if (!view) {
@@ -1158,6 +1158,7 @@ export class PAGXPlayer extends EventTarget {
                 .find((node) => node.kind === 'stateMachine' && node.isDefault);
             if (defaultSM != null) {
                 view.selectTimelineUnit('stateMachine', defaultSM.id);
+                view.selectTimelineUnit('', '');
             }
             view.play();
             this.dispatchEvent(new CustomEvent('play'));
