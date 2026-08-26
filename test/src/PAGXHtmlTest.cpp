@@ -193,7 +193,7 @@ CLI_TEST(PAGXHtmlTest, RootDocument) {
   EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
 }
 
-CLI_TEST(PAGXHtmlTest, FullDocumentFitsViewportWidthAndScrollsVertically) {
+CLI_TEST(PAGXHtmlTest, FullDocumentKeepsOriginalSizeAndAllowsScrolling) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/root_document.pagx"));
   ASSERT_TRUE(doc != nullptr);
@@ -203,12 +203,15 @@ CLI_TEST(PAGXHtmlTest, FullDocumentFitsViewportWidthAndScrollsVertically) {
 
   EXPECT_NE(html.find("name=\"viewport\""), std::string::npos);
   EXPECT_NE(html.find("data-pagx-viewport"), std::string::npos);
-  EXPECT_NE(html.find("width:100%;height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto"),
+  EXPECT_NE(html.find("html { margin:0;padding:0;min-width:320px;min-height:220px }"),
             std::string::npos);
-  EXPECT_NE(html.find("const scale=availableWidth/designWidth"), std::string::npos);
-  EXPECT_NE(html.find("canvas.style.transform='scale('+scale+')'"), std::string::npos);
-  EXPECT_NE(html.find("viewport.style.height=designHeight*scale+'px'"), std::string::npos);
-  EXPECT_NE(html.find("new ResizeObserver(resize).observe(viewport)"), std::string::npos);
+  EXPECT_NE(html.find("body { margin:0;padding:0;width:320px;height:220px;overflow:auto"),
+            std::string::npos);
+  EXPECT_NE(html.find("style=\"position:relative;width:320px;height:220px;overflow:visible\""),
+            std::string::npos);
+  EXPECT_EQ(html.find("const scale=availableWidth/designWidth"), std::string::npos);
+  EXPECT_EQ(html.find("canvas.style.transform='scale('+scale+')'"), std::string::npos);
+  EXPECT_EQ(html.find("new ResizeObserver(resize).observe(viewport)"), std::string::npos);
 }
 
 // =============================================================================
