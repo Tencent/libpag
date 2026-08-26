@@ -106,11 +106,13 @@ Rectangle {
             flick.contentX = 0;
             flick.contentY = 0;
         }
-        if (viewModel) {
+        if (viewModel && typeof viewModel.loadEditorText === "function") {
             // Large texts are appended asynchronously in chunks; keyboard input is blocked
             // while busy (see Keys.onPressed in textArea) so Apply/Save never see partial
             // content. readOnly is deliberately NOT used: setting it makes Qt move the
             // cursor to the document end, which scrolls the Flickable to the bottom.
+            // The capability check guards a view-type switch: reset() may run after the host
+            // has rebound viewModel to a non-PAGX one that has no loadEditorText.
             busy = true;
             viewModel.loadEditorText(textArea.textDocument, xml);
         } else {
