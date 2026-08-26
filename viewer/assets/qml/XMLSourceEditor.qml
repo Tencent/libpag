@@ -76,7 +76,6 @@ Rectangle {
     // froze the editor. This single binding is re-evaluated only on lineCountChanged.
     readonly property int documentLineCount: textArea.lineCount
 
-    readonly property bool modified: dirty
     readonly property bool hasDocument: textArea.length > 0
 
     color: backgroundColor
@@ -137,10 +136,6 @@ Rectangle {
     function reset() {
         needsDocumentLoad = false;
         loadXml("");
-    }
-
-    function getText() {
-        return textArea.text;
     }
 
     function handleDiscard() {
