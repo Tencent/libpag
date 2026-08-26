@@ -1859,7 +1859,14 @@ export function pagxCollectWAAPI(
         const authoredTransform = pagxPickProp(
           kf as unknown as Record<string, unknown>, 'transform', 'transform',
         );
-        if (authoredTransform != null && authoredTransform !== 'none') {
+        // Keep `none` in the authored endpoint set. CSS keyframes commonly
+        // omit `from`, in which case Web Animations exposes the synthesized
+        // underlying-value keyframe as `transform: none`. For a full turn such
+        // as `to { transform: rotate(360deg) }`, excluding that implicit start
+        // leaves only one authored transform and defeats the equivalent-matrix
+        // check below: both `none` and 360deg compute to the identity matrix,
+        // so the animation would otherwise collapse to a static transform.
+        if (authoredTransform != null) {
           authoredTransforms.push(authoredTransform);
         }
         const props = pagxNormalizeProps(kf, tgtBox);
@@ -1867,7 +1874,6 @@ export function pagxCollectWAAPI(
         const offset = kf.computedOffset != null ? kf.computedOffset : kf.offset;
         norm.push({ offset: offset != null ? offset : null, props });
       }
-      if (norm.length === 0) continue;
       pagxFillOffsets(norm);
       // A full-turn transform such as rotate(0deg) -> rotate(360deg) resolves
       // both authored endpoints to the identity matrix. Keeping only those two
@@ -1925,6 +1931,7 @@ export function pagxCollectWAAPI(
         }
         if (captured.length > before) continue;
       }
+      if (norm.length === 0) continue;
       const easing = pagxResolveWaapiEasing(anim, effect, ct, target as HTMLElement);
       captured.push({
         el: target as HTMLElement,

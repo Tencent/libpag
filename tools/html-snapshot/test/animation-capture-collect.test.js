@@ -415,6 +415,54 @@ describe('pagxCollectWAAPI', () => {
     expect(captured[0].keyframes.some((stop) =>
       stop.props.transform && stop.props.transform !== 'matrix(1, 0, 0, 1, 0, 0)')).toBe(true);
   });
+
+  test('samples a full turn whose from keyframe is the implicit none value', () => {
+    const { anim, target } = makeAnim();
+    let currentTime = 0;
+    anim.effect.getKeyframes = () => [
+      { transform: 'none', offset: 0 },
+      { transform: 'rotate(360deg)', offset: 1 },
+    ];
+    anim.effect.getComputedTiming = () => ({
+      duration: 800, delay: 0, iterations: Infinity, direction: 'normal',
+    });
+    anim.pause = () => {};
+    Object.defineProperty(anim, 'currentTime', {
+      get: () => currentTime,
+      set: (value) => { currentTime = Number(value); },
+    });
+    global.document = { body: { offsetHeight: 0 }, getAnimations: () => [anim] };
+    global.getComputedStyle = () => {
+      const angle = currentTime / 800 * Math.PI * 2;
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      return {
+        opacity: '1',
+        transform: `matrix(${c}, ${s}, ${-s}, ${c}, 0, 0)`,
+        color: 'rgb(0, 0, 0)',
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+        filter: 'none',
+        clipPath: 'none',
+        fill: 'none',
+        stroke: 'rgb(0, 0, 0)',
+        strokeDashoffset: '0px',
+        boxShadow: 'none',
+        animationName: 'spin',
+        animationTimingFunction: 'linear',
+      };
+    };
+
+    const captured = [];
+    const seen = new Set();
+    pagxCollectWAAPI(captured, seen, 9);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].durationMs).toBe(800);
+    expect(captured[0].iterations).toBe(Infinity);
+    expect(captured[0].keyframes.length).toBeGreaterThan(2);
+    expect(captured[0].keyframes.some((stop) =>
+      stop.props.transform && stop.props.transform !== 'matrix(1, 0, 0, 1, 0, 0)')).toBe(true);
+  });
 });
 
 describe('pagxCollectCSS', () => {

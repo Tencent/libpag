@@ -1093,6 +1093,13 @@ bool HTMLAnimationBuilder::buildForElement(
   std::vector<Keyframe<float>> yKeys;
   std::vector<Keyframe<Matrix>> matrixKeys;
   std::vector<Keyframe<Color>> colorKeys;
+  // A pure rotation can keep transform-origin structural: the animated Layer is placed at the
+  // pivot and its visual child is offset by the inverse pivot. Its matrix keys then contain only
+  // rotation (zero translation), avoiding the centre drift caused by independently interpolating
+  // the translation baked into T(pivot) * R * T(-pivot).
+  bool matrixUsesStructuralPivot = false;
+  float matrixPivotX = 0.0f;
+  float matrixPivotY = 0.0f;
   bool warnedTransform = false;
 
   // Raw (un-pivoted) CSS transform matrix per keyframe, collected first so we can decide once
@@ -1243,19 +1250,32 @@ bool HTMLAnimationBuilder::buildForElement(
       float cx = 0.0f;
       float cy = 0.0f;
       bool hasPivot = ResolvePivot(resolvedStyle, layer, _valueParser, cx, cy);
-      if (!hasPivot) {
-        _diagnostics.warn(
-            "html: transform animation without resolvable transform-origin; pivoting at top-left "
-            "may differ from CSS [subset:animation-unsupported-property]");
-      }
-      Matrix toCenter = Matrix::Translate(cx, cy);
-      Matrix fromCenter = Matrix::Translate(-cx, -cy);
-      for (const auto& ts : transformStops) {
-        Matrix m = ts.second;
-        if (hasPivot) {
-          m = toCenter * m * fromCenter;
+      std::vector<Keyframe<float>> rotationProbe;
+      bool canKeepPivotStructural =
+          hasPivot && layer->matrix3D.isIdentity() &&
+          BuildPureRotationKeys(transformStops, interp, &rotationProbe);
+      if (canKeepPivotStructural) {
+        matrixUsesStructuralPivot = true;
+        matrixPivotX = cx;
+        matrixPivotY = cy;
+        for (const auto& ts : transformStops) {
+          matrixKeys.push_back({ts.first, ts.second, interp, {}, {}});
         }
-        matrixKeys.push_back({ts.first, m, interp, {}, {}});
+      } else {
+        if (!hasPivot) {
+          _diagnostics.warn(
+              "html: transform animation without resolvable transform-origin; pivoting at "
+              "top-left may differ from CSS [subset:animation-unsupported-property]");
+        }
+        Matrix toCenter = Matrix::Translate(cx, cy);
+        Matrix fromCenter = Matrix::Translate(-cx, -cy);
+        for (const auto& ts : transformStops) {
+          Matrix m = ts.second;
+          if (hasPivot) {
+            m = toCenter * m * fromCenter;
+          }
+          matrixKeys.push_back({ts.first, m, interp, {}, {}});
+        }
       }
     }
   }
@@ -1323,6 +1343,14 @@ bool HTMLAnimationBuilder::buildForElement(
   float baselineAlpha = layer->alpha;
   float baselineXY = 0.0f;
   Matrix baselineMatrix = layer->matrix;
+  Matrix matrixChannelBaseline = baselineMatrix;
+  if (matrixUsesStructuralPivot) {
+    // HTMLLayerBuilder has already baked transform-origin into the static Layer matrix. Undo that
+    // bake because the pivot wrapper below supplies T(pivot) and T(-pivot) structurally.
+    Matrix toCenter = Matrix::Translate(matrixPivotX, matrixPivotY);
+    Matrix fromCenter = Matrix::Translate(-matrixPivotX, -matrixPivotY);
+    matrixChannelBaseline = fromCenter * baselineMatrix * toCenter;
+  }
   Color baselineColor = {};
   SolidColor* baselineSolid = nullptr;
   if (!colorKeys.empty()) {
@@ -1365,7 +1393,7 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyFillMode(alphaKeys, spec.fillMode, baselineAlpha, loopOnce, activeEnd);
   ApplyFillMode(xKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
   ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
-  ApplyFillMode(matrixKeys, spec.fillMode, baselineMatrix, loopOnce, activeEnd);
+  ApplyFillMode(matrixKeys, spec.fillMode, matrixChannelBaseline, loopOnce, activeEnd);
   // Color channel fill-mode is conditional on having a target SolidColor; if the lookup failed
   // the channel is dropped below, so the fill-mode mutation would be wasted work and the
   // diagnostic message would be misleading.
@@ -1423,6 +1451,30 @@ bool HTMLAnimationBuilder::buildForElement(
     xyTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
   }
 
+  // Keep a pure rotation's pivot outside the animated matrix. The first split preserves the
+  // element's parent-facing layout slot; the second creates a visual child that carries every
+  // renderable attribute and descendant. Positioning the matrix target at +pivot and the visual
+  // child at -pivot produces T(pivot) * R * T(-pivot), while R itself has no translation for the
+  // runtime to interpolate independently. This prevents the visible orbit/jitter of pivot-baked
+  // matrices and applies uniformly to backgrounds, imported SVG, filters, masks and child layers.
+  Layer* matrixTarget = layer;
+  if (!matrixKeys.empty() && matrixUsesStructuralPivot) {
+    auto* pivotTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
+    auto* visualTarget = SplitForTransformAnimation(pivotTarget, _document, _idAllocator);
+    // These wrappers are percentage-sized and excluded from flow. Use explicit positional
+    // constraints rather than x/y preferred positions: constraint layout intentionally ignores
+    // preferred positions for such children, which would leave both wrappers at the origin and
+    // make the visual orbit around the element's top-left.
+    pivotTarget->left = matrixPivotX;
+    pivotTarget->top = matrixPivotY;
+    pivotTarget->matrix = matrixChannelBaseline;
+    visualTarget->left = -matrixPivotX;
+    visualTarget->top = -matrixPivotY;
+    visualTarget->matrix = Matrix::Identity();
+    visualTarget->matrix3D = {};
+    matrixTarget = pivotTarget;
+  }
+
   // Layer-targeted alpha channel — stays on the original `layer` so the existing id keeps
   // identifying the alpha-animated element.
   if (!alphaKeys.empty()) {
@@ -1456,13 +1508,12 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   // Layer-targeted `matrix` channel for scale / rotate / skew (and any non-translation transform).
-  // Unlike x/y, the matrix channel animates the element's own transform (`Layer.matrix`) and not
-  // its layout position, so no inner-wrapper split is needed: the renderer recomposes the final
-  // transform as `Translate(layoutPosition) * matrix`, keeping the layout offset intact while the
-  // keyframes drive scale/rotate/skew/translate about the baked transform-origin pivot.
+  // General affine transforms target the original Layer with transform-origin baked into each
+  // matrix. Pure rotations target the structural pivot wrapper created above, whose keyframes have
+  // zero translation so interpolation cannot move the centre.
   if (!matrixKeys.empty()) {
     auto* object = _document->makeNode<AnimationObject>();
-    object->target = layer->id;
+    object->target = matrixTarget->id;
     auto* ch = _document->makeNode<TypedChannel<Matrix>>();
     ch->name = "matrix";
     ch->keyframes = std::move(matrixKeys);

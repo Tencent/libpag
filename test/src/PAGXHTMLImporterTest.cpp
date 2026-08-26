@@ -6859,14 +6859,21 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationReverseDirectionFlipsStepsJump) {
   EXPECT_NEAR(ch->keyframes.back().value, 0.0f, kEps);
 }
 
-PAG_TEST(PAGXHTMLImporterTest, AnimationRotateProducesMatrixChannel) {
-  // `rotate` (like scale / skew) is a non-translation transform, so it routes through the full
-  // affine `matrix` channel rather than x/y. No unsupported-property warning is expected.
+PAG_TEST(PAGXHTMLImporterTest, AnimationRotateUsesStructuralPivotMatrixChannel) {
+  // Sampled pure rotations keep transform-origin structural. The matrix channel targets a pivot
+  // wrapper and contains zero-translation rotation matrices, so runtime decomposition cannot make
+  // the centre drift between keyframes.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><head><style>
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      @keyframes spin {
+        0%   { transform: rotate(0deg); }
+        25%  { transform: rotate(90deg); }
+        50%  { transform: rotate(180deg); }
+        75%  { transform: rotate(270deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style></head>
     <body style="width:100px;height:100px">
       <div id="d" style="width:10px;height:10px;background-color:#000;
@@ -6883,7 +6890,39 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationRotateProducesMatrixChannel) {
   auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
   auto* mCh = dynamic_cast<pagx::TypedChannel<pagx::Matrix>*>(FindChannel(anim, "matrix"));
   ASSERT_NE(mCh, nullptr);
-  ASSERT_EQ(mCh->keyframes.size(), 2u);
+  ASSERT_EQ(mCh->keyframes.size(), 5u);
+  pagx::AnimationObject* matrixObject = nullptr;
+  for (auto* candidate : anim->objects) {
+    if (candidate != nullptr && !candidate->channels.empty() &&
+        candidate->channels.front() == mCh) {
+      matrixObject = candidate;
+      break;
+    }
+  }
+  ASSERT_NE(matrixObject, nullptr);
+  pagx::Layer* pivotLayer = nullptr;
+  std::vector<pagx::Layer*> pendingLayers(doc->layers.begin(), doc->layers.end());
+  while (!pendingLayers.empty() && pivotLayer == nullptr) {
+    auto* candidate = pendingLayers.back();
+    pendingLayers.pop_back();
+    if (candidate->id == matrixObject->target) {
+      pivotLayer = candidate;
+      break;
+    }
+    pendingLayers.insert(pendingLayers.end(), candidate->children.begin(),
+                         candidate->children.end());
+  }
+  ASSERT_NE(pivotLayer, nullptr);
+  EXPECT_FLOAT_EQ(pivotLayer->left, 5.0f);
+  EXPECT_FLOAT_EQ(pivotLayer->top, 5.0f);
+  ASSERT_EQ(pivotLayer->children.size(), 1u);
+  auto* visualLayer = pivotLayer->children.front();
+  EXPECT_FLOAT_EQ(visualLayer->left, -5.0f);
+  EXPECT_FLOAT_EQ(visualLayer->top, -5.0f);
+  for (const auto& key : mCh->keyframes) {
+    EXPECT_NEAR(key.value.tx, 0.0f, kEps);
+    EXPECT_NEAR(key.value.ty, 0.0f, kEps);
+  }
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnimationScaleProducesMatrixChannel) {
