@@ -46,8 +46,10 @@ class XmlDocumentHighlighter : public QSyntaxHighlighter {
     StateInTag,
   };
 
-  // Highlights the tag spanning [start, end], where end is the index of the closing '>'.
-  void highlightTag(const QString& text, int start, int end);
+  // Highlights an opening tag whose body occupies [start, end). When closed is true, end is the
+  // index of the closing '>'; when false the tag continues onto a later line and end is the text
+  // length, so only the name and the attributes present so far are colored.
+  void highlightTag(const QString& text, int start, int end, bool closed);
 
   // Highlights attribute name/value pairs within the [from, to) range of text.
   void highlightAttributes(const QString& text, int from, int to);

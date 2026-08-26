@@ -21,10 +21,11 @@
 
 namespace pag {
 
-// Matches an attribute inside a tag: leading whitespace, the name, the '=' separator, and an
-// optional double- or single-quoted value.
+// Matches an attribute inside a tag: optional leading whitespace, the name, the '=' separator,
+// and an optional double- or single-quoted value. Leading whitespace is optional so attributes
+// that wrap to the start of a continuation line are still recognized.
 static const QRegularExpression AttributePattern =
-    QRegularExpression("(\\s+)([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\\s*=\\s*)(\"[^\"]*\"|'[^']*')?");
+    QRegularExpression("(\\s*)([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\\s*=\\s*)(\"[^\"]*\"|'[^']*')?");
 
 static QTextCharFormat MakeColorFormat(const char* hexColor) {
   QTextCharFormat format = {};
@@ -44,6 +45,31 @@ static bool StartsWithAt(const QString& text, qsizetype index, QLatin1StringView
     }
   }
   return true;
+}
+
+// Finds the '>' that closes a tag starting at or after 'from', skipping any '>' that sits inside
+// a single- or double-quoted attribute value. Returns -1 when no unquoted '>' is on this line.
+// Quote state is only tracked within the line, so a value split across lines is not carried over
+// (rare for the source this editor targets).
+static int FindTagEnd(const QString& text, int from, int length) {
+  auto quote = QChar(u'\0');
+  for (auto i = from; i < length; ++i) {
+    const auto ch = text.at(i);
+    if (quote != u'\0') {
+      if (ch == quote) {
+        quote = u'\0';
+      }
+      continue;
+    }
+    if (ch == u'"' || ch == u'\'') {
+      quote = ch;
+      continue;
+    }
+    if (ch == u'>') {
+      return i;
+    }
+  }
+  return -1;
 }
 
 XmlDocumentHighlighter::XmlDocumentHighlighter(QTextDocument* document)
@@ -71,16 +97,35 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
 
   auto index = 0;
   while (index < length) {
+    if (state == StateInTag) {
+      // Continuation of a tag opened on an earlier line: keep coloring attribute name/value
+      // pairs until the closing '>' (quote-aware) is found on this line.
+      const auto tagEnd = FindTagEnd(text, index, length);
+      if (tagEnd < 0) {
+        highlightAttributes(text, index, length);
+        setCurrentBlockState(StateInTag);
+        return;
+      }
+      auto tailStart = tagEnd;
+      if (tagEnd > index && text.at(tagEnd - 1) == u'/') {
+        tailStart = tagEnd - 1;
+      }
+      if (index < tailStart) {
+        highlightAttributes(text, index, tailStart);
+      }
+      setFormat(tailStart, tagEnd - tailStart + 1, tagFormat);
+      index = tagEnd + 1;
+      state = StateNormal;
+      continue;
+    }
+
     if (state != StateNormal) {
-      // Continuation of a multi-line construct started on an earlier line: paint the whole
-      // region with the construct's color until its terminator is found on this line.
-      const char* terminator = ">";
-      const QTextCharFormat* format = &tagFormat;
+      // Continuation of a multi-line comment / CDATA / processing instruction started on an
+      // earlier line: paint the whole region with the construct's color until its terminator is
+      // found on this line.
+      const char* terminator = "-->";
+      const QTextCharFormat* format = &commentFormat;
       switch (state) {
-        case StateInComment:
-          terminator = "-->";
-          format = &commentFormat;
-          break;
         case StateInCData:
           terminator = "]]>";
           format = &grayFormat;
@@ -142,15 +187,15 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
     }
 
     if (text.at(index) == u'<') {
-      const auto tagEnd = text.indexOf(u'>', index);
+      const auto tagEnd = FindTagEnd(text, index, length);
       if (tagEnd < 0) {
-        // A tag split across lines keeps the tag color on this line and resumes after the
-        // closing '>' is found on a later line.
-        setFormat(index, length - index, tagFormat);
+        // A tag split across lines: highlight the tag name and any attributes present on this
+        // line, then resume after the closing '>' is found on a later line.
+        highlightTag(text, index, length, false);
         setCurrentBlockState(StateInTag);
         return;
       }
-      highlightTag(text, index, tagEnd);
+      highlightTag(text, index, tagEnd, true);
       index = tagEnd + 1;
       continue;
     }
@@ -164,10 +209,10 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
   }
 }
 
-void XmlDocumentHighlighter::highlightTag(const QString& text, int start, int end) {
+void XmlDocumentHighlighter::highlightTag(const QString& text, int start, int end, bool closed) {
   if (StartsWithAt(text, start, QLatin1String("</"))) {
     // Closing tags keep a single tag color for the whole region, matching the web editor.
-    setFormat(start, end - start + 1, tagFormat);
+    setFormat(start, end - start + (closed ? 1 : 0), tagFormat);
     return;
   }
   setFormat(start, 1, tagFormat);
@@ -178,13 +223,15 @@ void XmlDocumentHighlighter::highlightTag(const QString& text, int start, int en
   }
   setFormat(nameStart, nameEnd - nameStart, tagFormat);
   auto tailStart = end;
-  if (end > nameStart && text.at(end - 1) == u'/') {
+  if (closed && end > nameStart && text.at(end - 1) == u'/') {
     tailStart = end - 1;
   }
   if (nameEnd < tailStart) {
     highlightAttributes(text, nameEnd, tailStart);
   }
-  setFormat(tailStart, end - tailStart + 1, tagFormat);
+  if (closed) {
+    setFormat(tailStart, end - tailStart + 1, tagFormat);
+  }
 }
 
 void XmlDocumentHighlighter::highlightAttributes(const QString& text, int from, int to) {
