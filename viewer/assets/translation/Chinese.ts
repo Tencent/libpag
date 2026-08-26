@@ -627,7 +627,7 @@
         <location filename="../qml/XMLSourceEditor.qml" line="122"/>
         <location filename="../qml/XMLSourceEditor.qml" line="152"/>
         <source>A folded data line was modified. Discard to restore it.</source>
-        <translation type="unfinished"></translation>
+        <translation>折叠的数据行被修改，放弃修改以恢复。</translation>
     </message>
     <message>
         <location filename="../qml/XMLSourceEditor.qml" line="137"/>
@@ -638,6 +638,16 @@
         <location filename="../qml/XMLSourceEditor.qml" line="171"/>
         <source>File saved</source>
         <translation>文件已保存</translation>
+    </message>
+    <message>
+        <location filename="../qml/XMLSourceEditor.qml" line="471"/>
+        <source>Loading source... %1%</source>
+        <translation>正在加载源码… %1%</translation>
+    </message>
+    <message>
+        <location filename="../qml/XMLSourceEditor.qml" line="472"/>
+        <source>Loading source...</source>
+        <translation>正在加载源码…</translation>
     </message>
     <message>
         <location filename="../qml/XMLSourceEditor.qml" line="388"/>
