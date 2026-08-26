@@ -707,7 +707,7 @@ void PAGXViewModel::warmupLayoutChunk() {
     return;
   }
   auto* layout = warmupDocument->documentLayout();
-  for (auto i = 0; i < 256; ++i) {
+  for (auto i = 0; i < 512; ++i) {
     const auto block = warmupDocument->findBlockByNumber(warmupBlockNumber);
     if (!block.isValid()) {
       layoutWarmupTimer->stop();
