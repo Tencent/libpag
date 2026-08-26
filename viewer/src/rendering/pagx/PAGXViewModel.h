@@ -196,6 +196,9 @@ class PAGXViewModel : public ContentViewModel {
   void clearContent();
   void clearDocumentXml();
   Q_SLOT void appendEditorChunk();
+  // Lays out blocks progressively after a chunked load so hitTest (click-to-position) and
+  // far jumps never pay the sequential-layout cost of the blocks they pass through.
+  Q_SLOT void warmupLayoutChunk();
   // Diagnostics: fires whenever the document layout finishes a size pass, which exposes
   // full-document layouts triggered inside the text backend.
   Q_SLOT void onDocumentSizeChanged(const QSizeF& size);
@@ -243,6 +246,10 @@ class PAGXViewModel : public ContentViewModel {
   double loaderMaxLineWidth = 0;
   QElapsedTimer loaderElapsed;
   QTimer* loaderTimer = nullptr;
+  // Post-load layout warmup state.
+  QTimer* layoutWarmupTimer = nullptr;
+  QPointer<QTextDocument> warmupDocument = {};
+  int warmupBlockNumber = 0;
   int64_t totalFrames = 1;
   float frameRate = 0.0f;
   std::atomic<double> progress = 0.0;

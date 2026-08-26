@@ -602,6 +602,9 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   // block synchronously and freeze the UI for seconds on large files, so large documents are
   // appended in chunks instead: each insert only rehighlights its own range.
   EditorLog("loadEditorText: chunked path starting");
+  if (layoutWarmupTimer != nullptr) {
+    layoutWarmupTimer->stop();
+  }
   loaderElapsed.start();
   loaderDocument = document;
   loaderText = textToLoad;
@@ -682,7 +685,37 @@ void PAGXViewModel::appendEditorChunk() {
                   .arg(loaderChunkCount)
                   .arg(loaderElapsed.elapsed())
                   .arg(loaderMaxLineWidth));
+    // Viewport-observing rendering only lays out blocks that enter the viewport, but
+    // QTextDocumentLayout::hitTest walks blocks sequentially and lays out every one it
+    // passes, so the first click on a far-away line stalls for about a second. Warm the
+    // layouts up in the background instead.
+    if (layoutWarmupTimer == nullptr) {
+      layoutWarmupTimer = new QTimer(this);
+      layoutWarmupTimer->setInterval(16);
+      connect(layoutWarmupTimer, &QTimer::timeout, this, &PAGXViewModel::warmupLayoutChunk);
+    }
+    warmupDocument = loaderDocument;
+    warmupBlockNumber = 0;
+    layoutWarmupTimer->start();
     Q_EMIT editorLoadFinished(loaderMaxLineWidth);
+  }
+}
+
+void PAGXViewModel::warmupLayoutChunk() {
+  if (warmupDocument == nullptr) {
+    layoutWarmupTimer->stop();
+    return;
+  }
+  auto* layout = warmupDocument->documentLayout();
+  for (auto i = 0; i < 256; ++i) {
+    const auto block = warmupDocument->findBlockByNumber(warmupBlockNumber);
+    if (!block.isValid()) {
+      layoutWarmupTimer->stop();
+      EditorLog(QString("layout warmup finished after %1 blocks").arg(warmupBlockNumber));
+      return;
+    }
+    layout->blockBoundingRect(block);
+    ++warmupBlockNumber;
   }
 }
 
