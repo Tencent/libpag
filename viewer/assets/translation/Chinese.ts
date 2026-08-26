@@ -614,37 +614,43 @@
         <translation type="vanished">正在编辑第 %1 行（Enter=下一行，Esc=退出）</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="47"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="100"/>
         <source>Nothing to discard</source>
         <translation>没有可放弃的修改</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="51"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="108"/>
         <source>Changes discarded</source>
         <translation>修改已放弃</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="67"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="122"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="152"/>
+        <source>A folded data line was modified. Discard to restore it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/XMLSourceEditor.qml" line="137"/>
         <source>Changes applied</source>
         <translation>修改已应用</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="90"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="171"/>
         <source>File saved</source>
         <translation>文件已保存</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="265"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="388"/>
         <source>Discard</source>
         <translation>放弃</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="273"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="396"/>
         <source>Apply</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="281"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="404"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -652,7 +658,7 @@
 <context>
     <name>pag::PAGXViewModel</name>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="403"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="479"/>
         <source>Failed to parse XML: invalid syntax or structure</source>
         <translation>解析 XML 失败：语法或结构无效</translation>
     </message>
@@ -661,27 +667,27 @@
         <translation type="vanished">从 XML 文档构建图层失败</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="409"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="485"/>
         <source>Failed to build PAGScene from XML document</source>
         <translation>从 XML 文档构建 PAGScene 失败</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="435"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="511"/>
         <source>No file path specified</source>
         <translation>未指定文件路径</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="439"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="515"/>
         <source>Failed to open file for writing: %1</source>
         <translation>无法打开文件进行写入：%1</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="444"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="520"/>
         <source>Failed to write all data to file</source>
         <translation>写入文件数据不完整</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="456"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="532"/>
         <source>Line %1, column %2: %3</source>
         <translation>第 %1 行第 %2 列：%3</translation>
     </message>

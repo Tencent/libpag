@@ -34,6 +34,17 @@ Rectangle {
     // Set while a large document is being loaded into the editor chunk by chunk.
     property bool busy: false
 
+    // True when the Source Editor tab is the front tab of the data panel, set by the host
+    // (StackLayout hides inactive children by zeroing geometry, so the visible property is
+    // not a reliable activation signal).
+    property bool isActive: false
+
+    // Lazy loading: documentXmlChanged fires as soon as a file is parsed, but the multi-second
+    // chunked load should not compete with the default Layer panel. The text is deferred until
+    // the user actually switches to the Source Editor tab; the switch happens instantly and the
+    // busy overlay with the progress bar shows while the content streams in.
+    property bool needsDocumentLoad: false
+
     // Viewport position to restore once loading finishes: kept for Discard (stay where the
     // user was editing), zero for fresh file loads.
     property real savedScrollY: 0
@@ -81,6 +92,25 @@ Rectangle {
     onVisibleChanged: log("editor visible: " + visible + " lineCount: " + documentLineCount
                           + " length: " + textArea.length)
 
+    // Entry point for every "the document XML changed" notification. Loads immediately when
+    // the Source Editor tab is front, otherwise just raises the deferred flag.
+    function requestDocumentLoad() {
+        if (isActive && viewModel) {
+            loadXml(viewModel.documentXml);
+        } else {
+            needsDocumentLoad = true;
+            log("requestDocumentLoad: deferred until the Source Editor tab is active");
+        }
+    }
+
+    onIsActiveChanged: {
+        if (isActive && needsDocumentLoad && viewModel) {
+            needsDocumentLoad = false;
+            log("isActiveChanged: source tab activated, starting deferred load");
+            loadXml(viewModel.documentXml);
+        }
+    }
+
     function loadXml(xml, keepScrollPosition) {
         log("loadXml: length=" + xml.length);
         baselineXml = xml;
@@ -105,6 +135,7 @@ Rectangle {
 
     // Clears the editor, e.g. when the view type switches away from PAGX.
     function reset() {
+        needsDocumentLoad = false;
         loadXml("");
     }
 
@@ -199,7 +230,7 @@ Rectangle {
     Connections {
         target: viewModel
         function onDocumentXmlChanged() {
-            loadXml(viewModel.documentXml);
+            requestDocumentLoad();
         }
         function onEditorLoadProgress(progress) {
             root.loadProgress = progress;
@@ -237,7 +268,7 @@ Rectangle {
         log("connectViewModel: attaching highlighter");
         viewModel.attachHighlighter(textArea.textDocument);
         if (viewModel.documentXml !== "") {
-            loadXml(viewModel.documentXml);
+            requestDocumentLoad();
         }
     }
 
@@ -312,8 +343,12 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.HorizontalAndVerticalFlick
 
-            // Let TextArea handle selection drags while the Flickable handles scroll gestures.
-            TextArea.flickable: textArea
+            // NOTE: the TextArea is a plain child of the Flickable's contentItem, NOT attached
+            // via "TextArea.flickable". The attached property pipes the document's ideal width
+            // straight into Flickable.contentWidth, so an edit that changes the widest line
+            // resizes the TextArea, invalidates every text block's layout, and forces a full
+            // document re-shape (~1s on 10k+ lines). With a plain child the width stays pinned
+            // to maxLineWidth and edits only relayout the edited blocks.
 
             ScrollBar.vertical: ScrollBar {
                 policy: ScrollBar.AsNeeded

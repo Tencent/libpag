@@ -704,6 +704,7 @@ SplitView {
                             width: parent.width
                             height: parent.height
                             visible: currentViewType === "pagx"
+                            isActive: rightItem.isSourceEditorActive
                             viewModel: contentView ? contentView.viewModel : null
                         }
                     }
