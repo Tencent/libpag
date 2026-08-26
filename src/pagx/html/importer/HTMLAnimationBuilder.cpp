@@ -1255,9 +1255,8 @@ bool HTMLAnimationBuilder::buildForElement(
       float cy = 0.0f;
       bool hasPivot = ResolvePivot(resolvedStyle, layer, _valueParser, cx, cy);
       std::vector<Keyframe<float>> rotationProbe;
-      bool canKeepPivotStructural =
-          hasPivot && layer->matrix3D.isIdentity() &&
-          BuildPureRotationKeys(transformStops, interp, &rotationProbe);
+      bool canKeepPivotStructural = hasPivot && layer->matrix3D.isIdentity() &&
+                                    BuildPureRotationKeys(transformStops, interp, &rotationProbe);
       if (canKeepPivotStructural) {
         matrixUsesStructuralPivot = true;
         matrixPivotX = cx;
