@@ -25,7 +25,7 @@
 // PAGXView is structurally assignable to PlayerView so existing hosts keep working with no
 // adapter.
 
-import type { PlayerModule, PlayerView } from './pagx-view-types';
+import type { PlayerModule, PlayerView, TimelineTreeNode } from './pagx-view-types';
 
 /** A source-editor diagnostic expressed in 1-based Monaco source coordinates. `owner` identifies
  *  the provider that produced it and keeps markers from independent validators isolated, so a
@@ -247,4 +247,4 @@ export type PAGXPlayerEventName = keyof PAGXPlayerEventMap;
  *  callbacks or reading `player.getView()` can annotate against these shapes without importing
  *  pagx-viewer. Any concrete PAGXView instance from pagx-viewer is structurally assignable to
  *  PlayerView. */
-export type { PlayerModule, PlayerView };
+export type { PlayerModule, PlayerView, TimelineTreeNode };

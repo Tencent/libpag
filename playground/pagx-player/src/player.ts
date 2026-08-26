@@ -39,6 +39,7 @@ import type {
 } from './types';
 import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
+import { SMBlueprint, PreviewChipBar } from './sm-blueprint';
 import { buildToolbar, setToolbarVisible } from './toolbar';
 import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
 import type { DraftLineChange } from './editor/SourceEditor';
@@ -64,6 +65,8 @@ export class PAGXPlayer extends EventTarget {
     private readonly sizeContainer: HTMLElement;
     private readonly toolbarRoot: HTMLDivElement;
     private readonly playbackBar: PlaybackBar;
+    private readonly blueprint: SMBlueprint;
+    private readonly chipBar: PreviewChipBar;
     private readonly editor: EditorPanel | null = null;
     private readonly statusEl: HTMLDivElement;
 
@@ -71,6 +74,10 @@ export class PAGXPlayer extends EventTarget {
     private view: PlayerView | null = null;
     private detachCanvasEvents: (() => void) | null = null;
     private statusHideTimer: number | null = null;
+    // Preview id that was on stage when the user hit the SM panel play button. While non-null,
+    // the SM runs and the playback bar is dimmed, but the chip stays visually active so the
+    // user can un-park with one click. Cleared by selectTimelineUnit (chip click / dbl-click).
+    private parkedPreviewId: string | null = null;
     // Monotonically increasing id for each showStatus call; the caller can hold this token
     // and pass it to hideStatus() to only clear the pill when their own message is still on
     // screen. See showStatus / hideStatus for the full story.
@@ -212,6 +219,40 @@ export class PAGXPlayer extends EventTarget {
                 onSeek: (t) => this.dispatchEvent(new CustomEvent('seek', { detail: { currentTimeMicros: t } })),
             },
         });
+
+        // State-machine blueprint for default SM timelines: read-only state/transition graph
+        // with a live current-state highlight; double-clicking a state enters a solo preview of
+        // its bound animation. Hidden automatically when the document has no default SM. Host
+        // callbacks route through this player's public selectTimelineUnit so the playback bar
+        // switches to the preview instance's duration in the same call.
+        this.blueprint = new SMBlueprint({
+            getTimelineTree: () => this.view?.getTimelineTree() ?? [],
+            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
+            getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
+            selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
+            togglePlayback: () => this.toggleRawPlayback(),
+            isPlaying: () => this.view?.isPlaying() ?? false,
+            parkPreview: () => this.parkPreview(),
+            getParkedPreviewId: () => this.parkedPreviewId,
+        }, options.iconBaseUrl);
+        this.blueprint.attach(this.root);
+
+        // Floating operations row above the playback bar. Sibling of the blueprint panel:
+        // chips are not part of the SM graph, they are "preview history" / quick switches.
+        this.chipBar = new PreviewChipBar({
+            getTimelineTree: () => this.view?.getTimelineTree() ?? [],
+            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
+            getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
+            selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
+            togglePlayback: () => this.toggleRawPlayback(),
+            isPlaying: () => this.view?.isPlaying() ?? false,
+            parkPreview: () => this.parkPreview(),
+            getParkedPreviewId: () => this.parkedPreviewId,
+        });
+        this.chipBar.attach(this.root);
+        // Wire the chip strip's width to the playback bar's live width so the two rectangles
+        // always line up (single visual control cluster).
+        this.chipBar.setBarAnchor(this.playbackBar.getElement());
 
         // Editor (optional). Editor feedback ("Changes applied", validation errors, etc.) is
         // routed into this.showStatus so it lands in the same status slot as load/reload
@@ -394,6 +435,16 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         const generation = ++this.loadGeneration;
+        // Reset SM-panel state up front: a failed load (or a non-SM document) must not leave the
+        // wrapper in sm-default mode from the previously loaded document, and stale chips from
+        // the previous file's previews would otherwise linger across the reload.
+        this.root.classList.remove('sm-default');
+        this.blueprint.stopPolling();
+        this.chipBar.stopPolling();
+        this.chipBar.clear();
+        this.parkedPreviewId = null;
+        this.playbackBar.setDimmed(false);
+        this.playbackBar.setFrozen(null);
         // Snapshots taken while it's still safe to read pre-existing view state; used after
         // the reset() inside parsePAGX() to restore playback position and play/pause state.
         try {
@@ -486,13 +537,15 @@ export class PAGXPlayer extends EventTarget {
             setToolbarVisible(this.toolbarRoot, true);
             // A document without a queryable duration still gets the bar in its greyed-out
             // fallback mode, as long as it has a default timeline at all.
-            if (view.durationMicros() > 0) {
-                this.playbackBar.setVisible(true);
-            } else if (view.hasTimeline()) {
-                this.playbackBar.showUntimed();
-            } else {
-                this.playbackBar.setVisible(false);
-            }
+            // Rebuild the state-machine blueprint first (no-op / hidden for non-SM defaults):
+            // updatePlaybackBarMode() reads the sm-default class it toggles to decide whether
+            // the playback bar should yield its spot to the blueprint panel. Polling keeps the
+            // active-state highlight and the panel play icon live across reloads.
+            const hasDefaultSM = this.blueprint.refresh();
+            this.root.classList.toggle('sm-default', hasDefaultSM);
+            this.blueprint.startPolling();
+            this.chipBar.startPolling();
+            this.updatePlaybackBarMode();
 
             // Feed the editor with the freshly loaded XML. If the host pre-decoded it, we use
             // that; otherwise we decode the bytes so the editor always has something to show
@@ -558,13 +611,9 @@ export class PAGXPlayer extends EventTarget {
     public show(): void {
         this.canvas.classList.remove('hidden');
         setToolbarVisible(this.toolbarRoot, true);
-        if (this.view) {
-            if (this.view.durationMicros() > 0) {
-                this.playbackBar.setVisible(true);
-            } else if (this.view.hasTimeline()) {
-                this.playbackBar.showUntimed();
-            }
-        }
+        this.blueprint.setVisible(true);
+        this.chipBar.setVisible(true);
+        this.updatePlaybackBarMode();
     }
 
     /** Hide the player DOM subtree without destroying the view. Used by hosts that route
@@ -578,6 +627,8 @@ export class PAGXPlayer extends EventTarget {
         this.canvas.classList.add('hidden');
         setToolbarVisible(this.toolbarRoot, false);
         this.playbackBar.setVisible(false);
+        this.blueprint.setVisible(false);
+        this.chipBar.setVisible(false);
         this.editor?.close();
         this.hideStatus();
         this.view?.pause();
@@ -1107,6 +1158,24 @@ export class PAGXPlayer extends EventTarget {
         this.playbackBar.togglePlayback();
     }
 
+    /** Toggles the raw view play/pause without the timed-timeline guards: a default state
+     *  machine reports no duration, so the playback bar's toggle (and play()) would bail out
+     *  early. The blueprint panel's button drives the view directly instead - an SM has no
+     *  wrap-around semantics to honor anyway. */
+    public toggleRawPlayback(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        if (view.isPlaying()) {
+            view.pause();
+            this.dispatchEvent(new CustomEvent('pause'));
+        } else {
+            view.play();
+            this.dispatchEvent(new CustomEvent('play'));
+        }
+    }
+
     /** Sets a bool input on the default state machine timeline (playground hook for testing
      *  interactive state machines from the console). Returns false when the loaded document's
      *  default timeline is not a state machine or the input is unknown/wrong-typed. */
@@ -1122,6 +1191,102 @@ export class PAGXPlayer extends EventTarget {
     /** Trigger-input counterpart of setSMInputBool. */
     public fireSMInputTrigger(name: string): boolean {
         return this.view?.fireSMInputTrigger(name) ?? false;
+    }
+
+    /**
+     * Selects one unit of the timeline tree for solo preview (empty id clears the selection) and
+     * refreshes the playback-bar mode to match: a selected animation gets the normal bar bound to
+     * its own duration, and clearing the selection restores whatever the default timeline
+     * requires (normal bar / untimed bar / hidden behind the SM blueprint panel).
+     */
+    public selectTimelineUnit(kind: string, id: string): boolean {
+        const view = this.view;
+        if (!view || !view.selectTimelineUnit(kind, id)) {
+            return false;
+        }
+        // Any real selection change (including clearing) lifts the parked state, frozen
+        // poster and dim overlay: the bar is now driven by the freshly reset preview
+        // instance again, or hidden if the SM took the render loop back.
+        this.parkedPreviewId = null;
+        this.playbackBar.setDimmed(false);
+        this.playbackBar.setFrozen(null);
+        this.updatePlaybackBarMode();
+        this.playbackBar.updateAll();
+        return true;
+    }
+
+    /** Parks the currently active preview: the SM resets and resumes playing while the
+     *  playback bar keeps showing "0.00s / <preview duration>" behind a grey overlay so the
+     *  user still sees which animation is on the chip. The active chip stays highlighted
+     *  (tracked by parkedPreviewId); un-park by clicking that chip or double-clicking a state. */
+    public parkPreview(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        const selection = view.getSelectedTimelineUnit();
+        if (selection == null || selection.kind !== 'animation') {
+            return;
+        }
+        // Capture the preview instance's duration / frame rate BEFORE clearing the selection:
+        // once cleared, the view reports SM fallback values and the bar would lose the poster
+        // data we need to keep displaying.
+        const frozenSpec = {
+            durationUs: view.durationMicros(),
+            frameRate: view.frameRate(),
+        };
+        this.parkedPreviewId = selection.id;
+        // Rewind the preview lazy instance so re-selecting it (via chip / dbl-click) starts
+        // from the top rather than resuming wherever the park happened.
+        view.pause();
+        view.setCurrentTimeMicros(0);
+        // Hand the render loop back to the SM. The engine's selectTimelineUnit('', '') path
+        // resets the SM to its initial states and sets playing=true, so no extra play() call
+        // is needed here - the SM starts running on its own.
+        view.selectTimelineUnit('', '');
+        this.dispatchEvent(new CustomEvent('play'));
+        // Keep the playback bar visible with the preview's static "0/duration" poster and
+        // dim it so the user cannot interact. updatePlaybackBarMode sees parkedPreviewId and
+        // routes to setVisible(true) instead of hiding the bar for SM default.
+        this.updatePlaybackBarMode();
+        this.playbackBar.setFrozen(frozenSpec);
+        this.playbackBar.setDimmed(true);
+    }
+
+    /** The preview id that is "parked" (SM playing while a preview stays on the chip bar as
+     *  highlighted). Zero when no preview is parked. Read by PreviewChipBar via the host. */
+    public getParkedPreviewId(): string | null {
+        return this.parkedPreviewId;
+    }
+
+    /** Single source of truth for the playback bar's mode after a load or a solo-preview change:
+     *  a document with a queryable duration gets the normal bar (an active preview lives here),
+     *  a parked preview keeps the bar visible and dimmed so the user can see the "paused"
+     *  progress, a default state machine without a preview hides the bar (the blueprint panel
+     *  replaces it), other timelines keep the greyed untimed bar, and static documents hide
+     *  the bar. */
+    private updatePlaybackBarMode(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        if (view.durationMicros() > 0) {
+            this.playbackBar.setVisible(true);
+        } else if (this.parkedPreviewId != null) {
+            // Parked: keep the bar visible, dim state is applied separately by parkPreview.
+            this.playbackBar.setVisible(true);
+        } else if (this.root.classList.contains('sm-default')) {
+            this.playbackBar.setVisible(false);
+        } else if (view.hasTimeline()) {
+            this.playbackBar.showUntimed();
+        } else {
+            this.playbackBar.setVisible(false);
+        }
+    }
+
+    /** Returns the current solo-preview selection, or null when none is selected. */
+    public getSelectedTimelineUnit(): { kind: string; id: string } | null {
+        return this.view?.getSelectedTimelineUnit() ?? null;
     }
 
     public openEditor(): void {
@@ -1261,6 +1426,8 @@ export class PAGXPlayer extends EventTarget {
             this.statusHideTimer = null;
         }
         this.playbackBar.destroy();
+        this.blueprint.destroy();
+        this.chipBar.destroy();
         this.editor?.destroy();
         this.destroyView();
         // Removing the wrapper root cascades child removals (canvas, status, toolbar, playback

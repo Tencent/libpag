@@ -144,10 +144,41 @@ class PAGXView {
   bool setSMInputNumber(const std::string& name, float value);
   bool fireSMInputTrigger(const std::string& name);
 
+  // Exports the animation-unit tree of the loaded document as a JS array: every top-level
+  // Animation/StateMachine definition plus every <Timelines> mount point, nested by composition
+  // reference. Each node carries a path string ("1", "1/0") whose prefix encodes the nesting, and
+  // durationUs where resolvable (>0 = known, 0 = none, -1 = unresolvable: state machines and
+  // dangling references).
+  emscripten::val getTimelineTree();
+
+  // --- Unit preview selection (solo mode) ---
+
+  /**
+   * Selects one unit of the timeline tree for solo preview, or clears the selection when id is
+   * empty. Selecting an animation routes all playback values (current/duration/frameRate/seek)
+   * to a lazily instantiated runtime of that definition and freezes every other clock (default
+   * timeline and scene) until the selection is cleared. Selecting a state machine freezes the
+   * clocks as well but exposes no time axis (durationMicros() reports 0 while selected).
+   * @param kind "animation" or "stateMachine"; mount entries reuse these by their refKind.
+   * @param id Definition id from getTimelineTree(); empty clears the selection.
+   * @return false when the unit cannot be instantiated (unknown id or kind).
+   */
+  bool selectTimelineUnit(const std::string& kind, const std::string& id);
+
+  // Returns the current solo-preview selection as {kind, id}, or null when none is selected.
+  emscripten::val getSelectedTimelineUnit() const;
+
+  // Returns the live {regionName: currentStateName} map of the default state machine timeline, or
+  // an empty object when the default timeline is not a state machine. Lightweight polling endpoint
+  // for the blueprint view to refresh the active-state highlight (250ms cadence).
+  emscripten::val getSMCurrentStates() const;
+
  private:
   void updateContentTransform();
   void applyDisplayTransform();
   void applySceneDisplayOptions();
+  void dumpTimelineDiagnostics();
+  void advanceAnimationUnit(const std::shared_ptr<PAGAnimation>& animation, int64_t deltaUs);
   bool ensureWindow();
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
@@ -177,6 +208,12 @@ class PAGXView {
   // state, and PAGComposition::pauseTimeline cannot gate the top-level timeline driven here, so the
   // view gates advancement on this flag.
   bool playing = true;
+  // Solo-preview selection (unit selected from the timeline tree): previewAnimation is the lazily
+  // instantiated runtime the playback values route to while selected; a selected state machine has
+  // no runtime here (no time axis) — both cases freeze the default/scene clocks until cleared.
+  std::shared_ptr<PAGAnimation> previewAnimation = nullptr;
+  std::string selectedUnitKind = {};
+  std::string selectedUnitId = {};
   // Player-level loop switch that overrides the file's loop mode at cycle boundaries: the engine
   // still drives in-cycle motion (including PingPong mirroring), but whether a completed cycle
   // repeats or stops is decided here instead of by the file's LoopMode. Defaults to looping.

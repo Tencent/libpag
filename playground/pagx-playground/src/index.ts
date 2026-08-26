@@ -641,6 +641,44 @@ async function loadPAGXData(
 
     p.show();
 
+    // Temporary timeline-tree diagnostics: dump every retrievable animation unit (definitions and
+    // <Timelines> mounts, nested by composition reference) after each load, so the reachable /
+    // unreachable runtime data can be audited before the timeline preview design settles.
+    const view = p.getView();
+    if (view) {
+        const tree = view.getTimelineTree();
+        console.log('[pagx-tl] timeline tree:', tree);
+        const rows: {
+            path: string;
+            kind: string;
+            ref?: string;
+            id: string;
+            durationUs: number;
+            loop?: string;
+            frameRate?: number;
+            playing?: boolean;
+            offsetFrames?: number;
+        }[] = [];
+        const walk = (nodes: typeof tree): void => {
+            for (const entry of nodes) {
+                rows.push({
+                    path: entry.path,
+                    kind: entry.kind,
+                    ref: entry.refKind,
+                    id: entry.id,
+                    durationUs: entry.durationUs,
+                    loop: entry.loop,
+                    frameRate: entry.frameRate,
+                    playing: entry.playing,
+                    offsetFrames: entry.offsetFrames,
+                });
+                walk(entry.children);
+            }
+        };
+        walk(tree);
+        console.table(rows);
+    }
+
     hideDropZone();
     document.title = `PAGX Playground - ${name}`;
     currentFileName = name;

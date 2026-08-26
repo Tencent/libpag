@@ -94,6 +94,66 @@ export interface PagxSchemaDiagnostic {
 }
 
 /**
+ * One entry of the animation-unit tree exported by _getTimelineTree. `path` encodes the nesting
+ * ("1", "1/0"): nodes sharing a prefix are siblings under the same parent. durationUs: >0 known,
+ * 0 none (empty animation / empty state), -1 unresolvable (state machines, dangling references).
+ */
+export interface TimelineTreeNode {
+  /** Position in the tree, e.g. "1" or "1/0". */
+  path: string;
+  /** "animation" | "stateMachine" (top-level definitions) | "mount" (<Timelines> mount point) |
+   *  "compositionGroup" (synthetic parent wrapping a layer that has no drivers of its own but
+   *  references a composition containing mounts — non-clickable, just a visual grouping). */
+  kind: 'animation' | 'stateMachine' | 'mount' | 'compositionGroup';
+  /** Definition id / referenced id. */
+  id: string;
+  /** Display name: definition id, or the mounting layer id for mounts. */
+  name: string;
+  /** Duration in microseconds; 0 = none, -1 = unresolvable. */
+  durationUs: number;
+  /** Whether this definition is the default timeline (first top-level entry). */
+  isDefault?: boolean;
+  /** Animation definition frame rate. */
+  frameRate?: number;
+  /** Animation loop mode: "once" | "loop" | "pingPong". */
+  loop?: string;
+  /** Mount only: what the mount references. */
+  refKind?: 'animation' | 'stateMachine';
+  /** Mount (animation) only: initial playing flag. */
+  playing?: boolean;
+  /** Mount (animation) only: evaluationOffset in frames. */
+  offsetFrames?: number;
+  /** Mount only: id of the layer carrying the <Timelines>. */
+  layerId?: string;
+  /** stateMachine only: declared inputs. */
+  inputs?: { name: string; type: string }[];
+  /** stateMachine only: regions with their states, transitions, and the runtime current state
+   * (empty string when the runtime instance is unreachable, e.g. a nested mount). */
+  regions?: {
+    name: string;
+    initial: string;
+    current: string;
+    states: {
+      name: string;
+      animationId: string;
+      durationUs: number;
+      /** Whether the bound animation can be solo-previewed (targets resolvable in the root
+       * binding scope); false for empty states and dangling/nested-only definitions. */
+      previewSupported?: boolean;
+    }[];
+    transitions?: {
+      from: string;
+      to: string;
+      fromAny: boolean;
+      /** AND-joined condition summary, e.g. "speed > 0.5", or "always" when unconditional. */
+      conditions: string;
+    }[];
+  }[];
+  /** Nested mount nodes (composition-reference nesting). */
+  children: TimelineTreeNode[];
+}
+
+/**
  * The native PAGX View instance bound from C++.
  */
 export interface _PAGXView {
@@ -281,6 +341,23 @@ export interface _PAGXView {
   _setSMInputBool(name: string, value: boolean): boolean;
   _setSMInputNumber(name: string, value: number): boolean;
   _fireSMInputTrigger(name: string): boolean;
+
+  _selectTimelineUnit(kind: string, id: string): boolean;
+  _getSelectedTimelineUnit(): { kind: string; id: string } | null;
+
+  /**
+   * Returns the live { regionName: currentStateName } map of the default state machine timeline,
+   * or an empty object when the default timeline is not a state machine. Polling endpoint for the
+   * blueprint view's active-state highlight.
+   */
+  _getSMCurrentStates(): Record<string, string>;
+
+  /**
+   * Exports the animation-unit tree of the loaded document: every top-level Animation/StateMachine
+   * definition plus every <Timelines> mount point, nested by composition reference. Rebuilt after
+   * each load. Returns a plain JS value (emscripten::val), no manual delete() needed.
+   */
+  _getTimelineTree(): TimelineTreeNode[];
 
   /**
    * Releases the native resources. Must be called when done.

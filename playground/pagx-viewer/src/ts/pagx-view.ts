@@ -16,7 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import type { _PAGXView, HitTestResult, NodeBounds, NodeSourceEntry, PagxSchemaDiagnostic } from './types';
+import type {
+  _PAGXView,
+  HitTestResult,
+  NodeBounds,
+  NodeSourceEntry,
+  PagxSchemaDiagnostic,
+  TimelineTreeNode,
+} from './types';
 import { getPAGXModule } from './pagx-module';
 import { destroyVerify } from './decorators';
 
@@ -443,6 +450,37 @@ export class PAGXView {
    */
   public fireSMInputTrigger(name: string): boolean {
     return this.nativeView._fireSMInputTrigger(name);
+  }
+
+  /**
+   * Exports the animation-unit tree of the loaded document: every top-level Animation/StateMachine
+   * definition plus every <Timelines> mount point, nested by composition reference.
+   */
+  public getTimelineTree(): TimelineTreeNode[] {
+    return this.nativeView._getTimelineTree();
+  }
+
+  /**
+   * Selects one unit of the timeline tree for solo preview (empty id clears the selection):
+   * playback values route to the selected animation while every other clock freezes; a selected
+   * state machine freezes the clocks and exposes no time axis.
+   */
+  public selectTimelineUnit(kind: string, id: string): boolean {
+    return this.nativeView._selectTimelineUnit(kind, id);
+  }
+
+  /** Returns the current solo-preview selection, or null when none is selected. */
+  public getSelectedTimelineUnit(): { kind: string; id: string } | null {
+    return this.nativeView._getSelectedTimelineUnit();
+  }
+
+  /**
+   * Returns the live { regionName: currentStateName } map of the default state machine timeline,
+   * or an empty object when the default timeline is not a state machine. Polling endpoint for the
+   * blueprint view's active-state highlight.
+   */
+  public getSMCurrentStates(): Record<string, string> {
+    return this.nativeView._getSMCurrentStates();
   }
 
   /**

@@ -48,7 +48,7 @@ export interface PlaybackBarOptions {
 }
 
 /** Resolves the icon URL against `iconBaseUrl`, tolerating both '/foo/' and '/foo' inputs. */
-function iconUrl(base: string, name: string): string {
+export function iconUrl(base: string, name: string): string {
     if (!base) return name;
     return base.endsWith('/') ? base + name : base + '/' + name;
 }
@@ -76,6 +76,17 @@ export class PlaybackBar {
     // (e.g. a state machine). The bar stays visible greyed out; play/pause and frame stepping
     // keep working while the slider and loop toggle are disabled.
     private untimed = false;
+    // Dimmed overlay: the bar keeps rendering the underlying values but a semi-transparent
+    // mask covers everything and every interaction is disabled. Used by the SM blueprint to
+    // "park" the preview progress bar when the user presses the panel play button; the mask
+    // stays until the user re-selects a preview (via a chip click or a fresh state double
+    // click), which resets and un-dims the bar.
+    private dimmed = false;
+    // Frozen display: while parked, the bar keeps showing "0.00s / <preview duration>" for the
+    // preview animation whose selection has been cleared. Tick sampling from the view is
+    // paused; the frozen values below feed the counters and progress slider directly. When
+    // null, the bar reads live values from the view as usual.
+    private frozen: { durationUs: number; frameRate: number } | null = null;
     // Frame rate used for stepping in fallback mode (the view reports a default one).
     private fallbackRate = 60;
     // Handle of the pending requestAnimationFrame callback; null when the tick loop is stopped.
@@ -96,6 +107,12 @@ export class PlaybackBar {
         return !this.root.classList.contains('hidden');
     }
 
+    /** Root DOM element of the bar; exposed so companion components (e.g. the SM chip strip)
+     *  can position themselves relative to the bar and mirror its live width. */
+    public getElement(): HTMLElement {
+        return this.root;
+    }
+
     /** Normal mode shows a fully interactive bar; fallback mode (a default timeline without a
      *  queryable duration) keeps the bar visible but greyed out, disabling scrubbing and the
      *  loop toggle while play/pause and frame stepping keep working. */
@@ -105,8 +122,13 @@ export class PlaybackBar {
         this.untimed = !enabled;
         this.root.classList.remove('hidden');
         this.root.classList.toggle('is-untimed', this.untimed);
-        this.progressSlider.disabled = this.untimed;
-        this.loopBtn.disabled = this.untimed;
+        this.progressSlider.disabled = this.untimed || this.dimmed;
+        this.loopBtn.disabled = this.untimed || this.dimmed;
+        // Entering normal mode always lifts a stale frozen poster: the bar starts reading live
+        // view state again unless the host explicitly re-freezes it (park path).
+        if (enabled) {
+            this.frozen = null;
+        }
         this.updateAll();
         this.updateLoopIcon();
     }
@@ -119,7 +141,10 @@ export class PlaybackBar {
             this.setTimelineEnabled(true);
         } else {
             this.untimed = false;
+            this.dimmed = false;
+            this.frozen = null;
             this.root.classList.remove('is-untimed');
+            this.root.classList.remove('is-dimmed');
         }
     }
 
@@ -135,9 +160,54 @@ export class PlaybackBar {
         this.setTimelineEnabled(false);
     }
 
+    /** Overlay a dim mask on the bar and disable every interaction (buttons + slider). Used
+     *  when a preview is "parked" by the SM panel play button: the bar stays in place so the
+     *  user can see it, but pressing anything on it does nothing until the parent lifts the
+     *  dim state by re-selecting a preview. Orthogonal to setVisible/showUntimed. */
+    public setDimmed(dimmed: boolean): void {
+        this.dimmed = dimmed;
+        this.root.classList.toggle('is-dimmed', dimmed);
+        this.progressSlider.disabled = dimmed || this.untimed;
+        this.loopBtn.disabled = dimmed || this.untimed;
+    }
+
+    /** Freeze the bar's displayed values to the given duration + frame rate, and reset the
+     *  playhead label to "0.00s / <duration>". Once frozen the bar ignores view state entirely
+     *  (no tick sampling, no updates from togglePlayback / stepFrame - it's a static poster
+     *  for the parked preview's identity). Pass null to un-freeze; the next updateAll() call
+     *  will read live values again. */
+    public setFrozen(spec: { durationUs: number; frameRate: number } | null): void {
+        this.frozen = spec;
+        if (spec != null) {
+            // Render once so the bar shows 0/<duration> immediately without waiting for the
+            // next rAF tick (which would be skipped for frozen anyway).
+            this.renderFrozen();
+        }
+    }
+
+    private renderFrozen(): void {
+        if (this.frozen == null) {
+            return;
+        }
+        const totalFrames = this.frozen.frameRate > 0
+            ? Math.ceil((this.frozen.durationUs * this.frozen.frameRate) / 1_000_000)
+            : 0;
+        this.timeText.textContent = '0.00s / ' + formatTime(this.frozen.durationUs);
+        this.frameText.textContent = '0 / ' + String(totalFrames);
+        this.progressSlider.value = '0';
+        this.updateSliderFill();
+        this.playPauseImg.src = iconUrl(this.iconBaseUrl, 'play.png');
+    }
+
     /** Push all current PAGXView state onto the DOM. Called on visibility change and after
      *  user actions to keep the UI in sync. */
     public updateAll(): void {
+        if (this.frozen != null) {
+            // Frozen: keep the static "0 / duration" poster for the parked preview; nothing
+            // in the view state is relevant right now.
+            this.renderFrozen();
+            return;
+        }
         this.updatePlayPauseIcon();
         this.updateProgressSlider();
         this.updateTimeDisplay();
@@ -147,7 +217,7 @@ export class PlaybackBar {
      *  playthrough that ended at the tail becomes replay-able. */
     public togglePlayback(): void {
         const view = this.getView();
-        if (!view || (!this.untimed && view.durationMicros() <= 0)) {
+        if (!view || this.dimmed || (!this.untimed && view.durationMicros() <= 0)) {
             return;
         }
         if (view.isPlaying()) {
@@ -172,7 +242,7 @@ export class PlaybackBar {
      *  rather than drifting by the non-integer `1e6 / rate` each click. */
     public stepFrame(direction: number): void {
         const view = this.getView();
-        if (!view) {
+        if (!view || this.dimmed) {
             return;
         }
         if (this.untimed) {
@@ -384,7 +454,7 @@ export class PlaybackBar {
                 return;
             }
             const view = this.getView();
-            if (view && this.isVisible()) {
+            if (view && this.isVisible() && this.frozen == null) {
                 const playing = view.isPlaying();
                 if (!this.isDraggingSlider && (playing || this.wasPlaying)) {
                     this.updateAll();

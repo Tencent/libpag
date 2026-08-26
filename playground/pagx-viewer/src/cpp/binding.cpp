@@ -71,5 +71,9 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("_setNodeChannel", &pagx::PAGXView::setNodeChannel)
       .function("_setSMInputBool", &pagx::PAGXView::setSMInputBool)
       .function("_setSMInputNumber", &pagx::PAGXView::setSMInputNumber)
-      .function("_fireSMInputTrigger", &pagx::PAGXView::fireSMInputTrigger);
+      .function("_fireSMInputTrigger", &pagx::PAGXView::fireSMInputTrigger)
+      .function("_getTimelineTree", &pagx::PAGXView::getTimelineTree)
+      .function("_selectTimelineUnit", &pagx::PAGXView::selectTimelineUnit)
+      .function("_getSelectedTimelineUnit", &pagx::PAGXView::getSelectedTimelineUnit)
+      .function("_getSMCurrentStates", &pagx::PAGXView::getSMCurrentStates);
 }
