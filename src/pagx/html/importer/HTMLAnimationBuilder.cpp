@@ -811,9 +811,13 @@ SolidColor* FindSolidFillInElements(const std::vector<Element*>& elements, int e
 // position layout has assigned to `outer` (e.g. a flex child's main-axis offset, or the
 // padding origin of a constraint-laid-out child). By moving every visual / container attribute
 // onto a child Layer that fills its parent (`percentWidth/Height = 100`, no positional
-// constraints, `includeInLayout = false`), `inner.layoutBounds` is guaranteed to be (0, 0) so
-// the CSS keyframe values can be written verbatim onto `inner.x` / `inner.y` without baking in
-// any static layout offset.
+// constraints), `inner.layoutBounds` is guaranteed to be (0, 0) so the CSS keyframe values can be
+// written verbatim onto `inner.x` / `inner.y` without baking in any static layout offset. The inner
+// layer remains included in its outer's measurement: intrinsically-sized text leaves have no
+// authored width, so excluding the only visual child would collapse every flex slot to zero and
+// stack animated characters on top of one another. Percentage children fall back to their
+// preferred content size while their content-measured parent is unresolved, then fill the refined
+// parent size on layout's second pass.
 //
 // `outer` keeps the parent-facing slot (width/height/percent/positional-constraints/flex,
 // `includeInLayout`) and the existing `id` used by alpha targets and external references.
@@ -879,7 +883,7 @@ Layer* SplitForTransformAnimation(Layer* outer, PAGXDocument* document,
 
   inner->percentWidth = 100.0f;
   inner->percentHeight = 100.0f;
-  inner->includeInLayout = false;
+  inner->includeInLayout = true;
 
   outer->children.push_back(inner);
   return inner;

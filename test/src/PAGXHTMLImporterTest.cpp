@@ -6340,6 +6340,55 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationOpacityProducesAlphaChannel) {
   EXPECT_EQ(ch->keyframes.front().interpolation, pagx::KeyframeInterpolationType::Linear);
 }
 
+// Text leaves take a dedicated conversion path instead of convertContainer(). They must still be
+// registered with the post-tree animation builder; otherwise per-character animations captured as
+// animated <span> elements disappear completely from the PAGX document.
+PAG_TEST(PAGXHTMLImporterTest, AnimationOnTextLeafProducesTransformChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes wave {
+        0%   { transform: translateY(0px); }
+        50%  { transform: translateY(-14px); }
+        100% { transform: translateY(0px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <span id="glyph" style="font-size:40px;animation-name:wave;animation-duration:1.4s;
+                              animation-timing-function:linear;animation-iteration-count:infinite;
+                              animation-delay:0s;animation-fill-mode:both">S</span>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(anim->loop, pagx::LoopMode::Loop);
+  EXPECT_EQ(anim->duration, 84);
+  auto* glyph = doc->layers.front()->children.front();
+  EXPECT_EQ(glyph->id, "glyph");
+  ASSERT_EQ(glyph->children.size(), 1u);
+  auto* obj = FindObjectByTarget(anim, glyph->children.front()->id);
+  ASSERT_NE(obj, nullptr);
+  auto* yCh = dynamic_cast<pagx::TypedChannel<float>*>(FindChannel(anim, "y"));
+  ASSERT_NE(yCh, nullptr);
+  ASSERT_EQ(yCh->keyframes.size(), 3u);
+  EXPECT_EQ(yCh->keyframes.front().time, 0);
+  EXPECT_FLOAT_EQ(yCh->keyframes.front().value, 0.0f);
+  EXPECT_EQ(yCh->keyframes[1].time, 42);
+  EXPECT_FLOAT_EQ(yCh->keyframes[1].value, -14.0f);
+  EXPECT_EQ(yCh->keyframes.back().time, 84);
+  EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 0.0f);
+
+  // Transform splitting must keep the visual child in intrinsic measurement. Excluding it makes
+  // an auto-width text leaf collapse to zero, which stacks every animated flex character at the
+  // same x coordinate.
+  doc->applyLayout();
+  EXPECT_GT(glyph->layoutBounds().width, 0.0f);
+  EXPECT_GT(glyph->children.front()->layoutBounds().width, 0.0f);
+}
+
 // The builder emits one Animation per animated element; a post-pass then coalesces animations that
 // share the same duration / frameRate / loop into a single Animation (objects concatenated) so a
 // staggered grid of siblings does not produce a long run of near-identical <Animation> blocks. The

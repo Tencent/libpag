@@ -789,7 +789,14 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& element,
                                           const HTMLBoxAttributes& box,
                                           const HTMLInheritedStyle& inherited) {
-  return _textFragmentBuilder->convertTextLeaf(element, box, inherited);
+  auto* layer = _textFragmentBuilder->convertTextLeaf(element, box, inherited);
+  // Text leaves bypass convertContainer(), so they must pass through the same registration hook
+  // here. HTMLTextFragmentBuilder assigns authored ids/names to the layer, but a bare allocator
+  // assignment does not enqueue CSS animations for the post-tree animation pass. Without this,
+  // animations on <span>/<a>/<p>/<h1>... elements are silently dropped while identical styles on
+  // a <div> work, which is especially visible for per-character text animations.
+  assignElementId(layer, element);
+  return layer;
 }
 
 }  // namespace pagx
