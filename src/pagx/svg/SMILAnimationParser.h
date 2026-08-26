@@ -64,6 +64,22 @@ struct SMILAnimationGroup {
 };
 
 /**
+ * Begin/end timing for one SMIL animation element, resolved by buildAnimation before the
+ * element is dispatched to its parse function.
+ *
+ * beginSeconds carries the resolved document-time start: a plain clock value as authored, or
+ * the solved time of a syncbase reference (begin="id.end", "id.begin+2s", "id.repeat(n)").
+ * Negative values mean the animation started before the document timeline origin, so at time 0
+ * it is already partway through (the parser keeps negative keyframe times and evaluation clamps
+ * naturally). Interactive offsets (begin="click") have no PAGX equivalent and resolve to 0.
+ * endSeconds limits the active duration; a value < 0 means no end constraint.
+ */
+struct ResolvedTiming {
+  double beginSeconds = 0;
+  double endSeconds = -1;
+};
+
+/**
  * Information about a PAGX node that is the target of one or more SMIL animations, populated
  * during convertToLayer and consumed by buildAnimation to create AnimationObject + Channel nodes.
  *
@@ -165,6 +181,13 @@ class SMILAnimationParser {
  private:
   SMILAnimationParser() = default;
 
+  // Pre-scans every SMIL element and solves begin/end syncbase references (begin="id.end")
+  // to fixed document times; interactive offsets resolve to 0. Consumed by the parse
+  // functions via ResolvedTiming.
+  static std::unordered_map<const DOMNode*, ResolvedTiming> ResolveAllTimings(
+      SVGParserContext& ctx,
+      const std::unordered_map<const DOMNode*, SMILAnimationGroup>& smilAnimations);
+
   // Resolves an <animate>/<set> attributeName to the target PAGX node, channel name, and value
   // type. Searches Layer contents for Fill / Stroke / Shape nodes and allocates ids for newly
   // targeted content nodes.
@@ -172,21 +195,24 @@ class SMILAnimationParser {
                                             const std::string& attributeName,
                                             const AnimatedNodeInfo& nodeInfo);
 
-  // Parses a single <animate> element into a list of Channels. Handles from/to/by/values,
-  // keyTimes/keySplines/calcMode, begin/dur/repeatCount/fill, additive/accumulate.
+  // Parses a single <animate> element into a list of Channels. Handles from/to/by/values
+  // (to-only/by-only approximate the base value with the target's static value),
+  // keyTimes/keySplines/calcMode, begin/dur/repeatCount/repeatDur/fill, additive/accumulate.
   // outTargetId receives the PAGX node id that the channels drive (may differ from the Layer id
   // when the animate targets a Fill/Stroke/Shape content node).
   static std::vector<Channel*> parseAnimate(SVGParserContext& ctx, PAGXDocument* doc,
                                             const std::shared_ptr<DOMNode>& animElement,
                                             const AnimatedNodeInfo& nodeInfo, float frameRate,
-                                            Frame& outEndFrame, std::string& outTargetId);
+                                            const ResolvedTiming& timing, Frame& outEndFrame,
+                                            std::string& outTargetId);
 
   // Parses a single <set> element into a single Hold keyframe on each targeted channel.
   // outTargetId receives the PAGX node id that the channel drives.
   static std::vector<Channel*> parseSet(SVGParserContext& ctx, PAGXDocument* doc,
                                         const std::shared_ptr<DOMNode>& setElement,
                                         const AnimatedNodeInfo& nodeInfo, float frameRate,
-                                        Frame& outEndFrame, std::string& outTargetId);
+                                        const ResolvedTiming& timing, Frame& outEndFrame,
+                                        std::string& outTargetId);
 
   // Parses a single <animateTransform> element into a single Matrix channel driving the Layer's
   // runtime "matrix" channel. Each keyframe's transform params (translate/scale/rotate/skewX/
@@ -195,7 +221,8 @@ class SMILAnimationParser {
   static std::vector<Channel*> parseAnimateTransform(SVGParserContext& ctx, PAGXDocument* doc,
                                                      const std::shared_ptr<DOMNode>& animElement,
                                                      const AnimatedNodeInfo& nodeInfo,
-                                                     float frameRate, Frame& outEndFrame);
+                                                     float frameRate, const ResolvedTiming& timing,
+                                                     Frame& outEndFrame);
 
   // Parses a single <animateMotion> element into a single Matrix channel driving the Layer's
   // runtime "matrix" channel. Samples the referenced path via PathMeasure with an adaptive
@@ -204,7 +231,7 @@ class SMILAnimationParser {
   static std::vector<Channel*> parseAnimateMotion(SVGParserContext& ctx, PAGXDocument* doc,
                                                   const std::shared_ptr<DOMNode>& animElement,
                                                   const AnimatedNodeInfo& nodeInfo, float frameRate,
-                                                  Frame& outEndFrame);
+                                                  const ResolvedTiming& timing, Frame& outEndFrame);
 
   // Finds the first element of the given NodeType in the target Layer's contents.
   static Element* findContentNode(const AnimatedNodeInfo& nodeInfo, NodeType type);
