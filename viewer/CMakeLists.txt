@@ -257,7 +257,7 @@ if (APPLE)
             # Copy Info.plist
             COMMAND /bin/sh -c "cp -f '${CMAKE_SOURCE_DIR}/package/templates/Info.plist' '${VIEWER_BUNDLE_DIR}/Contents/'"
             # Deploy Qt
-            COMMAND /bin/sh -c "'${DEPLOYQT_EXECUTABLE}' '${VIEWER_BUNDLE_DIR}' -qmldir='${CMAKE_SOURCE_DIR}/assets/qml' -always-overwrite"
+            COMMAND /bin/sh -c "'${DEPLOYQT_EXECUTABLE}' '${VIEWER_BUNDLE_DIR}' -qmldir='${CMAKE_SOURCE_DIR}/assets/qml'"
             COMMENT "Deploying runtime dependencies into PAGViewer.app"
             VERBATIM
     )
