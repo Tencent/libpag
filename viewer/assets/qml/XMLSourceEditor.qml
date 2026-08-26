@@ -449,6 +449,12 @@ Rectangle {
         color: root.backgroundColor
         visible: root.busy
 
+        // Swallow mouse events while loading; without a grabber, clicks and drag-selection
+        // fall through to the TextArea underneath (only keyboard input is blocked elsewhere).
+        MouseArea {
+            anchors.fill: parent
+        }
+
         Rectangle {
             anchors.centerIn: parent
             width: 280
