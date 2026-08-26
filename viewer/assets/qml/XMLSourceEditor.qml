@@ -403,7 +403,7 @@ Rectangle {
                 // Block keyboard editing while a document is loading; Keys runs before the
                 // text control sees the event. readOnly is not an option: Qt moves the caret
                 // to the document end whenever it is toggled, scrolling the view to bottom.
-                Keys.onPressed: (event) => {
+                Keys.onPressed: function(event) {
                     if (root.busy) {
                         event.accepted = true;
                         return;
