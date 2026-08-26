@@ -4544,16 +4544,17 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate) {
   EXPECT_EQ(channel->name, "matrix");
   EXPECT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix);
   auto* matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
-  ASSERT_EQ(matrixChannel->keyframes.size(), 2u);
+  // The 360-degree sweep splits into three 120-degree segments: 4 keyframes (0/40/80/120).
+  ASSERT_EQ(matrixChannel->keyframes.size(), 4u);
   EXPECT_EQ(matrixChannel->keyframes[0].time, 0);
   EXPECT_TRUE(matrixChannel->keyframes[0].value.isIdentity());
-  EXPECT_EQ(matrixChannel->keyframes[1].time, 120);
+  EXPECT_EQ(matrixChannel->keyframes[3].time, 120);
   // rotate(360) composes to the identity matrix.
   auto expected = pagx::Matrix::Rotate(360.0f);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.a, expected.a);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.b, expected.b);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.c, expected.c);
-  EXPECT_FLOAT_EQ(matrixChannel->keyframes[1].value.d, expected.d);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.a, expected.a);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.b, expected.b);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.c, expected.c);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes[3].value.d, expected.d);
 }
 
 /**
@@ -4646,16 +4647,17 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateWithCenter) {
   ASSERT_EQ(obj->channels.size(), 1u);
   EXPECT_EQ(obj->channels[0]->name, "matrix");
   auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
-  ASSERT_EQ(ch->keyframes.size(), 2u);
+  // The 360-degree sweep splits into three 120-degree steps: 4 keyframes (0/40/80/120).
+  ASSERT_EQ(ch->keyframes.size(), 4u);
   EXPECT_TRUE(ch->keyframes[0].value.isIdentity());
   auto expected = pagx::Matrix::Translate(25.0f, 25.0f) * pagx::Matrix::Rotate(360.0f) *
                   pagx::Matrix::Translate(-25.0f, -25.0f);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.a, expected.a);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.b, expected.b);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.c, expected.c);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.d, expected.d);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.tx, expected.tx);
-  EXPECT_FLOAT_EQ(ch->keyframes[1].value.ty, expected.ty);
+  EXPECT_FLOAT_EQ(ch->keyframes[3].value.a, expected.a);
+  EXPECT_FLOAT_EQ(ch->keyframes[3].value.b, expected.b);
+  EXPECT_FLOAT_EQ(ch->keyframes[3].value.c, expected.c);
+  EXPECT_FLOAT_EQ(ch->keyframes[3].value.d, expected.d);
+  EXPECT_FLOAT_EQ(ch->keyframes[3].value.tx, expected.tx);
+  EXPECT_FLOAT_EQ(ch->keyframes[3].value.ty, expected.ty);
 }
 
 /**
@@ -5799,14 +5801,14 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateRoundnessStrokeWidthAndShadowBlur) {
 }
 
 /**
- * Test SVG import: animateTransform rotate 0→360 sampled at the midpoint decomposes to 0
- * degrees, documenting the current shortest-arc limitation of matrix-channel interpolation.
+ * Test SVG import: animateTransform rotate 0→360 is split into ≤180-degree segments at bake
+ * time so matrix-channel interpolation preserves the full turn.
  *
  * Baking an angle into a Matrix loses winding (DecomposeAffine recovers rotation via atan2,
- * confined to (-π, π]); MixDecomposed then interpolates the shortest arc. For 0→360 both
- * endpoints decompose to 0°, so every interpolated frame stays at 0° — the full turn is
- * silently dropped. If the importer later splits such rotations into ≤180° segments at bake
- * time (so each segment stays within the shortest-arc window), update this expectation to 180.
+ * confined to (-π, π]); MixDecomposed then interpolates the shortest arc. Without splitting,
+ * 0→360 both endpoints bake to the identity matrix and the tween never rotates. The importer
+ * splits the 360-degree delta into two 180-degree steps (0°@0, 180°@60, 360°@120), keeping
+ * every interpolated step inside the shortest-arc window.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateFullTurnInterpolation) {
   std::string svg =
@@ -5826,18 +5828,26 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotateFullTurnInterpolation) {
   EXPECT_TRUE(ch->keyframes.front().value.isIdentity());
   EXPECT_NEAR(ch->keyframes.back().value.a, 1.0f, 1e-4f);
   EXPECT_NEAR(ch->keyframes.back().value.b, 0.0f, 1e-4f);
-  // Midpoint (frame 60 of 120 at 60fps): the sampled matrix decomposes to ~0 degrees.
+  // The 360-degree sweep is split into three 120-degree segments (the 179-degree step bound
+  // avoids inserting keyframes exactly on the atan2 ±pi boundary): 4 keyframes at frames
+  // 0 / 40 / 80 / 120.
+  ASSERT_EQ(ch->keyframes.size(), 4u);
+  EXPECT_EQ(ch->keyframes[1].time, 40);
+  EXPECT_EQ(ch->keyframes[2].time, 80);
+  // Midpoint (frame 60) sits halfway through the 120→240 segment: 180 degrees.
   auto mid = std::get<pagx::Matrix>(ch->evaluateAt(60));
   float midAngle = std::atan2(mid.b, mid.a) * 180.0f / static_cast<float>(M_PI);
-  EXPECT_NEAR(midAngle, 0.0f, 0.1f);
+  EXPECT_NEAR(std::abs(midAngle), 180.0f, 0.1f);
+  // A quarter-way sample (frame 30) sits 75% through the 0→120 segment: 90 degrees.
+  auto quarter = std::get<pagx::Matrix>(ch->evaluateAt(30));
+  float quarterAngle = std::atan2(quarter.b, quarter.a) * 180.0f / static_cast<float>(M_PI);
+  EXPECT_NEAR(quarterAngle, 90.0f, 0.1f);
 }
 
 /**
- * Test SVG import: animateTransform rotate 0→270 sampled at the midpoint decomposes to -45
- * degrees instead of the intended +135, documenting the second face of the shortest-arc
- * limitation. atan2 recovers 270° as -90°, so the tween runs 0→-90 and the midpoint lands at
- * -45. If the importer later splits >180° rotations into ≤180° segments at bake time, update
- * this expectation to 135.
+ * Test SVG import: animateTransform rotate 0→270 is split so the midpoint lands at +135
+ * degrees instead of the reversed -45. Without splitting, atan2 recovers 270° as -90° and
+ * the shortest-arc tween runs 0→-90 (counterclockwise), reversing the author's intent.
  */
 PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate270Interpolation) {
   std::string svg =
@@ -5855,10 +5865,12 @@ PAGX_TEST(PAGXSVGTest, SVGImport_AnimateTransformRotate270Interpolation) {
   auto* ch = static_cast<pagx::TypedChannel<pagx::Matrix>*>(obj->channels[0]);
   // Endpoint: rotate(270) bakes to the matrix of -90 (cos270=0, sin270=-1).
   EXPECT_NEAR(ch->keyframes.back().value.b, -1.0f, 1e-4f);
-  // Midpoint: shortest arc takes 0→-90, so frame 60 sits at -45 (not the intended +135).
+  // 270 degrees splits into two 135-degree steps: 0°@0, 135°@60, 270°@120.
+  ASSERT_EQ(ch->keyframes.size(), 3u);
+  // Midpoint: the inserted 135-degree keyframe.
   auto mid = std::get<pagx::Matrix>(ch->evaluateAt(60));
   float midAngle = std::atan2(mid.b, mid.a) * 180.0f / static_cast<float>(M_PI);
-  EXPECT_NEAR(midAngle, -45.0f, 0.1f);
+  EXPECT_NEAR(midAngle, 135.0f, 0.1f);
 }
 
 }  // namespace pag
