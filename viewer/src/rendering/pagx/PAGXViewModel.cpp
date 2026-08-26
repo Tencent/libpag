@@ -631,8 +631,9 @@ void PAGXViewModel::appendEditorChunk() {
     Q_EMIT editorLoadFinished(loaderMaxLineWidth);
     return;
   }
-  constexpr qsizetype ChunkSize = 128 * 1024;
-  auto end = qMin(loaderText.size(), loaderOffset + ChunkSize);
+  QElapsedTimer tickTimer;
+  tickTimer.start();
+  auto end = qMin(loaderText.size(), loaderOffset + loaderChunkSize);
   if (end < loaderText.size()) {
     // Cut on a line boundary so every chunk holds complete lines and the highlighter's
     // cross-line states stay consistent.
@@ -681,6 +682,14 @@ void PAGXViewModel::appendEditorChunk() {
   // so the first click on a far-away line would stall for about a second. Warm layouts up
   // while loading instead.
   warmupLayouts(512);
+  // Pace the load against the frame budget: shrink the chunk when a tick overruns so the
+  // UI (overlay animation, canvas) stays responsive, and grow it when there is headroom.
+  const auto tickMs = tickTimer.elapsed();
+  if (tickMs > 33) {
+    loaderChunkSize = qMax<qsizetype>(24 * 1024, loaderChunkSize / 2);
+  } else if (tickMs < 12) {
+    loaderChunkSize = qMin<qsizetype>(256 * 1024, loaderChunkSize * 2);
+  }
   if (loaderOffset >= loaderText.size()) {
     loaderTimer->stop();
     loaderText.clear();

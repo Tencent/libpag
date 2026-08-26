@@ -376,6 +376,12 @@ Rectangle {
                 Keys.onPressed: (event) => {
                     if (root.busy) {
                         event.accepted = true;
+                        return;
+                    }
+                    // Diagnostic marker: the gap between this line and the following
+                    // textChanged log is the true cost of the delete pipeline.
+                    if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
+                        root.log("deleteKey pressed");
                     }
                 }
 

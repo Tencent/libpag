@@ -243,6 +243,9 @@ class PAGXViewModel : public ContentViewModel {
   double loaderMaxLineWidth = 0;
   QElapsedTimer loaderElapsed;
   QTimer* loaderTimer = nullptr;
+  // Adaptive chunk size, tuned every tick against the frame budget so loading keeps the UI
+  // responsive instead of hogging the main thread with fixed-size bursts.
+  qsizetype loaderChunkSize = 64 * 1024;
   // Layout warmup state: blocks are laid out progressively DURING the chunked load (a fixed
   // number per insert tick, remainder synchronously before the load finishes), so hitTest
   // and far jumps never pay the sequential-layout cost of unvisited blocks.
