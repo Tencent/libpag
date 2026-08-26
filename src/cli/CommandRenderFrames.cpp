@@ -41,13 +41,14 @@ struct RenderFramesOptions {
 };
 
 void PrintUsage() {
-  std::cout << "Usage: pagx render-frames [options] <file.pagx>\n"
-            << "\n"
-            << "Renders every frame of the default animation to PNG files in an output directory.\n"
-            << "\n"
-            << "Options:\n"
-            << "  -o, --output <dir>   Output directory (default: frames)\n"
-            << "  --fps <float>        Frame rate in frames per second (default: animation frame rate)\n";
+  std::cout
+      << "Usage: pagx render-frames [options] <file.pagx>\n"
+      << "\n"
+      << "Renders every frame of the default animation to PNG files in an output directory.\n"
+      << "\n"
+      << "Options:\n"
+      << "  -o, --output <dir>   Output directory (default: frames)\n"
+      << "  --fps <float>        Frame rate in frames per second (default: animation frame rate)\n";
 }
 
 int ParseOptions(int argc, char* argv[], RenderFramesOptions* options) {
@@ -180,8 +181,8 @@ int RunRenderFrames(int argc, char* argv[]) {
     ++written;
   }
 
-  std::cout << "pagx render-frames: wrote " << written << " frames to " << options.outputDir
-            << " (" << width << "x" << height << ")\n";
+  std::cout << "pagx render-frames: wrote " << written << " frames to " << options.outputDir << " ("
+            << width << "x" << height << ")\n";
   return 0;
 }
 
