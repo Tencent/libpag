@@ -80,17 +80,6 @@ Rectangle {
 
     color: backgroundColor
 
-    // Diagnostics helper matching the C++ [PAGXEditor] log format; remove once the
-    // large-file performance work settles.
-    function log(message) {
-        const d = new Date();
-        const ms = String(d.getMilliseconds()).padStart(3, "0");
-        console.log("[PAGXEditor] " + d.toTimeString().slice(0, 8) + "." + ms + " " + message);
-    }
-
-    onVisibleChanged: log("editor visible: " + visible + " lineCount: " + documentLineCount
-                          + " length: " + textArea.length)
-
     // Entry point for every "the document XML changed" notification. Loads immediately when
     // the Source Editor tab is front, otherwise just raises the deferred flag.
     function requestDocumentLoad() {
@@ -98,20 +87,17 @@ Rectangle {
             loadXml(viewModel.documentXml);
         } else {
             needsDocumentLoad = true;
-            log("requestDocumentLoad: deferred until the Source Editor tab is active");
         }
     }
 
     onIsActiveChanged: {
         if (isActive && needsDocumentLoad && viewModel) {
             needsDocumentLoad = false;
-            log("isActiveChanged: source tab activated, starting deferred load");
             loadXml(viewModel.documentXml);
         }
     }
 
     function loadXml(xml, keepScrollPosition) {
-        log("loadXml: length=" + xml.length);
         baselineXml = xml;
         maxLineWidth = 0;
         loadProgress = 0;
@@ -139,7 +125,6 @@ Rectangle {
     }
 
     function handleDiscard() {
-        log("handleDiscard");
         if (!dirty) {
             showToast(qsTr("Nothing to discard"), true);
             return;
@@ -160,10 +145,8 @@ Rectangle {
         if (!viewModel) {
             return;
         }
-        const start = Date.now();
         // Read the text once: each access copies the whole document out of the text backend.
         const editorText = textArea.text;
-        log("handleApply: start, editorLength=" + editorText.length);
         // Folded long data lines must round-trip back to their original content; a modified
         // marker cannot be restored safely, so refuse instead of silently losing data.
         if (viewModel.elideBroken(editorText)) {
@@ -177,7 +160,6 @@ Rectangle {
             return;
         }
         const error = viewModel.applyXmlChanges(text);
-        log("handleApply: done, validateAndApplyMs=" + (Date.now() - start));
         if (error === "") {
             // Advance the baseline so a later Discard restores what the canvas now shows.
             baselineXml = text;
@@ -192,10 +174,8 @@ Rectangle {
         if (!viewModel) {
             return;
         }
-        const start = Date.now();
         // Read the text once: each access copies the whole document out of the text backend.
         const editorText = textArea.text;
-        log("handleSave: start, editorLength=" + editorText.length);
         if (viewModel.elideBroken(editorText)) {
             showToast(qsTr("A folded data line was modified. Discard to restore it."), false);
             return;
@@ -212,7 +192,6 @@ Rectangle {
             return;
         }
         const saveError = viewModel.saveXmlToFile(text);
-        log("handleSave: done, validateApplySaveMs=" + (Date.now() - start));
         if (saveError === "") {
             baselineXml = text;
             dirty = false;
@@ -232,8 +211,6 @@ Rectangle {
         }
 
         function onEditorLoadFinished(maxLineWidth) {
-            log("editorLoadFinished: maxLineWidth=" + maxLineWidth
-                + " lineCount=" + root.documentLineCount);
             root.maxLineWidth = maxLineWidth;
             // Clearing the document pulls the caret to position 0, which drags the viewport
             // to the top; restore the saved position after the content is complete.
@@ -260,7 +237,6 @@ Rectangle {
             return;
         }
         connectedViewModel = viewModel;
-        log("connectViewModel: attaching highlighter");
         viewModel.attachHighlighter(textArea.textDocument);
         if (viewModel.documentXml !== "") {
             requestDocumentLoad();
@@ -394,10 +370,6 @@ Rectangle {
 
                 onTextChanged: {
                     root.dirty = true;
-                    // O(1) reads only: touching textArea.text here would copy the whole
-                    // document on every change notification.
-                    root.log("textChanged: length=" + textArea.length
-                             + " lineCount=" + root.documentLineCount);
                 }
 
                 // Block keyboard editing while a document is loading; Keys runs before the
@@ -407,11 +379,6 @@ Rectangle {
                     if (root.busy) {
                         event.accepted = true;
                         return;
-                    }
-                    // Diagnostic marker: the gap between this line and the following
-                    // textChanged log is the true cost of the delete pipeline.
-                    if (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete) {
-                        root.log("deleteKey pressed");
                     }
                 }
 
