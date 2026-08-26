@@ -1646,6 +1646,60 @@ std::vector<Channel*> SMILAnimationParser::parseAnimateTransform(
     splines = parseKeySplines(ctx.getAttribute(animElement, "keySplines"));
   }
 
+  // Rotate interpolation on the matrix channel goes through DecomposeAffine/MixDecomposed,
+  // which recovers rotation via atan2 confined to (-pi, pi] and interpolates the shortest arc.
+  // A Linear keyframe pair whose angle delta exceeds 180 degrees therefore loses winding:
+  // 0->360 bakes both endpoints to the identity matrix (the tween never rotates), and 0->270
+  // is recovered as -90 (reversed direction). Split such segments into <=180-degree steps at
+  // bake time so every interpolated step stays inside the shortest-arc window; time is split
+  // proportionally to keep the angular velocity constant, and rotation centers (when the
+  // three-parameter form is used) are linearly interpolated across the inserted keyframes.
+  // Only Linear interpolation is split: Bezier-eased multi-turn rotations stay unsplit (rare;
+  // splitting would need spline subdivision) and keep the shortest-arc limitation, while Hold
+  // never interpolates so it has no winding to lose.
+  if (type == "rotate" && interpolation == KeyframeInterpolationType::Linear &&
+      paramSets.size() >= 2) {
+    std::vector<std::vector<float>> expandedParams = {};
+    std::vector<double> expandedTimes = {};
+    expandedParams.reserve(paramSets.size() * 2);
+    expandedTimes.reserve(paramSets.size() * 2);
+    expandedParams.push_back(paramSets.front());
+    expandedTimes.push_back(keyTimes.front());
+    for (size_t i = 1; i < paramSets.size(); ++i) {
+      float prevAngle = (paramSets[i - 1].size() > 0) ? paramSets[i - 1][0] : 0.0f;
+      float curAngle = (paramSets[i].size() > 0) ? paramSets[i][0] : 0.0f;
+      float delta = curAngle - prevAngle;
+      if (std::abs(delta) <= 180.0f) {
+        expandedParams.push_back(paramSets[i]);
+        expandedTimes.push_back(keyTimes[i]);
+        continue;
+      }
+      float prevCX = (paramSets[i - 1].size() >= 3) ? paramSets[i - 1][1] : 0.0f;
+      float prevCY = (paramSets[i - 1].size() >= 3) ? paramSets[i - 1][2] : 0.0f;
+      float curCX = (paramSets[i].size() >= 3) ? paramSets[i][1] : 0.0f;
+      float curCY = (paramSets[i].size() >= 3) ? paramSets[i][2] : 0.0f;
+      bool hasCenter = paramSets[i - 1].size() >= 3 || paramSets[i].size() >= 3;
+      // The step bound is 179 rather than 180 degrees: an inserted keyframe at exactly 180
+      // degrees sits on the atan2 ±pi boundary, where float sin(pi) is a tiny negative number,
+      // the keyframe decomposes to -pi instead of +pi, and the shortest-arc wrap (which uses
+      // strict inequality) leaves the diff unwrapped — reversing that step's direction.
+      int steps = static_cast<int>(std::ceil(std::abs(delta) / 179.0f));
+      for (int k = 1; k <= steps; ++k) {
+        float t = static_cast<float>(k) / static_cast<float>(steps);
+        std::vector<float> params = {};
+        params.push_back(prevAngle + delta * t);
+        if (hasCenter) {
+          params.push_back(prevCX + (curCX - prevCX) * t);
+          params.push_back(prevCY + (curCY - prevCY) * t);
+        }
+        expandedParams.push_back(std::move(params));
+        expandedTimes.push_back(keyTimes[i - 1] + (keyTimes[i] - keyTimes[i - 1]) * t);
+      }
+    }
+    paramSets = std::move(expandedParams);
+    keyTimes = std::move(expandedTimes);
+  }
+
   // Bake each keyframe's transform params into a full Matrix on a single "matrix" channel
   // targeting the Layer. The runtime evaluates Matrix keyframes with decomposition interpolation
   // (LerpKeyframeValue<Matrix>) and applies keySplines bezier easing through the same
