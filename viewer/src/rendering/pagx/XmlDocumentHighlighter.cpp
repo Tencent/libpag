@@ -27,9 +27,8 @@ static void EditorLog(const QString& message) {
   qDebug().noquote() << "[PAGXEditor]" << QTime::currentTime().toString("hh:mm:ss.zzz") << message;
 }
 
-// Matches name="value" / name='value' / bare name inside a tag. Kept in the .cpp file because
-// moc's lexer cannot handle C++ raw string literals, which corrupted namespace tracking for
-// every header on this include chain.
+// Matches an attribute inside a tag: leading whitespace, the name, the '=' separator, and an
+// optional double- or single-quoted value.
 static const QRegularExpression AttributePattern =
     QRegularExpression("(\\s+)([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\\s*=\\s*)(\"[^\"]*\"|'[^']*')?");
 
