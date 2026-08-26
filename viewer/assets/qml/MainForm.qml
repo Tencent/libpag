@@ -2,6 +2,7 @@ import PAG
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Window
 import "components"
 
 SplitView {
@@ -55,13 +56,19 @@ SplitView {
         }
     }
 
+    // Item that currently holds active focus anywhere in the window; drives the "L" shortcut
+    // guard below. Read here (on an Item) since the Window attached property is not available
+    // on the non-visual Shortcut object.
+    readonly property Item focusedItem: Window.activeFocusItem
+
     // Mirror of the web playground's bare-L shortcut that toggles the source editor panel.
-    // Disabled while the editor holds focus so typing "l" in the text is never swallowed.
+    // Disabled whenever any text input holds focus so typing "l" is never swallowed; the
+    // source editor's TextArea is a TextEdit, so this also covers the editor itself.
     Shortcut {
         sequence: "L"
         enabled: currentViewType === "pagx" && hasPAGFile &&
-                  !(rightItemLoader.item && rightItemLoader.item.xmlSourceEditor &&
-                    rightItemLoader.item.xmlSourceEditor.editorFocused)
+                  !(splitView.focusedItem instanceof TextInput ||
+                    splitView.focusedItem instanceof TextEdit)
         onActivated: tabBar.currentIndex = tabBar.currentIndex === 1 ? 0 : 1
     }
 
