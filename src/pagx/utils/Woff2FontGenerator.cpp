@@ -195,6 +195,9 @@ static uint16_t ReadHeadUnitsPerEm(const std::vector<uint8_t>& sfnt) {
 
 // --- CFF number encoding ---
 
+// Encodes an integer operand for a CFF DICT. The 5-byte form below is a DICT-only encoding:
+// byte 29 introduces a 32-bit operand there, but inside a Type 2 charstring the same byte is
+// the callgsubr operator. Charstrings must use EncodeCharStringNumber instead.
 static void EncodeCFFInt(std::vector<uint8_t>& buf, int32_t val) {
   if (val >= -107 && val <= 107) {
     WriteU8(buf, static_cast<uint8_t>(val + 139));
@@ -226,12 +229,39 @@ static void EncodeCFFFixed(std::vector<uint8_t>& buf, float val) {
   WriteU8(buf, static_cast<uint8_t>(fixed & 0xFF));
 }
 
-static void EncodeCFFNumber(std::vector<uint8_t>& buf, float val) {
-  int32_t intVal = static_cast<int32_t>(std::round(val));
-  if (std::abs(val - static_cast<float>(intVal)) < 0.001f) {
-    EncodeCFFInt(buf, intVal);
+// Largest magnitude a Type 2 charstring operand can carry. Both the 3-byte integer form and
+// the integer part of the 16.16 fixed form are 16-bit signed, so anything beyond this range is
+// unrepresentable and gets clamped rather than silently wrapping around.
+static constexpr float MaxCharStringOperand = 32767.0f;
+
+// Encodes a number for a Type 2 charstring. The available forms are the 1- and 2-byte short
+// integers, a 3-byte integer introduced by byte 28, and 16.16 fixed introduced by byte 255.
+// Byte 29 is the callgsubr operator here, so the DICT 5-byte form must never be used: emitting
+// it made rasterizers call a non-existent global subroutine and abandon the rest of the glyph,
+// which dropped every glyph whose coordinate deltas exceeded the 2-byte range (common once
+// unitsPerEm is larger than 1131).
+static void EncodeCharStringNumber(std::vector<uint8_t>& buf, float val) {
+  float clamped = std::clamp(val, -MaxCharStringOperand, MaxCharStringOperand);
+  int32_t intVal = static_cast<int32_t>(std::round(clamped));
+  if (std::abs(clamped - static_cast<float>(intVal)) >= 0.001f) {
+    EncodeCFFFixed(buf, clamped);
+    return;
+  }
+  if (intVal >= -107 && intVal <= 107) {
+    WriteU8(buf, static_cast<uint8_t>(intVal + 139));
+  } else if (intVal >= 108 && intVal <= 1131) {
+    int v = intVal - 108;
+    WriteU8(buf, static_cast<uint8_t>((v >> 8) + 247));
+    WriteU8(buf, static_cast<uint8_t>(v & 0xFF));
+  } else if (intVal >= -1131 && intVal <= -108) {
+    int v = -intVal - 108;
+    WriteU8(buf, static_cast<uint8_t>((v >> 8) + 251));
+    WriteU8(buf, static_cast<uint8_t>(v & 0xFF));
   } else {
-    EncodeCFFFixed(buf, val);
+    // 3-byte encoding: prefix 28 + 2-byte big-endian signed int
+    WriteU8(buf, 28);
+    WriteU8(buf, static_cast<uint8_t>((intVal >> 8) & 0xFF));
+    WriteU8(buf, static_cast<uint8_t>(intVal & 0xFF));
   }
 }
 
@@ -316,8 +346,8 @@ struct CFFCharStringVisitor {
         float targetY = y(pts[0]);
         float dx = targetX - curX;
         float dy = targetY - curY;
-        EncodeCFFNumber(cs, dx);
-        EncodeCFFNumber(cs, dy);
+        EncodeCharStringNumber(cs, dx);
+        EncodeCharStringNumber(cs, dy);
         WriteU8(cs, 21);  // rmoveto
         curX = targetX;
         curY = targetY;
@@ -328,8 +358,8 @@ struct CFFCharStringVisitor {
         float targetY = y(pts[0]);
         float dx = targetX - curX;
         float dy = targetY - curY;
-        EncodeCFFNumber(cs, dx);
-        EncodeCFFNumber(cs, dy);
+        EncodeCharStringNumber(cs, dx);
+        EncodeCharStringNumber(cs, dy);
         WriteU8(cs, 5);  // rlineto
         curX = targetX;
         curY = targetY;
@@ -353,12 +383,12 @@ struct CFFCharStringVisitor {
         float dy2 = cp2Y - cp1Y;
         float dx3 = endX - cp2X;
         float dy3 = endY - cp2Y;
-        EncodeCFFNumber(cs, dx1);
-        EncodeCFFNumber(cs, dy1);
-        EncodeCFFNumber(cs, dx2);
-        EncodeCFFNumber(cs, dy2);
-        EncodeCFFNumber(cs, dx3);
-        EncodeCFFNumber(cs, dy3);
+        EncodeCharStringNumber(cs, dx1);
+        EncodeCharStringNumber(cs, dy1);
+        EncodeCharStringNumber(cs, dx2);
+        EncodeCharStringNumber(cs, dy2);
+        EncodeCharStringNumber(cs, dx3);
+        EncodeCharStringNumber(cs, dy3);
         WriteU8(cs, 8);  // rrcurveto
         curX = endX;
         curY = endY;
@@ -377,12 +407,12 @@ struct CFFCharStringVisitor {
         float dy2 = cp2Y - cp1Y;
         float dx3 = endX - cp2X;
         float dy3 = endY - cp2Y;
-        EncodeCFFNumber(cs, dx1);
-        EncodeCFFNumber(cs, dy1);
-        EncodeCFFNumber(cs, dx2);
-        EncodeCFFNumber(cs, dy2);
-        EncodeCFFNumber(cs, dx3);
-        EncodeCFFNumber(cs, dy3);
+        EncodeCharStringNumber(cs, dx1);
+        EncodeCharStringNumber(cs, dy1);
+        EncodeCharStringNumber(cs, dx2);
+        EncodeCharStringNumber(cs, dy2);
+        EncodeCharStringNumber(cs, dx3);
+        EncodeCharStringNumber(cs, dy3);
         WriteU8(cs, 8);  // rrcurveto
         curX = endX;
         curY = endY;

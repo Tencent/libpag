@@ -604,6 +604,34 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
   EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
 }
 
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsLargeCharstringOperands) {
+  auto doc = pagx::PAGXImporter::FromFile(ProjectPath::Absolute(
+      "resources/pagx_to_html/unit/large_charstring_operands_font.pagx"));
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(2048));
+  EXPECT_NEAR(fontResult.designScale, 1.0f, 0.001f);
+
+  // The exported font lands on disk so tools/scripts can verify the charstring bytes: coordinate
+  // deltas here exceed the 2-byte CFF integer range, which must not be emitted as the DICT-only
+  // 29-prefixed form (that byte is callgsubr inside a charstring).
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/large-operand-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+}
+
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/unit/custom_cff_charset_strings.pagx"));
