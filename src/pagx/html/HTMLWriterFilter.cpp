@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 #include "base/utils/MathUtil.h"
@@ -453,33 +455,7 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   float minY = 1e9f;
   float maxX = -1e9f;
   float maxY = -1e9f;
-  for (auto* e : mask->contents) {
-    if (e->nodeType() == NodeType::Rectangle) {
-      auto rect = static_cast<const Rectangle*>(e);
-      auto pos = rect->renderPosition();
-      auto sz = rect->renderSize();
-      minX = std::min(minX, pos.x - sz.width / 2);
-      minY = std::min(minY, pos.y - sz.height / 2);
-      maxX = std::max(maxX, pos.x + sz.width / 2);
-      maxY = std::max(maxY, pos.y + sz.height / 2);
-    } else if (e->nodeType() == NodeType::Ellipse) {
-      auto el = static_cast<const Ellipse*>(e);
-      auto pos = el->renderPosition();
-      auto sz = el->renderSize();
-      minX = std::min(minX, pos.x - sz.width / 2);
-      minY = std::min(minY, pos.y - sz.height / 2);
-      maxX = std::max(maxX, pos.x + sz.width / 2);
-      maxY = std::max(maxY, pos.y + sz.height / 2);
-    } else if (e->nodeType() == NodeType::Polystar) {
-      auto ps = static_cast<const Polystar*>(e);
-      float r = std::max(ps->outerRadius, ps->innerRadius);
-      auto pos = ps->renderPosition();
-      minX = std::min(minX, pos.x - r);
-      minY = std::min(minY, pos.y - r);
-      maxX = std::max(maxX, pos.x + r);
-      maxY = std::max(maxY, pos.y + r);
-    }
-  }
+  collectMaskBounds(mask, {}, minX, minY, maxX, maxY);
   if (minX >= 1e9f) {
     minX = 0;
     minY = 0;
@@ -496,8 +472,10 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   float svgH = maxY - minY;
   svg.addAttr("width", CssFloatToString(svgW));
   svg.addAttr("height", CssFloatToString(svgH));
-  svg.addAttr("viewBox", CssFloatToString(minX) + " " + CssFloatToString(minY) + " " +
-                             CssFloatToString(svgW) + " " + CssFloatToString(svgH));
+  // The viewBox origin must stay at 0,0. SVGImporter turns a non-zero viewBox origin into a
+  // content matrix translation that is then cancelled when composed with the mask layer's own
+  // matrix, so the origin shift is folded into each geometry element's transform instead.
+  svg.addAttr("viewBox", "0 0 " + CssFloatToString(svgW) + " " + CssFloatToString(svgH));
   svg.closeTagStart();
 
   if (useFillColor) {
@@ -567,76 +545,7 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
     }
   }
 
-  for (auto* e : mask->contents) {
-    if (e->nodeType() == NodeType::Rectangle) {
-      auto rect = static_cast<const Rectangle*>(e);
-      // Use renderPosition/renderSize so that Rectangle instances authored as
-      // <Rectangle width="W" height="H"/> (which leave the intrinsic `size`
-      // member at its default {0,0}) are emitted with their layout-resolved
-      // geometry; otherwise the mask rect degenerates to width=0/height=0 and
-      // the masked layer becomes fully transparent. Matches HTMLWriterShape's
-      // handling of the same element.
-      auto pos = rect->renderPosition();
-      auto sz = rect->renderSize();
-      svg.openTag("rect");
-      float x = pos.x - sz.width / 2;
-      float y = pos.y - sz.height / 2;
-      if (!FloatNearlyZero(x)) {
-        svg.addAttr("x", CssFloatToString(x));
-      }
-      if (!FloatNearlyZero(y)) {
-        svg.addAttr("y", CssFloatToString(y));
-      }
-      svg.addAttr("width", CssFloatToString(sz.width));
-      svg.addAttr("height", CssFloatToString(sz.height));
-      if (rect->roundness > 0) {
-        svg.addAttr("rx", CssFloatToString(rect->roundness));
-      }
-      svg.addAttr("fill", fillAttr);
-      if (fillOpacity < 1.0f) {
-        svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
-      }
-      svg.closeTagSelfClosing();
-    } else if (e->nodeType() == NodeType::Ellipse) {
-      auto el = static_cast<const Ellipse*>(e);
-      auto pos = el->renderPosition();
-      auto sz = el->renderSize();
-      svg.openTag("ellipse");
-      svg.addAttr("cx", CssFloatToString(pos.x));
-      svg.addAttr("cy", CssFloatToString(pos.y));
-      svg.addAttr("rx", CssFloatToString(sz.width / 2));
-      svg.addAttr("ry", CssFloatToString(sz.height / 2));
-      svg.addAttr("fill", fillAttr);
-      if (fillOpacity < 1.0f) {
-        svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
-      }
-      svg.closeTagSelfClosing();
-    } else if (e->nodeType() == NodeType::Path) {
-      auto p = static_cast<const Path*>(e);
-      std::string d = GetPathSVGString(p);
-      if (!d.empty()) {
-        svg.openTag("path");
-        svg.addAttr("d", d);
-        svg.addAttr("fill", fillAttr);
-        if (fillOpacity < 1.0f) {
-          svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
-        }
-        svg.closeTagSelfClosing();
-      }
-    } else if (e->nodeType() == NodeType::Polystar) {
-      auto ps = static_cast<const Polystar*>(e);
-      std::string d = BuildPolystarPath(ps);
-      if (!d.empty()) {
-        svg.openTag("path");
-        svg.addAttr("d", d);
-        svg.addAttr("fill", fillAttr);
-        if (fillOpacity < 1.0f) {
-          svg.addAttr("fill-opacity", CssFloatToString(fillOpacity));
-        }
-        svg.closeTagSelfClosing();
-      }
-    }
-  }
+  writeMaskGeometry(svg, mask, Matrix::Translate(-minX, -minY), fillAttr, fillOpacity);
   svg.closeTag();  // </svg>
 
   std::string svgContent = svg.release();
@@ -679,12 +588,14 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   } else {
     css += ";-webkit-mask-mode:alpha;mask-mode:alpha";
   }
-  // The mask SVG uses document-absolute coordinates (the maskLayer sits at the document
-  // origin), but CSS mask-image starts at the masked element's own (0,0). Shift the mask
-  // back by the masked layer's render position so the two coordinate systems align.
-  if (!FloatNearlyZero(maskedLayerPos.x) || !FloatNearlyZero(maskedLayerPos.y)) {
-    std::string px = CssFloatToString(-maskedLayerPos.x) + "px";
-    std::string py = CssFloatToString(-maskedLayerPos.y) + "px";
+  // The mask SVG covers the geometry bounds starting at (minX, minY) in the mask layer's
+  // coordinate space, but CSS mask-image starts at the masked element's own (0,0). Shift by
+  // the bounds origin relative to the masked layer's render position so the two align.
+  float posX = minX - maskedLayerPos.x;
+  float posY = minY - maskedLayerPos.y;
+  if (!FloatNearlyZero(posX) || !FloatNearlyZero(posY)) {
+    std::string px = CssFloatToString(posX) + "px";
+    std::string py = CssFloatToString(posY) + "px";
     css += ";-webkit-mask-position:" + px + " " + py;
     css += ";mask-position:" + px + " " + py;
   }
@@ -693,11 +604,210 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   // SVG's intrinsic size in others, and `mask-repeat:repeat` which would tile the mask SVG
   // across the masked element. Without explicit values a 100×100 mask on a 200×200 element
   // either stretches to fill (mask loses its clipping geometry, D1 section of
-  // optimizer_all_rules) or tiles into a checkerboard.
-  css += ";-webkit-mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
-  css += ";mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
+  // optimizer_all_rules) or tiles into a checkerboard. The value must match the SVG's own
+  // width/height so the importer resolves a scale of exactly 1 on the way back.
+  std::string sizeValue = CssFloatToString(svgW) + "px " + CssFloatToString(svgH) + "px";
+  css += ";-webkit-mask-size:" + sizeValue;
+  css += ";mask-size:" + sizeValue;
   css += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
   return css;
+}
+
+void HTMLWriter::ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
+                                     float& minY, float& maxX, float& maxY) {
+  float ax = 0;
+  float ay = 0;
+  float bx = 0;
+  float by = 0;
+  switch (element->nodeType()) {
+    case NodeType::Rectangle: {
+      auto rect = static_cast<const Rectangle*>(element);
+      auto pos = rect->renderPosition();
+      auto sz = rect->renderSize();
+      ax = pos.x - sz.width / 2;
+      ay = pos.y - sz.height / 2;
+      bx = pos.x + sz.width / 2;
+      by = pos.y + sz.height / 2;
+      break;
+    }
+    case NodeType::Ellipse: {
+      auto el = static_cast<const Ellipse*>(element);
+      auto pos = el->renderPosition();
+      auto sz = el->renderSize();
+      ax = pos.x - sz.width / 2;
+      ay = pos.y - sz.height / 2;
+      bx = pos.x + sz.width / 2;
+      by = pos.y + sz.height / 2;
+      break;
+    }
+    case NodeType::Path: {
+      auto p = static_cast<const Path*>(element);
+      if (p->data == nullptr || p->data->isEmpty()) {
+        return;
+      }
+      // GetPathSVGString bakes renderScale and renderPosition into the emitted `d`, so the
+      // bounds have to apply the same mapping to stay aligned with the geometry.
+      auto bounds = p->data->getBounds();
+      float scale = p->renderScale();
+      auto pos = p->renderPosition();
+      ax = pos.x + bounds.x * scale;
+      ay = pos.y + bounds.y * scale;
+      bx = pos.x + (bounds.x + bounds.width) * scale;
+      by = pos.y + (bounds.y + bounds.height) * scale;
+      break;
+    }
+    case NodeType::Polystar: {
+      auto ps = static_cast<const Polystar*>(element);
+      if (!(ps->pointCount > 0.0f) || !std::isfinite(ps->pointCount)) {
+        return;
+      }
+      auto pos = ps->renderPosition();
+      float r = std::max(ps->renderOuterRadius(), ps->renderInnerRadius());
+      ax = pos.x - r;
+      ay = pos.y - r;
+      bx = pos.x + r;
+      by = pos.y + r;
+      break;
+    }
+    default:
+      return;
+  }
+  Point corners[4] = {{ax, ay}, {bx, ay}, {ax, by}, {bx, by}};
+  for (const auto& corner : corners) {
+    auto mapped = combined.mapPoint(corner);
+    minX = std::min(minX, mapped.x);
+    minY = std::min(minY, mapped.y);
+    maxX = std::max(maxX, mapped.x);
+    maxY = std::max(maxY, mapped.y);
+  }
+}
+
+void HTMLWriter::collectMaskBounds(const Layer* layer, const Matrix& parent, float& minX,
+                                   float& minY, float& maxX, float& maxY) {
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
+  Matrix lm = layer->matrix;
+  if (layer->x != 0 || layer->y != 0) {
+    lm = Matrix::Translate(layer->x, layer->y) * lm;
+  }
+  Matrix combined = parent * lm;
+  for (auto* e : layer->contents) {
+    ExpandElementBounds(e, combined, minX, minY, maxX, maxY);
+  }
+  for (auto* child : layer->children) {
+    collectMaskBounds(child, combined, minX, minY, maxX, maxY);
+  }
+  if (layer->composition != nullptr) {
+    for (auto* compLayer : layer->composition->layers) {
+      collectMaskBounds(compLayer, combined, minX, minY, maxX, maxY);
+    }
+  }
+}
+
+void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent,
+                                   const std::string& fillAttr, float fillOpacity) {
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
+  Matrix lm = layer->matrix;
+  if (layer->x != 0 || layer->y != 0) {
+    lm = Matrix::Translate(layer->x, layer->y) * lm;
+  }
+  Matrix combined = parent * lm;
+  std::string tr = combined.isIdentity() ? "" : MatrixToCSS(combined);
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == NodeType::Rectangle) {
+      auto rect = static_cast<const Rectangle*>(e);
+      // Use renderPosition/renderSize so that Rectangle instances authored as
+      // <Rectangle width="W" height="H"/> (which leave the intrinsic `size`
+      // member at its default {0,0}) are emitted with their layout-resolved
+      // geometry; otherwise the mask rect degenerates to width=0/height=0 and
+      // the masked layer becomes fully transparent. Matches HTMLWriterShape's
+      // handling of the same element.
+      auto pos = rect->renderPosition();
+      auto sz = rect->renderSize();
+      out.openTag("rect");
+      if (!tr.empty()) {
+        out.addAttr("transform", tr);
+      }
+      float x = pos.x - sz.width / 2;
+      float y = pos.y - sz.height / 2;
+      if (!FloatNearlyZero(x)) {
+        out.addAttr("x", CssFloatToString(x));
+      }
+      if (!FloatNearlyZero(y)) {
+        out.addAttr("y", CssFloatToString(y));
+      }
+      out.addAttr("width", CssFloatToString(sz.width));
+      out.addAttr("height", CssFloatToString(sz.height));
+      if (rect->roundness > 0) {
+        out.addAttr("rx", CssFloatToString(rect->roundness));
+      }
+      out.addAttr("fill", fillAttr);
+      if (fillOpacity < 1.0f) {
+        out.addAttr("fill-opacity", CssFloatToString(fillOpacity));
+      }
+      out.closeTagSelfClosing();
+    } else if (e->nodeType() == NodeType::Ellipse) {
+      auto el = static_cast<const Ellipse*>(e);
+      auto pos = el->renderPosition();
+      auto sz = el->renderSize();
+      out.openTag("ellipse");
+      if (!tr.empty()) {
+        out.addAttr("transform", tr);
+      }
+      out.addAttr("cx", CssFloatToString(pos.x));
+      out.addAttr("cy", CssFloatToString(pos.y));
+      out.addAttr("rx", CssFloatToString(sz.width / 2));
+      out.addAttr("ry", CssFloatToString(sz.height / 2));
+      out.addAttr("fill", fillAttr);
+      if (fillOpacity < 1.0f) {
+        out.addAttr("fill-opacity", CssFloatToString(fillOpacity));
+      }
+      out.closeTagSelfClosing();
+    } else if (e->nodeType() == NodeType::Path) {
+      auto p = static_cast<const Path*>(e);
+      std::string d = GetPathSVGString(p);
+      if (!d.empty()) {
+        out.openTag("path");
+        if (!tr.empty()) {
+          out.addAttr("transform", tr);
+        }
+        out.addAttr("d", d);
+        out.addAttr("fill", fillAttr);
+        if (fillOpacity < 1.0f) {
+          out.addAttr("fill-opacity", CssFloatToString(fillOpacity));
+        }
+        out.closeTagSelfClosing();
+      }
+    } else if (e->nodeType() == NodeType::Polystar) {
+      auto ps = static_cast<const Polystar*>(e);
+      std::string d = BuildPolystarPath(ps);
+      if (!d.empty()) {
+        out.openTag("path");
+        if (!tr.empty()) {
+          out.addAttr("transform", tr);
+        }
+        out.addAttr("d", d);
+        out.addAttr("fill", fillAttr);
+        if (fillOpacity < 1.0f) {
+          out.addAttr("fill-opacity", CssFloatToString(fillOpacity));
+        }
+        out.closeTagSelfClosing();
+      }
+    }
+  }
+  for (auto* child : layer->children) {
+    writeMaskGeometry(out, child, combined, fillAttr, fillOpacity);
+  }
+  if (layer->composition != nullptr) {
+    for (auto* compLayer : layer->composition->layers) {
+      writeMaskGeometry(out, compLayer, combined, fillAttr, fillOpacity);
+    }
+  }
 }
 
 std::string HTMLWriter::writeClipDef(const Layer* mask) {

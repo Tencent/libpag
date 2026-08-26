@@ -22,8 +22,11 @@
 #include <vector>
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
+#include "pagx/HTMLImporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Layer.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 #include "tgfx/core/ImageCodec.h"
 #include "utils/Baseline.h"
@@ -789,6 +792,212 @@ CLI_TEST(PAGXHtmlTest, MaskAsChildNotEmittedAsContent) {
   // The mask layer must NOT be emitted as a visible element in the body.
   EXPECT_EQ(html.find("id=\"coverMask\""), std::string::npos)
       << "the mask layer must not appear as visible content";
+}
+
+// The mask SVG must enclose geometry contributed by the mask layer's descendants, not just the
+// elements sitting directly in its own contents list.
+CLI_TEST(PAGXHtmlTest, MaskGeometryRecursesIntoChildLayer) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Rectangle position=\"150,150\" size=\"80,60\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "      <Layer>"
+      "        <Rectangle position=\"50,50\" size=\"80,60\"/>"
+      "        <Fill color=\"#FFFFFF\"/>"
+      "      </Layer>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // Own rect spans x 110..190 / y 120..180, the child's spans x 10..90 / y 20..80, so the union
+  // is 180x160 anchored at (10, 20).
+  EXPECT_NE(html.find("viewBox=%220 0 180 160%22"), std::string::npos);
+  EXPECT_NE(html.find("mask-size:180px 160px"), std::string::npos);
+  EXPECT_NE(html.find("mask-position:10px 20px"), std::string::npos);
+  // Both rects must be emitted, each carrying the bounds-origin shift.
+  EXPECT_NE(html.find("x=%22110%22 y=%22120%22"), std::string::npos)
+      << "the mask layer's own rect must reach the mask SVG";
+  EXPECT_NE(html.find("x=%2210%22 y=%2220%22"), std::string::npos)
+      << "the child layer's rect must reach the mask SVG";
+  EXPECT_EQ(CountOccurrences(html, "transform=%22matrix(1,0,0,1,-10,-20)%22"), 4u)
+      << "two rects, each repeated across the -webkit- and unprefixed mask-image declarations";
+}
+
+// The mask layer's own matrix has to be baked into the emitted geometry. A transposing matrix
+// used to be dropped entirely, leaving the un-transposed shape as the clip.
+CLI_TEST(PAGXHtmlTest, MaskLayerMatrixTransposesGeometry) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\" matrix=\"0,1,1,0,0,0\">"
+      "      <Rectangle position=\"20,10\" size=\"40,20\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // The 40x20 rect transposes into a 20x40 box, so the viewBox has to follow the matrix.
+  EXPECT_NE(html.find("viewBox=%220 0 20 40%22"), std::string::npos);
+  EXPECT_NE(html.find("transform=%22matrix(0,1,1,0,0,0)%22"), std::string::npos);
+  EXPECT_NE(html.find("mask-size:20px 40px"), std::string::npos);
+}
+
+// Path elements have to contribute to the mask bounds. Without a Path branch the bounds loop
+// found nothing and fell back to the whole document, stretching the mask over the full page.
+CLI_TEST(PAGXHtmlTest, MaskPathProducesExactViewBox) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Path data=\"M 10,10 L 90,10 L 50,90 Z\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("viewBox=%220 0 80 80%22"), std::string::npos);
+  EXPECT_NE(html.find("mask-size:80px 80px"), std::string::npos);
+  EXPECT_NE(html.find("mask-position:10px 10px"), std::string::npos);
+  EXPECT_EQ(html.find("mask-size:200px 200px"), std::string::npos)
+      << "path bounds must not fall back to the document size";
+}
+
+// mask-size must match the SVG's own width/height. It used to emit the bounds' max extent, which
+// only agrees with the intrinsic size when the bounds happen to start at the origin.
+CLI_TEST(PAGXHtmlTest, MaskSizeMatchesTranslatedBounds) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Ellipse position=\"100,100\" size=\"80,40\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // Bounds are x 60..140 / y 80..120, so the SVG is 80x40 and the origin shift moves into the
+  // element transform while mask-position re-anchors it against the masked layer.
+  EXPECT_NE(html.find("viewBox=%220 0 80 40%22"), std::string::npos);
+  EXPECT_NE(html.find("mask-size:80px 40px"), std::string::npos);
+  EXPECT_NE(html.find("mask-position:60px 80px"), std::string::npos);
+  EXPECT_NE(html.find("transform=%22matrix(1,0,0,1,-60,-80)%22"), std::string::npos);
+  EXPECT_EQ(html.find("mask-size:140px 120px"), std::string::npos)
+      << "mask-size must be the intrinsic size, not the bounds max extent";
+}
+
+// Locates the first layer carrying a mask reference, depth first.
+static const pagx::Layer* FindMaskedLayer(const pagx::Layer* layer) {
+  if (layer == nullptr) {
+    return nullptr;
+  }
+  if (layer->mask != nullptr) {
+    return layer;
+  }
+  for (auto* child : layer->children) {
+    auto* found = FindMaskedLayer(child);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+// Locates the first Ellipse under `layer` and reports the transform chain accumulated from
+// `layer` down to the layer that owns it.
+static const pagx::Ellipse* FindEllipseWithTransform(const pagx::Layer* layer,
+                                                     const pagx::Matrix& parent,
+                                                     pagx::Matrix* outMatrix) {
+  if (layer == nullptr) {
+    return nullptr;
+  }
+  pagx::Matrix lm = layer->matrix;
+  if (layer->x != 0 || layer->y != 0) {
+    lm = pagx::Matrix::Translate(layer->x, layer->y) * lm;
+  }
+  pagx::Matrix combined = parent * lm;
+  for (auto* e : layer->contents) {
+    if (e->nodeType() == pagx::NodeType::Ellipse) {
+      *outMatrix = combined;
+      return static_cast<const pagx::Ellipse*>(e);
+    }
+  }
+  for (auto* child : layer->children) {
+    auto* found = FindEllipseWithTransform(child, combined, outMatrix);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+// Re-importing the exported HTML must land the mask geometry back where it started. This pins
+// the three pieces that have to agree for that to hold: the viewBox origin stays at zero, the
+// origin shift rides along in the element transform, and mask-size equals the SVG's intrinsic
+// size so the importer resolves a scale of exactly 1.
+CLI_TEST(PAGXHtmlTest, MaskExportRoundTripsTranslatedBounds) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Ellipse position=\"100,100\" size=\"80,40\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+
+  // WrapHtmlDocument targets browsers and emits an unclosed <meta>, which the XML-backed
+  // importer rejects. Re-import needs a well-formed wrapper instead.
+  auto wrapped = "<html><body style=\"width:200px;height:200px\">" + html + "</body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(wrapped);
+  ASSERT_NE(doc, nullptr);
+  const pagx::Layer* masked = nullptr;
+  for (auto* layer : doc->layers) {
+    masked = FindMaskedLayer(layer);
+    if (masked != nullptr) {
+      break;
+    }
+  }
+  ASSERT_NE(masked, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+
+  pagx::Matrix chain = {};
+  auto* ellipse = FindEllipseWithTransform(masked->mask, {}, &chain);
+  ASSERT_NE(ellipse, nullptr);
+  EXPECT_NEAR(ellipse->size.width, 80.0f, 0.01f);
+  EXPECT_NEAR(ellipse->size.height, 40.0f, 0.01f);
+  auto center = chain.mapPoint(ellipse->position);
+  EXPECT_NEAR(center.x, 100.0f, 0.01f);
+  EXPECT_NEAR(center.y, 100.0f, 0.01f);
 }
 
 CLI_TEST(PAGXHtmlTest, ScrollRectLayoutKeepsChildrenInFlexFlow) {
