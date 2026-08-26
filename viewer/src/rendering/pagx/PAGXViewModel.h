@@ -101,7 +101,7 @@ class PAGXViewModel : public ContentViewModel {
 
   /**
    * Replaces the editor document's text. Large documents are appended in chunks driven by a
-   * zero-interval timer so the attached highlighter only ever rehighlights one chunk at a
+   * 16ms-interval timer so the attached highlighter only ever rehighlights one chunk at a
    * time and the UI thread is never blocked for long. editorLoadFinished() is emitted when
    * the document is ready for editing. Lines longer than FoldLineThreshold are folded into
    * short placeholders (see ElidedLine) before loading, so megabyte-long base64 lines never
