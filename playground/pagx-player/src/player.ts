@@ -863,38 +863,18 @@ export class PAGXPlayer extends EventTarget {
      *  here. */
     private tryIncrementalApply(oldXml: string, newXml: string): boolean {
         if (!this.view || this.draftSourceMap.length === 0) {
-            // Temporary padding-diagnostics log.
-            console.debug(
-                `[pagx] incremental skipped: view=${!!this.view} sourceMap=${this.draftSourceMap.length}`,
-            );
             return false;
         }
         const edits = classifyEdits(oldXml, newXml, this.draftSourceMap);
         if (edits === null) {
-            // Temporary padding-diagnostics log: classifier gave up (structural change or a span
-            // whose round-trip serialisation did not match). Full reparse will take over.
-            console.log('[pagx] incremental skipped: classifyEdits=null (structural/mismatch)');
             return false;
         }
-        // Temporary padding-diagnostics log: prints the classifier's decision so mis-classifications
-        // ("padding=10 20 should emit 2 edits but 0/N came out") can be traced end-to-end. Remove
-        // once the padding regression is resolved.
-        console.debug(
-            `[pagx] incremental apply: ${edits.length} edit(s)`,
-            edits.map((e) => `#${e.index}.${e.channel}="${e.value}"`),
-        );
         if (edits.length === 0) {
             return true;
         }
         for (const edit of edits) {
             const ok = this.view.setNodeChannel(edit.index, edit.channel, edit.value);
-            console.debug(
-                `[pagx] setNodeChannel #${edit.index}.${edit.channel}="${edit.value}" -> ${ok}`,
-            );
             if (!ok) {
-                console.debug(
-                    `[pagx] full reparse: engine rejected setNodeChannel #${edit.index}.${edit.channel}="${edit.value}" (unknown channel or unparseable value)`,
-                );
                 return false;
             }
         }
@@ -1161,7 +1141,10 @@ export class PAGXPlayer extends EventTarget {
     /** Toggles the raw view play/pause without the timed-timeline guards: a default state
      *  machine reports no duration, so the playback bar's toggle (and play()) would bail out
      *  early. The blueprint panel's button drives the view directly instead - an SM has no
-     *  wrap-around semantics to honor anyway. */
+     *  wrap-around semantics to honor anyway. On resume from pause, the SM restarts from its
+     *  initial states so a second play press replays the sequence instead of resuming a stale
+     *  frozen frame; we get the reset for free from selectTimelineUnit's default-unit branch
+     *  (see PAGXView.cpp: selecting the default SM resets it, then we flip playing back on). */
     public toggleRawPlayback(): void {
         const view = this.view;
         if (!view) {
@@ -1171,6 +1154,11 @@ export class PAGXPlayer extends EventTarget {
             view.pause();
             this.dispatchEvent(new CustomEvent('pause'));
         } else {
+            const defaultSM = view.getTimelineTree()
+                .find((node) => node.kind === 'stateMachine' && node.isDefault);
+            if (defaultSM != null) {
+                view.selectTimelineUnit('stateMachine', defaultSM.id);
+            }
             view.play();
             this.dispatchEvent(new CustomEvent('play'));
         }
