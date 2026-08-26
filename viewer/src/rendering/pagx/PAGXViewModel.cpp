@@ -505,6 +505,12 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   Q_EMIT pagxDocumentChanged(pagxDocument);
   Q_EMIT requestFlush();
 
+  // A successful Apply establishes a new discard baseline: clear the editor document's undo
+  // history so discardToBaseline reverts to the applied content, not to an earlier state.
+  if (highlighter != nullptr) {
+    highlighter->document()->clearUndoRedoStacks();
+  }
+
   return {};  // Empty string means success
 }
 
