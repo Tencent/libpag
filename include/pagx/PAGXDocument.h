@@ -44,20 +44,25 @@ class ImagePattern;
  * One entry of the document's source-node map: the runtime index and source span of a node, its
  * type, and the reflectable channel names available on it. Used by editor selection (line<->index
  * mapping) and by hosts deciding which attribute edits can go incremental.
+ *
+ * startLine / endLine may be -1 independently of index: a node returned in getNodeSourceMap()
+ * always has index >= 0, but its source span can still be unknown when the node was created
+ * programmatically or by an importer that did not carry line information.
  */
 struct NodeSourceEntry {
   /**
-   * Index of the node in PAGXDocument::nodes.
+   * Index of the node in PAGXDocument::nodes. See Node::index for the caching caveats on this
+   * value.
    */
   int index = -1;
 
   /**
-   * 1-based start line of the node in the PAGX XML, -1 when unavailable.
+   * 1-based start line of the node in the PAGX XML, or -1 when the source span is unavailable.
    */
   int startLine = -1;
 
   /**
-   * 1-based end line of the node in the PAGX XML, -1 when unavailable.
+   * 1-based end line of the node in the PAGX XML, or -1 when the source span is unavailable.
    */
   int endLine = -1;
 
@@ -404,6 +409,18 @@ class PAGXDocument : public Node {
   // destroyed (on the next parsePAGX() call).
   std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
   bool layersByImageFilePathBuilt = false;
+
+  // Lazily built child -> parent map over every Layer in the document (and its inner composition
+  // trees). Used by applyLayoutIncremental to walk each edited Layer's ancestor chain without
+  // rebuilding the map on every incremental call. Layer::children is only mutated during import /
+  // optimizer passes and by removeNodes(), so the cache is invalidated only by removeNodes(); pure
+  // attribute edits do not touch parent relationships.
+  std::unordered_map<const Layer*, Layer*> parentOfCache = {};
+  bool parentOfCacheValid = false;
+
+  // Rebuilds parentOfCache from scratch by walking every Layer's children list. Called lazily by
+  // applyLayoutIncremental when the cache is not valid.
+  void rebuildParentOfCache();
 
   friend class PAGXImporter;
   friend class PAGXExporter;

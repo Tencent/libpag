@@ -641,44 +641,6 @@ async function loadPAGXData(
 
     p.show();
 
-    // Temporary timeline-tree diagnostics: dump every retrievable animation unit (definitions and
-    // <Timelines> mounts, nested by composition reference) after each load, so the reachable /
-    // unreachable runtime data can be audited before the timeline preview design settles.
-    const view = p.getView();
-    if (view) {
-        const tree = view.getTimelineTree();
-        console.log('[pagx-tl] timeline tree:', tree);
-        const rows: {
-            path: string;
-            kind: string;
-            ref?: string;
-            id: string;
-            durationUs: number;
-            loop?: string;
-            frameRate?: number;
-            playing?: boolean;
-            offsetFrames?: number;
-        }[] = [];
-        const walk = (nodes: typeof tree): void => {
-            for (const entry of nodes) {
-                rows.push({
-                    path: entry.path,
-                    kind: entry.kind,
-                    ref: entry.refKind,
-                    id: entry.id,
-                    durationUs: entry.durationUs,
-                    loop: entry.loop,
-                    frameRate: entry.frameRate,
-                    playing: entry.playing,
-                    offsetFrames: entry.offsetFrames,
-                });
-                walk(entry.children);
-            }
-        };
-        walk(tree);
-        console.table(rows);
-    }
-
     hideDropZone();
     document.title = `PAGX Playground - ${name}`;
     currentFileName = name;
@@ -706,8 +668,6 @@ async function loadPAGXFile(file: File): Promise<void> {
         currentPlayingFile = null;
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
-        // Temporary diagnostic for the nested-composition-Timelines wasm trap: log the full
-        // stack so the aborting wasm frame offsets are preserved. Remove once the trap is fixed.
         console.error('Failed to load PAGX file:', (error as Error)?.stack ?? error);
         // Load failed: the player has already torn down its own UI via its failure path, but
         // we still own the outer chrome (nav-btns overlay + currentPlayingFile pointer for

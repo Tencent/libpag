@@ -294,10 +294,25 @@ void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float contain
   LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, {}, context);
 }
 
+namespace {
 // Above this many resets the incremental path stops paying off versus a full layout, so callers
 // fall back to applyLayout. Kept small since the reset set covers only the edited Layers, their
 // ancestor chains and the edited Layers' content elements, never full subtrees.
-static const size_t MAX_INCREMENTAL_LAYOUT_LAYERS = 64;
+constexpr size_t MAX_INCREMENTAL_LAYOUT_LAYERS = 64;
+}  // namespace
+
+void PAGXDocument::rebuildParentOfCache() {
+  parentOfCache.clear();
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      for (auto* child : layer->children) {
+        parentOfCache[child] = layer;
+      }
+    }
+  }
+  parentOfCacheValid = true;
+}
 
 bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
                                           std::vector<Layer*>* changedOut) {
@@ -319,16 +334,13 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
     return false;
   }
   // Child -> parent map over every Layer (document and composition trees alike). Top-level layers
-  // have no entry, so the ancestor walk below naturally stops at each tree's root.
-  std::unordered_map<const Layer*, Layer*> parentOf = {};
-  for (auto& node : nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      auto* layer = static_cast<Layer*>(node.get());
-      for (auto* child : layer->children) {
-        parentOf[child] = layer;
-      }
-    }
+  // have no entry, so the ancestor walk below naturally stops at each tree's root. The map is
+  // cached across calls and invalidated only by removeNodes(); attribute edits do not touch
+  // Layer::children, so a single build covers many incremental applies.
+  if (!parentOfCacheValid) {
+    rebuildParentOfCache();
   }
+  const auto& parentOf = parentOfCache;
   // Reset set: each edited Layer plus its ancestor chain up to the root, plus the edited Layers'
   // content elements. Resetting the whole chain is required — if any ancestor kept its memo it
   // would be skipped on the top-down pass and its edited descendant would never be revisited.
@@ -342,6 +354,8 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
     Layer* cursor = layer;
     while (cursor != nullptr && resetNodes.insert(cursor).second) {
       if (resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+        LOGI("applyLayoutIncremental: falling back to full layout (reset=%zu > max=%zu).",
+             resetNodes.size(), MAX_INCREMENTAL_LAYOUT_LAYERS);
         return false;
       }
       auto it = parentOf.find(cursor);
@@ -351,6 +365,8 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
       auto* contentNode = LayoutNode::AsLayoutNode(element);
       if (contentNode != nullptr && resetNodes.insert(contentNode).second &&
           resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+        LOGI("applyLayoutIncremental: falling back to full layout (reset=%zu > max=%zu).",
+             resetNodes.size(), MAX_INCREMENTAL_LAYOUT_LAYERS);
         return false;
       }
     }
@@ -434,6 +450,11 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
   for (size_t i = 0; i < nodes.size(); i++) {
     nodes[i]->index = static_cast<int>(i);
   }
+  // Removals may drop entire Layer subtrees, so the cached child -> parent map is no longer
+  // guaranteed to be a superset of the current tree. Invalidate it lazily; the next
+  // applyLayoutIncremental call will rebuild it.
+  parentOfCacheValid = false;
+  parentOfCache.clear();
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {

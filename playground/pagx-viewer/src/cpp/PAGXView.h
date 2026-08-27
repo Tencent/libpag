@@ -177,7 +177,6 @@ class PAGXView {
   void updateContentTransform();
   void applyDisplayTransform();
   void applySceneDisplayOptions();
-  void dumpTimelineDiagnostics();
   void advanceAnimationUnit(const std::shared_ptr<PAGAnimation>& animation, int64_t deltaUs);
   bool ensureWindow();
   void syncSurfaceSize(int canvasWidth, int canvasHeight);

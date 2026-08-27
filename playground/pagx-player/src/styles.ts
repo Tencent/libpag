@@ -429,7 +429,8 @@ const CSS = `
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    /* No border-bottom: the first collapsible section below already carries its own top
+       border, so two borders would double-draw at the same line. */
 }
 
 .sm-title {
@@ -470,6 +471,95 @@ const CSS = `
     display: block;
     width: 32px;
     height: 32px;
+}
+
+/* Collapsible sections stacked below the panel header. Each section has a clickable header
+   (chevron + title) and a body that hides via .sm-section-collapsed. Multiple sections are
+   separated by a subtle top border so they read as distinct panels. */
+.sm-section {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sm-section-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+}
+
+.sm-section-header:hover {
+    color: #eee;
+}
+
+.sm-section-chevron {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    width: 12px;
+    display: inline-block;
+    text-align: center;
+}
+
+.sm-section-body {
+    padding-bottom: 4px;
+}
+
+.sm-section-body.sm-section-collapsed {
+    display: none;
+}
+
+.sm-anim-list {
+    display: flex;
+    flex-direction: column;
+    padding: 0 6px;
+    min-width: 200px;
+}
+
+.sm-anim-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    user-select: none;
+}
+
+.sm-anim-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sm-anim-row-current {
+    color: #7db8ff;
+    background: rgba(77, 159, 255, 0.16);
+}
+
+.sm-anim-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.sm-anim-meta {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.sm-anim-row-current .sm-anim-meta {
+    color: rgba(125, 184, 255, 0.7);
 }
 
 .sm-viewport {

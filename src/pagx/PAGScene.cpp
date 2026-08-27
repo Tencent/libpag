@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
+#include <algorithm>
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
@@ -702,15 +703,15 @@ void PAGScene::eraseNodeToLayerSubtree(const PAGLayer* layer) {
     return;
   }
   if (layer->node != nullptr) {
-    // Erase by (source node, PAGLayer) pair: the same source node may map to other still-alive
-    // instances, so a key-only erase would drop their entries too.
-    auto range = nodeToLayer.equal_range(layer->node);
-    auto it = range.first;
-    while (it != range.second) {
-      if (it->second == layer) {
-        it = nodeToLayer.erase(it);
-      } else {
-        ++it;
+    // Remove this PAGLayer from the source node's instance list. Uses std::remove to keep the
+    // relative order of the surviving instances unchanged, so removals of one instance do not
+    // permute the entries of unrelated live instances.
+    auto it = nodeToLayer.find(layer->node);
+    if (it != nodeToLayer.end()) {
+      auto& instances = it->second;
+      instances.erase(std::remove(instances.begin(), instances.end(), layer), instances.end());
+      if (instances.empty()) {
+        nodeToLayer.erase(it);
       }
     }
   }
@@ -724,14 +725,18 @@ std::vector<Rect> PAGScene::getGlobalBoundsForNode(const Layer* node) const {
     return {};
   }
   std::vector<Rect> bounds = {};
-  auto range = nodeToLayer.equal_range(node);
-  for (auto it = range.first; it != range.second; ++it) {
-    if (it->second == nullptr) {
+  auto it = nodeToLayer.find(node);
+  if (it == nodeToLayer.end()) {
+    return bounds;
+  }
+  bounds.reserve(it->second.size());
+  for (auto* pagLayerRaw : it->second) {
+    if (pagLayerRaw == nullptr) {
       continue;
     }
     // PAGLayer inherits enable_shared_from_this; nodeToLayer holds a raw pointer valid for as long
     // as the PAGLayer remains in the composition's children (syncChildren keeps it in sync).
-    auto pagLayer = it->second->shared_from_this();
+    auto pagLayer = pagLayerRaw->shared_from_this();
     bounds.push_back(getGlobalBounds(pagLayer));
   }
   return bounds;
@@ -884,14 +889,14 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
     // advancing) so the rebuilt targets are re-resolved (targetsDirty was set above) and written
     // back immediately. resetTimelines() above already covers the timelineDirty case.
     _rootComposition->apply();
-    // Top-level PAGAnimation instances live in instantiatedTimelines, not inside the root
-    // composition subtree, so _rootComposition->apply() above does not reach them. Re-apply them at
-    // their current position so an animated property on a top-level Animation (e.g. slidingBar's x)
-    // is written back immediately while paused. State machines are left to recover via the dirty
-    // flags set above (markInternalTargetsDirty) rather than being driven here, matching how the
-    // normal frame path advances them.
+    // Top-level PAGAnimation and PAGStateMachine instances live in instantiatedTimelines, not
+    // inside the root composition subtree, so _rootComposition->apply() above does not reach them.
+    // Re-apply them at their current position so an animated property on a top-level timeline
+    // (e.g. slidingBar's x, or a state machine's active-state channels) is written back
+    // immediately while paused; otherwise it would snap back to its static layout value until the
+    // next tick, which only fires while playing.
     for (auto& entry : instantiatedTimelines) {
-      if (entry.second != nullptr && entry.second->type() == TimelineType::Animation) {
+      if (entry.second != nullptr) {
         entry.second->apply();
       }
     }

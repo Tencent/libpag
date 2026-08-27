@@ -20,7 +20,7 @@
 // attribute-value changes on incrementable channels, and if so derives the channel writes that
 // reproduce it without a full reparse+rebuild. Every rejection path returns null (or a reason)
 // so the caller falls back to the full Apply pipeline, which is always the authoritative final
-// state. All console.debug traces exist to explain why an edit did NOT go incremental.
+// state.
 
 import type { NodeSourceEntry } from './pagx-view-types';
 
@@ -223,8 +223,7 @@ function pointTokens(value: string): [string, string] | null {
 }
 
 /** Result of classifying one node's span: either the incremental channel writes, or a human-
- *  readable reason the edit cannot go incremental (surfaced via console.debug for diagnosing why an
- *  Apply fell back to a full reparse). */
+ *  readable reason the edit cannot go incremental. */
 type NodeSpanClassification = { edits: ChannelEdit[] } | { reason: string };
 
 /** Classifies the change to one node's source span into per-attribute channel writes, or a reason
@@ -351,10 +350,14 @@ export function classifyEdits(
     const oldLines = oldXml.split('\n');
     const newLines = newXml.split('\n');
     if (oldLines.length !== newLines.length) {
-        console.debug(
-            `[pagx] full reparse: line count changed (${oldLines.length} -> ${newLines.length})`,
-        );
         return null;
+    }
+    // Look up entries by their native index rather than the array position: the runtime
+    // guarantees Node::index equals the sourceMap array offset today, but a future getNodeSourceMap
+    // that filters entries (e.g. programmatic nodes) would break a positional access silently.
+    const entryByIndex = new Map<number, NodeSourceEntry>();
+    for (const entry of sourceMap) {
+        entryByIndex.set(entry.index, entry);
     }
     const affected = new Set<number>();
     for (let i = 0; i < oldLines.length; i++) {
@@ -363,25 +366,25 @@ export function classifyEdits(
         }
         const idx = findNodeIndexForLine(sourceMap, i + 1);
         if (idx < 0) {
-            console.debug(`[pagx] full reparse: changed line ${i + 1} lies outside any node`);
             return null;
         }
         affected.add(idx);
     }
     const edits: ChannelEdit[] = [];
     for (const idx of affected) {
-        const entry = sourceMap[idx];
+        const entry = entryByIndex.get(idx);
+        if (!entry) {
+            return null;
+        }
         const start = entry.startLine;
         const end = entry.endLine > 0 ? entry.endLine : start;
         if (start <= 0) {
-            console.debug(`[pagx] full reparse: node #${idx} has no source span`);
             return null;
         }
         const oldSpan = oldLines.slice(start - 1, end).join('\n');
         const newSpan = newLines.slice(start - 1, end).join('\n');
         const result = classifyNodeSpan(oldSpan, newSpan, entry.channels);
         if ('reason' in result) {
-            console.debug(`[pagx] full reparse: node #${idx} - ${result.reason}`);
             return null;
         }
         for (const nodeEdit of result.edits) {

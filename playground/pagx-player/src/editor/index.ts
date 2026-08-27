@@ -629,16 +629,7 @@ export class EditorPanel {
     }
 
     private async handleApply(): Promise<void> {
-        // Temporary padding-diagnostics log: unconditional entry marker. If the user reports "no
-        // logs at all after pressing Apply" and this line still does not fire, the click never
-        // reached this method (button disabled, listener not bound, or the event was captured by
-        // a foreground widget such as Monaco's find bar).
-        console.debug(
-            `[pagx] handleApply entry: busy=${this.busy} hasEditor=${this.editor !== null}`,
-        );
         if (this.editor === null || this.busy) {
-            // Temporary padding-diagnostics log.
-            console.log(`[pagx] handleApply skipped: editor=${!!this.editor} busy=${this.busy}`);
             return;
         }
         const xmlText = this.editor.getContent();
@@ -650,10 +641,6 @@ export class EditorPanel {
         }
         const validationError = await this.editor.getValidationError();
         if (validationError !== '') {
-            // Temporary padding-diagnostics log: apply blocked by schema/parse errors — this is the
-            // most likely reason a large-value edit is silently ignored (no incremental log, no
-            // "no changes" pill).
-            console.log(`[pagx] handleApply blocked by validation: ${validationError}`);
             this.report(validationError, 'error');
             return;
         }
@@ -670,10 +657,8 @@ export class EditorPanel {
             let handled = false;
             try {
                 handled = this.incrementalApply(this.currentXmlText, xmlText);
-            } catch (error) {
-                // Falling back to the full Apply below is the intended recovery, but leave a
-                // trace so a silently-never-incremental editor stays diagnosable.
-                console.log('[pagx] incremental apply threw, falling back to full apply:', error);
+            } catch {
+                // Falling back to the full Apply below is the intended recovery.
                 handled = false;
             }
             if (handled) {

@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the License.
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -84,6 +84,18 @@ export class SMBlueprint {
   private viewport: HTMLElement;
   private content: HTMLElement;
   private tooltip: HTMLElement;
+  // "Blueprint" collapsible section wrapping the graph viewport, and "Animations" section
+  // holding the flat animation list below it. Body elements toggle .sm-section-collapsed
+  // when the user clicks the header (which owns its own chevron via closure).
+  private blueprintSection: HTMLElement;
+  private animationsSection: HTMLElement;
+  private animationList: HTMLElement;
+  // Rows keyed by animation id so highlight refresh doesn't rebuild the DOM.
+  private animationRowEls = new Map<string, HTMLElement>();
+  // Ids of animations rendered as top-level list rows (declaration order).
+  private animationIds: string[] = [];
+  // Last highlight set applied to the animation list; used to diff on poll.
+  private lastAnimationHighlight: Set<string> = new Set();
   private pollTimer: number | null = null;
   private regions: SMRegionData[] = [];
   private smTitle = '';
@@ -151,13 +163,54 @@ export class SMBlueprint {
       this.applyContentOffset();
     }, { passive: false });
 
+    // Collapsible sections: Blueprint (the graph) and Animations (a flat list of top-level
+    // animation defs). Both default to expanded; clicking the header toggles collapse. State
+    // is not persisted across reloads (per product decision, keep it simple).
+    const blueprint = this.buildSection('Blueprint');
+    this.blueprintSection = blueprint.section;
+    blueprint.body.appendChild(this.viewport);
+
+    const animations = this.buildSection('Animations');
+    this.animationsSection = animations.section;
+    this.animationList = document.createElement('div');
+    this.animationList.className = 'sm-anim-list';
+    animations.body.appendChild(this.animationList);
+
     this.tooltip = document.createElement('div');
     this.tooltip.className = 'sm-tooltip';
     this.tooltip.style.display = 'none';
 
     this.root.appendChild(header);
-    this.root.appendChild(this.viewport);
+    this.root.appendChild(this.blueprintSection);
+    this.root.appendChild(this.animationsSection);
     this.root.appendChild(this.tooltip);
+  }
+
+  /** Builds one collapsible section. Header row (chevron + title) toggles the body's
+   *  .sm-section-collapsed class on click; the caller populates the returned body element
+   *  with its own content. */
+  private buildSection(title: string): { section: HTMLElement; body: HTMLElement } {
+    const section = document.createElement('div');
+    section.className = 'sm-section';
+    const headerEl = document.createElement('div');
+    headerEl.className = 'sm-section-header';
+    const chevron = document.createElement('span');
+    chevron.className = 'sm-section-chevron';
+    chevron.textContent = '\u25BE'; // ▾ expanded
+    const titleEl = document.createElement('span');
+    titleEl.className = 'sm-section-title';
+    titleEl.textContent = title;
+    headerEl.appendChild(chevron);
+    headerEl.appendChild(titleEl);
+    const body = document.createElement('div');
+    body.className = 'sm-section-body';
+    headerEl.addEventListener('click', () => {
+      const collapsed = body.classList.toggle('sm-section-collapsed');
+      chevron.textContent = collapsed ? '\u25B8' : '\u25BE'; // ▸ / ▾
+    });
+    section.appendChild(headerEl);
+    section.appendChild(body);
+    return { section, body };
   }
 
   attach(parent: HTMLElement): void {
@@ -182,11 +235,15 @@ export class SMBlueprint {
     this.smTitle = '';
     this.nodeEls.clear();
     this.animationEls.clear();
+    this.animationRowEls.clear();
+    this.animationIds = [];
+    this.lastAnimationHighlight.clear();
     this.currentStates = {};
     this.contentX = 0;
     this.contentY = 0;
     this.applyContentOffset();
     this.content.innerHTML = '';
+    this.animationList.innerHTML = '';
     if (smNode == null || smNode.regions == null || smNode.regions.length === 0) {
       this.updateVisibility();
       return false;
@@ -222,9 +279,21 @@ export class SMBlueprint {
       }
       this.content.appendChild(regionEl);
     });
+    // Populate the flat animation list from the top-level <Animations> definitions. Skip the
+    // SM node itself (kind == 'stateMachine') and any non-animation nodes like mount groups.
+    for (const node of tree) {
+      if (node.kind !== 'animation') {
+        continue;
+      }
+      this.animationIds.push(node.id);
+      const row = this.buildAnimationRow(node);
+      this.animationRowEls.set(node.id, row);
+      this.animationList.appendChild(row);
+    }
     this.updateVisibility();
     this.lastPreviewId = this.refreshSelectionState();
     this.refreshHighlight(true);
+    this.refreshAnimationHighlight(true);
     this.updatePlayIcon();
     return true;
   }
@@ -282,8 +351,10 @@ export class SMBlueprint {
     if (previewId !== this.lastPreviewId) {
       this.lastPreviewId = previewId;
       this.refreshHighlight(true);
+      this.refreshAnimationHighlight(true);
     } else {
       this.refreshHighlight(false);
+      this.refreshAnimationHighlight(false);
     }
     this.updatePlayIcon();
   };
@@ -738,6 +809,86 @@ export class SMBlueprint {
       }
     }
   }
+
+  /** Builds one row in the animations section. Double-clicking a row solo-previews that
+   *  animation - same host path used by state node double-click on the blueprint above. */
+  private buildAnimationRow(node: TimelineTreeNode): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'sm-anim-row';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'sm-anim-name';
+    nameEl.textContent = node.name || node.id;
+    row.appendChild(nameEl);
+    const metaEl = document.createElement('span');
+    metaEl.className = 'sm-anim-meta';
+    metaEl.textContent = this.formatAnimationMeta(node);
+    row.appendChild(metaEl);
+    row.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      const selection = this.host.getSelectedTimelineUnit();
+      if (selection != null && selection.kind === 'animation' && selection.id === node.id) {
+        // Second dbl-click on the same animation exits the preview - matches the blueprint
+        // state node behavior.
+        this.host.selectTimelineUnit('', '');
+        return;
+      }
+      this.host.selectTimelineUnit('animation', node.id);
+    });
+    return row;
+  }
+
+  private formatAnimationMeta(node: TimelineTreeNode): string {
+    const parts: string[] = [];
+    if (node.durationUs != null && node.durationUs > 0) {
+      const seconds = node.durationUs / 1_000_000;
+      parts.push(`${seconds < 10 ? seconds.toFixed(2) : Math.round(seconds)}s`);
+    }
+    if (node.loop) {
+      parts.push(node.loop);
+    }
+    return parts.join(' \u00b7 ');
+  }
+
+  /** Highlights rows in the animations section that correspond to a currently-playing
+   *  animation: the active preview id, or the animations bound to each SM region's live
+   *  current state. Parked previews don't count - the SM is driving the render loop then. */
+  private refreshAnimationHighlight(force: boolean): void {
+    if (this.animationRowEls.size === 0) {
+      return;
+    }
+    const active = new Set<string>();
+    const selection = this.host.getSelectedTimelineUnit();
+    if (selection != null && selection.kind === 'animation') {
+      active.add(selection.id);
+    } else {
+      for (const region of this.regions) {
+        const currentName = this.currentStates[region.name] ?? '';
+        if (!currentName) {
+          continue;
+        }
+        const state = region.states.find((s) => s.name === currentName);
+        if (state != null && state.animationId) {
+          active.add(state.animationId);
+        }
+      }
+    }
+    if (!force && setsEqual(active, this.lastAnimationHighlight)) {
+      return;
+    }
+    this.lastAnimationHighlight = active;
+    this.animationRowEls.forEach((row, id) => {
+      row.classList.toggle('sm-anim-row-current', active.has(id));
+    });
+  }
+}
+
+/** Reference-independent equality check for the small string sets we use for highlight diff. */
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
 }
 
 /**

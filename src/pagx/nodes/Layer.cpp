@@ -31,7 +31,12 @@ namespace pagx {
 
 // NaN-aware equality for a memoized layout target: a content-measured axis arrives as NaN in every
 // pass and must compare equal so an unchanged target is recognized across two-pass layout.
+// Infinities never match: a caller passing inf (or -inf) means "unbounded" from an upstream flex /
+// PPT measurement, and letting the memo hit for it would freeze a layer at an out-of-range target.
 static bool SameLayoutInput(float a, float b) {
+  if (std::isinf(a) || std::isinf(b)) {
+    return false;
+  }
   return (std::isnan(a) && std::isnan(b)) || a == b;
 }
 

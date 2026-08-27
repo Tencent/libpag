@@ -1051,11 +1051,18 @@ static bool ParseChannelValue(ChannelValueType type, const std::string& raw, Key
       return true;
     }
     case ChannelValueType::String:
-    default:
       // Strings and enums are carried verbatim; enum validity is checked by the accessor.
       *out = raw;
       return true;
+    case ChannelValueType::ImageRef:
+    case ChannelValueType::Matrix:
+    case ChannelValueType::PAGImage:
+      // Not addressable through a raw attribute string: ImageRef/PAGImage need a resolved image
+      // handle and Matrix needs a full transform structure. Reject explicitly so callers see a
+      // dedicated "unsupported type" diagnostic rather than a generic accessor failure.
+      return false;
   }
+  return false;
 }
 
 bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw) {
@@ -1070,8 +1077,17 @@ bool SetNodeChannelFromString(Node* node, const std::string& channel, const std:
   }
   KeyValue value = {};
   if (!ParseChannelValue(field->valueType, raw, &value)) {
-    LOGE("SetNodeChannelFromString: cannot parse value '%s' for channel '%s'.", raw.c_str(),
-         channel.c_str());
+    if (field->valueType == ChannelValueType::ImageRef ||
+        field->valueType == ChannelValueType::Matrix ||
+        field->valueType == ChannelValueType::PAGImage) {
+      LOGE(
+          "SetNodeChannelFromString: channel '%s' has type %d which does not support string "
+          "parsing.",
+          channel.c_str(), static_cast<int>(field->valueType));
+    } else {
+      LOGE("SetNodeChannelFromString: cannot parse value '%s' for channel '%s'.", raw.c_str(),
+           channel.c_str());
+    }
     return false;
   }
   if (!field->access(node, nullptr, &value)) {

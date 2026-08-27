@@ -56,26 +56,36 @@ struct RuntimeBinding;
 /**
  * The result of a scene hit test: the source node under a surface point and its source span and
  * on-screen bounds. Used by editor selection (canvas hover/click) and any host that maps a click to
- * a PAGX source node. A -1 index means no hit.
+ * a PAGX source node.
+ *
+ * Use index >= 0 as the single hit / no-hit indicator: index == -1 means "no hit" and every other
+ * field is unset. When index >= 0, startLine / endLine may still be -1 to mean "the source span
+ * is not available for this node" (e.g. programmatically created nodes with no XML origin) even
+ * though the hit itself is valid.
  */
 struct HitTestResult {
   /**
-   * Index of the source node in PAGXDocument::nodes, or -1 when nothing was hit.
+   * Index of the source node in PAGXDocument::nodes when >= 0 (the "hit" flag). -1 means nothing
+   * was hit and every other field in this struct is unset. See Node::index for the caching
+   * caveats on this value.
    */
   int index = -1;
 
   /**
-   * 1-based start line of the source node in the PAGX XML, -1 when unavailable.
+   * 1-based start line of the source node in the PAGX XML, or -1 when the source span is
+   * unavailable. Only meaningful when index >= 0.
    */
   int startLine = -1;
 
   /**
-   * 1-based end line of the source node in the PAGX XML, -1 when unavailable.
+   * 1-based end line of the source node in the PAGX XML, or -1 when the source span is
+   * unavailable. Only meaningful when index >= 0.
    */
   int endLine = -1;
 
   /**
-   * Surface-space bounds of the hit runtime layer, empty when unavailable.
+   * Surface-space bounds of the hit runtime layer, empty when unavailable. Only meaningful when
+   * index >= 0.
    */
   Rect bounds = {};
 };
@@ -320,16 +330,19 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
 
-  // Maps source Layer nodes to their runtime PAGLayers for index-based bounds lookup
-  // (getGlobalBoundsForNode). A multimap because the same source Layer can be built once per
-  // referencing <Layer composition="@X"> instance, each instance adding its own entry so bounds
-  // lookups can report every instance. Populated by PAGComposition::BuildChildLayer and kept in
-  // sync by both removal paths (syncChildren and refreshPlainContainerChildren) via
-  // eraseNodeToLayerSubtree, which matches entries by their (source node, PAGLayer) pair.
-  // Property-only edits go through RefreshLayerInPlace which does NOT replace the PAGLayer, so
-  // the entries stay valid across incremental attribute edits; only structural changes (handled
-  // by a full runtime-tree rebuild in buildRuntimeTree) clear and repopulate the map.
-  std::unordered_multimap<const Layer*, PAGLayer*> nodeToLayer = {};
+  // Maps source Layer nodes to their runtime PAGLayers for bounds lookup (getGlobalBoundsForNode).
+  // The value is a vector because the same source Layer can be built once per referencing
+  // <Layer composition="@X"> instance, so a node referenced N times yields N PAGLayer entries and
+  // getGlobalBoundsForNode returns one rect per instance. Entries are populated by
+  // PAGComposition::BuildChildLayer in construction order; both removal paths (syncChildren and
+  // refreshPlainContainerChildren) call eraseNodeToLayerSubtree to prune entries matching the
+  // dropped PAGLayer pointer. Property-only edits go through RefreshLayerInPlace which does NOT
+  // replace the PAGLayer, so the entries stay valid across incremental attribute edits. The
+  // per-entry order is stable across property-only edits and across additive structural changes
+  // that do not touch already-live instances, but reordering or removing hosts at other levels
+  // may reorder the vector; callers must not assume a positional binding between this vector's
+  // index and any external ordering (e.g. host-layer order in the source XML).
+  std::unordered_map<const Layer*, std::vector<PAGLayer*>> nodeToLayer = {};
 
   // Erases the nodeToLayer entries of an entire PAGLayer subtree, matching each entry by its
   // (source node, PAGLayer) pair so other runtime instances built from the same source node

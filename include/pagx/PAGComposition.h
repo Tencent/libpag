@@ -88,7 +88,7 @@ class PAGComposition : public PAGLayer {
     return !timelines.empty();
   }
 
-protected:
+ protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
   // composition), its built subtree root, and the root PAGScene. The subtree, binding, timelines,
   // and children are populated by the PAGComposition/PAGScene factories after construction.
@@ -113,7 +113,7 @@ protected:
   void buildChildren(const std::vector<Layer*>& layers,
                      std::unordered_set<const Composition*>& visited);
 
-private:
+ private:
   // Builds a new runtime PAGLayer or PAGComposition for the given source layer, attaching its
   // tgfx subtree into the parent binding's slots. Shared by syncChildren and
   // refreshPlainContainerChildren so the construction logic stays in one place.

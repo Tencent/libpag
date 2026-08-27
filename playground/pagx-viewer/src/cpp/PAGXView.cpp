@@ -314,12 +314,6 @@ bool PAGXView::setNodeChannel(int index, const std::string& channel, const std::
   // RequiresLayout tells whether the edit only shows up after a layout pass; a render-only refresh
   // (layoutChanged=false) is the cheap path for edits that cannot move geometry (alpha/color/...).
   bool layoutChanged = RequiresLayout(node->nodeType(), channel);
-  // Temporary padding-diagnostics log: prints each accepted channel write with the layoutChanged
-  // routing. Pipe together with the classifier log in player.ts to see whether an edit ever
-  // reaches the engine and which refresh path it took. Remove once the padding regression is
-  // resolved.
-  std::printf("[pagx] setNodeChannel #%d %s=\"%s\" layoutChanged=%d\n", index, channel.c_str(),
-              value.c_str(), layoutChanged ? 1 : 0);
   document->notifyChange({node}, layoutChanged);
   presentImmediately = true;
   return true;
@@ -362,7 +356,6 @@ void PAGXView::buildLayers() {
   applySceneDisplayOptions();
   updateContentTransform();
   presentImmediately = true;
-  dumpTimelineDiagnostics();
 }
 
 static const char* LoopModeName(LoopMode mode) {
@@ -443,151 +436,6 @@ static std::string DescribeConditions(
 // not runtime instances). Composition references are followed with a path-scoped visited set so a
 // cyclic composition reference terminates while sibling instances of the same composition are all
 // listed (each instance may mount different drivers).
-static void DumpMountedTimelines(const std::vector<Layer*>& layers,
-                                 std::unordered_set<const Composition*>& visitedCompositions,
-                                 int* mountCount) {
-  for (const auto* layer : layers) {
-    if (layer == nullptr) {
-      continue;
-    }
-    for (const auto& driver : layer->timelines) {
-      if (driver == nullptr) {
-        continue;
-      }
-      const std::string layerLabel = layer->id.empty() ? "(no id)" : layer->id;
-      if (driver->timelineType() == TimelineType::Animation) {
-        auto* animationDriver = static_cast<const AnimationTimeline*>(driver.get());
-        std::printf("[pagx-tl] [mount] layer '%s' -> animation '@%s' playing=%d offset=%lldf\n",
-                    layerLabel.c_str(), animationDriver->animationId.c_str(),
-                    animationDriver->playing ? 1 : 0,
-                    static_cast<long long>(animationDriver->evaluationOffset));
-        (*mountCount)++;
-      } else if (driver->timelineType() == TimelineType::StateMachine) {
-        auto* smDriver = static_cast<const StateMachineTimeline*>(driver.get());
-        std::printf("[pagx-tl] [mount] layer '%s' -> stateMachine '@%s'\n", layerLabel.c_str(),
-                    smDriver->stateMachineId.c_str());
-        (*mountCount)++;
-      }
-    }
-    DumpMountedTimelines(layer->children, visitedCompositions, mountCount);
-    if (layer->composition != nullptr &&
-        visitedCompositions.find(layer->composition) == visitedCompositions.end()) {
-      visitedCompositions.insert(layer->composition);
-      DumpMountedTimelines(layer->composition->layers, visitedCompositions, mountCount);
-      visitedCompositions.erase(layer->composition);
-    }
-  }
-}
-
-// Temporary timeline-diagnostics log: printed once after each successful buildLayers() (i.e. after
-// a file is dragged in). Dumps every animation / state-machine definition in the document, the
-// state-machine structure (inputs, regions, states, transitions), and every <Timelines> mount
-// point, together with the runtime times obtainable through public APIs. Mounted (nested)
-// timelines expose no runtime time through public APIs (PAGComposition::timelines is private),
-// which is exactly the gap this dump verifies. Remove once the timeline preview design settles.
-void PAGXView::dumpTimelineDiagnostics() {
-  if (scene == nullptr || document == nullptr) {
-    return;
-  }
-  std::unordered_set<std::string> topLevelAnimationIds = {};
-  for (const auto* node : document->animations) {
-    if (node != nullptr && node->nodeType() == NodeType::Animation) {
-      topLevelAnimationIds.insert(static_cast<const Animation*>(node)->id);
-    }
-  }
-  const auto& defaultId = defaultTimeline != nullptr ? defaultTimeline->getId() : std::string();
-  std::printf("[pagx-tl] ===== timeline diagnostics =====\n");
-  std::printf("[pagx-tl] default timeline: %s\n", defaultId.empty() ? "(none)" : defaultId.c_str());
-  for (const auto* node : document->animations) {
-    if (node == nullptr) {
-      continue;
-    }
-    if (node->nodeType() == NodeType::Animation) {
-      auto* anim = static_cast<const Animation*>(node);
-      std::printf("[pagx-tl] [anim] id='%s'%s duration=%lldf@%.1ffps loop=%s", anim->id.c_str(),
-                  anim->id == defaultId ? " (default)" : "", static_cast<long long>(anim->duration),
-                  anim->frameRate, LoopModeName(anim->loop));
-      auto runtime = scene->getAnimation(anim->id);
-      if (runtime != nullptr) {
-        std::printf(" | runtime: current=%lldus position=%lldus period=%lldus",
-                    static_cast<long long>(runtime->currentTime()),
-                    static_cast<long long>(runtime->playbackPosition()),
-                    static_cast<long long>(runtime->playbackPeriod()));
-      } else {
-        std::printf(" | runtime: unavailable");
-      }
-      std::printf("\n");
-    } else if (node->nodeType() == NodeType::StateMachine) {
-      auto* sm = static_cast<const StateMachine*>(node);
-      std::printf("[pagx-tl] [sm] id='%s'%s regions=%zu inputs=%zu\n", sm->id.c_str(),
-                  sm->id == defaultId ? " (default)" : "", sm->regions.size(), sm->inputs.size());
-      std::unordered_map<std::string, StateMachineInputType> inputTypes = {};
-      for (const auto* input : sm->inputs) {
-        if (input == nullptr) {
-          continue;
-        }
-        inputTypes[input->name] = input->type;
-        std::printf("[pagx-tl]   input: %s(%s)", input->name.c_str(), InputTypeName(input->type));
-        if (input->type == StateMachineInputType::Number) {
-          std::printf(" default=%g", input->defaultNumber);
-        } else if (input->type == StateMachineInputType::Bool) {
-          std::printf(" default=%s", input->defaultBool ? "true" : "false");
-        }
-        std::printf("\n");
-      }
-      auto runtimeSm = scene->getStateMachineTimeline(sm->id);
-      for (const auto* region : sm->regions) {
-        if (region == nullptr) {
-          continue;
-        }
-        const std::string regionLabel = region->name.empty() ? "(unnamed)" : region->name;
-        std::printf("[pagx-tl]   region '%s' initial='%s'", regionLabel.c_str(),
-                    region->initialState.c_str());
-        if (runtimeSm != nullptr) {
-          auto currentState = runtimeSm->getCurrentState(region->name);
-          std::printf(" current='%s'", currentState.c_str());
-        }
-        std::printf("\n");
-        for (const auto* state : region->states) {
-          if (state == nullptr) {
-            continue;
-          }
-          if (state->stateType() != StateType::Animation) {
-            continue;
-          }
-          auto* animationState = static_cast<const AnimationState*>(state);
-          if (animationState->animationId.empty()) {
-            std::printf("[pagx-tl]     state: %s -> (empty)\n", state->name.c_str());
-            continue;
-          }
-          bool unresolved =
-              topLevelAnimationIds.find(animationState->animationId) == topLevelAnimationIds.end();
-          std::printf("[pagx-tl]     state: %s -> @%s%s\n", state->name.c_str(),
-                      animationState->animationId.c_str(),
-                      unresolved ? " (not in top-level <Animations>)" : "");
-        }
-        for (const auto* transition : region->transitions) {
-          if (transition == nullptr) {
-            continue;
-          }
-          std::printf("[pagx-tl]     transition: %s -> %s if [%s] fade=%lldf@%.0ffps\n",
-                      transition->from.c_str(), transition->to.c_str(),
-                      DescribeConditions(transition, inputTypes).c_str(),
-                      static_cast<long long>(transition->duration), transition->frameRate);
-        }
-      }
-    }
-  }
-  int mountCount = 0;
-  std::unordered_set<const Composition*> visitedCompositions = {};
-  DumpMountedTimelines(document->layers, visitedCompositions, &mountCount);
-  std::printf(
-      "[pagx-tl] mounted <Timelines> drivers: %d (their runtime times are not retrievable through "
-      "public APIs)\n",
-      mountCount);
-  std::printf("[pagx-tl] ===== end =====\n");
-}
-
 static double AnimationDurationUs(const Animation* anim) {
   if (anim == nullptr || anim->frameRate <= 0.0f) {
     return -1;
@@ -851,15 +699,6 @@ emscripten::val PAGXView::getTimelineTree() {
   if (document == nullptr) {
     return result;
   }
-  std::printf("[pagx-tl] getTimelineTree: top-level layers=%zu\n", document->layers.size());
-  for (const auto* layer : document->layers) {
-    if (layer == nullptr) {
-      continue;
-    }
-    std::printf("[pagx-tl]   layer '%s' timelines=%zu composition=%s\n",
-                layer->id.empty() ? "(no id)" : layer->id.c_str(), layer->timelines.size(),
-                layer->composition != nullptr ? "yes" : "no");
-  }
   const std::string defaultId =
       defaultTimeline != nullptr ? defaultTimeline->getId() : std::string();
   std::unordered_set<std::string> rootLayerIds = {};
@@ -882,7 +721,6 @@ emscripten::val PAGXView::getTimelineTree() {
   }
   std::unordered_set<const Composition*> visited = {};
   CollectMountNodes(document->layers, document.get(), "", &topIndex, nullptr, visited, result);
-  std::printf("[pagx-tl] getTimelineTree: result size=%zu\n", result["length"].as<size_t>());
   return result;
 }
 
@@ -940,15 +778,6 @@ void PAGXView::advanceAnimationUnit(const std::shared_ptr<PAGAnimation>& animati
   int64_t before = animation->playbackPosition();
   bool changed = animation->advanceAndApply(deltaUs);
   int64_t after = animation->playbackPosition();
-  static int advanceLogTick = 0;
-  if (++advanceLogTick % 30 == 1) {
-    std::printf(
-        "[pagx-tl] advance: pos=%lldus->%lldus dur=%lldus changed=%d playing=%d "
-        "selected=%s/%s\n",
-        static_cast<long long>(before), static_cast<long long>(after),
-        static_cast<long long>(duration), changed ? 1 : 0, playing ? 1 : 0,
-        selectedUnitKind.c_str(), selectedUnitId.c_str());
-  }
   if (!changed) {
     // A Once file clamps at the last frame and stops changing. Rewind to the head either way;
     // when looping keep playing for the next cycle, otherwise park on the first frame so a
@@ -1465,9 +1294,7 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
     if (animation == nullptr) {
       // Definition not in the document's top-level <Animations> (e.g. declared inside a
       // Composition's local <Animations> for a mount, or a dangling id): the mount-preview path
-      // (M2) will instantiate nested runtimes; until then this logs why the click was refused.
-      std::printf("[pagx-tl] selectTimelineUnit: animation '%s' has no top-level runtime\n",
-                  id.c_str());
+      // (M2) will instantiate nested runtimes; until then this call is refused.
       return false;
     }
     // Refuse when the animation targets a layer that only exists inside a nested composition:
@@ -1484,11 +1311,8 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
           continue;
         }
         if (rootLayerIds.find(obj->target) == rootLayerIds.end()) {
-          std::printf(
-              "[pagx-tl] selectTimelineUnit: animation '%s' target '%s' not in root binding "
-              "(defined inside a nested composition); preview would not update the stage. M2 "
-              "will handle mount-scoped previews.\n",
-              id.c_str(), obj->target.c_str());
+          // Target defined inside a nested composition; preview would not update the stage. M2
+          // will handle mount-scoped previews.
           return false;
         }
       }
@@ -1528,8 +1352,6 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
     // axis and all clocks stay frozen while selected. Nested (mounted) state machines cannot be
     // instantiated through the scene's top-level registry, so the lookup fails for them.
     if (scene->getStateMachineTimeline(id) == nullptr) {
-      std::printf("[pagx-tl] selectTimelineUnit: stateMachine '%s' has no top-level runtime\n",
-                  id.c_str());
       return false;
     }
     previewAnimation = nullptr;
@@ -1545,7 +1367,6 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
       playing = true;
     }
   } else {
-    std::printf("[pagx-tl] selectTimelineUnit: unknown kind '%s'\n", kind.c_str());
     return false;
   }
   selectedUnitKind = kind;

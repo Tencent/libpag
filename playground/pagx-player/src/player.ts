@@ -770,6 +770,22 @@ export class PAGXPlayer extends EventTarget {
         return entries.map((entry) => ({ ...entry, channels: [...entry.channels] }));
     }
 
+    /** Looks up a draft source entry by its native Node index. The runtime currently keeps
+     *  Node::index equal to the sourceMap array position, but callers must not depend on that:
+     *  a future getNodeSourceMap that skips entries (e.g. programmatic nodes) would silently
+     *  mis-target a positional read. Returns null when the index has no live entry. */
+    private draftEntryByIndex(index: number): NodeSourceEntry | null {
+        if (index < 0) {
+            return null;
+        }
+        for (const entry of this.draftSourceMap) {
+            if (entry.index === index) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
     /** Applies accepted draft line deltas to a projection of the runtime source map. Entries wholly
      *  deleted or partially cut by a multi-line replacement become unavailable rather than pointing
      *  at an unrelated surviving tag. Apply/Discard/reset restores a fresh projection. */
@@ -839,7 +855,10 @@ export class PAGXPlayer extends EventTarget {
         if (index < 0 || this.editor === null) {
             return null;
         }
-        const entry = this.draftSourceMap[index];
+        const entry = this.draftEntryByIndex(index);
+        if (entry === null) {
+            return null;
+        }
         const start = entry.startLine;
         if (start <= 0) {
             return null;
@@ -901,19 +920,22 @@ export class PAGXPlayer extends EventTarget {
         }
         const idx = this.hoverTarget();
         if (this.hoverHit !== null) {
-            const projected = this.draftSourceMap[this.hoverHit.index];
-            const start = projected?.startLine > 0 ? projected.startLine : this.hoverHit.startLine;
+            const projected = this.draftEntryByIndex(this.hoverHit.index);
+            const start = projected !== null && projected.startLine > 0
+                ? projected.startLine
+                : this.hoverHit.startLine;
             this.editor?.highlightHover(start, start);
             if (align !== 'none') {
                 this.editor?.scrollToLine(start, align);
             }
             return;
         }
-        if (idx < 0 || idx >= this.draftSourceMap.length || this.draftSourceMap[idx].startLine <= 0) {
+        const hoverEntry = this.draftEntryByIndex(idx);
+        if (hoverEntry === null || hoverEntry.startLine <= 0) {
             this.editor?.clearHover();
             return;
         }
-        const start = this.draftSourceMap[idx].startLine;
+        const start = hoverEntry.startLine;
         this.editor?.highlightHover(start, start);
         if (align !== 'none') {
             this.editor?.scrollToLine(start, align);
@@ -924,19 +946,21 @@ export class PAGXPlayer extends EventTarget {
     private syncEditorSelect(align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
         const idx = this.selectedIndex;
         if (this.selectHit !== null) {
-            const projected = this.draftSourceMap[this.selectHit.index];
-            const start = projected?.startLine > 0 ? projected.startLine : this.selectHit.startLine;
+            const projected = this.draftEntryByIndex(this.selectHit.index);
+            const start = projected !== null && projected.startLine > 0
+                ? projected.startLine
+                : this.selectHit.startLine;
             this.editor?.highlightSelect(start, start);
             if (align !== 'none') {
                 this.editor?.scrollToLine(start, align);
             }
             return;
         }
-        if (idx < 0 || idx >= this.draftSourceMap.length || this.draftSourceMap[idx].startLine <= 0) {
+        const entry = this.draftEntryByIndex(idx);
+        if (entry === null || entry.startLine <= 0) {
             this.editor?.clearSelect();
             return;
         }
-        const entry = this.draftSourceMap[idx];
         this.editor?.highlightSelect(entry.startLine, entry.startLine);
         if (align !== 'none') {
             this.editor?.scrollToLine(entry.startLine, align);
@@ -985,8 +1009,8 @@ export class PAGXPlayer extends EventTarget {
      *  span, or -1 if none. Used to climb from a Layer-internal element (Fill/Rectangle/... which
      *  has no independent canvas outline) up to the Layer that owns it. */
     private enclosingNodeIndex(index: number): number {
-        const child = this.draftSourceMap[index];
-        if (!child || child.startLine <= 0) {
+        const child = this.draftEntryByIndex(index);
+        if (child === null || child.startLine <= 0) {
             return -1;
         }
         const childStart = child.startLine;
