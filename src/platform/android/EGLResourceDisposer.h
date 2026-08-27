@@ -37,6 +37,14 @@ namespace pag {
 // PAGPlayer, so no thread is still using the EGL context. tgfx keeps its global device table
 // behind a mutex and holds windows weakly in its present list, so the cross-thread destruction is
 // safe even if another EGL context is current elsewhere.
+//
+// Tradeoff: the task queue is unbounded and every queued task holds strong references to its
+// Surface/EGLWindow (i.e. the underlying EGLContext/EGLSurface/textures). On affected drivers each
+// task with a window can block the worker for 35~85ms, so rapidly creating and destroying many
+// PAGViews (e.g. fast list scrolling) can pile up N tasks and defer the reclamation of N sets of
+// EGL resources by up to N * 85ms. This is deferred reclamation rather than a leak, but it can
+// raise GPU memory pressure and, on drivers that cap the number of EGL contexts per process,
+// temporarily hold more contexts than strictly necessary.
 class EGLResourceDisposer {
  public:
   // Moves the cached Surface and its EGLWindow to the disposer thread. The Surface is released

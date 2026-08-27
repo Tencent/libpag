@@ -62,6 +62,7 @@ void GPUDrawable::freeSurface() {
   // order, so a Surface enqueued earlier is always destroyed before a window enqueued later,
   // keeping its Context alive.
   EGLResourceDisposer::DisposeAsync(std::move(surface), nullptr);
+  onFreeSurface();
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
