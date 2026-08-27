@@ -556,9 +556,9 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
     return false;
   }
   // `id` / `name` on the mask layer come from SVG <clipPath>'s identifier and don't carry
-  // user-meaningful state — the mask layer itself stays in doc->layers (hidden) after we
-  // detach the mask reference, so any other consumer can still resolve it. Only customData
-  // truly blocks the rewrite.
+  // user-meaningful state — the mask layer itself stays in doc->layers after we detach the mask
+  // reference, so any other consumer can still resolve it. Only customData truly blocks the
+  // rewrite.
   if (!m->customData.empty()) {
     return false;
   }
@@ -655,6 +655,9 @@ bool TryConvertRectMaskToScrollRect(Layer* layer, const Layer* parent,
   // (which only suppresses on the parent's clip, not the child's) would fire false positives.
   layer->width = w;
   layer->height = h;
+  // 遮罩引用被解绑后原遮罩层成为孤立层：标为不可见，SVG 导出时按普通内容跳过
+  // （它的几何已经转写到上面的 scrollRect 里）。
+  m->visible = false;
   layer->mask = nullptr;
   return true;
 }
