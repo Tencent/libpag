@@ -345,6 +345,16 @@ class SVGWriterContext {
   std::unordered_map<const Layer*, const Layer*> layerParentMap = {};
   bool layerParentMapReady = false;
 
+  // Layers referenced by another layer's Layer::mask pointer. Populated lazily by
+  // SVGWriter::isMaskReferenceLayer on first use. writeLayer skips these: their content is
+  // emitted through writeMaskDef into <defs>, and emitting them as regular content would
+  // duplicate the mask geometry. Before mask reference layers kept visible=true in imported
+  // documents, the generic "!visible && no mask" check in writeLayer happened to skip them;
+  // now that visible is restored for downstream consumers, this explicit set is the skip
+  // authority.
+  std::unordered_set<const Layer*> maskReferenceLayers = {};
+  bool maskReferencesReady = false;
+
   // (mask layer, MaskType) → def-id cache. A single mask Layer can be referenced by many owners
   // (PAGX allows it explicitly), and without this cache `<mask>` / `<clipPath>` definitions get
   // re-emitted into <defs> on every reference, producing duplicate `id` values with undefined
@@ -549,6 +559,11 @@ class SVGWriter {
   // space and would silently misplace the mask otherwise, so a warning is surfaced via
   // addWarning when a cross-parent reference is detected.
   const Layer* findLayerParent(const Layer* layer);
+  // Lazily builds and caches `_context->maskReferenceLayers` (every layer referenced by
+  // another layer's Layer::mask pointer, including nested mask-of-mask references). Used by
+  // writeLayer to skip reference layers: their content is emitted through writeMaskDef into
+  // <defs>, so emitting them again as regular content would duplicate the mask geometry.
+  bool isMaskReferenceLayer(const Layer* layer);
   // Emits a <clipPath> in _defs for layer->scrollRect and returns the generated id.
   // Caller wires the id onto the group as clip-path="url(#...)".
   std::string writeScrollRectClipDef(const Layer* layer);
@@ -1892,6 +1907,44 @@ const Layer* SVGWriter::findLayerParent(const Layer* layer) {
   }
   auto it = _context->layerParentMap.find(layer);
   return it == _context->layerParentMap.end() ? nullptr : it->second;
+}
+
+bool SVGWriter::isMaskReferenceLayer(const Layer* layer) {
+  if (layer == nullptr || _doc == nullptr) {
+    return false;
+  }
+  if (!_context->maskReferencesReady) {
+    auto& refs = _context->maskReferenceLayers;
+    // Walk every Layer node in the document (top-level plus children/composition subtrees) and
+    // register each Layer::mask reference target, recursing into the mask's own subtree so
+    // nested mask-of-mask references are covered. `visited` guards against cycles.
+    std::unordered_set<const Layer*> visited;
+    std::function<void(const Layer*)> visit = [&](const Layer* node) {
+      if (node == nullptr || !visited.insert(node).second) {
+        return;
+      }
+      if (node->mask != nullptr) {
+        refs.insert(node->mask);
+        visit(node->mask);
+      }
+      for (const auto* child : node->children) {
+        visit(child);
+      }
+      if (node->composition != nullptr) {
+        for (const auto* compLayer : node->composition->layers) {
+          visit(compLayer);
+        }
+      }
+    };
+    for (const auto& nodePtr : _doc->nodes) {
+      if (nodePtr->nodeType() != NodeType::Layer) {
+        continue;
+      }
+      visit(static_cast<Layer*>(nodePtr.get()));
+    }
+    _context->maskReferencesReady = true;
+  }
+  return _context->maskReferenceLayers.count(layer) > 0;
 }
 
 //==============================================================================
@@ -3247,6 +3300,13 @@ void SVGWriter::writeLayerContents(SVGBuilder& out, const Layer* layer, const Ma
 }
 
 void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
+  // Mask reference layers are skipped: their content is emitted through writeMaskDef into
+  // <defs> when the owning layer references them, so emitting them here would duplicate the
+  // mask geometry. (Their visible flag is true in imported documents — restored by
+  // RestoreMaskLayerVisibility — so the generic visibility check below no longer skips them.)
+  if (isMaskReferenceLayer(layer)) {
+    return;
+  }
   if (!layer->visible && layer->mask == nullptr) {
     return;
   }

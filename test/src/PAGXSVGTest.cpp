@@ -6106,4 +6106,78 @@ PAGX_TEST(PAGXSVGTest, SVGImport_EndTimeTruncation) {
   EXPECT_EQ(anim->duration, 60);
 }
 
+/**
+ * Test SVG import: mask reference layers are converted with visible=false (so
+ * mergeAdjacentLayers keeps them separate from same-geometry content layers) but the flag is
+ * restored to true in the final document — consumers that read the mask node's visible flag to
+ * enable masking (e.g. CoCraft) require true. The renderer stays unaffected: tgfx mask layers
+ * get their maskOwner set via setMask, which is what prevents double drawing (see
+ * LayerBuilder::resolvePendingMasks, which itself calls setVisible(true)).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MaskReferenceLayerVisibleRestored) {
+  std::string svg =
+      "<svg width=\"120\" height=\"120\" viewBox=\"0 0 120 120\">"
+      "<defs>"
+      "<mask id=\"m0\"><rect x=\"0\" y=\"0\" width=\"120\" height=\"60\" fill=\"#FFFFFF\"/></mask>"
+      "</defs>"
+      "<rect x=\"0\" y=\"0\" width=\"120\" height=\"120\" fill=\"#EF4444\" mask=\"url(#m0)\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  // The masked content layer's mask reference must report visible=true.
+  bool foundMasked = false;
+  for (auto* layer : doc->layers) {
+    if (layer->mask != nullptr) {
+      foundMasked = true;
+      EXPECT_TRUE(layer->mask->visible) << "mask reference layer must be visible in output";
+    }
+  }
+  EXPECT_TRUE(foundMasked);
+}
+
+/**
+ * Test SVG import: clipPath reference layers follow the same restore rule as mask layers, and
+ * mask references nested inside child layers are restored too (the restore pass recurses).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ClipAndNestedMaskVisibleRestored) {
+  std::string svg =
+      "<svg width=\"120\" height=\"120\" viewBox=\"0 0 120 120\">"
+      "<defs>"
+      "<mask id=\"m0\"><rect width=\"120\" height=\"60\" fill=\"#FFFFFF\"/></mask>"
+      "<clipPath id=\"c0\"><circle cx=\"60\" cy=\"60\" r=\"50\"/></clipPath>"
+      "</defs>"
+      "<g>"
+      "<rect width=\"120\" height=\"120\" fill=\"#EF4444\" mask=\"url(#m0)\"/>"
+      "</g>"
+      "<rect x=\"10\" y=\"10\" width=\"50\" height=\"50\" fill=\"#3B82F6\" "
+      "clip-path=\"url(#c0)\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+  // Collect every mask reference reachable from the layer tree (including children).
+  std::vector<pagx::Layer*> references = {};
+  std::function<void(pagx::Layer*)> collect = [&](pagx::Layer* layer) {
+    if (layer == nullptr) {
+      return;
+    }
+    if (layer->mask != nullptr) {
+      references.push_back(layer->mask);
+      collect(layer->mask);
+    }
+    for (auto* child : layer->children) {
+      collect(child);
+    }
+  };
+  for (auto* layer : doc->layers) {
+    collect(layer);
+  }
+  // The <g>-nested mask reference and the clipPath reference must all be visible.
+  ASSERT_GE(references.size(), 2u);
+  for (auto* ref : references) {
+    EXPECT_TRUE(ref->visible) << "mask/clip reference layer must be visible in output";
+  }
+}
+
 }  // namespace pag

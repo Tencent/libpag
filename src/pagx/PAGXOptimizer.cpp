@@ -482,9 +482,9 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
     return false;
   }
   // `id` / `name` on the mask layer come from SVG <clipPath>'s identifier and don't carry
-  // user-meaningful state — the mask layer itself stays in doc->layers (hidden) after we
-  // detach the mask reference, so any other consumer can still resolve it. Only customData
-  // truly blocks the rewrite.
+  // user-meaningful state — the mask layer itself stays in doc->layers after we detach the mask
+  // reference, so any other consumer can still resolve it. Only customData truly blocks the
+  // rewrite.
   if (!m->customData.empty()) {
     return false;
   }
@@ -563,6 +563,11 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   // (which only suppresses on the parent's clip, not the child's) would fire false positives.
   layer->width = rect->size.width;
   layer->height = rect->size.height;
+  // The mask layer becomes an orphan once the reference is detached: mark it invisible so
+  // SVGExporter's writeLayer skips it as regular content (its geometry lives on in the
+  // scrollRect we just wrote). SVGImporter restores visible=true on referenced mask layers
+  // after merging; that restore only covers layers still referenced — this one no longer is.
+  m->visible = false;
   layer->mask = nullptr;
   return true;
 }

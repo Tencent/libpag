@@ -108,6 +108,14 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseFile(const std::string& fil
 
   return parseDOM(dom);
 }
+
+// Mask/clip reference layers are converted with visible=false so mergeAdjacentLayers keeps them
+// separate. Restore visible afterwards: consumers that read the mask node's visible flag (e.g.
+// CoCraft) need true to enable masking; the mask reference itself is what keeps the layer from
+// being rendered as regular content (the renderer sets tgfx maskOwner via setMask, mirroring
+// LayerBuilder::resolvePendingMasks' own setVisible(true)).
+static void RestoreMaskLayerVisibility(Layer* layer);
+
 std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<XMLDOM>& dom) {
   auto root = dom->getRootNode();
   if (!root || root->name != "svg") {
@@ -252,6 +260,12 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
 
   // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
   mergeAdjacentLayers(convertedLayers);
+
+  // Mask reference layers were kept invisible for the merge pass above; restore visible for
+  // downstream consumers once merging is done.
+  for (auto* layer : convertedLayers) {
+    RestoreMaskLayerVisibility(layer);
+  }
 
   // Apply content transform if needed. When there is exactly one converted layer, embed
   // the transform as a Group inside that layer (avoids an extra wrapper layer). Otherwise,
@@ -2301,6 +2315,20 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
 
   return style;
 }
+
+static void RestoreMaskLayerVisibility(Layer* layer) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->mask != nullptr) {
+    layer->mask->visible = true;
+    RestoreMaskLayerVisibility(layer->mask);
+  }
+  for (auto* child : layer->children) {
+    RestoreMaskLayerVisibility(child);
+  }
+}
+
 static void SkipWhitespace(const char*& ptr, const char* end) {
   while (ptr < end && (std::isspace(*ptr) || *ptr == ',')) {
     ++ptr;
