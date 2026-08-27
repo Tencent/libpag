@@ -36,6 +36,20 @@ endif ()
 #     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msimd128")
 # endif ()
 
+# Enable LTO for cross-TU inlining across tgfx/pagx/renderer/viewer. Must be set before
+# add_subdirectory so every target compiles to LLVM bitcode; the final link step then performs
+# whole-program optimization. Kept out of Debug builds to preserve fast iteration and
+# debuggability.
+#
+# Measured on a 13843x9218 design document (see docs/render-perf-analysis.md G4 / 6.12): XML parse
+# -58%, first-frame submit -49%, at the cost of +7.6% wasm.br size. The win comes from eliminating
+# cross-TU function-call overhead, which is amplified under the no-JIT iOS WeChat interpreter.
+if (DEFINED EMSCRIPTEN AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "WASM LTO enabled (-flto)")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto")
+endif ()
+
 # Add tgfx and pagx as dependencies
 if (NOT TARGET tgfx)
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -121,8 +135,10 @@ if (DEFINED EMSCRIPTEN)
         list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -O0 -g3)
         list(APPEND PAGX_VIEWER_LINK_OPTIONS -O0 -g3 -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)
     else ()
-        list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -Oz)
-        list(APPEND PAGX_VIEWER_LINK_OPTIONS -Oz)
+        # Link with -O3 (not -Oz) so the LTO inliner uses an O3 cost model: -Oz suppresses
+        # inlining at the link step, which would largely defeat the -flto win above.
+        list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -O3)
+        list(APPEND PAGX_VIEWER_LINK_OPTIONS -O3 -flto)
     endif ()
 else ()
     add_library(pagx-viewer SHARED ${PAGX_VIEWER_FILES})
