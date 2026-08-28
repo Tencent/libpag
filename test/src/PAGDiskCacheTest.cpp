@@ -16,8 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <thread>
+#include <vector>
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/caches/DiskCache.h"
@@ -537,6 +541,54 @@ PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
   }
   worker->waitAll();
   EXPECT_EQ(counter.load(), 100);
+}
+
+/**
+ * Regression test for issue #3684: background decoding through PAGDecoder must not race with the
+ * teardown path. Each reader thread mimics a PAGImageView flush task: it creates its own decoder,
+ * decodes video frames off the main thread, and releases the decoder (running the teardown chain
+ * ~PAGDecoder -> ~CompositionReader -> ~PAGPlayer -> ~VideoReader) while other threads are still
+ * decoding and while the disk cache is being cleared repeatedly. Before the fix, the destructors
+ * did not take their locks, so a teardown could free the demuxer and the player while an in-flight
+ * readFrame()/decodeFrame() was still using them.
+ */
+PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
+  pag::PAGDiskCache::RemoveAll();
+  auto pagFile = LoadPAGFile("resources/apitest/video_sequence_size.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+
+  std::atomic<bool> stopped = {false};
+  std::thread cacheCleaner([&] {
+    while (!stopped.load()) {
+      PAGDiskCache::RemoveAll();
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+  });
+
+  std::vector<std::thread> readers;
+  for (int i = 0; i < 4; i++) {
+    readers.emplace_back([&] {
+      for (int round = 0; round < 3; round++) {
+        auto decoder = PAGDecoder::MakeFrom(pagFile, 60, 1.0f);
+        if (decoder == nullptr) {
+          continue;
+        }
+        tgfx::Bitmap bitmap(decoder->width(), decoder->height(), false, false);
+        tgfx::Pixmap pixmap(bitmap);
+        auto frameCount = std::min(decoder->numFrames(), 10);
+        for (int frame = 0; frame < frameCount; frame++) {
+          decoder->readFrame(frame, pixmap.writablePixels(), pixmap.rowBytes());
+        }
+      }
+    });
+  }
+  for (auto& reader : readers) {
+    reader.join();
+  }
+  stopped = true;
+  cacheCleaner.join();
+
+  pag::PAGDiskCache::RemoveAll();
 }
 
 }  // namespace pag

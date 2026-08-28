@@ -306,11 +306,15 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     return YES;
   }
   [self updatePAGDecoder];
-  if (pagDecoder == nullptr) {
+  // Hold a strong reference for the rest of the call: pagDecoder->readFrame() only borrows the
+  // decoder through a raw dereference, so a local copy guarantees the decoder outlives this call
+  // even if a teardown path replaces the member concurrently.
+  auto decoder = pagDecoder;
+  if (decoder == nullptr) {
     return false;
   }
-  if (pagDecoder->checkFrameChanged(static_cast<int>(frameIndex))) {
-    BOOL status = pagDecoder->readFrame(static_cast<int>(frameIndex), pixelBuffer);
+  if (decoder->checkFrameChanged(static_cast<int>(frameIndex))) {
+    BOOL status = decoder->readFrame(static_cast<int>(frameIndex), pixelBuffer);
     if (!status) {
       return status;
     }

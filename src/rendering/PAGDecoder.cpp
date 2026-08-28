@@ -144,7 +144,17 @@ PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, i
 }
 
 PAGDecoder::~PAGDecoder() {
+  // Hold the locker so member destruction waits out any in-flight readFrame() call on another
+  // thread. readFrame() only borrows the decoder through a raw dereference, so without this the
+  // CompositionReader (and its PAGPlayer) could be destroyed while a background readFrame() was
+  // still using them (issue #3684).
+  std::lock_guard<std::mutex> autoLock(locker);
+  reader = nullptr;
+  sequenceFile = nullptr;
+  container = nullptr;
+  cacheKeyGeneratorFun = nullptr;
   delete lastImageInfo;
+  lastImageInfo = nullptr;
 }
 
 int PAGDecoder::numFrames() {
