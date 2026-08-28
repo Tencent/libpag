@@ -576,8 +576,8 @@ class HTMLWriter {
   // folded into the root matrix.
   void collectMaskBounds(const Layer* layer, const Matrix& parent, float& minX, float& minY,
                          float& maxX, float& maxY);
-  void writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent,
-                         const std::string& fillAttr, float fillOpacity);
+  void writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent, MaskType type,
+                         float inheritedAlpha, int& gradientIndex);
   static void ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
                                   float& minY, float& maxX, float& maxY);
 

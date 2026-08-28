@@ -83,6 +83,64 @@ static size_t CountOccurrences(const std::string& text, const std::string& needl
   return count;
 }
 
+struct DecodedCharStringBounds {
+  bool valid = false;
+  float minX = 0;
+  float maxX = 0;
+};
+
+static DecodedCharStringBounds DecodeCharStringXBounds(const std::vector<uint8_t>& charString) {
+  DecodedCharStringBounds result = {};
+  std::vector<float> operands;
+  float x = 0;
+  size_t index = 0;
+  while (index < charString.size()) {
+    uint8_t value = charString[index++];
+    if (value >= 32 && value <= 246) {
+      operands.push_back(static_cast<float>(value) - 139.0f);
+      continue;
+    }
+    if (value >= 247 && value <= 250 && index < charString.size()) {
+      operands.push_back(static_cast<float>((value - 247) * 256 + charString[index++] + 108));
+      continue;
+    }
+    if (value >= 251 && value <= 254 && index < charString.size()) {
+      operands.push_back(-static_cast<float>((value - 251) * 256 + charString[index++] + 108));
+      continue;
+    }
+    if (value == 28 && index + 1 < charString.size()) {
+      auto integer = static_cast<int16_t>((static_cast<uint16_t>(charString[index]) << 8) |
+                                          charString[index + 1]);
+      index += 2;
+      operands.push_back(static_cast<float>(integer));
+      continue;
+    }
+    if (value == 255 && index + 3 < charString.size()) {
+      auto fixed = static_cast<int32_t>((static_cast<uint32_t>(charString[index]) << 24) |
+                                        (static_cast<uint32_t>(charString[index + 1]) << 16) |
+                                        (static_cast<uint32_t>(charString[index + 2]) << 8) |
+                                        charString[index + 3]);
+      index += 4;
+      operands.push_back(static_cast<float>(fixed) / 65536.0f);
+      continue;
+    }
+    if ((value == 21 || value == 5) && operands.size() == 2) {
+      x += operands[0];
+    } else if (value == 8 && operands.size() == 6) {
+      x += operands[0] + operands[2] + operands[4];
+    } else if (value == 14) {
+      result.valid = true;
+      break;
+    } else {
+      return {};
+    }
+    result.minX = std::min(result.minX, x);
+    result.maxX = std::max(result.maxX, x);
+    operands.clear();
+  }
+  return result;
+}
+
 static std::vector<std::string> GetHtmlTestFiles() {
   std::vector<std::string> files = {};
   auto dir = ProjectPath::Absolute("resources/pagx_to_html");
@@ -657,6 +715,30 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsLargeCharstringOperands) {
   EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
 }
 
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSplitsOversizedCharstringMovements) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 2048;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  // Every coordinate is representable by CFF, but each horizontal edge has a 41000-unit delta.
+  // Clamping that delta makes the decoder stop at x=12767 while the encoder advances its own
+  // current point to x=21000, corrupting the rest of the contour.
+  *glyph->path = pagx::PathDataFromSVGString("M-20000 0 L21000 0 L21000 1000 L-20000 1000 Z");
+  glyph->advance = 2048;
+  font->glyphs.push_back(glyph);
+
+  auto charString = pagx::BuildWoff2GlyphCharString(*glyph->path);
+  ASSERT_FALSE(charString.empty());
+  auto bounds = DecodeCharStringXBounds(charString);
+  ASSERT_TRUE(bounds.valid);
+  EXPECT_NEAR(bounds.minX, -20000.0f, 0.01f);
+  EXPECT_NEAR(bounds.maxX, 21000.0f, 0.01f);
+
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+}
+
 CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
   auto doc = pagx::PAGXImporter::FromFile(
       ProjectPath::Absolute("resources/pagx_to_html/unit/custom_cff_charset_strings.pagx"));
@@ -966,6 +1048,60 @@ CLI_TEST(PAGXHtmlTest, MaskGeometryRecursesIntoChildLayer) {
       << "the child layer's rect must reach the mask SVG";
   EXPECT_EQ(CountOccurrences(html, "transform=%22matrix(1,0,0,1,-10,-20)%22"), 4u)
       << "two rects, each repeated across the -webkit- and unprefixed mask-image declarations";
+}
+
+// A recursive mask walk must consume the same layout-resolved layer position as normal layer
+// rendering. Authored x/y stay zero when left/top constraints place this child at (40, 30).
+CLI_TEST(PAGXHtmlTest, MaskGeometryUsesResolvedChildLayerPosition) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\" width=\"200\" height=\"200\">"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "      <Layer left=\"40\" top=\"30\" width=\"50\" height=\"40\">"
+      "        <Rectangle position=\"25,20\" size=\"50,40\"/>"
+      "        <Fill color=\"#FFFFFF\"/>"
+      "      </Layer>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("viewBox=%220 0 50 40%22"), std::string::npos);
+  EXPECT_NE(html.find("mask-position:40px 30px"), std::string::npos);
+  EXPECT_EQ(html.find("mask-position:0px 0px"), std::string::npos);
+}
+
+// Descendants resolve their own mask painter. Their layer alpha, Fill alpha, and source alpha all
+// participate in the emitted SVG opacity instead of reusing the root mask's paint.
+CLI_TEST(PAGXHtmlTest, NestedLuminanceMaskPreservesLayerPaintAndAlpha) {
+  std::string xml =
+      "<pagx width=\"100\" height=\"50\">"
+      "  <Layer width=\"100\" height=\"50\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Rectangle position=\"25,25\" size=\"50,50\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "      <Layer alpha=\"0.5\">"
+      "        <Rectangle position=\"75,25\" size=\"50,50\"/>"
+      "        <Fill color=\"#00000080\" alpha=\"0.5\"/>"
+      "      </Layer>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"luminance\">"
+      "      <Rectangle position=\"50,25\" size=\"100,50\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("fill=%22%23000000%22 fill-opacity=%220.1255%22"), std::string::npos)
+      << "the nested layer must use its own black fill and cumulative alpha";
+  EXPECT_NE(html.find("fill=%22%23FFFFFF%22"), std::string::npos)
+      << "the root mask geometry must retain its white fill";
 }
 
 // The mask layer's own matrix has to be baked into the emitted geometry. A transposing matrix

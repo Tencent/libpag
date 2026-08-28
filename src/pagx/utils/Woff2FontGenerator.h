@@ -53,4 +53,10 @@ Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId);
  */
 tgfx::Path ResolveWoff2GlyphPath(const PathData& path);
 
+/**
+ * Builds the Type 2 charstring used for a vector glyph. Exposed separately so callers can validate
+ * generated outline programs without depending on a platform font loader's WOFF2 support.
+ */
+std::vector<uint8_t> BuildWoff2GlyphCharString(const PathData& path, float designScale = 1.0f);
+
 }  // namespace pagx

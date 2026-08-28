@@ -437,18 +437,6 @@ void HTMLWriter::registerFilterId(const std::string& signature, const std::strin
 //==============================================================================
 
 std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos) {
-  const Fill* maskFill = nullptr;
-  for (auto* e : mask->contents) {
-    if (e->nodeType() == NodeType::Fill) {
-      maskFill = static_cast<const Fill*>(e);
-      break;
-    }
-  }
-
-  bool useFillColor = (type == MaskType::Luminance && maskFill != nullptr && maskFill->color);
-  std::string fillAttr = "white";
-  float fillOpacity = 1.0f;
-
   // Compute bounding box of mask geometry for SVG viewBox. Track both min and max
   // extents so that masks positioned at negative coordinates are fully enclosed.
   float minX = 1e9f;
@@ -478,74 +466,8 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   svg.addAttr("viewBox", "0 0 " + CssFloatToString(svgW) + " " + CssFloatToString(svgH));
   svg.closeTagStart();
 
-  if (useFillColor) {
-    auto* src = maskFill->color;
-    if (src->nodeType() == NodeType::LinearGradient ||
-        src->nodeType() == NodeType::RadialGradient) {
-      std::string gradId = "g";
-      svg.openTag("defs");
-      svg.closeTagStart();
-      if (src->nodeType() == NodeType::LinearGradient) {
-        auto g = static_cast<const LinearGradient*>(src);
-        svg.openTag("linearGradient");
-        svg.addAttr("id", gradId);
-        svg.addAttr("x1", CssFloatToString(g->startPoint.x));
-        svg.addAttr("y1", CssFloatToString(g->startPoint.y));
-        svg.addAttr("x2", CssFloatToString(g->endPoint.x));
-        svg.addAttr("y2", CssFloatToString(g->endPoint.y));
-        // fitsToGeometry maps to SVG objectBoundingBox, where coords live in [0,1] of the
-        // filled shape's bbox — this matches PAGX's normalized default. When fitsToGeometry
-        // is false the gradient parameters are pixel values in the mask's own coordinate
-        // space and must be emitted as userSpaceOnUse so SVG consumes them verbatim.
-        svg.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
-        if (!g->matrix.isIdentity()) {
-          svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
-        }
-        svg.closeTagStart();
-        for (auto* stop : g->colorStops) {
-          svg.openTag("stop");
-          svg.addAttr("offset", CssFloatToString(stop->offset));
-          svg.addAttr("stop-color", ColorToSVGHex(stop->color));
-          if (stop->color.alpha < 1.0f) {
-            svg.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
-          }
-          svg.closeTagSelfClosing();
-        }
-        svg.closeTag();
-      } else {
-        auto g = static_cast<const RadialGradient*>(src);
-        svg.openTag("radialGradient");
-        svg.addAttr("id", gradId);
-        svg.addAttr("cx", CssFloatToString(g->center.x));
-        svg.addAttr("cy", CssFloatToString(g->center.y));
-        svg.addAttr("r", CssFloatToString(g->radius));
-        svg.addAttr("gradientUnits", g->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
-        if (!g->matrix.isIdentity()) {
-          svg.addAttr("gradientTransform", MatrixToCSS(g->matrix));
-        }
-        svg.closeTagStart();
-        for (auto* stop : g->colorStops) {
-          svg.openTag("stop");
-          svg.addAttr("offset", CssFloatToString(stop->offset));
-          svg.addAttr("stop-color", ColorToSVGHex(stop->color));
-          if (stop->color.alpha < 1.0f) {
-            svg.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
-          }
-          svg.closeTagSelfClosing();
-        }
-        svg.closeTag();
-      }
-      svg.closeTag();  // </defs>
-      fillAttr = "url(#g)";
-      fillOpacity = maskFill->alpha;
-    } else if (src->nodeType() == NodeType::SolidColor) {
-      auto sc = static_cast<const SolidColor*>(src);
-      fillAttr = ColorToSVGHex(sc->color);
-      fillOpacity = sc->color.alpha * maskFill->alpha;
-    }
-  }
-
-  writeMaskGeometry(svg, mask, Matrix::Translate(-minX, -minY), fillAttr, fillOpacity);
+  int gradientIndex = 0;
+  writeMaskGeometry(svg, mask, Matrix::Translate(-minX, -minY), type, 1.0f, gradientIndex);
   svg.closeTag();  // </svg>
 
   std::string svgContent = svg.release();
@@ -689,8 +611,9 @@ void HTMLWriter::collectMaskBounds(const Layer* layer, const Matrix& parent, flo
     return;
   }
   Matrix lm = layer->matrix;
-  if (layer->x != 0 || layer->y != 0) {
-    lm = Matrix::Translate(layer->x, layer->y) * lm;
+  auto position = layer->renderPosition();
+  if (!FloatNearlyZero(position.x) || !FloatNearlyZero(position.y)) {
+    lm = Matrix::Translate(position.x, position.y) * lm;
   }
   Matrix combined = parent * lm;
   for (auto* e : layer->contents) {
@@ -707,17 +630,94 @@ void HTMLWriter::collectMaskBounds(const Layer* layer, const Matrix& parent, flo
 }
 
 void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent,
-                                   const std::string& fillAttr, float fillOpacity) {
+                                   MaskType type, float inheritedAlpha, int& gradientIndex) {
   RecursionGuard guard(_ctx);
   if (guard.overflowed()) {
     return;
   }
   Matrix lm = layer->matrix;
-  if (layer->x != 0 || layer->y != 0) {
-    lm = Matrix::Translate(layer->x, layer->y) * lm;
+  auto position = layer->renderPosition();
+  if (!FloatNearlyZero(position.x) || !FloatNearlyZero(position.y)) {
+    lm = Matrix::Translate(position.x, position.y) * lm;
   }
   Matrix combined = parent * lm;
   std::string tr = combined.isIdentity() ? "" : MatrixToCSS(combined);
+
+  const Fill* fill = nullptr;
+  for (auto* element : layer->contents) {
+    if (element->nodeType() == NodeType::Fill) {
+      fill = static_cast<const Fill*>(element);
+      break;
+    }
+  }
+  float fillOpacity = inheritedAlpha * layer->alpha;
+  std::string fillAttr = "white";
+  if (fill != nullptr) {
+    fillOpacity *= fill->alpha;
+    auto* source = fill->color;
+    if (source != nullptr && source->nodeType() == NodeType::SolidColor) {
+      auto* solid = static_cast<const SolidColor*>(source);
+      fillAttr = type == MaskType::Alpha ? "white" : ColorToSVGHex(solid->color);
+      fillOpacity *= solid->color.alpha;
+    } else if (source != nullptr && (source->nodeType() == NodeType::LinearGradient ||
+                                     source->nodeType() == NodeType::RadialGradient)) {
+      std::string gradientId = "g" + std::to_string(gradientIndex++);
+      out.openTag("defs");
+      out.closeTagStart();
+      if (source->nodeType() == NodeType::LinearGradient) {
+        auto* gradient = static_cast<const LinearGradient*>(source);
+        out.openTag("linearGradient");
+        out.addAttr("id", gradientId);
+        out.addAttr("x1", CssFloatToString(gradient->startPoint.x));
+        out.addAttr("y1", CssFloatToString(gradient->startPoint.y));
+        out.addAttr("x2", CssFloatToString(gradient->endPoint.x));
+        out.addAttr("y2", CssFloatToString(gradient->endPoint.y));
+        out.addAttr("gradientUnits",
+                    gradient->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+        if (!gradient->matrix.isIdentity()) {
+          out.addAttr("gradientTransform", MatrixToCSS(gradient->matrix));
+        }
+        out.closeTagStart();
+        for (auto* stop : gradient->colorStops) {
+          out.openTag("stop");
+          out.addAttr("offset", CssFloatToString(stop->offset));
+          out.addAttr("stop-color", type == MaskType::Alpha ? "white" : ColorToSVGHex(stop->color));
+          if (stop->color.alpha < 1.0f) {
+            out.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
+          }
+          out.closeTagSelfClosing();
+        }
+        out.closeTag();
+      } else {
+        auto* gradient = static_cast<const RadialGradient*>(source);
+        out.openTag("radialGradient");
+        out.addAttr("id", gradientId);
+        out.addAttr("cx", CssFloatToString(gradient->center.x));
+        out.addAttr("cy", CssFloatToString(gradient->center.y));
+        out.addAttr("r", CssFloatToString(gradient->radius));
+        out.addAttr("gradientUnits",
+                    gradient->fitsToGeometry ? "objectBoundingBox" : "userSpaceOnUse");
+        if (!gradient->matrix.isIdentity()) {
+          out.addAttr("gradientTransform", MatrixToCSS(gradient->matrix));
+        }
+        out.closeTagStart();
+        for (auto* stop : gradient->colorStops) {
+          out.openTag("stop");
+          out.addAttr("offset", CssFloatToString(stop->offset));
+          out.addAttr("stop-color", type == MaskType::Alpha ? "white" : ColorToSVGHex(stop->color));
+          if (stop->color.alpha < 1.0f) {
+            out.addAttr("stop-opacity", CssFloatToString(stop->color.alpha));
+          }
+          out.closeTagSelfClosing();
+        }
+        out.closeTag();
+      }
+      out.closeTag();
+      fillAttr = "url(#" + gradientId + ")";
+    }
+  }
+  // Alpha masks still need the source alpha (including gradient-stop alpha), but their RGB can
+  // stay white. Luminance masks consume both the resolved source color and alpha.
   for (auto* e : layer->contents) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
@@ -801,11 +801,12 @@ void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const M
     }
   }
   for (auto* child : layer->children) {
-    writeMaskGeometry(out, child, combined, fillAttr, fillOpacity);
+    writeMaskGeometry(out, child, combined, type, inheritedAlpha * layer->alpha, gradientIndex);
   }
   if (layer->composition != nullptr) {
     for (auto* compLayer : layer->composition->layers) {
-      writeMaskGeometry(out, compLayer, combined, fillAttr, fillOpacity);
+      writeMaskGeometry(out, compLayer, combined, type, inheritedAlpha * layer->alpha,
+                        gradientIndex);
     }
   }
 }
