@@ -306,9 +306,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     return YES;
   }
   [self updatePAGDecoder];
-  // Hold a strong reference for the rest of the call: pagDecoder->readFrame() only borrows the
-  // decoder through a raw dereference, so a local copy guarantees the decoder outlives this call
-  // even if a teardown path replaces the member concurrently.
+  // Take a local strong reference as belt-and-suspenders defense: pagDecoder->readFrame() only
+  // borrows the decoder through a raw dereference. The actual serialization is provided by
+  // imageViewLock, which the whole flush path holds and which every writer of pagDecoder also
+  // holds, so this copy simply guarantees the decoder object stays alive for the rest of this call.
   auto decoder = pagDecoder;
   if (decoder == nullptr) {
     return false;
