@@ -108,8 +108,6 @@ bool ParsingContext::endElement(const char* element) {
 
 namespace {
 
-constexpr const void* HASH_SEED = &HASH_SEED;
-
 #define HANDLER_CONTEXT(arg, name) ParsingContext* name = static_cast<ParsingContext*>(arg)
 
 void XMLCALL start_element_handler(void* data, const char* tag, const char** attributes) {
@@ -190,12 +188,6 @@ bool XMLParser::parse(const uint8_t* data, size_t length) {
     return false;
   }
   _expatParser = parsingContext._XMLParser.get();
-
-  // Avoid calls to rand_s if this is not set. This seed helps prevent DOS
-  // with a known hash sequence so an address is sufficient. The provided
-  // seed should not be zero as that results in a call to rand_s.
-  auto seed = static_cast<unsigned long>(reinterpret_cast<size_t>(HASH_SEED) & 0xFFFFFFFF);
-  XML_SetHashSalt(parsingContext._XMLParser, seed ? seed : 1);
 
   XML_SetUserData(parsingContext._XMLParser, &parsingContext);
   XML_SetElementHandler(parsingContext._XMLParser, start_element_handler, end_element_handler);

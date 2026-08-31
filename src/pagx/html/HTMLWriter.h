@@ -51,6 +51,7 @@
 namespace pagx {
 
 class Group;
+class HTMLZipWriter;
 class HTMLWriterContext;
 class LinearGradient;
 class RadialGradient;
@@ -183,9 +184,32 @@ class HTMLWriterContext {
   // resourceDir. `staticImgDir` is the absolute filesystem path where PNG assets are written;
   // `staticImgUrlPrefix` is the relative URL prefix that the generated HTML uses to reference
   // them (derived as the directory's basename + '/'). The resourceDir is mandatory at the
-  // public API boundary, so both fields are non-empty when HTMLWriter runs.
+  // public API boundary, so both fields are non-empty when HTMLWriter runs in ToHTML mode.
+  // In ToData mode staticImgDir is left empty (resources go to the ZIP writer instead) while
+  // staticImgUrlPrefix stays set so writeResource can prepend it to ZIP entry names.
   std::string staticImgDir = {};
   std::string staticImgUrlPrefix = {};
+
+  // ToData sets this ZIP writer; ToHTML leaves it null and writes resources to
+  // staticImgDir. HTML export currently supports no other resource writer.
+  HTMLZipWriter* zipWriter = nullptr;
+
+  // ToData only: first resource write failure, if any. An archive is all-or-nothing
+  // (design spec section 8), so any failed ZIP entry write fails the whole ToData call.
+  std::string zipWriteError = {};
+
+  bool hasResourceOutput() const {
+    return zipWriter != nullptr || !staticImgDir.empty();
+  }
+
+  // Writes a resource. relativePath is relative to the resource root (ToHTML:
+  // staticImgDir; ToData: the ZIP root) and may contain '/'-separated sub
+  // directories. In ToData mode the ZIP entry name is staticImgUrlPrefix +
+  // relativePath, keeping archive entries and HTML URLs in sync. Falls back
+  // to the original write-to-disk behavior when zipWriter is null.
+  bool writeResource(const std::string& relativePath, const void* bytes, size_t size,
+                     std::string* errorMsg);
+
   float rasterScale = 2.0f;
 
   // Cache: source absolute file path → assigned filename inside staticImgDir. Used by
@@ -194,6 +218,10 @@ class HTMLWriterContext {
   // basename receive disambiguated copies (e.g. "logo.png", "logo_1.png").
   std::unordered_map<std::string, std::string> externalImageCopies = {};
   std::unordered_set<std::string> externalImageClaimedNames = {};
+
+  // ToData only: Image* → assigned assets/ filename, so one Image is embedded
+  // at most once into the archive.
+  std::unordered_map<const Image*, std::string> externalImageAssets = {};
 
   // Per-plusDarker-Layer backdrop data registered by HTMLPlusDarkerRenderer before the writer
   // walks the tree. When a Layer pointer is present here, the writer emits an SVG filter that

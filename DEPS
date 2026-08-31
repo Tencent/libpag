@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
-        "commit": "75e1f2959db86f26e4ad67667b3af3ba7a5451cc",
+        "commit": "eccf358181c8ce96c80f5ead931041c25b188352",
         "dir": "third_party/tgfx"
       },
       {
@@ -37,7 +37,7 @@
       },
       {
         "url": "https://github.com/libexpat/libexpat.git",
-        "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
+        "commit": "70a0d4b01f2b6af4ec3d851ad2b399752f531ff8",
         "dir": "third_party/expat"
       },
       {
