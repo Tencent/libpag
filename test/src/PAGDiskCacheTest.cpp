@@ -544,18 +544,23 @@ PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
 }
 
 /**
- * Regression test for issue #3684: background decoding through PAGDecoder must not race with the
- * teardown path. Each reader thread mimics a PAGImageView flush task: it creates its own decoder,
- * decodes video frames off the main thread, and releases the decoder (running the teardown chain
- * ~PAGDecoder -> ~CompositionReader -> ~PAGPlayer -> ~VideoReader) while other threads are still
- * decoding and while the disk cache is being cleared repeatedly. Before the fix, the destructors
- * did not take their locks, so a teardown could free the demuxer and the player while an in-flight
- * readFrame()/decodeFrame() was still using them.
+ * Concurrency stress test around issue #3684. It repeatedly creates, uses, and destroys independent
+ * PAGDecoders on multiple threads (each thread owns its own PAGFile and decoder, running the
+ * teardown chain ~PAGDecoder -> ~CompositionReader -> ~PAGPlayer -> ~VideoReader) while the shared
+ * disk cache is cleared concurrently. Note that this does NOT deterministically reproduce the
+ * intra-decoder teardown race: within a single thread the decoder is created, used, and destroyed
+ * sequentially, so a teardown never overlaps an in-flight readFrame() on the same decoder. It
+ * exercises the destructor locking and the shared DiskCache paths under concurrent load, guarding
+ * against regressions of #3684 without pinning down the exact race window.
  */
 PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
   pag::PAGDiskCache::RemoveAll();
-  auto pagFile = LoadPAGFile("resources/apitest/video_sequence_size.pag");
-  ASSERT_TRUE(pagFile != nullptr);
+  std::vector<std::shared_ptr<PAGFile>> pagFiles;
+  for (int i = 0; i < 4; i++) {
+    auto pagFile = LoadPAGFile("resources/apitest/video_sequence_size.pag");
+    ASSERT_TRUE(pagFile != nullptr);
+    pagFiles.push_back(pagFile);
+  }
 
   std::atomic<bool> stopped = {false};
   std::thread cacheCleaner([&] {
@@ -567,9 +572,9 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
 
   std::vector<std::thread> readers;
   for (int i = 0; i < 4; i++) {
-    readers.emplace_back([&] {
+    readers.emplace_back([&, i] {
       for (int round = 0; round < 3; round++) {
-        auto decoder = PAGDecoder::MakeFrom(pagFile, 60, 1.0f);
+        auto decoder = PAGDecoder::MakeFrom(pagFiles[i], 60, 1.0f);
         if (decoder == nullptr) {
           continue;
         }
