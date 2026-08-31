@@ -1303,18 +1303,12 @@ bool PAGXView::selectTimelineUnit(const std::string& kind, const std::string& id
     // mount-preview path that instantiates the animation with the mount's own binding scope.
     if (auto* def = document->findNode(id);
         def != nullptr && def->nodeType() == NodeType::Animation) {
-      auto* animDef = static_cast<Animation*>(def);
       std::unordered_set<std::string> rootLayerIds = {};
       CollectRootLayerIds(document->layers, &rootLayerIds);
-      for (const auto* obj : animDef->objects) {
-        if (obj == nullptr || obj->target.empty()) {
-          continue;
-        }
-        if (rootLayerIds.find(obj->target) == rootLayerIds.end()) {
-          // Target defined inside a nested composition; preview would not update the stage. M2
-          // will handle mount-scoped previews.
-          return false;
-        }
+      if (!AnimationTargetsInRoot(static_cast<const Animation*>(def), rootLayerIds)) {
+        // Target defined inside a nested composition; preview would not update the stage. M2
+        // will handle mount-scoped previews.
+        return false;
       }
     }
     // Switching from one preview unit to another parks the previous preview at its first frame:

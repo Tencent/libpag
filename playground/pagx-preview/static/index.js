@@ -304,18 +304,6 @@ const player = new PAGXPlayer({
 
 let loading = false;
 let reloadQueued = false;
-// Captures the strategy chosen by the most recent player.load() call. Populated by the 'loaded'
-// event listener installed below and consumed once per load in loadPAGXFromBytes. A plain module
-// scoped variable is enough because player.load()'s internal generation gate guarantees a single
-// 'loaded' dispatch per completed load and loadPAGXFromBytes drains this value in the same
-// microtask that resolves the await.
-let lastLoadStrategy = 'fullReplace';
-player.addEventListener('loaded', (event) => {
-  // 'strategy' was added by the V0 update pipeline; older host builds still fire 'loaded'
-  // without it, in which case we assume the historical full-replace behavior for backward
-  // compatibility.
-  lastLoadStrategy = event.detail.strategy || 'fullReplace';
-});
 
 // Wraps player.load() with preview chrome (status/perf/invalidation/external-path report).
 // Split from loadPAGX() so the editor's Apply callback can feed edited XML through the exact
@@ -356,19 +344,11 @@ async function loadPAGXFromBytes(pagxBuf, { silent = false } = {}) {
     });
     perf.end('load');
 
-    // Skip the noise-side-effects entirely on a noChange short-circuit. The bytes were
-    // byte-identical to the previously accepted document, so the external path list can't
-    // have changed and re-POSTing it would only expand the server's watcher noise. The
-    // "Loaded" pill is also suppressed: chokidar's rename/attr/content bursts routinely fire
-    // 2-3 SSE reloads for a single save, and after V0 only the first one produces a real
-    // update — flashing three "Loaded" pills for what the user perceives as a single save
-    // is exactly what the equality short-circuit is meant to fix.
-    if (lastLoadStrategy === 'noChange') {
-      perf.summarize();
-      // eslint-disable-next-line no-console
-      console.log('[pagx-preview] noChange short-circuit');
-      return;
-    }
+    // Flip the internal visibility gates for the player's optional panels (state machine
+    // blueprint + preview chip bar). player.load() alone leaves them hidden by default so a
+    // headless host can render just the canvas; preview always wants the full UI, so this is
+    // called on every load. It's idempotent - subsequent reloads just re-assert the flags.
+    player.show();
 
     // Report the resource list so the server extends its watch to referenced images/fonts.
     // Fire-and-forget: only used to widen the file watcher scope on the server side.
@@ -388,8 +368,8 @@ async function loadPAGXFromBytes(pagxBuf, { silent = false } = {}) {
       // client round-trip.
       if (view) {
         const summary = {
-          width: view.contentWidth(),
-          height: view.contentHeight(),
+          width: view.contentWidth,
+          height: view.contentHeight,
           duration: view.durationMicros(),
           frameRate: view.frameRate(),
         };
