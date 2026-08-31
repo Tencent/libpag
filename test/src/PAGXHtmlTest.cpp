@@ -588,6 +588,39 @@ CLI_TEST(PAGXHtmlTest, PainterAccumulatedGeometry) {
   ASSERT_FALSE(html.empty());
 }
 
+// A background Fill in one Group must not leak into a later sibling Group whose foreground
+// Stroke is emitted after child layers. Otherwise the final stroke SVG also receives the opaque
+// background Fill and covers the child content.
+CLI_TEST(PAGXHtmlTest, GroupForegroundStrokeDoesNotReuseSiblingFill) {
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="200" height="200">
+  <Layer id="parent" width="200" height="200">
+    <Group>
+      <Rectangle position="100,100" size="200,200"/>
+      <Fill color="#FFFFFF"/>
+    </Group>
+    <Group>
+      <Rectangle position="100,100" size="200,200"/>
+      <Stroke color="#000000" width="2" placement="foreground"/>
+    </Group>
+    <Layer id="child" width="100" height="100" x="50" y="50">
+      <Rectangle position="50,50" size="100,100"/>
+      <Fill color="#FF0000"/>
+    </Layer>
+  </Layer>
+</pagx>)");
+  ASSERT_FALSE(html.empty());
+
+  auto childPosition = html.find("id=\"child\"");
+  ASSERT_NE(childPosition, std::string::npos);
+  auto foregroundStrokePosition = html.find("stroke=\"#000000\"", childPosition);
+  ASSERT_NE(foregroundStrokePosition, std::string::npos);
+  auto foregroundStrokeTag = FindTagContaining(html, "stroke=\"#000000\"");
+  ASSERT_FALSE(foregroundStrokeTag.empty());
+  EXPECT_NE(foregroundStrokeTag.find("fill=\"none\""), std::string::npos);
+  EXPECT_EQ(foregroundStrokeTag.find("fill=\"#FFFFFF\""), std::string::npos);
+}
+
 // =============================================================================
 // Shape modifiers
 // =============================================================================
@@ -1012,6 +1045,53 @@ CLI_TEST(PAGXHtmlTest, ContourMaskKeepsClipPathWithoutBackgroundBlur) {
   EXPECT_EQ(html.find("backdrop-filter"), std::string::npos);
   EXPECT_NE(html.find("clip-path:url("), std::string::npos)
       << "contour masks must still use clip-path when no background blur sits below";
+}
+
+// Regression (Frame 2147208032): a contour mask 2px shorter than the layer's border box must
+// still swap clip-path for overflow:hidden when a BackgroundBlurStyle lives below. Recent
+// Chromium versions degrade a backdrop-filter under a clip-path Backdrop Root to a near no-op,
+// so falling back to clip-path for a near-fullbox mask leaves the blur visually missing. The
+// overflow box follows the mask bounds via width/height overrides.
+CLI_TEST(PAGXHtmlTest, ContourMaskSwapAllowsMaskSmallerThanLayerBox) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"160\">"
+      "  <Layer id=\"window\" width=\"200\" height=\"160\">"
+      "    <Rectangle position=\"100,80\" size=\"200,160\" roundness=\"12\"/>"
+      "    <Fill color=\"#FFFFFF\" alpha=\"0.6\"/>"
+      "    <Layer id=\"windowMask\" visible=\"false\">"
+      "      <Rectangle position=\"100,79\" size=\"200,158\" roundness=\"12\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer id=\"windowClip\" width=\"200\" height=\"160\" mask=\"@windowMask\" "
+      "maskType=\"contour\">"
+      "      <Layer id=\"bar\" width=\"200\" height=\"160\">"
+      "        <Rectangle position=\"100,30\" size=\"160,20\"/>"
+      "        <Fill color=\"#111111\"/>"
+      "      </Layer>"
+      "      <Layer id=\"glass\" width=\"200\" height=\"160\">"
+      "        <Rectangle position=\"100,80\" size=\"200,160\"/>"
+      "        <Fill color=\"#FFFFFF\" alpha=\"0.1\"/>"
+      "        <BackgroundBlurStyle blurX=\"10\" blurY=\"10\"/>"
+      "      </Layer>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("backdrop-filter:blur(10px)"), std::string::npos)
+      << "the BackgroundBlurStyle must still emit a backdrop-filter";
+  EXPECT_EQ(html.find("clip-path:url("), std::string::npos)
+      << "a near-fullbox mask must still swap to overflow, not fall back to clip-path";
+  auto clipTag = FindTagContaining(html, "id=\"windowClip\"");
+  ASSERT_FALSE(clipTag.empty());
+  EXPECT_NE(clipTag.find("overflow:hidden"), std::string::npos)
+      << "the contour mask must clip via overflow";
+  EXPECT_NE(clipTag.find("border-radius:12px"), std::string::npos)
+      << "overflow:hidden needs the mask's corner radius";
+  // The mask rect spans y 0..158 (center 79), so the clip div's height must follow the mask box
+  // instead of the layer's 160px.
+  EXPECT_NE(clipTag.find("height:158px"), std::string::npos)
+      << "overflow must clip the mask's box, overriding the layer's 160px height";
 }
 
 // The mask SVG must enclose geometry contributed by the mask layer's descendants, not just the

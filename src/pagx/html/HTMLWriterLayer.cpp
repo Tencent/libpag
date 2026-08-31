@@ -769,8 +769,31 @@ void HTMLWriter::flattenGroup(HTMLBuilder& out, const Group* group, float alpha,
                             curTextBox, a);
           state.geos.clear();
           groupGeos.clear();
+        } else if (state.curFill != nullptr) {
+          // A Fill from an earlier sibling Group may have propagated into the enclosing element
+          // stream. Keep it when merging Text fill/stroke into one span, but never apply it to
+          // Shape geometry in this Group: the Shape fill was already painted in the background
+          // pass. Reusing the stale Fill here would turn a foreground stroke into an opaque
+          // foreground shape and cover all child layers below it.
+          std::vector<GeoInfo> textGeos;
+          std::vector<GeoInfo> shapeGeos;
+          for (auto& geo : state.geos) {
+            if (geo.type == NodeType::Text) {
+              textGeos.push_back(geo);
+            } else {
+              shapeGeos.push_back(geo);
+            }
+          }
+          if (!textGeos.empty()) {
+            paintGeos(out, textGeos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+                      state.curTrim, state.hasMerge, state.mergeMode);
+          }
+          if (!shapeGeos.empty()) {
+            paintGeos(out, shapeGeos, nullptr, state.curStroke, curTextBox, a, state.hasTrim,
+                      state.curTrim, state.hasMerge, state.mergeMode);
+          }
         } else {
-          paintGeos(out, state.geos, state.curFill, state.curStroke, curTextBox, a, state.hasTrim,
+          paintGeos(out, state.geos, nullptr, state.curStroke, curTextBox, a, state.hasTrim,
                     state.curTrim, state.hasMerge, state.mergeMode);
         }
       }
@@ -1428,28 +1451,38 @@ static std::string LayerBoxShadowBorderRadius(const Layer* layer) {
   return {};
 }
 
-// Tests whether `bounds` occupies exactly a containerW x containerH box anchored at the origin,
-// within a half-pixel tolerance. `overflow:hidden` always clips at the element's own box, so a
-// contour mask may only be swapped for it when the mask shape spans precisely that box — a shape
-// merely covering it would clip looser than the mask does.
-static bool ShapeMatchesLayerBox(const Rect& bounds, float containerW, float containerH) {
-  return std::fabs(bounds.x) <= 0.5f && std::fabs(bounds.y) <= 0.5f &&
-         std::fabs(bounds.width - containerW) <= 0.5f &&
-         std::fabs(bounds.height - containerH) <= 0.5f;
+// Tests whether `bounds` is anchored at the layer box's top-left origin, within a half-pixel
+// tolerance. `overflow:hidden` clips at the element's own box, whose position cannot move
+// independently of the layer div (children position against it), so only an origin-anchored
+// mask can be swapped in; the box size itself is overridable via width/height.
+static bool ShapeAnchoredAtOrigin(const Rect& bounds) {
+  return std::fabs(bounds.x) <= 0.5f && std::fabs(bounds.y) <= 0.5f;
 }
 
-// Returns a CSS border-radius value string (without the property prefix, e.g. "10px" or "50%") when
-// `layer`'s contour mask is a single Rectangle or Ellipse spanning exactly the layer's border box,
-// meaning the clip can be emitted as `overflow:hidden` plus that radius. "0" means square corners.
-// Returns an empty string for any other mask geometry.
+// A contour mask reduced to a CSS rounded box: the border-radius value and the mask box size in
+// layer-local coordinates. `radius` empty means the mask is not reducible. `width`/`height` may
+// differ from the layer's border box (e.g. a mask 2px shorter than the layer); the caller
+// overrides the div's width/height with them so `overflow:hidden` clips exactly where the mask
+// did.
+struct ContourMaskBox {
+  std::string radius;
+  float width = 0.0f;
+  float height = 0.0f;
+};
+
+// Returns the rounded-box reduction of `layer`'s contour mask when it is a single untransformed
+// Rectangle or Ellipse anchored at the layer box's origin, meaning the clip can be emitted as
+// `overflow:hidden` plus a border-radius, with width/height following the mask box. Returns an
+// empty radius for any other mask geometry.
 //
-// Used to keep a nested BackgroundBlurStyle working: `clip-path` turns the layer into a CSS Backdrop
-// Root, so a `backdrop-filter` emitted anywhere below it can only sample pixels painted inside the
-// clip. The layer's own Fill is emitted as a sibling of the mask target and the page behind it is
-// outside the clip entirely, so the sampled backdrop is almost fully transparent and the blur
+// Used to keep a nested BackgroundBlurStyle working: `clip-path` turns the layer into a CSS
+// Backdrop Root, so a `backdrop-filter` emitted anywhere below it can only sample pixels painted
+// inside the clip (recent Chromium versions degrade it to a near no-op even for content painted
+// inside). The layer's own Fill is emitted as a sibling of the mask target and the page behind it
+// is outside the clip entirely, so the sampled backdrop is almost fully transparent and the blur
 // silently degrades to a no-op. `overflow:hidden` clips the same box without becoming a Backdrop
 // Root.
-static std::string ContourMaskBorderRadius(const Layer* layer) {
+static ContourMaskBox ContourMaskBorderRadius(const Layer* layer) {
   auto* mask = layer->mask;
   // writeClipContent also walks the mask's children and composition, contributing geometry that a
   // border-radius box cannot reproduce.
@@ -1494,18 +1527,27 @@ static std::string ContourMaskBorderRadius(const Layer* layer) {
   if (shape == nullptr) {
     return {};
   }
+  ContourMaskBox box = {};
   if (shape->nodeType() == NodeType::Rectangle) {
     auto r = static_cast<const Rectangle*>(shape);
-    if (!ShapeMatchesLayerBox(r->layoutBounds(), layerBounds.width, layerBounds.height)) {
+    auto bounds = r->layoutBounds();
+    if (bounds.width <= 0 || bounds.height <= 0 || !ShapeAnchoredAtOrigin(bounds)) {
       return {};
     }
-    return r->roundness > 0 ? CssFloatToString(r->roundness) + "px" : "0";
+    box.radius = r->roundness > 0 ? CssFloatToString(r->roundness) + "px" : "0";
+    box.width = bounds.width;
+    box.height = bounds.height;
+    return box;
   }
   auto el = static_cast<const Ellipse*>(shape);
-  if (!ShapeMatchesLayerBox(el->layoutBounds(), layerBounds.width, layerBounds.height)) {
+  auto bounds = el->layoutBounds();
+  if (bounds.width <= 0 || bounds.height <= 0 || !ShapeAnchoredAtOrigin(bounds)) {
     return {};
   }
-  return "50%";
+  box.radius = "50%";
+  box.width = bounds.width;
+  box.height = bounds.height;
+  return box;
 }
 
 // Returns true when `layer` or any descendant carries a BackgroundBlurStyle that emits a CSS
@@ -2415,18 +2457,26 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     if (layer->maskType == MaskType::Contour) {
       // Prefer `overflow:hidden` over `clip-path` whenever a BackgroundBlurStyle lives below this
       // layer: `clip-path` would make the layer a Backdrop Root and starve that blur's backdrop.
-      // Only a mask spanning exactly the layer's rounded border box clips identically that way.
-      std::string maskRadius;
+      // When the mask box is smaller or larger than the layer's border box, the div's width/height
+      // are overridden with the mask box so overflow clips exactly where the mask did (later
+      // inline properties win over the width/height emitted further up).
+      ContourMaskBox maskBox;
       if (SubtreeHasBackgroundBlur(layer, 0)) {
-        maskRadius = ContourMaskBorderRadius(layer);
+        maskBox = ContourMaskBorderRadius(layer);
       }
-      if (maskRadius.empty()) {
+      if (maskBox.radius.empty()) {
         auto clipId = writeClipDef(layer->mask);
         style += ";clip-path:url(#" + clipId + ")";
       } else {
         style += ";overflow:hidden";
-        if (maskRadius != "0") {
-          style += ";border-radius:" + maskRadius;
+        if (maskBox.radius != "0") {
+          style += ";border-radius:" + maskBox.radius;
+        }
+        auto layerBounds = layer->layoutBounds();
+        if (std::fabs(maskBox.width - layerBounds.width) > 0.5f ||
+            std::fabs(maskBox.height - layerBounds.height) > 0.5f) {
+          style += ";width:" + CssFloatToString(maskBox.width) + "px";
+          style += ";height:" + CssFloatToString(maskBox.height) + "px";
         }
       }
     } else {
