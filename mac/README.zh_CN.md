@@ -30,4 +30,14 @@
 ./gen_mac -DPAG_USE_WEBP_ENCODE=ON
 ```
 
+### 选择 Metal 后端
+
+默认情况下生成的项目使用 OpenGL 后端。如需改用 Metal 后端，传入 `-DPAG_USE_METAL=ON`：
+
+```
+./gen_mac -DPAG_USE_METAL=ON
+```
+
+Metal 后端同时支持 Apple Silicon 与 Intel Mac，要求 macOS 10.15 及以上版本，无需额外参数。
+
 最后，启动 XCode 并打开 mac/PAGViewer.xcworkspace 即可。
