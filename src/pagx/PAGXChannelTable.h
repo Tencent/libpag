@@ -65,6 +65,11 @@ struct ChannelDef {
   ChannelFlags flags;
   ChannelAccessor access;
   ChannelValueType valueType;
+  // True for the width/height dimension channels: the raw attribute string uses the XSD
+  // DimensionType syntax ("100" or "50%") and SetNodeChannelFromString parses it with the
+  // importer's ReadDimension rules instead of the plain float grammar. The KeyValue stays float;
+  // this only changes how the string is parsed and which member the write lands on.
+  bool dimension = false;
 };
 
 // Returns the channel table for the given node type, or an empty table if the type has no

@@ -248,6 +248,41 @@ static bool AccessSizeAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) 
   return true;
 }
 
+// Dimension axis access for LayoutNode-derived types. The XML width/height attribute spans two
+// members (absolute + percent, see ReadDimension in the importer) and layout resolves percent
+// over absolute, so a typed write to either member must clear the other: a stale percent would
+// keep overriding a freshly written absolute value (and vice versa), diverging from what a full
+// reparse produces. WidthAxis selects the width or height axis; PercentAxis selects which of the
+// two members the channel addresses (reads still report that member alone).
+template <typename T, bool WidthAxis, bool PercentAxis>
+static bool AccessDimensionAxis(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  float& absolute = WidthAxis ? self->width : self->height;
+  float& percent = WidthAxis ? self->percentWidth : self->percentHeight;
+  if (getOut == nullptr && setIn == nullptr) {
+    // Reset: the attribute's default is "unspecified", i.e. both members NaN.
+    absolute = NAN;
+    percent = NAN;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = PercentAxis ? percent : absolute;
+    return true;
+  }
+  const auto* value = std::get_if<float>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  if (PercentAxis) {
+    percent = *value;
+    absolute = NAN;
+  } else {
+    absolute = *value;
+    percent = NAN;
+  }
+  return true;
+}
+
 // Padding sub-component access. Which: 0=left, 1=top, 2=right, 3=bottom.
 template <typename T, auto Field, int Which>
 static bool AccessPaddingComp(Node* node, KeyValue* getOut, const KeyValue* setIn) {
@@ -379,6 +414,14 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessOptionalFloat<T, &T::member>, ChannelValueType::Float }
 #define FIELD_OPT_COLOR(T, name, member, cls) \
   { name, cls, &AccessOptionalColor<T, &T::member>, ChannelValueType::Color }
+// The width/height dimension channels and their percent siblings. Both accessors cross-clear the
+// two members (see AccessDimensionAxis); the dimension flag routes SetNodeChannelFromString
+// through the XSD dimension parser instead of the plain float one, so "50%" is accepted and lands
+// on the percent member exactly like a full reparse.
+#define FIELD_DIMENSION(T, name, cls, WidthAxis) \
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, false>, ChannelValueType::Float, true }
+#define FIELD_PERCENT(T, name, cls, WidthAxis) \
+  { name, cls, &AccessDimensionAxis<T, WidthAxis, true>, ChannelValueType::Float }
 #define FIELD_ENUM(T, name, member, cls, E)                                                   \
   {                                                                                           \
     name, cls, &AccessEnum<T, E, &T::member, E##ToString, E##FromString, IsValid##E##String>, \
@@ -390,10 +433,10 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
 template <typename T>
 static void AppendLayoutNodeFields(std::vector<ChannelDef>& table) {
   std::vector<ChannelDef> shared = {
-      FIELD_FLOAT(T, "width", width, Layout),
-      FIELD_FLOAT(T, "height", height, Layout),
-      FIELD_FLOAT(T, "percentWidth", percentWidth, Layout),
-      FIELD_FLOAT(T, "percentHeight", percentHeight, Layout),
+      FIELD_DIMENSION(T, "width", Layout, true),
+      FIELD_DIMENSION(T, "height", Layout, false),
+      FIELD_PERCENT(T, "percentWidth", Layout, true),
+      FIELD_PERCENT(T, "percentHeight", Layout, false),
       FIELD_FLOAT(T, "left", left, Layout),
       FIELD_FLOAT(T, "right", right, Layout),
       FIELD_FLOAT(T, "top", top, Layout),
@@ -1065,6 +1108,57 @@ static bool ParseChannelValue(ChannelValueType type, const std::string& raw, Key
   return false;
 }
 
+// Parses a width/height attribute string with the same rules as ReadDimension in
+// PAGXImporter.cpp (the XSD DimensionType pattern "[0-9]*\.?[0-9]+%?"): "100" sets *outAbsolute,
+// "50%" sets *outPercent. Leading whitespace, signs, a hex prefix, non-finite and negative values
+// are rejected so an incremental edit never accepts input a full reparse would reject.
+static bool ParseDimensionString(const std::string& raw, float* outAbsolute, float* outPercent) {
+  *outAbsolute = NAN;
+  *outPercent = NAN;
+  if (raw.empty()) {
+    return false;
+  }
+  const char* cstr = raw.c_str();
+  // Reject leading whitespace, sign, and hex prefix; strtof would otherwise accept them.
+  char first = cstr[0];
+  if (first == ' ' || first == '\t' || first == '+' || first == '-') {
+    return false;
+  }
+  if (first == '0' && (cstr[1] == 'x' || cstr[1] == 'X')) {
+    return false;
+  }
+  char* endPtr = nullptr;
+  float value = strtof(cstr, &endPtr);
+  if (endPtr == cstr || !std::isfinite(value) || value < 0) {
+    return false;
+  }
+  if (*endPtr == '%') {
+    if (endPtr[1] != '\0') {
+      return false;
+    }
+    *outPercent = value;
+    return true;
+  }
+  if (*endPtr != '\0') {
+    return false;
+  }
+  *outAbsolute = value;
+  return true;
+}
+
+// The sibling percent channel for a dimension channel ("width" -> "percentWidth"); a "50%" value
+// routes through it so the write lands on the percent member. Returns null for a channel that has
+// no percent sibling.
+static const char* DimensionPercentChannel(const std::string& channel) {
+  if (channel == "width") {
+    return "percentWidth";
+  }
+  if (channel == "height") {
+    return "percentHeight";
+  }
+  return nullptr;
+}
+
 bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw) {
   if (node == nullptr) {
     return false;
@@ -1076,7 +1170,36 @@ bool SetNodeChannelFromString(Node* node, const std::string& channel, const std:
     return false;
   }
   KeyValue value = {};
-  if (!ParseChannelValue(field->valueType, raw, &value)) {
+  if (field->dimension) {
+    // Width/height accept the XML dimension syntax ("100" or "50%"). A percent value addresses
+    // the percent member, so route through the sibling percent channel; both dimension
+    // accessors clear their counterpart member, keeping the result identical to a full reparse
+    // (ReadDimension writes exactly one of the two members and NaNs the other).
+    float absolute = NAN;
+    float percent = NAN;
+    if (!ParseDimensionString(raw, &absolute, &percent)) {
+      LOGE("SetNodeChannelFromString: cannot parse dimension value '%s' for channel '%s'.",
+           raw.c_str(), channel.c_str());
+      return false;
+    }
+    if (!std::isnan(percent)) {
+      const char* percentChannel = DimensionPercentChannel(channel);
+      if (percentChannel == nullptr) {
+        LOGE("SetNodeChannelFromString: no percent channel for dimension channel '%s'.",
+             channel.c_str());
+        return false;
+      }
+      field = FindChannel(node->nodeType(), percentChannel);
+      if (field == nullptr) {
+        LOGE("SetNodeChannelFromString: unhandled channel '%s' for node type %d.", percentChannel,
+             static_cast<int>(node->nodeType()));
+        return false;
+      }
+      value = percent;
+    } else {
+      value = absolute;
+    }
+  } else if (!ParseChannelValue(field->valueType, raw, &value)) {
     if (field->valueType == ChannelValueType::ImageRef ||
         field->valueType == ChannelValueType::Matrix ||
         field->valueType == ChannelValueType::PAGImage) {
