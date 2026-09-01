@@ -146,10 +146,14 @@ void RuntimeBinding::remove(const Node* node) {
 //
 // PAG_DISABLE_BACKGROUND_BLUR_STYLE: skips BackgroundBlurStyle (offscreen background snapshot
 //   plus blur pass; usually the heaviest single category in dense designs).
+// PAG_DISABLE_GLASS_STYLE:           skips GlassStyle (offscreen background snapshot with
+//   refraction / dispersion / frost / edge-light passes; cost is comparable to or higher than
+//   BackgroundBlurStyle since it runs the full glass shader on the sampled background).
 // PAG_DISABLE_SHADOW_STYLES:         skips DropShadowStyle and InnerShadowStyle.
 // PAG_DISABLE_LAYER_FILTERS:         skips all LayerFilters (BlurFilter, DropShadow/InnerShadow
 //   filters, BlendFilter, ColorMatrixFilter). BlurFilter with very large sigma dominates here.
 #define PAG_DISABLE_BACKGROUND_BLUR_STYLE 0
+#define PAG_DISABLE_GLASS_STYLE 0
 #define PAG_DISABLE_SHADOW_STYLES 0
 #define PAG_DISABLE_LAYER_FILTERS 0
 
@@ -2474,6 +2478,9 @@ class LayerBuilderContext {
 #endif
       }
       case NodeType::GlassStyle: {
+#if PAG_DISABLE_GLASS_STYLE
+        return nullptr;
+#else
         auto style = static_cast<const pagx::GlassStyle*>(node);
         auto tgfxStyle =
             tgfx::GlassStyle::Make(style->refraction, style->depth, style->frost, style->dispersion,
@@ -2484,6 +2491,7 @@ class LayerBuilderContext {
         _result.binding.set(style, tgfxStyle);
         bindGlassStyleChannels(style);
         return tgfxStyle;
+#endif
       }
       case NodeType::NoiseStyle: {
         auto style = static_cast<const pagx::NoiseStyle*>(node);

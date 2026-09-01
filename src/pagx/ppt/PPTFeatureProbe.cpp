@@ -93,8 +93,7 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasDiamondGradient |= src.hasDiamondGradient;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasShearTransform |= src.hasShearTransform;
-  dst->hasBackgroundBlur |= src.hasBackgroundBlur;
-  dst->hasGlassStyle |= src.hasGlassStyle;
+  dst->hasBackdropStyle |= src.hasBackdropStyle;
 }
 
 static bool GradientHasWideGamutStop(const std::vector<ColorStop*>& stops) {
@@ -224,14 +223,15 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
     }
     if (style->nodeType() == NodeType::BackgroundBlurStyle) {
       auto* bg = static_cast<const BackgroundBlurStyle*>(style);
+      // Zero-radius BackgroundBlur is a true no-op, so only flag when blur is non-zero.
       if (bg->blurX > 0 || bg->blurY > 0) {
-        out.hasBackgroundBlur = true;
+        out.hasBackdropStyle = true;
       }
     } else if (style->nodeType() == NodeType::GlassStyle) {
-      // Unlike BackgroundBlurStyle (a true no-op at zero radius), a GlassStyle always
-      // composites the backdrop through the layer's shape (frost / refraction / chromatic
-      // dispersion / edge lighting) as soon as it is present, so flag it unconditionally.
-      out.hasGlassStyle = true;
+      // Unlike BackgroundBlurStyle, a GlassStyle always composites the backdrop through the
+      // layer's shape (frost / refraction / chromatic dispersion / edge lighting) as soon as
+      // it is present, so flag it unconditionally.
+      out.hasBackdropStyle = true;
     }
   }
 

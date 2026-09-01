@@ -204,26 +204,26 @@ interface RiskPathConfig {
 }
 
 const BASE_RISK_PATHS: Record<string, RiskPathConfig> = {
-  A_bg_x_uncacheable: { yellow: 2000, red: 4000 },
+  A_backdrop_x_uncacheable: { yellow: 2000, red: 4000 },
   B_path_data_MB: { yellow: 3, red: 25 },
   C_canvas_x_density: { yellow: 1500, red: 5000 },
-  bg_blur_count: { yellow: 200, red: 400 },
+  backdrop_style_count: { yellow: 200, red: 400 },
   layer_xml: { yellow: 15000, red: 30000 },
 };
 
 const LOCAL_RISK_PATHS = {
-  bgBlurAreaRadius: { yellow: 25, red: 120 },
+  backdropAreaRadius: { yellow: 25, red: 120 },
   imageLoadMP: { yellow: 80, red: 220 },
   imageRuntimeRisk: { yellow: 45, red: 95 },
 };
-const NEUTRAL_SDK_BG_UNCACHEABLE_RISK = BASE_RISK_PATHS.A_bg_x_uncacheable;
+const NEUTRAL_SDK_BG_UNCACHEABLE_RISK = BASE_RISK_PATHS.A_backdrop_x_uncacheable;
 const BARELY_USABLE_SCORE = 50;
 const NEUTRAL_SDK_GREEN_SCORE = 75;
-const SMALL_AREA_BLUR_RISK = 25;
+const SMALL_AREA_BACKDROP_RISK = 25;
 const LARGE_DOWNSCALE_RATIO = 16;
 
 interface LocalRiskRaw {
-  bgBlurAreaRadius: number;
+  backdropAreaRadius: number;
   imageDecodeMP: number;
   imageDownscaleMP: number;
   sdkBgUncacheableRisk: number;
@@ -241,7 +241,7 @@ interface ImageRiskState {
 
 interface LayerScanState {
   maxShapeArea: number;
-  bgBlurRadii: number[];
+  backdropStyleRadii: number[];
 }
 
 /**
@@ -656,7 +656,7 @@ function scanLocalRisk(root: XmlNode): LocalRiskRaw {
   const docWidth = readNumericAttr(root.attribs, 'width');
   const docHeight = readNumericAttr(root.attribs, 'height');
   const raw: LocalRiskRaw = {
-    bgBlurAreaRadius: 0,
+    backdropAreaRadius: 0,
     imageDecodeMP: 0,
     imageDownscaleMP: 0,
     sdkBgUncacheableRisk: 0,
@@ -671,7 +671,7 @@ function scanLocalRisk(root: XmlNode): LocalRiskRaw {
     downscaleOriginalPixels: new Map<string, number>(),
     patternIndex: 0,
   };
-  let bgBlurCount = 0;
+  let backdropStyleCount = 0;
   let innerShadowCount = 0;
   let blurFilterCount = 0;
   let gradientCount = 0;
@@ -680,7 +680,7 @@ function scanLocalRisk(root: XmlNode): LocalRiskRaw {
     let layerState: LayerScanState | null = null;
     if (node.tag === 'Layer') {
       raw.layerCount += 1;
-      layerState = { maxShapeArea: 0, bgBlurRadii: [] };
+      layerState = { maxShapeArea: 0, backdropStyleRadii: [] };
       layerStack.push(layerState);
     }
 
@@ -691,12 +691,21 @@ function scanLocalRisk(root: XmlNode): LocalRiskRaw {
       if (currentLayer && area > currentLayer.maxShapeArea) currentLayer.maxShapeArea = area;
     }
     if (node.tag === 'BackgroundBlurStyle') {
-      bgBlurCount += 1;
+      backdropStyleCount += 1;
       const currentLayer = currentLayerState(layerStack);
       if (currentLayer) {
-        currentLayer.bgBlurRadii.push(
+        currentLayer.backdropStyleRadii.push(
           Math.max(readNumericAttr(node.attribs, 'blurX'), readNumericAttr(node.attribs, 'blurY'), 0),
         );
+      }
+    }
+    // GlassStyle is a backdrop-sampling style with the same background snapshot cost
+    // as BackgroundBlurStyle; frost is the blur-equivalent parameter for radii tracking.
+    if (node.tag === 'GlassStyle') {
+      backdropStyleCount += 1;
+      const currentLayer = currentLayerState(layerStack);
+      if (currentLayer) {
+        currentLayer.backdropStyleRadii.push(readNumericAttr(node.attribs, 'frost'));
       }
     }
     if (node.tag === 'InnerShadowStyle') {
@@ -713,7 +722,7 @@ function scanLocalRisk(root: XmlNode): LocalRiskRaw {
 
     if (node.tag === 'Layer' && layerState) {
       const areaMP = layerState.maxShapeArea / 1_000_000;
-      for (const radius of layerState.bgBlurRadii) raw.bgBlurAreaRadius += areaMP * radius;
+      for (const radius of layerState.backdropStyleRadii) raw.backdropAreaRadius += areaMP * radius;
       layerStack.pop();
       const parentLayer = currentLayerState(layerStack);
       if (parentLayer && layerState.maxShapeArea > parentLayer.maxShapeArea) {
@@ -727,14 +736,14 @@ function scanLocalRisk(root: XmlNode): LocalRiskRaw {
     .reduce((sum, pixels) => sum + pixels, 0) / 1_000_000;
   raw.imageDownscaleMP = Array.from(imageState.downscaleOriginalPixels.values())
     .reduce((sum, pixels) => sum + pixels, 0) / 1_000_000;
-  raw.sdkBgUncacheableRisk = bgBlurCount * (innerShadowCount + blurFilterCount + gradientCount / 10);
+  raw.sdkBgUncacheableRisk = backdropStyleCount * (innerShadowCount + blurFilterCount + gradientCount / 10);
   return raw;
 }
 
-function scoreBgBlurAreaRadius(value: number): number {
+function scoreBackdropAreaRadius(value: number): number {
   if (value <= 0) return 100;
   return Math.max(
-    normalize(value, LOCAL_RISK_PATHS.bgBlurAreaRadius.yellow, LOCAL_RISK_PATHS.bgBlurAreaRadius.red),
+    normalize(value, LOCAL_RISK_PATHS.backdropAreaRadius.yellow, LOCAL_RISK_PATHS.backdropAreaRadius.red),
     BARELY_USABLE_SCORE,
   );
 }
@@ -744,14 +753,14 @@ function getImageRuntimeRisk(raw: LocalRiskRaw): number {
   if (effectiveDownscaleMP <= 0) return 0;
 
   const contentComplexity = raw.layerCount / 1500 + raw.textCount / 400 + raw.innerShadowCount / 10;
-  const bgBlurInteraction = raw.bgBlurAreaRadius > 0
-    && raw.bgBlurAreaRadius <= LOCAL_RISK_PATHS.bgBlurAreaRadius.red
-    ? (raw.bgBlurAreaRadius / 60) * contentComplexity
+  const backdropInteraction = raw.backdropAreaRadius > 0
+    && raw.backdropAreaRadius <= LOCAL_RISK_PATHS.backdropAreaRadius.red
+    ? (raw.backdropAreaRadius / 60) * contentComplexity
     : 0;
   const layoutInteraction = raw.imageDownscaleMP >= LOCAL_RISK_PATHS.imageLoadMP.yellow
     ? raw.layerCount / 6000 + raw.docMP / 100
     : 0;
-  return effectiveDownscaleMP * (bgBlurInteraction + layoutInteraction);
+  return effectiveDownscaleMP * (backdropInteraction + layoutInteraction);
 }
 
 function scoreImageLoadRisk(raw: LocalRiskRaw): number {
@@ -772,7 +781,7 @@ function scoreImageRuntimeRisk(raw: LocalRiskRaw): number {
 
 function scoreLocalRisk(raw: LocalRiskRaw): number {
   return Math.min(
-    scoreBgBlurAreaRadius(raw.bgBlurAreaRadius),
+    scoreBackdropAreaRadius(raw.backdropAreaRadius),
     scoreImageLoadRisk(raw),
     scoreImageRuntimeRisk(raw),
   );
@@ -787,10 +796,10 @@ function scoreNeutralSdkRisk(raw: LocalRiskRaw): number {
 }
 
 function protectDeviceSpread(baseScore: number, localScore: number, neutralScore: number, raw: LocalRiskRaw): number {
-  const isSmallAreaBlur = raw.bgBlurAreaRadius > 0 && raw.bgBlurAreaRadius <= SMALL_AREA_BLUR_RISK;
+  const isSmallAreaBackdrop = raw.backdropAreaRadius > 0 && raw.backdropAreaRadius <= SMALL_AREA_BACKDROP_RISK;
   if (baseScore < BARELY_USABLE_SCORE
       && localScore >= BARELY_USABLE_SCORE
-      && (neutralScore >= NEUTRAL_SDK_GREEN_SCORE || isSmallAreaBlur)) {
+      && (neutralScore >= NEUTRAL_SDK_GREEN_SCORE || isSmallAreaBackdrop)) {
     return BARELY_USABLE_SCORE;
   }
   return baseScore;
@@ -927,7 +936,13 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   const expandedTagCounts = countTagsWithExpansion(root);
 
   // Key metrics (use the expanded counts to reflect the real rendering cost).
-  const bgBlurCount = expandedTagCounts.get('BackgroundBlurStyle') || 0;
+  // Backdrop-sampling styles: BackgroundBlurStyle and GlassStyle both trigger the same
+  // background snapshot mechanism; GlassStyle runs the full glass shader (refraction /
+  // dispersion / frost / edge lighting) on the sampled background, so it is equally or
+  // more expensive per instance and must be counted alongside BackgroundBlurStyle.
+  const backdropStyleCount =
+    (expandedTagCounts.get('BackgroundBlurStyle') || 0) +
+    (expandedTagCounts.get('GlassStyle') || 0);
   const imagePattern = expandedTagCounts.get('ImagePattern') || 0;
   const innerShadowCount = expandedTagCounts.get('InnerShadowStyle') || 0;
   const blurFilterCount = expandedTagCounts.get('BlurFilter') || 0;
@@ -951,15 +966,15 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   // Compute the raw values of the five risk paths.
   const riskRaw: Record<string, number> = {
     // Path A: BgBlur × uncacheable elements (uses the expanded counts).
-    A_bg_x_uncacheable:
-      bgBlurCount * (innerShadowCount + blurFilterCount + gradientCount / 10),
+    A_backdrop_x_uncacheable:
+      backdropStyleCount * (innerShadowCount + blurFilterCount + gradientCount / 10),
     // Path B: Path data volume (uses the expanded counts).
     B_path_data_MB: pathDataBytes / (1024 * 1024),
     // Path C: canvas × element density (uses the expanded Layer count).
     C_canvas_x_density:
       (pixM / 100) * (imagePattern + expandedLayerCount / 30 + gradientCount / 20),
     // Path D: BgBlur count (uses the expanded counts).
-    bg_blur_count: bgBlurCount,
+    backdrop_style_count: backdropStyleCount,
     // Path E: Layer XML count (uses the raw XML count, consistent with the Python version).
     layer_xml: layerXml,
   };
@@ -972,8 +987,8 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
   }
 
   // Supplementary calibration from real-device business samples:
-  // - Large-area bgBlur bottoms out at 50 (openable but not recommended).
-  // - Image pressure only counts as a runtime FPS risk when combined with bgBlur / layers / text / canvas complexity.
+  // - Large-area backdrop styles bottoms out at 50 (openable but not recommended).
+  // - Image pressure only counts as a runtime FPS risk when combined with backdrop styles / layers / text / canvas complexity.
   // - Small-area but high-count blur is kept from being wrongly killed by the SDK A path.
   const localRiskRaw = scanLocalRisk(root);
   const localScore = scoreLocalRisk(localRiskRaw);

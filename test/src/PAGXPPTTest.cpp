@@ -4776,7 +4776,7 @@ PAGX_TEST(PAGXPPTTest, GlassStyleUsesBackdropRasterization) {
   doc->layers.push_back(glassLayer);
 
   auto features = pagx::ProbeLayerFeatures(glassLayer);
-  EXPECT_TRUE(features.hasGlassStyle);
+  EXPECT_TRUE(features.hasBackdropStyle);
   EXPECT_TRUE(features.needsRasterization(true));
   EXPECT_TRUE(features.requiresBackdrop(true));
   EXPECT_FALSE(features.needsRasterization(false));

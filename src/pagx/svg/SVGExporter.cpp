@@ -3265,9 +3265,9 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // diamond/conic gradient). If any trip AND rasterization is enabled, bake the whole layer to a
   // PNG so the visual result is preserved. The alternative (silently dropping unsupported
   // elements / degrading gradients to radial) is what the vector path below does.
-  // BackgroundBlurStyle and GlassStyle are intentionally excluded: SVG has no portable
-  // backdrop-blur / glass primitive, so the layer is kept as vector with the effect explicitly
-  // dropped (only the base content is emitted).
+  // Note: the SVG feature probe only covers layer->contents; layer styles (including
+  // BackgroundBlurStyle and GlassStyle, which SVG has no portable primitive for) are handled
+  // separately by the explicit skip in writeStyleList / writeFilterAndStyleDefs.
   if (_bakeUnsupported) {
     auto features = ProbeLayerFeaturesForSVG(layer);
     if (features.needsRasterization()) {
