@@ -1,4 +1,14 @@
 cmake_minimum_required(VERSION 3.13)
+
+# The iOS toolchain (third_party/vendor_tools/ios.toolchain.cmake) reads DEPLOYMENT_TARGET while
+# configuring the project and derives both the deployment target and the compiler target triple
+# from it. tgfx's Metal backend requires iOS 13 or later (MTLSharedEvent / MTLBinaryArchive), so
+# pre-set the minimum before configuration. This only applies to iOS builds; macOS keeps its own
+# default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
+if (PAG_USE_METAL AND NOT DEFINED DEPLOYMENT_TARGET AND PLATFORM MATCHES "^(OS|SIMULATOR)")
+    set(DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum iOS deployment target" FORCE)
+endif ()
+
 project(PAG)
 
 if (APPLE)
@@ -206,10 +216,9 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
         endif ()
     elseif (IOS)
-        # tgfx's Metal backend requires MTLSharedEvent / MTLBinaryArchive symbols introduced in
-        # iOS 13. Auto-raise the deployment target when Metal is selected; keep 9.0 for the GL
-        # backend so existing GL clients are unaffected. Callers wanting a different target can
-        # still pass -DDEPLOYMENT_TARGET=... explicitly to override this default.
+        # Default deployment target for the non-toolchain path (e.g. -DCMAKE_SYSTEM_NAME=iOS);
+        # the toolchain path is handled before project() above. tgfx's Metal backend needs iOS 13
+        # (MTLSharedEvent / MTLBinaryArchive), so raise the default for Metal and keep 9.0 for GL.
         if (PAG_USE_METAL)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
         else ()
