@@ -71,6 +71,11 @@
 #endif
 
 - (void)initPAG {
+#if defined(TGFX_USE_METAL)
+  // NSView is not layer-backed by default; enable it so makeBackingLayer creates the CAMetalLayer
+  // and self.layer returns a valid CAMetalLayer to render into.
+  self.wantsLayer = YES;
+#endif
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
