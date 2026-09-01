@@ -36,4 +36,16 @@
 ./gen_ios -DPAG_USE_WEBP_ENCODE=ON
 ```
 
+### 选择 Metal 后端
+
+默认情况下生成的项目使用 OpenGL 后端。如需改用 Metal 后端，传入 `-DPAG_USE_METAL=ON`：
+
+```
+./gen_ios -DPAG_USE_METAL=ON
+./gen_simulator -DPAG_USE_METAL=ON
+```
+
+Metal 后端要求 iOS 13 及以上版本，且仅支持 arm64 架构。选择 Metal 时部署目标会自动提升到 13.0，
+无需额外参数。因此模拟器构建仅支持 Apple Silicon 设备。
+
 最后，启动 XCode 并打开 ios/PAGViewer.xcworkspace 即可。
