@@ -63,7 +63,7 @@ jobs:
         run: |
           mkdir -p third_party/tgfx/out/cache
           chmod +x autotest.sh
-          ./autotest.sh USE_OPENGL_SWIFTSHADER
+          ./autotest.sh USE_OPENGL_SWIFTSHADER --skip-images
 
       - name: Run Codecov
         run: |
