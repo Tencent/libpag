@@ -81,9 +81,13 @@ class HTMLStyleCascade {
 
   /** Computes the inherited style for `element` based on `parent`. Mirrors the CSS cascade for
    *  text-related properties and pre-resolves the numeric forms (font-size, letter-spacing,
-   *  resolved text colour) so text-leaf conversion can read them without re-parsing. */
+   *  resolved text colour) so text-leaf conversion can read them without re-parsing.
+   *  When `recordFontFallbacks` is false, font-family chains discovered at this element are
+   *  not forwarded to the fallback sink — used for data-pagx-text hosts whose CSS font-family
+   *  is a synthetic pagx-font-* name that must not enter FontConfig fallbacks. */
   HTMLInheritedStyle resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
-                                           const HTMLInheritedStyle& parent);
+                                           const HTMLInheritedStyle& parent,
+                                           bool recordFontFallbacks = true);
 
   /** Resolves the box-model attributes from the element's resolved style (sizing, positioning,
    *  layout, visuals, transform). */

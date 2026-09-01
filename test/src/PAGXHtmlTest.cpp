@@ -27,8 +27,11 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/Woff2FontGenerator.h"
 #include "tgfx/core/ImageCodec.h"
@@ -830,7 +833,10 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
   EXPECT_NE(html.find("@font-face"), std::string::npos);
   EXPECT_NE(html.find("pagx-font-"), std::string::npos);
   EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
-  EXPECT_EQ(html.find("搜索"), std::string::npos);
+  // The original text is carried only by the round-trip metadata attribute, never as DOM text
+  // (the rendered span content stays the PUA glyph characters).
+  EXPECT_NE(html.find("data-pagx-text=\"搜索\""), std::string::npos);
+  EXPECT_EQ(html.find(">搜索"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseTheirOwnEmbeddedFonts) {
@@ -871,7 +877,9 @@ CLI_TEST(PAGXHtmlTest, SingleAutoSizeGlyphRunTextKeepsGlyphPosition) {
       options);
   ASSERT_FALSE(html.empty());
   EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
-  EXPECT_EQ(html.find("智能模式"), std::string::npos);
+  // Original text only inside the round-trip metadata attribute, never as DOM text.
+  EXPECT_NE(html.find("data-pagx-text=\"智能模式\""), std::string::npos);
+  EXPECT_EQ(html.find(">智能模式"), std::string::npos);
   EXPECT_NE(html.find("top:2px"), std::string::npos);
   EXPECT_NE(html.find("line-height:1"), std::string::npos);
   EXPECT_EQ(html.find("justify-content:center"), std::string::npos);
@@ -1664,6 +1672,645 @@ CLI_TEST(PAGXHtmlTest, HtmlScreenshotCompare) {
 
     EXPECT_TRUE(Baseline::Compare(pixmap, "PAGXTest/html/" + entry.baseName)) << entry.baseName;
   }
+}
+
+//==============================================================================
+// PAGX text round-trip (data-pagx-* metadata) tests
+//==============================================================================
+
+namespace {
+
+// Minimal embedded vector font (two glyphs) shared by the round-trip fixtures. HTMLExporter's
+// WOFF2 pre-pass picks it up, which routes Text nodes referencing it through the PUA emission
+// paths that carry the data-pagx-* metadata.
+const char* RoundTripFontResources() {
+  return "<Resources><Font id=\"rtFont\" unitsPerEm=\"1000\">"
+         "<Glyph advance=\"500\" path=\"M0 0L500 0L500 700L0 700Z\"/>"
+         "<Glyph advance=\"500\" path=\"M0 0L500 0L250 700Z\"/>"
+         "</Font></Resources>";
+}
+
+void CollectTextsFromElement(pagx::Element* element, std::vector<pagx::Text*>* out) {
+  if (element == nullptr) {
+    return;
+  }
+  auto type = element->nodeType();
+  if (type == pagx::NodeType::Text) {
+    out->push_back(static_cast<pagx::Text*>(element));
+  } else if (type == pagx::NodeType::Group) {
+    for (auto* child : static_cast<pagx::Group*>(element)->elements) {
+      CollectTextsFromElement(child, out);
+    }
+  } else if (type == pagx::NodeType::TextBox) {
+    for (auto* child : static_cast<pagx::TextBox*>(element)->elements) {
+      CollectTextsFromElement(child, out);
+    }
+  }
+}
+
+void CollectTextsFromLayer(pagx::Layer* layer, std::vector<pagx::Text*>* out) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto* element : layer->contents) {
+    CollectTextsFromElement(element, out);
+  }
+  for (auto* child : layer->children) {
+    CollectTextsFromLayer(child, out);
+  }
+}
+
+std::vector<pagx::Text*> CollectAllTexts(const std::shared_ptr<pagx::PAGXDocument>& doc) {
+  std::vector<pagx::Text*> texts;
+  if (doc == nullptr) {
+    return texts;
+  }
+  for (auto* layer : doc->layers) {
+    CollectTextsFromLayer(layer, &texts);
+  }
+  return texts;
+}
+
+// Exports the XML fixture to an HTML fragment and re-imports it as a full document.
+// htmlOut (optional) receives the exported fragment for further manipulation.
+std::shared_ptr<pagx::PAGXDocument> RoundTripXmlToPAGX(
+    const std::string& xml, std::string* htmlOut = nullptr,
+    const pagx::HTMLImporter::Options& options = {}) {
+  pagx::HTMLExportOptions exportOptions;
+  exportOptions.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, exportOptions);
+  if (htmlOut != nullptr) {
+    *htmlOut = html;
+  }
+  if (html.empty()) {
+    return nullptr;
+  }
+  auto wrapped = "<html><body style=\"width:200px;height:200px\">" + html + "</body></html>";
+  return pagx::HTMLImporter::ParseString(wrapped, options);
+}
+
+// Removes every data-pagx-* attribute (name + ="value") from the HTML, simulating an editor
+// that strips the round-trip metadata. Attribute values never contain a raw '"' (EscapeAttr
+// escapes it), so the open/close quote pair around each value is unambiguous.
+std::string StripPagxDataAttributes(const std::string& html) {
+  std::string out;
+  size_t pos = 0;
+  const std::string marker = " data-pagx-";
+  while (true) {
+    auto found = html.find(marker, pos);
+    if (found == std::string::npos) {
+      out += html.substr(pos);
+      break;
+    }
+    out += html.substr(pos, found - pos);
+    auto quoteOpen = html.find('"', found + marker.size());
+    if (quoteOpen == std::string::npos) {
+      // Malformed tail: keep the rest verbatim and stop.
+      out += html.substr(found);
+      break;
+    }
+    auto quoteClose = html.find('"', quoteOpen + 1);
+    if (quoteClose == std::string::npos) {
+      out += html.substr(found);
+      break;
+    }
+    pos = quoteClose + 1;
+  }
+  return out;
+}
+
+}  // namespace
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripPreservesText) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Line1&#10;Line2\" fontFamily=\"CustomFont\" fontStyle=\"Bold\" fontSize=\"16\" "
+      "letterSpacing=\"2.5\" fauxBold=\"true\" fauxItalic=\"true\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2,1\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  auto* text = texts[0];
+  EXPECT_EQ(text->text, "Line1\nLine2");
+  EXPECT_EQ(text->fontFamily, "CustomFont");
+  EXPECT_EQ(text->fontStyle, "Bold");
+  EXPECT_FLOAT_EQ(text->letterSpacing, 2.5f);
+  EXPECT_TRUE(text->fauxBold);
+  EXPECT_TRUE(text->fauxItalic);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripPerGlyphPositioning) {
+  // Known-value assertions (hand-computed, not derived from the generated HTML):
+  // an unconstrained Text has renderPosition() == position, so the exported container div
+  // lands at (20, 30) and the first glyph span (run.x + positions[0] = 10, run.y - fontSize
+  // = 24 - 16 = 8) at (10, 8) relative to it. The restored Layer must therefore sit at
+  // left = 20 + 10 = 30, top = 30 + 8 = 38.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"AB\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\" x=\"10\" y=\"24\" "
+      "positions=\"0,0;16,0\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+
+  // Anchor the assumption independently on the source document (layout must run before
+  // renderPosition() is meaningful).
+  auto sourceDoc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(sourceDoc, nullptr);
+  sourceDoc->applyLayout();
+  auto sourceTexts = CollectAllTexts(sourceDoc);
+  ASSERT_EQ(sourceTexts.size(), 1u);
+  auto renderPos = sourceTexts[0]->renderPosition();
+  EXPECT_FLOAT_EQ(renderPos.x, 20.0f);
+  EXPECT_FLOAT_EQ(renderPos.y, 30.0f);
+
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "AB");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+
+  // Locate the layer that hosts the restored Text and check its absolute position.
+  auto* text = texts[0];
+  pagx::Layer* textLayer = nullptr;
+  std::vector<pagx::Layer*> stack = {};
+  for (auto* layer : doc->layers) {
+    stack.push_back(layer);
+  }
+  while (!stack.empty() && textLayer == nullptr) {
+    auto* layer = stack.back();
+    stack.pop_back();
+    for (auto* element : layer->contents) {
+      if (element == text) {
+        textLayer = layer;
+        break;
+      }
+    }
+    for (auto* child : layer->children) {
+      stack.push_back(child);
+    }
+  }
+  ASSERT_NE(textLayer, nullptr);
+  ASSERT_FALSE(std::isnan(textLayer->left));
+  ASSERT_FALSE(std::isnan(textLayer->top));
+  EXPECT_FLOAT_EQ(textLayer->left, 30.0f);
+  EXPECT_FLOAT_EQ(textLayer->top, 38.0f);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripMultiRun) {
+  // Two runs of the same font at different sizes merge back into a single semantic Text; the
+  // style (font size) comes from the first run that actually emitted glyphs.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"ABC\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"10,20\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\"/>"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"20\" glyphs=\"1\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "ABC");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+  EXPECT_FLOAT_EQ(texts[0]->fontSize, 16.0f);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2TextInsideTextBoxPreservesTextSemantics) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<TextBox left=\"0\" right=\"0\" height=\"40\" textAlign=\"center\">"
+      "<Text text=\"In Box\" fontFamily=\"CustomFont\" fontStyle=\"Italic\" fontSize=\"16\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1\"/>"
+      "</Text>"
+      "<Fill color=\"#000000\"/>"
+      "</TextBox>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "In Box");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+  EXPECT_EQ(texts[0]->fontStyle, "Italic");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2TextModifierPreservesTextSemantics) {
+  // TextModifier per-character animation is not part of the semantic round trip; the restore
+  // path must still recover a plain Text with the original content and font semantics.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"MOD\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1\"/>"
+      "</Text>"
+      "<TextModifier position=\"8,0\" fillColor=\"#EC4899\">"
+      "<RangeSelector start=\"0\" end=\"0.5\" offset=\"0.3\" shape=\"triangle\"/>"
+      "</TextModifier>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "MOD");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2TextPathPreservesTextSemantics) {
+  // TextPath curve-following layout is not part of the semantic round trip; the restore path
+  // must still recover a plain Text with the original content and font semantics.
+  std::string xml =
+      "<pagx width=\"400\" height=\"100\"><Resources><Font id=\"rtFont\" unitsPerEm=\"1000\">"
+      "<Glyph advance=\"500\" path=\"M0 0L500 0L500 700L0 700Z\"/>"
+      "<Glyph advance=\"500\" path=\"M0 0L500 0L250 700Z\"/>"
+      "</Font>"
+      "<PathData id=\"wavePath\" data=\"M 0,40 C 60,0 120,80 180,40 C 240,0 300,80 360,40\"/>"
+      "</Resources>"
+      "<Layer width=\"400\" height=\"100\">"
+      "<Text text=\"AB\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"10,60\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\"/>"
+      "</Text>"
+      "<TextPath path=\"@wavePath\" perpendicular=\"true\" forceAlignment=\"true\"/>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "AB");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripEmptySemantics) {
+  // Case 1: empty fontFamily / fontStyle must round-trip as empty, not as the synthetic
+  // pagx-font-f0 family or the "Regular" default.
+  std::string xmlWithEmpty = "<pagx width=\"200\" height=\"100\">" +
+                             std::string(RoundTripFontResources()) +
+                             "<Layer width=\"200\" height=\"100\">"
+                             "<Text text=\"X\" fontSize=\"16\" position=\"20,30\">"
+                             "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1\"/>"
+                             "</Text>"
+                             "<Fill color=\"#3B82F6\"/>"
+                             "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xmlWithEmpty);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "X");
+  EXPECT_EQ(texts[0]->fontFamily, "");
+  EXPECT_EQ(texts[0]->fontStyle, "");
+
+  // Case 2: an empty original text (glyph runs without text) restores to no text content —
+  // no PUA characters may leak into the document.
+  std::string xmlEmptyText = "<pagx width=\"200\" height=\"100\">" +
+                             std::string(RoundTripFontResources()) +
+                             "<Layer width=\"200\" height=\"100\">"
+                             "<Text fontSize=\"16\" position=\"20,30\">"
+                             "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\"/>"
+                             "</Text>"
+                             "<Fill color=\"#3B82F6\"/>"
+                             "</Layer></pagx>";
+  auto doc2 = RoundTripXmlToPAGX(xmlEmptyText);
+  ASSERT_NE(doc2, nullptr);
+  for (auto* text : CollectAllTexts(doc2)) {
+    for (char c : text->text) {
+      auto code = static_cast<unsigned char>(c);
+      ASSERT_LT(code, 0xEEu) << "PUA character leaked into restored text: " << text->text;
+    }
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripNewlineAndEscapeEncoding) {
+  // Newlines / tabs ride through attribute numeric character references; a literal "&#10;"
+  // in the source text must stay distinct from a real newline (its '&' is escaped).
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"A&#10;B&#9;C&amp;#10;D&quot;E\\F\" fontFamily=\"CustomFont\" fontSize=\"16\" "
+      "position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2,1,2,1,2,1\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "A\nB\tC&#10;D\"E\\F");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripLetterSpacingPrecision) {
+  // Non-integer and negative letter spacing survive the %.9g round trip at full float
+  // precision (CssFloatToString's 4 fraction digits would not).
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"AB\" fontFamily=\"CustomFont\" fontSize=\"16\" letterSpacing=\"0.35\" "
+      "position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer>"
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"CD\" fontFamily=\"CustomFont\" fontSize=\"16\" letterSpacing=\"-1.25\" "
+      "position=\"20,60\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 2u);
+  EXPECT_FLOAT_EQ(texts[0]->letterSpacing, 0.35f);
+  EXPECT_FLOAT_EQ(texts[1]->letterSpacing, -1.25f);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2MetadataStaysOutOfCustomData) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Meta\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  std::string html;
+  auto doc = RoundTripXmlToPAGX(xml, &html);
+  ASSERT_NE(doc, nullptr);
+
+  // The exporter must still emit the document-level marker, and it must survive into
+  // customData on the root layer.
+  EXPECT_NE(html.find("data-pagx-version=\"1.0\""), std::string::npos);
+
+  std::vector<pagx::Layer*> stack = {};
+  for (auto* layer : doc->layers) {
+    stack.push_back(layer);
+  }
+  bool sawPagxVersion = false;
+  while (!stack.empty()) {
+    auto* layer = stack.back();
+    stack.pop_back();
+    for (auto* child : layer->children) {
+      stack.push_back(child);
+    }
+    for (const auto& entry : layer->customData) {
+      EXPECT_EQ(entry.first.find("pagx-text"), std::string::npos)
+          << "round-trip protocol key leaked into customData: " << entry.first;
+      EXPECT_EQ(entry.first.find("pagx-font-family"), std::string::npos)
+          << "round-trip protocol key leaked into customData: " << entry.first;
+      EXPECT_EQ(entry.first.find("pagx-faux"), std::string::npos)
+          << "round-trip protocol key leaked into customData: " << entry.first;
+      if (entry.first == "pagx-version") {
+        sawPagxVersion = true;
+      }
+    }
+  }
+  EXPECT_TRUE(sawPagxVersion) << "data-pagx-version must still be forwarded to customData";
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2DuplicatedTextGroupProducesTwoTexts) {
+  // Duplicating the whole host span (as an AI editor might) must produce two restored texts,
+  // not be de-duplicated away.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Dup\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  std::string html;
+  auto doc = RoundTripXmlToPAGX(xml, &html);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(CollectAllTexts(doc).size(), 1u);
+
+  auto hostMarker = html.find("data-pagx-text=");
+  ASSERT_NE(hostMarker, std::string::npos);
+  auto tagStart = html.rfind('<', hostMarker);
+  auto spanEnd = html.find("</span>", hostMarker);
+  ASSERT_NE(tagStart, std::string::npos);
+  ASSERT_NE(spanEnd, std::string::npos);
+  auto hostTag = html.substr(tagStart, spanEnd + 7 - tagStart);
+
+  auto duplicated = html + hostTag;
+  auto wrapped = "<html><body style=\"width:200px;height:200px\">" + duplicated + "</body></html>";
+  auto doc2 = pagx::HTMLImporter::ParseString(wrapped);
+  ASSERT_NE(doc2, nullptr);
+  auto texts = CollectAllTexts(doc2);
+  ASSERT_EQ(texts.size(), 2u);
+  for (auto* text : texts) {
+    EXPECT_EQ(text->text, "Dup");
+    EXPECT_EQ(text->fontFamily, "CustomFont");
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripWithExtractedStyleSheet) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Styled\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2,1\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+
+  pagx::HTMLExportOptions exportOptions;
+  exportOptions.extractStyleSheet = true;
+  auto html = LoadXMLAndConvert(xml, exportOptions);
+  ASSERT_FALSE(html.empty());
+  // The style extractor rewrites style/class attributes but must keep data-pagx-* verbatim.
+  EXPECT_NE(html.find("data-pagx-text=\"Styled\""), std::string::npos);
+
+  // The importer collects <style> rules from <head>; move the extracted block there.
+  auto styleStart = html.find("<style");
+  auto styleEnd = html.find("</style>");
+  ASSERT_NE(styleStart, std::string::npos);
+  ASSERT_NE(styleEnd, std::string::npos);
+  auto styleBlock = html.substr(styleStart, styleEnd + 8 - styleStart);
+  auto rest = html.substr(0, styleStart) + html.substr(styleEnd + 8);
+  auto wrapped = "<html><head>" + styleBlock + "</head><body style=\"width:200px;height:200px\">" +
+                 rest + "</body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(wrapped);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "Styled");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripBothNormalizeModes) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Norm\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+
+  for (int i = 0; i < 2; i++) {
+    pagx::HTMLImporter::Options options;
+    options.autoNormalize = (i == 0);
+    auto doc = RoundTripXmlToPAGX(xml, nullptr, options);
+    ASSERT_NE(doc, nullptr) << "autoNormalize=" << (i == 0);
+    auto texts = CollectAllTexts(doc);
+    ASSERT_EQ(texts.size(), 1u) << "autoNormalize=" << (i == 0);
+    EXPECT_EQ(texts[0]->text, "Norm") << "autoNormalize=" << (i == 0);
+    EXPECT_EQ(texts[0]->fontFamily, "CustomFont") << "autoNormalize=" << (i == 0);
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2StrippedMetadataFallsBackToPlainHTMLImport) {
+  // Removing every data-pagx-* attribute leaves a plain HTML document: the import must not
+  // crash and behaves exactly like the pre-roundtrip feature (PUA glyphs imported as text).
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Plain\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  std::string html;
+  auto doc = RoundTripXmlToPAGX(xml, &html);
+  ASSERT_NE(doc, nullptr);
+
+  auto stripped = StripPagxDataAttributes(html);
+  EXPECT_EQ(stripped.find("data-pagx-"), std::string::npos);
+  auto wrapped = "<html><body style=\"width:200px;height:200px\">" + stripped + "</body></html>";
+  auto doc2 = pagx::HTMLImporter::ParseString(wrapped);
+  if (doc2 == nullptr) {
+    std::cout << "=== stripped round-trip HTML ===" << std::endl << wrapped << std::endl;
+  }
+  ASSERT_NE(doc2, nullptr);
+  EXPECT_FALSE(CollectAllTexts(doc2).empty());
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2MetadataDoesNotPolluteFontFallbacks) {
+  // The synthetic pagx-font-* family of a metadata host must NOT be registered as a FontConfig
+  // fallback, while a plain HTML span using a pagx-font-* name still registers normally
+  // (the availability thunk only treats a family as resolvable once it is registered).
+  const char* html =
+      "<html><body style=\"width:400px;height:100px\">"
+      "<span style=\"position:absolute;left:0;top:0;font-family:pagx-font-f0;line-height:1\" "
+      "data-pagx-text=\"A\" data-pagx-font-family=\"RealFont\" data-pagx-font-style=\"\" "
+      "data-pagx-faux-bold=\"0\" data-pagx-faux-italic=\"0\">A</span>"
+      "<span style=\"position:absolute;left:100px;top:0;"
+      "font-family:'ZZMissingTwo','pagx-font-f0'\">B</span>"
+      "</body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(html);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 2u);
+  EXPECT_EQ(texts[0]->text, "A");
+  EXPECT_EQ(texts[0]->fontFamily, "RealFont");
+  // If the host's synthetic family had leaked into the fallback registry, the availability
+  // thunk would pick pagx-font-f0 over the (unregistered, unavailable) ZZMissingTwo.
+  EXPECT_EQ(texts[1]->fontFamily, "ZZMissingTwo");
+
+  // A pagx-font-* family on a plain (non-metadata) span is unaffected by the metadata
+  // filtering: pre-register it on an external FontConfig and the availability thunk picks it
+  // over an unavailable leader, exactly as before. (Font families recorded during import are
+  // only flushed into FontConfig at the end of parseDOM, so same-document observation is not
+  // possible; the external registration exercises the same lookup path.)
+  const char* htmlPlain =
+      "<html><body style=\"width:400px;height:100px\">"
+      "<span style=\"position:absolute;left:100px;top:0;"
+      "font-family:'ZZMissingOne','pagx-font-custom'\">B</span>"
+      "</body></html>";
+  pagx::FontConfig fontConfig;
+  fontConfig.addFallbackFont(std::string(), 0, "pagx-font-custom", "Regular");
+  pagx::HTMLImporter::Options plainOptions;
+  plainOptions.fontConfig = &fontConfig;
+  auto doc2 = pagx::HTMLImporter::ParseString(htmlPlain, plainOptions);
+  ASSERT_NE(doc2, nullptr);
+  auto texts2 = CollectAllTexts(doc2);
+  ASSERT_EQ(texts2.size(), 1u);
+  EXPECT_EQ(texts2[0]->fontFamily, "pagx-font-custom");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RestoreProducesBareTextNotTextBox) {
+  // The WOFF2 span's `line-height:1` is a visual implementation detail; the restored subtree
+  // must be a bare <Text>+<Fill> pair, never a TextBox.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Bare\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+
+  // Walk up from the Text element: the owning layer's contents must be exactly Text + Fill.
+  auto* text = texts[0];
+  ASSERT_FALSE(doc->layers.empty());
+  pagx::Layer* host = nullptr;
+  std::vector<pagx::Layer*> stack = {};
+  for (auto* layer : doc->layers) {
+    stack.push_back(layer);
+  }
+  while (!stack.empty() && host == nullptr) {
+    auto* layer = stack.back();
+    stack.pop_back();
+    for (auto* element : layer->contents) {
+      if (element == text) {
+        host = layer;
+        break;
+      }
+    }
+    for (auto* child : layer->children) {
+      stack.push_back(child);
+    }
+  }
+  ASSERT_NE(host, nullptr);
+  ASSERT_EQ(host->contents.size(), 2u);
+  EXPECT_EQ(host->contents[0]->nodeType(), pagx::NodeType::Text);
+  EXPECT_EQ(host->contents[1]->nodeType(), pagx::NodeType::Fill);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2HostWinsWhenBothMarkersPresent) {
+  // An element carrying both markers (e.g. after sloppy editing) must be treated as a host —
+  // dropping it would silently lose the semantics it carries.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Both\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  std::string html;
+  auto doc = RoundTripXmlToPAGX(xml, &html);
+  ASSERT_NE(doc, nullptr);
+
+  auto hostMarker = html.find("data-pagx-text=\"Both\"");
+  ASSERT_NE(hostMarker, std::string::npos);
+  auto conflict = html;
+  conflict.insert(hostMarker, " data-pagx-text-part=\"1\" ");
+  auto wrapped = "<html><body style=\"width:200px;height:200px\">" + conflict + "</body></html>";
+  auto doc2 = pagx::HTMLImporter::ParseString(wrapped);
+  ASSERT_NE(doc2, nullptr);
+  auto texts = CollectAllTexts(doc2);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "Both");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
 }
 
 }  // namespace pag

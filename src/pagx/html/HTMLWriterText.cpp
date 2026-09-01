@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <random>
 #include <string>
@@ -54,6 +55,11 @@ using pag::FloatNearlyZero;
 //==============================================================================
 // Text helper statics
 //==============================================================================
+
+// PAGX round-trip metadata emitters (defined next to AppendUTF8 below; forward-declared here
+// because the TextModifier / TextPath branches call them earlier in the file).
+static void EmitPagxTextHostMetadata(HTMLBuilder& out, const Text* text);
+static void EmitPagxTextPartMarker(HTMLBuilder& out);
 
 // Decodes a single UTF-8 character from the byte stream.
 // Returns the number of bytes consumed, or 0 on error.
@@ -1080,6 +1086,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       }
       out.openTag("div");
       out.addAttr("style", containerStyle);
+      EmitPagxTextHostMetadata(out, text);
       out.closeTagStart();
 
       size_t glyphIdx = 0;
@@ -1191,6 +1198,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           AppendUTF8(puaChar, 0xE000 + (glyphId - 1));
           out.openTag("span");
           out.addAttr("style", charStyle);
+          EmitPagxTextPartMarker(out);
           out.closeTagWithText(puaChar);
           glyphIdx++;
         }
@@ -1654,6 +1662,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       }
       out.openTag("div");
       out.addAttr("style", containerStyle);
+      EmitPagxTextHostMetadata(out, text);
       out.closeTagStart();
 
       for (auto* run : text->glyphRuns) {
@@ -1732,6 +1741,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           AppendUTF8(puaChar, 0xE000 + glyphId - 1);
           out.openTag("span");
           out.addAttr("style", charStyle);
+          EmitPagxTextPartMarker(out);
           out.closeTagWithText(puaChar);
           currentArcPos += glyphAdvance + extraSpacing;
         }
@@ -2133,6 +2143,37 @@ static void AppendUTF8(std::string& out, uint32_t cp) {
   }
 }
 
+//==============================================================================
+// PAGX text round-trip metadata (data-pagx-*)
+//==============================================================================
+
+// Emits the semantic host metadata of a WOFF2/PUA text group. The HTML importer restores the
+// original Text semantics (text content, font family / style, letter spacing, faux styles)
+// from these attributes instead of the PUA glyph characters, which carry no readable text.
+// The semantic attributes are always emitted, including empty values, so "the original value
+// was empty" stays distinguishable from "this element is not marked".
+static void EmitPagxTextHostMetadata(HTMLBuilder& out, const Text* text) {
+  out.addAttrAllowEmpty("data-pagx-text", text->text);
+  out.addAttrAllowEmpty("data-pagx-font-family", text->fontFamily);
+  out.addAttrAllowEmpty("data-pagx-font-style", text->fontStyle);
+  // %.9g gives FLT_DECIMAL_DIG significant digits so the float survives the round trip
+  // exactly (CssFloatToString's 4 fraction digits would not). NaN / infinity are treated as
+  // the default and skipped so the importer never sees a non-finite literal.
+  if (std::isfinite(text->letterSpacing) && text->letterSpacing != 0.0f) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.9g", text->letterSpacing);
+    out.addAttr("data-pagx-letter-spacing", buf);
+  }
+  out.addAttr("data-pagx-faux-bold", text->fauxBold ? "1" : "0");
+  out.addAttr("data-pagx-faux-italic", text->fauxItalic ? "1" : "0");
+}
+
+// Marks a WOFF2/PUA element as a non-host member of a text group. The importer skips marked
+// elements entirely so their PUA characters never leak into the restored document.
+static void EmitPagxTextPartMarker(HTMLBuilder& out) {
+  out.addAttr("data-pagx-text-part", "1");
+}
+
 void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text,
                                                 const Fill* fill, const Stroke* stroke,
                                                 float alpha) {
@@ -2242,6 +2283,13 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
       }
       out.openTag("span");
       out.addAttr("style", style);
+      // The first span that actually emits glyphs carries the round-trip semantics; later
+      // runs of the same Text are marked as parts and skipped by the importer.
+      if (emittedGlyph) {
+        EmitPagxTextPartMarker(out);
+      } else {
+        EmitPagxTextHostMetadata(out, text);
+      }
       out.closeTagWithText(puaText);
       emittedGlyph = true;
     }
@@ -2301,6 +2349,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     }
     out.openTag("div");
     out.addAttr("style", containerStyle);
+    EmitPagxTextHostMetadata(out, text);
     out.closeTagStart();
 
     for (auto* run : text->glyphRuns) {
@@ -2492,6 +2541,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
         AppendUTF8(puaChar, 0xE000 + (glyphID - 1));
         out.openTag("span");
         out.addAttr("style", charStyle);
+        EmitPagxTextPartMarker(out);
         out.closeTagWithText(puaChar);
       }
     }
