@@ -20,6 +20,7 @@
 
 #include <multimedia/player_framework/native_avcapability.h>
 #include <multimedia/player_framework/native_avcodec_videodecoder.h>
+#include <atomic>
 #include <cstdint>
 #include <list>
 #include <queue>
@@ -48,6 +49,11 @@ class CodecUserData {
   std::mutex outputMutex;
   std::condition_variable outputCondition;
   std::queue<CodecBufferInfo> outputBufferInfoQueue;
+
+  // Set by the error callback when the codec enters an unrecoverable error state. The input and
+  // output waiters check it so they can bail out instead of blocking forever or using buffers
+  // that the codec service may have already released.
+  std::atomic<bool> codecError = {false};
 
   void clearQueue() {
     {
