@@ -1492,10 +1492,12 @@ void SVGWriter::writeFilterList(const std::vector<LayerFilter*>& filters, int& s
 }
 
 // LayerStyle emission mirrors the Filter pass so DropShadowStyle / InnerShadowStyle
-// share the feMerge aggregation logic. BackgroundBlurStyle is silently skipped because SVG has
-// no portable backdrop-blur primitive (the deprecated enable-background is not supported by
-// modern renderers). NoiseStyle emits its SVG primitives and adds the result name to
-// agg.aboveResults so it composites above the source in the final feMerge.
+// share the feMerge aggregation logic. BackgroundBlurStyle and GlassStyle are explicitly
+// skipped because SVG has no portable backdrop-blur / glass primitive (the deprecated
+// enable-background is not supported by modern renderers), so the layer keeps its base vector
+// content and only the unsupported backdrop effect is dropped. NoiseStyle emits its SVG
+// primitives and adds the result name to agg.aboveResults so it composites above the source in
+// the final feMerge.
 void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shadowIndex,
                                ShadowAggregate& agg) {
   int noiseStyleIndex = 0;
@@ -1548,6 +1550,12 @@ void SVGWriter::writeStyleList(const std::vector<LayerStyle*>& styles, int& shad
         agg.needSourceGraphic = true;
         break;
       }
+      case NodeType::GlassStyle:
+        // GlassStyle (frost / refraction / chromatic dispersion / edge lighting) samples and
+        // optically distorts the backdrop via GPU shaders; SVG has no portable equivalent.
+        // Skipped explicitly like BackgroundBlurStyle so the layer's base content still
+        // renders and no wrong approximation is emitted.
+        break;
       default:
         break;
     }
@@ -1606,12 +1614,14 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
     return {};
   }
 
-  // BackgroundBlurStyle is silently skipped (SVG has no portable backdrop-blur). Check whether
-  // any style will actually produce SVG filter primitives so we don't emit an empty <filter>
-  // element, which would make the layer invisible.
+  // BackgroundBlurStyle and GlassStyle are explicitly skipped (SVG has no portable
+  // backdrop-blur / glass primitive). Check whether any other style will actually produce SVG
+  // filter primitives so we don't emit an empty <filter> element, which would make the layer
+  // invisible.
   bool hasEffectiveStyle = false;
   for (const auto* style : styles) {
-    if (style->nodeType() != NodeType::BackgroundBlurStyle) {
+    if (style->nodeType() != NodeType::BackgroundBlurStyle &&
+        style->nodeType() != NodeType::GlassStyle) {
       hasEffectiveStyle = true;
       break;
     }
@@ -3255,8 +3265,9 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
   // diamond/conic gradient). If any trip AND rasterization is enabled, bake the whole layer to a
   // PNG so the visual result is preserved. The alternative (silently dropping unsupported
   // elements / degrading gradients to radial) is what the vector path below does.
-  // BackgroundBlurStyle is intentionally excluded: SVG has no portable backdrop-blur primitive,
-  // so the layer is kept as vector with the blur effect silently dropped.
+  // BackgroundBlurStyle and GlassStyle are intentionally excluded: SVG has no portable
+  // backdrop-blur / glass primitive, so the layer is kept as vector with the effect explicitly
+  // dropped (only the base content is emitted).
   if (_bakeUnsupported) {
     auto features = ProbeLayerFeaturesForSVG(layer);
     if (features.needsRasterization()) {

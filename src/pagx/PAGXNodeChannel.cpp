@@ -33,6 +33,7 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -745,6 +746,20 @@ static std::vector<ChannelDef> BuildBackgroundBlurStyleFields() {
   };
 }
 
+static std::vector<ChannelDef> BuildGlassStyleFields() {
+  return {
+      FIELD_ENUM(GlassStyle, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_BOOL(GlassStyle, "excludeChildEffects", excludeChildEffects, NoFlags),
+      FIELD_FLOAT(GlassStyle, "refraction", refraction, Anim),
+      FIELD_FLOAT(GlassStyle, "depth", depth, Anim),
+      FIELD_FLOAT(GlassStyle, "frost", frost, Anim),
+      FIELD_FLOAT(GlassStyle, "dispersion", dispersion, Anim),
+      FIELD_FLOAT(GlassStyle, "splay", splay, Anim),
+      FIELD_FLOAT(GlassStyle, "lightAngle", lightAngle, Anim),
+      FIELD_FLOAT(GlassStyle, "lightIntensity", lightIntensity, Anim),
+  };
+}
+
 static std::vector<ChannelDef> BuildBlurFilterFields() {
   return {
       FIELD_FLOAT(BlurFilter, "blurX", blurX, Anim),
@@ -893,6 +908,10 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
     }
     case NodeType::BackgroundBlurStyle: {
       static const std::vector<ChannelDef> table = BuildBackgroundBlurStyleFields();
+      return table;
+    }
+    case NodeType::GlassStyle: {
+      static const std::vector<ChannelDef> table = BuildGlassStyleFields();
       return table;
     }
     case NodeType::BlurFilter: {

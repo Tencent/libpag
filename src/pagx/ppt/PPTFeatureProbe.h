@@ -57,21 +57,29 @@ struct PPTFeatureFlags {
                                      // rounded corners, so it is not a valid stand-in). On the
                                      // vector path the style is silently dropped; only the
                                      // backdrop-aware raster fallback can reproduce it.
+  bool hasGlassStyle = false;        // GlassStyle is a shader-based glass effect (refraction,
+                                     // chromatic dispersion, frosted blur, edge lighting) that
+                                     // samples and optically distorts the backdrop behind the
+                                     // layer. OOXML has no primitive that can reproduce it and no
+                                     // approximate stand-in is worth emitting, so the layer must
+                                     // be baked via the backdrop-aware raster fallback to stay
+                                     // faithful. On the vector path the style is silently dropped.
 
   /**
    * Returns true when at least one unsupported feature is present and the exporter should fall
    * back to baking the layer to a PNG patch. Features with no meaningful vector fallback
    * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear transforms) always
    * trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported blend
-   * modes fall back to Normal, wide-gamut colors clamp to sRGB, background blur is dropped)
-   * trigger a bake only when the caller opts in via `bakeUnsupported`.
+   * modes fall back to Normal, wide-gamut colors clamp to sRGB, background blur and glass
+   * effects are dropped) trigger a bake only when the caller opts in via `bakeUnsupported`.
    */
   bool needsRasterization(bool bakeUnsupported) const {
     if (hasTextPath || hasTextModifier || hasColorMatrix || hasConicGradient ||
         hasDiamondGradient || hasShearTransform) {
       return true;
     }
-    if (bakeUnsupported && (hasUnsupportedBlend || hasWideGamutColor || hasBackgroundBlur)) {
+    if (bakeUnsupported &&
+        (hasUnsupportedBlend || hasWideGamutColor || hasBackgroundBlur || hasGlassStyle)) {
       return true;
     }
     return false;
@@ -79,11 +87,12 @@ struct PPTFeatureFlags {
 
   /**
    * Returns true when reproducing the unsupported feature requires compositing the layer against
-   * the real backdrop pixels (non-Normal blend mode, BackgroundBlurStyle). Self-contained features
-   * (TextPath, ColorMatrix, wide-gamut color, etc.) render fine against an empty canvas.
+   * the real backdrop pixels (non-Normal blend mode, BackgroundBlurStyle, GlassStyle).
+   * Self-contained features (TextPath, ColorMatrix, wide-gamut color, etc.) render fine against
+   * an empty canvas.
    */
   bool requiresBackdrop(bool bakeUnsupported) const {
-    return bakeUnsupported && (hasUnsupportedBlend || hasBackgroundBlur);
+    return bakeUnsupported && (hasUnsupportedBlend || hasBackgroundBlur || hasGlassStyle);
   }
 };
 

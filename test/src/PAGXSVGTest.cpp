@@ -41,6 +41,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -1236,6 +1237,31 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DropShadowStyle) {
   EXPECT_NE(svg.find("<feOffset"), std::string::npos);
   EXPECT_NE(svg.find("<feMerge"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_dropshadow_style.svg");
+}
+
+/**
+ * GlassStyle has no faithful SVG representation. The base vector content remains visible and no
+ * empty filter is emitted.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_GlassStylePreservesBaseContent) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.4f, 0.8f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->styles.push_back(doc->makeNode<pagx::GlassStyle>());
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<rect"), std::string::npos);
+  EXPECT_EQ(svg.find("<filter"), std::string::npos);
+  EXPECT_EQ(svg.find("GlassStyle"), std::string::npos);
 }
 
 /**

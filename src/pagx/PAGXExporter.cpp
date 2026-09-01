@@ -39,6 +39,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -1267,6 +1268,27 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->tileMode != Default<BackgroundBlurStyle>().tileMode) {
         xml.addAttribute("tileMode", TileModeToString(style->tileMode));
       }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::GlassStyle: {
+      auto style = static_cast<const GlassStyle*>(node);
+      xml.openElement("GlassStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<GlassStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<GlassStyle>().excludeChildEffects);
+      xml.addAttribute("refraction", style->refraction, Default<GlassStyle>().refraction);
+      xml.addAttribute("depth", style->depth, Default<GlassStyle>().depth);
+      xml.addAttribute("frost", style->frost, Default<GlassStyle>().frost);
+      xml.addAttribute("dispersion", style->dispersion, Default<GlassStyle>().dispersion);
+      xml.addAttribute("splay", style->splay, Default<GlassStyle>().splay);
+      xml.addAttribute("lightAngle", style->lightAngle, Default<GlassStyle>().lightAngle);
+      xml.addAttribute("lightIntensity", style->lightIntensity,
+                       Default<GlassStyle>().lightIntensity);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

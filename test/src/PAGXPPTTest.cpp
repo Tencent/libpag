@@ -42,6 +42,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -66,6 +67,7 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/ppt/PPTBoilerplate.h"
+#include "pagx/ppt/PPTFeatureProbe.h"
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/utils/TextUtils.h"
@@ -4751,6 +4753,42 @@ PAGX_TEST(PAGXPPTTest, BackgroundBlurStyleEmitted) {
 
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "bg_blur_style"));
+}
+
+PAGX_TEST(PAGXPPTTest, GlassStyleUsesBackdropRasterization) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* background = doc->makeNode<pagx::Layer>();
+  auto* backgroundRect = doc->makeNode<pagx::Rectangle>();
+  backgroundRect->position = {200, 150};
+  backgroundRect->size = {400, 300};
+  background->contents.push_back(backgroundRect);
+  background->contents.push_back(MakeSolidFill(doc.get(), {0.2f, 0.4f, 0.8f, 1.0f}));
+  doc->layers.push_back(background);
+
+  auto* glassLayer = doc->makeNode<pagx::Layer>();
+  auto* glassRect = doc->makeNode<pagx::Rectangle>();
+  glassRect->position = {200, 150};
+  glassRect->size = {180, 120};
+  glassRect->roundness = 24;
+  glassLayer->contents.push_back(glassRect);
+  glassLayer->contents.push_back(MakeSolidFill(doc.get(), {1.0f, 1.0f, 1.0f, 0.35f}));
+  glassLayer->styles.push_back(doc->makeNode<pagx::GlassStyle>());
+  doc->layers.push_back(glassLayer);
+
+  auto features = pagx::ProbeLayerFeatures(glassLayer);
+  EXPECT_TRUE(features.hasGlassStyle);
+  EXPECT_TRUE(features.needsRasterization(true));
+  EXPECT_TRUE(features.requiresBackdrop(true));
+  EXPECT_FALSE(features.needsRasterization(false));
+  EXPECT_FALSE(features.requiresBackdrop(false));
+
+  pagx::PPTExportOptions options;
+  options.bakeUnsupported = true;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/media/image1.png"), std::string::npos);
+  ASSERT_TRUE(ExportAndVerify(*doc, "glass_style_with_backdrop", options));
 }
 
 PAGX_TEST(PAGXPPTTest, MultipleShadowStylesAndFilters) {
