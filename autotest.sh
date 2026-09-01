@@ -24,14 +24,26 @@ WORKSPACE=$(pwd)
 
 cd $WORKSPACE
 
-./update_baseline.sh "${1:-""}"
+# Parse arguments the same way update_baseline.sh does, so the backend keyword and the
+# --skip-images flag can appear in any order (e.g. `./autotest.sh --skip-images USE_METAL`).
+# Without this, the dispatch below would reject --skip-images as an unknown backend even though
+# update_baseline.sh (invoked next) handles it fine, leaving the user in a confusing state.
+BACKEND_ARG=""
+for arg in "$@"; do
+  case "$arg" in
+    --skip-images) ;;
+    *) BACKEND_ARG="$arg" ;;
+  esac
+done
+
+./update_baseline.sh "$@"
 if test $? -ne 0; then
    exit 1
 fi
 cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
 # Determine cmake args and target suffix from the requested backend keyword.
-case "$1" in
+case "$BACKEND_ARG" in
   USE_OPENGL_SWIFTSHADER)
     CMAKE_BACKEND_ARGS="-DPAG_USE_SWIFTSHADER=ON"
     TARGET_SUFFIX="OpenGL" ;;
@@ -48,7 +60,7 @@ case "$1" in
     CMAKE_BACKEND_ARGS=""
     TARGET_SUFFIX="OpenGL" ;;
   *)
-    echo "Error: unknown backend '$1'."
+    echo "Error: unknown backend '$BACKEND_ARG'."
     echo "Supported: USE_OPENGL (default), USE_OPENGL_SWIFTSHADER, USE_METAL, USE_VULKAN, USE_D3D12."
     exit 1 ;;
 esac

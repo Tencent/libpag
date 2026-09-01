@@ -80,7 +80,7 @@
   # Remove build artifacts before stash to avoid "already exists" conflicts on pop.
   rm -rf ${BUILD_DIR}
   STASH_LIST_BEFORE=$(git stash list)
-  git stash push --quiet
+  git stash push --include-untracked --quiet
   STASH_LIST_AFTER=$(git stash list)
   git switch main --quiet
 
