@@ -18,12 +18,22 @@
 
 #import "PAGView.h"
 
-#if defined(TGFX_USE_OPENGL)
+#include <mutex>
+
+#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
 
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+
+#if defined(TGFX_USE_OPENGL)
 #import "platform/ios/private/GPUDrawable.h"
+#endif
+
+#if defined(TGFX_USE_METAL)
+#import <Metal/Metal.h>
+#import <MetalKit/MetalKit.h>
+#endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGAnimatorListener>
 @end
@@ -60,13 +70,15 @@
                                                name:UIApplicationDidBecomeActiveNotification
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(applicationDidReceiveMemoryWarning:)
-                                               name:UIApplicationDidReceiveMemoryWarningNotification
-                                             object:nil];
+                                          selector:@selector(applicationDidReceiveMemoryWarning:)
+                                              name:UIApplicationDidReceiveMemoryWarningNotification
+                                            object:nil];
+#if defined(TGFX_USE_OPENGL)
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(AsyncSurfacePrepared:)
-                                               name:pag::AsyncSurfacePreparedNotification
-                                             object:self.layer];
+                                          selector:@selector(AsyncSurfacePrepared:)
+                                              name:pag::AsyncSurfacePreparedNotification
+                                            object:self.layer];
+#endif
 }
 
 - (void)dealloc {
@@ -86,7 +98,20 @@
 }
 
 + (Class)layerClass {
+#if defined(TGFX_USE_METAL)
+  return [CAMetalLayer class];
+#else
   return [CAEAGLLayer class];
+#endif
+}
+
+- (void)updateLayerDrawableSize {
+#if defined(TGFX_USE_METAL)
+  CAMetalLayer* layer = (CAMetalLayer*)[self layer];
+  CGSize size = self.bounds.size;
+  CGFloat scale = self.contentScaleFactor;
+  layer.drawableSize = CGSizeMake(size.width * scale, size.height * scale);
+#endif
 }
 
 - (void)setBounds:(CGRect)bounds {
@@ -94,6 +119,7 @@
   [super setBounds:bounds];
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
+    [self updateLayerDrawableSize];
     [pagSurface updateSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
       [animator update];
@@ -106,6 +132,7 @@
   [super setFrame:frame];
   if (pagSurface != nil &&
       (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
+    [self updateLayerDrawableSize];
     [pagSurface updateSize];
     if (oldRect.size.width == 0 || oldRect.size.height == 0) {
       [animator update];
@@ -117,6 +144,7 @@
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
   if (pagSurface != nil && oldScaleFactor != scaleFactor) {
+    [self updateLayerDrawableSize];
     [pagSurface updateSize];
   }
 }
@@ -153,8 +181,16 @@
 }
 
 - (void)initPAGSurface {
+#if defined(TGFX_USE_METAL)
+  CAMetalLayer* layer = (CAMetalLayer*)[self layer];
+  layer.device = MTLCreateSystemDefaultDevice();
+  layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+  layer.framebufferOnly = YES;
+  pagSurface = [[PAGSurface FromMetalLayer:layer] retain];
+#else
   CAEAGLLayer* layer = (CAEAGLLayer*)[self layer];
   pagSurface = [[PAGSurface FromLayer:layer] retain];
+#endif
   [pagPlayer setSurface:pagSurface];
   [animator update];
 }
@@ -440,9 +476,11 @@
   return CGRectNull;
 }
 
+#if defined(TGFX_USE_OPENGL)
 - (void)AsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
+#endif
 @end
 
-#endif  // TGFX_USE_OPENGL
+#endif  // TGFX_USE_OPENGL || TGFX_USE_METAL
