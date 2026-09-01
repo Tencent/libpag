@@ -735,7 +735,7 @@ src/platform/web/pagx/GPUDrawable.h                 # 平台窗口
 7. **[不适用] Windows 排除 GLRestorer 的历史原因**：与 Metal 无关。
 8. **[待完成] Metal/D3D12 多 GPU 场景**：默认走系统默认 device，用户主动选非默认 GPU 时需要 device 注入 API（见第 9 项）。
 9. **[待完成] device 注入 API（`SetSharedDevice` 或等价形态）本身**：随首个需要它的后端 PR 定稿其生命周期与线程安全语义。Metal 的多 GPU 场景同样依赖它，优先级低于 Vulkan/WebGPU。
-10. **[待完成] PAGView 的 Metal 版本**（本次遗漏、补录）：iOS/mac 的 `PAGView`（UIView/NSView 高层封装）当前整个被 `#if defined(TGFX_USE_OPENGL)` 门控，Metal 下缺失。用户需自行管理 CAMetalLayer / MTKView + `PAGAnimator` 动画循环。可复用 `[PAGSurface FromMetalLayer:]` / `[PAGSurface FromMTKView:]` + `PAGAnimator` 实现，是最影响开发者体验的缺口。
+10. **[完成] PAGView 的 Metal 版本**：iOS/mac 的 `PAGView`（UIView/NSView 高层封装）已支持 Metal 后端——复用 `[PAGSurface FromMetalLayer:]` + `PAGAnimator` 动画循环，`layerClass` / `makeBackingLayer` 按后端返回 `CAMetalLayer`，并在 `initPAGSurface` 显式设置 `drawableSize`（bounds × scale）与 Metal device 启动期重试。mac 端额外需 `wantsLayer = YES` 启用 layer backing。已通过 mac / iOS 模拟器 / iOS 真机三端验证（动画循环 + Retina 缩放 + 内容上屏）。
 
 ### 8.2 具体后端接入 PR 建议
 
@@ -743,7 +743,7 @@ src/platform/web/pagx/GPUDrawable.h                 # 平台窗口
 
 | 后端 | 工作量 | 关键改动 |
 |---|---|---|
-| Metal | 核心已完成，剩 PAGView Metal 版 + device 注入 | `Devices.cpp` Metal 分支 + `MetalGPUDrawable` + iOS/mac 平台 API 扩展（已完成）；PAGView Metal 版 + device 注入 API 待做（见 §8.1 第 8/9/10 项） |
+| Metal | 核心已完成，仅剩 device 注入（多 GPU，低优先级） | `Devices.cpp` Metal 分支 + `MetalGPUDrawable` + iOS/mac 平台 API 扩展 + PAGView Metal 版（均已完成）；device 注入 API 待做（见 §8.1 第 8/9 项） |
 | Vulkan | 大 | 引入 device 注入 API 并强制要求 + 各平台 Vulkan Drawable + `TGFXCast` VK 分支 |
 | D3D12 | 中 | `Devices.cpp` D3D12 分支 + Windows Drawable + `TGFXCast` D3D12 分支 |
 | WebGPU | 大 | 引入并强制 device 注入 API + Web 侧 API + 异步初始化处理 |
@@ -752,8 +752,9 @@ src/platform/web/pagx/GPUDrawable.h                 # 平台窗口
 
 | 待办 | 工作量 | 设计复杂度 | 优先级 | 建议 |
 |---|---|---|---|---|
-| PAGView Metal 版（§8.1 第 10 项） | 中 | 低 | **高** | 先做：改动集中（`layerClass` + `initPAGSurface` 两处 GL 依赖）、95% 代码复用、用户可感知价值最大 |
 | device 注入 API + 多 GPU（§8.1 第 8/9 项） | 中 | **高** | 低 | 延后：进程级全局状态 + 生命周期 + 线程安全语义需精确定稿，且仅多 GPU 边缘场景需要；建议随 Vulkan/WebGPU 一起定稿，避免单独为 Metal 定语义后再改 |
+
+Metal 的其余功能（含 PAGView Metal 版）均已完成，当前唯一剩余待办是 device 注入 API。
 
 ---
 
