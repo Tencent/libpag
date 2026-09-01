@@ -23,8 +23,8 @@
 // PAGView is a UIView-backed UI wrapper. On the OpenGL backend it renders into a CAEAGLLayer
 // via GPUDrawable; on the Metal backend it renders into a CAMetalLayer via
 // [PAGSurface FromMetalLayer:]. Both backends share the same PAGPlayer + PAGAnimator animation
-// loop and listener surface, so the class is available whenever either backend is enabled.
-#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
+// loop and listener surface. The public API is backend-agnostic, so the class is always declared
+// here; backend-specific surface creation is resolved inside the implementation.
 
 @class PAGView;
 
@@ -285,5 +285,3 @@ PAG_API @interface PAGView : UIView
  */
 - (CGRect)getBounds:(PAGLayer*)pagLayer;
 @end
-
-#endif  // TGFX_USE_OPENGL || TGFX_USE_METAL
