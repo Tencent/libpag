@@ -301,7 +301,13 @@ void OHOSVideoDecoder::onFlush() {
   codecUserData->codecError = false;
   pendingFrames.clear();
   codecBufferInfo = {0, nullptr};
-  start();
+  if (!start()) {
+    // start() failed on this recovery path. When OH_VideoDecoder_Start itself fails the codec is
+    // not running, so OH_AVCodecOnNeedInputBuffer never fires and the next onSendBytes would block
+    // forever on an empty input queue with codecError cleared above. Surface the failure as an
+    // error instead so onSendBytes fast-fails and VideoReader can fall back to software decoding.
+    codecUserData->codecError = true;
+  }
 }
 
 bool OHOSVideoDecoder::start() {
