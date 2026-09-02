@@ -55,13 +55,12 @@ class CodecUserData {
   std::condition_variable outputCondition;
   std::queue<CodecBufferInfo> outputBufferInfoQueue;
 
-  // Set when the codec enters an error state it cannot recover from on its own, either by the
-  // error callback or by
-  // onSendBytes after it dequeues an unusable input buffer (null/undersized) or fails to submit
-  // one. The input waiter checks it directly so it can bail out of onSendBytes instead of blocking
-  // forever on a codec that will never redeliver the dequeued input buffers; the output waiter is
-  // not gated on this flag but is instead woken by a sentinel (0, nullptr) entry the error callback
-  // pushes into outputBufferInfoQueue. onFlush clears it to allow recovery.
+  // Set when the codec enters an error state it cannot recover from on its own, either by the error
+  // callback or by onSendBytes after it dequeues an unusable input buffer (null/undersized) or fails
+  // to submit one. The input waiter checks it directly so it can bail out of onSendBytes instead of
+  // blocking forever on a codec that will never redeliver the dequeued input buffers; the output
+  // waiter is not gated on this flag but is instead woken by a sentinel (0, nullptr) entry the error
+  // callback pushes into outputBufferInfoQueue. onFlush clears it to allow recovery.
   std::atomic<bool> codecError = {false};
 
   void clearQueue() {
