@@ -44,6 +44,8 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
+  void freeSurface() override;
+
   void present(tgfx::Context* context) override;
 
   void setTimeStamp(int64_t timeStamp) override;

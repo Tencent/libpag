@@ -37,7 +37,7 @@ class Drawable {
 
   virtual std::shared_ptr<tgfx::Surface> getFrontSurface(tgfx::Context* context, bool queryOnly);
 
-  void freeSurface();
+  virtual void freeSurface();
 
   virtual void setTimeStamp(int64_t timestamp);
 
