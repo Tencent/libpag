@@ -36,7 +36,12 @@ struct CodecBufferInfo {
 
   CodecBufferInfo(uint32_t argBufferIndex, OH_AVBuffer* argBuffer)
       : bufferIndex(argBufferIndex), buffer(argBuffer) {
-    OH_AVBuffer_GetBufferAttr(argBuffer, &attr);
+    // Guard against a null buffer (e.g. the (0, nullptr) sentinel pushed by the error callback):
+    // OH_AVBuffer_GetBufferAttr is not documented to tolerate a null buffer on every HarmonyOS
+    // build, and attr already holds a valid zero-initialized default here.
+    if (argBuffer != nullptr) {
+      OH_AVBuffer_GetBufferAttr(argBuffer, &attr);
+    }
   };
 };
 
@@ -50,10 +55,12 @@ class CodecUserData {
   std::condition_variable outputCondition;
   std::queue<CodecBufferInfo> outputBufferInfoQueue;
 
-  // Set by the error callback when the codec enters an unrecoverable error state. The input waiter
-  // checks it directly so it can bail out of onSendBytes instead of blocking forever; the output
-  // waiter is not gated on this flag but is instead woken by a sentinel (0, nullptr) entry the
-  // error callback pushes into outputBufferInfoQueue.
+  // Set when the codec enters an unrecoverable error state, either by the error callback or by
+  // onSendBytes after it dequeues an unusable input buffer (null/undersized) or fails to submit
+  // one. The input waiter checks it directly so it can bail out of onSendBytes instead of blocking
+  // forever on a codec that will never redeliver the dequeued input buffers; the output waiter is
+  // not gated on this flag but is instead woken by a sentinel (0, nullptr) entry the error callback
+  // pushes into outputBufferInfoQueue. onFlush clears it to allow recovery.
   std::atomic<bool> codecError = {false};
 
   void clearQueue() {

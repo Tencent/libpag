@@ -216,6 +216,10 @@ DecodingResult OHOSVideoDecoder::onSendBytes(void* bytes, size_t length, int64_t
   lock.unlock();
 
   if (codecBufferInfo.buffer == nullptr) {
+    // The buffer was already popped above but cannot be returned to the codec, so mark the codec
+    // as errored to stop further onSendBytes calls from draining and leaking the remaining input
+    // buffers or blocking forever once the queue empties. onFlush resets this to recover.
+    codecUserData->codecError = true;
     return DecodingResult::Error;
   }
 
@@ -228,6 +232,7 @@ DecodingResult OHOSVideoDecoder::onSendBytes(void* bytes, size_t length, int64_t
     if (bufferAddr == nullptr || capacity < 0 || static_cast<size_t>(capacity) < length) {
       LOGE("onSendBytes: invalid input buffer, addr=%p, capacity=%d, length=%zu", bufferAddr,
            capacity, length);
+      codecUserData->codecError = true;
       return DecodingResult::Error;
     }
     memcpy(bufferAddr, bytes, length);
@@ -247,6 +252,9 @@ DecodingResult OHOSVideoDecoder::onSendBytes(void* bytes, size_t length, int64_t
   }
 
   if (ret != AV_ERR_OK) {
+    // The buffer was popped but not accepted by the codec; treat the codec as errored so later
+    // calls fail fast instead of leaking the remaining input buffers or blocking forever.
+    codecUserData->codecError = true;
     return DecodingResult::Error;
   }
   if (length > 0 && time >= 0) {
