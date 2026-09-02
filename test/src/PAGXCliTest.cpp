@@ -849,6 +849,19 @@ CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCost) {
   EXPECT_TRUE(output.find("high-cost children") != std::string::npos);
 }
 
+CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCostGlassStyle) {
+  auto inputPath = TestResourcePath("verify_c11_low_opacity_glass.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("opacity") != std::string::npos);
+  EXPECT_TRUE(output.find("high-cost children") != std::string::npos);
+}
+
 CLI_TEST(PAGXCliTest, Verify_C13_SimpleRectangleMask) {
   auto inputPath = TestResourcePath("verify_c13_simple_rect_mask.pagx");
   std::streambuf* old = std::cerr.rdbuf();

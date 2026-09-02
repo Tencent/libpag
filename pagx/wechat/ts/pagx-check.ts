@@ -705,7 +705,8 @@ function scanLocalRisk(root: XmlNode): LocalRiskRaw {
       backdropStyleCount += 1;
       const currentLayer = currentLayerState(layerStack);
       if (currentLayer) {
-        currentLayer.backdropStyleRadii.push(readNumericAttr(node.attribs, 'frost'));
+        const frost = node.attribs.frost === undefined ? 5 : readNumericAttr(node.attribs, 'frost');
+        currentLayer.backdropStyleRadii.push(Math.max(0.5, frost * 0.5));
       }
     }
     if (node.tag === 'InnerShadowStyle') {
