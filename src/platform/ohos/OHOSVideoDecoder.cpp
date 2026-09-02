@@ -53,14 +53,21 @@ struct NV12FrameBuffer {
 };
 }  // namespace
 
-void OH_AVCodecOnError(OH_AVCodec*, int32_t index, void* userData) {
+void OH_AVCodecOnError(OH_AVCodec*, int32_t errorCode, void* userData) {
   if (userData == nullptr) {
     return;
   }
-  LOGE("video decoder error, index:%d \n", index);
+  LOGE("video decoder error, errorCode:%d \n", errorCode);
   CodecUserData* codecUserData = static_cast<CodecUserData*>(userData);
+  codecUserData->codecError = true;
+  // Wake the input waiter as well. The input queue is untouched here, so without an explicit
+  // error flag onSendBytes would keep waiting forever on a codec that will never deliver another
+  // input buffer. Take the lock before notifying so the flag cannot be missed by a waiter that is
+  // about to evaluate its predicate.
+  { std::unique_lock<std::mutex> lock(codecUserData->inputMutex); }
+  codecUserData->inputCondition.notify_all();
   std::unique_lock<std::mutex> lock(codecUserData->outputMutex);
-  codecUserData->outputBufferInfoQueue.emplace(index, nullptr);
+  codecUserData->outputBufferInfoQueue.emplace(0, nullptr);
   codecUserData->outputCondition.notify_all();
 }
 
@@ -176,20 +183,46 @@ bool OHOSVideoDecoder::initDecoder(const OH_AVCodecCategory avCodecCategory) {
 
 DecodingResult OHOSVideoDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
   std::unique_lock<std::mutex> lock(codecUserData->inputMutex);
-  codecUserData->inputCondition.wait(
-      lock, [this]() { return codecUserData->inputBufferInfoQueue.size() > 0; });
+  codecUserData->inputCondition.wait(lock, [this]() {
+    return codecUserData->inputBufferInfoQueue.size() > 0 || codecUserData->codecError;
+  });
+  if (codecUserData->codecError) {
+    return DecodingResult::Error;
+  }
   CodecBufferInfo codecBufferInfo = codecUserData->inputBufferInfoQueue.front();
+  // Pop before use so a buffer that fails validation below is never left in the queue for the
+  // next call to pick up again.
+  codecUserData->inputBufferInfoQueue.pop();
   lock.unlock();
+
+  if (codecBufferInfo.buffer == nullptr) {
+    // The buffer was already popped above but cannot be returned to the codec, so mark the codec
+    // as errored to stop further onSendBytes calls from draining and leaking the remaining input
+    // buffers or blocking forever once the queue empties. onFlush resets this to recover.
+    codecUserData->codecError = true;
+    return DecodingResult::Error;
+  }
+
+  if (bytes != nullptr && length > 0) {
+    uint8_t* bufferAddr = OH_AVBuffer_GetAddr(codecBufferInfo.buffer);
+    int32_t capacity = OH_AVBuffer_GetCapacity(codecBufferInfo.buffer);
+    // Guard the memcpy destination. On some HarmonyOS builds GetAddr can return null or report a
+    // capacity smaller than the data when the codec is already in a bad state, which previously
+    // crashed here with a SIGSEGV while writing the SPS/PPS headers during initialization.
+    if (bufferAddr == nullptr || capacity < 0 || static_cast<size_t>(capacity) < length) {
+      LOGE("onSendBytes: invalid input buffer, addr=%p, capacity=%d, length=%zu", bufferAddr,
+           capacity, length);
+      codecUserData->codecError = true;
+      return DecodingResult::Error;
+    }
+    memcpy(bufferAddr, bytes, length);
+  }
 
   OH_AVCodecBufferAttr bufferAttr;
   bufferAttr.size = length;
   bufferAttr.offset = 0;
   bufferAttr.pts = time >= 0 ? time : 0;
   bufferAttr.flags = length == 0 ? AVCODEC_BUFFER_FLAGS_EOS : AVCODEC_BUFFER_FLAGS_NONE;
-
-  if (bytes != nullptr && length > 0) {
-    memcpy(OH_AVBuffer_GetAddr(codecBufferInfo.buffer), bytes, length);
-  }
   int ret = OH_AVBuffer_SetBufferAttr(codecBufferInfo.buffer, &bufferAttr);
   if (ret == AV_ERR_OK) {
     ret = OH_VideoDecoder_PushInputBuffer(videoCodec, codecBufferInfo.bufferIndex);
@@ -197,11 +230,11 @@ DecodingResult OHOSVideoDecoder::onSendBytes(void* bytes, size_t length, int64_t
       LOGE("OH_VideoDecoder_PushInputBuffer failed, ret:%d", ret);
     }
   }
-  lock.lock();
-  codecUserData->inputBufferInfoQueue.pop();
-  lock.unlock();
 
   if (ret != AV_ERR_OK) {
+    // The buffer was popped but not accepted by the codec; treat the codec as errored so later
+    // calls fail fast instead of leaking the remaining input buffers or blocking forever.
+    codecUserData->codecError = true;
     return DecodingResult::Error;
   }
   if (length > 0 && time >= 0) {
@@ -245,9 +278,16 @@ void OHOSVideoDecoder::onFlush() {
     return;
   }
   codecUserData->clearQueue();
+  codecUserData->codecError = false;
   pendingFrames.clear();
   codecBufferInfo = {0, nullptr};
-  start();
+  if (!start()) {
+    // start() failed on this recovery path. When OH_VideoDecoder_Start itself fails the codec is
+    // not running, so OH_AVCodecOnNeedInputBuffer never fires and the next onSendBytes would block
+    // forever on an empty input queue with codecError cleared above. Surface the failure as an
+    // error instead so onSendBytes fast-fails and VideoReader can fall back to software decoding.
+    codecUserData->codecError = true;
+  }
 }
 
 bool OHOSVideoDecoder::start() {
@@ -257,7 +297,11 @@ bool OHOSVideoDecoder::start() {
     return false;
   }
   for (auto& header : videoFormat.headers) {
-    onSendBytes(const_cast<void*>(header->data()), header->size(), -1);
+    if (onSendBytes(const_cast<void*>(header->data()), header->size(), -1) !=
+        DecodingResult::Success) {
+      LOGE("video decoder send header failed!");
+      return false;
+    }
   }
   return true;
 }
