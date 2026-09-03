@@ -90,9 +90,9 @@
   [animator setSync:YES];
 #if defined(TGFX_USE_OPENGL)
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                          selector:@selector(onAsyncSurfacePrepared:)
-                                              name:pag::AsyncSurfacePreparedNotification
-                                            object:self];
+                                           selector:@selector(onAsyncSurfacePrepared:)
+                                               name:pag::AsyncSurfacePreparedNotification
+                                             object:self];
 #endif
 }
 
@@ -179,7 +179,9 @@
     // before applicationDidFinishLaunching finishes setting up GPU access, so the very first
     // attempt here may return nil. Retry on the next runloop iteration until it succeeds.
     if (_metalInitRetries++ < 20) {
-      dispatch_async(dispatch_get_main_queue(), ^{ [self initPAGSurface]; });
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self initPAGSurface];
+      });
     } else {
       NSLog(@"[PAGView] Metal device unavailable after %d retries; giving up", _metalInitRetries);
     }

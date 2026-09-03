@@ -71,14 +71,14 @@
                                                name:UIApplicationDidBecomeActiveNotification
                                              object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                          selector:@selector(applicationDidReceiveMemoryWarning:)
-                                              name:UIApplicationDidReceiveMemoryWarningNotification
-                                            object:nil];
+                                           selector:@selector(applicationDidReceiveMemoryWarning:)
+                                               name:UIApplicationDidReceiveMemoryWarningNotification
+                                             object:nil];
 #if defined(TGFX_USE_OPENGL)
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                          selector:@selector(AsyncSurfacePrepared:)
-                                              name:pag::AsyncSurfacePreparedNotification
-                                            object:self.layer];
+                                           selector:@selector(AsyncSurfacePrepared:)
+                                               name:pag::AsyncSurfacePreparedNotification
+                                             object:self.layer];
 #endif
 }
 
@@ -189,7 +189,9 @@
     // Metal device may not be available yet (the view can become visible before the app's
     // GPU access is fully set up). Retry on the next runloop iteration until it succeeds.
     if (_metalInitRetries++ < 20) {
-      dispatch_async(dispatch_get_main_queue(), ^{ [self initPAGSurface]; });
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self initPAGSurface];
+      });
     } else {
       NSLog(@"[PAGView] Metal device unavailable after %d retries; giving up", _metalInitRetries);
     }
