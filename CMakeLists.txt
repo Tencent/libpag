@@ -257,6 +257,12 @@ file(GLOB_RECURSE SRC_FILES
         src/base/*.*
         src/codec/*.*
         src/rendering/*.*)
+# Devices_Metal.mm is an Objective-C++ file; it only has content under TGFX_USE_METAL. On non-Apple
+# platforms the GCC toolchain lacks the Objective-C++ frontend (`cc1objplus`) and would fail even
+# compiling an empty .mm. Drop it from the source list outside of Apple.
+if (NOT APPLE)
+    list(FILTER SRC_FILES EXCLUDE REGEX "src/rendering/gpu/Devices_Metal\\.mm$")
+endif ()
 list(APPEND PAG_FILES ${SRC_FILES})
 
 if (PAG_BUILD_PAGX)
