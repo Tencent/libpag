@@ -454,6 +454,21 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   for (auto* text : textOrder) {
     auto& layoutRuns = text->glyphData->layoutRuns;
     if (!layoutRuns.empty()) {
+      // Layout drops fauxItalic when the resolved typeface is a real italic face, so the
+      // embedded glyph paths already carry the slant. Clear the Text-level flag in that case,
+      // otherwise rendering the embedded paths shears them a second time.
+      if (text->fauxItalic) {
+        bool anyRunSynthesised = false;
+        for (auto& tlRun : layoutRuns) {
+          if (tlRun.font.isFauxItalic()) {
+            anyRunSynthesised = true;
+            break;
+          }
+        }
+        if (!anyRunSynthesised) {
+          text->fauxItalic = false;
+        }
+      }
       for (auto& tlRun : layoutRuns) {
         auto* typeface = tlRun.font.getTypeface().get();
         if (typeface == nullptr) {
