@@ -102,14 +102,27 @@
         -DPAG_BUILD_TESTS=ON -DPAG_SKIP_BASELINE_CHECK=ON \
         -DCMAKE_BUILD_TYPE=Debug ../
 
-  cmake --build . --target UpdateBaseline_${TARGET_SUFFIX} -- -j 12
-  ./UpdateBaseline_${TARGET_SUFFIX}
+  # The UpdateBaseline_${SUFFIX} targets are introduced together with the per-backend baseline
+  # cache isolation. When this script runs against an older main branch that only exposes the
+  # legacy generic UpdateBaseline target (before this PR is merged), skip the baseline generation
+  # step gracefully — Baseline.cpp will fall through to its "cache out of date -> skip comparison"
+  # path, so the downstream PAGFullTest does not fail. Once merged into main, this branch is
+  # always taken.
+  if cmake --build . --target help 2>/dev/null | grep -Eq "\bUpdateBaseline_${TARGET_SUFFIX}\b"; then
+    cmake --build . --target UpdateBaseline_${TARGET_SUFFIX} -- -j 12
+    ./UpdateBaseline_${TARGET_SUFFIX}
 
-  if test $? -eq 0; then
-     echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Success~~~~~~~~~~~~~~~~~~~~~"
+    if test $? -eq 0; then
+       echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Success~~~~~~~~~~~~~~~~~~~~~"
+    else
+      echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Failed~~~~~~~~~~~~~~~~~~"
+      COMPLIE_RESULT=false
+    fi
   else
-    echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND_NAME) Failed~~~~~~~~~~~~~~~~~~"
-    COMPLIE_RESULT=false
+    echo "WARNING: target 'UpdateBaseline_${TARGET_SUFFIX}' is not available on the main branch."
+    echo "This PR introduces per-backend UpdateBaseline_* targets; when running against an older"
+    echo "main the baseline cache cannot be pre-populated. PAGFullTest will fall back to skip-"
+    echo "comparison mode until this PR is merged."
   fi
 
   cd ..
