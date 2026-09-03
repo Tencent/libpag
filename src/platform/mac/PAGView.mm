@@ -19,9 +19,10 @@
 #import "PAGView.h"
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
 #import "platform/mac/private/GPUDrawable.h"
 
-@interface PAGView () <PAGAnimatorUpdater, PAGAnimatorListener>
+@interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
 
 @implementation PAGView {
@@ -30,6 +31,7 @@
   PAGFile* pagFile;
   NSString* filePath;
   PAGAnimator* animator;
+  PAGAnimatorListenerProxy* animatorListenerProxy;
   BOOL _isVisible;
   NSHashTable* listeners;
   NSLock* listenerLock;
@@ -51,7 +53,8 @@
   animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
   listeners = [[NSHashTable weakObjectsHashTable] retain];
   listenerLock = [[NSLock alloc] init];
-  [animator addListener:self];
+  animatorListenerProxy = [[PAGAnimatorListenerProxy alloc] initWithForwarder:self];
+  [animator addListener:animatorListenerProxy];
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
@@ -63,7 +66,9 @@
 
 - (void)dealloc {
   [animator cancel];
+  [animatorListenerProxy detach];
   [animator release];
+  [animatorListenerProxy release];
   [pagPlayer release];
   [pagSurface release];
   [pagFile release];
@@ -153,27 +158,7 @@
   [listenerLock unlock];
 }
 
-#pragma mark - PAGAnimatorListener
-
-- (void)onAnimationStart:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationStart:)];
-}
-
-- (void)onAnimationEnd:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationEnd:)];
-}
-
-- (void)onAnimationCancel:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationCancel:)];
-}
-
-- (void)onAnimationRepeat:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationRepeat:)];
-}
-
-- (void)onAnimationUpdate:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationUpdate:)];
-}
+#pragma mark - Listener dispatch
 
 - (void)dispatchListenerEvent:(SEL)selector {
   if ([NSThread isMainThread]) {
