@@ -108,6 +108,13 @@ class SVGParserContext {
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element, const InheritedStyle& parentStyle,
                         int depth = 0);
+  // Instantiates a <use> that references a container element (<symbol>/<g>/<svg>) as a group layer.
+  // convertElement/convertUse only produce leaf shapes and return null for containers, which would
+  // silently drop referenced sub-trees. Applies the use's x/y offset and, for <symbol>/<svg> with a
+  // viewBox, the preserveAspectRatio viewport fit. Returns null if nothing renderable is produced.
+  Layer* convertUseContainer(const std::shared_ptr<DOMNode>& useElement,
+                             const std::shared_ptr<DOMNode>& refElement,
+                             const InheritedStyle& inheritedStyle, int depth);
   void convertChildren(const std::shared_ptr<DOMNode>& element, std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
                        ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);

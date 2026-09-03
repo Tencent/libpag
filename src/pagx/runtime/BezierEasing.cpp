@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/runtime/BezierEasing.h"
-#include <algorithm>
 #include <cmath>
 
 namespace pagx {
@@ -102,8 +101,12 @@ double SolveBezierEasing(double p1x, double p1y, double p2x, double p2y, double 
   if (p1x == p1y && p2x == p2y) {
     return input;
   }
+  // CSS cubic-bezier allows y control points outside [0, 1] to express overshoot/anticipation
+  // (e.g. the "back" easing family). The output is intentionally NOT clamped — value-type Lerp
+  // implementations decide how to handle t outside [0, 1]: float lerp produces the overshoot,
+  // while LerpColor clamps t to keep RGBA components within [0, 1].
   double t = SolveCurveX(p1x, p2x, input);
-  return std::clamp(SampleCurve(p1y, p2y, t), 0.0, 1.0);
+  return SampleCurve(p1y, p2y, t);
 }
 
 }  // namespace pagx

@@ -124,6 +124,14 @@ void ResetLayoutAnchors(Layer* inner) {
   inner->flex = 0.0f;
 }
 
+// `background-clip: text` redirects gradient backgrounds to descendant text fills. Keep this
+// predicate separate from the visual-emission code because replaced elements may still have a
+// foreground fill, border, shadow, or backdrop filter that must survive the redirect.
+bool ClipsGradientBackgroundToText(const HTMLBoxAttributes& box) {
+  return box.backgroundClipText &&
+         ToLower(box.backgroundImage).find("gradient(") != std::string::npos;
+}
+
 }  // namespace
 
 BlendMode HTMLLayerBuilder::resolveBackgroundBlendMode(const std::string& value) {
@@ -148,8 +156,10 @@ void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
 }
 
 bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
-  return box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
-         box.borderSet || !box.boxShadow.empty() || !box.backdropFilter.empty();
+  bool hasBoxBackground = !ClipsGradientBackgroundToText(box) &&
+                          (box.backgroundColorSet || !box.backgroundImage.empty());
+  return hasBoxBackground || box.borderRadiusSet || box.borderSet || !box.boxShadow.empty() ||
+         !box.backdropFilter.empty();
 }
 
 bool HTMLLayerBuilder::hasLayoutHostAttributes(const HTMLBoxAttributes& box) {
@@ -340,26 +350,31 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
   return path;
 }
 
-bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box) {
+bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
+                                              Fill* foregroundFill) {
   // `background-clip: text` redirects the gradient to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
-  // `background-image`, suppress the rectangle + gradient Fill that would otherwise
-  // paint a coloured block behind the text.
-  if (box.backgroundClipText && !box.backgroundImage.empty() &&
-      box.backgroundImage.find("gradient") != std::string::npos) {
-    return false;
-  }
+  // `background-image`, suppress only that box background. Replaced-element foregrounds and
+  // independent box visuals (border, shadow, backdrop filter) must still be emitted.
+  bool clipsGradientToText = ClipsGradientBackgroundToText(box);
   bool emitted = false;
   // `geometry` is the shape node (Rectangle or Path) that anchors the Fill / Stroke chain
   // emitted below. We only allocate it when the box actually carries a paintable visual.
   Element* geometry = nullptr;
-  if (box.backgroundColorSet || !box.backgroundImage.empty() || box.borderRadiusSet ||
-      box.borderSet) {
+  bool hasBoxBackground =
+      !clipsGradientToText && (box.backgroundColorSet || !box.backgroundImage.empty());
+  if (foregroundFill != nullptr || hasBoxBackground || box.borderRadiusSet || box.borderSet) {
     geometry = buildBackgroundGeometry(box);
     layer->contents.push_back(geometry);
     emitted = true;
   }
-  applyBackgroundFill(layer, box, geometry, emitted);
+  if (!clipsGradientToText) {
+    applyBackgroundFill(layer, box, geometry, emitted);
+  }
+  if (foregroundFill != nullptr) {
+    layer->contents.push_back(foregroundFill);
+    emitted = true;
+  }
   applyBorderStroke(layer, box, geometry, emitted);
   applyBoxShadows(layer, box, emitted);
   applyBackdropFilter(layer, box, emitted);
@@ -538,6 +553,13 @@ void HTMLLayerBuilder::applyBoxShadows(Layer* layer, const HTMLBoxAttributes& bo
       drop->blurX = sigma;
       drop->blurY = sigma;
       drop->color = s.color;
+      // A CSS outer `box-shadow` is always clipped to *outside* the element's border box, so it is
+      // never visible under the box itself — even when the box has a translucent (or absent)
+      // background. PAGX's default `showBehindLayer=true` instead paints the shadow behind the whole
+      // layer, so with a translucent fill the shadow bleeds through and washes the box in the shadow
+      // colour. Setting `showBehindLayer=false` makes the layer knock the shadow out of its own
+      // coverage, matching the CSS clip and leaving only the exterior glow.
+      drop->showBehindLayer = false;
       layer->styles.push_back(drop);
     }
   }
@@ -596,6 +618,19 @@ void HTMLLayerBuilder::applyBoxTransform(Layer* layer, const HTMLBoxAttributes& 
 
 void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<DOMNode>& element,
                                             const HTMLBoxAttributes& box) {
+  // A centered line fragment emitted by html-snapshot is intrinsically sized text inside a
+  // fixed-width host. Its measured CSS left/width only describe Chromium's current font metrics;
+  // PAGX must measure the editable text itself and keep that result centered as it changes.
+  // centerX has higher constraint priority than left, but clear both edge anchors as well so the
+  // serialized PAGX expresses the intended layout without stale geometry.
+  if (element != nullptr) {
+    const auto* intrinsicWidth = element->findAttribute("data-pagx-intrinsic-width");
+    if (intrinsicWidth != nullptr && ToLower(Trim(*intrinsicWidth)) == "center") {
+      layer->left = NAN;
+      layer->right = NAN;
+      layer->centerX = 0.0f;
+    }
+  }
   if (box.opacitySet) layer->alpha = box.opacity;
   if (!box.mixBlendMode.empty()) {
     // CSS `mix-blend-mode` uses hyphenated keywords (e.g. `color-dodge`, `hard-light`,
@@ -639,6 +674,10 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
             layer->filters.push_back(f);
           }
         }
+      } else if (step.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
+        auto cm = _document->makeNode<ColorMatrixFilter>();
+        cm->matrix = step.matrix;
+        layer->filters.push_back(cm);
       } else {
         _diagnostics.warn("html: filter '" + step.raw + "' not supported");
       }
@@ -661,6 +700,9 @@ void HTMLLayerBuilder::forwardDataAttributes(Layer* layer,
   if (layer == nullptr || element == nullptr) return;
   for (const auto& attr : element->attributes) {
     if (attr.name.compare(0, 5, "data-") != 0) continue;
+    // Internal html-snapshot/importer handshake; it controls layout semantics and is not user
+    // custom data. Keep all other data-* attributes forwarding exactly as before.
+    if (attr.name == "data-pagx-intrinsic-width") continue;
     std::string key = attr.name.substr(5);
     if (IsValidCustomDataKey(key)) {
       auto existing = layer->customData.find(key);

@@ -820,26 +820,21 @@ PAGX_TEST(PAGXSVGTest, SVGImport_StrokeDashPathLengthAcrossShapes) {
 
 /**
  * Test SVG import: a document whose canvas size differs from its viewBox needs a content transform.
- * With a single converted layer the importer folds the scale into an inner Group rather than adding
- * a wrapper layer.
+ * With a single converted layer the importer folds the scale into that layer's own matrix rather
+ * than adding a wrapper layer or an inner Group, so the mapping also reaches nested child layers.
  */
-PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoGroup) {
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoLayerMatrix) {
   std::string svg =
       "<svg width=\"200\" height=\"200\" viewBox=\"0 0 100 100\">"
       "<rect x=\"10\" y=\"10\" width=\"40\" height=\"40\" fill=\"#3B82F6\"/></svg>";
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   ASSERT_EQ(doc->layers.size(), 1u);
-
-  std::vector<pagx::Element*> groups;
-  for (auto layer : doc->layers) {
-    CollectElementsByType(layer, pagx::NodeType::Group, groups);
-  }
-  ASSERT_FALSE(groups.empty());
-  auto* group = static_cast<pagx::Group*>(groups[0]);
-  // viewBox 100 -> canvas 200 is a uniform 2x scale embedded in the group.
-  EXPECT_FLOAT_EQ(group->scale.x, 2.0f);
-  EXPECT_FLOAT_EQ(group->scale.y, 2.0f);
+  // viewBox 100 -> canvas 200 is a uniform 2x scale folded into the single converted layer's own
+  // matrix (rather than a wrapper Group) so the mapping also reaches any nested child layers.
+  auto* layer = doc->layers[0];
+  EXPECT_FLOAT_EQ(layer->matrix.a, 2.0f);
+  EXPECT_FLOAT_EQ(layer->matrix.d, 2.0f);
 }
 
 /**
@@ -891,6 +886,34 @@ PAGX_TEST(PAGXSVGTest, SVGImport_SharedGradientReferencedTwice) {
     CollectElementsByType(layer, pagx::NodeType::Fill, fills);
   }
   EXPECT_GE(fills.size(), 2u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_QuotedGradientUrlReferences) {
+  std::string svg =
+      "<svg width=\"200\" height=\"100\" viewBox=\"0 0 200 100\">"
+      "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\">"
+      "<stop offset=\"0\" stop-color=\"#F00\"/><stop offset=\"1\" stop-color=\"#00F\"/>"
+      "</linearGradient></defs>"
+      "<rect x=\"0\" y=\"0\" width=\"80\" height=\"80\" fill=\"url('#g')\"/>"
+      "<rect x=\"100\" y=\"0\" width=\"80\" height=\"80\" fill=\"none\" "
+      "stroke=\"url(&quot;#g&quot;)\" stroke-width=\"4\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+
+  std::vector<pagx::Element*> fills;
+  std::vector<pagx::Element*> strokes;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+    CollectElementsByType(layer, pagx::NodeType::Stroke, strokes);
+  }
+  ASSERT_FALSE(fills.empty());
+  ASSERT_FALSE(strokes.empty());
+  auto* fill = static_cast<pagx::Fill*>(fills.front());
+  auto* stroke = static_cast<pagx::Stroke*>(strokes.front());
+  ASSERT_NE(fill->color, nullptr);
+  ASSERT_NE(stroke->color, nullptr);
+  EXPECT_EQ(fill->color->nodeType(), pagx::NodeType::LinearGradient);
+  EXPECT_EQ(stroke->color->nodeType(), pagx::NodeType::LinearGradient);
 }
 
 /**
