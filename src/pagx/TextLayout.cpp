@@ -18,6 +18,7 @@
 
 #include "TextLayout.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include "LayoutContext.h"
 #include "TextLayoutParams.h"
@@ -66,6 +67,20 @@ static tgfx::Matrix ComputeGroupMatrix(const Group* group) {
 
 static bool CompareByCluster(const ShapedGlyph& a, const ShapedGlyph& b) {
   return a.cluster < b.cluster;
+}
+
+// Returns true when the typeface's own style already provides an italic/oblique slant. fauxItalic
+// is a synthesis axis meant for upright faces only: applying it on top of a real italic design
+// double-slants the glyphs, both when embedding glyph paths and when rendering.
+static bool TypefaceHasItalicSlant(const std::shared_ptr<tgfx::Typeface>& typeface) {
+  if (typeface == nullptr) {
+    return false;
+  }
+  auto style = typeface->fontStyle();
+  for (auto& c : style) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return style.find("italic") != std::string::npos || style.find("oblique") != std::string::npos;
 }
 
 static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar) {
@@ -390,9 +405,10 @@ class TextLayoutContext {
     }
 
     float effectiveFontSize = glyph.fontSize * textScale;
+    bool typefaceIsItalic = TypefaceHasItalicSlant(primaryTypeface);
     tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
     primaryFont.setFauxBold(glyph.fauxBold);
-    primaryFont.setFauxItalic(glyph.fauxItalic);
+    primaryFont.setFauxItalic(glyph.fauxItalic && !typefaceIsItalic);
     tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
     metricsFont.setFauxBold(glyph.fauxBold);
     metricsFont.setFauxItalic(glyph.fauxItalic);

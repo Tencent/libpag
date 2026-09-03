@@ -41,8 +41,8 @@ static constexpr const char* HTML_DEFAULT_FONT_FAMILY = "Arial";
 /**
  * Default font style/variant name written to every imported `Text` node. The synthesis in
  * `ResolveFontStyleSynthesis` leaves the style label empty for the plain Regular-weight upright
- * face (italic is carried by `fauxItalic`); this constant substitutes the canonical "Regular"
- * name so every HTML-imported `Text` node always carries a concrete `fontStyle`.
+ * face; this constant substitutes the canonical "Regular" name so every HTML-imported `Text`
+ * node always carries a concrete `fontStyle`.
  */
 static constexpr const char* HTML_DEFAULT_FONT_STYLE = "Regular";
 
@@ -74,13 +74,15 @@ struct HTMLInheritedStyle {
   std::string fontSize = {};
   std::string fontWeight = {};
   std::string fontStyle = {};
-  std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Black" / ""
+  std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Italic" / ""
   // Synthetic slant the renderer must emboss on top of the resolved face. Set by
-  // `resolveInheritedStyle` for italic/oblique requests, whose axis is dropped from `fontStyleName`
-  // (see `ResolveFontStyleSynthesis`) and carried through to `Text::fauxItalic` so the authored
-  // slant survives even when the styled italic face is not installed on the render host. The
-  // importer never pre-synthesises the weight axis: it stays in `fontStyleName` as a real-face
-  // keyword, so `fauxBold` remains false even if font lookup later falls back to a lighter face.
+  // `resolveInheritedStyle` for italic/oblique requests and carried through to `Text::fauxItalic`
+  // so the authored slant survives even when the styled italic face is not installed on the
+  // render host. The face label itself keeps the italic axis (`fontStyleName` may be "Italic" or
+  // "Medium Italic"); text layout drops this flag when the resolved typeface already provides a
+  // real italic face, so the slant is never applied twice. The importer never pre-synthesises the
+  // weight axis: it stays in `fontStyleName` as a real-face keyword, so `fauxBold` remains false
+  // even if font lookup later falls back to a lighter face.
   bool fauxBold = false;
   bool fauxItalic = false;
   std::string letterSpacing = {};

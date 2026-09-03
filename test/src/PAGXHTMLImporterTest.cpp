@@ -3680,9 +3680,9 @@ PAG_TEST(PAGXHTMLImporterTest, BoldItalicCombined) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // The weight axis becomes a real-face "Bold" style label; only the italic axis is synthesised via
-  // faux italic so the slant survives a missing styled italic face.
-  EXPECT_EQ(text->fontStyle, "Bold");
+  // Both axes become real-face style labels ("Bold Italic") so font lookup can select the authored
+  // face; fauxItalic stays true as a synthesis fallback for when that face is unavailable.
+  EXPECT_EQ(text->fontStyle, "Bold Italic");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_TRUE(text->fauxItalic);
 }
@@ -6056,9 +6056,9 @@ PAG_TEST(PAGXHTMLImporterTest, GradientThreeStopsImplicitMiddleInterpolated) {
   EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.5f, 0.01f));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesFauxItalic) {
-  // Pure italic without bold is synthesised via faux italic; the base-face label surfaces as the
-  // canonical "Regular".
+PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesRealFaceWithFauxFallback) {
+  // Pure italic becomes the real-face "Italic" style label so font lookup can select the authored
+  // face; fauxItalic stays true as a synthesis fallback for when that face is unavailable.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-size:14px;color:#000;font-style:italic">Hi</span>
@@ -6067,7 +6067,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesFauxItalic) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->fontStyle, "Regular");
+  EXPECT_EQ(text->fontStyle, "Italic");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_TRUE(text->fauxItalic);
 }
