@@ -18,17 +18,28 @@
 
 #pragma once
 
+#include <QElapsedTimer>
+#include <QPointer>
+#include <QTextDocument>
 #include <atomic>
 #include <mutex>
 #include "pagx/PAGAnimation.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXDocument.h"
 #include "rendering/ContentViewModel.h"
-#include "rendering/pagx/XmlLinesModel.h"
+#include "rendering/pagx/XmlDocumentHighlighter.h"
 
 class QQuickWindow;
+class QTimer;
 
 namespace pag {
+
+// A long data line folded out of the editor: the exact placeholder line shown in the editor
+// plus the original full line it stands for.
+struct ElidedLine {
+  QString placeholder = {};
+  QString fullLine = {};
+};
 
 /**
  * ViewModel for PAGX format content. Owns PAGXDocument and PAGScene with PAGTimeline,
@@ -36,7 +47,7 @@ namespace pag {
  */
 class PAGXViewModel : public ContentViewModel {
   Q_OBJECT
-  Q_PROPERTY(XmlLinesModel* linesModel READ linesModel CONSTANT)
+  Q_PROPERTY(QString documentXml READ documentXml NOTIFY documentXmlChanged)
  public:
   explicit PAGXViewModel(QObject* parent = nullptr);
 
@@ -67,9 +78,58 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE void nextFrame() override;
   Q_INVOKABLE void previousFrame() override;
 
-  XmlLinesModel* linesModel() const;
+  /**
+   * Returns the XML text of the most recently loaded file. Emitted only from the file-load
+   * path (deferred to onRenderCompleted); Apply/Save flows never touch it, so an in-progress
+   * edit session is never overwritten by its own applied content.
+   */
+  QString documentXml() const;
   Q_INVOKABLE QString applyXmlChanges(const QString& newXml);
   Q_INVOKABLE QString saveXmlToFile(const QString& xml);
+
+  /**
+   * Checks XML well-formedness without building a scene, so Apply can report syntax errors
+   * quickly. Returns an empty string on success, or a localized error message.
+   */
+  Q_INVOKABLE QString validateXml(const QString& xml) const;
+
+  /**
+   * Attaches the shared XML syntax highlighter to a QML TextEdit/TextArea document. The
+   * quickTextDocument argument is the edit element's textDocument property value.
+   */
+  Q_INVOKABLE void attachHighlighter(QObject* quickTextDocument);
+
+  /**
+   * Replaces the editor document's text. Large documents are appended in chunks driven by a
+   * 16ms-interval timer so the attached highlighter only ever rehighlights one chunk at a
+   * time and the UI thread is never blocked for long. editorLoadFinished() is emitted when
+   * the document is ready for editing. Lines longer than FoldLineThreshold are folded into
+   * short placeholders (see ElidedLine) before loading, so megabyte-long base64 lines never
+   * reach the text layout engine.
+   */
+  Q_INVOKABLE void loadEditorText(QObject* quickTextDocument, const QString& text);
+
+  /**
+   * Returns true if the editor text contains a line that looks like a folded-data marker but
+   * does not exactly match a known placeholder, i.e. the user modified a folded line. Apply
+   * and Save refuse to run in that state; the user must Discard to restore the line.
+   */
+  Q_INVOKABLE bool elideBroken(const QString& editorText) const;
+
+  /**
+   * Rebuilds the full source text by substituting every intact folded placeholder back with
+   * its original line content.
+   */
+  Q_INVOKABLE QString restoreElidedLines(const QString& editorText) const;
+
+  /**
+   * Discards all edits by undoing them: the undo stack is cleared right after loading, so it
+   * starts at the baseline and every user edit is on it. Undoing costs only as much as the
+   * edits themselves, unlike reloading the whole document (seconds for large files). Returns
+   * false when the stack cannot restore the baseline, in which case the caller should fall
+   * back to a full reload.
+   */
+  Q_INVOKABLE bool discardToBaseline(QObject* quickTextDocument);
 
   struct RenderState {
     std::shared_ptr<pagx::PAGScene> scene;
@@ -118,10 +178,14 @@ class PAGXViewModel : public ContentViewModel {
   void notifyPlaybackFinished(uint64_t generation);
 
   Q_SIGNAL void pagxDocumentChanged(std::shared_ptr<pagx::PAGXDocument> pagxDocument);
+  Q_SIGNAL void documentXmlChanged();
+  Q_SIGNAL void editorLoadFinished(double maxLineWidth);
+  // Loading progress in the 0..1 range, emitted once per inserted chunk.
+  Q_SIGNAL void editorLoadProgress(double progress);
 
   /**
    * Called by PAGXView when the render thread completes a render.
-   * This is used to defer XmlLinesModel updates until the first render is done.
+   * This is used to defer documentXml updates until the first render is done.
    */
   Q_SLOT void onRenderCompleted();
 
@@ -130,6 +194,8 @@ class PAGXViewModel : public ContentViewModel {
 
  private:
   void clearContent();
+  void clearDocumentXml();
+  Q_SLOT void appendEditorChunk();
   void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
@@ -160,8 +226,32 @@ class PAGXViewModel : public ContentViewModel {
   int pagxWidth = 0;
   int pagxHeight = 0;
   std::string currentFilePath = {};
-  XmlLinesModel* xmlLinesModel = nullptr;
+  // XML text of the loaded file, published to the editor through documentXmlChanged.
+  QString documentXmlText = {};
   QString pendingXmlContent = {};
+  QPointer<XmlDocumentHighlighter> highlighter = {};
+  // Folded long lines of the currently loaded document.
+  QList<ElidedLine> elidedLines = {};
+  // Chunked editor-loading state; loading lives here so it survives QML rebinding of the editor.
+  QPointer<QTextDocument> loaderDocument = {};
+  QString loaderText = {};
+  qsizetype loaderOffset = 0;
+  qsizetype loaderChunkCount = 0;
+  double loaderMaxLineWidth = 0;
+  QElapsedTimer loaderElapsed;
+  QTimer* loaderTimer = nullptr;
+  // Adaptive chunk size, tuned every tick against the frame budget so loading keeps the UI
+  // responsive instead of hogging the main thread with fixed-size bursts.
+  qsizetype loaderChunkSize = 64 * 1024;
+  // Layout warmup state: blocks are laid out progressively DURING the chunked load (a fixed
+  // number per insert tick, remainder synchronously before the load finishes), so hitTest
+  // and far jumps never pay the sequential-layout cost of unvisited blocks.
+  QPointer<QTextDocument> warmupDocument = {};
+  int warmupBlockNumber = 0;
+
+  // Lays out up to maxBlocks blocks starting at warmupBlockNumber; stops early at the last
+  // inserted block.
+  void warmupLayouts(int maxBlocks);
   int64_t totalFrames = 1;
   float frameRate = 0.0f;
   std::atomic<double> progress = 0.0;

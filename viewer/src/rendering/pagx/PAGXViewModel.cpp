@@ -17,17 +17,96 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/pagx/PAGXViewModel.h"
+#include <QAbstractTextDocumentLayout>
+#include <QCryptographicHash>
+#include <QDebug>
 #include <QFile>
+#include <QFontMetrics>
 #include <QMetaObject>
+#include <QQuickItem>
+#include <QQuickTextDocument>
 #include <QQuickWindow>
+#include <QTextCursor>
+#include <QTime>
+#include <QTimer>
+#include <QXmlStreamReader>
 #include <cmath>
+#include <limits>
 #include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
 
 namespace pag {
 
+static void EditorLog(const QString& message) {
+  qDebug().noquote() << "[PAGXEditor]" << QTime::currentTime().toString("hh:mm:ss.zzz") << message;
+}
+
+// Long data lines (e.g. embedded base64 images) are folded into short placeholders in the
+// editor: the text layout engine chokes on megabyte-long lines with multi-second synchronous
+// layouts, and they are useless to read or edit by hand anyway. Thresholds and marker format
+// live next to the folding implementation.
+constexpr qsizetype FoldLineThreshold = 4096;
+constexpr qsizetype FoldVisibleEdge = 1024;
+constexpr const char* FoldMarkerPrefix = "<!--FOLDED-";
+
+static QString BuildFoldMarker(const QString& fullLine) {
+  const auto hash = QCryptographicHash::hash(fullLine.toUtf8(), QCryptographicHash::Sha1);
+  return QString(FoldMarkerPrefix) + QString::fromLatin1(hash.toHex().left(16)) + "-->";
+}
+
+static void BuildElidedText(const QString& text, QString* elidedText,
+                            QList<ElidedLine>* elidedLines) {
+  elidedText->clear();
+  elidedText->reserve(text.size());
+  elidedLines->clear();
+  qsizetype start = 0;
+  while (start < text.size()) {
+    auto end = text.indexOf(u'\n', start);
+    if (end < 0) {
+      end = text.size();
+    }
+    const auto lineLength = end - start;
+    if (lineLength > FoldLineThreshold) {
+      const auto fullLine = text.mid(start, lineLength);
+      const auto placeholder = text.mid(start, FoldVisibleEdge) + BuildFoldMarker(fullLine) +
+                               text.mid(end - FoldVisibleEdge, FoldVisibleEdge);
+      elidedLines->append({placeholder, fullLine});
+      elidedText->append(placeholder);
+    } else {
+      elidedText->append(QStringView(text).mid(start, lineLength));
+    }
+    if (end >= text.size()) {
+      break;
+    }
+    elidedText->append(u'\n');
+    start = end + 1;
+  }
+}
+
+// Measures the widest line with the document's font so the QML editor can size its content
+// without ever asking QTextDocumentLayout for the ideal width, which would force a full
+// layout pass over every block and freeze the UI on large files.
+static double MeasureMaxLineWidth(const QTextDocument* document, const QString& text) {
+  const QFontMetrics metrics(document->defaultFont());
+  double maxWidth = 0;
+  qsizetype start = 0;
+  while (start < text.size()) {
+    auto end = text.indexOf(u'\n', start);
+    if (end < 0) {
+      end = text.size();
+    }
+    const auto width =
+        metrics.horizontalAdvance(QStringView(text).mid(start, end - start).toString());
+    maxWidth = qMax(maxWidth, static_cast<double>(width));
+    if (end >= text.size()) {
+      break;
+    }
+    start = end + 1;
+  }
+  return maxWidth;
+}
+
 PAGXViewModel::PAGXViewModel(QObject* parent) : ContentViewModel(parent) {
-  xmlLinesModel = new XmlLinesModel(this);
 }
 
 int PAGXViewModel::getWidth() const {
@@ -244,12 +323,14 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
+    clearDocumentXml();
     Q_EMIT filePathChanged("");
     return false;
   }
 
   auto document = pagx::PAGXImporter::FromXML(byteData->data(), byteData->length());
   if (document == nullptr) {
+    clearDocumentXml();
     Q_EMIT filePathChanged("");
     return false;
   }
@@ -264,6 +345,7 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
       // null timeline this stops playback, zeroes the frame counters, and bumps the generation.
       updateAnimationState();
     }
+    clearDocumentXml();
     Q_EMIT filePathChanged("");
     Q_EMIT pagxDocumentChanged(nullptr);
     emitContentStateReset();
@@ -298,9 +380,9 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
   // happens asynchronously and won't block the render.
   Q_EMIT pagxDocumentChanged(pagxDocument);
 
-  // Save XML content for deferred update. The actual XmlLinesModel::setContent()
-  // will be called from onRenderCompleted() after the first render finishes.
-  // This avoids race conditions between ListView updates and texture presentation.
+  // Save XML content for deferred update. The actual documentXmlText assignment happens in
+  // onRenderCompleted() after the first render finishes, avoiding races between editor updates
+  // and texture presentation.
   pendingXmlContent = xmlString;
 
   resetView();
@@ -387,8 +469,8 @@ void PAGXViewModel::updateAnimationState() {
   isPlaying_ = hasAnimation();
 }
 
-XmlLinesModel* PAGXViewModel::linesModel() const {
-  return xmlLinesModel;
+QString PAGXViewModel::documentXml() const {
+  return documentXmlText;
 }
 
 QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
@@ -423,6 +505,12 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   Q_EMIT pagxDocumentChanged(pagxDocument);
   Q_EMIT requestFlush();
 
+  // A successful Apply establishes a new discard baseline: clear the editor document's undo
+  // history so discardToBaseline reverts to the applied content, not to an earlier state.
+  if (highlighter != nullptr) {
+    highlighter->document()->clearUndoRedoStacks();
+  }
+
   return {};  // Empty string means success
 }
 
@@ -444,13 +532,279 @@ QString PAGXViewModel::saveXmlToFile(const QString& xml) {
   return {};  // Empty string means success
 }
 
+QString PAGXViewModel::validateXml(const QString& xml) const {
+  QXmlStreamReader reader(xml);
+  while (!reader.atEnd()) {
+    reader.readNext();
+    if (reader.hasError()) {
+      return tr("Line %1, column %2: %3")
+          .arg(reader.lineNumber())
+          .arg(reader.columnNumber())
+          .arg(reader.errorString());
+    }
+  }
+  return {};  // Empty string means the XML is well-formed
+}
+
+void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
+  auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
+  if (quickDocument == nullptr) {
+    return;
+  }
+  auto* document = quickDocument->textDocument();
+  if (highlighter != nullptr && highlighter->document() == document) {
+    return;
+  }
+  // A previous highlighter can only belong to a previous editor instance's document; replace
+  // it so a recreated editor is never left unhighlighted.
+  // QQuickTextEdit only builds text nodes for blocks inside the viewport when this flag is
+  // set, and Qt sets it in setText() only for documents over 10000 characters. The chunked
+  // loader bypasses setText, so enable it explicitly: without the flag every scroll frame
+  // rebuilds text nodes for the ENTIRE document, which stalls the UI for seconds.
+  if (auto* editorItem = qobject_cast<QQuickItem*>(quickDocument->parent())) {
+    editorItem->setFlag(QQuickItem::ItemObservesViewport, true);
+  }
+  delete highlighter;
+  highlighter = new XmlDocumentHighlighter(document);
+}
+
+void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
+  // A new load must abort any in-progress chunked load; otherwise a pending timer tick would
+  // append the previous file's remaining chunk onto the new content (loaderDocument is the same
+  // persistent document). Reset the loader state so appendEditorChunk cannot resume with it.
+  if (loaderTimer != nullptr) {
+    loaderTimer->stop();
+  }
+  loaderText.clear();
+  loaderOffset = 0;
+  loaderChunkCount = 0;
+  loaderMaxLineWidth = 0;
+  loaderChunkSize = 64 * 1024;
+  loaderDocument = nullptr;
+  warmupDocument = nullptr;
+  warmupBlockNumber = 0;
+  auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
+  if (quickDocument == nullptr) {
+    Q_EMIT editorLoadFinished(0);
+    return;
+  }
+  auto* document = quickDocument->textDocument();
+  QString textToLoad = text;
+  BuildElidedText(text, &textToLoad, &elidedLines);
+  constexpr qsizetype SmallDocumentThreshold = 256 * 1024;
+  if (textToLoad.size() <= SmallDocumentThreshold) {
+    QElapsedTimer timer;
+    timer.start();
+    document->setPlainText(textToLoad);
+    const auto setMs = timer.restart();
+    document->clearUndoRedoStacks();
+    const auto maxLineWidth = MeasureMaxLineWidth(document, textToLoad);
+    EditorLog(QString("loadEditorText: small path done, setPlainText=%1ms measure=%2ms "
+                      "maxLineWidth=%3")
+                  .arg(setMs)
+                  .arg(timer.elapsed())
+                  .arg(maxLineWidth));
+    Q_EMIT editorLoadFinished(maxLineWidth);
+    return;
+  }
+  // Replacing the whole text at once would make the attached highlighter rehighlight every
+  // block synchronously and freeze the UI for seconds on large files, so large documents are
+  // appended in chunks instead: each insert only rehighlights its own range.
+  loaderElapsed.start();
+  loaderDocument = document;
+  warmupDocument = document;
+  warmupBlockNumber = 0;
+  loaderText = textToLoad;
+  loaderOffset = 0;
+  loaderChunkCount = 0;
+  loaderMaxLineWidth = 0;
+  document->clear();
+  if (loaderTimer == nullptr) {
+    loaderTimer = new QTimer(this);
+    // A 16ms gap between chunks keeps the UI (loading overlay animation, canvas) at ~60fps
+    // while the load is running on the main thread; QTextDocument is not thread-safe so the
+    // inserts cannot move to a worker thread.
+    loaderTimer->setInterval(16);
+    connect(loaderTimer, &QTimer::timeout, this, &PAGXViewModel::appendEditorChunk);
+  }
+  loaderTimer->start();
+}
+
+void PAGXViewModel::appendEditorChunk() {
+  if (loaderDocument == nullptr) {
+    loaderTimer->stop();
+    loaderText.clear();
+    Q_EMIT editorLoadFinished(loaderMaxLineWidth);
+    return;
+  }
+  QElapsedTimer tickTimer;
+  tickTimer.start();
+  auto end = qMin(loaderText.size(), loaderOffset + loaderChunkSize);
+  if (end < loaderText.size()) {
+    // Cut on a line boundary so every chunk holds complete lines and the highlighter's
+    // cross-line states stay consistent.
+    const auto newLine = loaderText.lastIndexOf(u'\n', end);
+    if (newLine > loaderOffset) {
+      end = newLine + 1;
+    } else {
+      // No line boundary within the window: a single line longer than ChunkSize (e.g. an
+      // embedded base64 payload). Extend the chunk to the end of that line so the line is
+      // inserted in ONE piece; growing it across chunks would relayout the whole line after
+      // every insert, which is quadratic in the line length (multi-second stalls per chunk
+      // for megabyte-long lines, as seen in the [PAGXEditor] logs).
+      const auto nextNewLine = loaderText.indexOf(u'\n', end);
+      end = nextNewLine < 0 ? loaderText.size() : nextNewLine + 1;
+    }
+  }
+  const auto chunk = QStringView(loaderText).mid(loaderOffset, end - loaderOffset).toString();
+  loaderMaxLineWidth = qMax(loaderMaxLineWidth, MeasureMaxLineWidth(loaderDocument, chunk));
+  QTextCursor cursor(loaderDocument);
+  cursor.movePosition(QTextCursor::End);
+  cursor.beginEditBlock();
+  cursor.insertText(chunk);
+  cursor.endEditBlock();
+  ++loaderChunkCount;
+  Q_EMIT editorLoadProgress(static_cast<double>(end) / static_cast<double>(loaderText.size()));
+  loaderOffset = end;
+  // Viewport-observing rendering only lays out blocks that enter the viewport, but
+  // QTextDocumentLayout::hitTest walks blocks sequentially and lays out every one it passes,
+  // so the first click on a far-away line would stall for about a second. Warm layouts up
+  // while loading instead.
+  warmupLayouts(512);
+  // Pace the load against the frame budget: shrink the chunk when a tick overruns so the
+  // UI (overlay animation, canvas) stays responsive, and grow it when there is headroom.
+  const auto tickMs = tickTimer.elapsed();
+  if (tickMs > 33) {
+    loaderChunkSize = qMax<qsizetype>(24 * 1024, loaderChunkSize / 2);
+  } else if (tickMs < 12) {
+    loaderChunkSize = qMin<qsizetype>(256 * 1024, loaderChunkSize * 2);
+  }
+  if (loaderOffset >= loaderText.size()) {
+    loaderTimer->stop();
+    loaderText.clear();
+    loaderDocument->clearUndoRedoStacks();
+    // Finish the remaining blocks now, while the loading overlay still covers the editor:
+    // the user never sees a partially warmed document.
+    warmupLayouts(std::numeric_limits<int>::max());
+    EditorLog(QString("appendEditorChunk: chunked load finished, chunks=%1 totalMs=%2 "
+                      "maxLineWidth=%3 warmupBlocks=%4")
+                  .arg(loaderChunkCount)
+                  .arg(loaderElapsed.elapsed())
+                  .arg(loaderMaxLineWidth)
+                  .arg(warmupBlockNumber));
+    Q_EMIT editorLoadFinished(loaderMaxLineWidth);
+  }
+}
+
+void PAGXViewModel::warmupLayouts(int maxBlocks) {
+  if (warmupDocument == nullptr) {
+    return;
+  }
+  auto* layout = warmupDocument->documentLayout();
+  for (auto i = 0; i < maxBlocks; ++i) {
+    const auto block = warmupDocument->findBlockByNumber(warmupBlockNumber);
+    if (!block.isValid()) {
+      // Not inserted yet (during loading) or all blocks are warmed up.
+      return;
+    }
+    layout->blockBoundingRect(block);
+    ++warmupBlockNumber;
+  }
+}
+
+bool PAGXViewModel::elideBroken(const QString& editorText) const {
+  if (elidedLines.isEmpty()) {
+    return false;
+  }
+  qsizetype start = 0;
+  while (start < editorText.size()) {
+    auto end = editorText.indexOf(u'\n', start);
+    if (end < 0) {
+      end = editorText.size();
+    }
+    const auto line = QStringView(editorText).mid(start, end - start);
+    // Deleting a whole folded line is a legitimate edit (its marker simply disappears);
+    // only a line that still carries the marker but no longer matches the placeholder
+    // verbatim means the folded payload can no longer be restored safely.
+    if (line.contains(QLatin1String(FoldMarkerPrefix))) {
+      auto intact = false;
+      for (const auto& elided : elidedLines) {
+        if (line == QStringView(elided.placeholder)) {
+          intact = true;
+          break;
+        }
+      }
+      if (!intact) {
+        return true;
+      }
+    }
+    start = end + 1;
+  }
+  return false;
+}
+
+QString PAGXViewModel::restoreElidedLines(const QString& editorText) const {
+  if (elidedLines.isEmpty()) {
+    return editorText;
+  }
+  QString result;
+  result.reserve(editorText.size() * 2);
+  qsizetype start = 0;
+  while (start < editorText.size()) {
+    auto end = editorText.indexOf(u'\n', start);
+    if (end < 0) {
+      end = editorText.size();
+    }
+    const auto line = QStringView(editorText).mid(start, end - start);
+    const ElidedLine* match = nullptr;
+    for (const auto& elided : elidedLines) {
+      if (line == QStringView(elided.placeholder)) {
+        match = &elided;
+        break;
+      }
+    }
+    if (match != nullptr) {
+      result.append(match->fullLine);
+    } else {
+      result.append(line);
+    }
+    if (end >= editorText.size()) {
+      break;
+    }
+    result.append(u'\n');
+    start = end + 1;
+  }
+  return result;
+}
+
+bool PAGXViewModel::discardToBaseline(QObject* quickTextDocument) {
+  auto* quickDocument = qobject_cast<QQuickTextDocument*>(quickTextDocument);
+  if (quickDocument == nullptr) {
+    return false;
+  }
+  auto* document = quickDocument->textDocument();
+  if (!document->isUndoAvailable()) {
+    return false;
+  }
+  while (document->isUndoAvailable()) {
+    document->undo();
+  }
+  return true;
+}
+
+void PAGXViewModel::clearDocumentXml() {
+  documentXmlText.clear();
+  pendingXmlContent.clear();
+  Q_EMIT documentXmlChanged();
+}
+
 void PAGXViewModel::onRenderCompleted() {
   if (pendingXmlContent.isEmpty()) {
     return;
   }
-  auto xmlContent = std::move(pendingXmlContent);
+  documentXmlText = std::move(pendingXmlContent);
   pendingXmlContent.clear();
-  xmlLinesModel->setContent(xmlContent);
+  Q_EMIT documentXmlChanged();
 }
 
 }  // namespace pag
