@@ -138,7 +138,7 @@ Options:
 
 `snapshot.js` also supports `-o -` to write the snapshot HTML to stdout (used as the
 `pagx import` bridge). `--embed-fonts` is a `html2pagx`-only flag; `snapshot.js` exposes
-only `--download-fonts` (embedding happens in the `pagx font embed` step downstream).
+only `--download-fonts` (embedding happens in the `pagx embed` step downstream).
 
 ### Inline icon fonts
 
@@ -223,7 +223,7 @@ typeface — `--fallback` both registers the face (matching the document's
 subset files jointly cover the text:
 
 ```bash
-pagx font embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
+pagx embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
 pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
 ```
 
@@ -275,7 +275,7 @@ Options:
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
 | `--capture-animations` | Forwarded to `snapshot.js`: capture the page's animations into the subset so the `.pagx` replays the motion (default: a single static frame) |
 | `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
-| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx font embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
+| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 |
 | `--image-dir <dir>` | Where downloaded images are written (default `<output>.images/`) |

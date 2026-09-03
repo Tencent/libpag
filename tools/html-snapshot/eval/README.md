@@ -53,7 +53,7 @@ With `--download-fonts`, `snapshot.js` saves each web font the page uses into a
 single shared, content-addressed cache at `out/<label>/fonts/` — a face common
 to the corpus is stored once instead of being re-downloaded per case — and each
 case records the subset it uses in `out/<label>/<case>/fonts.txt`. `run.js` then
-runs `pagx font embed --fallback …` on the resolved document and passes the same
+runs `pagx embed --fallback …` on the resolved document and passes the same
 per-case files to `pagx render --fallback`, so text in an uninstalled web font
 renders with the correct face instead of a host system fallback. Cases with no
 web fonts are unaffected.

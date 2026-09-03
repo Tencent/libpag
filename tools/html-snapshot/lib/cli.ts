@@ -136,7 +136,7 @@ const FLAGS: FlagSpec[] = [
   // Download every web font the page actually uses (each unicode-range
   // subset the browser fetched) and write it to disk as a plain SFNT
   // (TTF/OTF). Off by default. The files can then be handed to
-  // `pagx render --fallback` / `pagx font embed --fallback` so text styled
+  // `pagx render --fallback` / `pagx embed --fallback` so text styled
   // with an uninstalled web font renders with the correct typeface instead
   // of a system fallback. The destination defaults to a sibling
   // `<output>.fonts/` directory; override with `--font-dir`.
@@ -154,7 +154,7 @@ const FLAGS: FlagSpec[] = [
   // Write the list of font files this snapshot actually uses (one absolute
   // path per line) to <path>. With a shared --font-dir, the directory may hold
   // fonts from many pages; the manifest lets a caller (eval/run.js) hand only
-  // the fonts this page needs to `pagx render` / `pagx font embed`.
+  // the fonts this page needs to `pagx render` / `pagx embed`.
   { names: ['--font-manifest'], set: (o, v) => { o.fontManifest = v as string; } },
   // Pick the headless browser driver. Defaults to puppeteer; pass
   // `playwright` to drive Chromium through Playwright instead (requires
@@ -215,7 +215,7 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     scrollReveal: false,
     // Web-font download: when true, every font file the browser fetched
     // while rendering is written to `fontDir` as a plain SFNT (TTF/OTF) so
-    // downstream `pagx render`/`pagx font embed` can use the real typeface
+    // downstream `pagx render`/`pagx embed` can use the real typeface
     // instead of a host system fallback. See lib/font-download.ts; toggle
     // via `--download-fonts`, redirect via `--font-dir`.
     downloadFonts: false,
@@ -378,7 +378,7 @@ Options:
                              unicode-range subset the browser fetched) to disk
                              as a plain SFNT (TTF/OTF). Default: disabled. Hand
                              the files to 'pagx render --fallback' or
-                             'pagx font embed --fallback' so text in an
+                             'pagx embed --fallback' so text in an
                              uninstalled web font renders with the right face.
   --font-dir <dir>           Destination for --download-fonts (default:
                              <output-without-ext>.fonts/). May be shared across
