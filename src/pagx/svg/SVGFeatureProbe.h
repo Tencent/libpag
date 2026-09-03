@@ -39,12 +39,14 @@ struct SVGFeatureFlags {
   bool hasTextModifier = false;     // TextModifier / RangeSelector (per-glyph animation styling).
   bool hasConicGradient = false;    // No SVG conic/sweep gradient primitive.
   bool hasDiamondGradient = false;  // No SVG diamond gradient primitive.
+  bool hasInvertedMask = false;     // SVG masks cannot express inverted alpha/luminance.
 
   /**
    * Returns true when at least one feature is present.
    */
   bool needsRasterization() const {
-    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient;
+    return hasTextPath || hasTextModifier || hasConicGradient || hasDiamondGradient ||
+           hasInvertedMask;
   }
 };
 

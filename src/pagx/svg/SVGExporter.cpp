@@ -1705,14 +1705,36 @@ std::string SVGWriter::writeFilterAndStyleDefs(const std::vector<LayerFilter*>& 
 // SVGWriter – mask / clip-path defs
 //==============================================================================
 
-std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskType) {
+// Inverted mask types degrade to their base type for best-effort vector output: SVG masks
+// cannot express inversion, so the inversion is dropped here (the feature probe rasterizes
+// the layer instead when baking is enabled).
+static MaskType DegradeInvertedMaskType(MaskType type) {
+  switch (type) {
+    case MaskType::AlphaInverted:
+      return MaskType::Alpha;
+    case MaskType::LuminanceInverted:
+      return MaskType::Luminance;
+    case MaskType::ContourInverted:
+      return MaskType::Contour;
+    default:
+      return type;
+  }
+}
+
+std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType requestedType) {
+  // SVG cannot express mask inversion, so inverted types are normalised to their base type up
+  // front: the emitted def, its cache key and its id suffix all key off the base type. Two owners
+  // referencing the same mask layer as Alpha and AlphaInverted therefore share one def instead of
+  // emitting two byte-identical `<mask>` elements.
+  auto maskType = DegradeInvertedMaskType(requestedType);
+
   // Reuse a previously-emitted def for the same (maskLayer, maskType). Without this cache, a
   // single mask Layer referenced by N owners produces N `<mask>` (or `<clipPath>`) elements
   // with the same id in <defs>, which is undefined per the SVG spec — browsers typically use
   // the first and silently ignore the rest, but a regression that changes emission order would
   // re-wire all owners to a different copy.
   //
-  // MaskType participates in the key because the three values map to materially different SVG
+  // MaskType participates in the key because the values map to materially different SVG
   // output: Alpha and Luminance both emit `<mask>` but differ in `mask-type` (alpha channel vs
   // luminance, the SVG default), while Contour emits `<clipPath>` (geometry-only inside/outside
   // test). Without keying on MaskType, the second reference for a layer used in two roles
@@ -1739,6 +1761,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
     defId = generateId(idPrefix);
   } else {
     defId = maskLayer->id;
+    // maskType is already normalised to a base type, so the inverted values never reach here.
     switch (maskType) {
       case MaskType::Alpha:
         defId += "_a";
@@ -1747,6 +1770,7 @@ std::string SVGWriter::writeMaskOrClipDef(const Layer* maskLayer, MaskType maskT
         defId += "_l";
         break;
       case MaskType::Contour:
+      default:
         defId += "_c";
         break;
     }
@@ -3269,8 +3293,8 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     if (features.needsRasterization()) {
       addWarning("layer '" + (layer->id.empty() ? std::string("(unnamed)") : layer->id) +
                  "' uses SVG-unsupported features (TextPath / TextModifier / diamond or conic "
-                 "gradient) and bakeUnsupported is false; emitting as best-effort vector with "
-                 "those features dropped or downgraded to radial.");
+                 "gradient / inverted mask) and bakeUnsupported is false; emitting as best-effort"
+                 " vector with those features dropped or downgraded to radial.");
     }
   }
 
@@ -3435,7 +3459,7 @@ void SVGWriter::writeLayerOuterAttributes(SVGBuilder& out, const Layer* layer) {
   }
 
   if (layer->mask != nullptr) {
-    if (layer->maskType == MaskType::Contour) {
+    if (layer->maskType == MaskType::Contour || layer->maskType == MaskType::ContourInverted) {
       // Contour masking uses <clipPath> which only supports geometry clipping.
       auto clipId = writeClipPathDef(layer->mask, layer);
       out.addAttribute("clip-path", "url(#" + clipId + ")");

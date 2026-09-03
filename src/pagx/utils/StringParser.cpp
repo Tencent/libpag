@@ -187,7 +187,10 @@ DEFINE_ENUM_CONVERSION(ScaleMode, ScaleMode::LetterBox, {ScaleMode::None, "none"
                        {ScaleMode::Zoom, "zoom"})
 
 DEFINE_ENUM_CONVERSION(MaskType, MaskType::Alpha, {MaskType::Alpha, "alpha"},
-                       {MaskType::Luminance, "luminance"}, {MaskType::Contour, "contour"})
+                       {MaskType::Luminance, "luminance"}, {MaskType::Contour, "contour"},
+                       {MaskType::AlphaInverted, "alphaInverted"},
+                       {MaskType::LuminanceInverted, "luminanceInverted"},
+                       {MaskType::ContourInverted, "contourInverted"})
 
 DEFINE_ENUM_CONVERSION(PolystarType, PolystarType::Polygon, {PolystarType::Polygon, "polygon"},
                        {PolystarType::Star, "star"})

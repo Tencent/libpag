@@ -163,6 +163,9 @@
       <xs:enumeration value="alpha"/>
       <xs:enumeration value="luminance"/>
       <xs:enumeration value="contour"/>
+      <xs:enumeration value="alphaInverted"/>
+      <xs:enumeration value="luminanceInverted"/>
+      <xs:enumeration value="contourInverted"/>
     </xs:restriction>
   </xs:simpleType>
 

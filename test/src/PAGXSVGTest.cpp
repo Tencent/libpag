@@ -4132,6 +4132,86 @@ PAGX_TEST(PAGXSVGTest, SVGExport_SharedMaskLayerDifferentMaskTypesEmitDistinctDe
 }
 
 /**
+ * SVG has no mask inversion operator. With bakeUnsupported=true (the default) an inverted mask
+ * trips the feature probe and the whole layer is rasterized to an <image>, preserving the visual
+ * result.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_BakeUnsupportedRastersInvertedMask) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+
+  auto* maskLayer = doc->makeNode<pagx::Layer>();
+  maskLayer->id = "invMask";
+  auto* maskRect = doc->makeNode<pagx::Rectangle>();
+  maskRect->position = {50, 100};
+  maskRect->size = {100, 200};
+  maskLayer->contents.push_back(maskRect);
+  maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+  auto* owner = doc->makeNode<pagx::Layer>();
+  owner->id = "invOwner";
+  owner->mask = maskLayer;
+  owner->maskType = pagx::MaskType::AlphaInverted;
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {180, 180};
+  owner->contents.push_back(rect);
+  owner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+  doc->layers.push_back(owner);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<image"), std::string::npos);
+  EXPECT_NE(svg.find("data:image/png;base64,"), std::string::npos);
+}
+
+/**
+ * With bakeUnsupported=false the inverted mask degrades to its base type: AlphaInverted emits an
+ * alpha <mask> (not a luminance one) and ContourInverted emits a <clipPath>. The inversion itself
+ * is dropped — that is the documented best-effort vector behaviour.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_InvertedMaskDegradesToBaseType) {
+  auto makeDoc = [](pagx::MaskType maskType) {
+    auto doc = pagx::PAGXDocument::Make(200, 200);
+    auto* maskLayer = doc->makeNode<pagx::Layer>();
+    maskLayer->id = "invMask";
+    auto* maskRect = doc->makeNode<pagx::Rectangle>();
+    maskRect->position = {50, 100};
+    maskRect->size = {100, 200};
+    maskLayer->contents.push_back(maskRect);
+    maskLayer->contents.push_back(MakeSolidFillSVG(doc.get(), 1, 1, 1));
+
+    auto* owner = doc->makeNode<pagx::Layer>();
+    owner->mask = maskLayer;
+    owner->maskType = maskType;
+    auto* rect = doc->makeNode<pagx::Rectangle>();
+    rect->position = {100, 100};
+    rect->size = {180, 180};
+    owner->contents.push_back(rect);
+    owner->contents.push_back(MakeSolidFillSVG(doc.get(), 0.2f, 0.6f, 0.9f));
+    doc->layers.push_back(owner);
+    return doc;
+  };
+
+  pagx::SVGExporter::Options opts;
+  opts.bakeUnsupported = false;
+
+  // AlphaInverted degrades to an alpha <mask>, keyed and suffixed by the base type.
+  auto alphaDoc = makeDoc(pagx::MaskType::AlphaInverted);
+  auto alphaSvg = pagx::SVGExporter::ToSVG(*alphaDoc, opts);
+  EXPECT_NE(alphaSvg.find("id=\"invMask_a\""), std::string::npos)
+      << "AlphaInverted must reuse the alpha def id";
+  EXPECT_NE(alphaSvg.find("mask-type:alpha"), std::string::npos)
+      << "AlphaInverted must stay an alpha mask, not degrade to luminance";
+
+  // ContourInverted degrades to a <clipPath>, not a <mask>.
+  auto contourDoc = makeDoc(pagx::MaskType::ContourInverted);
+  auto contourSvg = pagx::SVGExporter::ToSVG(*contourDoc, opts);
+  EXPECT_NE(contourSvg.find("<clipPath"), std::string::npos)
+      << "ContourInverted must degrade to a clipPath";
+  EXPECT_EQ(contourSvg.find("<mask "), std::string::npos)
+      << "ContourInverted must not degrade to a mask";
+}
+
+/**
  * A mask Layer referenced by multiple owners under the same MaskType must produce exactly one
  * <mask> def. The cache reuses the existing def id rather than re-emitting a duplicate-id
  * element into <defs>.
