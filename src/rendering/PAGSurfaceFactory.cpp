@@ -23,7 +23,7 @@
 #include "rendering/drawables/OffscreenDrawable.h"
 #include "rendering/drawables/RenderTargetDrawable.h"
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 
 namespace pag {
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
@@ -35,12 +35,22 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
+  auto adopted = Devices::AdoptCurrent();
+  auto device = std::move(adopted.device);
+  bool externalContext = adopted.externalContext;
+  if (device == nullptr) {
+    // AdoptCurrent() only returns a device on backends with a thread-local "current context"
+    // concept (OpenGL). Other backends (Metal / D3D12) reach the render device by walking back
+    // from the caller's external render target itself. Vulkan / WebGPU do not carry a device
+    // reference on their target types and fall back to Devices::MakeDefault() inside
+    // MakeCompatibleWith*.
+    device = Devices::MakeForTexture(ToTGFX(renderTarget));
+  }
   auto drawable = RenderTargetDrawable::MakeFrom(device, ToTGFX(renderTarget), ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), true));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
@@ -48,12 +58,24 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
   std::shared_ptr<tgfx::Device> device = nullptr;
   bool externalContext = false;
   if (forAsyncThread) {
-    auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
-    device = tgfx::GLDevice::Make(sharedContext);
+    // Prefer a share-context device derived from the caller's current host context so the async
+    // worker can access the caller's external texture; if no host context is current on this
+    // thread, fall back to a standalone default device (matches the original behavior of
+    // GLDevice::Make(nullptr), which returned an independent device).
+    device = Devices::MakeForAsyncThread();
+    if (device == nullptr) {
+      device = Devices::MakeDefault();
+    }
   }
   if (device == nullptr) {
-    device = tgfx::GLDevice::Current();
-    externalContext = true;
+    auto adopted = Devices::AdoptCurrent();
+    device = std::move(adopted.device);
+    externalContext = adopted.externalContext;
+  }
+  if (device == nullptr) {
+    // Backends without a thread-local "current context" (Metal / D3D12) derive the device from
+    // the external texture itself; Vulkan / WebGPU fall back to MakeDefault() internally.
+    device = Devices::MakeForTexture(ToTGFX(texture));
   }
   auto drawable = TextureDrawable::MakeFrom(device, ToTGFX(texture), ToTGFX(origin));
   if (drawable == nullptr) {

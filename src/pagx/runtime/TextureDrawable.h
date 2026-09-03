@@ -24,8 +24,9 @@ namespace pagx {
 
 /**
  * TextureDrawable backs a PAGSurface with an externally created backend texture. The device is
- * obtained from GLDevice::Current() so that the PAGSurface shares the same GPU context as the
- * caller. The texture must not be bound to any framebuffer when passed in.
+ * adopted from the host thread's current GPU context (via pag::Devices::AdoptCurrent()) so that
+ * the PAGSurface shares the same GPU context as the caller. The texture must not be bound to any
+ * framebuffer when passed in.
  */
 class TextureDrawable : public Drawable {
  public:

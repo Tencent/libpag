@@ -31,10 +31,32 @@
 #include "utils/ProjectPath.h"
 #include "utils/Semaphore.h"
 
+#ifdef TGFX_USE_OPENGL
+#include "tgfx/gpu/opengl/GLTypes.h"
+#endif
+
+#ifdef TGFX_USE_METAL
+#include "tgfx/gpu/metal/MetalTypes.h"
+#endif
+
 namespace pag {
 std::string ToString(Frame frame);
 
+#ifdef TGFX_USE_OPENGL
 BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, int height);
+bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLTextureInfo* texture);
+#endif
+
+#ifdef TGFX_USE_METAL
+// Backend-specific helpers for Metal tests. Implemented in TestUtils_Metal.mm (Objective-C++ is
+// required to bridge the id<MTLTexture> stored in MetalTextureInfo::texture).
+BackendTexture ToBackendTexture(const tgfx::MetalTextureInfo& texture, int width, int height);
+BackendRenderTarget ToBackendRenderTarget(const tgfx::MetalTextureInfo& texture, int width,
+                                          int height);
+bool CreateMetalTexture(tgfx::Context* context, int width, int height,
+                        tgfx::MetalTextureInfo* texture);
+void ReleaseMetalTexture(tgfx::MetalTextureInfo* texture);
+#endif
 
 std::vector<std::string> GetAllPAGFiles(const std::string& path);
 
@@ -42,8 +64,6 @@ tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);
-
-bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLTextureInfo* texture);
 
 std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path);
 

@@ -221,21 +221,29 @@ bool HardwareDecoder::resetVideoToolBox() {
 
   // create decompression session
   CFDictionaryRef attrs = NULL;
+  // Ask CoreVideo to make the decoded CVPixelBuffer usable directly by whichever GPU backend
+  // libpag was built against. Wrong compatibility flag causes tgfx to fall back to a CPU copy
+  // and hurts decode → render performance.
+#if defined(TGFX_USE_METAL)
+  const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferMetalCompatibilityKey,
+                        kCVPixelBufferIOSurfacePropertiesKey};
+  uint32_t gpuCompatibility = true;
+#else
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLESCompatibilityKey,
                         kCVPixelBufferIOSurfacePropertiesKey};
+  uint32_t gpuCompatibility = true;
+#endif
 
-  uint32_t openGLESCompatibility = true;
   uint32_t pixelFormatType = tgfx::IsLimitedYUVColorRange(sourceColorSpace)
                                  ? kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
                                  : kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
-  CFNumberRef openGLESCompatibilityValue =
-      CFNumberCreate(NULL, kCFNumberSInt32Type, &openGLESCompatibility);
+  CFNumberRef gpuCompatibilityValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &gpuCompatibility);
   CFDictionaryRef ioSurfaceParam =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
 
-  const void* values[] = {pixelFormatTypeValue, openGLESCompatibilityValue, ioSurfaceParam};
+  const void* values[] = {pixelFormatTypeValue, gpuCompatibilityValue, ioSurfaceParam};
 
   attrs = CFDictionaryCreate(NULL, keys, values, 3, NULL, NULL);
 
@@ -250,7 +258,7 @@ bool HardwareDecoder::resetVideoToolBox() {
 
   CFRelease(attrs);
   CFRelease(pixelFormatTypeValue);
-  CFRelease(openGLESCompatibilityValue);
+  CFRelease(gpuCompatibilityValue);
   CFRelease(ioSurfaceParam);
 
   if (@available(iOS 10.0, *)) {

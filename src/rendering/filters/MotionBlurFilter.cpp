@@ -139,7 +139,8 @@ std::vector<tgfx::Attribute> MotionBlurFilter::vertexAttributes() const {
 }
 
 std::vector<tgfx::BindingEntry> MotionBlurFilter::uniformBlocks() const {
-  return {{"VertexArgs", 0}, {"FragmentArgs", 1}};
+  return {{"VertexArgs", 0, tgfx::ShaderVisibility::Vertex},
+          {"FragmentArgs", 1, tgfx::ShaderVisibility::Fragment}};
 }
 
 void MotionBlurFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

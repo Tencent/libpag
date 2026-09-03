@@ -177,7 +177,7 @@ std::string BulgeFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> BulgeFilter::uniformBlocks() const {
-  return {{"Args", 0}};
+  return {{"Args", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void BulgeFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

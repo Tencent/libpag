@@ -31,10 +31,10 @@
 #include "pagx/FontConfig.h"
 #include "pagx/nodes/Node.h"
 #include "renderer/LayerBuilder.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx::cli {
@@ -335,7 +335,7 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
     return {};
   }
 
-  auto device = tgfx::GLDevice::Make();
+  auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
     std::cerr << "pagx render: failed to create GL device\n";
     return {};
