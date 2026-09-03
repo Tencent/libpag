@@ -253,12 +253,13 @@ export interface RunPagxFontEmbedOptions extends SpawnCaptureOptions {
   fontFiles?: string[];
 }
 
-// Optional Step 3.5 — `pagx font embed <pagx> --fallback <font>...`.
+// Optional Step 3.5 — `pagx embed <pagx> --skip-images --fallback <font>...`. Images are left
+// alone here because their storage mode is owned by the resolve step's --images flag.
 export async function runPagxFontEmbed(opts: RunPagxFontEmbedOptions = {}): Promise<SpawnCaptureResult> {
   const { pagxBin, pagxFile, fontFiles = [], stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxFontEmbed: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxFontEmbed: pagxFile is required');
-  const args = ['font', 'embed', pagxFile];
+  const args = ['embed', pagxFile, '--skip-images'];
   for (const f of fontFiles) args.push('--fallback', f);
   return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
@@ -515,7 +516,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     if (embedFonts && fonts.length > 0) {
       log(`[font-embed] ${pagxFile} (${fonts.length} font file(s))`);
       const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts });
-      assertStepOk('pagx font embed', embedResult);
+      assertStepOk('pagx embed', embedResult);
     }
 
     if (!doRender) {

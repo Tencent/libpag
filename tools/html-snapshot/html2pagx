@@ -81,7 +81,7 @@ Options (any unknown flag is forwarded to snapshot.js):
                              web fonts renders correctly. The fonts are not
                              embedded into the .pagx. Default: disabled.
   --embed-fonts              On top of --download-fonts, embed the downloaded
-                             faces into the .pagx (pagx font embed) so the
+                             faces into the .pagx (pagx embed) so the
                              document is self-contained and its glyph metrics
                              match the snapshot on any host. Implies
                              --download-fonts. Default: disabled.
