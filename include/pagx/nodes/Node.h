@@ -293,6 +293,25 @@ class Node {
    */
   int sourceLine = -1;
 
+  /**
+   * Index of this node in PAGXDocument::nodes, assigned at creation. -1 for nodes not yet attached
+   * to a document.
+   *
+   * WARNING: this is a positional index into a mutable vector, not a stable identity. It is
+   * invalidated whenever the node list changes: reloading the document, importer reruns, and
+   * PAGXDocument::removeNodes all renumber every remaining node. Callers MUST NOT cache this
+   * value across any operation that may mutate the node list; re-query hitTest() /
+   * getNodeSourceMap() and use the freshly returned index instead.
+   */
+  int index = -1;
+
+  /**
+   * The line number where this node's end tag appears in the source XML. Equals sourceLine for
+   * self-closing or single-line nodes. -1 means unavailable (e.g. programmatically created nodes
+   * without a source span). Set by PAGXImporter during parsing.
+   */
+  int endLine = -1;
+
   virtual ~Node() = default;
 
   /**

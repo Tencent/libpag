@@ -109,6 +109,16 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
   virtual void apply(float mix = 1.0f);
 
   /**
+   * Returns the parent PAGLayer in the runtime tree, or nullptr for the root composition. Used to
+   * climb from an internal hit-tested layer up to the referencing PAGComposition so a click on a
+   * composition instance resolves to the <Layer composition="@X"> reference rather than the
+   * internal definition node.
+   */
+  std::shared_ptr<PAGLayer> getParent() const {
+    return parent.lock();
+  }
+
+  /**
    * Returns the source Layer node associated with this runtime layer, or nullptr for the root
    * composition.
    */
@@ -135,6 +145,9 @@ class PAGLayer : public std::enable_shared_from_this<PAGLayer> {
   const Layer* node = nullptr;
   std::shared_ptr<tgfx::Layer> runtimeLayer = nullptr;
   std::vector<std::shared_ptr<PAGLayer>> children = {};
+  // Parent in the runtime tree. weak_ptr because the parent owns its children via shared_ptr; a
+  // strong ref here would create a cycle (parent → child → parent) that prevents destruction.
+  std::weak_ptr<PAGLayer> parent = {};
 
   /**
    * Traverses the runtime layer subtree and calls visitor for every PAGComposition node found.

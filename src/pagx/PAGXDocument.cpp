@@ -23,6 +23,7 @@
 #include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/PAGXNodeChannel.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -293,6 +294,118 @@ void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float contain
   LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, {}, context);
 }
 
+namespace {
+// Above this many resets the incremental path stops paying off versus a full layout, so callers
+// fall back to applyLayout. Kept small since the reset set covers only the edited Layers, their
+// ancestor chains and the edited Layers' content elements, never full subtrees.
+constexpr size_t MAX_INCREMENTAL_LAYOUT_LAYERS = 64;
+}  // namespace
+
+void PAGXDocument::rebuildParentOfCache() {
+  parentOfCache.clear();
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Layer) {
+      auto* layer = static_cast<Layer*>(node.get());
+      for (auto* child : layer->children) {
+        parentOfCache[child] = layer;
+      }
+    }
+  }
+  parentOfCacheValid = true;
+}
+
+bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
+                                          std::vector<Layer*>* changedOut) {
+  if (!layoutApplied) {
+    return false;
+  }
+  // Only a pure set of this document's Layer nodes qualifies; any non-Layer (or foreign) dirty
+  // node forces the full path. A dirty Layer stands for an edit to its own fields or to any node
+  // in its contents, so the reset below invalidates both.
+  std::vector<Layer*> changedLayers;
+  changedLayers.reserve(dirtyNodes.size());
+  for (auto* node : dirtyNodes) {
+    if (node == nullptr || node->nodeType() != NodeType::Layer || nodeSet.count(node) == 0) {
+      return false;
+    }
+    changedLayers.push_back(static_cast<Layer*>(node));
+  }
+  if (changedLayers.empty()) {
+    return false;
+  }
+  // Child -> parent map over every Layer (document and composition trees alike). Top-level layers
+  // have no entry, so the ancestor walk below naturally stops at each tree's root. The map is
+  // cached across calls and invalidated only by removeNodes(); attribute edits do not touch
+  // Layer::children, so a single build covers many incremental applies.
+  if (!parentOfCacheValid) {
+    rebuildParentOfCache();
+  }
+  const auto& parentOf = parentOfCache;
+  // Reset set: each edited Layer plus its ancestor chain up to the root, plus the edited Layers'
+  // content elements. Resetting the whole chain is required — if any ancestor kept its memo it
+  // would be skipped on the top-down pass and its edited descendant would never be revisited.
+  // Content elements must be reset as well because a content-node edit is reported with the host
+  // Layer dirty; their stale preferred sizes would otherwise leak through MeasureChildNodes and
+  // the layer would keep its pre-edit geometry. Child Layers and sibling subtrees are
+  // intentionally left memoized; target-size changes cascade to them through the per-node
+  // constraint memo.
+  std::unordered_set<LayoutNode*> resetNodes = {};
+  for (auto* layer : changedLayers) {
+    Layer* cursor = layer;
+    while (cursor != nullptr && resetNodes.insert(cursor).second) {
+      if (resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+        LOGI("applyLayoutIncremental: falling back to full layout (reset=%zu > max=%zu).",
+             resetNodes.size(), MAX_INCREMENTAL_LAYOUT_LAYERS);
+        return false;
+      }
+      auto it = parentOf.find(cursor);
+      cursor = it != parentOf.end() ? it->second : nullptr;
+    }
+    for (auto* element : layer->contents) {
+      auto* contentNode = LayoutNode::AsLayoutNode(element);
+      if (contentNode != nullptr && resetNodes.insert(contentNode).second &&
+          resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+        LOGI("applyLayoutIncremental: falling back to full layout (reset=%zu > max=%zu).",
+             resetNodes.size(), MAX_INCREMENTAL_LAYOUT_LAYERS);
+        return false;
+      }
+    }
+  }
+  // Snapshot layoutBounds before resetting so the post-pass can report which Layers actually moved
+  // (mirrors applyLayout). Only reset nodes lose their memo; everything else is skipped below.
+  std::unordered_map<Layer*, Rect> beforeBounds = {};
+  if (changedOut != nullptr) {
+    for (auto& node : nodes) {
+      if (node->nodeType() == NodeType::Layer) {
+        auto* layer = static_cast<Layer*>(node.get());
+        beforeBounds.emplace(layer, layer->layoutBounds());
+      }
+    }
+  }
+  for (auto* node : resetNodes) {
+    node->resetLayout();
+  }
+  // Re-run the normal top-down pass. Composition layers first (they may be referenced by document
+  // layers). External documents are intentionally not recursed: their content is unchanged and they
+  // were already laid out by the initial full pass.
+  LayoutContext context(&_fontConfig);
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      auto* comp = static_cast<Composition*>(node.get());
+      layoutLayers(comp->layers, comp->width, comp->height, &context);
+    }
+  }
+  layoutLayers(layers, width, height, &context);
+  if (changedOut != nullptr) {
+    for (auto& [layer, oldBounds] : beforeBounds) {
+      if (layer->layoutBounds() != oldBounds) {
+        changedOut->push_back(layer);
+      }
+    }
+  }
+  return true;
+}
+
 std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   doc->width = docWidth;
@@ -334,6 +447,14 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
     }
   }
   nodes.resize(writeIdx);
+  for (size_t i = 0; i < nodes.size(); i++) {
+    nodes[i]->index = static_cast<int>(i);
+  }
+  // Removals may drop entire Layer subtrees, so the cached child -> parent map is no longer
+  // guaranteed to be a superset of the current tree. Invalidate it lazily; the next
+  // applyLayoutIncremental call will rebuild it.
+  parentOfCacheValid = false;
+  parentOfCache.clear();
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {
@@ -392,6 +513,21 @@ std::vector<std::string> PAGXDocument::getExternalImagePaths() const {
   std::unordered_set<const PAGXDocument*> visited = {};
   AppendExternalImagePaths(this, &paths, visited);
   return paths;
+}
+
+std::vector<NodeSourceEntry> PAGXDocument::getNodeSourceMap() const {
+  std::vector<NodeSourceEntry> result = {};
+  result.reserve(nodes.size());
+  for (const auto& node : nodes) {
+    NodeSourceEntry entry = {};
+    entry.index = node->index;
+    entry.startLine = node->sourceLine;
+    entry.endLine = node->endLine;
+    entry.nodeType = node->nodeType();
+    entry.channels = ListChannels(node->nodeType());
+    result.push_back(std::move(entry));
+  }
+  return result;
 }
 
 bool PAGXDocument::loadFileData(const std::string& filePath, std::shared_ptr<Data> data) {
@@ -667,6 +803,10 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
       changedImages.push_back(static_cast<Image*>(node));
     }
   }
+  // Snapshot the owned dirty set before the Layer collapse below. The incremental layout path keys
+  // off the pre-collapse nodes: it only engages when every edited node is a Layer, since a content
+  // node collapsed to its owning Layer loses the precise measure dependency and must go full.
+  std::vector<Node*> dirtyBeforeCollapse = ownedDirty;
   {
     std::vector<Node*> layerDirty = {};
     for (auto* node : ownedDirty) {
@@ -716,9 +856,14 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   // changed, and those are merged into ownedDirty below so refreshNodes re-syncs their runtime
   // transform too.
   if (layoutChanged) {
-    std::unordered_set<const PAGXDocument*> visited = {};
     std::vector<Layer*> layoutRepositioned = {};
-    applyLayout(nullptr, visited, &layoutRepositioned);
+    // Try the incremental subtree re-layout first (resets only the edited Layers and their ancestor
+    // chains, letting unchanged subtrees hit the layout memo). It declines (returns false) for
+    // content-node edits or oversized reset sets, in which case fall back to the full applyLayout.
+    if (!applyLayoutIncremental(dirtyBeforeCollapse, &layoutRepositioned)) {
+      std::unordered_set<const PAGXDocument*> visited = {};
+      applyLayout(nullptr, visited, &layoutRepositioned);
+    }
     if (!layoutRepositioned.empty()) {
       ownedDirty.reserve(ownedDirty.size() + layoutRepositioned.size());
       for (auto* layer : layoutRepositioned) {

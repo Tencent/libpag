@@ -115,6 +115,46 @@ PAGStateMachine::PAGStateMachine(StateMachine* sm, RuntimeBinding* b, PAGXDocume
   }
 }
 
+void PAGStateMachine::reset() {
+  if (stateMachine == nullptr || owner.expired()) {
+    return;
+  }
+  // Re-run the construction-time initialization so the runtime returns to its load state: input
+  // values back to their declared defaults, every region back to initialState with a fresh
+  // animation at time 0, and any crossfade / trigger bookkeeping discarded.
+  for (size_t i = 0; i < stateMachine->inputs.size() && i < inputValues.size(); i++) {
+    const auto* input = stateMachine->inputs[i];
+    if (input == nullptr) {
+      continue;
+    }
+    inputValues[i].boolValue =
+        (input->type == StateMachineInputType::Bool) ? input->defaultBool : false;
+    inputValues[i].numberValue =
+        (input->type == StateMachineInputType::Number) ? input->defaultNumber : 0.0f;
+    inputValues[i].fired = false;
+  }
+  for (auto& ri : regions) {
+    if (ri.region == nullptr) {
+      continue;
+    }
+    ri.currentState = nullptr;
+    for (const auto* state : ri.region->states) {
+      if (state != nullptr && state->name == ri.region->initialState) {
+        ri.currentState = state;
+        break;
+      }
+    }
+    if (ri.currentState == nullptr && !ri.region->states.empty()) {
+      ri.currentState = ri.region->states[0];
+    }
+    ri.currentTimeline = createTimelineForState(ri.currentState);
+    ri.transition = nullptr;
+    ri.mix = 1.0f;
+    ri.fadingOut.clear();
+    ri.consumedTriggers.clear();
+  }
+}
+
 // =============================================================================
 // Identity / queries
 // =============================================================================

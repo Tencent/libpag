@@ -249,6 +249,15 @@ class LayoutNode {
   float layoutWidth = NAN;
   float layoutHeight = NAN;
 
+  // Memoization of the last resolved (targetWidth, targetHeight) passed to setLayoutSize. Within one
+  // applyLayout pass the subtree's measured sizes are fixed, so an unchanged target reproduces the
+  // same layout; Layer::setLayoutSize uses this to skip re-laying an entire subtree when a
+  // content-measured parent re-descends with an unchanged target during two-pass refinement,
+  // collapsing the otherwise exponential re-layout to linear. Cleared by resetLayout().
+  float lastLayoutTargetWidth = NAN;
+  float lastLayoutTargetHeight = NAN;
+  bool layoutResolved = false;
+
   friend class Rectangle;
   friend class Ellipse;
   friend class Path;

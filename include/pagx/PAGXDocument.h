@@ -41,6 +41,44 @@ class Image;
 class ImagePattern;
 
 /**
+ * One entry of the document's source-node map: the runtime index and source span of a node, its
+ * type, and the reflectable channel names available on it. Used by editor selection (line<->index
+ * mapping) and by hosts deciding which attribute edits can go incremental.
+ *
+ * startLine / endLine may be -1 independently of index: a node returned in getNodeSourceMap()
+ * always has index >= 0, but its source span can still be unknown when the node was created
+ * programmatically or by an importer that did not carry line information.
+ */
+struct NodeSourceEntry {
+  /**
+   * Index of the node in PAGXDocument::nodes. See Node::index for the caching caveats on this
+   * value.
+   */
+  int index = -1;
+
+  /**
+   * 1-based start line of the node in the PAGX XML, or -1 when the source span is unavailable.
+   */
+  int startLine = -1;
+
+  /**
+   * 1-based end line of the node in the PAGX XML, or -1 when the source span is unavailable.
+   */
+  int endLine = -1;
+
+  /**
+   * The node type.
+   */
+  NodeType nodeType = NodeType::Document;
+
+  /**
+   * Reflectable channel names of the node, from ListChannels(nodeType). Empty for node types that
+   * expose no channels.
+   */
+  std::vector<std::string> channels = {};
+};
+
+/**
  * PAGXDocument is the root container for a PAGX document. It owns the resources, layers, and font
  * configuration of a parsed/authored document, and tracks the live PAGScene instances created from
  * it so post-build edits issued through notifyChange() can be broadcast to each scene. Use
@@ -99,6 +137,7 @@ class PAGXDocument : public Node {
   T* makeNode(const std::string& id = "") {
     auto node = std::unique_ptr<T>(new T());
     auto* result = node.get();
+    result->index = static_cast<int>(nodes.size());
     registerNode(result, id);
     nodeSet.insert(result);
     nodes.push_back(std::move(node));
@@ -160,6 +199,16 @@ class PAGXDocument : public Node {
   std::vector<std::string> getExternalImagePaths() const;
 
   /**
+   * Returns one entry per node in PAGXDocument::nodes, in document order, carrying the node's
+   * runtime index, source span (1-based lines), type, and reflectable channel names. Use it to map
+   * source lines to node indexes for editor selection, and to decide which attribute edits can go
+   * incremental (a channel edit that fails can fall back to a full reparse). Entries reference the
+   * current node indexing; a structural document change renumbers nodes, so rebuild the map after
+   * such edits.
+   */
+  std::vector<NodeSourceEntry> getNodeSourceMap() const;
+
+  /**
    * Loads external file data matching the given file path. Image data is embedded into matching
    * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
    * For performance, load all external file data before creating any PAGScene from this document.
@@ -178,8 +227,7 @@ class PAGXDocument : public Node {
    * individually for each file when embedding multiple images.
    * @param fileDataMap a map from file path to the file content to embed
    */
-  void loadFileDataMap(
-      const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
+  void loadFileDataMap(const std::unordered_map<std::string, std::shared_ptr<Data>>& fileDataMap);
 
   /**
    * Returns the document's font configuration. Importers populate fallback fonts here
@@ -302,10 +350,10 @@ class PAGXDocument : public Node {
 
   // Sets runtimeImage on every Image node matching filePath in this document and its resolved
   // external documents, collecting the touched Image nodes per owning document.
-  static void LoadImageInChain(PAGXDocument* document, const std::string& filePath,
-                               const std::shared_ptr<PAGImage>& image,
-                               std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
-                               std::unordered_set<const PAGXDocument*>& visited);
+  static void LoadImageInChain(
+      PAGXDocument* document, const std::string& filePath, const std::shared_ptr<PAGImage>& image,
+      std::unordered_map<PAGXDocument*, std::vector<Node*>>& docDirtyImages,
+      std::unordered_set<const PAGXDocument*>& visited);
 
   // Recursive layout worker. visited holds the documents on the current ancestor path so an
   // externalDoc cycle built directly through the API (bypassing loadFileData's own chain guard)
@@ -317,6 +365,21 @@ class PAGXDocument : public Node {
                    std::vector<Layer*>* changedOut);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
+
+  // Incremental subtree re-layout for a pure set of edited Layer nodes. Instead of resetting every
+  // node's cached layout (as applyLayout does), it resets only each edited Layer and its ancestor
+  // chain up to the (composition or document) root, then re-runs the normal top-down layout pass:
+  // unchanged subtrees hit the per-node measure/constraint memo and are skipped, while target-size
+  // changes still cascade to descendants and repositioned siblings through that same memo. Requires
+  // the document to be already laid out and every dirty node to be a Layer owned by this document
+  // (content-node edits collapse to a Layer and lose the precise measure dependency needed to
+  // invalidate their subtree, so they are not handled here). Returns false — leaving the document
+  // untouched — when it cannot apply incrementally (not yet laid out, a non-Layer or foreign dirty
+  // node, or the reset set exceeds MAX_INCREMENTAL_LAYOUT_LAYERS); the caller must then fall back to
+  // a full applyLayout. On success, changedOut (when non-null) receives every Layer whose
+  // layoutBounds changed, exactly like applyLayout.
+  bool applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
+                              std::vector<Layer*>* changedOut);
 
   void registerNode(Node* node, const std::string& id);
 
@@ -346,6 +409,18 @@ class PAGXDocument : public Node {
   // destroyed (on the next parsePAGX() call).
   std::unordered_map<std::string, std::vector<const Layer*>> layersByImageFilePath = {};
   bool layersByImageFilePathBuilt = false;
+
+  // Lazily built child -> parent map over every Layer in the document (and its inner composition
+  // trees). Used by applyLayoutIncremental to walk each edited Layer's ancestor chain without
+  // rebuilding the map on every incremental call. Layer::children is only mutated during import /
+  // optimizer passes and by removeNodes(), so the cache is invalidated only by removeNodes(); pure
+  // attribute edits do not touch parent relationships.
+  std::unordered_map<const Layer*, Layer*> parentOfCache = {};
+  bool parentOfCacheValid = false;
+
+  // Rebuilds parentOfCache from scratch by walking every Layer's children list. Called lazily by
+  // applyLayoutIncremental when the cache is not valid.
+  void rebuildParentOfCache();
 
   friend class PAGXImporter;
   friend class PAGXExporter;

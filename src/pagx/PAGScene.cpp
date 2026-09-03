@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
+#include <algorithm>
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
@@ -40,6 +41,7 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/RasterUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
@@ -116,6 +118,7 @@ void PAGScene::buildRuntimeTree() {
   *rootComp->binding = std::move(buildResult.binding);
   rootComp->document = document.get();
   _rootComposition = rootComp;
+  nodeToLayer.clear();
   std::unordered_set<const Composition*> visited = {};
   _rootComposition->buildChildren(document->layers, visited);
   displayList->root()->addChild(rootComp->runtimeLayer);
@@ -685,11 +688,90 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
     return {};
   }
   auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
-  auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
+  // Tight bounds clipped to the layer's own scrollRect window, so selection outlines hug the
+  // visible content (per-glyph extents for text) instead of the conservative content envelope
+  // that Layer::getBounds returns by default.
+  auto rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
   Matrix rootToSurface = {};
   rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
   return FromTGFX(surfaceBounds);
+}
+
+void PAGScene::eraseNodeToLayerSubtree(const PAGLayer* layer) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->node != nullptr) {
+    // Remove this PAGLayer from the source node's instance list. Uses std::remove to keep the
+    // relative order of the surviving instances unchanged, so removals of one instance do not
+    // permute the entries of unrelated live instances.
+    auto it = nodeToLayer.find(layer->node);
+    if (it != nodeToLayer.end()) {
+      auto& instances = it->second;
+      instances.erase(std::remove(instances.begin(), instances.end(), layer), instances.end());
+      if (instances.empty()) {
+        nodeToLayer.erase(it);
+      }
+    }
+  }
+  for (const auto& child : layer->children) {
+    eraseNodeToLayerSubtree(child.get());
+  }
+}
+
+std::vector<Rect> PAGScene::getGlobalBoundsForNode(const Layer* node) const {
+  if (node == nullptr) {
+    return {};
+  }
+  std::vector<Rect> bounds = {};
+  auto it = nodeToLayer.find(node);
+  if (it == nodeToLayer.end()) {
+    return bounds;
+  }
+  bounds.reserve(it->second.size());
+  for (auto* pagLayerRaw : it->second) {
+    if (pagLayerRaw == nullptr) {
+      continue;
+    }
+    // PAGLayer inherits enable_shared_from_this; nodeToLayer holds a raw pointer valid for as long
+    // as the PAGLayer remains in the composition's children (syncChildren keeps it in sync).
+    auto pagLayer = pagLayerRaw->shared_from_this();
+    bounds.push_back(getGlobalBounds(pagLayer));
+  }
+  return bounds;
+}
+
+HitTestResult PAGScene::hitTest(float surfaceX, float surfaceY) {
+  HitTestResult result = {};
+  auto layers = getLayersUnderPoint(surfaceX, surfaceY);
+  if (layers.empty()) {
+    return result;
+  }
+  // getLayersUnderPoint returns the most specific runtime layer under the pointer (e.g. a
+  // <Rectangle> inside a <Composition>), not the <Layer composition="@X"> reference. Walk the
+  // parent chain up to the first Composition that has a source node (a real reference layer, not
+  // the root composition whose node is null) so the caller highlights the reference, not the
+  // internal definition. If no such ancestor exists (a plain <Layer> at the document root), fall
+  // back to the hit itself.
+  auto target = layers.front();
+  auto walker = target;
+  while (walker != nullptr) {
+    if (walker->layerType() == LayerType::Composition && walker->getNode() != nullptr) {
+      target = walker;
+      break;
+    }
+    walker = walker->getParent();
+  }
+  const auto* node = target->getNode();
+  if (node == nullptr) {
+    return result;
+  }
+  result.index = node->index;
+  result.startLine = node->sourceLine;
+  result.endLine = node->endLine;
+  result.bounds = getGlobalBounds(target);
+  return result;
 }
 
 bool PAGScene::surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const {
@@ -798,6 +880,26 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
       _rootComposition->resetTimelines();
     }
     instantiatedTimelines.clear();
+  } else if (_rootComposition != nullptr) {
+    // RefreshLayerInPlace reset the rebuilt layers' runtime channels to their node defaults. The
+    // per-frame updateDataBinds restores ViewModel-bound channels, but timeline-driven channels
+    // recover only on the next apply(). When playback is paused no advance/apply happens, so an
+    // animated property (e.g. a Channel-driven x) would snap back to its static layout value until
+    // playback resumes. Re-apply the timelines at their current position here (apply without
+    // advancing) so the rebuilt targets are re-resolved (targetsDirty was set above) and written
+    // back immediately. resetTimelines() above already covers the timelineDirty case.
+    _rootComposition->apply();
+    // Top-level PAGAnimation and PAGStateMachine instances live in instantiatedTimelines, not
+    // inside the root composition subtree, so _rootComposition->apply() above does not reach them.
+    // Re-apply them at their current position so an animated property on a top-level timeline
+    // (e.g. slidingBar's x, or a state machine's active-state channels) is written back
+    // immediately while paused; otherwise it would snap back to its static layout value until the
+    // next tick, which only fires while playing.
+    for (auto& entry : instantiatedTimelines) {
+      if (entry.second != nullptr) {
+        entry.second->apply();
+      }
+    }
   }
 }
 

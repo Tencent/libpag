@@ -28,6 +28,7 @@
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/types/Rect.h"
 
 namespace tgfx {
 class Context;
@@ -40,6 +41,7 @@ namespace pagx {
 
 class Animation;
 class Node;
+class Layer;
 class PAGSurface;
 class PAGViewModel;
 class PAGXDocument;
@@ -50,6 +52,43 @@ class ViewModel;
 class Image;
 struct Matrix;
 struct RuntimeBinding;
+
+/**
+ * The result of a scene hit test: the source node under a surface point and its source span and
+ * on-screen bounds. Used by editor selection (canvas hover/click) and any host that maps a click to
+ * a PAGX source node.
+ *
+ * Use index >= 0 as the single hit / no-hit indicator: index == -1 means "no hit" and every other
+ * field is unset. When index >= 0, startLine / endLine may still be -1 to mean "the source span
+ * is not available for this node" (e.g. programmatically created nodes with no XML origin) even
+ * though the hit itself is valid.
+ */
+struct HitTestResult {
+  /**
+   * Index of the source node in PAGXDocument::nodes when >= 0 (the "hit" flag). -1 means nothing
+   * was hit and every other field in this struct is unset. See Node::index for the caching
+   * caveats on this value.
+   */
+  int index = -1;
+
+  /**
+   * 1-based start line of the source node in the PAGX XML, or -1 when the source span is
+   * unavailable. Only meaningful when index >= 0.
+   */
+  int startLine = -1;
+
+  /**
+   * 1-based end line of the source node in the PAGX XML, or -1 when the source span is
+   * unavailable. Only meaningful when index >= 0.
+   */
+  int endLine = -1;
+
+  /**
+   * Surface-space bounds of the hit runtime layer, empty when unavailable. Only meaningful when
+   * index >= 0.
+   */
+  Rect bounds = {};
+};
 
 /**
  * PAGScene is the runtime host for a PAGXDocument. It builds the runtime layer tree from the
@@ -183,12 +222,38 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
-   * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
-   * rectangle if the layer is null or does not belong to this scene. For the layer's untransformed
-   * local bounds, use PAGLayer::getBounds.
+   * on-screen transform (including animation and the display zoom/offset) applied. The bounds are
+   * tight (per-glyph extents for text instead of the font-wide envelope) and clipped to the
+   * layer's own scrollRect window when one is present, so the result outlines the visible
+   * content. Returns an empty rectangle if the layer is null or does not belong to this scene.
+   * For the layer's untransformed local bounds, use PAGLayer::getBounds.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
+
+  /**
+   * Returns the surface-space bounds of every runtime layer built from the given source Layer
+   * node. A source node referenced by multiple <Layer composition="@X"> instances builds one
+   * runtime layer per instance, so one rectangle is returned per instance (a single element for
+   * regular nodes). The vector is empty if no runtime layer maps to the node (e.g. the node has
+   * no runtime layer in this scene). Used by hosts that hold a source node index (e.g. an editor
+   * selection) and need the on-screen rects without first resolving them to PAGLayer handles.
+   * @param node the source Layer node to look up
+   */
+  std::vector<Rect> getGlobalBoundsForNode(const Layer* node) const;
+
+  /**
+   * Returns the source node under the given surface point, resolved for editor selection. This is a
+   * convenience over getLayersUnderPoint + PAGLayer::getNode: it returns the top-most hit and walks
+   * up to the first Composition that has a source node, so a click inside a <Layer composition="@X">
+   * instance resolves to the reference node rather than the internal definition node. The returned
+   * bounds are the on-screen rect of the clicked runtime layer (the instance itself, not the whole
+   * reference span). Does not require a prior draw().
+   * @param surfaceX the x coordinate in surface (device) space.
+   * @param surfaceY the y coordinate in surface (device) space.
+   * @return a HitTestResult with index -1 when nothing is hit or the hit layer has no source node.
+   */
+  HitTestResult hitTest(float surfaceX, float surfaceY);
 
  private:
   PAGScene();
@@ -264,6 +329,27 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
   std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
+
+  // Maps source Layer nodes to their runtime PAGLayers for bounds lookup (getGlobalBoundsForNode).
+  // The value is a vector because the same source Layer can be built once per referencing
+  // <Layer composition="@X"> instance, so a node referenced N times yields N PAGLayer entries and
+  // getGlobalBoundsForNode returns one rect per instance. Entries are populated by
+  // PAGComposition::BuildChildLayer in construction order; both removal paths (syncChildren and
+  // refreshPlainContainerChildren) call eraseNodeToLayerSubtree to prune entries matching the
+  // dropped PAGLayer pointer. Property-only edits go through RefreshLayerInPlace which does NOT
+  // replace the PAGLayer, so the entries stay valid across incremental attribute edits. The
+  // per-entry order is stable across property-only edits and across additive structural changes
+  // that do not touch already-live instances, but reordering or removing hosts at other levels
+  // may reorder the vector; callers must not assume a positional binding between this vector's
+  // index and any external ordering (e.g. host-layer order in the source XML).
+  std::unordered_map<const Layer*, std::vector<PAGLayer*>> nodeToLayer = {};
+
+  // Erases the nodeToLayer entries of an entire PAGLayer subtree, matching each entry by its
+  // (source node, PAGLayer) pair so other runtime instances built from the same source node
+  // survive. Every removal path must call this before dropping a subtree from its parent's
+  // children so the map never holds dangling PAGLayer pointers that getGlobalBoundsForNode
+  // would dereference.
+  void eraseNodeToLayerSubtree(const PAGLayer* layer);
 
   friend class PAGXDocument;
   friend class PAGTimeline;

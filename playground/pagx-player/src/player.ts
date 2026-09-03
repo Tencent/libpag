@@ -22,7 +22,7 @@
 // load(); everything else - keyboard shortcuts, size responsiveness, playback UI - is owned by
 // the player.
 
-import type { PlayerModule, PlayerView } from './pagx-view-types';
+import type { HitTestResult, NodeBounds, NodeSourceEntry, PlayerModule, PlayerView } from './pagx-view-types';
 import type {
     BackgroundColor,
     EditorCallbacks,
@@ -32,13 +32,18 @@ import type {
     PAGXPlayerEventMap,
     PAGXPlayerLoadOptions,
     PAGXPlayerOptions,
+    SourceDiagnostic,
+    SourceDiagnosticProvider,
     StatusOptions,
     ToolbarSlot,
 } from './types';
 import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
+import { SMBlueprint, PreviewChipBar } from './sm-blueprint';
 import { buildToolbar, setToolbarVisible } from './toolbar';
-import { EditorPanel, EDITOR_STATUS_DURATION_MS } from './editor/index';
+import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
+import type { DraftLineChange } from './editor/SourceEditor';
+import { classifyEdits, findNodeIndexForLine, hasMatchingSpanBoundaries } from './incremental-apply';
 import { ensureStylesInjected } from './styles';
 
 /** Canvas element id assigned by the player. Kept stable so external CSS or debug tooling
@@ -60,6 +65,8 @@ export class PAGXPlayer extends EventTarget {
     private readonly sizeContainer: HTMLElement;
     private readonly toolbarRoot: HTMLDivElement;
     private readonly playbackBar: PlaybackBar;
+    private readonly blueprint: SMBlueprint;
+    private readonly chipBar: PreviewChipBar;
     private readonly editor: EditorPanel | null = null;
     private readonly statusEl: HTMLDivElement;
 
@@ -67,11 +74,56 @@ export class PAGXPlayer extends EventTarget {
     private view: PlayerView | null = null;
     private detachCanvasEvents: (() => void) | null = null;
     private statusHideTimer: number | null = null;
+    // Preview id that was on stage when the user hit the SM panel play button. While non-null,
+    // the SM runs and the playback bar is dimmed, but the chip stays visually active so the
+    // user can un-park with one click. Cleared by selectTimelineUnit (chip click / dbl-click).
+    private parkedPreviewId: string | null = null;
     // Monotonically increasing id for each showStatus call; the caller can hold this token
     // and pass it to hideStatus() to only clear the pill when their own message is still on
     // screen. See showStatus / hideStatus for the full story.
     private statusTokenSeq = 0;
     private currentStatusToken = 0;
+
+    // --- Selection mode (phase 1: canvas<->editor highlighting) ---
+    private selectMode = false;
+    private hoverIndex = -1;
+    // Full hitTest result from the last canvas hover/select. Carries the reference node's span
+    // (so the editor highlights the <Layer composition="@X"> reference, not the internal
+    // definition) and the clicked instance's on-screen bounds (so the overlay outlines exactly
+    // what the user clicked, even when the same source node has multiple instances). Cleared by
+    // editor-direction selection (onEditorDblClick) sets selectedIndex via
+    // sourceMap line lookup and have no hitTest result to mirror.
+    private hoverHit: HitTestResult | null = null;
+    private selectHit: HitTestResult | null = null;
+    // Node index the editor is hovering (editor->canvas direction). Independent of selectMode:
+    // hovering an editor line always highlights the corresponding node on the canvas.
+    private editorHoverIndex = -1;
+    // The physical tag line highlighted in the editor. It is intentionally separate from the node's
+    // full source span so parents never swallow their children during source browsing.
+    private editorHoverLine = -1;
+    private selectedIndex = -1;
+    // Runtime spans are refreshed only by load(). Draft spans are a line-number projection used
+    // while unsaved source edits insert or remove lines, then reset from runtime spans on Apply/Discard.
+    private sourceMap: NodeSourceEntry[] = [];
+    private draftSourceMap: NodeSourceEntry[] = [];
+    // Selection boxes painted over the canvas, one per runtime layer instance built from the
+    // bounds-bearing node — a source node referenced by N composition layers builds N instances,
+    // all of which get outlined. Kept as a reusable pool so the per-frame follow-loop only
+    // toggles styles instead of churning DOM nodes.
+    private overlayBoxes: HTMLDivElement[] = [];
+    // The bounds-bearing node the overlay currently paints (resolved from the hover/select target
+    // by climbing to the owning Layer for internal elements), and which visual state to render.
+    // Cached by refreshOverlay so the per-frame follow-loop skips the ancestry walk.
+    private overlayBoundsIndex = -1;
+    private overlayKind: 'hover' | 'select' = 'hover';
+    // Bounds queried on the previous overlay tick, one entry per instance. PAGXView.draw()
+    // double-buffers recordings, so during playback the canvas presents the frame recorded one
+    // tick earlier than the scene state getNodeBounds reads; presenting the previous tick's
+    // bounds keeps the outline on the pixels.
+    private overlayPreviousBounds: NodeBounds[] | null = null;
+    private overlayRaf = 0;
+    private hoverRaf = 0;
+    private detachHover: (() => void) | null = null;
 
     // Concurrency + lifetime guards. Every load() captures loadGeneration on entry and
     // re-reads it after each await; a mismatch means a newer load() (or destroy() / non-BFCache
@@ -168,6 +220,40 @@ export class PAGXPlayer extends EventTarget {
             },
         });
 
+        // State-machine blueprint for default SM timelines: read-only state/transition graph
+        // with a live current-state highlight; double-clicking a state enters a solo preview of
+        // its bound animation. Hidden automatically when the document has no default SM. Host
+        // callbacks route through this player's public selectTimelineUnit so the playback bar
+        // switches to the preview instance's duration in the same call.
+        this.blueprint = new SMBlueprint({
+            getTimelineTree: () => this.view?.getTimelineTree() ?? [],
+            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
+            getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
+            selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
+            togglePlayback: () => this.toggleRawPlayback(),
+            isPlaying: () => this.view?.isPlaying() ?? false,
+            parkPreview: () => this.parkPreview(),
+            getParkedPreviewId: () => this.parkedPreviewId,
+        }, options.iconBaseUrl);
+        this.blueprint.attach(this.root);
+
+        // Floating operations row above the playback bar. Sibling of the blueprint panel:
+        // chips are not part of the SM graph, they are "preview history" / quick switches.
+        this.chipBar = new PreviewChipBar({
+            getTimelineTree: () => this.view?.getTimelineTree() ?? [],
+            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
+            getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
+            selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
+            togglePlayback: () => this.toggleRawPlayback(),
+            isPlaying: () => this.view?.isPlaying() ?? false,
+            parkPreview: () => this.parkPreview(),
+            getParkedPreviewId: () => this.parkedPreviewId,
+        });
+        this.chipBar.attach(this.root);
+        // Wire the chip strip's width to the playback bar's live width so the two rectangles
+        // always line up (single visual control cluster).
+        this.chipBar.setBarAnchor(this.playbackBar.getElement());
+
         // Editor (optional). Editor feedback ("Changes applied", validation errors, etc.) is
         // routed into this.showStatus so it lands in the same status slot as load/reload
         // status. Editor keeps calling notify() unaware of the pill; the player controls the
@@ -180,6 +266,14 @@ export class PAGXPlayer extends EventTarget {
                 parent: this.root,
                 canvasContainer: this.root,
                 callbacks: options.editorCallbacks!,
+                onToggleSelect: () => this.toggleSelectMode(),
+                onClose: () => {
+                    // Exit select mode whenever the editor closes (manual close, document switch,
+                    // hide) so the canvas stops driving highlights against a hidden editor.
+                    if (this.selectMode) {
+                        this.toggleSelectMode();
+                    }
+                },
                 notify: (message, kind, notifyOptions) => {
                     // Sticky messages ("Applying...", "Saving...") don't auto-hide; the editor
                     // will call notify() again with the resolved result and that replaces the
@@ -192,14 +286,32 @@ export class PAGXPlayer extends EventTarget {
                     });
                 },
                 dismiss: (token) => this.hideStatus(token),
+                diagnosticProviders: this.createDiagnosticProviders(options.diagnosticProviders ?? []),
+                incrementalApply: (oldXml, newXml) => this.tryIncrementalApply(oldXml, newXml),
             });
+        }
+        // Wire editor->canvas interactions. Hover highlights the node on the canvas + mirrors the
+        // grey highlight on the editor line; double-click unlocks the enclosing node's span for
+        // editing. Registered once here; EditorPanel re-applies both across editor rebuilds.
+        if (this.editor) {
+            this.editor.onHoverLine((line) => this.onEditorHover(line));
+            this.editor.onDblClickLine((line) => this.onEditorDblClick(line));
+            this.editor.onDraftLineChanges((changes) => this.onDraftLineChanges(changes));
+            this.editor.setTagSpanResolver((line) => this.resolveTagSpan(line));
         }
 
         // Gesture manager (view accessor closure keeps working across reloads)
         this.gesture = new GestureManager(() => this.view);
-        this.detachCanvasEvents = bindCanvasEvents(this.canvas, this.gesture, () => {
-            this.playbackBar.togglePlayback();
+        this.detachCanvasEvents = bindCanvasEvents(this.canvas, this.gesture, (x, y) => {
+            if (this.selectMode) {
+                this.confirmSelection(x, y);
+            } else {
+                this.playbackBar.togglePlayback();
+            }
         });
+        // Hover tracking for selection mode. Bound separately from bindCanvasEvents (which owns
+        // tap/drag/wheel) so select-mode hover never interferes with playback gestures.
+        this.detachHover = this.bindHover();
 
         // Lifecycle listeners
         this.onVisibilityChange = () => {
@@ -277,6 +389,39 @@ export class PAGXPlayer extends EventTarget {
         }
     }
 
+    /** Creates the built-in importer provider followed by host-provided providers. The importer
+     *  validates only well-formed XML and never replaces the view's current document; the editor
+     *  handles XML syntax separately before invoking this provider. */
+    private createDiagnosticProviders(
+        providers: readonly SourceDiagnosticProvider[],
+    ): SourceDiagnosticProvider[] {
+        return [
+            {
+                id: 'pagx-importer',
+                validate: this.validateWithImporter.bind(this),
+            },
+            ...providers,
+        ];
+    }
+
+    /** Converts the WASM importer's line-based errors into generic source diagnostics. Importer
+     *  errors currently identify an entire element line rather than an attribute span, therefore
+     *  endColumn uses a large value that SourceEditor clamps to the end of that line. */
+    private validateWithImporter(xmlText: string): SourceDiagnostic[] {
+        if (this.view === null) {
+            return [];
+        }
+        return this.view.validatePAGX(new TextEncoder().encode(xmlText)).map((diagnostic) => ({
+            owner: 'pagx-importer',
+            severity: 'error',
+            message: diagnostic.message,
+            startLine: diagnostic.line,
+            startColumn: 1,
+            endLine: diagnostic.line,
+            endColumn: Number.MAX_SAFE_INTEGER,
+        }));
+    }
+
     /** Load a pagx from raw bytes. Handles the full pipeline: ensure wasm module, parse the
      *  document, register fonts (via callback), resolve external resources (via callback),
      *  build layers, first draw. Emits 'loaded' on success and 'loadError' on failure.
@@ -290,6 +435,16 @@ export class PAGXPlayer extends EventTarget {
             return;
         }
         const generation = ++this.loadGeneration;
+        // Reset SM-panel state up front: a failed load (or a non-SM document) must not leave the
+        // wrapper in sm-default mode from the previously loaded document, and stale chips from
+        // the previous file's previews would otherwise linger across the reload.
+        this.root.classList.remove('sm-default');
+        this.blueprint.stopPolling();
+        this.chipBar.stopPolling();
+        this.chipBar.clear();
+        this.parkedPreviewId = null;
+        this.playbackBar.setDimmed(false);
+        this.playbackBar.setFrozen(null);
         // Snapshots taken while it's still safe to read pre-existing view state; used after
         // the reset() inside parsePAGX() to restore playback position and play/pause state.
         try {
@@ -380,8 +535,17 @@ export class PAGXPlayer extends EventTarget {
 
             this.canvas.classList.remove('hidden');
             setToolbarVisible(this.toolbarRoot, true);
-            const hasAnimation = view.durationMicros() > 0;
-            this.playbackBar.setVisible(hasAnimation);
+            // A document without a queryable duration still gets the bar in its greyed-out
+            // fallback mode, as long as it has a default timeline at all.
+            // Rebuild the state-machine blueprint first (no-op / hidden for non-SM defaults):
+            // updatePlaybackBarMode() reads the sm-default class it toggles to decide whether
+            // the playback bar should yield its spot to the blueprint panel. Polling keeps the
+            // active-state highlight and the panel play icon live across reloads.
+            const hasDefaultSM = this.blueprint.refresh();
+            this.root.classList.toggle('sm-default', hasDefaultSM);
+            this.blueprint.startPolling();
+            this.chipBar.startPolling();
+            this.updatePlaybackBarMode();
 
             // Feed the editor with the freshly loaded XML. If the host pre-decoded it, we use
             // that; otherwise we decode the bytes so the editor always has something to show
@@ -392,10 +556,23 @@ export class PAGXPlayer extends EventTarget {
             }
             this.editor?.setDocumentXml(xmlText ?? null);
 
+            // Refresh the source map (node index -> source span) for selection highlighting.
+            // Rebuilt on every load since a new document renumbers nodes.
+            this.sourceMap = view.getNodeSourceMap();
+            this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
+            this.hoverIndex = -1;
+            this.hoverHit = null;
+            this.selectHit = null;
+            this.editorHoverIndex = -1;
+            this.editorHoverLine = -1;
+            this.selectedIndex = -1;
+            this.editor?.clearHighlight();
+            this.refreshOverlay();
+
             const detail: LoadedEventDetail = {
                 duration: view.durationMicros(),
                 frameRate: view.frameRate(),
-                hasAnimation,
+                hasAnimation: view.hasTimeline(),
                 xmlText,
             };
             this.dispatchEvent(new CustomEvent('loaded', { detail }));
@@ -434,9 +611,9 @@ export class PAGXPlayer extends EventTarget {
     public show(): void {
         this.canvas.classList.remove('hidden');
         setToolbarVisible(this.toolbarRoot, true);
-        if (this.view && this.view.durationMicros() > 0) {
-            this.playbackBar.setVisible(true);
-        }
+        this.blueprint.setVisible(true);
+        this.chipBar.setVisible(true);
+        this.updatePlaybackBarMode();
     }
 
     /** Hide the player DOM subtree without destroying the view. Used by hosts that route
@@ -450,6 +627,8 @@ export class PAGXPlayer extends EventTarget {
         this.canvas.classList.add('hidden');
         setToolbarVisible(this.toolbarRoot, false);
         this.playbackBar.setVisible(false);
+        this.blueprint.setVisible(false);
+        this.chipBar.setVisible(false);
         this.editor?.close();
         this.hideStatus();
         this.view?.pause();
@@ -458,6 +637,501 @@ export class PAGXPlayer extends EventTarget {
     /** Restore identity transform (zoom 1.0, offset 0,0). Also fired by the toolbar Reset button. */
     public resetView(): void {
         this.gesture.resetTransform();
+    }
+
+    /** Toggle inspect (selection) mode. When on, canvas hover/click drive editor line
+     *  highlighting instead of toggling playback. Auto-opens the editor so the canvas<->XML
+     *  hover highlight is visible (DevTools-like). */
+    public toggleSelectMode(): void {
+        if (this.selectMode) {
+            this.exitSelectMode();
+        } else {
+            this.selectMode = true;
+            this.editor?.setSelectMode(true);
+            this.editor?.open();
+            this.canvas.style.cursor = 'crosshair';
+            this.refreshOverlay();
+        }
+    }
+
+    /** Leaves inspect mode: stops canvas-driven hover hit-testing and clears the transient grey
+     *  hover highlight. The blue selection (from a canvas click or editor double-click) and
+     *  editor-hover highlighting are independent and stay live. */
+    private exitSelectMode(): void {
+        if (!this.selectMode) {
+            return;
+        }
+        this.selectMode = false;
+        this.editor?.setSelectMode(false);
+        this.canvas.style.cursor = '';
+        this.hoverIndex = -1;
+        this.hoverHit = null;
+        this.syncEditorHover();
+        this.refreshOverlay();
+    }
+
+    // --- Selection (phase 1) private helpers ---
+
+    /** Binds a mousemove listener (rAF-throttled) for select-mode hover hit-testing. Returns a
+     *  cleanup function. */
+    private bindHover(): () => void {
+        const handler = (event: MouseEvent) => {
+            if (!this.selectMode || this.gesture.isCurrentlyDragging()) {
+                return;
+            }
+            const cx = event.clientX;
+            const cy = event.clientY;
+            if (this.hoverRaf !== 0) {
+                cancelAnimationFrame(this.hoverRaf);
+            }
+            this.hoverRaf = requestAnimationFrame(() => {
+                this.hoverRaf = 0;
+                this.handleHover(cx, cy);
+            });
+        };
+        this.canvas.addEventListener('mousemove', handler);
+        return () => this.canvas.removeEventListener('mousemove', handler);
+    }
+
+    private handleHover(clientX: number, clientY: number): void {
+        if (!this.view || !this.selectMode) {
+            return;
+        }
+        const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
+        const hit = this.view.hitTest(surfaceX, surfaceY);
+        const idx = hit !== null ? hit.index : -1;
+        if (idx !== this.hoverIndex) {
+            this.hoverIndex = idx;
+            this.hoverHit = hit;
+            this.refreshOverlay();
+            this.syncEditorHover('center');
+        }
+    }
+
+    /** Selects the node under the click point (inspect-mode click). Hit-tests the live click
+     *  coordinates rather than relying on the cached hover index, which may be stale or unset when
+     *  the pointer barely moved before the click (the rAF-throttled hover may not have run). */
+    private confirmSelection(clientX: number, clientY: number): void {
+        if (!this.view) {
+            return;
+        }
+        const { surfaceX, surfaceY } = this.clientToSurface(clientX, clientY);
+        const hit = this.view.hitTest(surfaceX, surfaceY);
+        // Missed the geometry (clicked empty canvas): keep the inspector armed so the user can
+        // try again rather than silently dropping out of inspect mode.
+        if (hit === null) {
+            return;
+        }
+        this.selectedIndex = hit.index;
+        this.selectHit = hit;
+        // DevTools-style: picking a layer deactivates the inspector. exitSelectMode() clears the
+        // transient hover and repaints the overlay from the now-set selection, so only the sticky
+        // blue outline remains; it stays highlighted on the canvas and mirrored in the editor
+        // until the user's next action.
+        this.exitSelectMode();
+        this.syncEditorSelect('center');
+    }
+
+    /** Editor hover resolves only a physical XML tag line. The full node index remains available for
+     *  canvas overlay bounds, but the grey source decoration never expands to the node's children. */
+    private onEditorHover(line: number): void {
+        const tagLine = this.editor?.getDraftTagLine(line) ?? null;
+        const idx = tagLine === null ? -1 : findNodeIndexForLine(this.draftSourceMap, tagLine);
+        const nextLine = tagLine ?? -1;
+        if (idx === this.editorHoverIndex && nextLine === this.editorHoverLine) {
+            return;
+        }
+        this.editorHoverIndex = idx;
+        this.editorHoverLine = nextLine;
+        this.refreshOverlay();
+        this.syncEditorHover();
+    }
+
+    /** Double-clicking any physical line unlocks the whole document for editing; the amber edit
+     *  decoration marks the double-clicked line itself. There is no "is this a valid tag" gate:
+     *  whether one can edit depends only on which line was clicked, never on that line's content
+     *  (a line whose tag markup was deleted mid-edit must still be re-enterable). findNodeIndexForLine
+     *  is a pure line-number lookup against draftSourceMap (not a content check) and only drives the
+     *  canvas selection sync; when the line falls outside every node's span (e.g. the XML
+     *  declaration), it simply returns -1 and no canvas node gets selected. */
+    private onEditorDblClick(line: number): void {
+        const idx = findNodeIndexForLine(this.draftSourceMap, line);
+        this.selectedIndex = idx;
+        // Editor-direction selection has no hitTest result, so updateOverlay falls back to the
+        // source-map node bounds when one exists. Lines with no runtime node clear the canvas box.
+        this.selectHit = null;
+        this.editor?.clearHover();
+        this.editor?.enterEditMode(line);
+        this.refreshOverlay();
+        this.syncEditorSelect();
+    }
+
+    private cloneSourceMap(entries: readonly NodeSourceEntry[]): NodeSourceEntry[] {
+        return entries.map((entry) => ({ ...entry, channels: [...entry.channels] }));
+    }
+
+    /** Looks up a draft source entry by its native Node index. The runtime currently keeps
+     *  Node::index equal to the sourceMap array position, but callers must not depend on that:
+     *  a future getNodeSourceMap that skips entries (e.g. programmatic nodes) would silently
+     *  mis-target a positional read. Returns null when the index has no live entry. */
+    private draftEntryByIndex(index: number): NodeSourceEntry | null {
+        if (index < 0) {
+            return null;
+        }
+        for (const entry of this.draftSourceMap) {
+            if (entry.index === index) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    /** Applies accepted draft line deltas to a projection of the runtime source map. Entries wholly
+     *  deleted or partially cut by a multi-line replacement become unavailable rather than pointing
+     *  at an unrelated surviving tag. Apply/Discard/reset restores a fresh projection. */
+    private onDraftLineChanges(
+        changes: readonly DraftLineChange[] | null,
+    ): void {
+        if (changes === null) {
+            this.draftSourceMap = this.cloneSourceMap(this.sourceMap);
+            return;
+        }
+        for (const change of changes) {
+            this.applyDraftLineChange(change);
+        }
+        // The pointer may now refer to a shifted source line; wait for the next mouse move instead
+        // of leaving a stale editor-originated hover decoration behind.
+        this.editorHoverLine = -1;
+        this.editorHoverIndex = -1;
+    }
+
+    private applyDraftLineChange(change: DraftLineChange): void {
+        const removedLineCount = change.endLine - change.startLine;
+        const lineDelta = change.insertedLineCount - removedLineCount;
+        if (lineDelta === 0) {
+            return;
+        }
+        for (const entry of this.draftSourceMap) {
+            if (entry.startLine <= 0) {
+                continue;
+            }
+            const endLine = entry.endLine > 0 ? entry.endLine : entry.startLine;
+            if (endLine < change.startLine) {
+                continue;
+            }
+            if (entry.startLine > change.endLine) {
+                entry.startLine += lineDelta;
+                if (entry.endLine > 0) {
+                    entry.endLine += lineDelta;
+                }
+                continue;
+            }
+            if (removedLineCount > 0 && entry.startLine >= change.startLine &&
+                endLine <= change.endLine) {
+                entry.startLine = -1;
+                entry.endLine = -1;
+                continue;
+            }
+            if (entry.startLine <= change.startLine && endLine >= change.endLine) {
+                if (entry.endLine > 0) {
+                    entry.endLine += lineDelta;
+                }
+                continue;
+            }
+            // A range boundary was cut but the node was not wholly removed. It has no reliable
+            // textual identity until Apply rebuilds the runtime map, so never map it incorrectly.
+            entry.startLine = -1;
+            entry.endLine = -1;
+        }
+    }
+
+    /** Resolves the line span of the innermost tag enclosing the given 1-based source line, for
+     *  the editor's tag-block copy/delete context menu actions. The last valid source map supplies
+     *  the structural span; only that node's own boundary tags are re-validated against the draft.
+     *  A malformed child therefore does not prevent deleting its intact parent, while a damaged
+     *  parent boundary still falls back safely to the current line. */
+    private resolveTagSpan(line: number): LineRange | null {
+        const index = findNodeIndexForLine(this.draftSourceMap, line);
+        if (index < 0 || this.editor === null) {
+            return null;
+        }
+        const entry = this.draftEntryByIndex(index);
+        if (entry === null) {
+            return null;
+        }
+        const start = entry.startLine;
+        if (start <= 0) {
+            return null;
+        }
+        const end = entry.endLine > 0 ? entry.endLine : start;
+        const lines = this.editor.getContent().split('\n');
+        if (end > lines.length) {
+            return null;
+        }
+        if (!hasMatchingSpanBoundaries(lines.slice(start - 1, end).join('\n'))) {
+            return null;
+        }
+        return { startLine: start, endLine: end };
+    }
+
+    /** Attempts to apply the edit from oldXml to newXml incrementally, in place, via setNodeChannel
+     *  instead of a full reparse+rebuild. Returns true only when the whole edit is a set of pure
+     *  attribute-value changes on incrementable channels; false otherwise, signalling the editor to
+     *  fall back to the full onApply pipeline. Failing (even part-way) is safe: the fallback reparse
+     *  of newXml is the authoritative final state regardless of any channel writes already applied
+     *  here. */
+    private tryIncrementalApply(oldXml: string, newXml: string): boolean {
+        if (!this.view || this.draftSourceMap.length === 0) {
+            return false;
+        }
+        const edits = classifyEdits(oldXml, newXml, this.draftSourceMap);
+        if (edits === null) {
+            return false;
+        }
+        if (edits.length === 0) {
+            return true;
+        }
+        for (const edit of edits) {
+            const ok = this.view.setNodeChannel(edit.index, edit.channel, edit.value);
+            if (!ok) {
+                return false;
+            }
+        }
+        this.view.draw();
+        return true;
+    }
+
+    /** The transient hover target: editor-hover wins over canvas-hover (mouse can only be in one). */
+    private hoverTarget(): number {
+        return this.editorHoverIndex >= 0 ? this.editorHoverIndex : this.hoverIndex;
+    }
+
+    /** Mirrors the transient hover target onto the editor as the grey hover line highlight.
+     *  Span source: canvas-originating hover uses the hitTest result's span (which points at the
+     *  <Layer composition="@X"> reference, not the internal definition); editor-originating hover
+     *  (editorHoverIndex) falls back to sourceMap since no hitTest ran. */
+    private syncEditorHover(align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
+        if (this.editorHoverLine > 0) {
+            this.editor?.highlightHover(this.editorHoverLine, this.editorHoverLine);
+            if (align !== 'none') {
+                this.editor?.scrollToLine(this.editorHoverLine, align);
+            }
+            return;
+        }
+        const idx = this.hoverTarget();
+        if (this.hoverHit !== null) {
+            const projected = this.draftEntryByIndex(this.hoverHit.index);
+            const start = projected !== null && projected.startLine > 0
+                ? projected.startLine
+                : this.hoverHit.startLine;
+            this.editor?.highlightHover(start, start);
+            if (align !== 'none') {
+                this.editor?.scrollToLine(start, align);
+            }
+            return;
+        }
+        const hoverEntry = this.draftEntryByIndex(idx);
+        if (hoverEntry === null || hoverEntry.startLine <= 0) {
+            this.editor?.clearHover();
+            return;
+        }
+        const start = hoverEntry.startLine;
+        this.editor?.highlightHover(start, start);
+        if (align !== 'none') {
+            this.editor?.scrollToLine(start, align);
+        }
+    }
+
+    /** Mirrors the sticky selection onto the editor as the blue opening-tag line highlight. */
+    private syncEditorSelect(align: 'none' | 'nearest' | 'start' | 'center' = 'none'): void {
+        const idx = this.selectedIndex;
+        if (this.selectHit !== null) {
+            const projected = this.draftEntryByIndex(this.selectHit.index);
+            const start = projected !== null && projected.startLine > 0
+                ? projected.startLine
+                : this.selectHit.startLine;
+            this.editor?.highlightSelect(start, start);
+            if (align !== 'none') {
+                this.editor?.scrollToLine(start, align);
+            }
+            return;
+        }
+        const entry = this.draftEntryByIndex(idx);
+        if (entry === null || entry.startLine <= 0) {
+            this.editor?.clearSelect();
+            return;
+        }
+        this.editor?.highlightSelect(entry.startLine, entry.startLine);
+        if (align !== 'none') {
+            this.editor?.scrollToLine(entry.startLine, align);
+        }
+    }
+
+    private clientToSurface(clientX: number, clientY: number): { surfaceX: number; surfaceY: number } {
+        const rect = this.canvas.getBoundingClientRect();
+        // hitTest takes surface (backing-store) coordinates; canvas.width is the backing width so
+        // this naturally absorbs DPR.
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        return {
+            surfaceX: (clientX - rect.left) * scaleX,
+            surfaceY: (clientY - rect.top) * scaleY,
+        };
+    }
+
+    /** Grows or shrinks the pool of selection boxes so updateOverlay can paint one per runtime
+     *  instance; surplus boxes are hidden but kept for reuse. */
+    private setOverlayBoxCount(count: number): void {
+        while (this.overlayBoxes.length < count) {
+            const overlay = document.createElement('div');
+            overlay.className = 'pagx-select-overlay';
+            overlay.style.pointerEvents = 'none';
+            this.root.appendChild(overlay);
+            this.overlayBoxes.push(overlay);
+        }
+        for (let i = count; i < this.overlayBoxes.length; i++) {
+            this.overlayBoxes[i].style.display = 'none';
+        }
+    }
+
+    /** Overlay target: a transient hover (grey) takes priority over the sticky selection (blue),
+     *  so hovering temporarily previews another node then reverts to the selection on mouse-out.
+     *  Returns the node index and which visual state to render. */
+    private currentOverlayTarget(): { index: number; kind: 'hover' | 'select' } {
+        const hover = this.hoverTarget();
+        if (hover >= 0) {
+            return { index: hover, kind: 'hover' };
+        }
+        return { index: this.selectedIndex, kind: 'select' };
+    }
+
+    /** Returns the index of the innermost source node that strictly encloses the given node's
+     *  span, or -1 if none. Used to climb from a Layer-internal element (Fill/Rectangle/... which
+     *  has no independent canvas outline) up to the Layer that owns it. */
+    private enclosingNodeIndex(index: number): number {
+        const child = this.draftEntryByIndex(index);
+        if (child === null || child.startLine <= 0) {
+            return -1;
+        }
+        const childStart = child.startLine;
+        const childEnd = child.endLine > 0 ? child.endLine : childStart;
+        let bestIndex = -1;
+        let bestSpan = Number.POSITIVE_INFINITY;
+        for (const entry of this.draftSourceMap) {
+            if (entry.index === index || entry.startLine <= 0) {
+                continue;
+            }
+            const start = entry.startLine;
+            const end = entry.endLine > 0 ? entry.endLine : start;
+            const encloses = start <= childStart && end >= childEnd && (start < childStart || end > childEnd);
+            if (!encloses) {
+                continue;
+            }
+            const span = end - start;
+            if (span < bestSpan) {
+                bestSpan = span;
+                bestIndex = entry.index;
+            }
+        }
+        return bestIndex;
+    }
+
+    /** Resolves the node whose bounds the overlay should paint. A node with its own bounds (a
+     *  Layer) resolves to itself; a Layer-internal element resolves to the nearest ancestor that
+     *  does have bounds - i.e. its owning Layer - so hovering/selecting an internal row still
+     *  outlines the visible Layer. Returns -1 when nothing in the ancestry has bounds. */
+    private resolveBoundsIndex(index: number): number {
+        if (index < 0 || !this.view) {
+            return -1;
+        }
+        let cursor = index;
+        let guard = 0;
+        while (cursor >= 0 && guard++ < 64) {
+            if (this.view.getNodeBounds(cursor) !== null) {
+                return cursor;
+            }
+            cursor = this.enclosingNodeIndex(cursor);
+        }
+        return -1;
+    }
+
+    /** Repaints the overlay and starts/stops the follow-loop based on whether any highlight target
+     *  exists. Decoupled from selectMode so editor-hover highlighting works with inspect off. The
+     *  bounds-bearing index is resolved once here (climbing to the owning Layer for internal
+     *  elements) and cached so the per-frame follow-loop doesn't repeat the ancestry walk. */
+    private refreshOverlay(): void {
+        const raw = this.currentOverlayTarget();
+        this.overlayBoundsIndex = raw.index >= 0 ? this.resolveBoundsIndex(raw.index) : -1;
+        this.overlayKind = raw.kind;
+        // The previous-tick bounds belong to the old target; carrying them over would flash the
+        // old outline for one frame when the target switches mid-playback.
+        this.overlayPreviousBounds = null;
+        if (this.overlayBoundsIndex >= 0) {
+            this.startOverlayLoop();
+        } else {
+            this.stopOverlayLoop();
+        }
+        this.updateOverlay();
+    }
+
+    private updateOverlay(): void {
+        if (this.overlayBoundsIndex < 0 || !this.view) {
+            this.setOverlayBoxCount(0);
+            return;
+        }
+        // Every frame queries getNodeBounds so the overlay tracks zoom and animation in real time.
+        // The hitTest snapshot bounds (hoverHit/selectHit) are NOT used here because they are a
+        // point-in-time snapshot that would not follow zoom/animation; using them caused the overlay
+        // to freeze and disappear during zoom. getNodeBounds returns one rect per runtime instance,
+        // so a source node referenced by several composition layers gets every instance outlined.
+        const bounds = this.view.getNodeBounds(this.overlayBoundsIndex);
+        if (bounds === null || bounds.length === 0) {
+            this.setOverlayBoxCount(0);
+            this.overlayPreviousBounds = null;
+            return;
+        }
+        // PAGXView.draw() double-buffers recordings: while the timeline is playing, the canvas
+        // presents the frame recorded one rAF earlier than the scene state getNodeBounds reads,
+        // so applying the current bounds would lead the pixels by one frame. Present the previous
+        // tick's bounds instead. Paused interactions (scrub/zoom/edit) set presentImmediately in
+        // draw(), which presents the current frame, so the current bounds are correct there.
+        const shown = this.view.isPlaying() && this.overlayPreviousBounds !== null
+            ? this.overlayPreviousBounds
+            : bounds;
+        this.overlayPreviousBounds = bounds;
+        const rect = this.canvas.getBoundingClientRect();
+        // Surface (backing) -> CSS pixels.
+        const scaleX = rect.width / this.canvas.width;
+        const scaleY = rect.height / this.canvas.height;
+        this.setOverlayBoxCount(shown.length);
+        for (let i = 0; i < shown.length; i++) {
+            const overlay = this.overlayBoxes[i];
+            overlay.style.display = 'block';
+            overlay.style.left = shown[i].x * scaleX + 'px';
+            overlay.style.top = shown[i].y * scaleY + 'px';
+            overlay.style.width = shown[i].w * scaleX + 'px';
+            overlay.style.height = shown[i].h * scaleY + 'px';
+            overlay.classList.toggle('is-selected', this.overlayKind === 'select');
+            overlay.classList.toggle('is-hover', this.overlayKind === 'hover');
+        }
+    }
+
+    private startOverlayLoop(): void {
+        if (this.overlayRaf !== 0) {
+            return;
+        }
+        const tick = () => {
+            this.updateOverlay();
+            this.overlayRaf = requestAnimationFrame(tick);
+        };
+        this.overlayRaf = requestAnimationFrame(tick);
+    }
+
+    private stopOverlayLoop(): void {
+        if (this.overlayRaf !== 0) {
+            cancelAnimationFrame(this.overlayRaf);
+            this.overlayRaf = 0;
+        }
     }
 
     public play(): void {
@@ -486,6 +1160,160 @@ export class PAGXPlayer extends EventTarget {
 
     public togglePlayback(): void {
         this.playbackBar.togglePlayback();
+    }
+
+    /** Toggles the raw view play/pause without the timed-timeline guards: a default state
+     *  machine reports no duration, so the playback bar's toggle (and play()) would bail out
+     *  early. The blueprint panel's button drives the view directly instead - an SM has no
+     *  wrap-around semantics to honor anyway. On resume from pause, the SM restarts from its
+     *  initial states (same contract as parkPreview - see restartDefaultSM). */
+    public toggleRawPlayback(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        if (view.isPlaying()) {
+            view.pause();
+            this.dispatchEvent(new CustomEvent('pause'));
+        } else {
+            this.restartDefaultSM();
+            this.dispatchEvent(new CustomEvent('play'));
+        }
+    }
+
+    /** Resets the default state machine to its initial states and starts it playing. Works by
+     *  routing through selectTimelineUnit's "clear-with-previous-selection" branch, which is
+     *  the only public path that triggers PAGStateMachine::reset() from JS today; when there
+     *  is no active selection we briefly synthesize one on the default SM so the clear branch
+     *  fires. Callable from anywhere that needs the SM to (re)start from frame 0 - the
+     *  blueprint play button on resume and parkPreview both go through here. */
+    private restartDefaultSM(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        const hasSelection = view.getSelectedTimelineUnit() != null;
+        if (!hasSelection) {
+            const defaultSM = view.getTimelineTree()
+                .find((node) => node.kind === 'stateMachine' && node.isDefault);
+            if (defaultSM != null) {
+                view.selectTimelineUnit('stateMachine', defaultSM.id);
+            }
+        }
+        view.selectTimelineUnit('', '');
+        view.play();
+    }
+
+    /** Sets a bool input on the default state machine timeline (playground hook for testing
+     *  interactive state machines from the console). Returns false when the loaded document's
+     *  default timeline is not a state machine or the input is unknown/wrong-typed. */
+    public setSMInputBool(name: string, value: boolean): boolean {
+        return this.view?.setSMInputBool(name, value) ?? false;
+    }
+
+    /** Number-input counterpart of setSMInputBool. */
+    public setSMInputNumber(name: string, value: number): boolean {
+        return this.view?.setSMInputNumber(name, value) ?? false;
+    }
+
+    /** Trigger-input counterpart of setSMInputBool. */
+    public fireSMInputTrigger(name: string): boolean {
+        return this.view?.fireSMInputTrigger(name) ?? false;
+    }
+
+    /**
+     * Selects one unit of the timeline tree for solo preview (empty id clears the selection) and
+     * refreshes the playback-bar mode to match: a selected animation gets the normal bar bound to
+     * its own duration, and clearing the selection restores whatever the default timeline
+     * requires (normal bar / untimed bar / hidden behind the SM blueprint panel).
+     */
+    public selectTimelineUnit(kind: string, id: string): boolean {
+        const view = this.view;
+        if (!view || !view.selectTimelineUnit(kind, id)) {
+            return false;
+        }
+        // Any real selection change (including clearing) lifts the parked state, frozen
+        // poster and dim overlay: the bar is now driven by the freshly reset preview
+        // instance again, or hidden if the SM took the render loop back.
+        this.parkedPreviewId = null;
+        this.playbackBar.setDimmed(false);
+        this.playbackBar.setFrozen(null);
+        this.updatePlaybackBarMode();
+        this.playbackBar.updateAll();
+        return true;
+    }
+
+    /** Parks the currently active preview: the SM resets and resumes playing while the
+     *  playback bar keeps showing "0.00s / <preview duration>" behind a grey overlay so the
+     *  user still sees which animation is on the chip. The active chip stays highlighted
+     *  (tracked by parkedPreviewId); un-park by clicking that chip or double-clicking a state. */
+    public parkPreview(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        const selection = view.getSelectedTimelineUnit();
+        if (selection == null || selection.kind !== 'animation') {
+            return;
+        }
+        // Capture the preview instance's duration / frame rate BEFORE clearing the selection:
+        // once cleared, the view reports SM fallback values and the bar would lose the poster
+        // data we need to keep displaying.
+        const frozenSpec = {
+            durationUs: view.durationMicros(),
+            frameRate: view.frameRate(),
+        };
+        this.parkedPreviewId = selection.id;
+        // Rewind the preview lazy instance so re-selecting it (via chip / dbl-click) starts
+        // from the top rather than resuming wherever the park happened.
+        view.pause();
+        view.setCurrentTimeMicros(0);
+        // Hand the render loop back to the SM. restartDefaultSM triggers the same
+        // clear-with-previous-selection reset path used by the blueprint play button.
+        this.restartDefaultSM();
+        this.dispatchEvent(new CustomEvent('play'));
+        // Keep the playback bar visible with the preview's static "0/duration" poster and
+        // dim it so the user cannot interact. updatePlaybackBarMode sees parkedPreviewId and
+        // routes to setVisible(true) instead of hiding the bar for SM default.
+        this.updatePlaybackBarMode();
+        this.playbackBar.setFrozen(frozenSpec);
+        this.playbackBar.setDimmed(true);
+    }
+
+    /** The preview id that is "parked" (SM playing while a preview stays on the chip bar as
+     *  highlighted). Zero when no preview is parked. Read by PreviewChipBar via the host. */
+    public getParkedPreviewId(): string | null {
+        return this.parkedPreviewId;
+    }
+
+    /** Single source of truth for the playback bar's mode after a load or a solo-preview change:
+     *  a document with a queryable duration gets the normal bar (an active preview lives here),
+     *  a parked preview keeps the bar visible and dimmed so the user can see the "paused"
+     *  progress, a default state machine without a preview hides the bar (the blueprint panel
+     *  replaces it), other timelines keep the greyed untimed bar, and static documents hide
+     *  the bar. */
+    private updatePlaybackBarMode(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        if (view.durationMicros() > 0) {
+            this.playbackBar.setVisible(true);
+        } else if (this.parkedPreviewId != null) {
+            // Parked: keep the bar visible, dim state is applied separately by parkPreview.
+            this.playbackBar.setVisible(true);
+        } else if (this.root.classList.contains('sm-default')) {
+            this.playbackBar.setVisible(false);
+        } else if (view.hasTimeline()) {
+            this.playbackBar.showUntimed();
+        } else {
+            this.playbackBar.setVisible(false);
+        }
+    }
+
+    /** Returns the current solo-preview selection, or null when none is selected. */
+    public getSelectedTimelineUnit(): { kind: string; id: string } | null {
+        return this.view?.getSelectedTimelineUnit() ?? null;
     }
 
     public openEditor(): void {
@@ -601,6 +1429,17 @@ export class PAGXPlayer extends EventTarget {
         this.loadGeneration++;
         this.detachCanvasEvents?.();
         this.detachCanvasEvents = null;
+        this.detachHover?.();
+        this.detachHover = null;
+        this.stopOverlayLoop();
+        if (this.hoverRaf !== 0) {
+            cancelAnimationFrame(this.hoverRaf);
+            this.hoverRaf = 0;
+        }
+        for (const overlay of this.overlayBoxes) {
+            overlay.remove();
+        }
+        this.overlayBoxes = [];
         this.resizeObserver?.disconnect();
         this.resizeObserver = null;
         document.removeEventListener('visibilitychange', this.onVisibilityChange);
@@ -614,6 +1453,8 @@ export class PAGXPlayer extends EventTarget {
             this.statusHideTimer = null;
         }
         this.playbackBar.destroy();
+        this.blueprint.destroy();
+        this.chipBar.destroy();
         this.editor?.destroy();
         this.destroyView();
         // Removing the wrapper root cascades child removals (canvas, status, toolbar, playback
@@ -782,6 +1623,8 @@ export type {
     LoadErrorEventDetail,
     PAGXPlayerLoadOptions,
     PAGXPlayerOptions,
+    SourceDiagnostic,
+    SourceDiagnosticProvider,
     StatusOptions,
     ToolbarSlot,
 };
