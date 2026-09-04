@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tests: charstring operands beyond the 2-byte CFF integer range (|value| > 1131). At
+     unitsPerEm=2048 ordinary glyph coordinates exceed that range, which must be encoded with the
+     3-byte 28-prefixed form. The DICT 5-byte 29-prefixed form is the callgsubr operator inside a
+     charstring and silently destroys the glyph. -->
+<pagx width="64" height="64">
+  <Resources>
+    <Font id="wide" unitsPerEm="2048">
+      <Glyph advance="2048" path="M 224,0 L 1824,0 L 1824,-1600 L 224,-1600 Z"/>
+    </Font>
+  </Resources>
+  <Layer width="64" height="64">
+    <Text>
+      <GlyphRun font="@wide" fontSize="32" glyphs="1" x="8" y="48"/>
+    </Text>
+    <Fill color="#111111"/>
+  </Layer>
+</pagx>

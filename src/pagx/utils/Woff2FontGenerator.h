@@ -22,9 +22,14 @@
 #include <string>
 #include <vector>
 
+namespace tgfx {
+class Path;
+}
+
 namespace pagx {
 
 class Font;
+class PathData;
 
 struct Woff2FontResult {
   std::vector<uint8_t> woff2Data;
@@ -41,5 +46,17 @@ struct Woff2FontResult {
  * Returns an empty result if the font has no glyphs or contains incompatible glyph data.
  */
 Woff2FontResult BuildWoff2FromFont(const Font* font, const std::string& fontId);
+
+/**
+ * Resolves a winding-filled glyph path into a non-overlapping outline suitable for CFF
+ * rasterizers that apply parity semantics to overlapping contours.
+ */
+tgfx::Path ResolveWoff2GlyphPath(const PathData& path);
+
+/**
+ * Builds the Type 2 charstring used for a vector glyph. Exposed separately so callers can validate
+ * generated outline programs without depending on a platform font loader's WOFF2 support.
+ */
+std::vector<uint8_t> BuildWoff2GlyphCharString(const PathData& path, float designScale = 1.0f);
 
 }  // namespace pagx
