@@ -241,6 +241,34 @@ inline size_t CountBackgroundBlurStyles(pagx::Layer* layer) {
   return count;
 }
 
+// Returns the first Layer in `layer`'s subtree whose import directive targets SVG, or nullptr.
+// Used to assert that SVG sources ride the import-directive path regardless of wrapper nesting.
+inline pagx::Layer* FindSvgImportLayer(pagx::Layer* layer) {
+  if (!layer) return nullptr;
+  if (layer->importDirective.format == "svg") return layer;
+  for (auto* c : layer->children) {
+    if (auto* match = FindSvgImportLayer(c)) {
+      return match;
+    }
+  }
+  return nullptr;
+}
+
+// True when any Fill in `layer`'s subtree paints an ImagePattern — the raster path an SVG
+// import source must not take. ImagePattern is a ColorSource, not an Element, so the check goes
+// through each Fill's `color` pointer instead of the contents list.
+inline bool HasImagePatternFill(pagx::Layer* layer) {
+  if (!layer) return false;
+  for (auto* e : layer->contents) {
+    auto* fill = As<pagx::Fill>(e);
+    if (fill && As<pagx::ImagePattern>(fill->color)) return true;
+  }
+  for (auto* c : layer->children) {
+    if (HasImagePatternFill(c)) return true;
+  }
+  return false;
+}
+
 // Returns the first Channel named `name` across all AnimationObjects of `anim`, or nullptr.
 inline pagx::Channel* FindChannel(pagx::Animation* anim, const std::string& name) {
   if (!anim) return nullptr;
@@ -8010,6 +8038,43 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgChild) {
     </body></html>
   )HTML");
   ASSERT_NE(doc, nullptr);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, ImgSvgDataUriRoutesAsImportDirective) {
+  // An inline `data:image/svg+xml;base64` <img> (the check-mark icon getflect.app embeds) decodes
+  // to SVG text and rides the same import-directive path as an external `.svg` file, instead of a
+  // raster ImagePattern that the renderer cannot decode.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=="
+           style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_EQ(layer->importDirective.format, "svg");
+  EXPECT_TRUE(layer->importDirective.source.empty());
+  EXPECT_NE(layer->importDirective.content.find("<path"), std::string::npos);
+  EXPECT_FALSE(HasImagePatternFill(layer));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgDataUriChild) {
+  // An SVG data-URI <img> inside a rounded wrapper must not fold into a raster ImagePattern; it
+  // keeps riding the import-directive path like an external `.svg` child.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=="
+             style="width:50px;height:50px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_NE(FindSvgImportLayer(wrapper), nullptr);
+  EXPECT_FALSE(HasImagePatternFill(wrapper));
 }
 
 //==================================================================================================

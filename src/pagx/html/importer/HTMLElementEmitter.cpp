@@ -229,18 +229,22 @@ int HexDigitValue(char h) {
   return -1;
 }
 
-// Decodes a percent-encoded `data:image/svg+xml,...` URI payload into raw SVG text. The HTML
-// exporter emits the mask SVG as `url('data:image/svg+xml,<percent-encoded>')` (NOT base64), so
-// only the `%XX` escapes the exporter produced (`<`, `>`, `#`, `"`, `'`) plus any stray ones need
-// undoing. Returns empty when `dataUri` is not an `image/svg+xml` data URI. A `base64,` payload is
-// rejected (the exporter never emits one) rather than mis-decoded.
+// Decodes a `data:image/svg+xml,...` URI payload into raw SVG text. Two encodings are accepted:
+// base64 (what html-snapshot pages embed in `<img src>` for inline SVG icons) and percent-encoded
+// (what the HTML exporter emits for mask SVGs, where only the `%XX` escapes it produced — `<`,
+// `>`, `#`, `"`, `'` — plus any stray ones need undoing). Returns empty when `dataUri` is not an
+// `image/svg+xml` data URI or the payload fails to decode.
 std::string DecodeSvgDataUri(const std::string& dataUri) {
   static const char* Prefix = "data:image/svg+xml";
   if (dataUri.compare(0, std::strlen(Prefix), Prefix) != 0) return {};
   auto comma = dataUri.find(',');
   if (comma == std::string::npos) return {};
   std::string meta = dataUri.substr(std::strlen(Prefix), comma - std::strlen(Prefix));
-  if (ToLower(meta).find("base64") != std::string::npos) return {};
+  if (ToLower(meta).find("base64") != std::string::npos) {
+    auto data = DecodeBase64DataURI(dataUri);
+    if (data == nullptr || data->size() == 0) return {};
+    return std::string(reinterpret_cast<const char*>(data->bytes()), data->size());
+  }
   std::string out;
   out.reserve(dataUri.size() - comma);
   for (size_t i = comma + 1; i < dataUri.size(); ++i) {
@@ -257,6 +261,20 @@ std::string DecodeSvgDataUri(const std::string& dataUri) {
     out.push_back(c);
   }
   return out;
+}
+
+// True when `src` should ride the SVG import-directive path instead of a raster image fill:
+// an external `.svg` file, or an inline `data:image/svg+xml,...` URI (base64 or
+// percent-encoded). `decoded` receives the decoded SVG text for the data-URI form; it stays
+// empty for the external-file form, whose bytes are read at resolve time via `source`.
+bool IsSvgImportSource(const std::string& src, std::string* decoded = nullptr) {
+  if (IsExternalSvgSrc(src)) return true;
+  std::string svg = DecodeSvgDataUri(src);
+  if (svg.empty()) return false;
+  if (decoded != nullptr) {
+    *decoded = std::move(svg);
+  }
+  return true;
 }
 
 // Maps a `background-repeat` keyword onto a per-axis tile mode. CSS `repeat` / `repeat-x` /
@@ -537,7 +555,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   auto* srcAttr = img->findAttribute("src");
   if (!srcAttr || srcAttr->empty()) return false;
   const std::string& src = *srcAttr;
-  if (IsExternalSvgSrc(src)) return false;
+  if (IsSvgImportSource(src)) return false;
 
   // The image must exactly cover the outer wrapper's content box, anchored at
   // top-left — otherwise the rounded clip would shape only part of the visible
@@ -575,7 +593,8 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
                                        const HTMLBoxAttributes& box) {
   auto* srcAttr = element->findAttribute("src");
   const std::string src = (srcAttr != nullptr) ? *srcAttr : std::string();
-  if (IsExternalSvgSrc(src)) {
+  std::string svgContent;
+  if (IsSvgImportSource(src, &svgContent)) {
     auto* layer = _document->makeNode<Layer>();
     _layerBuilder->applySizeAndPosition(layer, box);
     _layerBuilder->applyLayerAttributes(layer, element, box);
@@ -609,7 +628,11 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
         layer->children.push_back(borderOverlay);
       }
     }
-    importHost->importDirective.source = resolveImageSource(src);
+    if (svgContent.empty()) {
+      importHost->importDirective.source = resolveImageSource(src);
+    } else {
+      importHost->importDirective.content = std::move(svgContent);
+    }
     importHost->importDirective.format = "svg";
     auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
     assignElementId(wrapper, element);
