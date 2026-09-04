@@ -61,6 +61,20 @@ const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 // See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
 const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
 
+// Whitespace-collapse pattern that spares NBSP (U+00A0). Source pages run English-typography
+// pre-passes that glue short function words to their neighbours with NBSP (e.g. getflect.app's
+// `applyEnglishTypography` rewrites "to perform" / "But nowhere" into "to\u00a0perform" /
+// "But\u00a0nowhere"), which is exactly the line-break-unit semantics the author designed.
+// JS `\s` matches U+00A0, so a plain `/\s+/g` collapse would silently demote every NBSP to a
+// breakable ASCII space — nowrap protects the first paint, but any PAGX-side re-typeset
+// (text edit, box resize) would then break inside those glued pairs. `[^\S\u00a0]` matches
+// whitespace except NBSP (\S is the negated whitespace class, so its complement minus NBSP is
+// exactly the collapsible set). The PAGX importer already treats NBSP as a real glyph
+// (see BOUNDARY_SPACE) and LineBreaker maps it to the GL (glue) class, so a preserved NBSP
+// keeps its no-break meaning downstream. Re-declared in PAYLOAD_CONSTANTS_SRC for the
+// browser payload (same pattern as BOUNDARY_SPACE).
+const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
+
 /* eslint-disable no-undef, no-inner-declarations */
 
 // ===== Style-value normalisers =====
@@ -890,7 +904,7 @@ function gatherDirectText(el) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.TEXT_NODE) s += n.nodeValue;
   }
-  return s.replace(/\s+/g, ' ').trim();
+  return s.replace(COLLAPSIBLE_WS, ' ').trim();
 }
 
 function elementHasChildren(el) {
@@ -918,7 +932,7 @@ function scanChildNodes(el) {
       directText += n.nodeValue;
     }
   }
-  return { hasElementChild, directText: directText.replace(/\s+/g, ' ').trim() };
+  return { hasElementChild, directText: directText.replace(COLLAPSIBLE_WS, ' ').trim() };
 }
 
 function firstTextNodeChild(el) {
@@ -2345,10 +2359,11 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   // (nowrap) span carries no stray hard break; leading/internal spaces — i.e.
   // indentation — stay intact. The line's vertical offset is already encoded in
   // its rect, so dropping the break characters never loses positioning.
-  // Collapsing modes fold + trim all whitespace as before.
+  // Collapsing modes fold + trim all whitespace as before, except NBSP which
+  // carries the source page's no-break glue semantics (see COLLAPSIBLE_WS).
   const cleanLine = (s) => {
     const stripped = s.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
-    return preserve ? stripped : stripped.replace(/\s+/g, ' ').trim();
+    return preserve ? stripped : stripped.replace(COLLAPSIBLE_WS, ' ').trim();
   };
   const range = document.createRange();
   range.selectNodeContents(textNode);
@@ -4003,8 +4018,22 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   // the fixed host box. Preserve both facts explicitly: the importer drops the measured
   // Chromium width and replaces the baked `left` offset with a PAGX centerX constraint. Merely
   // dropping width would make an edited line grow only to the right and cease to be centered.
+  //
+  // The `text-align: center` -> `intrinsic-width=center` promotion only applies to text leaves
+  // whose own box is a real fixed-width host (`display: block` or `inline-block`). An inline-
+  // level leaf (`display: inline`, e.g. `<em>` inside a centered paragraph) inherits its
+  // `text-align: center` for inline-flow character placement, NOT for the line fragment as a
+  // whole — Chromium measures each inline fragment at its inline-flow position, and marking
+  // those fragments `intrinsic-width=center` would re-center them inside the inline parent
+  // (e.g. putting "feel" at the em-container's horizontal centre instead of the line-end
+  // Chromium reported), breaking inline layout. `inline-block` keeps the centre-against-host
+  // semantics: its parent is a real fixed-width box whose centre is meaningful.
   const textAlign = String(computed.getPropertyValue('text-align') || '').trim().toLowerCase();
-  const intrinsicWidth = textAlign === 'center' ? 'center' : false;
+  const display = String(computed.display || '').trim().toLowerCase();
+  const intrinsicWidth = (textAlign === 'center' &&
+                          (display === 'block' || display === 'inline-block'))
+      ? 'center'
+      : false;
   const lineSpans = textNode
     ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed, { intrinsicWidth })
     : [];
@@ -4100,7 +4129,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
 // for the same expansion applied along the absolute-positioning path.
 function renderFlexTextItem(child, parentComputed) {
   const r = child.rect;
-  const text = (child.node.nodeValue || '').replace(/\s+/g, ' ').trim();
+  const text = (child.node.nodeValue || '').replace(COLLAPSIBLE_WS, ' ').trim();
   const lineHeightPx = readNum(parentComputed, 'line-height');
   const height = lineHeightPx > r.height + 0.1 ? lineHeightPx : r.height;
   const baseStyle = buildStyle(0, 0, 0, 0, parentComputed, {
@@ -4955,6 +4984,12 @@ const BOUNDARY_SPACE = '\\u00a0';
 const NAME_ANCHOR_ATTR = '${NAME_ANCHOR_ATTR}';
 
 const INTRINSIC_WIDTH_ATTR = '${INTRINSIC_WIDTH_ATTR}';
+
+// Browser-scope twin of the module-level COLLAPSIBLE_WS (whitespace collapse
+// that spares NBSP; see the module-level declaration for the rationale). The
+// raw-JS helpers below run inside this IIFE, so they resolve this payload-side
+// const rather than the TS module one.
+const COLLAPSIBLE_WS = /[^\\S\\u00a0]+/g;
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
@@ -5818,6 +5853,229 @@ async function materializeDecorativePseudoElements() {
 
 /* eslint-enable no-undef, no-inner-declarations */
 
+/* eslint-disable no-undef, no-inner-declarations */
+
+// ===== Pre-snapshot pass: expand sticky scrollytelling blocks =====
+
+// "Scrollytelling" pages pin a viewport-sized `position: sticky` panel inside
+// a much taller scroll track and cross-fade between N stacked step layers as
+// `scrollY` advances (Flect's `.method-scroll` / `.method-sticky` is the
+// canonical case). A static snapshot freezes the page at scroll 0, so:
+//
+//   - the track keeps its full height (4545px) but only the top panel
+//     (766px) has content — the rest renders as blank space, and
+//   - the step layers the page's JS left at `opacity: 0` are dropped by
+//     `isVisible` (or worse, half-captured by the animation sampler whose
+//     state depends on the lazy-load warm-up sweep timing), losing steps 2..N
+//     entirely or leaving them as invisible alpha-0 layers.
+//
+// This pass rewrites the live DOM before the walker runs: the sticky panel is
+// cloned N times and the clones are tiled vertically down the track, one per
+// step, each showing exactly one layer of every stacked group. The exported
+// PAGX then reads top-to-bottom as "page 1, page 2, page 3" instead of "page
+// 1, blank, blank".
+//
+// Detection is heuristic and deliberately conservative — no class names, no
+// site-specific selectors:
+//
+//   1. a sticky element S whose parent track P is at least 2x S's height
+//      (the scroll-into interval must exist for scrollytelling to make
+//      sense), and
+//   2. inside S, a group of >= 2 sibling `position: absolute` layers that
+//      stack on top of each other (pairwise vertical overlap, similar size)
+//      with mutually exclusive opacities (one >= 0.9, one <= 0.1) — the
+//      cross-faded steps. Sticky headers, tab panels without a scroll track,
+//      carousels and parallax decorations all fail one of these checks.
+//
+// Layer handling per segment keeps the page's own geometry: the surviving
+// layer's computed `transform` is frozen inline (removing it could snap the
+// layer back to an entrance-state CSS rule such as `scale(.965)`), while
+// `opacity`/`filter`/`visibility` are forced visible. The track's height is
+// pinned inline in case it was content-driven and would collapse once the
+// sticky panel leaves the flow.
+//
+// Idempotent: expanded tracks carry `data-snapshot-sticky-expanded` and both
+// the detection loop and this guard skip anything inside such a track (which
+// also shields nested stickies inside the cloned panels).
+function expandStickyScrollytelling() {
+  // Self-contained on purpose: this function is shipped through
+  // `page.evaluate`, so only its own body crosses the boundary (same rule as
+  // materializeDecorativePseudoElements above).
+  function overlapRatio(a, b) {
+    const top = Math.max(a.top, b.top);
+    const bottom = Math.min(a.bottom, b.bottom);
+    if (bottom <= top) return 0;
+    const shared = bottom - top;
+    return Math.min(shared / Math.max(1, a.height), shared / Math.max(1, b.height));
+  }
+
+  function sizeSimilar(a, b) {
+    const w = Math.abs(a.width - b.width) / Math.max(1, Math.max(a.width, b.width));
+    const h = Math.abs(a.height - b.height) / Math.max(1, Math.max(a.height, b.height));
+    return w <= 0.25 && h <= 0.25;
+  }
+
+  // Group absolutely-positioned candidates by parent, then keep the buckets
+  // that look like a cross-fade step stack: >= 2 layers, pairwise stacked,
+  // similar size, mutually exclusive opacities.
+  function findLayerGroups(root) {
+    const buckets = new Map();
+    const all = root.querySelectorAll('*');
+    for (const el of all) {
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'absolute') continue;
+      if (cs.display === 'none') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const parent = el.parentElement;
+      if (!parent) continue;
+      if (!buckets.has(parent)) buckets.set(parent, []);
+      buckets.get(parent).push({ el, cs, rect });
+    }
+    const groups = [];
+    for (const layers of buckets.values()) {
+      if (layers.length < 2) continue;
+      let stacked = true;
+      for (let i = 0; i < layers.length && stacked; i++) {
+        for (let j = i + 1; j < layers.length; j++) {
+          if (overlapRatio(layers[i].rect, layers[j].rect) < 0.6 ||
+              !sizeSimilar(layers[i].rect, layers[j].rect)) {
+            stacked = false;
+            break;
+          }
+        }
+      }
+      if (!stacked) continue;
+      const ops = layers.map((l) => parseFloat(l.cs.opacity) || 0);
+      if (Math.max.apply(null, ops) < 0.9) continue;
+      if (Math.min.apply(null, ops) > 0.1) continue;
+      groups.push(layers.map((l) => l.el));
+    }
+    return groups;
+  }
+
+  // Freeze one surviving layer into its visible resting state. `transform`
+  // keeps the *computed* value: the layer's CSS base rule may hold an
+  // entrance transform (e.g. `translateY(-50%)` centering or `scale(.965)`)
+  // that inline JS overrode at runtime, and removing the inline value would
+  // snap the geometry back. opacity/filter/visibility are forced so the
+  // walker's `isVisible` check never prunes the layer.
+  function keepLayer(el) {
+    const cs = getComputedStyle(el);
+    el.style.opacity = '1';
+    el.style.filter = 'none';
+    el.style.visibility = 'visible';
+    el.style.transform = cs.transform;
+    el.style.removeProperty('transition');
+    el.style.removeProperty('animation');
+  }
+
+  const results = [];
+  const candidates = Array.from(document.body ? document.body.querySelectorAll('*') : []);
+  for (const el of candidates) {
+    if (!el.parentElement) continue;
+    if (el.closest('[data-snapshot-sticky-expanded]')) continue;
+    let cs;
+    try {
+      cs = getComputedStyle(el);
+    } catch (_) {
+      continue;
+    }
+    if (cs.position !== 'sticky') continue;
+    if (cs.display === 'none') continue;
+    const track = el.parentElement;
+    const elRect = el.getBoundingClientRect();
+    const trackRect = track.getBoundingClientRect();
+    if (elRect.width <= 0 || elRect.height <= 0) continue;
+    if (trackRect.height < 2 * elRect.height) continue;
+    // The sticky panel must be the track's only in-flow visible child:
+    // switching it to absolute releases its layout slot, and any in-flow
+    // sibling would shift up and corrupt the geometry of everything the
+    // walker measures afterwards. Scrollytelling tracks are dedicated
+    // height-creating wrappers, so this holds for the intended targets and
+    // rejects sticky headers living inside a normal content flow.
+    let hasFlowSibling = false;
+    for (const sibling of Array.from(track.children)) {
+      if (sibling === el) continue;
+      const sc = getComputedStyle(sibling);
+      if (sc.display === 'none') continue;
+      if (sc.position === 'absolute' || sc.position === 'fixed' || sc.position === 'sticky') {
+        continue;
+      }
+      if (sibling.getBoundingClientRect().height > 0) {
+        hasFlowSibling = true;
+        break;
+      }
+    }
+    if (hasFlowSibling) continue;
+    const groups = findLayerGroups(el);
+    if (groups.length === 0) continue;
+
+    const segments = Math.max.apply(null, groups.map((g) => g.length));
+    const segmentHeight = trackRect.height / segments;
+    const panelLeft = elRect.left - trackRect.left;
+    const panelWidth = elRect.width;
+
+    // Tag every layer with its group + index so the clones (fresh nodes the
+    // original references don't reach) can be re-queried per segment.
+    groups.forEach((layers, groupIndex) => {
+      layers.forEach((layer, layerIndex) => {
+        layer.setAttribute('data-snapshot-layer-group', String(groupIndex));
+        layer.setAttribute('data-snapshot-layer-index', String(layerIndex));
+      });
+    });
+
+    // The track must become the containing block for the absolutely
+    // positioned panels.
+    if (getComputedStyle(track).position === 'static') {
+      track.style.position = 'relative';
+    }
+
+    const panels = [el];
+    for (let i = 1; i < segments; i++) {
+      panels.push(el.cloneNode(true));
+    }
+    panels.forEach((panel, i) => {
+      if (i > 0) track.appendChild(panel);
+      panel.style.position = 'absolute';
+      panel.style.top = (i * segmentHeight + (segmentHeight - elRect.height) / 2) + 'px';
+      panel.style.left = panelLeft + 'px';
+      panel.style.width = panelWidth + 'px';
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+      panel.style.removeProperty('margin-top');
+      panel.style.removeProperty('margin-bottom');
+      panel.style.removeProperty('margin-left');
+      panel.style.removeProperty('margin-right');
+      groups.forEach((layers, groupIndex) => {
+        const inPanel = panel.querySelectorAll(
+          '[data-snapshot-layer-group="' + groupIndex + '"]');
+        if (inPanel.length === 0) return;
+        const keepIndex = Math.min(i, inPanel.length - 1);
+        for (let li = 0; li < inPanel.length; li++) {
+          if (li === keepIndex) keepLayer(inPanel[li]);
+          else inPanel[li].remove();
+        }
+      });
+    });
+
+    // Only pin the height when the panel leaving the flow actually collapsed
+    // the track (a content-driven height). Writing getBoundingClientRect's
+    // border-box height into `style.height` unconditionally would inflate a
+    // `box-sizing: content-box` track by its padding and border.
+    if (Math.abs(track.getBoundingClientRect().height - trackRect.height) > 1) {
+      track.style.boxSizing = 'border-box';
+      track.style.height = trackRect.height + 'px';
+    }
+
+    track.setAttribute('data-snapshot-sticky-expanded', String(segments));
+    results.push({ segments });
+  }
+  return { blocks: results.length, expanded: results };
+}
+
+/* eslint-enable no-undef, no-inner-declarations */
+
 // `HELPERS_SRC` / `PAYLOAD_CONSTANTS_SRC` are exposed for the browser-bundle
 // build script (see build-browser-bundle.js): the bundle inlines them into a
 // UMD wrapper so the same snapshot logic runs without puppeteer when loaded
@@ -5834,6 +6092,7 @@ export {
   imgAlt,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  expandStickyScrollytelling,
   mergeRectsOnSameLine,
   bandInsetRect,
   inlineBoxLineRects,

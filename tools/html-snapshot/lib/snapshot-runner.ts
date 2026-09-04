@@ -15,6 +15,7 @@ import {
   normalizeEmptyImagePlaceholders,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  expandStickyScrollytelling,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import {
@@ -529,6 +530,27 @@ export async function runSnapshot(
       await page.evaluate(inlineExternalImages, srcByUrl);
     };
     await inlineCapturedImages();
+
+    // Expand scrollytelling blocks (a sticky panel inside a tall scroll track
+    // whose steps cross-fade as the page scrolls — Flect's "How Flect works"
+    // is the canonical case) into N vertically tiled panels so the exported
+    // PAGX shows every step instead of the frozen top frame plus blank track.
+    // Runs after image inlining (clones carry the inlined data URIs) and
+    // before every other pass (canvas/icon-font/animation capture and the
+    // snapshot walker all see the expanded DOM). Opt out with
+    // HTML_SNAPSHOT_NO_STICKY_EXPAND=1. Best-effort: a failure falls back to
+    // the unexpanded snapshot rather than aborting.
+    if (process.env.HTML_SNAPSHOT_NO_STICKY_EXPAND !== '1') {
+      try {
+        const stickyStats = await page.evaluate(expandStickyScrollytelling);
+        if (log && stickyStats && stickyStats.blocks > 0) {
+          const segList = stickyStats.expanded.map((b: { segments: number }) => b.segments).join(', ');
+          log(`sticky-scrollytelling: expanded ${stickyStats.blocks} block(s) into ${segList} segment(s) each`);
+        }
+      } catch (err) {
+        if (log) log(`sticky-scrollytelling expansion skipped: ${errMessage(err)}`);
+      }
+    }
 
     // Chromium renders an empty/missing-src <img> with non-empty alt text as
     // fallback glyphs and ignores even explicit CSS width/height in that
