@@ -865,11 +865,17 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
                         firstMode + "' for every background layer");
     }
   }
-  // `background-clip: text` is the only clip value the importer models. The subset transformer
-  // already normalises every other keyword to empty, so a non-empty value here equals `text`.
+  // `background-clip: text` routes the gradient onto descendant text fills. Any other
+  // non-empty list carries per-layer box clips (`padding-box`, comma-separated in CSS layer
+  // order) — kept raw so `applyBackgroundFill` can rebuild each layer with its own inset
+  // geometry (gradient borders). The subset transformer has already dropped all-default
+  // `border-box` lists, so a non-`text` value here always contains at least one
+  // `padding-box` / `content-box` layer.
   std::string bgClip = LookupLowerTrimmed(props, "background-clip");
   if (bgClip == "text") {
     box.backgroundClipText = true;
+  } else if (!bgClip.empty()) {
+    box.backgroundClip = bgClip;
   }
 
   const std::string& br = LookupProperty(props, "border-radius");

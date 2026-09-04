@@ -166,3 +166,95 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
     expect(state.cancelled).toBe(false);
   });
 });
+
+describe('materializeDecorativePseudoElements — in-flow decorative pseudo', () => {
+  // Mirrors the getflect.app `.free-tag` chip: an inline-flex host whose
+  // ::before is a static, 6x6 flex-item status dot with rounded corners.
+  function makeHostWithInFlowBefore() {
+    const host = new FakeElement('span');
+    host.appendChild(new FakeElement('span'));
+    host.__cs = {
+      '::before': makeCs({
+        content: '""',
+        position: 'static',
+        display: 'block',
+        width: '6px',
+        height: '6px',
+        'border-top-left-radius': '50%',
+        'background-color': 'rgba(116, 138, 42, 0.18)',
+        'flex-grow': '0',
+        'flex-shrink': '0',
+        'flex-basis': 'auto',
+      }),
+      '::after': makeCs({ content: 'none' }),
+    };
+    return host;
+  }
+
+  function runOnCapturingStyles(host) {
+    const styleEls = [];
+    global.document = {
+      querySelectorAll: () => [host],
+      createElement: (tag) => new FakeElement(tag),
+      head: { appendChild: (el) => styleEls.push(el) },
+    };
+    return materializeDecorativePseudoElements().then(() => styleEls);
+  }
+
+  test('materialises a static in-flow pseudo as a layout stand-in and switches the original off', async () => {
+    const host = makeHostWithInFlowBefore();
+    const styleEls = await runOnCapturingStyles(host);
+
+    // Exactly one stand-in div, inserted in front of the host's real child
+    // (the ::before slot), so the document order mirrors paint order.
+    expect(host.children).toHaveLength(2);
+    const div = host.children[0];
+    expect(div.getAttribute('data-snapshot-pseudo')).toBe('::before');
+    expect(host.getAttribute('data-snapshot-pseudo-host')).toBe('');
+
+    const style = div.getAttribute('style');
+    // Layout identity is copied so the stand-in occupies the same flow slot.
+    expect(style).toContain('display: block');
+    expect(style).toContain('width: 6px');
+    expect(style).toContain('height: 6px');
+    expect(style).toContain('background-color: rgba(116, 138, 42, 0.18)');
+    expect(style).toContain('border-top-left-radius: 50%');
+    expect(style).toContain('flex-shrink: 0');
+
+    // The original pseudo is switched off via an injected content:none rule
+    // so pseudo + stand-in cannot double-occupy the flow slot.
+    expect(host.getAttribute('data-snapshot-pseudo-off-0')).toBe('');
+    expect(styleEls).toHaveLength(1);
+    expect(styleEls[0].getAttribute('data-snapshot-pseudo-off')).toBe('');
+    expect(styleEls[0].textContent)
+      .toContain('[data-snapshot-pseudo-off-0]::before { content: none !important; }');
+  });
+
+  test('an out-of-flow pseudo does not inject a content:none rule', async () => {
+    const { host } = makeHostWithAfter({ animated: false });
+    const styleEls = await runOnCapturingStyles(host);
+
+    expect(host.children).toHaveLength(1);
+    expect(styleEls).toHaveLength(0);
+    expect(host.hasAttribute('data-snapshot-pseudo-off-0')).toBe(false);
+  });
+
+  test('a sticky pseudo is still rejected', async () => {
+    const host = new FakeElement('div');
+    host.__cs = {
+      '::before': makeCs({
+        content: '""',
+        position: 'sticky',
+        width: '6px',
+        height: '6px',
+        'background-color': 'rgb(255, 0, 0)',
+      }),
+      '::after': makeCs({ content: 'none' }),
+    };
+    const styleEls = await runOnCapturingStyles(host);
+
+    expect(host.children).toHaveLength(0);
+    expect(styleEls).toHaveLength(0);
+    expect(host.getAttribute('data-snapshot-pseudo-skipped')).toBe('position-sticky');
+  });
+});

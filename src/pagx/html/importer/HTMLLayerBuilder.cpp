@@ -453,6 +453,52 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   }
 
   if (!colors.empty()) {
+    // `background-clip` carries per-layer box keywords in CSS layer order (the subset
+    // transformer only keeps lists with at least one non-`border-box` layer). CSS cycles a
+    // shorter clip list across the image layers, so index with modulo.
+    auto clips = SplitTopLevelCommas(ToLower(Trim(box.backgroundClip)));
+    for (auto& clip : clips) {
+      clip = Trim(clip);
+    }
+    // The inset path paints each `padding-box` / `content-box` layer on its own child layer,
+    // which renders above the host's `contents` (where the `border-box` layers live) but
+    // below every content child. That ordering can only express the canonical CSS pattern —
+    // every non-border-box layer sits above every border-box layer (a border-box layer above
+    // a tighter layer would fully cover it anyway unless transparent). Any other order falls
+    // back to plain border-box painting with a diagnostic.
+    bool useInsetLayers = !clips.empty();
+    if (useInsetLayers) {
+      bool sawBorderBox = false;
+      for (size_t i = 0; i < colors.size(); i++) {
+        const std::string& clip = clips[i % clips.size()];
+        if (clip == "border-box") {
+          sawBorderBox = true;
+        } else if (sawBorderBox) {
+          useInsetLayers = false;
+          break;
+        }
+      }
+    }
+    // The inset layer needs concrete px geometry: an unsized box (percent layout) or a
+    // per-corner / ellipse radius has no exact inset rectangle to build.
+    if (useInsetLayers && (std::isnan(box.widthPx) || std::isnan(box.heightPx) ||
+                           box.widthPx <= 0.0f || box.heightPx <= 0.0f)) {
+      _diagnostics.warn(
+          "html: background-clip padding-box without fixed px width/height; clipping to "
+          "border-box");
+      useInsetLayers = false;
+    }
+    if (useInsetLayers && box.borderRadiusSet &&
+        (!box.borderRadiusUniform || box.borderRadiusEllipse)) {
+      _diagnostics.warn(
+          "html: background-clip padding-box with non-uniform or ellipse border-radius; "
+          "clipping to border-box");
+      useInsetLayers = false;
+    }
+    if (!useInsetLayers) {
+      clips.clear();
+    }
+
     // `background-blend-mode` blends each background layer against the layers *below* it, with
     // the background-color as the bottom-most layer. Emit the solid colour first so the blended
     // gradient Fill has a backdrop to composite against; without a blend mode an opaque gradient
@@ -476,12 +522,28 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
       hasBackdrop = true;
     }
     // Gradients are pushed in reverse CSS order (the CSS-last layer first), so the first Fill
-    // emitted here is the bottom-most background layer.
+    // emitted here is the bottom-most background layer. Border-box layers stay on the host's
+    // contents (bottom of the paint stack); each tighter clip becomes an inset child layer,
+    // pushed bottom-most-first so the CSS-topmost layer ends up as the topmost child.
     for (auto it = colors.rbegin(); it != colors.rend(); ++it) {
-      auto fill = _document->makeNode<Fill>();
-      fill->color = *it;
-      fill->blendMode = hasBackdrop ? blend : BlendMode::Normal;
-      layer->contents.push_back(fill);
+      const size_t cssIndex = static_cast<size_t>(std::distance(it, colors.rend())) - 1;
+      const std::string& clip = clips.empty() ? std::string() : clips[cssIndex % clips.size()];
+      if (clip == "padding-box" || clip == "content-box") {
+        Padding inset = {};
+        inset.top = inset.right = inset.bottom = inset.left = box.borderWidthPx;
+        if (clip == "content-box") {
+          inset.top += box.padding.top;
+          inset.right += box.padding.right;
+          inset.bottom += box.padding.bottom;
+          inset.left += box.padding.left;
+        }
+        emitInsetBackgroundLayer(layer, box, *it, inset, hasBackdrop ? blend : BlendMode::Normal);
+      } else {
+        auto fill = _document->makeNode<Fill>();
+        fill->color = *it;
+        fill->blendMode = hasBackdrop ? blend : BlendMode::Normal;
+        layer->contents.push_back(fill);
+      }
       hasBackdrop = true;
     }
     emitted = true;
@@ -498,6 +560,34 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
     layer->contents.push_back(fill);
     emitted = true;
   }
+}
+
+void HTMLLayerBuilder::emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttributes& box,
+                                                ColorSource* color, const Padding& inset,
+                                                BlendMode blendMode) {
+  auto inner = _document->makeNode<Layer>();
+  inner->includeInLayout = false;
+  inner->x = inset.left;
+  inner->y = inset.top;
+  inner->width = box.widthPx - inset.left - inset.right;
+  inner->height = box.heightPx - inset.top - inset.bottom;
+  auto* rect = _document->makeNode<Rectangle>();
+  rect->percentWidth = 100.0f;
+  rect->percentHeight = 100.0f;
+  // CSS shrinks the padding-box corner radius by the border width (the inner curve of a
+  // rounded border). With a uniform authored radius a single scalar is exact; the max inset
+  // approximates per-side insets on a uniform-radius box.
+  rect->roundness = std::max(
+      0.0f, box.borderRadiusTLPx - std::max({inset.top, inset.right, inset.bottom, inset.left}));
+  inner->contents.push_back(rect);
+  auto* fill = _document->makeNode<Fill>();
+  fill->color = color;
+  fill->blendMode = blendMode;
+  inner->contents.push_back(fill);
+  // Child layers render above the host's own contents (the border-box layers) and below the
+  // content children pushed later, so the inset layer reveals the border-box layer beneath
+  // as a gradient frame exactly like CSS padding-box clipping.
+  layer->children.push_back(inner);
 }
 
 void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box,

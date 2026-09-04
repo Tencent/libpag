@@ -237,6 +237,12 @@ struct HTMLBoxAttributes {
   // `background-image`; the gradient is then routed onto descendant text fills instead of
   // painting a rectangle on this element.
   bool backgroundClipText = false;
+  // Per-layer `background-clip` box keywords (`border-box` / `padding-box`), comma-separated
+  // in CSS layer order (first entry clips the top-most background-image layer, matching
+  // `backgroundImage`'s order). Empty means every layer clips to the default `border-box`.
+  // A `padding-box` layer is how CSS paints gradient borders: the layer inset by the border
+  // width lets the border-box layer beneath show through as a frame.
+  std::string backgroundClip = {};
 
   // CSS `background-size` / `background-repeat` / `background-position`, kept lower-cased and
   // trimmed. Only meaningful when `backgroundImage` is a `url(...)` reference; the importer maps

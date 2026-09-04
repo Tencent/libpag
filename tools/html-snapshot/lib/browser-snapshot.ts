@@ -156,16 +156,26 @@ function normalizeBackgroundImage(value) {
   return '';
 }
 
-// PAGX only models `background-clip: text` — combined with a gradient
-// `background-image`, the importer routes the gradient to descendant text
-// fills (so the text glyphs are filled with the gradient instead of the
-// element painting a rectangular gradient). Every other clip value is
-// dropped: PAGX has no `padding-box` / `content-box` distinction. Chromium
-// computed style already coalesces `-webkit-background-clip` into the
-// unprefixed `background-clip`, so a single schema entry suffices.
+// `background-clip: text` routes a gradient `background-image` to descendant
+// text fills in the importer (the text glyphs are filled with the gradient
+// instead of the element painting a rectangular gradient). Layered box clips
+// (`padding-box` / `content-box` / `border-box`, comma-separated per
+// background layer) are kept verbatim: a layer clipped tighter than the
+// border box is how CSS paints gradient borders (transparent border + a
+// border-box layer showing through a padding-box layer's inset), and the
+// importer rebuilds each layer with its own inset geometry. A list where
+// every layer is the default `border-box` still collapses to '' so the
+// STYLE_SCHEMA defaults filter drops the property. Chromium computed style
+// already coalesces `-webkit-background-clip` into the unprefixed
+// `background-clip`, so a single schema entry suffices.
 function normalizeBackgroundClip(value) {
   if (!value) return '';
-  return value.trim().toLowerCase() === 'text' ? 'text' : '';
+  const v = value.trim().toLowerCase();
+  if (v === 'text') return 'text';
+  const layers = v.split(',').map((s) => s.trim()).filter(Boolean);
+  if (layers.length === 0) return '';
+  if (layers.every((l) => l === 'border-box')) return '';
+  return layers.join(', ');
 }
 
 // PAGX's mask-image supports the same value forms as background-image: a
@@ -5514,6 +5524,12 @@ async function materializeDecorativePseudoElements() {
   const COPY_PROPS = [
     'position', 'left', 'right', 'top', 'bottom',
     'width', 'height',
+    // Layout identity for in-flow stand-ins: without the exact display / flex
+    // participation the synthetic div would occupy a different slot in the
+    // host's flow (flex item vs block) and shift the measured children.
+    'display',
+    'flex-grow', 'flex-shrink', 'flex-basis', 'align-self', 'order',
+    'min-width', 'min-height', 'max-width', 'max-height',
     'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
     'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
     'background-color', 'background-image', 'background-clip',
@@ -5553,6 +5569,13 @@ async function materializeDecorativePseudoElements() {
   const DEFAULTS = new Map([
     ['position', 'static'],
     ['left', 'auto'], ['right', 'auto'], ['top', 'auto'], ['bottom', 'auto'],
+    // `display` is intentionally NOT default-suppressed: a `div` stand-in
+    // defaults to block, and an in-flow pseudo with `inline` / `inline-block`
+    // participation must keep it or the flow slot changes.
+    ['flex-grow', '0'], ['flex-shrink', '1'], ['flex-basis', 'auto'],
+    ['align-self', 'auto'], ['order', '0'],
+    ['min-width', 'auto'], ['min-height', 'auto'],
+    ['max-width', 'none'], ['max-height', 'none'],
     ['margin-top', '0px'], ['margin-right', '0px'],
     ['margin-bottom', '0px'], ['margin-left', '0px'],
     ['padding-top', '0px'], ['padding-right', '0px'],
@@ -5602,24 +5625,31 @@ async function materializeDecorativePseudoElements() {
   }
 
   // Decide whether a pseudo with the given resolved style should be
-  // materialised. Out-of-flow position is required so the synthetic sibling
-  // doesn't push the host's real children around. A pseudo with no visible
-  // box (no width / height / background / border / shadow / transform) is
-  // skipped — there's nothing to render anyway.
+  // materialised. A pseudo with no visible box (no width / height) is
+  // skipped — there's nothing to render anyway. Out-of-flow pseudos
+  // (absolute/fixed) become detached synthetic siblings exactly as before.
+  // In-flow pseudos (static/relative) are materialised as layout-equivalent
+  // stand-ins: the synthetic div joins the same flow (flex item, inline
+  // block, …) with the pseudo's copied layout styles and the original pseudo
+  // is switched off via an injected `content: none` rule, so the host's
+  // measured layout is unchanged while the decorative box survives the
+  // snapshot. `sticky` keeps its old rejection: the stand-in would freeze it
+  // at the current scroll position and lose the sticky semantics.
   function shouldMaterialise(cs, pseudoText) {
     if (pseudoText !== '') {
       return { ok: false, reason: 'text-content' };
     }
     const position = (cs.getPropertyValue('position') || '').trim();
-    if (position !== 'absolute' && position !== 'fixed') {
-      return { ok: false, reason: 'in-flow' };
+    if (position !== 'absolute' && position !== 'fixed' &&
+        position !== 'static' && position !== 'relative') {
+      return { ok: false, reason: 'position-' + (position || 'unknown') };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
     if (widthPx <= 0 && heightPx <= 0) {
       return { ok: false, reason: 'zero-size' };
     }
-    return { ok: true };
+    return { ok: true, inFlow: position === 'static' || position === 'relative' };
   }
 
   function emitInlineStyle(cs) {
@@ -5682,6 +5712,7 @@ async function materializeDecorativePseudoElements() {
   // `<svg>` subtrees are an opaque resolver target downstream — leaving
   // pseudo-elements declared on inline SVG markup alone matches how the
   // snapshot already passes the SVG through verbatim.
+  const pseudoOffRules = [];
   const all = document.querySelectorAll('*');
   for (let i = 0; i < all.length; i++) {
     const el = all[i];
@@ -5696,8 +5727,11 @@ async function materializeDecorativePseudoElements() {
     if (el.closest('svg') && tag !== 'svg') continue;
     // Skip our own synthetic nodes from a previous pass (defensive — the
     // pipeline today calls this exactly once per page, but the in-page
-    // helpers can also be invoked manually).
+    // helpers can also be invoked manually). A host that already went
+    // through materialisation is skipped entirely so a second pass cannot
+    // stack a second stand-in next to the first.
     if (el.hasAttribute('data-snapshot-pseudo')) continue;
+    if (el.hasAttribute('data-snapshot-pseudo-host')) continue;
 
     // Two-phase decision: first read both pseudos so we know whether the
     // host carries a text-bearing pseudo. If it does, leave the host alone
@@ -5750,11 +5784,35 @@ async function materializeDecorativePseudoElements() {
       } else {
         el.appendChild(div);
       }
+      // An out-of-flow pseudo never affected the host's layout, so the
+      // original can keep rendering until the stylesheet is stripped. An
+      // in-flow stand-in DOES take a layout slot: without switching the
+      // original off, pseudo + stand-in would double-occupy the flow and
+      // shift every measured sibling. Record a `content: none` override and
+      // inject all rules after the walk — injecting mid-walk would be safe
+      // too (already-read styles are unaffected), but batching keeps the
+      // DOM mutation profile flat and the markers deterministic.
+      if (decision.inFlow) {
+        const marker = 'data-snapshot-pseudo-off-' + pseudoOffRules.length;
+        el.setAttribute(marker, '');
+        pseudoOffRules.push('[' + marker + ']' + slot.pseudo + ' { content: none !important; }');
+      }
       materialisedAny = true;
     }
     if (materialisedAny) {
       el.setAttribute('data-snapshot-pseudo-host', '');
     }
+  }
+
+  // Switch off every in-flow pseudo that now has a layout stand-in. The rule
+  // lives in the snapshot's <head> style block, so it keeps guarding the
+  // stand-in against a double paint if the snapshot is re-rendered with the
+  // original stylesheet still attached.
+  if (pseudoOffRules.length > 0) {
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-snapshot-pseudo-off', '');
+    styleEl.textContent = pseudoOffRules.join('\n');
+    document.head.appendChild(styleEl);
   }
 }
 
