@@ -17,5 +17,5 @@
       ]
     }
   },
-  "include": ["ts/pagx.ts"]
+  "include": ["ts/pagx.ts", "ts/pagx-check.ts"]
 }
