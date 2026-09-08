@@ -16,9 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 #include <vector>
 #include "base/PAGTest.h"
 #include "pagx/HTMLExporter.h"
@@ -38,6 +40,7 @@
 #include "tgfx/core/Path.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
+#include "woff2/decode.h"
 
 namespace pag {
 
@@ -822,6 +825,242 @@ CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontRemovesOverlappingContours) {
 
   auto fontResult = pagx::BuildWoff2FromFont(font, "overlap");
   ASSERT_FALSE(fontResult.woff2Data.empty());
+}
+
+static uint16_t ReadTestU16(const std::vector<uint8_t>& data, size_t offset) {
+  return static_cast<uint16_t>((data[offset] << 8) | data[offset + 1]);
+}
+
+static bool FindTestTable(const std::vector<uint8_t>& sfnt, const char* tag, size_t* offset,
+                          size_t* length) {
+  auto numTables = ReadTestU16(sfnt, 4);
+  size_t recordOffset = 12;
+  for (uint16_t i = 0; i < numTables; i++) {
+    if (recordOffset + 16 > sfnt.size()) {
+      return false;
+    }
+    if (std::memcmp(sfnt.data() + recordOffset, tag, 4) == 0) {
+      *offset = (static_cast<size_t>(sfnt[recordOffset + 8]) << 24) |
+                (static_cast<size_t>(sfnt[recordOffset + 9]) << 16) |
+                (static_cast<size_t>(sfnt[recordOffset + 10]) << 8) |
+                static_cast<size_t>(sfnt[recordOffset + 11]);
+      *length = (static_cast<size_t>(sfnt[recordOffset + 12]) << 24) |
+                (static_cast<size_t>(sfnt[recordOffset + 13]) << 16) |
+                (static_cast<size_t>(sfnt[recordOffset + 14]) << 8) |
+                static_cast<size_t>(sfnt[recordOffset + 15]);
+      return *offset + *length <= sfnt.size();
+    }
+    recordOffset += 16;
+  }
+  return false;
+}
+
+// Parses the CFF INDEX starting at pos. Appends each item's [start, end) byte range and returns
+// the position just past the INDEX, or 0 if the structure is malformed.
+static size_t ParseCFFTestIndex(const std::vector<uint8_t>& cff, size_t pos,
+                                std::vector<std::pair<size_t, size_t>>* items) {
+  if (pos + 2 > cff.size()) {
+    return 0;
+  }
+  auto count = ReadTestU16(cff, pos);
+  pos += 2;
+  if (count == 0) {
+    return pos;
+  }
+  if (pos >= cff.size()) {
+    return 0;
+  }
+  auto offSize = static_cast<size_t>(cff[pos]);
+  pos += 1;
+  size_t offsetArraySize = (static_cast<size_t>(count) + 1) * offSize;
+  if (offsetArraySize > cff.size() || pos + offsetArraySize > cff.size()) {
+    return 0;
+  }
+  std::vector<uint32_t> offsets(count + 1);
+  for (size_t i = 0; i <= count; i++) {
+    uint32_t value = 0;
+    for (size_t b = 0; b < offSize; b++) {
+      value = (value << 8) | cff[pos + i * offSize + b];
+    }
+    offsets[i] = value;
+  }
+  size_t dataStart = pos + offsetArraySize;
+  for (size_t i = 0; i < count; i++) {
+    items->emplace_back(dataStart + offsets[i] - 1, dataStart + offsets[i + 1] - 1);
+  }
+  return dataStart + offsets[count] - 1;
+}
+
+// Scans DICT data for the given operator and returns its preceding integer operand. Only covers
+// the operand forms emitted by Woff2FontGenerator (EncodeCFFInt: single/double byte and 29).
+static bool FindTestDictOperand(const std::vector<uint8_t>& dict, uint8_t opKey, int32_t* out) {
+  size_t i = 0;
+  int32_t operand = 0;
+  bool hasOperand = false;
+  while (i < dict.size()) {
+    uint8_t b = dict[i];
+    if (b >= 32 && b <= 246) {
+      operand = b - 139;
+      hasOperand = true;
+      i += 1;
+    } else if (b >= 247 && b <= 250) {
+      if (i + 1 >= dict.size()) {
+        return false;
+      }
+      operand = (b - 247) * 256 + dict[i + 1] + 108;
+      hasOperand = true;
+      i += 2;
+    } else if (b >= 251 && b <= 254) {
+      if (i + 1 >= dict.size()) {
+        return false;
+      }
+      operand = -(b - 251) * 256 - dict[i + 1] - 108;
+      hasOperand = true;
+      i += 2;
+    } else if (b == 29) {
+      if (i + 4 >= dict.size()) {
+        return false;
+      }
+      operand = (static_cast<int32_t>(dict[i + 1]) << 24) |
+                (static_cast<int32_t>(dict[i + 2]) << 16) |
+                (static_cast<int32_t>(dict[i + 3]) << 8) | static_cast<int32_t>(dict[i + 4]);
+      hasOperand = true;
+      i += 5;
+    } else {
+      i += 1;
+      if (b == 12) {
+        i += 1;
+        continue;
+      }
+      if (b == opKey && hasOperand) {
+        *out = operand;
+        return true;
+      }
+      hasOperand = false;
+    }
+  }
+  return false;
+}
+
+// Lexically scans a Type 2 CharString. Fails on callgsubr (29) or callsubr (10) operators: the
+// generator never emits subr calls, so a 29 byte here means DICT-only number encoding leaked into
+// CharString data and OTS will reject the font. Also reports whether the 28-prefixed shortint
+// form (used for values beyond the 2-byte range) appears.
+static bool ScanTestCharString(const std::vector<uint8_t>& cff, size_t start, size_t end,
+                               bool* usesShortint) {
+  size_t i = start;
+  while (i < end) {
+    uint8_t b = cff[i];
+    if (b >= 32 && b <= 246) {
+      i += 1;
+    } else if (b >= 247 && b <= 254) {
+      i += 2;
+    } else if (b == 28) {
+      *usesShortint = true;
+      i += 3;
+    } else if (b == 255) {
+      i += 5;
+    } else if (b == 29 || b == 10) {
+      return false;
+    } else {
+      i += 1;
+      if (b == 12) {
+        i += 1;
+      }
+    }
+    if (i > end) {
+      return false;
+    }
+  }
+  return i == end;
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2LargeCoordinateGlyphsUseCharStringEncoding) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  ASSERT_NE(doc, nullptr);
+  auto font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto path = doc->makeNode<pagx::PathData>();
+  path->moveTo(0, 0);
+  path->lineTo(2000, 0);
+  path->lineTo(2000, 1500);
+  path->lineTo(0, 1500);
+  path->close();
+  auto glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = path;
+  glyph->advance = 2000;
+  font->glyphs.push_back(glyph);
+  // A second glyph with fractional cubic control points makes the CharStrings INDEX large
+  // enough that the Private DICT offset crosses DICT integer encoding boundaries, which used
+  // to desynchronize the Top DICT offsets from the actual serialized layout.
+  auto curvePath = doc->makeNode<pagx::PathData>();
+  curvePath->moveTo(0, 0);
+  curvePath->quadTo(-1500, -900, -2500, 600);
+  auto curveGlyph = doc->makeNode<pagx::Glyph>();
+  curveGlyph->path = curvePath;
+  curveGlyph->advance = 1200;
+  font->glyphs.push_back(curveGlyph);
+  // More glyphs push the Private DICT offset past the single-byte DICT encoding boundary (246),
+  // where a variable-length Top DICT encoding would desynchronize offsets from the layout.
+  for (int i = 0; i < 12; i++) {
+    auto filler = doc->makeNode<pagx::Glyph>();
+    filler->path = curvePath;
+    filler->advance = 1200;
+    font->glyphs.push_back(filler);
+  }
+
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+
+  auto finalSize =
+      woff2::ComputeWOFF2FinalSize(fontResult.woff2Data.data(), fontResult.woff2Data.size());
+  ASSERT_GT(finalSize, static_cast<size_t>(0));
+  std::vector<uint8_t> ttf(finalSize);
+  ASSERT_TRUE(woff2::ConvertWOFF2ToTTF(ttf.data(), ttf.size(), fontResult.woff2Data.data(),
+                                       fontResult.woff2Data.size()));
+
+  size_t cffOffset = 0;
+  size_t cffLength = 0;
+  ASSERT_TRUE(FindTestTable(ttf, "CFF ", &cffOffset, &cffLength));
+  std::vector<uint8_t> cff(ttf.begin() + static_cast<long>(cffOffset),
+                           ttf.begin() + static_cast<long>(cffOffset + cffLength));
+
+  auto headerSize = static_cast<size_t>(cff[2]);
+  std::vector<std::pair<size_t, size_t>> nameItems;
+  ASSERT_GT(ParseCFFTestIndex(cff, headerSize, &nameItems), static_cast<size_t>(0));
+  ASSERT_EQ(nameItems.size(), static_cast<size_t>(1));
+
+  std::vector<std::pair<size_t, size_t>> topDictItems;
+  auto afterTopDict = ParseCFFTestIndex(cff, nameItems[0].second, &topDictItems);
+  ASSERT_GT(afterTopDict, static_cast<size_t>(0));
+  ASSERT_EQ(topDictItems.size(), static_cast<size_t>(1));
+
+  std::vector<uint8_t> topDict(cff.begin() + static_cast<long>(topDictItems[0].first),
+                               cff.begin() + static_cast<long>(topDictItems[0].second));
+  int32_t charsetOffset = 0;
+  ASSERT_TRUE(FindTestDictOperand(topDict, 15, &charsetOffset));
+  ASSERT_GT(static_cast<size_t>(charsetOffset), static_cast<size_t>(0));
+  ASSERT_LT(static_cast<size_t>(charsetOffset), cff.size());
+  // The generator always writes a format-2 charset; anything else means the offset is stale.
+  EXPECT_EQ(cff[static_cast<size_t>(charsetOffset)], 2);
+  int32_t charStringsOffset = 0;
+  ASSERT_TRUE(FindTestDictOperand(topDict, 17, &charStringsOffset));
+  ASSERT_GT(static_cast<size_t>(charStringsOffset), static_cast<size_t>(0));
+  ASSERT_LT(static_cast<size_t>(charStringsOffset), cff.size());
+
+  std::vector<std::pair<size_t, size_t>> charStringItems;
+  ASSERT_GT(ParseCFFTestIndex(cff, static_cast<size_t>(charStringsOffset), &charStringItems),
+            static_cast<size_t>(0));
+  // .notdef + 2 explicit + 12 filler glyphs
+  ASSERT_EQ(charStringItems.size(), static_cast<size_t>(15));
+
+  bool anyShortint = false;
+  for (auto& range : charStringItems) {
+    ASSERT_TRUE(ScanTestCharString(cff, range.first, range.second, &anyShortint));
+  }
+  // The 2000/1500 unit deltas exceed the 2-byte operand range (±1131) and must be encoded with
+  // the Type 2 shortint form (28) rather than the DICT-only 29 form, which is callgsubr here.
+  EXPECT_TRUE(anyShortint);
 }
 
 CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {

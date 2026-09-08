@@ -212,7 +212,7 @@ static void EncodeCFFInt(std::vector<uint8_t>& buf, int32_t val) {
     WriteU8(buf, static_cast<uint8_t>((v >> 8) + 251));
     WriteU8(buf, static_cast<uint8_t>(v & 0xFF));
   } else {
-    // 5-byte encoding: prefix 29 + 4-byte big-endian int
+    // 5-byte encoding: prefix 29 + 4-byte big-endian int (valid in DICT data only)
     WriteU8(buf, 29);
     WriteU8(buf, static_cast<uint8_t>((val >> 24) & 0xFF));
     WriteU8(buf, static_cast<uint8_t>((val >> 16) & 0xFF));
@@ -532,15 +532,28 @@ std::vector<uint8_t> BuildWoff2GlyphCharString(const PathData& path, float desig
 
 // --- Table builders ---
 
+// Encodes a DICT operand in the fixed 5-byte (29-prefixed) form. Top DICT offsets must use this
+// form regardless of magnitude: with variable-length encoding, offset values can cross DICT
+// integer encoding boundaries (246/1131) as the serialized dict size changes, so the dict size
+// and the offsets it encodes oscillate instead of converging in a fixed number of passes.
+static void EncodeDictOffset(std::vector<uint8_t>& buf, uint32_t val) {
+  auto v = static_cast<int32_t>(val);
+  WriteU8(buf, 29);
+  WriteU8(buf, static_cast<uint8_t>((v >> 24) & 0xFF));
+  WriteU8(buf, static_cast<uint8_t>((v >> 16) & 0xFF));
+  WriteU8(buf, static_cast<uint8_t>((v >> 8) & 0xFF));
+  WriteU8(buf, static_cast<uint8_t>(v & 0xFF));
+}
+
 static std::vector<uint8_t> BuildCFFTopDict(uint32_t charsetOff, uint32_t charStringsOff,
                                             uint32_t privateDictSize, uint32_t privateDictOff) {
   std::vector<uint8_t> dict;
-  EncodeCFFInt(dict, static_cast<int32_t>(charsetOff));
+  EncodeDictOffset(dict, charsetOff);
   EncodeDictOperator(dict, 15);
-  EncodeCFFInt(dict, static_cast<int32_t>(charStringsOff));
+  EncodeDictOffset(dict, charStringsOff);
   EncodeDictOperator(dict, 17);
-  EncodeCFFInt(dict, static_cast<int32_t>(privateDictSize));
-  EncodeCFFInt(dict, static_cast<int32_t>(privateDictOff));
+  EncodeDictOffset(dict, privateDictSize);
+  EncodeDictOffset(dict, privateDictOff);
   EncodeDictOperator(dict, 18);
   return dict;
 }
@@ -559,8 +572,6 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
   std::vector<std::vector<uint8_t>> names;
   names.push_back(std::vector<uint8_t>(familyName.begin(), familyName.end()));
   WriteCFFIndex(cff, names);
-
-  // Top DICT offsets are computed below after all sub-structures are serialized.
 
   // Build CharStrings
   uint16_t numGlyphs = static_cast<uint16_t>(font->glyphs.size() + 1);  // +1 for .notdef
@@ -618,12 +629,6 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
   // Name INDEX
   WriteCFFIndex(cff, names);
 
-  // We need to figure out where things land. First, serialize the string and global subr INDEXes,
-  // then the charset, charstrings, and private dict.
-
-  // Compute Top DICT size to know where subsequent data goes.
-  // We'll use a two-pass approach: first estimate, then finalize.
-
   // Serialize String INDEX
   std::vector<uint8_t> stringIndex;
   WriteCFFIndex(stringIndex, stringEntries);
@@ -643,55 +648,31 @@ static std::vector<uint8_t> BuildCFF(const Font* font, const std::string& family
   //   charset
   //   CharStrings INDEX
   //   Private DICT
-
-  // We need to know the Top DICT INDEX size to compute downstream offsets.
-  // Top DICT needs to encode the offsets, whose byte length depends on their magnitude.
-  // Use a conservative estimate first, then finalize.
+  //
+  // BuildCFFTopDict encodes every operand in a fixed 5-byte form, so the Top DICT INDEX size is
+  // independent of the offset values and the downstream offsets can be computed in one pass.
 
   size_t afterNameIndex = cff.size();
 
-  // Estimate top dict: we'll build it with 5-byte operands for all offsets
-  auto tempDict =
-      BuildCFFTopDict(0xFFFF, 0xFFFF, static_cast<uint32_t>(privateDict.size()), 0xFFFF);
+  auto topDict = BuildCFFTopDict(0, 0, 0, 0);
   std::vector<std::vector<uint8_t>> topDictItems;
-  topDictItems.push_back(tempDict);
+  topDictItems.push_back(topDict);
   std::vector<uint8_t> topDictIndex;
   WriteCFFIndex(topDictIndex, topDictItems);
 
-  size_t topDictIndexSize = topDictIndex.size();
-
-  // Compute offsets relative to start of CFF data
   size_t baseOffset =
-      afterNameIndex + topDictIndexSize + stringIndex.size() + globalSubrIndex.size();
+      afterNameIndex + topDictIndex.size() + stringIndex.size() + globalSubrIndex.size();
   uint32_t charsetOffset = static_cast<uint32_t>(baseOffset);
   uint32_t charStringsOffset = static_cast<uint32_t>(baseOffset + charset.size());
   uint32_t privateDictOffset =
       static_cast<uint32_t>(baseOffset + charset.size() + charStringsData.size());
 
-  // Rebuild top dict with real offsets
   auto finalDict = BuildCFFTopDict(charsetOffset, charStringsOffset,
                                    static_cast<uint32_t>(privateDict.size()), privateDictOffset);
-
-  // Check if size changed (it might due to different integer encoding sizes)
   topDictItems.clear();
   topDictItems.push_back(finalDict);
   topDictIndex.clear();
   WriteCFFIndex(topDictIndex, topDictItems);
-
-  if (topDictIndex.size() != topDictIndexSize) {
-    // Offset encoding size changed (typically 1 iteration suffices to stabilize).
-    topDictIndexSize = topDictIndex.size();
-    baseOffset = afterNameIndex + topDictIndexSize + stringIndex.size() + globalSubrIndex.size();
-    charsetOffset = static_cast<uint32_t>(baseOffset);
-    charStringsOffset = static_cast<uint32_t>(baseOffset + charset.size());
-    privateDictOffset = static_cast<uint32_t>(baseOffset + charset.size() + charStringsData.size());
-    finalDict = BuildCFFTopDict(charsetOffset, charStringsOffset,
-                                static_cast<uint32_t>(privateDict.size()), privateDictOffset);
-    topDictItems.clear();
-    topDictItems.push_back(finalDict);
-    topDictIndex.clear();
-    WriteCFFIndex(topDictIndex, topDictItems);
-  }
 
   // Write Top DICT INDEX
   cff.insert(cff.end(), topDictIndex.begin(), topDictIndex.end());
