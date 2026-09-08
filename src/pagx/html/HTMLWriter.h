@@ -568,6 +568,19 @@ class HTMLWriter {
   std::string writeClipDef(const Layer* mask);
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 
+  // Two-pass mask geometry walk. writeMaskCSS emits a self-contained SVG whose viewBox must
+  // start at the origin (the HTML importer folds a non-zero viewBox origin into a content
+  // matrix that is then cancelled when composed with the mask layer's own matrix), so the
+  // full bounds have to be known before the <svg> open tag is written. collectMaskBounds
+  // gathers those bounds; writeMaskGeometry then re-walks the tree with the origin shift
+  // folded into the root matrix.
+  void collectMaskBounds(const Layer* layer, const Matrix& parent, float& minX, float& minY,
+                         float& maxX, float& maxY);
+  void writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent, MaskType type,
+                         float inheritedAlpha, int& gradientIndex);
+  static void ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
+                                  float& minY, float& maxX, float& maxY);
+
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX = 0, float bboxY = 0,
                     float bboxW = 0, float bboxH = 0, bool emitFillRule = true);

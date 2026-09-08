@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLTextFragmentBuilder.h"
+#include <cerrno>
 #include <cmath>
+#include <cstdlib>
 #include <utility>
 #include "pagx/PAGXDocument.h"
 #include "pagx/html/importer/HTMLDetail.h"
@@ -72,7 +74,10 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   auto t = _document->makeNode<Text>();
   t->text = fragment.text;
   t->fontFamily = fragment.fontFamily;
-  t->fontStyle = ResolveHTMLFontStyleName(fragment.fontStyleName);
+  // Round-trip fragments carry the exact PAGX fontStyle (empty means empty); only the ordinary
+  // HTML path substitutes the canonical "Regular" name for an empty label.
+  t->fontStyle = fragment.exactFontStyle ? fragment.fontStyleName
+                                         : ResolveHTMLFontStyleName(fragment.fontStyleName);
   t->fauxBold = fragment.fauxBold;
   t->fauxItalic = fragment.fauxItalic;
   t->fontSize = fragment.fontSize;
@@ -108,6 +113,113 @@ Stroke* HTMLTextFragmentBuilder::buildTextStroke(const TextFragment& fragment) {
   // HTMLWriter::ResolveTextStrokeCss, which relies on CSS's default `fill stroke` paint-order).
   stroke->align = StrokeAlign::Center;
   return stroke;
+}
+
+void HTMLTextFragmentBuilder::applyPagxTextMetadata(TextFragment& frag, const DOMNode* element) {
+  if (const std::string* value = element->findAttribute("data-pagx-text")) {
+    frag.text = *value;
+  }
+  if (const std::string* value = element->findAttribute("data-pagx-font-family")) {
+    frag.fontFamily = *value;
+  }
+  if (const std::string* value = element->findAttribute("data-pagx-font-style")) {
+    frag.fontStyleName = *value;
+    frag.exactFontStyle = true;
+  }
+  if (const std::string* value = element->findAttribute("data-pagx-letter-spacing")) {
+    // Strict parse: the exporter writes %.9g (possibly scientific notation); require the whole
+    // token to be consumed, reject ERANGE over/underflow and non-finite results.
+    errno = 0;
+    char* end = nullptr;
+    float parsed = std::strtof(value->c_str(), &end);
+    if (!value->empty() && end == value->c_str() + value->size() && errno != ERANGE &&
+        std::isfinite(parsed)) {
+      frag.letterSpacing = parsed;
+    } else {
+      _diagnostics.warn("html: invalid data-pagx-letter-spacing '" + *value +
+                        "'; CSS-resolved value kept");
+    }
+  }
+  static const char* fauxKeys[2] = {"data-pagx-faux-bold", "data-pagx-faux-italic"};
+  bool* fauxTargets[2] = {&frag.fauxBold, &frag.fauxItalic};
+  for (int i = 0; i < 2; i++) {
+    if (const std::string* value = element->findAttribute(fauxKeys[i])) {
+      if (*value == "1") {
+        *fauxTargets[i] = true;
+      } else if (*value == "0") {
+        *fauxTargets[i] = false;
+      } else {
+        _diagnostics.warn(std::string("html: invalid ") + fauxKeys[i] + " '" + *value +
+                          "'; CSS-resolved value kept");
+      }
+    }
+  }
+}
+
+Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>& element,
+                                                  const std::vector<TextFragment>& fragments,
+                                                  const HTMLBoxAttributes& box,
+                                                  const HTMLInheritedStyle& inherited) {
+  if (fragments.empty() || fragments.front().text.empty()) {
+    return nullptr;
+  }
+  Layer* textHost = nullptr;
+  // hasBgVisuals / shrink are always false: WOFF2 spans and their containers carry only
+  // positioning and font CSS, never backgrounds or authored sizes.
+  Layer* wrapper = buildTextHostLayers(element, box, /*hasBgVisuals=*/false,
+                                       /*shrinkWidth=*/false, /*shrinkHeight=*/false, textHost);
+  // Force the bare <Text>+<Fill> path. The WOFF2 span's `line-height:1` is a visual-layer
+  // implementation detail of the glyph positioning; letting it drive needsTextBox would wrap
+  // every restored text in a TextBox the original PAGX never had.
+  populateTextHostContents(textHost, fragments, inherited, box,
+                           /*needsTextBox=*/false, /*isVertical=*/false, /*hasNoWrap=*/false);
+  _idAllocator.assign(wrapper, element);
+  return wrapper;
+}
+
+Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
+                                                    const HTMLInheritedStyle& inherited) {
+  // The generator emits glyph <span>s as direct children of the host container; the first one
+  // carries the style (font size / colour) of the first rendered glyph.
+  std::shared_ptr<DOMNode> firstSpan;
+  for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
+    if (child->type == DOMNodeType::Element && child->name == "span") {
+      firstSpan = child;
+      break;
+    }
+  }
+  if (!firstSpan) {
+    return nullptr;
+  }
+  // Resolve the style chain through the container so any styles it contributes still apply,
+  // then through the first span. Both resolves are local to this host: the synthetic
+  // pagx-font-* family must not be forwarded to the FontConfig fallback sink.
+  HTMLInheritedStyle containerStyle =
+      _styleCascade.resolveInheritedStyle(element, inherited, /*recordFontFallbacks=*/false);
+  HTMLInheritedStyle spanStyle =
+      _styleCascade.resolveInheritedStyle(firstSpan, containerStyle, /*recordFontFallbacks=*/false);
+  TextFragment frag = makeFragment(spanStyle);
+  applyPagxTextMetadata(frag, element.get());
+  if (frag.text.empty()) {
+    return nullptr;
+  }
+
+  // Child span offsets are relative to the positioned container; recover the absolute position
+  // as container + first-child offset. Only left/top are honoured — per-glyph transforms
+  // (rotation / scale / skew) belong to individual glyphs and cannot apply to the whole run.
+  HTMLBoxAttributes containerBox = _styleCascade.computeBoxAttributes(element);
+  HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
+  HTMLBoxAttributes box = containerBox;
+  float left = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) +
+               (std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx);
+  float top = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) +
+              (std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx);
+  box.leftPx = left;
+  box.topPx = top;
+  box.rightPx = NAN;
+  box.bottomPx = NAN;
+
+  return buildPAGXTextHost(element, std::vector<TextFragment>{std::move(frag)}, box, spanStyle);
 }
 
 HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
@@ -270,6 +382,16 @@ void HTMLTextFragmentBuilder::collectFragments(const std::shared_ptr<DOMNode>& e
 Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& element,
                                                 const HTMLBoxAttributes& box,
                                                 const HTMLInheritedStyle& inherited) {
+  if (element->findAttribute("data-pagx-text") != nullptr) {
+    // WOFF2 round-trip span host: the DOM text nodes hold PUA glyph characters; restore the
+    // original semantics from the data-pagx-* attributes instead of collecting them.
+    TextFragment frag = makeFragment(inherited);
+    applyPagxTextMetadata(frag, element.get());
+    if (frag.text.empty()) {
+      return nullptr;
+    }
+    return buildPAGXTextHost(element, std::vector<TextFragment>{std::move(frag)}, box, inherited);
+  }
   std::vector<TextFragment> fragments;
   collectFragments(element, inherited, fragments);
   collapseFragmentWhitespace(fragments);

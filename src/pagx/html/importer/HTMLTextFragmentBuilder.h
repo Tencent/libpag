@@ -59,6 +59,10 @@ class HTMLTextFragmentBuilder {
     std::string text = {};
     std::string fontFamily = {};
     std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Black" / ""
+    // When true, fontStyleName carries the exact PAGX fontStyle string (possibly empty) from a
+    // data-pagx-* round-trip host and must be assigned verbatim; the ordinary HTML path instead
+    // defaults an empty label to "Regular" via ResolveHTMLFontStyleName.
+    bool exactFontStyle = false;
     // Synthetic slant baked in from the CSS request (see `ResolveFontStyleSynthesis`). Surfaces as
     // `Text::fauxItalic` so an authored oblique slant survives a missing styled italic face on the
     // render host. The importer does not pre-synthesise the weight axis (it stays in
@@ -107,6 +111,12 @@ class HTMLTextFragmentBuilder {
   Layer* convertTextLeaf(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                          const HTMLInheritedStyle& inherited);
 
+  /** Converts a data-pagx-text container host (per-glyph / TextModifier / TextPath WOFF2
+   *  export output) into a single semantic Text layer, restoring the original text and font
+   *  semantics from the data-pagx-* attributes instead of the PUA glyph spans. */
+  Layer* convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
+                             const HTMLInheritedStyle& inherited);
+
   /** Builds a `Text` element from a fragment. Exposed so the synthetic anonymous-text-leaf
    *  path in `HTMLParserContext` can reuse it. */
   Text* buildTextElement(const TextFragment& fragment);
@@ -122,6 +132,19 @@ class HTMLTextFragmentBuilder {
 
  private:
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);
+
+  /** Overlays the data-pagx-* round-trip metadata (original text / font family / font style /
+   *  letter spacing / faux styles) from `element` onto `frag`. Attributes are honoured whenever
+   *  present, including empty values; letter-spacing uses a strict float parser and faux flags
+   *  only accept "1" / "0" (anything else keeps the CSS-resolved value with a warning). */
+  void applyPagxTextMetadata(TextFragment& frag, const DOMNode* element);
+
+  /** Shared emission path for both data-pagx-text host shapes (span host and container host).
+   *  Always produces a bare `<Text>+<Fill>` pair — the WOFF2 span's `line-height:1` is a visual
+   *  implementation detail and must not force a TextBox. */
+  Layer* buildPAGXTextHost(const std::shared_ptr<DOMNode>& element,
+                           const std::vector<TextFragment>& fragments, const HTMLBoxAttributes& box,
+                           const HTMLInheritedStyle& inherited);
 
   /** Derives the two whitespace-handling flags from a CSS `white-space` value:
    *  `outCollapseWhitespace` is false for `pre` / `pre-wrap` (source spaces kept verbatim),
