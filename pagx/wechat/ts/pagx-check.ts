@@ -8,10 +8,10 @@ declare const wx: any;
  * Risk model: "max-risk-path" scoring (May 2026 calibration, high-end device as baseline).
  *
  * Five independent failure paths:
- *   A. "BgBlur × uncacheable below"    bg_count × (inner + blur + grad/10)
+ *   A. "Backdrop × uncacheable below"  backdrop_style_count × (inner + blur + grad/10)
  *   B. "Path geometry overload"        path_data_bytes (MB)
  *   C. "Big canvas × element density"  (pix_M/100) × (imgPat + layer/30 + grad/20)
- *   D. "BgBlur count"                  bg_count
+ *   D. "Backdrop style count"          backdrop_style_count (BackgroundBlurStyle + GlassStyle)
  *   E. "Layer XML count"               raw <Layer> count in source XML
  *
  * Rendering recommendation (decided by runtime platform):

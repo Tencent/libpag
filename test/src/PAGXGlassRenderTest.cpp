@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <cmath>
-
 #include "base/PAGTest.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Fill.h"
@@ -106,14 +105,16 @@ static tgfx::Bitmap RenderViaDisplayList(pagx::PAGXDocument* document, tgfx::Con
   return surface->readPixels(pixmap.info(), pixmap.writablePixels()) ? bitmap : tgfx::Bitmap{};
 }
 
-static tgfx::Bitmap RenderViaOrphanDirectDraw(pagx::PAGXDocument* document, tgfx::Context* context) {
+static tgfx::Bitmap RenderViaOrphanDirectDraw(pagx::PAGXDocument* document,
+                                              tgfx::Context* context) {
   document->applyLayout();
   auto layer = pagx::LayerBuilder::Build(document);
   EXPECT_NE(layer, nullptr);
   if (layer == nullptr) {
     return {};
   }
-  auto surface = tgfx::Surface::Make(context, 300, 300, tgfx::ColorType::RGBA_8888, 1, 0, 0, nullptr);
+  auto surface =
+      tgfx::Surface::Make(context, 300, 300, tgfx::ColorType::RGBA_8888, 1, 0, 0, nullptr);
   EXPECT_NE(surface, nullptr);
   if (surface == nullptr) {
     return {};
