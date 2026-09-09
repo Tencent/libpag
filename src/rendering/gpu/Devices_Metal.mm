@@ -31,12 +31,16 @@ namespace {
 /**
  * ExternalDeviceRef subclass for the Metal backend. Retains the underlying id<MTLDevice> so
  * comparing identity later is safe even after the caller drops its own strong reference.
- * Under ARC (which libpag builds with on Apple), the strong ivar keeps the object alive for the
- * lifetime of the ref.
+ * libpag builds without ARC, so ownership is managed manually: retain in the constructor and
+ * release in the destructor, which keeps the object alive for the lifetime of the ref.
  */
 class MetalExternalDeviceRef : public ExternalDeviceRef {
  public:
-  explicit MetalExternalDeviceRef(id<MTLDevice> mtlDevice) : device(mtlDevice) {
+  explicit MetalExternalDeviceRef(id<MTLDevice> mtlDevice) : device([mtlDevice retain]) {
+  }
+
+  ~MetalExternalDeviceRef() {
+    [device release];
   }
 
   id<MTLDevice> device = nil;
