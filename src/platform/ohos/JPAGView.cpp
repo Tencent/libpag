@@ -908,42 +908,31 @@ void JPAGView::onAnimationUpdate(PAGAnimator* animator) {
 }
 
 void JPAGView::onSurfaceCreated(NativeWindow* window) {
-  std::shared_ptr<PAGPlayer> currentPlayer = nullptr;
-  {
-    std::lock_guard lock_guard(locker);
-    if (player == nullptr || animator == nullptr) {
-      return;
-    }
-    currentPlayer = player;
+  std::lock_guard lock_guard(locker);
+  if (player == nullptr || animator == nullptr) {
+    return;
   }
   auto drawable = pag::GPUDrawable::FromWindow(window, EGL_NO_CONTEXT, false);
-  currentPlayer->setSurface(pag::PAGSurface::MakeFrom(drawable));
+  player->setSurface(pag::PAGSurface::MakeFrom(drawable));
 }
 
 void JPAGView::onSurfaceSizeChanged() {
-  std::shared_ptr<PAGPlayer> currentPlayer = nullptr;
-  {
-    std::lock_guard lock_guard(locker);
-    currentPlayer = player;
-  }
-  if (currentPlayer == nullptr) {
+  std::lock_guard lock_guard(locker);
+  if (player == nullptr) {
     return;
   }
-  auto surface = currentPlayer->getSurface();
+  auto surface = player->getSurface();
   if (surface) {
     surface->updateSize();
   }
 }
 
 void JPAGView::onSurfaceDestroyed() {
-  std::shared_ptr<PAGPlayer> currentPlayer = nullptr;
-  {
-    std::lock_guard lock_guard(locker);
-    currentPlayer = player;
+  std::lock_guard lock_guard(locker);
+  if (player == nullptr) {
+    return;
   }
-  if (currentPlayer != nullptr) {
-    currentPlayer->setSurface(nullptr);
-  }
+  player->setSurface(nullptr);
 }
 
 void JPAGView::release() {
