@@ -53,7 +53,8 @@ class ExternalStateGuard {
  * safely sample the resource (i.e. shares GPU resources with the device that created it).
  * Each backend subclass holds the underlying handle with strong ownership so the identity is not
  * dangling after the creator releases its own reference. Vulkan and WebGPU do not expose a device
- * back-reference from their texture handles, so Devices::CaptureCurrent() may return nullptr on
+ * back-reference from their texture handles, so Devices::CaptureFromTexture() may return nullptr
+ * on
  * those backends and Devices::CanSampleFrom() treats a null ref as "trust the caller".
  */
 class ExternalDeviceRef {
@@ -138,17 +139,22 @@ class Devices {
       const tgfx::BackendRenderTarget& renderTarget);
 
   /**
-   * Captures an identity tag for the calling thread's current host GPU context, to be stored
-   * alongside an external resource and verified later via CanSampleFrom().
-   *   OpenGL: Records GLDevice::CurrentNativeHandle().
-   *   Others: Return nullptr; those backends have no thread-local "current" concept and
-   *           CanSampleFrom() will treat the null ref as "trust the caller".
+   * Captures an identity tag for the device that owns the given external backend texture, to be
+   * stored alongside the texture and verified later via CanSampleFrom().
+   *   OpenGL: Records GLDevice::CurrentNativeHandle(); OpenGL cannot walk from a texture id back
+   *           to its owning context, so the caller is expected to invoke this while the texture's
+   *           creating context is current. The texture parameter is unused on this backend but
+   *           kept for signature parity.
+   *   Metal:  Reads MTLTexture.device and retains it in a backend-specific ExternalDeviceRef.
+   *   Others: Return nullptr; VulkanImageInfo / WebGPUTextureInfo do not expose a device
+   *           back-reference from the texture handle, and CanSampleFrom() will treat the null ref
+   *           as "trust the caller".
    * Used by Picture::BackendTextureProxy to remember the external device identity.
    */
-  static std::shared_ptr<ExternalDeviceRef> CaptureCurrent();
+  static std::shared_ptr<ExternalDeviceRef> CaptureFromTexture(const tgfx::BackendTexture& texture);
 
   /**
-   * Returns true when Devices::CaptureCurrent() being nullptr is treated as an error condition
+   * Returns true when Devices::CaptureFromTexture() being nullptr is treated as an error condition
    * for the current backend, false otherwise. Only OpenGL (which has a thread-local "current
    * context" concept) returns true — callers such as PAGImage::FromTexture use this to decide
    * whether a null capture should be reported as a missing GPU context or accepted silently.
@@ -160,7 +166,9 @@ class Devices {
   /**
    * Returns true when `context` can safely sample a resource whose device identity was previously
    * captured as `deviceRef`. When deviceRef is null (Vulkan/WebGPU capture, or a call site that
-   * did not capture identity) the result is unconditionally true.
+   * did not capture identity) the result is unconditionally true. Otherwise the render context's
+   * device is compared against the captured one — a mismatch means the resource cannot be used
+   * by that context and the caller must reject drawing.
    */
   static bool CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef);
 

@@ -64,9 +64,9 @@ std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, I
   // Verify the caller has a current host GPU context (only meaningful on GL); on GL this records
   // the native handle and Picture::BackendTextureProxy uses it later to check the render
   // surface's device is share-compatible. On backends without a "current context" concept
-  // (Metal / D3D12 / Vulkan / WebGPU), CaptureCurrent() legitimately returns nullptr and we must
+  // (Metal / D3D12 / Vulkan / WebGPU), the capture legitimately returns nullptr and we must
   // not treat that as an error — RequiresCapturedIdentity() distinguishes the two cases.
-  auto deviceRef = Devices::CaptureCurrent();
+  auto deviceRef = Devices::CaptureFromTexture(ToTGFX(texture));
   if (deviceRef == nullptr && Devices::RequiresCapturedIdentity()) {
     LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
     return nullptr;

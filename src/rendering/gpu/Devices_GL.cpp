@@ -30,8 +30,8 @@ namespace {
 
 /**
  * ExternalDeviceRef subclass for the OpenGL backend. Stores the native GL context handle captured
- * at Devices::CaptureCurrent() time. The handle is compared via GLDevice::sharableWith() on the
- * render thread; libpag never dereferences it, so no retain is needed.
+ * at Devices::CaptureFromTexture() time. The handle is compared via GLDevice::sharableWith() on
+ * the render thread; libpag never dereferences it, so no retain is needed.
  */
 class GLExternalDeviceRef : public ExternalDeviceRef {
  public:
@@ -78,7 +78,9 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendRenderT
   return tgfx::GLDevice::Current();
 }
 
-std::shared_ptr<ExternalDeviceRef> Devices::CaptureCurrent() {
+std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(const tgfx::BackendTexture&) {
+  // GL cannot walk from a texture id back to its owning context. The caller is expected to
+  // invoke this while the texture's creating context is current on the calling thread.
   auto handle = tgfx::GLDevice::CurrentNativeHandle();
   if (handle == nullptr) {
     return nullptr;

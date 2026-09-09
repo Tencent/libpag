@@ -96,25 +96,41 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(
   return tgfx::MetalDevice::MakeFrom((__bridge void*)mtlDevice);
 }
 
-std::shared_ptr<ExternalDeviceRef> Devices::CaptureCurrent() {
-  // Metal has no thread-local "current device", so there is nothing to capture. Returning
-  // nullptr is the intended sentinel — CanSampleFrom() treats a null ref as "trust the caller",
-  // and RequiresCapturedIdentity() returns false so higher-level factories (PAGImage::FromTexture,
-  // Picture::MakeFrom) do not treat this as an error.
-  return nullptr;
+std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(
+    const tgfx::BackendTexture& texture) {
+  // Metal can reach back through the MTLTexture to its owning MTLDevice. Retaining the device in
+  // MetalExternalDeviceRef keeps the identity valid for the render-time comparison even after the
+  // caller drops its own reference to the texture.
+  tgfx::MetalTextureInfo mtlInfo = {};
+  if (!texture.getMetalTextureInfo(&mtlInfo) || mtlInfo.texture == nullptr) {
+    return nullptr;
+  }
+  id<MTLTexture> mtlTexture = (__bridge id<MTLTexture>)mtlInfo.texture;
+  id<MTLDevice> mtlDevice = mtlTexture.device;
+  if (mtlDevice == nil) {
+    return nullptr;
+  }
+  return std::make_shared<MetalExternalDeviceRef>(mtlDevice);
 }
 
 bool Devices::RequiresCapturedIdentity() {
   return false;
 }
 
-bool Devices::CanSampleFrom(tgfx::Context* /*context*/, const ExternalDeviceRef* /*deviceRef*/) {
-  // Metal cannot walk from a tgfx::Context back to the MTLDevice in a portable way without
-  // reaching into tgfx internals. Since MakeForTexture already forced the render Device to be
-  // built from the external texture's own MTLDevice, sampling is safe by construction. Return
-  // true unconditionally; if a future test needs a stronger check, MetalExternalDeviceRef.device
-  // can be compared against the Context's MetalDevice once tgfx exposes that.
-  return true;
+bool Devices::CanSampleFrom(tgfx::Context* context, const ExternalDeviceRef* deviceRef) {
+  if (deviceRef == nullptr) {
+    return true;
+  }
+  if (context == nullptr) {
+    return false;
+  }
+  // Metal forbids using a resource on a different MTLDevice (API validation assert or undefined
+  // behavior when validation is off), so a mismatch must reject drawing instead of failing at
+  // command encode time.
+  auto metalDevice = static_cast<tgfx::MetalDevice*>(context->device());
+  auto metalRef = static_cast<const MetalExternalDeviceRef*>(deviceRef);
+  auto contextDevice = (id<MTLDevice>)metalDevice->metalDevice();
+  return contextDevice == metalRef->device;
 }
 
 std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
