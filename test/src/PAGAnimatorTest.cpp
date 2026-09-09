@@ -20,6 +20,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+#include <vector>
 #include "base/PAGTest.h"
 #include "rendering/PAGAnimator.h"
 
@@ -120,6 +121,64 @@ class CancelOnUpdateListener : public PAGAnimator::Listener {
   std::condition_variable condition = {};
   bool updateStarted = false;
   bool cancelReturned = false;
+};
+
+enum class AnimationEvent { Update, End };
+
+class EndUpdateListener : public PAGAnimator::Listener {
+ public:
+  explicit EndUpdateListener(bool cancelDeferredUpdate)
+      : cancelDeferredUpdate(cancelDeferredUpdate) {
+  }
+
+  bool waitForEventCount(size_t count, uint64_t timeout) {
+    std::unique_lock<std::mutex> lock(locker);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout);
+    while (events.size() < count) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout) {
+        return events.size() >= count;
+      }
+    }
+    return true;
+  }
+
+  std::vector<AnimationEvent> getEvents() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    return events;
+  }
+
+ protected:
+  void onAnimationUpdate(PAGAnimator* animator) override {
+    bool requestUpdate = false;
+    {
+      std::lock_guard<std::mutex> autoLock(locker);
+      events.push_back(AnimationEvent::Update);
+      if (!deferredUpdateRequested) {
+        deferredUpdateRequested = true;
+        requestUpdate = true;
+      }
+      condition.notify_all();
+    }
+    if (requestUpdate) {
+      animator->updateAsync();
+      if (cancelDeferredUpdate) {
+        animator->cancel();
+      }
+    }
+  }
+
+  void onAnimationEnd(PAGAnimator*) override {
+    std::lock_guard<std::mutex> autoLock(locker);
+    events.push_back(AnimationEvent::End);
+    condition.notify_all();
+  }
+
+ private:
+  std::mutex locker = {};
+  std::condition_variable condition = {};
+  std::vector<AnimationEvent> events = {};
+  bool cancelDeferredUpdate = false;
+  bool deferredUpdateRequested = false;
 };
 
 class AnimatorCall {
@@ -263,6 +322,47 @@ PAG_TEST(PAGAnimatorTest, AsyncUpdateAllowsReentrantCancel) {
   }
   EXPECT_TRUE(cancelReturned);
   animator->cancel();
+  EXPECT_EQ(animator->task, nullptr);
+}
+
+PAG_TEST(PAGAnimatorTest, FinalUpdatePrecedesDeferredUpdate) {
+  auto listener = std::make_shared<EndUpdateListener>(false);
+  auto animator = MakeAnimator(listener);
+  animator->_duration = 1;
+  animator->_progress = 1.0;
+  animator->_isRunning = true;
+
+  animator->advance();
+
+  auto deferredUpdateCompleted = listener->waitForEventCount(3, 1000);
+  if (!deferredUpdateCompleted) {
+    animator->cancel();
+  }
+  ASSERT_TRUE(deferredUpdateCompleted);
+  animator->cancel();
+  auto events = listener->getEvents();
+  ASSERT_EQ(events.size(), 3u);
+  EXPECT_EQ(events[0], AnimationEvent::Update);
+  EXPECT_EQ(events[1], AnimationEvent::End);
+  EXPECT_EQ(events[2], AnimationEvent::Update);
+  EXPECT_FALSE(animator->isEnding);
+}
+
+PAG_TEST(PAGAnimatorTest, CancelDropsUpdateDeferredDuringEnd) {
+  auto listener = std::make_shared<EndUpdateListener>(true);
+  auto animator = MakeAnimator(listener);
+  animator->_duration = 1;
+  animator->_progress = 1.0;
+  animator->_isRunning = true;
+
+  animator->advance();
+
+  auto events = listener->getEvents();
+  ASSERT_EQ(events.size(), 2u);
+  EXPECT_EQ(events[0], AnimationEvent::Update);
+  EXPECT_EQ(events[1], AnimationEvent::End);
+  EXPECT_FALSE(animator->isEnding);
+  EXPECT_FALSE(animator->asyncUpdateRequested);
   EXPECT_EQ(animator->task, nullptr);
 }
 
