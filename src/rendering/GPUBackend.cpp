@@ -147,47 +147,49 @@ bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
   return true;
 }
 
-BackendSemaphore::BackendSemaphore()
-    : _backend(Backend::MOCK), _glSync(nullptr), _isInitialized(false) {
+BackendSemaphore::BackendSemaphore() : _backend(Backend::MOCK), _glSync(nullptr) {
 }
 
 void BackendSemaphore::initGL(void* sync) {
-  if (sync == nullptr) {
-    return;
-  }
   _backend = Backend::OPENGL;
   _glSync = sync;
-  _isInitialized = true;
 }
 
 void* BackendSemaphore::glSync() const {
-  if (!_isInitialized || _backend != Backend::OPENGL) {
+  if (_backend != Backend::OPENGL || _glSync == nullptr) {
     return nullptr;
   }
   return _glSync;
 }
 
 void BackendSemaphore::initMetal(void* event, uint64_t value) {
-  if (event == nullptr) {
-    return;
-  }
   _backend = Backend::METAL;
   _mtlInfo.event = event;
   _mtlInfo.value = value;
-  _isInitialized = true;
 }
 
 void* BackendSemaphore::mtlEvent() const {
-  if (!_isInitialized || _backend != Backend::METAL) {
+  if (_backend != Backend::METAL || _mtlInfo.event == nullptr) {
     return nullptr;
   }
   return _mtlInfo.event;
 }
 
 uint64_t BackendSemaphore::mtlValue() const {
-  if (!_isInitialized || _backend != Backend::METAL) {
+  if (_backend != Backend::METAL || _mtlInfo.event == nullptr) {
     return 0;
   }
   return _mtlInfo.value;
+}
+
+bool BackendSemaphore::isInitialized() const {
+  switch (_backend) {
+    case Backend::OPENGL:
+      return _glSync != nullptr;
+    case Backend::METAL:
+      return _mtlInfo.event != nullptr;
+    default:
+      return false;
+  }
 }
 }  // namespace pag

@@ -320,9 +320,10 @@ class PAG_API BackendSemaphore {
  public:
   BackendSemaphore();
 
-  bool isInitialized() const {
-    return _isInitialized;
-  }
+  /**
+   * Returns true if the backend semaphore has been initialized.
+   */
+  bool isInitialized() const;
 
   void initGL(void* sync);
 
@@ -354,11 +355,13 @@ class PAG_API BackendSemaphore {
     uint64_t value = 0;
   };
 
+  // The initialized state is derived from _backend plus the stored handle instead of a dedicated
+  // flag, which keeps sizeof(BackendSemaphore) and member offsets identical to earlier releases
+  // (binary compatibility).
   Backend _backend = Backend::MOCK;
   union {
     void* _glSync;
     MtlEventInfo _mtlInfo;
   };
-  bool _isInitialized;
 };
 }  // namespace pag
