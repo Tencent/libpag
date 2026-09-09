@@ -47,7 +47,6 @@
   std::mutex lock;
   NSHashTable* listeners;
   std::mutex listenerLock;
-  int _metalInitRetries;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -184,21 +183,6 @@
 - (void)initPAGSurface {
 #if defined(TGFX_USE_METAL)
   CAMetalLayer* layer = (CAMetalLayer*)[self layer];
-  id<MTLDevice> device = MTLCreateSystemDefaultDevice();
-  if (device == nil) {
-    // Metal device may not be available yet (the view can become visible before the app's
-    // GPU access is fully set up). Retry on the next runloop iteration until it succeeds.
-    if (_metalInitRetries++ < 20) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        [self initPAGSurface];
-      });
-    } else {
-      NSLog(@"[PAGView] Metal device unavailable after %d retries; giving up", _metalInitRetries);
-    }
-    return;
-  }
-  _metalInitRetries = 0;
-  layer.device = device;
   layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
   layer.framebufferOnly = YES;
   // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
