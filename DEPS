@@ -1,8 +1,7 @@
 {
   "version": "1.3.12",
   "vars": {
-    "PAG_GROUP": "https://github.com/libpag",
-    "DESIGN_THIRD_PARTY": "https://cnb.woa.com/tencent-design/third-party"
+    "PAG_GROUP": "https://github.com/libpag"
   },
   "repos": {
     "common": [
@@ -12,8 +11,8 @@
         "dir": "third_party/vendor_tools"
       },
       {
-        "url": "${DESIGN_THIRD_PARTY}/tgfx.git",
-        "commit": "e82f6c1acbe23853eb3a1ae155e3e8cba9b610d8",
+        "url": "${PAG_GROUP}/tgfx.git",
+        "commit": "ac79e7a3160b7726fa08df886a4899b283862204",
         "dir": "third_party/tgfx"
       },
       {
