@@ -128,13 +128,19 @@ int RunEmbed(int argc, char* argv[]) {
             return 1;
           }
           fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
+          // Also reach this file through the fallback chain: a (family, style) key holds one
+          // primary registration, so unicode-range subset files sharing that key would otherwise
+          // overwrite each other and drop every glyph that lives in an earlier subset.
+          fontConfig.addFallbackFont(font->file, 0);
         }
       }
     }
     FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
     document->applyLayout(&fontConfig);
     FontEmbedder embedder = {};
-    if (!embedder.embed(document.get())) {
+    FontEmbedder::EmbedOptions embedOptions = {};
+    embedOptions.outputBaseDir = GetDirectory(options.outputFile);
+    if (!embedder.embed(document.get(), embedOptions)) {
       std::cerr << "pagx embed: font embedding failed\n";
       return 1;
     }

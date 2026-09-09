@@ -45,6 +45,8 @@ class TypefaceHolder {
   std::shared_ptr<tgfx::Typeface> getTypeface();
   const std::string& getFontFamily() const;
   const std::string& getFontStyle() const;
+  const std::string& getPath() const;
+  int getTtcIndex() const;
 
  private:
   std::string path = {};

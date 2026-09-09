@@ -5429,6 +5429,203 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
 }
 
+// Collects the document's source-declaration Font nodes (non-empty file, empty glyphs).
+static std::vector<pagx::Font*> CollectFontSourceNodes(const pagx::PAGXDocument* doc) {
+  std::vector<pagx::Font*> sources = {};
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (!font->file.empty()) {
+        sources.push_back(font);
+      }
+    }
+  }
+  return sources;
+}
+
+/**
+ * Test case: embed() with EmbedOptions writes a source-declaration Font node for every on-disk
+ * typeface that shaped the text. The file attribute is relative to outputBaseDir, glyphs stay
+ * empty, a typeface registered both as primary and on the fallback chain yields a single node,
+ * and fonts that contributed no glyphs are not written.
+ */
+PAGX_TEST(PAGXTest, FontEmbedderWritesFontSourceDeclarations) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  const std::string fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  // Register the file both ways, mirroring the CLI's --fallback handling, plus an unused font:
+  // neither may produce duplicate or spurious source nodes.
+  fontConfig.registerFont(fontPath, 0, typeface->fontFamily(), typeface->fontStyle());
+  fontConfig.addFallbackFont(fontPath, 0);
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"), 0,
+                          "Noto Serif SC", "Regular");
+  doc->applyLayout(&fontConfig);
+
+  pagx::FontEmbedder::EmbedOptions embedOptions = {};
+  embedOptions.outputBaseDir = ProjectPath::Absolute("");
+  pagx::FontEmbedder embedder;
+  ASSERT_TRUE(embedder.embed(doc.get(), embedOptions));
+
+  auto sources = CollectFontSourceNodes(doc.get());
+  ASSERT_EQ(sources.size(), 1u);
+  EXPECT_EQ(sources[0]->file, "resources/font/NotoSansSC-Regular.otf");
+  EXPECT_EQ(sources[0]->fileOriginal, "resources/font/NotoSansSC-Regular.otf");
+  EXPECT_TRUE(sources[0]->glyphs.empty());
+}
+
+/**
+ * Test case: re-embedding with the same options does not duplicate source-declaration nodes
+ * (ClearEmbeddedGlyphRuns preserves them, and the second pass skips already-known paths).
+ */
+PAGX_TEST(PAGXTest, FontEmbedderFontSourceIdempotent) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
+
+  pagx::FontEmbedder::EmbedOptions embedOptions = {};
+  embedOptions.outputBaseDir = ProjectPath::Absolute("");
+
+  doc->applyLayout(&fontConfig);
+  pagx::FontEmbedder embedder;
+  ASSERT_TRUE(embedder.embed(doc.get(), embedOptions));
+  ASSERT_EQ(CollectFontSourceNodes(doc.get()).size(), 1u);
+
+  pagx::FontEmbedder::ClearEmbeddedGlyphRuns(doc.get());
+  doc->applyLayout(&fontConfig);
+  ASSERT_TRUE(embedder.embed(doc.get(), embedOptions));
+
+  EXPECT_EQ(CollectFontSourceNodes(doc.get()).size(), 1u);
+  ASSERT_FALSE(text->glyphRuns.empty());
+}
+
+/**
+ * Test case: the written source declaration survives an export -> FromFile round-trip, and a
+ * consumer that re-shapes through the referenced font file (the CommandEmbed flow) reproduces
+ * the original GlyphRun and does not duplicate the source node.
+ */
+PAGX_TEST(PAGXTest, FontEmbedderFontSourceRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  const std::string fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  fontConfig.registerFont(fontPath, 0, typeface->fontFamily(), typeface->fontStyle());
+  doc->applyLayout(&fontConfig);
+
+  const std::string outDir = ProjectPath::Absolute("test/out/PAGXTest/");
+  pagx::FontEmbedder::EmbedOptions embedOptions = {};
+  embedOptions.outputBaseDir = outDir;
+  pagx::FontEmbedder embedder;
+  ASSERT_TRUE(embedder.embed(doc.get(), embedOptions));
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_FALSE(text->glyphRuns.empty());
+  auto firstGlyphs = text->glyphRuns[0]->glyphs;
+  auto firstPositions = text->glyphRuns[0]->positions;
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("file=\"../../../resources/font/NotoSansSC-Regular.otf\""), std::string::npos);
+  auto savedPath = SavePAGXFile(xml, "PAGXTest/FontEmbedderFontSourceRoundTrip.pagx");
+
+  auto doc2 = pagx::PAGXImporter::FromFile(savedPath);
+  ASSERT_TRUE(doc2 != nullptr);
+  auto sources = CollectFontSourceNodes(doc2.get());
+  ASSERT_EQ(sources.size(), 1u);
+  // FromFile resolves the relative attribute against the PAGX file's directory by plain
+  // concatenation (no lexical normalisation), so compare as filesystem paths.
+  EXPECT_EQ(std::filesystem::weakly_canonical(sources[0]->file),
+            std::filesystem::weakly_canonical(fontPath));
+  EXPECT_EQ(sources[0]->fileOriginal, "../../../resources/font/NotoSansSC-Regular.otf");
+
+  // Re-shape through the referenced file exactly like pagx embed does, and verify the GlyphRun
+  // is reproduced and no duplicate source node appears.
+  pagx::FontConfig fontConfig2;
+  for (auto* source : sources) {
+    auto loaded = Typeface::MakeFromPath(source->file);
+    ASSERT_NE(loaded, nullptr);
+    fontConfig2.registerFont(source->file, 0, loaded->fontFamily(), loaded->fontStyle());
+    fontConfig2.addFallbackFont(source->file, 0);
+  }
+  pagx::FontEmbedder::ClearEmbeddedGlyphRuns(doc2.get());
+  doc2->applyLayout(&fontConfig2);
+  pagx::FontEmbedder::EmbedOptions embedOptions2 = {};
+  embedOptions2.outputBaseDir = outDir;
+  ASSERT_TRUE(embedder.embed(doc2.get(), embedOptions2));
+
+  pagx::Text* text2 = nullptr;
+  for (auto* element : doc2->layers[0]->contents) {
+    if (element != nullptr && element->nodeType() == pagx::NodeType::Text) {
+      text2 = static_cast<pagx::Text*>(element);
+      break;
+    }
+  }
+  ASSERT_NE(text2, nullptr);
+  ASSERT_FALSE(text2->glyphRuns.empty());
+  EXPECT_EQ(text2->glyphRuns[0]->glyphs, firstGlyphs);
+  ASSERT_EQ(text2->glyphRuns[0]->positions.size(), firstPositions.size());
+  for (size_t i = 0; i < firstPositions.size(); i++) {
+    EXPECT_NEAR(text2->glyphRuns[0]->positions[i].x, firstPositions[i].x, 0.001f);
+    EXPECT_NEAR(text2->glyphRuns[0]->positions[i].y, firstPositions[i].y, 0.001f);
+  }
+  EXPECT_EQ(CollectFontSourceNodes(doc2.get()).size(), 1u);
+}
+
 /**
  * Test case: Vertical text layout produces TextLayoutGlyphRun with rotations.
  */

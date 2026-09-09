@@ -65,6 +65,14 @@ const std::string& TypefaceHolder::getFontStyle() const {
   return fontStyle;
 }
 
+const std::string& TypefaceHolder::getPath() const {
+  return path;
+}
+
+int TypefaceHolder::getTtcIndex() const {
+  return ttcIndex;
+}
+
 FontConfig::FontConfig() : data(std::make_unique<Data>()) {
 }
 
@@ -224,6 +232,29 @@ std::vector<std::string> FontConfig::fallbackFamilyNames() const {
     names.push_back(holder.getFontFamily());
   }
   return names;
+}
+
+std::vector<FontSourceInfo> FontConfig::fontSources(const tgfx::Typeface* typeface) {
+  std::vector<FontSourceInfo> sources = {};
+  if (typeface == nullptr) {
+    return sources;
+  }
+  // The same file can be registered both as a primary font and on the fallback chain (the CLI
+  // registers every --fallback file both ways), so one typeface may yield duplicate paths; the
+  // caller de-duplicates.
+  auto collect = [&](TypefaceHolder& holder) {
+    if (holder.getTypeface().get() != typeface || holder.getPath().empty()) {
+      return;
+    }
+    sources.push_back({holder.getPath(), holder.getTtcIndex()});
+  };
+  for (auto& pair : data->registeredTypefaces) {
+    collect(pair.second);
+  }
+  for (auto& holder : data->fallbackTypefaces) {
+    collect(holder);
+  }
+  return sources;
 }
 
 bool FontConfig::containsFamily(const std::string& fontFamily) const {
