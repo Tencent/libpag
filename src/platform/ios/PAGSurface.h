@@ -22,35 +22,30 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-#if defined(TGFX_USE_METAL)
 @class CAMetalLayer;
 @class MTKView;
 @protocol MTLDevice;
-#endif
 
 PAG_API @interface PAGSurface : NSObject
 
-#if defined(TGFX_USE_OPENGL)
 /**
  * Creates a new PAGSurface from specified CAEAGLLayer. The GPU context will be created internally
- * by PAGSurface. Only available on the OpenGL backend build.
+ * by PAGSurface. Returns nil if the current libpag build does not use the OpenGL backend.
  */
 + (PAGSurface*)FromLayer:(CAEAGLLayer*)layer;
-#endif
 
-#if defined(TGFX_USE_METAL)
 /**
  * Creates a new PAGSurface from a CAMetalLayer. The MTLDevice on the layer (or the system
- * default) is adopted internally. Only available on the Metal backend build.
+ * default) is adopted internally. Returns nil if the current libpag build does not use the Metal
+ * backend.
  */
 + (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
 
 /**
- * Creates a new PAGSurface from an MTKView. The view's layer must be a CAMetalLayer. Only
- * available on the Metal backend build.
+ * Creates a new PAGSurface from an MTKView. The view's layer must be a CAMetalLayer. Returns nil
+ * if the current libpag build does not use the Metal backend.
  */
 + (PAGSurface*)FromMTKView:(MTKView*)view;
-#endif
 
 /**
  * Creates a new PAGSurface from specified CVPixelBuffer. The GPU context will be created internally
@@ -58,24 +53,20 @@ PAG_API @interface PAGSurface : NSObject
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
-#if defined(TGFX_USE_OPENGL)
 /**
  * Creates a new PAGSurface from specified CVPixelBuffer and EAGLContext. Multiple PAGSurfaces with
  * the same context share the same GPU caches. The caches are not destroyed when resetting a
- * PAGPlayer's surface to another PAGSurface with the same context. Only available on the OpenGL
- * backend build.
+ * PAGPlayer's surface to another PAGSurface with the same context. Returns nil if the current
+ * libpag build does not use the OpenGL backend.
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext;
-#endif
 
-#if defined(TGFX_USE_METAL)
 /**
  * Creates a new PAGSurface from specified CVPixelBuffer and MTLDevice. The MTLDevice is used as
  * the rendering device — the CVPixelBuffer must have been created with kCVPixelBufferMetal-
- * CompatibilityKey set. Only available on the Metal backend build.
+ * CompatibilityKey set. Returns nil if the current libpag build does not use the Metal backend.
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
-#endif
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead)

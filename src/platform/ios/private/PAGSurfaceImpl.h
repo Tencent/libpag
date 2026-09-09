@@ -23,28 +23,22 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
-#if defined(TGFX_USE_METAL)
 @class CAMetalLayer;
 @class MTKView;
 @protocol MTLDevice;
-#endif
 
 @interface PAGSurfaceImpl : NSObject
 
-#if defined(TGFX_USE_OPENGL)
 + (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
 
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
-#endif
-
-#if defined(TGFX_USE_METAL)
 + (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer;
 
 + (PAGSurfaceImpl*)FromMTKView:(MTKView*)view;
 
++ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
+                             context:(EAGLContext*)eaglContext;
+
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
-#endif
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 

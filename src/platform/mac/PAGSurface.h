@@ -23,32 +23,28 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-#if defined(TGFX_USE_METAL)
 @class CAMetalLayer;
 @class MTKView;
-#endif
 
 PAG_API @interface PAGSurface : NSObject
 
-#if defined(TGFX_USE_OPENGL)
 /**
- * Creates a new PAGSurface from a NSView. Only available on the OpenGL backend build.
+ * Creates a new PAGSurface from a NSView. Returns nil if the current libpag build does not use
+ * the OpenGL backend.
  */
 + (PAGSurface*)FromView:(NSView*)view;
-#endif
 
-#if defined(TGFX_USE_METAL)
 /**
- * Creates a new PAGSurface from a CAMetalLayer. Only available on the Metal backend build.
+ * Creates a new PAGSurface from a CAMetalLayer. Returns nil if the current libpag build does not
+ * use the Metal backend.
  */
 + (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
 
 /**
- * Creates a new PAGSurface from an MTKView. The view's layer must be a CAMetalLayer. Only
- * available on the Metal backend build.
+ * Creates a new PAGSurface from an MTKView. The view's layer must be a CAMetalLayer. Returns nil
+ * if the current libpag build does not use the Metal backend.
  */
 + (PAGSurface*)FromMTKView:(MTKView*)view;
-#endif
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead.)

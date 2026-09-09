@@ -51,36 +51,47 @@
   return _pagSurface;
 }
 
-#if defined(TGFX_USE_OPENGL)
 + (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer {
+#if defined(TGFX_USE_OPENGL)
   auto drawable = pag::GPUDrawable::FromLayer(layer);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-}
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromLayer:].");
+  return nil;
 #endif
+}
 
-#if defined(TGFX_USE_METAL)
 + (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer {
+#if defined(TGFX_USE_METAL)
   auto drawable = pag::MetalGPUDrawable::FromLayer(layer);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromMetalLayer:].");
+  return nil;
+#endif
 }
 
 + (PAGSurfaceImpl*)FromMTKView:(MTKView*)view {
+#if defined(TGFX_USE_METAL)
   auto drawable = pag::MetalGPUDrawable::FromView(view);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-}
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromMTKView:].");
+  return nil;
 #endif
+}
 
 #if TARGET_IPHONE_SIMULATOR
 
@@ -89,30 +100,30 @@
   return nil;
 }
 
-#if defined(TGFX_USE_OPENGL)
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
                              context:(EAGLContext*)eaglContext {
   LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:context:].");
   return nil;
 }
-#endif
 
-#if defined(TGFX_USE_METAL)
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
   LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:mtlDevice:].");
   return nil;
 }
-#endif
 
 #else  // TARGET_IPHONE_SIMULATOR
 
-#if defined(TGFX_USE_OPENGL)
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+#if defined(TGFX_USE_OPENGL)
   return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:nil];
+#else
+  return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:nil];
+#endif
 }
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
                              context:(EAGLContext*)eaglContext {
+#if defined(TGFX_USE_OPENGL)
   auto device = tgfx::EAGLDevice::MakeFrom(eaglContext);
   auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
@@ -120,15 +131,14 @@
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
-}
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromCVPixelBuffer:context:].");
+  return nil;
 #endif
-
-#if defined(TGFX_USE_METAL)
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:nil];
 }
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
+#if defined(TGFX_USE_METAL)
   std::shared_ptr<tgfx::MetalDevice> metalDevice = nullptr;
   if (device != nil) {
     metalDevice = tgfx::MetalDevice::MakeFrom((__bridge void*)device);
@@ -139,8 +149,11 @@
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
-}
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromCVPixelBuffer:mtlDevice:].");
+  return nil;
 #endif
+}
 
 #endif  // TARGET_IPHONE_SIMULATOR
 

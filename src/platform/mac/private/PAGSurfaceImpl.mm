@@ -40,36 +40,47 @@
   CVPixelBufferRef pixelBuffer;
 }
 
-#if defined(TGFX_USE_OPENGL)
 + (PAGSurfaceImpl*)FromView:(NSView*)view {
+#if defined(TGFX_USE_OPENGL)
   auto drawable = pag::GPUDrawable::FromView(view);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-}
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromView:].");
+  return nil;
 #endif
+}
 
-#if defined(TGFX_USE_METAL)
 + (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer {
+#if defined(TGFX_USE_METAL)
   auto drawable = pag::MetalGPUDrawable::FromLayer(layer);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromMetalLayer:].");
+  return nil;
+#endif
 }
 
 + (PAGSurfaceImpl*)FromMTKView:(MTKView*)view {
+#if defined(TGFX_USE_METAL)
   auto drawable = pag::MetalGPUDrawable::FromView(view);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-}
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromMTKView:].");
+  return nil;
 #endif
+}
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
   auto surface = pag::PAGSurface::MakeOffscreen(static_cast<int>(roundf(size.width)),
