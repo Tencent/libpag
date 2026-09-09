@@ -78,6 +78,50 @@ class AnimatorListener : public PAGAnimator::Listener {
   bool updateReleased = false;
 };
 
+class CancelOnUpdateListener : public PAGAnimator::Listener {
+ public:
+  bool waitForUpdateStart(uint64_t timeout) {
+    std::unique_lock<std::mutex> lock(locker);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout);
+    while (!updateStarted) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout) {
+        return updateStarted;
+      }
+    }
+    return true;
+  }
+
+  bool waitForCancelReturn(uint64_t timeout) {
+    std::unique_lock<std::mutex> lock(locker);
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout);
+    while (!cancelReturned) {
+      if (condition.wait_until(lock, deadline) == std::cv_status::timeout) {
+        return cancelReturned;
+      }
+    }
+    return true;
+  }
+
+ protected:
+  void onAnimationUpdate(PAGAnimator* animator) override {
+    {
+      std::lock_guard<std::mutex> autoLock(locker);
+      updateStarted = true;
+      condition.notify_all();
+    }
+    animator->cancel();
+    std::lock_guard<std::mutex> autoLock(locker);
+    cancelReturned = true;
+    condition.notify_all();
+  }
+
+ private:
+  std::mutex locker = {};
+  std::condition_variable condition = {};
+  bool updateStarted = false;
+  bool cancelReturned = false;
+};
+
 class AnimatorCall {
  public:
   AnimatorCall(std::shared_ptr<PAGAnimator> animator, bool update)
@@ -143,7 +187,7 @@ static void RunAnimatorCall(AnimatorCall* call) {
 }
 
 static std::shared_ptr<PAGAnimator> MakeAnimator(
-    const std::shared_ptr<AnimatorListener>& listener) {
+    const std::shared_ptr<PAGAnimator::Listener>& listener) {
   auto animator = std::shared_ptr<PAGAnimator>(new PAGAnimator(listener));
   animator->weakThis = animator;
   return animator;
@@ -199,6 +243,25 @@ PAG_TEST(PAGAnimatorTest, StoppedAsyncUpdateProcessesLatestRequest) {
   animator->updateAsync();
   listener->releaseUpdate();
   EXPECT_TRUE(listener->waitForUpdateCount(2, 1000));
+  animator->cancel();
+  EXPECT_EQ(animator->task, nullptr);
+}
+
+PAG_TEST(PAGAnimatorTest, AsyncUpdateAllowsReentrantCancel) {
+  auto listener = std::make_shared<CancelOnUpdateListener>();
+  auto animator = MakeAnimator(listener);
+
+  animator->updateAsync();
+  auto updateStarted = listener->waitForUpdateStart(1000);
+  if (!updateStarted) {
+    animator->cancel();
+  }
+  ASSERT_TRUE(updateStarted);
+  auto cancelReturned = listener->waitForCancelReturn(100);
+  if (!cancelReturned) {
+    EXPECT_TRUE(listener->waitForCancelReturn(1000));
+  }
+  EXPECT_TRUE(cancelReturned);
   animator->cancel();
   EXPECT_EQ(animator->task, nullptr);
 }

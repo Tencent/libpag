@@ -29,6 +29,23 @@ static constexpr int AnimationTypeEnd = 1;
 static constexpr int AnimationTypeRepeat = 2;
 static constexpr int AnimationTypeUpdate = 3;
 
+class AnimatorUpdateTask : public tgfx::Task {
+ public:
+  explicit AnimatorUpdateTask(std::weak_ptr<PAGAnimator> animator) : animator(std::move(animator)) {
+  }
+
+ protected:
+  void onExecute() override {
+    auto strongAnimator = animator.lock();
+    if (strongAnimator) {
+      strongAnimator->onAsyncFlush(this);
+    }
+  }
+
+ private:
+  std::weak_ptr<PAGAnimator> animator = {};
+};
+
 class AnimationTicker {
  public:
   static AnimationTicker* GetInstance() {
@@ -194,6 +211,12 @@ void PAGAnimator::start() {
 void PAGAnimator::cancel() {
   std::unique_lock<std::mutex> lock(locker);
   if (!_isRunning) {
+    if (isEnding) {
+      asyncUpdateRequested = false;
+    }
+    if (task != nullptr) {
+      extractAndWaitTask(lock);
+    }
     return;
   }
   _isRunning = false;
@@ -209,6 +232,35 @@ void PAGAnimator::update() {
   doUpdate(false);
 }
 
+void PAGAnimator::updateAsync() {
+  auto newTask = std::make_shared<AnimatorUpdateTask>(weakThis);
+  bool useDefaultUpdate = false;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (isEnding) {
+      asyncUpdateRequested = true;
+      return;
+    }
+    if (_isSync) {
+      useDefaultUpdate = true;
+    } else if (isTaskRunning()) {
+      if (taskCanCancel) {
+        asyncUpdateRequested = true;
+      }
+      return;
+    } else {
+      task = newTask;
+      taskCanCancel = true;
+      asyncUpdateRequested = false;
+    }
+  }
+  if (useDefaultUpdate) {
+    update();
+    return;
+  }
+  tgfx::Task::Run(std::move(newTask));
+}
+
 bool PAGAnimator::isTaskRunning() const {
   if (task == nullptr) {
     return false;
@@ -219,9 +271,25 @@ bool PAGAnimator::isTaskRunning() const {
 
 void PAGAnimator::extractAndWaitTask(std::unique_lock<std::mutex>& lock) {
   auto pendingTask = std::move(task);
+  auto canCancel = taskCanCancel;
+  auto isExecutingTaskThread = canCancel && asyncTaskThread == std::this_thread::get_id();
   task = nullptr;
+  asyncTaskThread = {};
+  taskCanCancel = false;
+  asyncUpdateRequested = false;
   lock.unlock();
   if (pendingTask == nullptr) {
+    return;
+  }
+  if (canCancel) {
+    pendingTask->cancel();
+    if (pendingTask->status() == tgfx::TaskStatus::Canceled) {
+      return;
+    }
+  }
+  // A listener may re-enter cancel() or setSync() from the explicit asynchronous update task.
+  // Waiting for that same executing task would block the callback until the timeout expires.
+  if (isExecutingTaskThread) {
     return;
   }
   // Wait with a timeout to avoid blocking the caller thread indefinitely when the async flush task
@@ -241,6 +309,8 @@ void PAGAnimator::flushAsync(bool setStartTime) {
   if (!_isRunning) {
     return;
   }
+  taskCanCancel = false;
+  asyncUpdateRequested = false;
   task = tgfx::Task::Run([weakThis = weakThis, setStartTime]() {
     auto animator = weakThis.lock();
     if (animator) {
@@ -253,13 +323,27 @@ void PAGAnimator::advance() {
   auto events = doAdvance();
   auto listener = weakListener.lock();
   if (listener == nullptr) {
+    std::lock_guard<std::mutex> autoLock(locker);
+    isEnding = false;
+    asyncUpdateRequested = false;
     return;
   }
   for (auto& type : events) {
     switch (type) {
-      case AnimationTypeEnd:
+      case AnimationTypeEnd: {
         listener->onAnimationEnd(this);
+        bool updateAfterEnd = false;
+        {
+          std::lock_guard<std::mutex> autoLock(locker);
+          isEnding = false;
+          updateAfterEnd = asyncUpdateRequested;
+          asyncUpdateRequested = false;
+        }
+        if (updateAfterEnd) {
+          updateAsync();
+        }
         break;
+      }
       case AnimationTypeRepeat:
         listener->onAnimationRepeat(this);
         break;
@@ -301,6 +385,7 @@ std::vector<int> PAGAnimator::doAdvance() {
   }
   // Set the playedCount to 0 to allow the animation to be played again.
   playedCount = 0;
+  isEnding = true;
   isEnded = true;
   _isRunning = false;
   cancelAnimation();
@@ -328,6 +413,35 @@ void PAGAnimator::doUpdate(bool setStartTime) {
     return;
   }
   flushAsync(setStartTime);
+}
+
+void PAGAnimator::onAsyncFlush(AnimatorUpdateTask* currentTask) {
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (task.get() != currentTask) {
+      return;
+    }
+    asyncTaskThread = std::this_thread::get_id();
+  }
+  while (true) {
+    auto listener = weakListener.lock();
+    if (listener) {
+      listener->onAnimationWillUpdate(this);
+    }
+    onFlush(false);
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (task.get() != currentTask) {
+      return;
+    }
+    if (asyncUpdateRequested) {
+      asyncUpdateRequested = false;
+      continue;
+    }
+    task = nullptr;
+    asyncTaskThread = {};
+    taskCanCancel = false;
+    return;
+  }
 }
 
 void PAGAnimator::onFlush(bool setStartTime) {
