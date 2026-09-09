@@ -13,7 +13,7 @@
       },
       {
         "url": "${DESIGN_THIRD_PARTY}/tgfx.git",
-        "commit": "cfdf2c43690e5ca62531cb0a2887a3aba375ffe9",
+        "commit": "8838e3ee636d3713aaa69731e1a10b469a2adbb4",
         "dir": "third_party/tgfx"
       },
       {
