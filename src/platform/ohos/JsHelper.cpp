@@ -19,67 +19,216 @@
 #include "JsHelper.h"
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
-#include <mutex>
+#include <cstdint>
 #include <unordered_map>
 #include "base/utils/Log.h"
 #include "tgfx/core/ImageInfo.h"
 
 namespace pag {
 
-// Constructor references are partitioned by napi_env, because each OHOS Worker has its own
-// EcmaVM. A napi_ref created with one env's EcmaVM cannot be safely released or accessed
-// from another env's thread. Using a process-wide map keyed only by name caused a fatal
-// "ecma_vm cannot run in multi-thread" abort when a Worker thread imported libpag and tried
-// to delete a reference that was created on the main thread's EcmaVM.
-//
-// We do NOT call napi_delete_reference for entries belonging to other envs from this map
-// (that was the original crash). Per-env cleanup is handled by CleanupConstructorRefs,
-// registered via napi_add_env_cleanup_hook on first insertion for each env. The hook runs
-// on the owning env's thread during teardown, where napi_delete_reference is safe.
-static std::mutex ConstructorRefMapMutex;
-static std::unordered_map<napi_env, std::unordered_map<std::string, napi_ref>> ConstructorRefMap;
+// OHOS can reuse a destroyed NativeEngine's napi_env address for a new TaskPool worker. Store the
+// constructor context on the current JS realm's global object so an address reused by another
+// engine cannot expose references owned by the destroyed engine. napi_set_instance_data is not
+// used here because OHOS provides only one instance-data slot shared by all native modules.
+static constexpr uint64_t CONSTRUCTOR_CONTEXT_MAGIC = 0x504147434F4E5458ULL;
+static constexpr char CONSTRUCTOR_CONTEXT_KEY[] = "__libpag_ohos_constructor_context_v1__";
+static const napi_type_tag ConstructorContextTypeTag = {0x4C49425041474F48ULL,
+                                                        0x4F53434F4E544558ULL};
 
-static void CleanupConstructorRefs(void* arg) {
-  auto env = static_cast<napi_env>(arg);
-  std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
-  auto envIt = ConstructorRefMap.find(env);
-  if (envIt == ConstructorRefMap.end()) {
+enum class ConstructorContextState {
+  Initializing,
+  Ready,
+  Failed,
+};
+
+struct ConstructorContext {
+  uint64_t magic = CONSTRUCTOR_CONTEXT_MAGIC;
+  ConstructorContextState state = ConstructorContextState::Initializing;
+  std::unordered_map<std::string, napi_ref> constructors = {};
+};
+
+static void FinalizeConstructorContext(napi_env, void* data, void*) {
+  auto context = static_cast<ConstructorContext*>(data);
+  if (context == nullptr || context->magic != CONSTRUCTOR_CONTEXT_MAGIC) {
     return;
   }
-  for (auto& entry : envIt->second) {
-    napi_delete_reference(env, entry.second);
+  // The NativeEngine can already be marked destroyed when finalizers run. Its reference table owns
+  // the remaining napi_refs and releases them during teardown, so calling napi_delete_reference
+  // here would trigger ValidEngineCheck on affected OHOS versions.
+  context->magic = 0;
+  delete context;
+}
+
+static ConstructorContext* GetConstructorContext(napi_env env) {
+  if (env == nullptr) {
+    return nullptr;
   }
-  ConstructorRefMap.erase(envIt);
+  napi_value global = nullptr;
+  auto status = napi_get_global(env, &global);
+  if (status != napi_ok) {
+    LOGE("GetConstructorContext napi_get_global failed :%d", status);
+    return nullptr;
+  }
+  napi_value key = nullptr;
+  status = napi_create_string_utf8(env, CONSTRUCTOR_CONTEXT_KEY, NAPI_AUTO_LENGTH, &key);
+  if (status != napi_ok) {
+    LOGE("GetConstructorContext napi_create_string_utf8 failed :%d", status);
+    return nullptr;
+  }
+  bool hasContext = false;
+  status = napi_has_own_property(env, global, key, &hasContext);
+  if (status != napi_ok || !hasContext) {
+    return nullptr;
+  }
+  napi_value external = nullptr;
+  status = napi_get_property(env, global, key, &external);
+  if (status != napi_ok) {
+    LOGE("GetConstructorContext napi_get_property failed :%d", status);
+    return nullptr;
+  }
+  bool matches = false;
+  status = napi_check_object_type_tag(env, external, &ConstructorContextTypeTag, &matches);
+  if (status != napi_ok || !matches) {
+    LOGE("GetConstructorContext invalid type tag :%d", status);
+    return nullptr;
+  }
+  void* data = nullptr;
+  status = napi_get_value_external(env, external, &data);
+  if (status != napi_ok || data == nullptr) {
+    LOGE("GetConstructorContext napi_get_value_external failed :%d", status);
+    return nullptr;
+  }
+  auto context = static_cast<ConstructorContext*>(data);
+  if (context->magic != CONSTRUCTOR_CONTEXT_MAGIC) {
+    LOGE("GetConstructorContext invalid context");
+    return nullptr;
+  }
+  return context;
+}
+
+static ConstructorContext* CreateConstructorContext(napi_env env) {
+  napi_value global = nullptr;
+  auto status = napi_get_global(env, &global);
+  if (status != napi_ok) {
+    LOGE("CreateConstructorContext napi_get_global failed :%d", status);
+    return nullptr;
+  }
+  auto context = new ConstructorContext();
+  napi_value external = nullptr;
+  status = napi_create_external(env, context, FinalizeConstructorContext, nullptr, &external);
+  if (status != napi_ok) {
+    delete context;
+    LOGE("CreateConstructorContext napi_create_external failed :%d", status);
+    return nullptr;
+  }
+  status = napi_type_tag_object(env, external, &ConstructorContextTypeTag);
+  if (status != napi_ok) {
+    LOGE("CreateConstructorContext napi_type_tag_object failed :%d", status);
+    return nullptr;
+  }
+  napi_property_descriptor property = {
+      CONSTRUCTOR_CONTEXT_KEY, nullptr, nullptr, nullptr, nullptr, external, napi_default, nullptr};
+  status = napi_define_properties(env, global, 1, &property);
+  if (status != napi_ok) {
+    LOGE("CreateConstructorContext napi_define_properties failed :%d", status);
+    return nullptr;
+  }
+  return context;
+}
+
+static void ClearConstructorReferences(napi_env env, ConstructorContext* context) {
+  for (const auto& entry : context->constructors) {
+    auto status = napi_delete_reference(env, entry.second);
+    if (status != napi_ok) {
+      LOGE("ClearConstructorReferences napi_delete_reference failed :%d", status);
+    }
+  }
+  context->constructors.clear();
+}
+
+bool PrepareConstructorContext(napi_env env, bool* needsInitialization) {
+  if (env == nullptr || needsInitialization == nullptr) {
+    return false;
+  }
+  auto context = GetConstructorContext(env);
+  if (context == nullptr) {
+    context = CreateConstructorContext(env);
+    if (context == nullptr) {
+      return false;
+    }
+    *needsInitialization = true;
+    return true;
+  }
+  if (context->state == ConstructorContextState::Failed) {
+    context->state = ConstructorContextState::Initializing;
+    *needsInitialization = true;
+    return true;
+  }
+  if (context->state != ConstructorContextState::Ready) {
+    LOGE("PrepareConstructorContext invalid state :%d", static_cast<int>(context->state));
+    return false;
+  }
+  *needsInitialization = false;
+  return true;
+}
+
+bool FinishConstructorContext(napi_env env, bool success) {
+  auto context = GetConstructorContext(env);
+  if (context == nullptr || context->state != ConstructorContextState::Initializing) {
+    return false;
+  }
+  if (!success) {
+    ClearConstructorReferences(env, context);
+    context->state = ConstructorContextState::Failed;
+    return false;
+  }
+  context->state = ConstructorContextState::Ready;
+  return true;
+}
+
+bool ExportConstructors(napi_env env, napi_value exports) {
+  if (env == nullptr || exports == nullptr) {
+    return false;
+  }
+  auto context = GetConstructorContext(env);
+  if (context == nullptr || context->state != ConstructorContextState::Ready) {
+    return false;
+  }
+  for (const auto& entry : context->constructors) {
+    napi_value constructor = nullptr;
+    auto status = napi_get_reference_value(env, entry.second, &constructor);
+    if (status != napi_ok || constructor == nullptr) {
+      LOGE("ExportConstructors napi_get_reference_value failed :%d", status);
+      return false;
+    }
+    status = napi_set_named_property(env, exports, entry.first.c_str(), constructor);
+    if (status != napi_ok) {
+      LOGE("ExportConstructors napi_set_named_property failed :%d", status);
+      return false;
+    }
+  }
+  return true;
 }
 
 static bool SetConstructor(napi_env env, napi_value constructor, const std::string& name) {
   if (env == nullptr || constructor == nullptr || name.empty()) {
     return false;
   }
-  std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
-  bool firstInsert = ConstructorRefMap.find(env) == ConstructorRefMap.end();
-  auto& envMap = ConstructorRefMap[env];
-  if (firstInsert) {
-    auto status = napi_add_env_cleanup_hook(env, CleanupConstructorRefs, env);
-    if (status != napi_ok) {
-      ConstructorRefMap.erase(env);
-      LOGE("SetConstructor napi_add_env_cleanup_hook failed :%d", status);
-      return false;
-    }
-  }
-  if (envMap.find(name) != envMap.end()) {
-    // Reuse the existing reference instead of deleting and recreating it. Multiple taskpool
-    // threads sharing the same napi_env can enter module init concurrently, and deleting a
-    // reference created on another thread corrupts the underlying global handle pool.
-    return true;
-  }
-  napi_ref ref = nullptr;
-  auto refStatus = napi_create_reference(env, constructor, 1, &ref);
-  if (refStatus != napi_ok) {
-    LOGE("SetConstructor napi_create_reference failed :%d", refStatus);
+  auto context = GetConstructorContext(env);
+  if (context == nullptr || context->state != ConstructorContextState::Initializing) {
     return false;
   }
-  envMap[name] = ref;
+  if (context->constructors.find(name) != context->constructors.end()) {
+    LOGE("SetConstructor duplicate constructor :%s", name.c_str());
+    return false;
+  }
+  napi_ref ref = nullptr;
+  auto status = napi_create_reference(env, constructor, 1, &ref);
+  if (status != napi_ok) {
+    LOGE("SetConstructor napi_create_reference failed :%d", status);
+    return false;
+  }
+  context->constructors[name] = ref;
   return true;
 }
 
@@ -87,18 +236,19 @@ napi_value GetConstructor(napi_env env, const std::string& name) {
   if (env == nullptr || name.empty()) {
     return nullptr;
   }
+  auto context = GetConstructorContext(env);
+  if (context == nullptr || context->state == ConstructorContextState::Failed) {
+    return nullptr;
+  }
+  auto refIt = context->constructors.find(name);
+  if (refIt == context->constructors.end()) {
+    return nullptr;
+  }
   napi_value result = nullptr;
-  {
-    std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
-    auto envIt = ConstructorRefMap.find(env);
-    if (envIt == ConstructorRefMap.end()) {
-      return nullptr;
-    }
-    auto refIt = envIt->second.find(name);
-    if (refIt == envIt->second.end()) {
-      return nullptr;
-    }
-    napi_get_reference_value(env, refIt->second, &result);
+  auto status = napi_get_reference_value(env, refIt->second, &result);
+  if (status != napi_ok) {
+    LOGE("GetConstructor napi_get_reference_value failed :%d", status);
+    return nullptr;
   }
   return result;
 }
@@ -112,14 +262,14 @@ napi_status ExtendClass(napi_env env, napi_value constructor, const std::string&
     LOGE("ExtendClass get baseConstructor failed status");
     return napi_status::napi_invalid_arg;
   }
-  napi_value basePrototype;
+  napi_value basePrototype = nullptr;
   napi_status statusCode =
       napi_get_named_property(env, baseConstructor, "prototype", &basePrototype);
   if (statusCode != napi_status::napi_ok) {
     LOGE("ExtendClass get baseConstructor's prototype  failed status :%d", statusCode);
     return statusCode;
   }
-  napi_value derivedPrototype;
+  napi_value derivedPrototype = nullptr;
   statusCode = napi_get_named_property(env, constructor, "prototype", &derivedPrototype);
   if (statusCode != napi_status::napi_ok) {
     LOGE("ExtendClass get constructor's prototype  failed status :%d", statusCode);
