@@ -938,7 +938,7 @@ Layer child elements are automatically categorized into five collections by type
 | Child Element Type | Category | Description |
 |-------------------|----------|-------------|
 | VectorElement | contents | Geometry elements, modifiers, painters (participate in accumulation processing) |
-| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle |
+| LayerStyle | styles | DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle, GlassStyle |
 | LayerFilter | filters | BlurFilter, DropShadowFilter, InnerShadowFilter, BlendFilter, ColorMatrixFilter, NoiseFilter |
 | `<Timelines>` | timelines | Container of `<Animation ref="@id" playing="..."/>` and `<StateMachine ref="@id"/>` entries that drive animations or state machines on the referenced Composition |
 | Layer | children | Nested child layers |
@@ -1082,6 +1082,25 @@ Overlays procedural Perlin noise above the layer content. Three noise modes are 
 | `firstColor` | Color | #000000 | First noise color for Duo mode |
 | `secondColor` | Color | #FFFFFF | Second noise color for Duo mode |
 | `opacity` | float | 0.15 | Overall noise opacity for Multi mode, in [0, 1] |
+
+#### 5.3.5 GlassStyle
+
+Simulates the physical behavior of light passing through a glass surface, producing refraction, chromatic dispersion, frosted blur, and specular highlights. Computes the effect based on **layer background**, using opaque layer content as the shape mask. The background comes implicitly from the complete PAGX layer tree below the layer; no background reference attribute is used. All seven parameters are animatable float channels matching `tgfx::GlassStyle`.
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `refraction` | float | 80 | Optical distortion strength along curved edges, range [0, 100] |
+| `depth` | float | 20 | Inward extent of the refraction region from edges, range [1, 100] |
+| `frost` | float | 5 | Background blur amount (frosted glass), range [0, 100] |
+| `dispersion` | float | 50 | Chromatic aberration intensity (rainbow prism effect), range [0, 100] |
+| `splay` | float | 0 | Refraction direction blend factor, range [0, 100]. At 0, refraction follows the curvature of the shape's edges; at 100, it points toward the shape center |
+| `lightAngle` | float | 45 | Light source direction in degrees. 0 means light from directly above, positive values rotate clockwise. Range [-179, 180] |
+| `lightIntensity` | float | 80 | Edge highlight brightness, range [0, 100] |
+
+**Rendering Steps**:
+1. Get layer background below the layer (implicit backdrop of the full PAGX layer tree)
+2. Apply frosted blur (`frost`), refraction (`refraction`, `depth`, `splay`), and chromatic dispersion (`dispersion`) to the layer background, shaped by the opaque layer content
+3. Add specular edge highlights using `lightAngle` and `lightIntensity`
 
 ### 5.4 Layer Filters
 
@@ -2799,7 +2818,7 @@ This appendix describes node categorization and nesting rules.
 | **State Machine** | `StateMachine`, `Input`, `StateRegion`, `State`, `Transition`, `Condition` | State-driven behavior: input-conditioned transitions between states, each bound to an Animation or empty. Defined in `<Animations>`, driven via `<StateMachine ref="@id"/>` in Layer `<Timelines>`. |
 | **ViewModel** | `ViewModel`, `Property`, `DataBind`, `DataConverter` | ViewModel schema and data binding definitions. |
 | **Color Sources** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | Color definitions used by painters. |
-| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `NoiseStyle` | Visual effects applied to Layer content. |
+| **Layer Styles** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `NoiseStyle`, `GlassStyle` | Visual effects applied to Layer content. |
 | **Layer Filters** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter`, `NoiseFilter` | Post-processing effects applied to composited Layer. |
 | **Geometry Elements** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | Drawable geometry (shapes and text). Must be inside Layer/Group. |
 | **Modifiers** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` | Transform or combine geometry and text. |
@@ -2816,7 +2835,7 @@ pagx (required attributes: width, height)
 │   ├── VectorElement* (see A.3)
 │   ├── <svg>* (import directive, see §7)
 │   ├── Timelines? → Animation* (ref="@id", playing) or StateMachine* (ref="@id")
-│   ├── LayerStyle* (DropShadow / InnerShadow / BackgroundBlur / Noise)
+│   ├── LayerStyle* (DropShadow / InnerShadow / BackgroundBlur / Noise / Glass)
 │   ├── LayerFilter* (Blur / DropShadow / InnerShadow / Blend / ColorMatrix / Noise)
 │   └── Layer* (child layers, recursive)
 │
@@ -3131,6 +3150,18 @@ Group and TextBox share the following transform channels for applying animated t
 | `blurX`, `blurY` | float | Blur radius |
 | `color` | color | Shadow / overlay color |
 | `showBehindLayer` | boolean | Show behind layer (DropShadowStyle) |
+
+**GlassStyle** (all animatable float channels):
+
+| Channel | Value Type | Description |
+|---------|------------|-------------|
+| `refraction` | float | Optical distortion strength along curved edges [0, 100] |
+| `depth` | float | Inward extent of the refraction region from edges [1, 100] |
+| `frost` | float | Background blur amount (frosted glass) [0, 100] |
+| `dispersion` | float | Chromatic aberration intensity [0, 100] |
+| `splay` | float | Refraction direction blend factor [0, 100] |
+| `lightAngle` | float | Light source direction in degrees [-179, 180] |
+| `lightIntensity` | float | Edge highlight brightness [0, 100] |
 
 ### D.9 Filters (Blur / DropShadow / InnerShadow / Blend)
 

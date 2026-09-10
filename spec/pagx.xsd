@@ -775,6 +775,20 @@
     <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
   </xs:complexType>
 
+  <!-- GlassStyle -->
+  <xs:complexType name="GlassStyleType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="refraction" type="xs:decimal" default="80"/>
+    <xs:attribute name="depth" type="xs:decimal" default="20"/>
+    <xs:attribute name="frost" type="xs:decimal" default="5"/>
+    <xs:attribute name="dispersion" type="xs:decimal" default="50"/>
+    <xs:attribute name="splay" type="xs:decimal" default="0"/>
+    <xs:attribute name="lightAngle" type="xs:decimal" default="45"/>
+    <xs:attribute name="lightIntensity" type="xs:decimal" default="80"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
+  </xs:complexType>
+
   <!-- ========================= Layer Filters ========================= -->
 
   <!-- BlurFilter -->
@@ -887,6 +901,7 @@
       <xs:element name="DropShadowStyle" type="DropShadowStyleType"/>
       <xs:element name="InnerShadowStyle" type="InnerShadowStyleType"/>
       <xs:element name="BackgroundBlurStyle" type="BackgroundBlurStyleType"/>
+      <xs:element name="GlassStyle" type="GlassStyleType"/>
       <!-- Layer Filters -->
       <xs:element name="BlurFilter" type="BlurFilterType"/>
       <xs:element name="DropShadowFilter" type="DropShadowFilterType"/>

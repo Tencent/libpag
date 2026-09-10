@@ -60,6 +60,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -131,6 +132,7 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
@@ -479,6 +481,97 @@ PAGX_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   EXPECT_FLOAT_EQ(doc2->width, 200.0f);
   EXPECT_FLOAT_EQ(doc2->height, 150.0f);
   EXPECT_GE(doc2->layers.size(), 1u);
+}
+
+/**
+ * Test case: GlassStyle survives PAGX round-trip and maps all animatable fields to TGFX.
+ */
+PAGX_TEST(PAGXTest, GlassStyleRoundTripAndRuntime) {
+  auto doc = pagx::PAGXDocument::Make(200, 150);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->width = 200;
+  layer->height = 150;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 75};
+  rect->size = {120, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1, 1, 1, 0.5f};
+  fill->color = color;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto glass = doc->makeNode<pagx::GlassStyle>("glass");
+  glass->refraction = 12;
+  glass->depth = 24;
+  glass->frost = 6;
+  glass->dispersion = 36;
+  glass->splay = 48;
+  glass->lightAngle = -30;
+  glass->lightIntensity = 72;
+  glass->excludeChildEffects = true;
+  glass->blendMode = pagx::BlendMode::Screen;
+  layer->styles.push_back(glass);
+  doc->layers.push_back(layer);
+
+  auto animation = doc->makeNode<pagx::Animation>("glass-animation");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  doc->animations.push_back(animation);
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "glass";
+  animation->objects.push_back(object);
+  auto refraction = doc->makeNode<pagx::TypedChannel<float>>();
+  refraction->name = "refraction";
+  refraction->keyframes.push_back({0, 30.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(refraction);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("<GlassStyle"), std::string::npos);
+  EXPECT_NE(xml.find("refraction=\"12\""), std::string::npos);
+  EXPECT_NE(xml.find("lightIntensity=\"72\""), std::string::npos);
+  EXPECT_EQ(xml.find("backgroundRef"), std::string::npos);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(reloaded != nullptr);
+  ASSERT_TRUE(reloaded->errors.empty());
+  auto reloadedGlass = reloaded->findNode<pagx::GlassStyle>("glass");
+  ASSERT_TRUE(reloadedGlass != nullptr);
+  EXPECT_FLOAT_EQ(reloadedGlass->refraction, 12);
+  EXPECT_FLOAT_EQ(reloadedGlass->depth, 24);
+  EXPECT_FLOAT_EQ(reloadedGlass->frost, 6);
+  EXPECT_FLOAT_EQ(reloadedGlass->dispersion, 36);
+  EXPECT_FLOAT_EQ(reloadedGlass->splay, 48);
+  EXPECT_FLOAT_EQ(reloadedGlass->lightAngle, -30);
+  EXPECT_FLOAT_EQ(reloadedGlass->lightIntensity, 72);
+  EXPECT_TRUE(reloadedGlass->excludeChildEffects);
+  EXPECT_EQ(reloadedGlass->blendMode, pagx::BlendMode::Screen);
+
+  const char* channels[] = {"refraction", "depth",      "frost",         "dispersion",
+                            "splay",      "lightAngle", "lightIntensity"};
+  for (const auto* channel : channels) {
+    EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::GlassStyle, channel));
+  }
+
+  reloaded->applyLayout();
+  auto scene = pagx::PAGScene::Make(reloaded);
+  ASSERT_TRUE(scene != nullptr);
+  auto binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto runtimeGlass = binding->get<tgfx::GlassStyle>(reloadedGlass);
+  ASSERT_TRUE(runtimeGlass != nullptr);
+  EXPECT_FLOAT_EQ(runtimeGlass->depth(), 24);
+  EXPECT_FLOAT_EQ(runtimeGlass->frost(), 6);
+  EXPECT_FLOAT_EQ(runtimeGlass->dispersion(), 36);
+  EXPECT_FLOAT_EQ(runtimeGlass->splay(), 48);
+  EXPECT_FLOAT_EQ(runtimeGlass->lightAngle(), -30);
+  EXPECT_FLOAT_EQ(runtimeGlass->lightIntensity(), 72);
+
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(runtimeGlass->refraction(), 30);
 }
 
 /**
@@ -10021,6 +10114,8 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   layer->styles.push_back(innerStyle);
   auto backgroundBlurStyle = doc->makeNode<pagx::BackgroundBlurStyle>();
   layer->styles.push_back(backgroundBlurStyle);
+  auto glassStyle = doc->makeNode<pagx::GlassStyle>();
+  layer->styles.push_back(glassStyle);
   auto blurFilter = doc->makeNode<pagx::BlurFilter>();
   layer->filters.push_back(blurFilter);
   auto dropFilter = doc->makeNode<pagx::DropShadowFilter>();
@@ -10044,19 +10139,20 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   ASSERT_TRUE(binding != nullptr);
 
   // For each built node, every Animatable channel in the registry must have a runtime writer.
-  pagx::Node* nodes[] = {layer,       rect,
-                         ellipse,     polystar,
-                         trim,        roundCorner,
-                         repeater,    fill,
-                         stroke,      solid,
-                         group,       linear,
-                         linearStop,  radial,
-                         conic,       diamond,
-                         modifier,    selector,
-                         text,        dropStyle,
-                         innerStyle,  backgroundBlurStyle,
-                         blurFilter,  dropFilter,
-                         innerFilter, blendFilter};
+  pagx::Node* nodes[] = {layer,      rect,
+                         ellipse,    polystar,
+                         trim,       roundCorner,
+                         repeater,   fill,
+                         stroke,     solid,
+                         group,      linear,
+                         linearStop, radial,
+                         conic,      diamond,
+                         modifier,   selector,
+                         text,       dropStyle,
+                         innerStyle, backgroundBlurStyle,
+                         glassStyle, blurFilter,
+                         dropFilter, innerFilter,
+                         blendFilter};
   for (auto* node : nodes) {
     for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
       if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {

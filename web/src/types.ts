@@ -91,6 +91,15 @@ export interface PAG extends EmscriptenModule {
   TGFXPathFillType: TGFXPathFillType;
   TGFXLineCap: TGFXLineCap;
   TGFXLineJoin: TGFXLineJoin;
+  /**
+   * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
+   * restore the default, which is based on the number of CPU cores and capped at 32.
+   */
+  setTaskMaxThreadCounts: (maxThreadCounts: number) => void;
+  /**
+   * Returns the current maximum number of worker threads that can be created for running tasks.
+   */
+  taskMaxThreadCounts: () => number;
   globalCanvas: GlobalCanvas;
   module: PAG;
   PAGPlayer: typeof PAGPlayer;

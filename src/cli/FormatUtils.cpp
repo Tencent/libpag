@@ -389,6 +389,8 @@ const char* NodeTypeName(NodeType type) {
       return "InnerShadowStyle";
     case NodeType::BackgroundBlurStyle:
       return "BackgroundBlurStyle";
+    case NodeType::GlassStyle:
+      return "GlassStyle";
     default:
       return "Node";
   }

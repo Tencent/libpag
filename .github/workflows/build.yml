@@ -115,6 +115,12 @@ jobs:
       - name: Check Out Repo
         uses: actions/checkout@v4
 
+      - name: WeChat Risk Check Test
+        run: |
+          cd pagx/wechat
+          npm install
+          npm run test:pagx-check
+
       - name: Get emsdk Cache
         id: emsdk-cache
         uses: actions/cache/restore@v4
