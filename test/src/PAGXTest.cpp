@@ -558,7 +558,7 @@ PAGX_TEST(PAGXTest, NoiseRoundTrip) {
     auto filter = doc->makeNode<pagx::NoiseFilter>();
     filter->mode = mode;
     filter->size = 9;
-    filter->density = 0.5f;
+    filter->density = 0.75f;
     filter->seed = 5;
     filter->blendMode = pagx::BlendMode::Screen;
     filter->color = {0, 1, 1, 1};
@@ -10261,6 +10261,27 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   auto blendFilter = doc->makeNode<pagx::BlendFilter>();
   layer->filters.push_back(blendFilter);
 
+  // One noise style and one noise filter per mode: their color/opacity channels are bound per mode,
+  // so every mode has to be built to cover the writers that resolve for it.
+  auto monoStyle = doc->makeNode<pagx::NoiseStyle>();
+  monoStyle->mode = pagx::NoiseMode::Mono;
+  layer->styles.push_back(monoStyle);
+  auto duoStyle = doc->makeNode<pagx::NoiseStyle>();
+  duoStyle->mode = pagx::NoiseMode::Duo;
+  layer->styles.push_back(duoStyle);
+  auto multiStyle = doc->makeNode<pagx::NoiseStyle>();
+  multiStyle->mode = pagx::NoiseMode::Multi;
+  layer->styles.push_back(multiStyle);
+  auto monoFilter = doc->makeNode<pagx::NoiseFilter>();
+  monoFilter->mode = pagx::NoiseMode::Mono;
+  layer->filters.push_back(monoFilter);
+  auto duoFilter = doc->makeNode<pagx::NoiseFilter>();
+  duoFilter->mode = pagx::NoiseMode::Duo;
+  layer->filters.push_back(duoFilter);
+  auto multiFilter = doc->makeNode<pagx::NoiseFilter>();
+  multiFilter->mode = pagx::NoiseMode::Multi;
+  layer->filters.push_back(multiFilter);
+
   // Text needs a registered fallback font to shape; apply layout with one before the scene build
   // so the Text node's runtime target (and TextHolder) are created.
   pagx::FontConfig fontConfig;
@@ -10299,6 +10320,36 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
           << "' is Animatable but has no runtime writer";
     }
   }
+
+  // Noise nodes bind the grain channels (size/density/seed) for every mode, but the color and
+  // opacity channels are bound per mode: Mono -> color, Duo -> firstColor/secondColor,
+  // Multi -> opacity. The channel registry is type-level and lists every field that can carry a
+  // channel, so a field belonging to another mode intentionally has no runtime writer. Assert both
+  // halves of that contract so the exemption stays explicit instead of implicit.
+  auto expectNoiseModeChannels = [&](pagx::Node* node, std::vector<std::string> activeChannels) {
+    for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
+      if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
+        continue;
+      }
+      bool isActiveModeChannel = std::find(activeChannels.begin(), activeChannels.end(),
+                                           channel.channel) != activeChannels.end();
+      if (isActiveModeChannel) {
+        EXPECT_TRUE(binding->hasWriter(node, channel.channel))
+            << "channel '" << channel.channel
+            << "' is Animatable and active for this noise mode but has no runtime writer";
+      } else {
+        EXPECT_FALSE(binding->hasWriter(node, channel.channel))
+            << "channel '" << channel.channel
+            << "' belongs to another noise mode and is expected to stay unbound";
+      }
+    }
+  };
+  expectNoiseModeChannels(monoStyle, {"size", "density", "seed", "color"});
+  expectNoiseModeChannels(duoStyle, {"size", "density", "seed", "firstColor", "secondColor"});
+  expectNoiseModeChannels(multiStyle, {"size", "density", "seed", "opacity"});
+  expectNoiseModeChannels(monoFilter, {"size", "density", "seed", "color"});
+  expectNoiseModeChannels(duoFilter, {"size", "density", "seed", "firstColor", "secondColor"});
+  expectNoiseModeChannels(multiFilter, {"size", "density", "seed", "opacity"});
 }
 
 /**

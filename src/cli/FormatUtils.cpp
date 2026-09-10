@@ -383,6 +383,14 @@ const char* NodeTypeName(NodeType type) {
       return "Image";
     case NodeType::BlurFilter:
       return "BlurFilter";
+    case NodeType::DropShadowFilter:
+      return "DropShadowFilter";
+    case NodeType::InnerShadowFilter:
+      return "InnerShadowFilter";
+    case NodeType::BlendFilter:
+      return "BlendFilter";
+    case NodeType::ColorMatrixFilter:
+      return "ColorMatrixFilter";
     case NodeType::DropShadowStyle:
       return "DropShadowStyle";
     case NodeType::InnerShadowStyle:

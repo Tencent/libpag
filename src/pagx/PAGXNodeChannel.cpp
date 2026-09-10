@@ -764,7 +764,9 @@ static std::vector<ChannelDef> BuildGlassStyleFields() {
 
 // The animatable set mirrors LayerBuilder::bindNoiseStyleChannels: the grain parameters are always
 // bound, while the colors and opacity are bound per mode. This table is mode-independent because it
-// declares which fields can carry a channel; the renderer decides which ones resolve at runtime.
+// declares which fields can carry a channel; the renderer decides which ones resolve at runtime, so
+// a field belonging to another mode has no runtime writer. That exemption is asserted explicitly
+// (both halves) by PAGXTest.AnimatableChannelsHaveWriters.
 static std::vector<ChannelDef> BuildNoiseStyleFields() {
   return {
       FIELD_ENUM(NoiseStyle, "blendMode", blendMode, NoFlags, BlendMode),
@@ -818,7 +820,8 @@ static std::vector<ChannelDef> BuildBlendFilterFields() {
 }
 
 // NoiseFilter carries the same noise parameters as NoiseStyle but declares its own blendMode and has
-// no excludeChildEffects, so the two tables cannot be shared.
+// no excludeChildEffects, so the two tables cannot be shared. The mode-dependent binding of the
+// color and opacity channels matches NoiseStyle (see BuildNoiseStyleFields).
 static std::vector<ChannelDef> BuildNoiseFilterFields() {
   return {
       FIELD_ENUM(NoiseFilter, "mode", mode, NoFlags, NoiseMode),
