@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Data.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
@@ -99,6 +100,14 @@ class Font : public Node {
    * authored by the user are preserved after a round-trip through embed and re-export.
    */
   std::string fileOriginal = {};
+
+  /**
+   * Embedded font binary data (decoded from a `data:font/...;base64,...` URI in the `file`
+   * attribute). Mutually exclusive with `file` / `fileOriginal`, mirroring Image's
+   * data-vs-filePath split: a source-declaration Font node carries either an external reference
+   * or inline bytes, and consumers register the bytes directly for shaping when present.
+   */
+  std::shared_ptr<Data> data = nullptr;
 
   /**
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing

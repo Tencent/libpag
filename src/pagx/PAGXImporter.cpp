@@ -2155,8 +2155,16 @@ static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   font->unitsPerEm = GetIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
-  font->file = GetAttribute(node, "file");
-  font->fileOriginal = font->file;
+  // The `file` attribute carries either an external path or a `data:font/...;base64,...` URI with
+  // inline bytes (mirroring Image's `source`); the two split into different fields so that
+  // FromFile's relative-path resolution never touches data URIs.
+  auto fileValue = GetAttribute(node, "file");
+  if (auto embedded = DecodeBase64DataURI(fileValue)) {
+    font->data = std::move(embedded);
+  } else {
+    font->file = std::move(fileValue);
+    font->fileOriginal = font->file;
+  }
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {

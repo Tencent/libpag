@@ -47,6 +47,7 @@ class TypefaceHolder {
   const std::string& getFontStyle() const;
   const std::string& getPath() const;
   int getTtcIndex() const;
+  const std::shared_ptr<const std::vector<uint8_t>>& getBytes() const;
 
  private:
   std::string path = {};

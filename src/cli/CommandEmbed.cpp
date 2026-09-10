@@ -35,6 +35,9 @@ struct EmbedOptions {
   std::vector<std::string> fallbacks = {};
   bool skipFonts = false;
   bool skipImages = false;
+  // How the shaping font sources are stored in the output: an external `file` reference
+  // (default) or inline base64 data (single-file self-contained output).
+  bool embedFontData = false;
 };
 
 static void PrintEmbedUsage() {
@@ -47,6 +50,9 @@ static void PrintEmbedUsage() {
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
       << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
       << "                                   be specified multiple times)\n"
+      << "  --fonts <mode>                   How font sources are stored: 'external' (default;\n"
+      << "                                   reference the font files by relative path) or\n"
+      << "                                   'embed' (inline the font bytes as base64 data URIs)\n"
       << "  --skip-fonts                     Skip font embedding\n"
       << "  --skip-images                    Skip image embedding\n"
       << "  -h, --help                       Show this help message\n";
@@ -60,6 +66,17 @@ static int ParseEmbedOptions(int argc, char* argv[], EmbedOptions* options) {
       options->outputFile = argv[++i];
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.push_back(argv[++i]);
+    } else if (arg == "--fonts" && i + 1 < argc) {
+      std::string mode = argv[++i];
+      if (mode == "external") {
+        options->embedFontData = false;
+      } else if (mode == "embed") {
+        options->embedFontData = true;
+      } else {
+        std::cerr << "pagx embed: error: invalid --fonts value '" << mode
+                  << "' (expected 'external' or 'embed')\n";
+        return 1;
+      }
     } else if (arg == "--skip-fonts") {
       options->skipFonts = true;
     } else if (arg == "--skip-images") {
@@ -121,7 +138,18 @@ int RunEmbed(int argc, char* argv[]) {
     for (auto& node : document->nodes) {
       if (node->nodeType() == NodeType::Font) {
         auto* font = static_cast<Font*>(node.get());
-        if (!font->file.empty()) {
+        if (font->data != nullptr) {
+          // Inline font source: register the embedded bytes directly.
+          auto typeface = tgfx::Typeface::MakeFromBytes(font->data->bytes(), font->data->size());
+          if (typeface == nullptr) {
+            std::cerr << "pagx embed: failed to load embedded font data\n";
+            return 1;
+          }
+          fontConfig.registerFont(font->data->bytes(), font->data->size(), 0,
+                                  typeface->fontFamily(), typeface->fontStyle());
+          fontConfig.addFallbackFont(font->data->bytes(), font->data->size(), 0,
+                                     typeface->fontFamily(), typeface->fontStyle());
+        } else if (!font->file.empty()) {
           auto typeface = tgfx::Typeface::MakeFromPath(font->file);
           if (typeface == nullptr) {
             std::cerr << "pagx embed: failed to load font '" << font->file << "'\n";
@@ -140,6 +168,7 @@ int RunEmbed(int argc, char* argv[]) {
     FontEmbedder embedder = {};
     FontEmbedder::EmbedOptions embedOptions = {};
     embedOptions.outputBaseDir = GetDirectory(options.outputFile);
+    embedOptions.embedFontData = options.embedFontData;
     if (!embedder.embed(document.get(), embedOptions)) {
       std::cerr << "pagx embed: font embedding failed\n";
       return 1;

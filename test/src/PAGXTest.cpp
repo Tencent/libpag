@@ -5429,13 +5429,13 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
 }
 
-// Collects the document's source-declaration Font nodes (non-empty file, empty glyphs).
+// Collects the document's source-declaration Font nodes (external file reference or inline data).
 static std::vector<pagx::Font*> CollectFontSourceNodes(const pagx::PAGXDocument* doc) {
   std::vector<pagx::Font*> sources = {};
   for (auto& node : doc->nodes) {
     if (node->nodeType() == pagx::NodeType::Font) {
       auto* font = static_cast<pagx::Font*>(node.get());
-      if (!font->file.empty()) {
+      if (!font->file.empty() || font->data != nullptr) {
         sources.push_back(font);
       }
     }
@@ -5624,6 +5624,159 @@ PAGX_TEST(PAGXTest, FontEmbedderFontSourceRoundTrip) {
     EXPECT_NEAR(text2->glyphRuns[0]->positions[i].y, firstPositions[i].y, 0.001f);
   }
   EXPECT_EQ(CollectFontSourceNodes(doc2.get()).size(), 1u);
+}
+
+/**
+ * Test case: EmbedOptions::embedFontData writes the shaping font's bytes inline on the
+ * source-declaration Font node (data set, file empty, glyphs empty, SFNT magic).
+ */
+PAGX_TEST(PAGXTest, FontEmbedderEmbedsFontSourceData) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
+  doc->applyLayout(&fontConfig);
+
+  pagx::FontEmbedder::EmbedOptions embedOptions = {};
+  embedOptions.embedFontData = true;
+  pagx::FontEmbedder embedder;
+  ASSERT_TRUE(embedder.embed(doc.get(), embedOptions));
+
+  auto sources = CollectFontSourceNodes(doc.get());
+  ASSERT_EQ(sources.size(), 1u);
+  EXPECT_TRUE(sources[0]->file.empty());
+  EXPECT_TRUE(sources[0]->glyphs.empty());
+  ASSERT_NE(sources[0]->data, nullptr);
+  EXPECT_GT(sources[0]->data->size(), 4u);
+  // SFNT magic: TrueType (0x00 0x01 0x00 0x00) or CFF OpenType ("OTTO").
+  auto magic = sources[0]->data->bytes();
+  bool isSfnt = (magic[0] == 0x00 && magic[1] == 0x01) ||
+                (magic[0] == 'O' && magic[1] == 'T' && magic[2] == 'T' && magic[3] == 'O');
+  EXPECT_TRUE(isSfnt);
+}
+
+/**
+ * Test case: inline font sources survive the XML round-trip as data URIs, and a consumer that
+ * re-shapes from the embedded bytes (the pagx embed --fonts embed flow) reproduces the original
+ * GlyphRun without duplicating the source node.
+ */
+PAGX_TEST(PAGXTest, FontEmbedderFontSourceDataRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_TRUE(doc != nullptr);
+  auto layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  ASSERT_NE(typeface, nullptr);
+
+  auto text = doc->makeNode<pagx::Text>();
+  text->text = "Embed";
+  text->fontFamily = typeface->fontFamily();
+  text->fontStyle = typeface->fontStyle();
+  text->fontSize = 24;
+
+  auto fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          typeface->fontFamily(), typeface->fontStyle());
+  doc->applyLayout(&fontConfig);
+
+  pagx::FontEmbedder::EmbedOptions embedOptions = {};
+  embedOptions.embedFontData = true;
+  pagx::FontEmbedder embedder;
+  ASSERT_TRUE(embedder.embed(doc.get(), embedOptions));
+  ASSERT_FALSE(text->glyphRuns.empty());
+  auto firstGlyphs = text->glyphRuns[0]->glyphs;
+  size_t firstDataSize = 0;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (font->data != nullptr) {
+        firstDataSize = font->data->size();
+      }
+    }
+  }
+  ASSERT_GT(firstDataSize, 0u);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("file=\"data:font/"), std::string::npos);
+  auto savedPath = SavePAGXFile(xml, "PAGXTest/FontEmbedderFontSourceDataRoundTrip.pagx");
+
+  auto doc2 = pagx::PAGXImporter::FromFile(savedPath);
+  ASSERT_TRUE(doc2 != nullptr);
+  pagx::Font* sourceNode = nullptr;
+  for (auto& node : doc2->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (font->data != nullptr) {
+        sourceNode = font;
+      }
+    }
+  }
+  ASSERT_NE(sourceNode, nullptr);
+  EXPECT_EQ(sourceNode->data->size(), firstDataSize);
+  EXPECT_TRUE(sourceNode->file.empty());
+
+  // Re-shape from the embedded bytes exactly like `pagx embed` does.
+  pagx::FontConfig fontConfig2;
+  auto loaded = Typeface::MakeFromBytes(sourceNode->data->bytes(), sourceNode->data->size());
+  ASSERT_NE(loaded, nullptr);
+  fontConfig2.registerFont(sourceNode->data->bytes(), sourceNode->data->size(), 0,
+                           loaded->fontFamily(), loaded->fontStyle());
+  fontConfig2.addFallbackFont(sourceNode->data->bytes(), sourceNode->data->size(), 0,
+                              loaded->fontFamily(), loaded->fontStyle());
+  pagx::FontEmbedder::ClearEmbeddedGlyphRuns(doc2.get());
+  doc2->applyLayout(&fontConfig2);
+  pagx::FontEmbedder::EmbedOptions embedOptions2 = {};
+  embedOptions2.embedFontData = true;
+  ASSERT_TRUE(embedder.embed(doc2.get(), embedOptions2));
+
+  pagx::Text* text2 = nullptr;
+  for (auto* element : doc2->layers[0]->contents) {
+    if (element != nullptr && element->nodeType() == pagx::NodeType::Text) {
+      text2 = static_cast<pagx::Text*>(element);
+      break;
+    }
+  }
+  ASSERT_NE(text2, nullptr);
+  ASSERT_FALSE(text2->glyphRuns.empty());
+  EXPECT_EQ(text2->glyphRuns[0]->glyphs, firstGlyphs);
+
+  size_t sourceCount = 0;
+  for (auto& node : doc2->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      auto* font = static_cast<pagx::Font*>(node.get());
+      if (font->data != nullptr) {
+        sourceCount++;
+      }
+    }
+  }
+  EXPECT_EQ(sourceCount, 1u);
 }
 
 /**

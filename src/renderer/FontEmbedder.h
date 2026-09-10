@@ -59,6 +59,14 @@ class FontEmbedder {
      * written relative to it. Empty keeps the registered path verbatim.
      */
     std::string outputBaseDir = {};
+
+    /**
+     * When true, source-declaration Font nodes carry the font bytes inline (a
+     * `data:font/...;base64,...` URI in the `file` attribute) instead of an external path,
+     * making the PAGX self-contained: a consumer that re-shapes needs nothing but the file
+     * itself. When false (default), only the relative path is written.
+     */
+    bool embedFontData = false;
   };
 
   /**

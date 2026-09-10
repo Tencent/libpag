@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/FontConfig.h"
+#include <memory>
 #include "FontConfigData.h"
+#include "pagx/types/Data.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -71,6 +73,10 @@ const std::string& TypefaceHolder::getPath() const {
 
 int TypefaceHolder::getTtcIndex() const {
   return ttcIndex;
+}
+
+const std::shared_ptr<const std::vector<uint8_t>>& TypefaceHolder::getBytes() const {
+  return bytes;
 }
 
 FontConfig::FontConfig() : data(std::make_unique<Data>()) {
@@ -239,14 +245,24 @@ std::vector<FontSourceInfo> FontConfig::fontSources(const tgfx::Typeface* typefa
   if (typeface == nullptr) {
     return sources;
   }
-  // The same file can be registered both as a primary font and on the fallback chain (the CLI
-  // registers every --fallback file both ways), so one typeface may yield duplicate paths; the
+  // The same source can be registered both as a primary font and on the fallback chain (the CLI
+  // registers every --fallback file both ways), so one typeface may yield duplicate entries; the
   // caller de-duplicates.
   auto collect = [&](TypefaceHolder& holder) {
-    if (holder.getTypeface().get() != typeface || holder.getPath().empty()) {
+    if (holder.getTypeface().get() != typeface) {
       return;
     }
-    sources.push_back({holder.getPath(), holder.getTtcIndex()});
+    FontSourceInfo info = {};
+    info.path = holder.getPath();
+    info.ttcIndex = holder.getTtcIndex();
+    const auto& bytes = holder.getBytes();
+    if (bytes && !bytes->empty()) {
+      // Fully qualified: FontConfig::Data (the registry struct) shadows pagx::Data inside members.
+      info.data = pagx::Data::MakeWithCopy(bytes->data(), bytes->size());
+    } else if (info.path.empty()) {
+      return;
+    }
+    sources.push_back(std::move(info));
   };
   for (auto& pair : data->registeredTypefaces) {
     collect(pair.second);
