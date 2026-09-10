@@ -192,6 +192,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
 | `transform-origin` | forwarded; honoured when it resolves to the box center (`50% 50%`, `center`, `center center`, or px values equal to the box center); other origins warn |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
+| `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
 
 `background-clip: border-box` / `padding-box` / `content-box` are silent no-ops (only the
 `text` keyword has a PAGX effect, see above).
@@ -217,7 +218,7 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` overlay (`bottom="0"` / `centerY="0"`), see §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
 | `writing-mode: vertical-rl | vertical-lr` | `TextBox.writingMode = "Vertical"` (horizontal modes are the default) |
-| `overflow: hidden` on a text container | `TextBox.overflow = "hidden"` |
+| `overflow: hidden` (or any non-`visible` axis) on a text container | `TextBox.overflow = "hidden"` |
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
 
 Disallowed (warning + skip): `text-transform`, `text-indent`, `word-spacing`, `direction`,

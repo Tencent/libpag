@@ -1563,6 +1563,49 @@ PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenMapsToClipToBounds) {
   EXPECT_TRUE(div->clipToBounds);
 }
 
+// Chromium emits the two-value `overflow` shorthand for per-axis CSS (`overflow-x: auto;
+// overflow-y: hidden` → `overflow: auto hidden`). CSS makes the box a clipping container as soon
+// as one axis is not `visible`, so the shorthand has to fold into `clipToBounds` as well —
+// otherwise the clip is silently dropped and off-screen content parked at a negative offset (the
+// clone layers of an infinite carousel) bleeds into the layout.
+PAG_TEST(PAGXHTMLImporterTest, OverflowTwoValueShorthandClipsBothAxes) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;overflow:auto hidden;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(div->clipToBounds);
+  // `auto` implies a scroll affordance PAGX cannot model, so the shorthand still warns.
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "overflow: auto hidden not fully supported"));
+}
+
+// A two-value shorthand built only from silent keywords clips without a diagnostic.
+PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenTwoValueClipsSilently) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;overflow:hidden visible;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(div->clipToBounds);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "overflow"));
+}
+
+// Both axes `visible` leaves the box unclipped, matching CSS.
+PAG_TEST(PAGXHTMLImporterTest, OverflowVisibleTwoValueDoesNotClip) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;overflow:visible visible;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->clipToBounds);
+}
+
 // `border-radius` + `overflow: hidden` on a container that is NOT a single-image fold (here a
 // nested text child) must clip descendants to the rounded outline. PAGX's `clipToBounds` is
 // rectangular, so the importer swaps it for a contour mask shaped like the border-radius geometry
@@ -5605,7 +5648,8 @@ PAG_TEST(PAGXHTMLImporterTest, RawBorderDottedProducesRoundDots) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawOverflowAutoWarns) {
-  // Only `hidden` and `visible` are silent; everything else emits a warning.
+  // `hidden` / `clip` map cleanly and stay silent; `auto` / `scroll` / `overlay` clip too but
+  // lose a scroll affordance PAGX cannot model, so they emit a warning.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(

@@ -912,11 +912,35 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   }
   box.mixBlendMode = LookupLowerTrimmed(props, "mix-blend-mode");
 
+  // CSS `overflow` takes one or two values (`<x> <y>`) and clips the box whenever either axis is
+  // not `visible` (the other axis computes to `auto` and still clips), so every clipping axis
+  // folds into PAGX's single `Layer.clipToBounds` flag. `hidden` / `clip` clip without implying
+  // any scrolling and map silently; `auto` / `scroll` / `overlay` also clip but lose a scroll
+  // affordance PAGX cannot model, so they keep a diagnostic. Chromium emits the two-value form
+  // for per-axis CSS (`overflow-x: auto; overflow-y: hidden` → `overflow: auto hidden`);
+  // comparing against the whole string would drop the clip and let off-screen content bleed in —
+  // carousel clones parked at a negative offset are the common case.
   std::string overflow = LookupLowerTrimmed(props, "overflow");
-  if (overflow == "hidden") {
-    box.clipOverflow = true;
-  } else if (!overflow.empty() && overflow != "visible") {
-    _diagnostics.warn("html: overflow: " + overflow + " not fully supported");
+  if (!overflow.empty()) {
+    bool clips = false;
+    bool silent = true;
+    for (const auto& token : SplitTopLevelWhitespace(overflow)) {
+      if (token == "visible") {
+        continue;
+      }
+      if (token == "hidden" || token == "clip") {
+        clips = true;
+      } else if (token == "auto" || token == "scroll" || token == "overlay") {
+        clips = true;
+        silent = false;
+      } else {
+        silent = false;
+      }
+    }
+    box.clipOverflow = clips;
+    if (!silent) {
+      _diagnostics.warn("html: overflow: " + overflow + " not fully supported");
+    }
   }
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
