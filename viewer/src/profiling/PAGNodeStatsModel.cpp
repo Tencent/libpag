@@ -78,11 +78,13 @@ static QString GetNodeCategory(pagx::NodeType type) {
     case pagx::NodeType::DropShadowStyle:
     case pagx::NodeType::InnerShadowStyle:
     case pagx::NodeType::BackgroundBlurStyle:
+    case pagx::NodeType::NoiseStyle:
     case pagx::NodeType::BlurFilter:
     case pagx::NodeType::DropShadowFilter:
     case pagx::NodeType::InnerShadowFilter:
     case pagx::NodeType::BlendFilter:
     case pagx::NodeType::ColorMatrixFilter:
+    case pagx::NodeType::NoiseFilter:
       return "Effects";
     default:
       return "Other";

@@ -481,6 +481,142 @@ PAGX_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   EXPECT_GE(doc2->layers.size(), 1u);
 }
 
+// NoiseStyle and NoiseFilter declare the same noise parameters, so one template covers both. The
+// fields belonging to the inactive modes are compared too, because the exporter must keep them.
+template <typename T>
+static void ExpectNoiseFieldsEqual(const T* expected, const T* actual, const std::string& label) {
+  ASSERT_TRUE(actual != nullptr) << label;
+  EXPECT_EQ(actual->mode, expected->mode) << label;
+  EXPECT_FLOAT_EQ(actual->size, expected->size) << label;
+  EXPECT_FLOAT_EQ(actual->density, expected->density) << label;
+  EXPECT_FLOAT_EQ(actual->seed, expected->seed) << label;
+  EXPECT_EQ(actual->blendMode, expected->blendMode) << label;
+  EXPECT_TRUE(actual->color == expected->color) << label;
+  EXPECT_TRUE(actual->firstColor == expected->firstColor) << label;
+  EXPECT_TRUE(actual->secondColor == expected->secondColor) << label;
+  EXPECT_FLOAT_EQ(actual->opacity, expected->opacity) << label;
+}
+
+// Checks that the channel table for a noise node type lists exactly the expected animatable fields,
+// which is the set LayerBuilder binds at runtime.
+static void ExpectAnimatableChannels(pagx::NodeType type, std::vector<std::string> expected,
+                                     const std::string& label) {
+  std::vector<std::string> animatable = {};
+  for (const auto& channel : pagx::ChannelsFor(type)) {
+    if (pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
+      animatable.push_back(channel.channel);
+    }
+  }
+  std::sort(animatable.begin(), animatable.end());
+  std::sort(expected.begin(), expected.end());
+  EXPECT_EQ(animatable, expected) << label;
+}
+
+/**
+ * Test case: NoiseStyle and NoiseFilter survive an export -> import round-trip without losing any
+ * field, for every noise mode and for both the all-defaults and the all-custom case. Also checks
+ * that the exported XML passes schema validation through `pagx verify`.
+ */
+PAGX_TEST(PAGXTest, NoiseRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 150);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto addContents = [&](pagx::Layer* layer) {
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->size = {80, 60};
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solidColor = doc->makeNode<pagx::SolidColor>();
+    solidColor->color = {0, 1, 0, 1};
+    fill->color = solidColor;
+    layer->contents.push_back(rect);
+    layer->contents.push_back(fill);
+  };
+
+  const pagx::NoiseMode modes[] = {pagx::NoiseMode::Mono, pagx::NoiseMode::Duo,
+                                   pagx::NoiseMode::Multi};
+  for (auto mode : modes) {
+    auto layer = doc->makeNode<pagx::Layer>();
+    addContents(layer);
+
+    // Every field is set to a non-default value, including the colors and opacity that the current
+    // mode ignores: dropping them on export would lose data as soon as the mode changes.
+    auto style = doc->makeNode<pagx::NoiseStyle>();
+    style->mode = mode;
+    style->size = 7;
+    style->density = 0.25f;
+    style->seed = 3;
+    style->blendMode = pagx::BlendMode::Multiply;
+    style->excludeChildEffects = true;
+    style->color = {1, 0, 0, 1};
+    style->firstColor = {0, 0, 1, 1};
+    style->secondColor = {0, 1, 0, 1};
+    style->opacity = 0.75f;
+    layer->styles.push_back(style);
+
+    auto filter = doc->makeNode<pagx::NoiseFilter>();
+    filter->mode = mode;
+    filter->size = 9;
+    filter->density = 0.5f;
+    filter->seed = 5;
+    filter->blendMode = pagx::BlendMode::Screen;
+    filter->color = {0, 1, 1, 1};
+    filter->firstColor = {1, 1, 0, 1};
+    filter->secondColor = {1, 0, 1, 1};
+    filter->opacity = 0.25f;
+    layer->filters.push_back(filter);
+
+    doc->layers.push_back(layer);
+  }
+
+  // Nodes that keep every default: the exporter omits all attributes and the importer must restore
+  // the same defaults.
+  auto defaultLayer = doc->makeNode<pagx::Layer>();
+  addContents(defaultLayer);
+  defaultLayer->styles.push_back(doc->makeNode<pagx::NoiseStyle>());
+  defaultLayer->filters.push_back(doc->makeNode<pagx::NoiseFilter>());
+  doc->layers.push_back(defaultLayer);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("<NoiseStyle"), std::string::npos);
+  EXPECT_NE(xml.find("<NoiseFilter"), std::string::npos);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(reloaded != nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  ASSERT_EQ(reloaded->layers.size(), doc->layers.size());
+
+  for (size_t i = 0; i < doc->layers.size(); i++) {
+    auto label = "layer " + std::to_string(i);
+    auto* sourceLayer = doc->layers[i];
+    auto* targetLayer = reloaded->layers[i];
+    ASSERT_EQ(targetLayer->styles.size(), 1u) << label;
+    ASSERT_EQ(targetLayer->filters.size(), 1u) << label;
+    ASSERT_EQ(targetLayer->styles[0]->nodeType(), pagx::NodeType::NoiseStyle) << label;
+    ASSERT_EQ(targetLayer->filters[0]->nodeType(), pagx::NodeType::NoiseFilter) << label;
+
+    auto* expectedStyle = static_cast<pagx::NoiseStyle*>(sourceLayer->styles[0]);
+    auto* actualStyle = static_cast<pagx::NoiseStyle*>(targetLayer->styles[0]);
+    ExpectNoiseFieldsEqual(expectedStyle, actualStyle, label);
+    EXPECT_EQ(actualStyle->excludeChildEffects, expectedStyle->excludeChildEffects) << label;
+
+    ExpectNoiseFieldsEqual(static_cast<pagx::NoiseFilter*>(sourceLayer->filters[0]),
+                           static_cast<pagx::NoiseFilter*>(targetLayer->filters[0]), label);
+  }
+
+  auto pagxPath = SavePAGXFile(xml, "PAGXTest/noise_roundtrip.pagx");
+  VerifyFile(pagxPath, "noise_roundtrip");
+
+  // The grain parameters carry channels in every mode; the colors and opacity do so per mode, so
+  // the table lists them all and the renderer decides which ones resolve at runtime.
+  ExpectAnimatableChannels(
+      pagx::NodeType::NoiseStyle,
+      {"size", "density", "seed", "color", "firstColor", "secondColor", "opacity"}, "NoiseStyle");
+  ExpectAnimatableChannels(
+      pagx::NodeType::NoiseFilter,
+      {"size", "density", "seed", "color", "firstColor", "secondColor", "opacity"}, "NoiseFilter");
+}
+
 /**
  * Test case: Font and Glyph node creation
  */

@@ -389,6 +389,10 @@ const char* NodeTypeName(NodeType type) {
       return "InnerShadowStyle";
     case NodeType::BackgroundBlurStyle:
       return "BackgroundBlurStyle";
+    case NodeType::NoiseStyle:
+      return "NoiseStyle";
+    case NodeType::NoiseFilter:
+      return "NoiseFilter";
     default:
       return "Node";
   }
