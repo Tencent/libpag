@@ -583,6 +583,25 @@ PAGX_TEST(PAGXTest, NoiseRoundTrip) {
   EXPECT_NE(xml.find("<NoiseStyle"), std::string::npos);
   EXPECT_NE(xml.find("<NoiseFilter"), std::string::npos);
 
+  // The default nodes must serialize as bare tags: the exporter omits every attribute that still
+  // holds its default, so an exporter regression that writes all defaults is caught right here
+  // instead of going unnoticed.
+  // The default nodes are the last layer in the document, so their tags are the last occurrences.
+  auto expectBareTag = [&](const std::string& tag) {
+    auto open = xml.rfind("<" + tag);
+    ASSERT_NE(open, std::string::npos) << tag;
+    auto close = xml.find("/>", open);
+    ASSERT_NE(close, std::string::npos) << tag;
+    auto element = xml.substr(open, close - open);
+    for (const auto* attribute : {"mode", "size", "density", "seed", "blendMode", "color",
+                                  "firstColor", "secondColor", "opacity", "excludeChildEffects"}) {
+      EXPECT_EQ(element.find(attribute), std::string::npos)
+          << "the default <" << tag << "> should omit '" << attribute << "' but wrote: " << element;
+    }
+  };
+  expectBareTag("NoiseStyle");
+  expectBareTag("NoiseFilter");
+
   auto reloaded = pagx::PAGXImporter::FromXML(xml);
   ASSERT_TRUE(reloaded != nullptr);
   EXPECT_TRUE(reloaded->errors.empty());
