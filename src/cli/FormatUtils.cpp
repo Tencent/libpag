@@ -383,6 +383,14 @@ const char* NodeTypeName(NodeType type) {
       return "Image";
     case NodeType::BlurFilter:
       return "BlurFilter";
+    case NodeType::DropShadowFilter:
+      return "DropShadowFilter";
+    case NodeType::InnerShadowFilter:
+      return "InnerShadowFilter";
+    case NodeType::BlendFilter:
+      return "BlendFilter";
+    case NodeType::ColorMatrixFilter:
+      return "ColorMatrixFilter";
     case NodeType::DropShadowStyle:
       return "DropShadowStyle";
     case NodeType::InnerShadowStyle:
@@ -391,6 +399,10 @@ const char* NodeTypeName(NodeType type) {
       return "BackgroundBlurStyle";
     case NodeType::GlassStyle:
       return "GlassStyle";
+    case NodeType::NoiseStyle:
+      return "NoiseStyle";
+    case NodeType::NoiseFilter:
+      return "NoiseFilter";
     default:
       return "Node";
   }
