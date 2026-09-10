@@ -31,7 +31,7 @@ struct Rect;
 class Context;
 class Surface;
 class ImageInfo;
-class GLDevice;
+class Device;
 }  // namespace tgfx
 
 namespace pag {
@@ -1644,7 +1644,7 @@ class PAG_API PAGDecoder {
   int _numFrames = 0;
   float _frameRate = 30.0f;
   float maxFrameRate = 30.0f;
-  std::shared_ptr<tgfx::GLDevice> sharedDevice = nullptr;
+  std::shared_ptr<tgfx::Device> sharedDevice = nullptr;
   int lastReadIndex = -1;
   tgfx::ImageInfo* lastImageInfo = nullptr;
   uint32_t lastContentVersion = 0;
@@ -1662,7 +1662,7 @@ class PAG_API PAGDecoder {
                                                    int numFrames);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
-             float frameRate, float maxFrameRate, std::shared_ptr<tgfx::GLDevice> sharedDevice);
+             float frameRate, float maxFrameRate, std::shared_ptr<tgfx::Device> sharedDevice);
 
   bool readFrameInternal(int index, std::shared_ptr<BitmapBuffer> bitmap);
   bool renderFrame(std::shared_ptr<PAGComposition> composition, int index,

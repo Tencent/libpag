@@ -23,8 +23,8 @@
 #include "pagx/runtime/RenderTargetDrawable.h"
 #include "pagx/runtime/TextureDrawable.h"
 #include "pagx/tgfx.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -42,16 +42,26 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendTexture& texture,
                                                  pag::ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
-  auto drawable = TextureDrawable::MakeFrom(device, pag::ToTGFX(texture), pag::ToTGFX(origin));
+  auto tgfxTexture = pag::ToTGFX(texture);
+  auto device = pag::Devices::AdoptCurrent().device;
+  if (device == nullptr) {
+    // Backends without a thread-local "current context" (Metal / D3D12) reach the render device
+    // by walking back from the caller's external texture; Vulkan / WebGPU fall back to
+    // MakeDefault() inside MakeForTexture.
+    device = pag::Devices::MakeForTexture(tgfxTexture);
+  }
+  auto drawable = TextureDrawable::MakeFrom(device, tgfxTexture, pag::ToTGFX(origin));
   return MakeFrom(drawable);
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendRenderTarget& renderTarget,
                                                  pag::ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
-  auto drawable =
-      RenderTargetDrawable::MakeFrom(device, pag::ToTGFX(renderTarget), pag::ToTGFX(origin));
+  auto tgfxRenderTarget = pag::ToTGFX(renderTarget);
+  auto device = pag::Devices::AdoptCurrent().device;
+  if (device == nullptr) {
+    device = pag::Devices::MakeForTexture(tgfxRenderTarget);
+  }
+  auto drawable = RenderTargetDrawable::MakeFrom(device, tgfxRenderTarget, pag::ToTGFX(origin));
   return MakeFrom(drawable);
 }
 

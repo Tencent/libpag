@@ -151,42 +151,116 @@ ColorType ToPAG(tgfx::ColorType colorType) {
 }
 
 tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
-  GLTextureInfo glInfo = {};
-  if (!texture.getGLTextureInfo(&glInfo)) {
-    return {};
+  // Runtime dispatch on the backend tag so a Metal / GL binary can each accept the type it
+  // supports without pretending to translate one into the other. tgfx's BackendTexture holds
+  // per-backend info in a union and its constructors are backend-inline in Backend.h, so we can
+  // safely emit any variant here — the actual GPU-facing consumers (tgfx::Image, tgfx::Surface,
+  // etc.) only accept the info matching the compiled backend.
+  switch (texture.backend()) {
+    case Backend::OPENGL: {
+      GLTextureInfo glInfo = {};
+      if (!texture.getGLTextureInfo(&glInfo)) {
+        return {};
+      }
+      tgfx::GLTextureInfo sampler = {};
+      sampler.id = glInfo.id;
+      sampler.target = glInfo.target;
+      sampler.format = glInfo.format;
+      return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
+    }
+    case Backend::METAL: {
+      MtlTextureInfo mtlInfo = {};
+      if (!texture.getMtlTextureInfo(&mtlInfo)) {
+        return {};
+      }
+      tgfx::MetalTextureInfo sampler = {};
+      sampler.texture = mtlInfo.texture;
+      sampler.format = mtlInfo.format;
+      return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
+    }
+    case Backend::VULKAN:
+    case Backend::MOCK:
+    default:
+      return {};
   }
-  tgfx::GLTextureInfo sampler = {};
-  sampler.id = glInfo.id;
-  sampler.target = glInfo.target;
-  sampler.format = glInfo.format;
-  return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
 }
 
 BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
-  tgfx::GLTextureInfo glInfo = {};
-  if (!texture.getGLTextureInfo(&glInfo)) {
-    return {};
+  switch (texture.backend()) {
+    case tgfx::Backend::OpenGL: {
+      tgfx::GLTextureInfo glInfo = {};
+      if (!texture.getGLTextureInfo(&glInfo)) {
+        return {};
+      }
+      GLTextureInfo sampler = {};
+      sampler.id = glInfo.id;
+      sampler.target = glInfo.target;
+      sampler.format = glInfo.format;
+      return {sampler, texture.width(), texture.height()};
+    }
+    case tgfx::Backend::Metal: {
+      tgfx::MetalTextureInfo mtlInfo = {};
+      if (!texture.getMetalTextureInfo(&mtlInfo)) {
+        return {};
+      }
+      MtlTextureInfo sampler = {};
+      // tgfx::MetalTextureInfo::texture is const void* (immutable view of id<MTLTexture>);
+      // pag::MtlTextureInfo predates that and uses void*. The pointer is treated as an opaque
+      // handle by libpag — the const_cast is safe because no writer path exists downstream.
+      sampler.texture = const_cast<void*>(mtlInfo.texture);
+      sampler.format = mtlInfo.format;
+      return {sampler, texture.width(), texture.height()};
+    }
+    default:
+      return {};
   }
-  GLTextureInfo sampler = {};
-  sampler.id = glInfo.id;
-  sampler.target = glInfo.target;
-  sampler.format = glInfo.format;
-  return {sampler, texture.width(), texture.height()};
 }
 
 tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
-  GLFrameBufferInfo glInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&glInfo)) {
-    return {};
+  switch (renderTarget.backend()) {
+    case Backend::OPENGL: {
+      GLFrameBufferInfo glInfo = {};
+      if (!renderTarget.getGLFramebufferInfo(&glInfo)) {
+        return {};
+      }
+      tgfx::GLFrameBufferInfo frameBuffer = {};
+      frameBuffer.id = glInfo.id;
+      frameBuffer.format = glInfo.format;
+      return tgfx::BackendRenderTarget(frameBuffer, renderTarget.width(), renderTarget.height());
+    }
+    case Backend::METAL: {
+      MtlTextureInfo mtlInfo = {};
+      if (!renderTarget.getMtlTextureInfo(&mtlInfo)) {
+        return {};
+      }
+      tgfx::MetalTextureInfo sampler = {};
+      sampler.texture = mtlInfo.texture;
+      sampler.format = mtlInfo.format;
+      return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
+    }
+    case Backend::VULKAN:
+    case Backend::MOCK:
+    default:
+      return {};
   }
-  tgfx::GLFrameBufferInfo frameBuffer = {};
-  frameBuffer.id = glInfo.id;
-  frameBuffer.format = glInfo.format;
-  return tgfx::BackendRenderTarget(frameBuffer, renderTarget.width(), renderTarget.height());
 }
 
 tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
-  tgfx::GLSyncInfo syncInfo = {semaphore.glSync()};
-  return tgfx::BackendSemaphore(syncInfo);
+  // Dispatch on the pag-side backend tag so the returned tgfx::BackendSemaphore carries the
+  // right variant. Non-initialized semaphores return a default-constructed tgfx one, which is
+  // a no-op at the tgfx layer. Vulkan / D3D12 / WebGPU sync ABI extensions are deferred to
+  // the specific backend PRs that introduce user-facing sync APIs.
+  if (!semaphore.isInitialized()) {
+    return {};
+  }
+  if (auto glSync = semaphore.glSync()) {
+    tgfx::GLSyncInfo syncInfo = {glSync};
+    return tgfx::BackendSemaphore(syncInfo);
+  }
+  if (auto mtlEvent = semaphore.mtlEvent()) {
+    tgfx::MetalSyncInfo syncInfo = {mtlEvent, semaphore.mtlValue()};
+    return tgfx::BackendSemaphore(syncInfo);
+  }
+  return {};
 }
 }  // namespace pag

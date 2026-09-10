@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,18 +18,27 @@
 
 #pragma once
 
-#if defined(TGFX_USE_OPENGL)
+#if defined(TGFX_USE_METAL)
+
+#import <QuartzCore/QuartzCore.h>
+@class MTKView;
 
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#include "tgfx/gpu/metal/MetalWindow.h"
 
 namespace pag {
 
-extern NSString* const AsyncSurfacePreparedNotification;
-
-class GPUDrawable : public Drawable {
+/**
+ * Drawable that renders into an externally owned CAMetalLayer / MTKView. Shared between iOS and
+ * macOS since Metal's CAMetalLayer/MTKView API is identical across the two platforms — only the
+ * host layer/view type name differs at the OC-facade level, and both funnel into a CAMetalLayer
+ * for the low-level tgfx wiring.
+ */
+class MetalGPUDrawable : public Drawable {
  public:
-  static std::shared_ptr<GPUDrawable> FromView(NSView* view);
+  static std::shared_ptr<MetalGPUDrawable> FromLayer(CAMetalLayer* layer);
+
+  static std::shared_ptr<MetalGPUDrawable> FromView(MTKView* view);
 
   int width() const override {
     return _width;
@@ -51,17 +60,16 @@ class GPUDrawable : public Drawable {
   void onFreeSurface() override;
 
  private:
-  std::weak_ptr<GPUDrawable> weakThis;
   int _width = 0;
   int _height = 0;
-  NSView* view = nil;
-  std::shared_ptr<tgfx::CGLWindow> window = nullptr;
-  std::atomic<bool> bufferPreparing = false;
+  CAMetalLayer* layer = nil;
+  MTKView* view = nil;
+  std::shared_ptr<tgfx::MetalWindow> window = nullptr;
 
-  explicit GPUDrawable(NSView* view);
-
-  void tryCreateSurface();
+  explicit MetalGPUDrawable(CAMetalLayer* layer);
+  MetalGPUDrawable(MTKView* view, CAMetalLayer* layer);
 };
+
 }  // namespace pag
 
-#endif  // TGFX_USE_OPENGL
+#endif  // TGFX_USE_METAL

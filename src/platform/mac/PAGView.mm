@@ -17,9 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGView.h"
+
+#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
+
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+
+#if defined(TGFX_USE_OPENGL)
 #import "platform/mac/private/GPUDrawable.h"
+#endif
+
+#if defined(TGFX_USE_METAL)
+#import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGAnimatorListener>
 @end
@@ -33,6 +44,7 @@
   BOOL _isVisible;
   NSHashTable* listeners;
   NSLock* listenerLock;
+  int _metalInitRetries;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -42,7 +54,28 @@
   return self;
 }
 
+#if defined(TGFX_USE_METAL)
+- (CALayer*)makeBackingLayer {
+  return [CAMetalLayer layer];
+}
+
+- (void)updateLayerDrawableSize {
+  CAMetalLayer* layer = (CAMetalLayer*)self.layer;
+  CGSize size = self.bounds.size;
+  // NSView's layer.contentsScale does not track window.backingScaleFactor automatically, so sync it
+  // explicitly and derive the drawableSize in pixels (bounds × scale).
+  CGFloat scale = self.window.backingScaleFactor > 0 ? self.window.backingScaleFactor : 1.0;
+  layer.contentsScale = scale;
+  layer.drawableSize = CGSizeMake(size.width * scale, size.height * scale);
+}
+#endif
+
 - (void)initPAG {
+#if defined(TGFX_USE_METAL)
+  // NSView is not layer-backed by default; enable it so makeBackingLayer creates the CAMetalLayer
+  // and self.layer returns a valid CAMetalLayer to render into.
+  self.wantsLayer = YES;
+#endif
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
@@ -55,10 +88,12 @@
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
+#if defined(TGFX_USE_OPENGL)
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(onAsyncSurfacePrepared:)
                                                name:pag::AsyncSurfacePreparedNotification
                                              object:self];
+#endif
 }
 
 - (void)dealloc {
@@ -79,6 +114,9 @@
   [super setBounds:bounds];
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
+#if defined(TGFX_USE_METAL)
+    [self updateLayerDrawableSize];
+#endif
     [pagSurface updateSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
       [animator update];
@@ -91,6 +129,9 @@
   [super setFrame:frame];
   if (pagSurface != nil &&
       (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
+#if defined(TGFX_USE_METAL)
+    [self updateLayerDrawableSize];
+#endif
     [pagSurface updateSize];
     if (oldRect.size.width == 0 || oldRect.size.height == 0) {
       [animator update];
@@ -130,7 +171,33 @@
 }
 
 - (void)initPAGSurface {
+#if defined(TGFX_USE_METAL)
+  CAMetalLayer* layer = (CAMetalLayer*)self.layer;
+  id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+  if (device == nil) {
+    // Metal device isn't available yet on macOS: in an AppKit app, viewDidMoveToWindow can fire
+    // before applicationDidFinishLaunching finishes setting up GPU access, so the very first
+    // attempt here may return nil. Retry on the next runloop iteration until it succeeds.
+    if (_metalInitRetries++ < 20) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self initPAGSurface];
+      });
+    } else {
+      NSLog(@"[PAGView] Metal device unavailable after %d retries; giving up", _metalInitRetries);
+    }
+    return;
+  }
+  _metalInitRetries = 0;
+  layer.device = device;
+  layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
+  layer.framebufferOnly = YES;
+  // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
+  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
+  [self updateLayerDrawableSize];
+  pagSurface = [[PAGSurface FromMetalLayer:layer] retain];
+#else
   pagSurface = [[PAGSurface FromView:self] retain];
+#endif
   [pagPlayer setSurface:pagSurface];
   [animator update];
 }
@@ -358,7 +425,11 @@
   return CGRectNull;
 }
 
+#if defined(TGFX_USE_OPENGL)
 - (void)onAsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
+#endif
 @end
+
+#endif  // TGFX_USE_OPENGL || TGFX_USE_METAL

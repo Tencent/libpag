@@ -18,6 +18,8 @@
 
 #include "GPUDrawable.h"
 
+#if defined(TGFX_USE_OPENGL)
+
 namespace pag {
 NSString* const AsyncSurfacePreparedNotification = @"io.pag.AsyncSurfacePrepared";
 
@@ -124,3 +126,5 @@ void GPUDrawable::present(tgfx::Context*) {
   // DrawingBuffer::presentWindows() after command submission.
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

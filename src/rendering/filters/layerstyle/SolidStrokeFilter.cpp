@@ -170,7 +170,7 @@ std::string SolidStrokeThickFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> SolidStrokeFilter::uniformBlocks() const {
-  return {{"FilterUniforms", 0}};
+  return {{"FilterUniforms", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 std::vector<tgfx::BindingEntry> SolidStrokeFilter::textureSamplers() const {

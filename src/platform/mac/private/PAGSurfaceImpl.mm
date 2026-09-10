@@ -17,10 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurfaceImpl.h"
-#include "GPUDrawable.h"
 #import "PAGLayerImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
+
+#if defined(TGFX_USE_OPENGL)
+#include "GPUDrawable.h"
+#endif
+
+#if defined(TGFX_USE_METAL)
+#import <MetalKit/MetalKit.h>
+#include "platform/cocoa/private/MetalGPUDrawable.h"
+#endif
 
 @interface PAGSurfaceImpl ()
 
@@ -32,6 +40,7 @@
   CVPixelBufferRef pixelBuffer;
 }
 
+#if defined(TGFX_USE_OPENGL)
 + (PAGSurfaceImpl*)FromView:(NSView*)view {
   auto drawable = pag::GPUDrawable::FromView(view);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
@@ -40,6 +49,27 @@
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
 }
+#endif
+
+#if defined(TGFX_USE_METAL)
++ (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer {
+  auto drawable = pag::MetalGPUDrawable::FromLayer(layer);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+}
+
++ (PAGSurfaceImpl*)FromMTKView:(MTKView*)view {
+  auto drawable = pag::MetalGPUDrawable::FromView(view);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+}
+#endif
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
   auto surface = pag::PAGSurface::MakeOffscreen(static_cast<int>(roundf(size.width)),

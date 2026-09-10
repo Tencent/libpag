@@ -19,9 +19,9 @@
 #pragma once
 
 #include <memory>
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Device.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pagx {
 
@@ -54,7 +54,7 @@ class Drawable {
   }
 
   virtual std::shared_ptr<tgfx::Device> getDevice() {
-    return tgfx::GLDevice::Current();
+    return pag::Devices::AdoptCurrent().device;
   }
 
   virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) {

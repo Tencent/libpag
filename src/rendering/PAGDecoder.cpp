@@ -23,10 +23,10 @@
 #include "pag/pag.h"
 #include "rendering/CompositionReader.h"
 #include "rendering/caches/DiskCache.h"
+#include "rendering/gpu/Devices.h"
 #include "rendering/layers/ContentVersion.h"
 #include "rendering/utils/BitmapBuffer.h"
 #include "rendering/utils/LockGuard.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 
@@ -103,7 +103,6 @@ std::vector<TimeRange> PAGDecoder::GetStaticTimeRange(std::shared_ptr<PAGComposi
 
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
                                                  float maxFrameRate, float scale) {
-  auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
   if (composition == nullptr || maxFrameRate <= 0 || scale <= 0) {
     return nullptr;
   }
@@ -120,13 +119,15 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   auto width = roundf(static_cast<float>(composition->width()) * scale);
   auto height = roundf(static_cast<float>(composition->height()) * scale);
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
-  // Turn the caller's current GL context into a self-owned shared device right away, while the
-  // context is still guaranteed to be alive. GLDevice::Make() creates a brand-new context that only
-  // shares the sharegroup and reads the caller's context exactly once, so the decoder no longer
-  // depends on the lifetime of that context afterwards. This removes the use-after-free that
-  // happened when the raw context pointer was dereferenced later on a background thread in
-  // readFrame().
-  auto sharedDevice = sharedContext != nullptr ? tgfx::GLDevice::Make(sharedContext) : nullptr;
+  // Derive a self-owned shared device from the caller's current GPU context right away, while
+  // the context is still guaranteed to be alive. On the GL backend Devices::MakeForAsyncThread()
+  // creates a brand-new share-context device that reads the caller's context exactly once, so
+  // the decoder no longer depends on the lifetime of that context afterwards. This removes the
+  // use-after-free that happened when the raw context pointer was dereferenced later on a
+  // background thread in readFrame(). If there is no current host context, MakeForAsyncThread()
+  // returns nullptr and CompositionReader's internal default-device fallback picks one up on
+  // demand — matching the original pre-refactor behavior.
+  auto sharedDevice = Devices::MakeForAsyncThread();
   return std::shared_ptr<PAGDecoder>(
       new PAGDecoder(std::move(composition), static_cast<int>(width), static_cast<int>(height),
                      result.first, result.second, maxFrameRate, std::move(sharedDevice)));
@@ -134,7 +135,7 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
                        int numFrames, float frameRate, float maxFrameRate,
-                       std::shared_ptr<tgfx::GLDevice> sharedDevice)
+                       std::shared_ptr<tgfx::Device> sharedDevice)
     : _width(width), _height(height), _numFrames(numFrames), _frameRate(frameRate),
       maxFrameRate(maxFrameRate), sharedDevice(std::move(sharedDevice)) {
   container = PAGComposition::Make(width, height);

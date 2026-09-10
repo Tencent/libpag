@@ -91,6 +91,10 @@ export interface PAG extends EmscriptenModule {
   TGFXPathFillType: TGFXPathFillType;
   TGFXLineCap: TGFXLineCap;
   TGFXLineJoin: TGFXLineJoin;
+  // Forwarded from the TGFX runtime after TGFXBind() wires them onto the PAG module. Declared here
+  // so TGFXBind(module: TGFX) accepts a PAG instance without the two "missing property" errors.
+  setTaskMaxThreadCounts: (maxThreadCounts: number) => void;
+  taskMaxThreadCounts: () => number;
   globalCanvas: GlobalCanvas;
   module: PAG;
   PAGPlayer: typeof PAGPlayer;

@@ -1,4 +1,14 @@
 cmake_minimum_required(VERSION 3.13)
+
+# The iOS toolchain (third_party/vendor_tools/ios.toolchain.cmake) reads DEPLOYMENT_TARGET while
+# configuring the project and derives both the deployment target and the compiler target triple
+# from it. tgfx's Metal backend requires iOS 13 or later (MTLSharedEvent / MTLBinaryArchive), so
+# pre-set the minimum before configuration. This only applies to iOS builds; macOS keeps its own
+# default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
+if (PAG_USE_METAL AND NOT DEFINED DEPLOYMENT_TARGET AND PLATFORM MATCHES "^(OS|SIMULATOR)")
+    set(DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum iOS deployment target" FORCE)
+endif ()
+
 project(PAG)
 
 if (APPLE)
@@ -25,6 +35,10 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building libpag
 option(PAG_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
+option(PAG_USE_METAL "Use Metal as the GPU backend on Apple platforms" OFF)
+option(PAG_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
+option(PAG_USE_D3D12 "Use D3D12 as the GPU backend on Windows" OFF)
+option(PAG_USE_WEBGPU "Use WebGPU as the GPU backend on Web" OFF)
 option(PAG_USE_SWIFTSHADER "Allow build with the SwiftShader library" OFF)
 option(PAG_USE_ANGLE "Allow build with the ANGLE library" OFF)
 option(PAG_USE_QT "Allow build with QT frameworks" OFF)
@@ -87,6 +101,26 @@ if (MACOS AND CLION_IDE AND NOT HasParent)
     option(PAG_BUILD_TESTS "Build libpag tests" ON)
 endif ()
 
+# Non-GL backends (Metal / Vulkan / D3D12 / WebGPU) are mutually exclusive with each other and
+# with OpenGL. If any non-GL backend is enabled, disable OpenGL and all GL-only variants
+# (QT / SwiftShader / ANGLE). This mirrors the mutual-exclusion contract enforced in
+# third_party/tgfx/CMakeLists.txt, and must run BEFORE the existing QT / SwiftShader mutual-
+# exclusion block so the "if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE) set(PAG_USE_OPENGL ON)"
+# fixup further down does not accidentally re-enable GL.
+if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
+    set(PAG_USE_OPENGL OFF)
+    set(PAG_USE_QT OFF)
+    set(PAG_USE_SWIFTSHADER OFF)
+    set(PAG_USE_ANGLE OFF)
+endif ()
+
+if (NOT PAG_USE_OPENGL AND NOT PAG_USE_METAL AND NOT PAG_USE_VULKAN
+        AND NOT PAG_USE_D3D12 AND NOT PAG_USE_WEBGPU)
+    message(FATAL_ERROR
+            "At least one GPU backend must be enabled "
+            "(PAG_USE_OPENGL / PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
+endif ()
+
 if (PAG_USE_QT)
     set(PAG_USE_SWIFTSHADER OFF)
     set(PAG_USE_ANGLE OFF)
@@ -118,6 +152,26 @@ endif ()
 
 if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE)
     set(PAG_USE_OPENGL ON)
+endif ()
+
+# Expose the selected tgfx backend to libpag sources. Devices.cpp dispatches on this macro to
+# pick the right tgfx backend headers; kept in sync with the TGFX_USE_* variables passed to tgfx
+# further down. libpag defines its own copy instead of relying on tgfx's PRIVATE compile
+# definitions, so tgfx can change its visibility policy without breaking libpag.
+if (PAG_USE_OPENGL)
+    list(APPEND PAG_DEFINES TGFX_USE_OPENGL)
+endif ()
+if (PAG_USE_METAL)
+    list(APPEND PAG_DEFINES TGFX_USE_METAL)
+endif ()
+if (PAG_USE_VULKAN)
+    list(APPEND PAG_DEFINES TGFX_USE_VULKAN)
+endif ()
+if (PAG_USE_D3D12)
+    list(APPEND PAG_DEFINES TGFX_USE_D3D12)
+endif ()
+if (PAG_USE_WEBGPU)
+    list(APPEND PAG_DEFINES TGFX_USE_WEBGPU)
 endif ()
 
 if (PAG_USE_FFAVC)
@@ -162,7 +216,14 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
         endif ()
     elseif (IOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+        # Default deployment target for the non-toolchain path (e.g. -DCMAKE_SYSTEM_NAME=iOS);
+        # the toolchain path is handled before project() above. tgfx's Metal backend needs iOS 13
+        # (MTLSharedEvent / MTLBinaryArchive), so raise the default for Metal and keep 9.0 for GL.
+        if (PAG_USE_METAL)
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
+        else ()
+            set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+        endif ()
     endif ()
 endif ()
 
@@ -196,6 +257,12 @@ file(GLOB_RECURSE SRC_FILES
         src/base/*.*
         src/codec/*.*
         src/rendering/*.*)
+# Devices_Metal.mm is an Objective-C++ file; it only has content under TGFX_USE_METAL. On non-Apple
+# platforms the GCC toolchain lacks the Objective-C++ frontend (`cc1objplus`) and would fail even
+# compiling an empty .mm. Drop it from the source list outside of Apple.
+if (NOT APPLE)
+    list(FILTER SRC_FILES EXCLUDE REGEX "src/rendering/gpu/Devices_Metal\\.mm$")
+endif ()
 list(APPEND PAG_FILES ${SRC_FILES})
 
 if (PAG_BUILD_PAGX)
@@ -459,9 +526,10 @@ elseif (IOS)
             list(APPEND PAG_SHARED_LIBS ${OpenGLES_LIBS})
             list(APPEND PAG_DEFINES GLES_SILENCE_DEPRECATION)
         else ()
-            # Uses Metal instead.
+            # Uses Metal instead. MetalKit is needed for MTKView bindings in MetalGPUDrawable.
             find_library(Metal_LIBS Metal REQUIRED)
-            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
+            find_library(MetalKit_LIBS MetalKit REQUIRED)
+            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS} ${MetalKit_LIBS})
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
@@ -498,9 +566,10 @@ elseif (MACOS)
             list(APPEND PAG_SHARED_LIBS ${OpenGL_LIBS})
             list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
         else ()
-            # Uses Metal instead.
+            # Uses Metal instead. MetalKit is needed for MTKView bindings in MetalGPUDrawable.
             find_library(Metal_LIBS Metal REQUIRED)
-            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
+            find_library(MetalKit_LIBS MetalKit REQUIRED)
+            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS} ${MetalKit_LIBS})
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
@@ -650,6 +719,10 @@ elseif (HAS_CUSTOM_TGFX_DIR)
     message("TGFX_DIR: ${TGFX_DIR}")
     list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
     set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+    set(TGFX_USE_METAL ${PAG_USE_METAL})
+    set(TGFX_USE_VULKAN ${PAG_USE_VULKAN})
+    set(TGFX_USE_D3D12 ${PAG_USE_D3D12})
+    set(TGFX_USE_WEBGPU ${PAG_USE_WEBGPU})
     set(TGFX_USE_QT ${PAG_USE_QT})
     set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
     set(TGFX_USE_ANGLE ${PAG_USE_ANGLE})
@@ -674,6 +747,10 @@ else ()
     if (EXISTS ${TGFX_CACHE_DIR})
         message("TGFX_CACHE_DIR: ${TGFX_CACHE_DIR}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_OPENGL=${PAG_USE_OPENGL}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_METAL=${PAG_USE_METAL}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_VULKAN=${PAG_USE_VULKAN}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_D3D12=${PAG_USE_D3D12}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBGPU=${PAG_USE_WEBGPU}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_QT=${PAG_USE_QT}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_SWIFTSHADER=${PAG_USE_SWIFTSHADER}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_ANGLE=${PAG_USE_ANGLE}")
@@ -708,6 +785,10 @@ else ()
     else ()
         message("TGFX_DIR: ${TGFX_DIR}")
         set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+        set(TGFX_USE_METAL ${PAG_USE_METAL})
+        set(TGFX_USE_VULKAN ${PAG_USE_VULKAN})
+        set(TGFX_USE_D3D12 ${PAG_USE_D3D12})
+        set(TGFX_USE_WEBGPU ${PAG_USE_WEBGPU})
         set(TGFX_USE_QT ${PAG_USE_QT})
         set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
         set(TGFX_USE_ANGLE ${PAG_USE_ANGLE})
@@ -914,17 +995,50 @@ endif ()
 
 if (PAG_BUILD_TESTS)
 
+    # Determine backend name for baseline cache isolation (aligned with tgfx). Each backend keeps
+    # its own .cache/{backend}/ subdirectory so switching backends never clobbers the other
+    # backend's md5/version snapshots. Also drives the *_{Backend} target suffix below and gets
+    # forwarded to test sources as the PAG_BACKEND_NAME preprocessor macro so
+    # test/src/utils/Baseline.cpp can locate the per-backend cache at runtime.
+    if (PAG_USE_SWIFTSHADER)
+        set(BACKEND_SUFFIX "-swiftshader")
+    else ()
+        set(BACKEND_SUFFIX "")
+    endif ()
+    if (PAG_USE_METAL)
+        set(PAG_BACKEND_NAME "metal")
+        set(TEST_TARGET_SUFFIX "Metal")
+    elseif (PAG_USE_VULKAN)
+        set(PAG_BACKEND_NAME "vulkan${BACKEND_SUFFIX}")
+        set(TEST_TARGET_SUFFIX "Vulkan")
+    elseif (PAG_USE_D3D12)
+        set(PAG_BACKEND_NAME "d3d12")
+        set(TEST_TARGET_SUFFIX "D3D12")
+    elseif (PAG_USE_WEBGPU)
+        set(PAG_BACKEND_NAME "webgpu")
+        set(TEST_TARGET_SUFFIX "WebGPU")
+    else ()
+        set(PAG_BACKEND_NAME "opengl${BACKEND_SUFFIX}")
+        set(TEST_TARGET_SUFFIX "OpenGL")
+    endif ()
+    message("PAG_BACKEND_NAME: ${PAG_BACKEND_NAME}")
+
+    set(BASELINE_CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/${PAG_BACKEND_NAME})
+    file(MAKE_DIRECTORY ${BASELINE_CACHE_DIR})
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
-    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/HEAD "${HEAD_COMMIT}")
+    file(WRITE ${BASELINE_CACHE_DIR}/HEAD "${HEAD_COMMIT}")
     if (NOT PAG_SKIP_BASELINE_CHECK)
-        set(CacheVersionFile ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/version.json)
+        set(CacheVersionFile ${BASELINE_CACHE_DIR}/version.json)
         if (EXISTS ${CacheVersionFile})
             execute_process(COMMAND git diff -G. --name-only origin/main:test/baseline/version.json ${CacheVersionFile} OUTPUT_VARIABLE HAS_DIFF)
         else ()
             set(HAS_DIFF ON)
         endif ()
         if (HAS_DIFF)
-            message(WARNING "The local md5 cache is out of date! Please run the 'update_baseline.sh' to regenerate the cache.")
+            string(REPLACE "-" "_" BACKEND_ARG_NAME "${PAG_BACKEND_NAME}")
+            string(TOUPPER "${BACKEND_ARG_NAME}" BACKEND_ARG_NAME)
+            message(WARNING "The local md5 cache for '${PAG_BACKEND_NAME}' is out of date! "
+                    "Please run './update_baseline.sh USE_${BACKEND_ARG_NAME}' to regenerate the cache.")
         endif ()
     endif ()
 
@@ -950,7 +1064,10 @@ if (PAG_BUILD_TESTS)
     list(APPEND PAG_TEST_INCLUDES vendor/ffavc/include)
 
     list(APPEND PAG_TEST_COMPILE_OPTIONS ${PAG_COMPILE_OPTIONS} -fno-access-control)
-    list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES})
+    # PAG_BACKEND_NAME is consumed by test/src/utils/Baseline.cpp to root the per-backend cache
+    # directory. Keep it as a PUBLIC macro on every test target so downstream tests / utilities
+    # can also reference it if needed.
+    list(APPEND PAG_TEST_DEFINES ${PAG_DEFINES} PAG_BACKEND_NAME="${PAG_BACKEND_NAME}")
 
     foreach (FILE_PATH ${PAG_TEST_FILES})
         get_filename_component(FILE_NAME "${FILE_PATH}" NAME_WE)
@@ -967,30 +1084,32 @@ if (PAG_BUILD_TESTS)
     if (NOT PAG_SKIP_GENERATE_BASELINE_IMAGES)
         list(APPEND PAG_BASELINE_DEFINES GENERATE_BASELINE_IMAGES)
     endif ()
-    # used to update the local md5 data for baseline testing and generate baseline images to the
-    # out/ directory. each image has a "_base" suffix.
-    add_executable(UpdateBaseline ${PAG_TEST_FILES})
-    add_dependencies(UpdateBaseline test-vendor)
-    target_include_directories(UpdateBaseline PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(UpdateBaseline PUBLIC ${PAG_BASELINE_DEFINES})
-    target_compile_options(UpdateBaseline PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(UpdateBaseline PRIVATE ${PAG_TEST_LINK_OPTIONS})
-    target_link_libraries(UpdateBaseline ${PAG_TEST_LIBS})
+    # UpdateBaseline_{Backend}: refresh the per-backend .cache and (optionally) generate baseline
+    # images to the out/ directory (each image has a "_base" suffix). Named with a backend
+    # suffix so `accept_baseline.sh` can build the right binary for each backend on the same
+    # source tree.
+    add_executable(UpdateBaseline_${TEST_TARGET_SUFFIX} ${PAG_TEST_FILES})
+    add_dependencies(UpdateBaseline_${TEST_TARGET_SUFFIX} test-vendor)
+    target_include_directories(UpdateBaseline_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_INCLUDES})
+    target_compile_definitions(UpdateBaseline_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_BASELINE_DEFINES})
+    target_compile_options(UpdateBaseline_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
+    target_link_options(UpdateBaseline_${TEST_TARGET_SUFFIX} PRIVATE ${PAG_TEST_LINK_OPTIONS})
+    target_link_libraries(UpdateBaseline_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
-    add_executable(PAGUnitTest ${PAG_TEST_FILES})
-    add_dependencies(PAGUnitTest test-vendor)
-    target_include_directories(PAGUnitTest PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(PAGUnitTest PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
-    target_compile_options(PAGUnitTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGUnitTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
-    target_link_libraries(PAGUnitTest ${PAG_TEST_LIBS})
+    add_executable(PAGUnitTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_FILES})
+    add_dependencies(PAGUnitTest_${TEST_TARGET_SUFFIX} test-vendor)
+    target_include_directories(PAGUnitTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_INCLUDES})
+    target_compile_definitions(PAGUnitTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES} SKIP_FRAME_COMPARE)
+    target_compile_options(PAGUnitTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
+    target_link_options(PAGUnitTest_${TEST_TARGET_SUFFIX} PRIVATE ${PAG_TEST_LINK_OPTIONS})
+    target_link_libraries(PAGUnitTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
-    add_executable(PAGFullTest ${PAG_TEST_FILES})
-    add_dependencies(PAGFullTest test-vendor)
-    target_include_directories(PAGFullTest PUBLIC ${PAG_TEST_INCLUDES})
-    target_compile_definitions(PAGFullTest PUBLIC ${PAG_TEST_DEFINES})
-    target_compile_options(PAGFullTest PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
-    target_link_options(PAGFullTest PRIVATE ${PAG_TEST_LINK_OPTIONS})
-    target_link_libraries(PAGFullTest ${PAG_TEST_LIBS})
+    add_executable(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_FILES})
+    add_dependencies(PAGFullTest_${TEST_TARGET_SUFFIX} test-vendor)
+    target_include_directories(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_INCLUDES})
+    target_compile_definitions(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_DEFINES})
+    target_compile_options(PAGFullTest_${TEST_TARGET_SUFFIX} PUBLIC ${PAG_TEST_COMPILE_OPTIONS})
+    target_link_options(PAGFullTest_${TEST_TARGET_SUFFIX} PRIVATE ${PAG_TEST_LINK_OPTIONS})
+    target_link_libraries(PAGFullTest_${TEST_TARGET_SUFFIX} ${PAG_TEST_LIBS})
 
 endif ()

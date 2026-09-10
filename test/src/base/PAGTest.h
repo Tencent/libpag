@@ -19,7 +19,8 @@
 #pragma once
 
 #include "gtest/gtest.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
+#include "tgfx/gpu/Device.h"
 
 namespace pag {
 class PAGTest : public testing::Test {
@@ -64,12 +65,12 @@ class PAGTest : public testing::Test {
 
 class PAGXTest : public PAGTest {
  public:
-  std::shared_ptr<tgfx::GLDevice> device = nullptr;
+  std::shared_ptr<tgfx::Device> device = nullptr;
   tgfx::Context* context = nullptr;
 
   void SetUp() override {
     PAGTest::SetUp();
-    device = tgfx::GLDevice::Make();
+    device = Devices::MakeDefault();
     ASSERT_TRUE(device != nullptr);
     context = device->lockContext();
     ASSERT_TRUE(context != nullptr);

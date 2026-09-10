@@ -22,6 +22,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/ImageFormatUtils.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
@@ -31,7 +32,6 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -216,7 +216,7 @@ GPUContext::~GPUContext() {
 
 tgfx::Context* GPUContext::lockContext() {
   if (!_device) {
-    _device = tgfx::GLDevice::Make();
+    _device = pag::Devices::MakeDefault();
     if (!_device) {
       return nullptr;
     }

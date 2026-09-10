@@ -123,6 +123,14 @@ struct MtlTextureInfo {
    * Pointer to MTLTexture.
    */
   void* texture = nullptr;
+
+  /**
+   * The pixel format of the MTLTexture, expressed as a raw MTLPixelFormat value. Defaults to
+   * MTLPixelFormatRGBA8Unorm (70) — the format tgfx uses internally when no explicit format is
+   * supplied. Callers passing textures created with a different MTLPixelFormat (BGRA8Unorm,
+   * RGBA16Float, etc.) must set this field so tgfx can bind the texture correctly.
+   */
+  unsigned format = 70;
 };
 
 /**
@@ -320,10 +328,36 @@ class PAG_API BackendSemaphore {
 
   void* glSync() const;
 
+  /**
+   * Initializes the semaphore with a Metal id<MTLEvent> and a signal value. The event pointer is
+   * treated as an opaque handle — libpag never releases it. Metal's cross-queue synchronization
+   * always uses timeline (signaled/waited by counter value) semantics on MTLEvent, so both the
+   * event and its value are required. Passing a nullptr event leaves the semaphore uninitialized.
+   */
+  void initMetal(void* event, uint64_t value);
+
+  /**
+   * Returns the id<MTLEvent> handle previously set via initMetal(), or nullptr if this
+   * semaphore was not initialized for the Metal backend.
+   */
+  void* mtlEvent() const;
+
+  /**
+   * Returns the signal value paired with mtlEvent(), or 0 if this semaphore was not initialized
+   * for the Metal backend.
+   */
+  uint64_t mtlValue() const;
+
  private:
+  struct MtlEventInfo {
+    void* event = nullptr;
+    uint64_t value = 0;
+  };
+
   Backend _backend = Backend::MOCK;
   union {
     void* _glSync;
+    MtlEventInfo _mtlInfo;
   };
   bool _isInitialized;
 };

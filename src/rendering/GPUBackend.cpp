@@ -166,4 +166,28 @@ void* BackendSemaphore::glSync() const {
   }
   return _glSync;
 }
+
+void BackendSemaphore::initMetal(void* event, uint64_t value) {
+  if (event == nullptr) {
+    return;
+  }
+  _backend = Backend::METAL;
+  _mtlInfo.event = event;
+  _mtlInfo.value = value;
+  _isInitialized = true;
+}
+
+void* BackendSemaphore::mtlEvent() const {
+  if (!_isInitialized || _backend != Backend::METAL) {
+    return nullptr;
+  }
+  return _mtlInfo.event;
+}
+
+uint64_t BackendSemaphore::mtlValue() const {
+  if (!_isInitialized || _backend != Backend::METAL) {
+    return 0;
+  }
+  return _mtlInfo.value;
+}
 }  // namespace pag

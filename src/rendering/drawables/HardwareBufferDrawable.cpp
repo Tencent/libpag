@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareBufferDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace pag {
@@ -28,7 +28,7 @@ std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::MakeFrom(
     return nullptr;
   }
   if (device == nullptr) {
-    device = tgfx::GLDevice::MakeWithFallback();
+    device = Devices::MakeDefault();
   }
   if (device == nullptr) {
     return nullptr;

@@ -35,9 +35,16 @@
 namespace pag {
 using namespace tgfx;
 
+#ifndef PAG_BACKEND_NAME
+#define PAG_BACKEND_NAME "opengl"
+#endif
+
 static std::unique_ptr<Baseline> baseline = nullptr;
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline");
-static const std::string CACHE_ROOT = TestDir::GetRoot() + "/baseline/.cache";
+// Per-backend cache root so a GL run's md5/version snapshots never overwrite a Metal (or future
+// Vulkan / D3D12 / WebGPU) run's snapshots on the same machine. The suffix comes from the
+// PAG_BACKEND_NAME preprocessor macro set by the top-level CMakeLists.txt.
+static const std::string CACHE_ROOT = TestDir::GetRoot() + "/baseline/.cache/" + PAG_BACKEND_NAME;
 static const std::string EXISTING_OUT_ROOT = TestDir::GetRoot() + "/out";
 #ifdef GENERATE_BASELINE_IMAGES
 static const std::string OUT_ROOT = TestDir::GetRoot() + "/baseline-out";

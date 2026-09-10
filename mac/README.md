@@ -33,4 +33,16 @@ a project with webp encoding support, please run the following command:
 ./gen_mac -DPAG_USE_WEBP_ENCODE=ON
 ```
 
+### Selecting the Metal backend
+
+By default the generated project uses the OpenGL backend. To build with the Metal backend instead,
+pass `-DPAG_USE_METAL=ON`:
+
+```
+./gen_mac -DPAG_USE_METAL=ON
+```
+
+The Metal backend works on both Apple Silicon and Intel Macs, and requires macOS 10.15 or later.
+No extra flags are needed.
+
 At last, launch XCode and open the mac/PAGViewer.xcworkspace. You'll be ready to go!

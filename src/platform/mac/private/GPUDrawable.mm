@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDrawable.h"
+
+#if defined(TGFX_USE_OPENGL)
+
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 
@@ -118,3 +121,5 @@ void GPUDrawable::present(tgfx::Context*) {
   // DrawingBuffer::presentWindows() after command submission. No explicit present() needed.
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

@@ -18,6 +18,8 @@
 
 #pragma once
 
+#if defined(TGFX_USE_OPENGL)
+
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 
@@ -57,3 +59,5 @@ class GPUDrawable : public Drawable {
   void tryCreateSurface();
 };
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

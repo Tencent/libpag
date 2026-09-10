@@ -20,7 +20,7 @@
 
 namespace pag {
 std::shared_ptr<CompositionReader> CompositionReader::Make(
-    int width, int height, std::shared_ptr<tgfx::GLDevice> sharedDevice) {
+    int width, int height, std::shared_ptr<tgfx::Device> sharedDevice) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }

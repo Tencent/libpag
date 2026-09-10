@@ -26,9 +26,22 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
+#if defined(TGFX_USE_METAL)
+@class CAMetalLayer;
+@class MTKView;
+#endif
+
 @interface PAGSurfaceImpl : NSObject
 
+#if defined(TGFX_USE_OPENGL)
 + (PAGSurfaceImpl*)FromView:(NSView*)view;
+#endif
+
+#if defined(TGFX_USE_METAL)
++ (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer;
+
++ (PAGSurfaceImpl*)FromMTKView:(MTKView*)view;
+#endif
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 

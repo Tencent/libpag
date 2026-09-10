@@ -29,6 +29,14 @@ PAG_C_PLUS_PLUS_BEGIN_GUARD
 PAG_EXPORT pag_backend_texture* pag_backend_texture_create_from_gl_texture_info(
     pag_gl_texture_info textureInfo, int width, int height);
 
+/**
+ * Creates a new pag_backend_texture from a Metal id<MTLTexture>. Release it by pag_release.
+ * The MTLTexture pointer inside textureInfo is stored as an opaque handle; libpag will not
+ * release it. The pixel format defaults to MTLPixelFormatRGBA8Unorm (70) if not set.
+ */
+PAG_EXPORT pag_backend_texture* pag_backend_texture_create_from_mtl_texture_info(
+    pag_mtl_texture_info textureInfo, int width, int height);
+
 PAG_EXPORT bool pag_backend_texture_get_gl_texture_info(pag_backend_texture* texture,
                                                      pag_gl_texture_info* textureInfo);
 

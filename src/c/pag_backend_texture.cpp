@@ -31,6 +31,15 @@ pag_backend_texture* pag_backend_texture_create_from_gl_texture_info(
   return new pag_backend_texture(backendTexture);
 }
 
+pag_backend_texture* pag_backend_texture_create_from_mtl_texture_info(
+    pag_mtl_texture_info textureInfo, int width, int height) {
+  pag::MtlTextureInfo info;
+  info.texture = textureInfo.texture;
+  info.format = textureInfo.format;
+  pag::BackendTexture backendTexture(info, width, height);
+  return new pag_backend_texture(backendTexture);
+}
+
 bool pag_backend_texture_get_gl_texture_info(pag_backend_texture* texture,
                                              pag_gl_texture_info* textureInfo) {
   if (texture == nullptr || textureInfo == nullptr) {
@@ -67,6 +76,7 @@ bool pag_backend_texture_get_mtl_texture_info(pag_backend_texture* texture,
   MtlTextureInfo info;
   if (texture->p.getMtlTextureInfo(&info)) {
     mtl_texture_info->texture = info.texture;
+    mtl_texture_info->format = info.format;
     return true;
   }
   return false;
