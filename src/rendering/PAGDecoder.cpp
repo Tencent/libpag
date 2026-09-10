@@ -144,7 +144,18 @@ PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, i
 }
 
 PAGDecoder::~PAGDecoder() {
+  // Hold the locker so member teardown serializes against any in-flight readFrame() call, which
+  // holds the same locker on another thread. Correctness primarily relies on the owner keeping a
+  // strong reference to the PAGDecoder for the whole duration of the readFrame() call; this lock is
+  // the in-object defense that ensures teardown waits out a call already in progress rather than
+  // destroying the CompositionReader (and its PAGPlayer) from under it (issue #3684).
+  std::lock_guard<std::mutex> autoLock(locker);
+  reader = nullptr;
+  sequenceFile = nullptr;
+  container = nullptr;
+  cacheKeyGeneratorFun = nullptr;
   delete lastImageInfo;
+  lastImageInfo = nullptr;
 }
 
 int PAGDecoder::numFrames() {

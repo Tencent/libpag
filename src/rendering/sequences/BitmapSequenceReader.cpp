@@ -40,6 +40,10 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
 }
 
 BitmapSequenceReader::~BitmapSequenceReader() {
+  // Hold the locker to wait out any in-flight onMakeBuffer() call, mirroring how decoding is
+  // serialized, so a concurrent teardown cannot release the hardware buffer while it is in use.
+  std::lock_guard<std::mutex> autoLock(locker);
+  imageBuffer = nullptr;
   if (hardWareBuffer) {
     tgfx::HardwareBufferRelease(hardWareBuffer);
   }
