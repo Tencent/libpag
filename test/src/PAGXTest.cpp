@@ -586,13 +586,34 @@ PAGX_TEST(PAGXTest, NoiseRoundTrip) {
   // The default nodes must serialize as bare tags: the exporter omits every attribute that still
   // holds its default, so an exporter regression that writes all defaults is caught right here
   // instead of going unnoticed.
-  // The default nodes are the last layer in the document, so their tags are the last occurrences.
+  //
+  // This uses a separate document that holds only the default nodes, so each tag appears exactly
+  // once and can be located directly instead of depending on element order. Ids are not an option
+  // for locating them: an id turns the node into a resource, and `pagx verify` reports an
+  // unreferenced one, while these styles are inlined rather than referenced.
+  auto defaultDoc = pagx::PAGXDocument::Make(200, 150);
+  ASSERT_TRUE(defaultDoc != nullptr);
+  auto defaultOnlyLayer = defaultDoc->makeNode<pagx::Layer>();
+  auto defaultRect = defaultDoc->makeNode<pagx::Rectangle>();
+  defaultRect->size = {80, 60};
+  auto defaultFill = defaultDoc->makeNode<pagx::Fill>();
+  auto defaultSolidColor = defaultDoc->makeNode<pagx::SolidColor>();
+  defaultSolidColor->color = {0, 1, 0, 1};
+  defaultFill->color = defaultSolidColor;
+  defaultOnlyLayer->contents.push_back(defaultRect);
+  defaultOnlyLayer->contents.push_back(defaultFill);
+  defaultOnlyLayer->styles.push_back(defaultDoc->makeNode<pagx::NoiseStyle>());
+  defaultOnlyLayer->filters.push_back(defaultDoc->makeNode<pagx::NoiseFilter>());
+  defaultDoc->layers.push_back(defaultOnlyLayer);
+
+  auto defaultXml = pagx::PAGXExporter::ToXML(*defaultDoc);
+  ASSERT_FALSE(defaultXml.empty());
   auto expectBareTag = [&](const std::string& tag) {
-    auto open = xml.rfind("<" + tag);
+    auto open = defaultXml.find("<" + tag);
     ASSERT_NE(open, std::string::npos) << tag;
-    auto close = xml.find("/>", open);
+    auto close = defaultXml.find("/>", open);
     ASSERT_NE(close, std::string::npos) << tag;
-    auto element = xml.substr(open, close - open);
+    auto element = defaultXml.substr(open, close - open);
     for (const auto* attribute : {"mode", "size", "density", "seed", "blendMode", "color",
                                   "firstColor", "secondColor", "opacity", "excludeChildEffects"}) {
       EXPECT_EQ(element.find(attribute), std::string::npos)
