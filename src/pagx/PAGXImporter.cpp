@@ -45,6 +45,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -190,6 +191,7 @@ static Composition* ParseComposition(const DOMNode* node, PAGXDocument* doc);
 static Font* ParseFont(const DOMNode* node, PAGXDocument* doc);
 static Glyph* ParseGlyph(const DOMNode* node, PAGXDocument* doc);
 static GlyphRun* ParseGlyphRun(const DOMNode* node, PAGXDocument* doc);
+static GlassStyle* ParseGlassStyle(const DOMNode* node, PAGXDocument* doc);
 static DropShadowStyle* ParseDropShadowStyle(const DOMNode* node, PAGXDocument* doc);
 static InnerShadowStyle* ParseInnerShadowStyle(const DOMNode* node, PAGXDocument* doc);
 static BackgroundBlurStyle* ParseBackgroundBlurStyle(const DOMNode* node, PAGXDocument* doc);
@@ -620,6 +622,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
                     " Path, Text, Fill, Stroke, TrimPath, RoundCorner,"
                     " MergePath, TextModifier, TextPath, TextBox, Repeater,"
                     " DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle,"
+                    " GlassStyle,"
                     " BlurFilter, DropShadowFilter, InnerShadowFilter,"
                     " BlendFilter, ColorMatrixFilter, NoiseFilter.");
   }
@@ -665,7 +668,7 @@ static void ParseStyles(const DOMNode* node, Layer* layer, PAGXDocument* doc) {
                   "Element '" + current->name +
                       "' is not allowed in 'styles'."
                       " Expected: DropShadowStyle, InnerShadowStyle,"
-                      " BackgroundBlurStyle, NoiseStyle.");
+                      " BackgroundBlurStyle, NoiseStyle, GlassStyle.");
     }
   }
 }
@@ -813,6 +816,9 @@ static LayerStyle* ParseLayerStyle(const DOMNode* node, PAGXDocument* doc) {
   }
   if (node->name == "NoiseStyle") {
     return ParseNoiseStyle(node, doc);
+  }
+  if (node->name == "GlassStyle") {
+    return ParseGlassStyle(node, doc);
   }
   return nullptr;
 }
@@ -2428,6 +2434,25 @@ static BackgroundBlurStyle* ParseBackgroundBlurStyle(const DOMNode* node, PAGXDo
   style->blurX = GetFloatAttribute(node, "blurX", Default<BackgroundBlurStyle>().blurX, doc);
   style->blurY = GetFloatAttribute(node, "blurY", Default<BackgroundBlurStyle>().blurY, doc);
   style->tileMode = GET_ENUM(node, "tileMode", "mirror", doc, TileMode);
+  return style;
+}
+
+static GlassStyle* ParseGlassStyle(const DOMNode* node, PAGXDocument* doc) {
+  auto style = makeNodeFromXML<GlassStyle>(node, doc);
+  if (!style) {
+    return nullptr;
+  }
+  style->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
+  style->excludeChildEffects =
+      GetBoolAttribute(node, "excludeChildEffects", Default<GlassStyle>().excludeChildEffects, doc);
+  style->refraction = GetFloatAttribute(node, "refraction", Default<GlassStyle>().refraction, doc);
+  style->depth = GetFloatAttribute(node, "depth", Default<GlassStyle>().depth, doc);
+  style->frost = GetFloatAttribute(node, "frost", Default<GlassStyle>().frost, doc);
+  style->dispersion = GetFloatAttribute(node, "dispersion", Default<GlassStyle>().dispersion, doc);
+  style->splay = GetFloatAttribute(node, "splay", Default<GlassStyle>().splay, doc);
+  style->lightAngle = GetFloatAttribute(node, "lightAngle", Default<GlassStyle>().lightAngle, doc);
+  style->lightIntensity =
+      GetFloatAttribute(node, "lightIntensity", Default<GlassStyle>().lightIntensity, doc);
   return style;
 }
 

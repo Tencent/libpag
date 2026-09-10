@@ -938,7 +938,7 @@ Layer 的子元素按类型自动归类为五个集合：
 | 子元素类型 | 归类 | 说明 |
 |-----------|------|------|
 | VectorElement | contents | 几何元素、修改器、绘制器（参与累积处理） |
-| LayerStyle | styles | DropShadowStyle、InnerShadowStyle、BackgroundBlurStyle、NoiseStyle |
+| LayerStyle | styles | DropShadowStyle、InnerShadowStyle、BackgroundBlurStyle、NoiseStyle、GlassStyle |
 | LayerFilter | filters | BlurFilter、DropShadowFilter、InnerShadowFilter、BlendFilter、ColorMatrixFilter、NoiseFilter |
 | Timeline | timelines | `<Timelines>` 容器内的 `<Animation ref="@id" playing="..."/>` 和 `<StateMachine ref="@id"/>` 条目，用于驱动引用合成上的动画或状态机 |
 | Layer | children | 嵌套子图层 |
@@ -1082,6 +1082,25 @@ Layer 的子元素按类型自动归类为五个集合：
 | `firstColor` | Color | #000000 | Duo 模式下的第一种噪声颜色 |
 | `secondColor` | Color | #FFFFFF | Duo 模式下的第二种噪声颜色 |
 | `opacity` | float | 0.15 | Multi 模式下的整体噪声透明度 [0, 1] |
+
+#### 5.3.5 玻璃样式（GlassStyle）
+
+模拟光穿过玻璃表面的物理行为，产生折射、色散（色差）、磨砂模糊和镜面高光。基于**图层背景**计算效果，并使用不透明图层内容作为形状遮罩。背景来自完整 PAGX 图层树的隐式 backdrop，不使用背景引用属性。七个参数均为可动画的 float 通道，字段与 `tgfx::GlassStyle` 一致。
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `refraction` | float | 80 | 沿曲线边缘的光学畸变强度，范围 [0, 100] |
+| `depth` | float | 20 | 折射区域从边缘向内的延伸程度，范围 [1, 100] |
+| `frost` | float | 5 | 背景模糊量（磨砂玻璃），范围 [0, 100] |
+| `dispersion` | float | 50 | 色散（彩虹棱镜效果）强度，范围 [0, 100] |
+| `splay` | float | 0 | 折射方向混合因子，范围 [0, 100]。为 0 时折射沿形状边缘曲率方向；为 100 时指向形状中心 |
+| `lightAngle` | float | 45 | 光源方向（角度）。0 表示光源位于正上方，正值顺时针旋转。范围 [-179, 180] |
+| `lightIntensity` | float | 80 | 边缘高光亮度，范围 [0, 100] |
+
+**渲染步骤**：
+1. 获取图层下方的图层背景（完整 PAGX 图层树的隐式 backdrop）
+2. 以不透明图层内容为形状遮罩，对图层背景应用磨砂模糊（`frost`）、折射（`refraction`、`depth`、`splay`）和色散（`dispersion`）
+3. 使用 `lightAngle` 和 `lightIntensity` 添加镜面边缘高光
 
 ### 5.4 图层滤镜（Layer Filters）
 
@@ -2791,7 +2810,7 @@ ViewModel 是属性的模式定义，包含名称、类型、默认值和可选�
 | **状态机** | `StateMachine`, `Input`, `StateRegion`, `State`, `Transition`, `Condition` | 状态驱动行为：由输入条件触发状态间转换，每个状态可绑定 Animation 或为空。在 `<Animations>` 中定义，通过 `<StateMachine ref="@id"/>` 在 Layer `<Timelines>` 中驱动。 |
 | **ViewModel** | `ViewModel`, `Property`, `DataBind`, `DataConverter` | ViewModel 模式与数据绑定定义。 |
 | **颜色源** | `SolidColor`, `LinearGradient`, `RadialGradient`, `ConicGradient`, `DiamondGradient`, `ImagePattern`, `ColorStop` | 绘制器使用的颜色定义。 |
-| **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `NoiseStyle` | 应用于图层内容的视觉效果。 |
+| **图层样式** | `DropShadowStyle`, `InnerShadowStyle`, `BackgroundBlurStyle`, `NoiseStyle`, `GlassStyle` | 应用于图层内容的视觉效果。 |
 | **图层滤镜** | `BlurFilter`, `DropShadowFilter`, `InnerShadowFilter`, `BlendFilter`, `ColorMatrixFilter`, `NoiseFilter` | 应用于合成图层的后期处理效果。 |
 | **几何元素** | `Rectangle`, `Ellipse`, `Polystar`, `Path`, `Text`, `GlyphRun` | 可绘制的几何（形状和文本）。必须在 Layer/Group 内。 |
 | **修改器** | `TrimPath`, `RoundCorner`, `MergePath`, `TextModifier`, `RangeSelector`, `TextPath`, `Repeater` | 变换或组合几何图形和文本。 |
@@ -2808,7 +2827,7 @@ pagx（必需属性：width、height）
 │   ├── VectorElement*（见 A.3）
 │   ├── <svg>*（导入指令，见 §7）
 │   ├── Timelines? → Animation* (ref="@id", playing) 或 StateMachine* (ref="@id")
-│   ├── LayerStyle*（DropShadow / InnerShadow / BackgroundBlur / Noise）
+│   ├── LayerStyle*（DropShadow / InnerShadow / BackgroundBlur / Noise / Glass）
 │   ├── LayerFilter*（Blur / DropShadow / InnerShadow / Blend / ColorMatrix / Noise）
 │   └── Layer*（子图层，递归）
 │
@@ -3123,6 +3142,18 @@ Group 和 TextBox 共享以下变换通道，可对内部元素整体施加动�
 | `blurX`, `blurY` | float | 模糊半径 |
 | `color` | color | 阴影/覆盖颜色 |
 | `showBehindLayer` | boolean | 是否显示在图层后方（DropShadowStyle） |
+
+**GlassStyle**（全部为可动画 float 通道）：
+
+| 通道 | 值类型 | 说明 |
+|------|--------|------|
+| `refraction` | float | 沿曲线边缘的光学畸变强度 [0, 100] |
+| `depth` | float | 折射区域从边缘向内的延伸程度 [1, 100] |
+| `frost` | float | 背景模糊量（磨砂玻璃）[0, 100] |
+| `dispersion` | float | 色散强度 [0, 100] |
+| `splay` | float | 折射方向混合因子 [0, 100] |
+| `lightAngle` | float | 光源方向（角度）[-179, 180] |
+| `lightIntensity` | float | 边缘高光亮度 [0, 100] |
 
 ### D.9 滤镜（Blur / DropShadow / InnerShadow / Blend）
 
