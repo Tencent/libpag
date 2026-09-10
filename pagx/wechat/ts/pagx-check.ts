@@ -966,7 +966,7 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
 
   // Compute the raw values of the five risk paths.
   const riskRaw: Record<string, number> = {
-    // Path A: BgBlur × uncacheable elements (uses the expanded counts).
+    // Path A: backdrop styles × uncacheable elements (uses the expanded counts).
     A_backdrop_x_uncacheable:
       backdropStyleCount * (innerShadowCount + blurFilterCount + gradientCount / 10),
     // Path B: Path data volume (uses the expanded counts).
@@ -974,7 +974,7 @@ export async function CheckPagx(pagxData: Uint8Array): Promise<PagxCheckResult> 
     // Path C: canvas × element density (uses the expanded Layer count).
     C_canvas_x_density:
       (pixM / 100) * (imagePattern + expandedLayerCount / 30 + gradientCount / 20),
-    // Path D: BgBlur count (uses the expanded counts).
+    // Path D: backdrop style count (uses the expanded counts).
     backdrop_style_count: backdropStyleCount,
     // Path E: Layer XML count (uses the raw XML count, consistent with the Python version).
     layer_xml: layerXml,
