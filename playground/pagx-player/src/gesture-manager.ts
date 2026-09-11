@@ -344,15 +344,23 @@ export class GestureManager {
         // Nothing to reset: scaleStartZoom and offsets are only used inside a gesture, and
         // gesturestart re-seeds them on the next pinch.
     }
+
+    /** True while a pan/zoom gesture (mouse drag, touch pan, or pinch) is in progress. Used by
+     *  the player to suppress select-mode hover hit-testing mid-gesture so the overlay does not
+     *  fight the transform. */
+    public isCurrentlyDragging(): boolean {
+        return this.isDragging || this.isTouchPanning || this.isTouchZooming;
+    }
 }
 
 /** Attach gesture listeners to the canvas element. Returns a cleanup function to detach them.
- *  `onCanvasTap` is invoked when a pointer down + up pair are within CLICK_MOVE_THRESHOLD px,
- *  which the player uses to toggle playback on a bare click. */
+ *  `onCanvasTap` is invoked with the pointer's client coordinates when a pointer down + up pair
+ *  are within CLICK_MOVE_THRESHOLD px, which the player uses to toggle playback (or, in inspect
+ *  mode, to hit-test and select the node under the pointer) on a bare click. */
 export function bindCanvasEvents(
     canvas: HTMLCanvasElement,
     manager: GestureManager,
-    onCanvasTap: () => void,
+    onCanvasTap: (clientX: number, clientY: number) => void,
 ): () => void {
     canvas.style.cursor = 'grab';
 
@@ -379,7 +387,7 @@ export function bindCanvasEvents(
             Math.abs(e.clientX - pressStartX) < CLICK_MOVE_THRESHOLD &&
             Math.abs(e.clientY - pressStartY) < CLICK_MOVE_THRESHOLD
         ) {
-            onCanvasTap();
+            onCanvasTap(e.clientX, e.clientY);
         }
     };
     const onMouseLeave = () => {
@@ -407,7 +415,7 @@ export function bindCanvasEvents(
                 Math.abs(touch.clientX - pressStartX) < CLICK_MOVE_THRESHOLD &&
                 Math.abs(touch.clientY - pressStartY) < CLICK_MOVE_THRESHOLD
             ) {
-                onCanvasTap();
+                onCanvasTap(touch.clientX, touch.clientY);
             }
         }
     };

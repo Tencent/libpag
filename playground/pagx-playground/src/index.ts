@@ -95,12 +95,14 @@ function t(): I18nStrings {
 }
 
 // Base URL used to fetch every remote asset the playground consumes (wasm, fonts, .pagx
-// samples, sample thumbnails, player icons). Local development (localhost / 127.0.0.1) keeps
-// relative paths so `npm run server` continues serving out of the working tree, while any
-// other host is redirected to the PAG CDN. The CDN version substantially reduces first-load
-// time for the official pagx site because the ~21 MB of fonts + wasm come from a
-// geographically-close edge instead of the origin server. Ends without a trailing slash;
-// concatenation sites (assetUrl below) prepend '/' explicitly.
+// samples, sample thumbnails, player icons). Only the official pagx site host is redirected to
+// the PAG CDN; every other host (localhost, 127.0.0.1, a LAN IP used to share a dev build with
+// teammates, etc.) keeps relative paths so `npm run server` serves the locally built artifacts
+// out of the working tree. Routing a LAN IP to the CDN would 404 on the single-threaded wasm
+// (the CDN only hosts the multi-threaded variant) and hit CORS on the fonts. The CDN version
+// substantially reduces first-load time for the official pagx site because the ~21 MB of fonts +
+// wasm come from a geographically-close edge instead of the origin server. Ends without a
+// trailing slash; concatenation sites (assetUrl below) prepend '/' explicitly.
 //
 // Uses `globalThis.location` rather than `window.location` because the pagx-viewer
 // multi-threaded build starts Emscripten pthread workers whose script is this same rollup
@@ -108,12 +110,14 @@ function t(): I18nStrings {
 // at module-init time (below) would throw ReferenceError on every worker spawn. `location`
 // is present on both Window and DedicatedWorkerGlobalScope, so this call reads the correct
 // hostname in either environment.
+const CDN_HOSTS = ['pag.qq.com'];
+
 function computeResourceBase(): string {
     const host = globalThis.location?.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-        return '';
+    if (host !== undefined && CDN_HOSTS.includes(host)) {
+        return 'https://pag.qq.com/pagx';
     }
-    return 'https://pag.qq.com/pagx';
+    return '';
 }
 
 const RESOURCE_BASE = computeResourceBase();
@@ -483,6 +487,7 @@ async function applyXml(xmlText: string): Promise<string> {
     }
     try {
         const bytes = new TextEncoder().encode(xmlText);
+
         // Preserve playback position so an Apply doesn't jump the animation back to frame 0.
         // baseURL for external resources stays the same as the currently loaded sample (or
         // empty for drag-and-drop) - re-editing XML keeps the same resource root.
@@ -494,6 +499,7 @@ async function applyXml(xmlText: string): Promise<string> {
                 ? makeResourceResolver(assetUrl('samples/'))
                 : undefined,
         });
+
         return '';
     } catch (e) {
         return e instanceof Error ? e.message : String(e);
@@ -545,6 +551,9 @@ function ensurePlayer(): PAGXPlayer {
         },
         extraMenuItems: slots,
     });
+    // Expose the player on window for DevTools-driven manual testing, e.g. driving state machine
+    // inputs of an interactive pagx: pagx.setSMInputBool('hover', true).
+    (window as Window & { pagx?: PAGXPlayer }).pagx = player;
     return player;
 }
 
@@ -623,6 +632,7 @@ async function loadPAGXData(
     // Decode xmlText once for the source editor; the player forwards it into the editor via
     // the load option so the editor doesn't have to redo the TextDecoder work.
     const xmlText = new TextDecoder('utf-8').decode(data);
+
     await p.load(data, {
         xmlText,
         registerFonts: registerFontsToView,
@@ -630,6 +640,7 @@ async function loadPAGXData(
     });
 
     p.show();
+
     hideDropZone();
     document.title = `PAGX Playground - ${name}`;
     currentFileName = name;
@@ -644,16 +655,20 @@ async function loadPAGXFile(file: File): Promise<void> {
         // editor; editor Apply/Save go through applyXml -> player.load directly and preserve
         // the editor state.
         player?.closeEditor();
+
         await prepareForLoading();
+
         const fileBuffer = await file.arrayBuffer();
+
         // Drag-and-drop files have no baseURL for external references (external assets
         // packaged next to a .pagx aren't accessible over http); pass undefined so the
         // player's default (no external fetches) applies.
         await loadPAGXData(new Uint8Array(fileBuffer), file.name);
+
         currentPlayingFile = null;
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
-        console.error('Failed to load PAGX file:', error);
+        console.error('Failed to load PAGX file:', (error as Error)?.stack ?? error);
         // Load failed: the player has already torn down its own UI via its failure path, but
         // we still own the outer chrome (nav-btns overlay + currentPlayingFile pointer for
         // downstream resource resolution). Restore both so the user can navigate to Samples
@@ -680,7 +695,9 @@ async function loadPAGXSample(name: string, pushHistory: boolean = true): Promis
         // Mirror loadPAGXFile: close the editor and reveal the loading overlay before the
         // network round-trip so click feedback is immediate even on slow CDN networks.
         player?.closeEditor();
+
         await prepareForLoading();
+
         const url = assetUrl(`samples/${name}`);
         // Fetch the sample bytes ourselves (rather than delegating to prepareForLoading) so a
         // 404 from the CDN surfaces as a network error in the drop-zone instead of stalling
@@ -690,11 +707,13 @@ async function loadPAGXSample(name: string, pushHistory: boolean = true): Promis
             throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
         }
         const fileBuffer = await response.arrayBuffer();
+
         await loadPAGXData(
             new Uint8Array(fileBuffer),
             name,
             makeResourceResolver(assetUrl('samples/')),
         );
+
         currentPlayingFile = name;
 
         const cleanUrl = `${window.location.pathname}?sample=${encodeURIComponent(name)}`;

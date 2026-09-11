@@ -42,6 +42,12 @@ const bundleNames = ['umd', 'esm', 'cjs', 'min'].map(
 );
 
 let replacedCount = 0;
+// Emscripten >= 3.1.x spawns the pthread worker self-referentially via
+// `new Worker(new URL(import.meta.url))` instead of the old hard-coded `new URL("pagx-viewer.js",
+// import.meta.url)`. That form already points the worker at whichever bundle it lives in, so no
+// rewrite is needed. We count such bundles separately so the guard below can tell "already
+// correct" (selfReferentialCount > 0) from a real regression (both counts zero).
+let selfReferentialCount = 0;
 for (const bundleName of bundleNames) {
     const filePath = path.join(libDir, bundleName);
     if (!fs.existsSync(filePath)) {
@@ -59,14 +65,19 @@ for (const bundleName of bundleNames) {
         // filename so the worker re-loads the same module.
         if (replaceInFile(filePath, 'pagx-viewer.js', bundleName)) {
             replacedCount++;
+        } else if (fs.readFileSync(filePath, 'utf-8').includes('new URL(import.meta.url)')) {
+            // Newer emscripten self-references import.meta.url for the worker spawn (see
+            // above); nothing to patch for this bundle.
+            selfReferentialCount++;
         }
     }
 }
 
-if (replacedCount === 0) {
-    // No replacement means either the bundles were not built yet, or the emcc glue's
-    // hard-coded URL string changed (for example after an emscripten upgrade). Fail loudly
-    // so CI catches the regression instead of shipping bundles that 404 at runtime.
+if (replacedCount === 0 && selfReferentialCount === 0) {
+    // No replacement and no self-referential worker spawn means either the bundles were not
+    // built yet, or the emcc glue's hard-coded URL string changed again (for example after an
+    // emscripten upgrade). Fail loudly so CI catches the regression instead of shipping bundles
+    // that 404 at runtime.
     console.error(
         `fix-wasm-imports: no occurrences rewritten in lib/. Expected to patch the ` +
             `${isSt ? 'wasm URL ("pagx-viewer.wasm")' : 'pthread worker URL ("pagx-viewer.js")'} ` +

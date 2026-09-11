@@ -86,17 +86,102 @@ class PAGXView {
   int64_t currentTimeMicros() const;
   int64_t durationMicros() const;
   float frameRate() const;
+  // Returns true when the loaded document has a default timeline at all — even one without a
+  // queryable duration (e.g. a state machine). The playback bar uses this to stay visible in a
+  // greyed-out fallback mode instead of hiding entirely.
+  bool hasTimeline() const;
   void setCurrentTimeMicros(int64_t micros);
   void setLoop(bool loop);
   bool isLoop() const;
+
+  // --- Selection (phase 1, read-only canvas<->editor queries) ---
+
+  // Returns the hit-test result for the top-most layer under the surface point, or a null val if
+  // none. The result carries the source span (1-based lines) and surface bounds of the *reference*
+  // node — i.e. when the click lands inside a <Layer composition="@X"> instance, the span points
+  // at that <Layer> reference rather than at the internal definition node inside <Composition id>.
+  // bounds is the on-screen rect of the clicked instance itself (not the whole reference span),
+  // so the canvas overlay outlines exactly what the user clicked.
+  emscripten::val hitTest(float surfaceX, float surfaceY);
+
+  // One-shot export of every node's source span and incrementable channel list, for the editor
+  // to map lines<->index and (phase 2) decide which attr edits can go incremental. Call after
+  // buildLayers(); rebuild on full reload.
+  emscripten::val getNodeSourceMap() const;
+
+  // Returns the current-frame surface bounds {x,y,w,h} of every runtime layer instance built from
+  // nodes[index] — one array entry per instance when the node is referenced by several composition
+  // layers — or null if index is out of range or has no runtime layer. For overlay box drawing.
+  emscripten::val getNodeBounds(int index) const;
+
+  // --- Source-editor validation and incremental edit ---
+
+  /**
+   * Validates a PAGX XML byte buffer without modifying the view's loaded document or scene.
+   *
+   * The browser-side XML parser reports well-formedness. This method reports importer/schema
+   * errors (unknown elements, invalid attribute values, unresolved references, etc.) as an array
+   * of {message, line, column} objects for Monaco diagnostics.
+   * @param pagxData UTF-8 encoded PAGX XML bytes.
+   * @return JavaScript array of schema diagnostic objects.
+   */
+  emscripten::val validatePAGX(const emscripten::val& pagxData) const;
+
+  // Sets the given channel on nodes[index] from its raw PAGX attribute string and refreshes the
+  // scene in place (reusing Layer handles; layout re-run only when the channel requires it). This
+  // is the fast path for a pure attribute-value edit; structural edits fall back to a full reload.
+  // Returns false when the index is invalid, the channel is unknown for the node type, or the
+  // string cannot be parsed into the channel's type (caller should then do a full reparse).
+  bool setNodeChannel(int index, const std::string& channel, const std::string& value);
+
+  // --- StateMachine input hooks (playground interaction testing) ---
+
+  // Sets a bool/number input or fires a trigger on the default state machine timeline; the scene
+  // picks the new value up on the next advance(). Returns false when the default timeline is not
+  // a state machine or the input name/type does not match. Exposed through the binding so a
+  // tester can drive interactive state machines from the browser console.
+  bool setSMInputBool(const std::string& name, bool value);
+  bool setSMInputNumber(const std::string& name, float value);
+  bool fireSMInputTrigger(const std::string& name);
+
+  // Exports the animation-unit tree of the loaded document as a JS array: every top-level
+  // Animation/StateMachine definition plus every <Timelines> mount point, nested by composition
+  // reference. Each node carries a path string ("1", "1/0") whose prefix encodes the nesting, and
+  // durationUs where resolvable (>0 = known, 0 = none, -1 = unresolvable: state machines and
+  // dangling references).
+  emscripten::val getTimelineTree();
+
+  // --- Unit preview selection (solo mode) ---
+
+  /**
+   * Selects one unit of the timeline tree for solo preview, or clears the selection when id is
+   * empty. Selecting an animation routes all playback values (current/duration/frameRate/seek)
+   * to a lazily instantiated runtime of that definition and freezes every other clock (default
+   * timeline and scene) until the selection is cleared. Selecting a state machine freezes the
+   * clocks as well but exposes no time axis (durationMicros() reports 0 while selected).
+   * @param kind "animation" or "stateMachine"; mount entries reuse these by their refKind.
+   * @param id Definition id from getTimelineTree(); empty clears the selection.
+   * @return false when the unit cannot be instantiated (unknown id or kind).
+   */
+  bool selectTimelineUnit(const std::string& kind, const std::string& id);
+
+  // Returns the current solo-preview selection as {kind, id}, or null when none is selected.
+  emscripten::val getSelectedTimelineUnit() const;
+
+  // Returns the live {regionName: currentStateName} map of the default state machine timeline, or
+  // an empty object when the default timeline is not a state machine. Lightweight polling endpoint
+  // for the blueprint view to refresh the active-state highlight (250ms cadence).
+  emscripten::val getSMCurrentStates() const;
 
  private:
   void updateContentTransform();
   void applyDisplayTransform();
   void applySceneDisplayOptions();
+  void advanceAnimationUnit(const std::shared_ptr<PAGAnimation>& animation, int64_t deltaUs);
   bool ensureWindow();
   void syncSurfaceSize(int canvasWidth, int canvasHeight);
   void advanceTimelines(double frameStartMs);
+  void advanceFallbackTimeline(int64_t deltaUs);
   void onZoomEnd();
   void updatePerformanceState(double frameDurationMs);
   void updateAdaptiveTileRefinement();
@@ -113,10 +198,21 @@ class PAGXView {
   // PAGTimeline base, so they are routed through this pointer. Null when there is no default
   // timeline or it is not an animation.
   std::shared_ptr<PAGAnimation> defaultAnimation = nullptr;
+  // Virtual clock for a default timeline without a queryable duration (e.g. a state machine):
+  // accumulated from frame deltas while playing and moved by seek-equivalent relative steps, so
+  // the playback bar can offer play/pause and frame stepping even though no total duration or
+  // absolute seek exists.
+  int64_t fallbackClockUs = 0;
   // Playback state maintained by the view itself. The timeline API no longer carries play/pause
   // state, and PAGComposition::pauseTimeline cannot gate the top-level timeline driven here, so the
   // view gates advancement on this flag.
   bool playing = true;
+  // Solo-preview selection (unit selected from the timeline tree): previewAnimation is the lazily
+  // instantiated runtime the playback values route to while selected; a selected state machine has
+  // no runtime here (no time axis) — both cases freeze the default/scene clocks until cleared.
+  std::shared_ptr<PAGAnimation> previewAnimation = nullptr;
+  std::string selectedUnitKind = {};
+  std::string selectedUnitId = {};
   // Player-level loop switch that overrides the file's loop mode at cycle boundaries: the engine
   // still drives in-cycle motion (including PingPong mirroring), but whether a completed cycle
   // repeats or stops is decided here instead of by the file's LoopMode. Defaults to looping.

@@ -110,6 +110,17 @@ class PAGStateMachine : public PAGTimeline,
   bool fireTrigger(const std::string& name);
 
   /**
+   * Resets the state machine to its freshly-constructed state and restarts playback from the head:
+   * every region returns to its initialState with a newly built animation at time 0 (crossfades,
+   * pending transitions, and consumed triggers are discarded), and every input value returns to
+   * its declared default. Call apply() afterwards to reflect the reset state on the content. A
+   * state machine whose once-regions have finished cannot be resumed by advancing; reset() is the
+   * way to play it again. State-change listeners are notified for every region whose current
+   * state actually changes. No-op once the owning PAGScene has been destroyed.
+   */
+  void reset();
+
+  /**
    * Advances all regions by deltaMicroseconds: advances elapsed time for active animations,
    * advances crossfade progress, and evaluates state transitions (including chained transitions
    * within the same frame, capped at 100 iterations).
@@ -186,6 +197,7 @@ class PAGStateMachine : public PAGTimeline,
   bool advanceMix(RegionInstance& ri, int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
+  void notifyStateChange(const RegionInstance& ri);
   std::shared_ptr<PAGAnimation> createTimelineForState(const State* state);
 
   // Marks every inner PAGAnimation (each region's current timeline and any crossfading-out ones)

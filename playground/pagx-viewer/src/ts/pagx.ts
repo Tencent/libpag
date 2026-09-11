@@ -21,7 +21,7 @@ import type { PAGXModule } from './types';
 import createPAGX from 'pagx-glue';
 
 export { PAGXView } from './pagx-view';
-export type { PAGXModule } from './types';
+export type { HitTestResult, NodeBounds, NodeSourceEntry, PagxSchemaDiagnostic, PAGXModule } from './types';
 
 export interface ModuleOption {
   /**

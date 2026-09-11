@@ -27,9 +27,11 @@
 // per player, and the `pagx:loaded` global event has been replaced with explicit
 // `setDocumentXml()` calls driven by the player.
 
-import type { EditorCallbacks } from '../types';
-import { SourceEditor } from './SourceEditor';
+import type { EditorCallbacks, SourceDiagnosticProvider } from '../types';
+import { SourceEditor, type DraftLineChange, type LineRange } from './SourceEditor';
 import { EDITOR_STYLES } from './styles';
+
+export type { LineRange };
 
 const MOBILE_BREAKPOINT = 768;
 /** Auto-hide window (ms) used by the player when it forwards editor notifications to the
@@ -51,6 +53,14 @@ export interface EditorPanelOptions {
      *  causing its width to shrink so the canvas doesn't render underneath the panel. */
     canvasContainer: HTMLElement;
     callbacks: EditorCallbacks;
+    /** Fired when the user clicks the inspect button in the editor header. The host owns
+     *  selectMode state and should call back into EditorPanel.setSelectMode() to keep the
+     *  button's active class in sync. */
+    onToggleSelect: () => void;
+    /** Fired whenever the panel closes (manual close button, document switch via
+     *  setDocumentXml(null), player hide()). The host uses this to exit select mode so the
+     *  canvas doesn't keep driving highlights against a hidden editor. */
+    onClose?: () => void;
     /** Bridge for user-facing feedback ("Changes applied", validation errors, etc.). PAGXPlayer
      *  wires this to its unified status pill so editor feedback lives in the same visual slot
      *  as load / reload status - keeping messages horizontally aligned, avoiding overlap, and
@@ -73,6 +83,18 @@ export interface EditorPanelOptions {
      *  drop its own sticky "Applying..." pill when a mid-flight document swap makes the
      *  Apply's own result no longer relevant. */
     dismiss: (token: number) => void;
+
+    /** Semantic source diagnostic providers. XML well-formedness remains built into SourceEditor;
+     *  these providers run only after syntax passes and render independent Monaco marker owners.
+     *  Providers may be sync or async and errors block Apply/Save. */
+    diagnosticProviders?: SourceDiagnosticProvider[];
+    /** Optional incremental fast path for Apply. Given the previous baseline XML and the newly
+     *  edited XML, the player attempts to apply the change in place (setNodeChannel) without a full
+     *  reparse. Returns true when it fully handled the edit (Apply then skips onApply and promotes
+     *  the new text to baseline); returns false for any structural or non-incrementable edit, in
+     *  which case Apply falls back to the full onApply pipeline. When omitted, every Apply uses the
+     *  full pipeline. */
+    incrementalApply?: (oldXml: string, newXml: string) => boolean;
 }
 
 /** Injects the editor stylesheet exactly once per document. Idempotent. */
@@ -85,27 +107,24 @@ function ensureEditorStylesInjected(): void {
     document.head.appendChild(style);
 }
 
-/** True when the keyboard event originates from an editable element. */
+/** True when the keyboard event originates from an editable element. INPUT and TEXTAREA
+ *  are checked for readOnly/disabled so Monaco's hidden input textarea (which receives
+ *  `readonly="true"` when domReadOnly is enabled) is treated as non-editable — otherwise
+ *  its own keyboard handling would shadow the global L-key panel toggle. */
 function isEditableTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) {
         return false;
     }
     const tag = target.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
-}
-
-/** Validates XML well-formedness using DOMParser. Returns empty string on success, error
- *  message on failure. */
-function validateXml(xmlText: string): string {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xmlText, 'application/xml');
-    const parseError = doc.querySelector('parsererror');
-    if (parseError) {
-        const errorText = parseError.textContent || 'Invalid XML';
-        const firstLine = errorText.trim().split('\n')[0].trim();
-        return firstLine || 'Invalid XML format';
+    if (tag === 'INPUT') {
+        const input = target as HTMLInputElement;
+        return !input.readOnly && !input.disabled;
     }
-    return '';
+    if (tag === 'TEXTAREA') {
+        const textarea = target as HTMLTextAreaElement;
+        return !textarea.readOnly && !textarea.disabled;
+    }
+    return target.isContentEditable;
 }
 
 /** Yield the main thread for one frame + one macrotask so the browser can paint any DOM
@@ -132,6 +151,10 @@ export class EditorPanel {
         options?: { sticky?: boolean },
     ) => number;
     private readonly dismiss: (token: number) => void;
+    private readonly onToggleSelect: () => void;
+    private readonly onClose: (() => void) | null;
+    private readonly diagnosticProviders: readonly SourceDiagnosticProvider[];
+    private readonly incrementalApply: ((oldXml: string, newXml: string) => boolean) | null;
 
     private panel!: HTMLElement;
     private resizer!: HTMLElement;
@@ -152,12 +175,22 @@ export class EditorPanel {
     // NOT bump documentGeneration, otherwise the Apply would falsely detect a document swap
     // and skip its own success report (leaving "Applying..." pinned to the status pill).
     private pendingApplyXml: string | null = null;
+    // True when setDocumentXml() received a new document while the panel was closed, so the
+    // editor instance (which survives close(), only the `visible` class is dropped) still holds
+    // the previous document's text. open() consumes this to push the pending content in.
+    // Without it a closed-then-reopened panel would keep showing - and Apply would write back -
+    // the stale text of the document that was loaded before the switch.
+    private pendingEditorSync = false;
     private panelWidthPx: number | null = null;
     private resizing = false;
     // True while an onApply/onSave promise from the host is still pending. Prevents overlapping
     // callbacks (double-click on Apply firing two loadPAGX pipelines against the same view)
     // and keeps the buttons visibly disabled so users get feedback that work is in flight.
     private busy = false;
+    private pendingHoverCb: ((line: number) => void) | null = null;
+    private pendingDblClickCb: ((line: number) => void) | null = null;
+    private pendingDraftLineChangesCb: ((changes: readonly DraftLineChange[] | null) => void) | null = null;
+    private pendingTagSpanResolver: ((line: number) => LineRange | null) | null = null;
     private readonly boundKeydown: (event: KeyboardEvent) => void;
     private readonly boundResize: () => void;
 
@@ -167,16 +200,22 @@ export class EditorPanel {
         this.callbacks = opts.callbacks;
         this.notify = opts.notify;
         this.dismiss = opts.dismiss;
+        this.onToggleSelect = opts.onToggleSelect;
+        this.onClose = opts.onClose ?? null;
+        this.diagnosticProviders = opts.diagnosticProviders ?? [];
+        this.incrementalApply = opts.incrementalApply ?? null;
         ensureEditorStylesInjected();
         this.buildDom();
         this.boundKeydown = this.handleKeydown.bind(this);
         this.boundResize = this.onWindowResize.bind(this);
-        document.addEventListener('keydown', this.boundKeydown);
+        // Capture before Monaco consumes read-only undo/redo shortcuts; SourceEditor itself checks
+        // text focus so unrelated inputs never receive this handling.
+        document.addEventListener('keydown', this.boundKeydown, true);
         window.addEventListener('resize', this.boundResize);
     }
 
     /** Push the XML source of the currently loaded document. Called by the player after every
-     *  successful load. Passing null clears the panel and destroys the CodeMirror instance so
+     *  successful load. Passing null clears the panel and destroys the editor instance so
      *  the next open starts with fresh undo history rooted at the new content. A call that
      *  actually switches the baseline bumps documentGeneration so any Apply awaiting a slow
      *  host callback can detect that a fresher document supersedes its result and drop its
@@ -199,10 +238,24 @@ export class EditorPanel {
                 this.editor.destroy();
                 this.editor = null;
             }
+            // The next open() recreates the instance and seeds it from currentXmlText, so there is
+            // no deferred push outstanding.
+            this.pendingEditorSync = false;
             return;
         }
         if (this.isOpen() && this.editor !== null) {
-            this.editor.setContent(xmlText);
+            // An Apply loopback carries exactly the text already in the current Monaco model. Do
+            // not replace that model: replacement preserves the viewport but destroys undo/redo
+            // history. A genuine document load still creates a fresh model and starts a new history.
+            if (!isApplyLoopback) {
+                this.editor.setContent(xmlText);
+            }
+            this.pendingEditorSync = false;
+        } else if (!isApplyLoopback) {
+            // Panel is closed (or not built yet): close() keeps the editor instance alive, so it
+            // still holds the previous document's text. Defer the push to open() instead of dropping
+            // it, otherwise reopening the panel would show — and Apply would write back — stale XML.
+            this.pendingEditorSync = true;
         }
     }
 
@@ -215,11 +268,37 @@ export class EditorPanel {
         if (this.editor === null) {
             const host = this.panel.querySelector('.editor-host');
             if (host instanceof HTMLElement) {
-                this.editor = new SourceEditor(host);
+                this.editor = new SourceEditor(host, this.diagnosticProviders);
+                // Enter-to-apply and read-only delete auto-apply both converge on the same
+                // pipeline the Apply button runs.
+                this.editor.onApplyRequest(() => {
+                    void this.handleApply();
+                });
+                if (this.pendingHoverCb !== null) {
+                    this.editor.onHoverLine(this.pendingHoverCb);
+                }
+                if (this.pendingDblClickCb !== null) {
+                    this.editor.onDblClickLine(this.pendingDblClickCb);
+                }
+                if (this.pendingDraftLineChangesCb !== null) {
+                    this.editor.onDraftLineChanges(this.pendingDraftLineChangesCb);
+                }
+                if (this.pendingTagSpanResolver !== null) {
+                    this.editor.setTagSpanResolver(this.pendingTagSpanResolver);
+                }
             }
-        }
-        if (this.editor !== null && this.currentXmlText !== null) {
+            // Seed the freshly created instance with the current document.
+            if (this.editor !== null && this.currentXmlText !== null) {
+                this.editor.setContent(this.currentXmlText);
+            }
+            this.pendingEditorSync = false;
+        } else if (this.pendingEditorSync && this.currentXmlText !== null) {
+            // A different document was loaded while the panel was closed. Push it now — resetting
+            // the view to the top, since this is a genuine document switch. Re-opening on the same
+            // document leaves pendingEditorSync false and skips this, so toggling inspect mode or
+            // reopening the panel preserves the user's caret and scroll position.
             this.editor.setContent(this.currentXmlText);
+            this.pendingEditorSync = false;
         }
         this.panel.classList.add('visible');
         // Toggles the `with-editor` class on the container. Hosts are responsible for providing
@@ -233,6 +312,7 @@ export class EditorPanel {
     public close(): void {
         this.panel.classList.remove('visible');
         this.canvasContainer.classList.remove('with-editor');
+        this.onClose?.();
     }
 
     public toggle(): void {
@@ -243,12 +323,101 @@ export class EditorPanel {
         }
     }
 
+    /** Grey transient hover highlight of a node's source span. No-op when the editor is closed. */
+    public highlightHover(startLine: number, endLine: number): void {
+        this.editor?.highlightHover(startLine, endLine);
+    }
+
+    public clearHover(): void {
+        this.editor?.clearHover();
+    }
+
+    /** Blue sticky selection highlight of a node's source span. */
+    public highlightSelect(startLine: number, endLine: number): void {
+        this.editor?.highlightSelect(startLine, endLine);
+    }
+
+    public clearSelect(): void {
+        this.editor?.clearSelect();
+    }
+
+    public clearHighlight(): void {
+        this.editor?.clearHighlight();
+    }
+
+    public scrollToLine(line: number, align: 'start' | 'nearest' | 'center' = 'start'): void {
+        this.editor?.scrollToLine(line, align);
+    }
+
+    /** Unlocks the whole document for editing, showing the amber edit state only on the clicked
+     *  tag line. */
+    public enterEditMode(decorationLine: number): void {
+        this.editor?.enterEditMode(decorationLine);
+    }
+
+    /** Returns the current physical XML tag line, or null when a line is not itself a tag. */
+    public getDraftTagLine(line: number): number | null {
+        return this.editor?.getDraftTagLine(line) ?? null;
+    }
+
+    /** Handles an undo/redo keyboard shortcut while the source editor is read-only. */
+    public handleReadOnlyUndoRedo(event: KeyboardEvent): boolean {
+        return this.editor?.handleReadOnlyUndoRedo(event) ?? false;
+    }
+
+    /** Reflects the host's selectMode state on the inspect button (active class + aria-pressed).
+     *  Called by the player whenever selectMode changes. */
+    public setSelectMode(active: boolean): void {
+        const btn = this.panel.querySelector('.editor-select-btn');
+        if (btn) {
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', String(active));
+        }
+    }
+
+    /** Register an editor line-hover callback for the editor->canvas overlay highlight direction.
+     *  Survives editor recreation (open/close): the callback is re-applied each time the editor is
+     *  rebuilt. Pass null to remove. */
+    public onHoverLine(cb: ((line: number) => void) | null): void {
+        this.pendingHoverCb = cb;
+        this.editor?.onHoverLine(cb);
+    }
+
+    /** Register an editor double-click line callback (host resolves the editable span). Survives
+     *  editor recreation. Pass null to remove. */
+    public onDblClickLine(cb: ((line: number) => void) | null): void {
+        this.pendingDblClickCb = cb;
+        this.editor?.onDblClickLine(cb);
+    }
+
+    /** Reports accepted draft line replacements so the host can project source-map line numbers
+     *  until Apply rebuilds the runtime document. A null value resets that projection. */
+    public onDraftLineChanges(cb: ((changes: readonly DraftLineChange[] | null) => void) | null): void {
+        this.pendingDraftLineChangesCb = cb;
+        this.editor?.onDraftLineChanges(cb);
+    }
+
+    /** Registers the resolver SourceEditor consults for its tag-block copy/delete context menu
+     *  actions: it maps a source line to the line span of the enclosing tag, or null when that
+     *  tag's own boundaries cannot be identified (the actions then fall back to the single line).
+     *  Malformed descendants do not invalidate an intact enclosing block. Survives editor
+     *  recreation. Pass null to remove. */
+    public setTagSpanResolver(resolver: ((line: number) => LineRange | null) | null): void {
+        this.pendingTagSpanResolver = resolver;
+        this.editor?.setTagSpanResolver(resolver);
+    }
+
+    /** Returns the current editor document text, or '' when the editor instance is not created. */
+    public getContent(): string {
+        return this.editor?.getContent() ?? '';
+    }
+
     /** Detach global listeners and remove the panel from the DOM. Any layout side-effects the
      *  editor may have left on the host DOM (with-editor class on the canvas container,
      *  --editor-width property, body cursor/user-select set during a drag) are cleared here
      *  so tearing the player down doesn't outlive the component with orphaned styling. */
     public destroy(): void {
-        document.removeEventListener('keydown', this.boundKeydown);
+        document.removeEventListener('keydown', this.boundKeydown, true);
         window.removeEventListener('resize', this.boundResize);
         if (this.editor !== null) {
             this.editor.destroy();
@@ -274,6 +443,14 @@ export class EditorPanel {
         this.panel.innerHTML = `
             <div class="editor-resizer"></div>
             <div class="editor-header">
+                <button class="editor-select-btn" id="select-btn" title="Inspect (hover canvas to highlight XML)" aria-label="Toggle inspect" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 8V5a1 1 0 0 1 1-1h3"/>
+                        <path d="M16 4h3a1 1 0 0 1 1 1v3"/>
+                        <path d="M4 14v5a1 1 0 0 0 1 1h4"/>
+                        <path d="M13.5 12.5l6.5 2.4-2.8 1.2-1.2 2.8-2.5-6.4z"/>
+                    </svg>
+                </button>
                 <span class="editor-title">Source Editor</span>
                 <button class="editor-close-btn" title="Close" aria-label="Close">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -299,6 +476,11 @@ export class EditorPanel {
 
         const closeBtn = this.panel.querySelector('.editor-close-btn');
         closeBtn?.addEventListener('click', () => this.close());
+        const selectBtn = this.panel.querySelector<HTMLElement>('.editor-select-btn');
+        selectBtn?.addEventListener('click', () => {
+            this.onToggleSelect();
+            selectBtn.blur();
+        });
 
         this.discardBtn = this.panel.querySelector('.editor-btn.discard') as HTMLButtonElement;
         this.discardBtn.addEventListener('click', () => this.handleDiscard());
@@ -313,6 +495,29 @@ export class EditorPanel {
     }
 
     private handleKeydown(event: KeyboardEvent): void {
+        if (this.editor?.handleReadOnlyUndoRedo(event)) {
+            return;
+        }
+        // Ctrl/Cmd+F: hijack the browser's native find and open Monaco's find widget instead.
+        // Native find is unusable on Monaco because it virtualises the document DOM, so text
+        // outside the current viewport is invisible to the browser. Only intercept when a
+        // document is loaded and the event does not originate from another editable field (a
+        // settings input, a modal search box, ...) so unrelated forms keep their native find.
+        // The panel does not need to be visible: open() is idempotent and mirrors the L-key
+        // toggle in surfacing the editor when the user searches from the canvas.
+        if (this.currentXmlText !== null && (event.ctrlKey || event.metaKey) && !event.altKey &&
+            !event.shiftKey && (event.key === 'f' || event.key === 'F') &&
+            !isEditableTarget(event.target)) {
+            if (window.innerWidth < MOBILE_BREAKPOINT) {
+                // Match the L-key path: source editing/searching is desktop-only.
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            this.open();
+            this.editor?.openFind();
+            return;
+        }
         if (event.key !== 'l' && event.key !== 'L') {
             return;
         }
@@ -415,7 +620,10 @@ export class EditorPanel {
             return;
         }
         if (this.currentXmlText !== null) {
-            this.editor.setContent(this.currentXmlText);
+            // Restore the last applied text inside the existing model. This keeps the full history
+            // and records Discard itself as one edit, so Ctrl+Z can recover the discarded draft.
+            // Only a genuine document load replaces the model and starts a new undo history.
+            this.editor.discardTo(this.currentXmlText);
         }
         this.report('Changes discarded', 'success');
     }
@@ -425,10 +633,40 @@ export class EditorPanel {
             return;
         }
         const xmlText = this.editor.getContent();
-        const validationError = validateXml(xmlText);
+        // Nothing changed since the last applied/loaded text: skip the whole pipeline so Apply is a
+        // no-op (no reparse, no incremental write, no baseline churn).
+        if (this.currentXmlText !== null && this.currentXmlText === xmlText) {
+            this.report('No changes to apply', 'info');
+            return;
+        }
+        const validationError = await this.editor.getValidationError();
         if (validationError !== '') {
             this.report(validationError, 'error');
             return;
+        }
+        // Incremental fast path: a pure attribute-value edit is applied in place (setNodeChannel)
+        // and skips the full reparse/rebuild entirely. Structural or non-incrementable edits return
+        // false and fall through to the full onApply pipeline below. The update is synchronous and
+        // instant, so there is no "Applying..." pill or busy window; on success the edited text
+        // becomes the new baseline just like a full apply.
+        if (
+            this.incrementalApply !== null &&
+            this.currentXmlText !== null &&
+            this.currentXmlText !== xmlText
+        ) {
+            let handled = false;
+            try {
+                handled = this.incrementalApply(this.currentXmlText, xmlText);
+            } catch {
+                // Falling back to the full Apply below is the intended recovery.
+                handled = false;
+            }
+            if (handled) {
+                this.currentXmlText = xmlText;
+                this.editor.markApplied();
+                this.report('Changes applied', 'success');
+                return;
+            }
         }
         // Sticky "Applying..." keeps showing until the host promise settles - a long parse +
         // build on a big pagx (seconds) would otherwise leave the pill blank. The button row
@@ -470,6 +708,7 @@ export class EditorPanel {
             // Discard still restores a known-good state.
             if (error === '') {
                 this.currentXmlText = xmlText;
+                this.editor.markApplied();
                 this.report('Changes applied', 'success');
             } else {
                 this.report(error, 'error');
@@ -496,13 +735,18 @@ export class EditorPanel {
             return;
         }
         const xmlText = this.editor.getContent();
-        const validationError = validateXml(xmlText);
+        const validationError = await this.editor.getValidationError();
         if (validationError !== '') {
             this.report(validationError, 'error');
             return;
         }
         this.setBusy(true);
         const savingToken = this.report('Saving...', 'info', { sticky: true });
+        // Advertise the XML the host is about to receive so a host that reloads via
+        // player.load() -> setDocumentXml() recognizes its own loopback and preserves the
+        // caret/scroll position, mirroring Apply. Without this the reload is treated as a
+        // foreign document swap and the editor resets to the top.
+        this.pendingApplyXml = xmlText;
         // Same rationale as handleApply's yield: paint the sticky "Saving..." pill and the
         // disabled button state before the host callback (which may run heavy synchronous
         // work) enters the microtask queue.
@@ -517,6 +761,7 @@ export class EditorPanel {
         } catch (err) {
             this.report(err instanceof Error ? err.message : String(err), 'error');
         } finally {
+            this.pendingApplyXml = null;
             this.setBusy(false);
             // Safety-net dismiss: successful and error paths already replaced the sticky pill
             // via report() (whose fresh token makes this dismiss a no-op), but a synchronous

@@ -79,6 +79,18 @@ class PAGComposition : public PAGLayer {
    */
   bool isTimelinePlaying(const std::string& id) const;
 
+  /**
+   * Returns true when this composition has any spawned timeline (i.e. a referencing layer drives
+   * at least one Animation or StateMachine through <Timelines>). Only meaningful for non-root
+   * compositions: the root composition has no owner layer, so spawnTimelines() returns early and
+   * this is always false on it. To tell an animated document apart from a purely static one, walk
+   * the runtime tree and query each child composition (the playground's PAGXView does this with
+   * its own recursive helper).
+   */
+  bool hasTimelines() const {
+    return !timelines.empty();
+  }
+
  protected:
   // Constructs a runtime composition node bound to the given source layer (null for the root
   // composition), its built subtree root, and the root PAGScene. The subtree, binding, timelines,
@@ -113,11 +125,13 @@ class PAGComposition : public PAGLayer {
       std::unordered_set<const Composition*>& visited);
 
   // Builds the persistent per-layer runtime node tree into outChildren. Internal static helper used
-  // by BuildChildLayer and buildChildren.
+  // by BuildChildLayer and buildChildren. parentForChildren is set as the parent of every child
+  // pushed into outChildren, so the runtime tree's parent chain matches the source tree.
   static void BuildChildren(RuntimeBinding* binding, const std::vector<Layer*>& layers,
                             std::vector<std::shared_ptr<PAGLayer>>& outChildren,
                             const std::shared_ptr<PAGScene>& scene,
-                            std::unordered_set<const Composition*>& visited);
+                            std::unordered_set<const Composition*>& visited,
+                            const std::shared_ptr<PAGLayer>& parentForChildren);
 
   // Collects the direct child compositions of a layer into outChildren, transparently descending
   // through plain PAGLayer containers (which may nest compositions) but not into the child
