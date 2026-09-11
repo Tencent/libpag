@@ -277,7 +277,7 @@ emscripten::val PAGXView::getNodeBounds(int index) const {
   // at the geometric baseline while the rasterizer paints slightly below it, visually clipping
   // the last row of ink. Extending the bottom by 5% of the layer height covers the overshoot,
   // with a 0.5 root-space floor scaled by the current zoom. This is presentation-only slack,
-  // kept here so PAGScene::getGlobalBounds keeps returning tight bounds.
+  // kept here so PAGScene::getGlobalBoundsForNode keeps returning tight bounds.
   float zoom = contentScale * userZoom;
   auto array = emscripten::val::array();
   size_t visibleCount = 0;
@@ -351,6 +351,7 @@ void PAGXView::buildLayers() {
   selectedUnitId.clear();
   playing = true;
   lastAnimationTimeMs = -1.0;
+  fallbackClockUs = 0;
   pagxWidth = scene->width();
   pagxHeight = scene->height();
   applySceneDisplayOptions();
@@ -624,6 +625,16 @@ static void CollectRootLayerIds(const std::vector<Layer*>& layers,
   }
 }
 
+// Builds the next child path under parentPath: top-level nodes are numbered by *topIndex, while
+// nodes inside a composition group are numbered by *localIndex (a per-group counter threaded
+// through the recursion by the caller).
+static std::string MakeChildPath(const std::string& parentPath, int* topIndex, int* localIndex) {
+  if (parentPath.empty()) {
+    return std::to_string((*topIndex)++);
+  }
+  return parentPath + "/" + std::to_string((*localIndex)++);
+}
+
 // Collects mount nodes from the layer list into `out`. Layout follows the layer physical
 // hierarchy: any layer that references a composition (with or without its own drivers) becomes a
 // synthetic group wrapper whose children are (a) the layer's own drivers and (b) the mounts found
@@ -635,12 +646,6 @@ static void CollectMountNodes(const std::vector<Layer*>& layers, PAGXDocument* d
                               const std::string& parentPath, int* topIndex, int* localIndex,
                               std::unordered_set<const Composition*>& visited,
                               emscripten::val& out) {
-  auto nextPath = [&]() {
-    if (parentPath.empty()) {
-      return std::to_string((*topIndex)++);
-    }
-    return parentPath + "/" + std::to_string((*localIndex)++);
-  };
   for (const auto* layer : layers) {
     if (layer == nullptr) {
       continue;
@@ -649,20 +654,19 @@ static void CollectMountNodes(const std::vector<Layer*>& layers, PAGXDocument* d
       // Layer references a composition: even a layer with drivers of its own becomes a group so
       // the "layer + its mount drivers + the mounts inside the composition" nesting is visible.
       const bool descend = visited.insert(layer->composition).second;
-      const std::string wrapperPath = nextPath();
+      const std::string wrapperPath = MakeChildPath(parentPath, topIndex, localIndex);
       auto* subDoc = layer->externalDoc != nullptr ? layer->externalDoc.get() : doc;
       auto wrapper = emscripten::val::object();
       wrapper.set("path", wrapperPath);
       wrapper.set("kind", "compositionGroup");
       wrapper.set("name", layer->id.empty() ? "(composition)" : layer->id);
       wrapper.set("id", layer->id);
-      wrapper.set("refKind", emscripten::val::null());
+      // durationUs stays 0 (the TS contract's "none" marker) because the TS type marks it
+      // required; mount-only fields (refKind, loop, frameRate, playing, offsetFrames) are left
+      // unset so consumers see undefined, matching how mount nodes omit fields that do not
+      // apply. layerId carries the referencing layer's id for both mounts and groups.
       wrapper.set("durationUs", 0);
       wrapper.set("layerId", layer->id);
-      wrapper.set("loop", emscripten::val::null());
-      wrapper.set("frameRate", 0);
-      wrapper.set("playing", false);
-      wrapper.set("offsetFrames", 0);
       auto children = emscripten::val::array();
       int childIndex = 0;
       for (const auto& driver : layer->timelines) {
@@ -686,7 +690,7 @@ static void CollectMountNodes(const std::vector<Layer*>& layers, PAGXDocument* d
         if (driver == nullptr) {
           continue;
         }
-        const std::string path = nextPath();
+        const std::string path = MakeChildPath(parentPath, topIndex, localIndex);
         out.call<void>("push", MakeMountNode(layer, driver.get(), doc, path));
       }
       CollectMountNodes(layer->children, doc, parentPath, topIndex, localIndex, visited, out);

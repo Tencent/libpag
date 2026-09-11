@@ -361,6 +361,10 @@ export class SourceEditor {
     private syntaxValidationTimer: number | null = null;
     private destroyed = false;
     private creating = false;
+    // Latest setContent() text that arrived while Monaco was still loading. createEditor's
+    // pending load consumes it instead of its own initialContent argument, so the editor is
+    // created with the most recent document even when a second push lands during the CDN load.
+    private pendingContent: string | null = null;
     private loadErrorEl: HTMLElement | null = null;
     private readonly disposers: MonacoNS.IDisposable[] = [];
 
@@ -382,7 +386,10 @@ export class SourceEditor {
                 return;
             }
             this.clearLoadError();
-            this.model = m.editor.createModel(initialContent, 'xml');
+            // A setContent() that arrived during the CDN load replaces the buffered text.
+            const initialText = this.pendingContent ?? initialContent;
+            this.pendingContent = null;
+            this.model = m.editor.createModel(initialText, 'xml');
             this.editor = m.editor.create(this.host, {
                 model: this.model,
                 theme: 'pagx-dark',
@@ -925,9 +932,10 @@ export class SourceEditor {
     setContent(text: string, preserveViewState = false): void {
         const trimmed = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
         if (this.editor === null || this.model === null) {
-            // Monaco may still be loading. createEditor buffers the content and creates the
-            // editor once Monaco resolves; if it's already loaded, creation is synchronous
-            // inside the .then() callback.
+            // Monaco may still be loading. Record the latest content so the pending creation
+            // picks it up: a second document push that arrives while the CDN load is in flight
+            // must not be dropped in favor of the first push's text.
+            this.pendingContent = trimmed;
             this.createEditor(trimmed);
             return;
         }

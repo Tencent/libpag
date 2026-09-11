@@ -137,6 +137,7 @@ void PAGStateMachine::reset() {
     if (ri.region == nullptr) {
       continue;
     }
+    const State* previousState = ri.currentState;
     ri.currentState = nullptr;
     for (const auto* state : ri.region->states) {
       if (state != nullptr && state->name == ri.region->initialState) {
@@ -152,6 +153,11 @@ void PAGStateMachine::reset() {
     ri.mix = 1.0f;
     ri.fadingOut.clear();
     ri.consumedTriggers.clear();
+    // reset() does not go through changeState(), so regions whose state actually changed must
+    // be reported here; listeners otherwise cannot tell that getCurrentState() now differs.
+    if (ri.currentState != previousState) {
+      notifyStateChange(ri);
+    }
   }
 }
 
@@ -408,14 +414,19 @@ void PAGStateMachine::changeState(RegionInstance& ri, const StateTransition* t) 
       ri.consumedTriggers.insert(c->inputName);
     }
   }
-  if (ri.currentState != nullptr) {
-    // Snapshot listeners so a reentrant add/remove during dispatch does not invalidate the
-    // vector being iterated.
-    auto listenersSnapshot = stateChangeListeners;
-    for (auto& [listenerId, cb] : listenersSnapshot) {
-      if (cb) {
-        cb(ri.region->name, ri.currentState->name);
-      }
+  notifyStateChange(ri);
+}
+
+void PAGStateMachine::notifyStateChange(const RegionInstance& ri) {
+  if (ri.currentState == nullptr) {
+    return;
+  }
+  // Snapshot listeners so a reentrant add/remove during dispatch does not invalidate the
+  // vector being iterated.
+  auto listenersSnapshot = stateChangeListeners;
+  for (auto& [listenerId, cb] : listenersSnapshot) {
+    if (cb) {
+      cb(ri.region->name, ri.currentState->name);
     }
   }
 }

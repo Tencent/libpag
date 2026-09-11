@@ -155,7 +155,8 @@ export interface TimelineTreeNode {
     playing?: boolean;
     /** Mount (animation) only: evaluationOffset in frames. */
     offsetFrames?: number;
-    /** Mount only: id of the layer carrying the <Timelines>. */
+    /** Mount and compositionGroup: id of the layer carrying the <Timelines> / referencing the
+     *  composition. */
     layerId?: string;
     /** stateMachine only: declared inputs. */
     inputs?: { name: string; type: string }[];

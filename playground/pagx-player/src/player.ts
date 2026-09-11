@@ -543,8 +543,13 @@ export class PAGXPlayer extends EventTarget {
             // active-state highlight and the panel play icon live across reloads.
             const hasDefaultSM = this.blueprint.refresh();
             this.root.classList.toggle('sm-default', hasDefaultSM);
-            this.blueprint.startPolling();
-            this.chipBar.startPolling();
+            if (hasDefaultSM) {
+                // Polling is only meaningful for SM-default documents: the blueprint and chip
+                // queries are cross-wasm-boundary embind calls, and a non-SM document never
+                // shows those panels.
+                this.blueprint.startPolling();
+                this.chipBar.startPolling();
+            }
             this.updatePlaybackBarMode();
 
             // Feed the editor with the freshly loaded XML. If the host pre-decoded it, we use
@@ -613,6 +618,11 @@ export class PAGXPlayer extends EventTarget {
         setToolbarVisible(this.toolbarRoot, true);
         this.blueprint.setVisible(true);
         this.chipBar.setVisible(true);
+        if (this.root.classList.contains('sm-default')) {
+            // Restore the polling that hide() stopped (only SM-default documents poll).
+            this.blueprint.startPolling();
+            this.chipBar.startPolling();
+        }
         this.updatePlaybackBarMode();
     }
 
@@ -632,6 +642,10 @@ export class PAGXPlayer extends EventTarget {
         this.editor?.close();
         this.hideStatus();
         this.view?.pause();
+        // Off-screen panels must not keep polling across the wasm boundary; show() restores
+        // polling when the SM-default document becomes visible again.
+        this.blueprint.stopPolling();
+        this.chipBar.stopPolling();
     }
 
     /** Restore identity transform (zoom 1.0, offset 0,0). Also fired by the toolbar Reset button. */
@@ -1604,7 +1618,17 @@ export class PAGXPlayer extends EventTarget {
         // is null for elements whose computed display is none anywhere on the ancestor chain
         // (except the body, which the player is not).
         if (this.canvas.offsetParent === null) return;
-        if (!this.playbackBar.isVisible()) return;
+        if (!this.playbackBar.isVisible()) {
+            // sm-default mode: the bar yielded its spot to the blueprint panel, but playback
+            // shortcuts must stay functional. Route Space to the same raw toggle the panel's
+            // play button uses (a default SM reports no duration, so the bar's own toggle
+            // would bail out early). Arrow stepping has no SM equivalent and stays disabled.
+            if (isPlayPause && this.root.classList.contains('sm-default')) {
+                event.preventDefault();
+                this.toggleRawPlayback();
+            }
+            return;
+        }
         event.preventDefault();
         if (isPlayPause) {
             this.playbackBar.togglePlayback();

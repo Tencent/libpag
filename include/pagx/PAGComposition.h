@@ -81,8 +81,11 @@ class PAGComposition : public PAGLayer {
 
   /**
    * Returns true when this composition has any spawned timeline (i.e. a referencing layer drives
-   * at least one Animation or StateMachine through <Timelines>). Used to tell animated documents
-   * apart from purely static ones even when there is no top-level default timeline.
+   * at least one Animation or StateMachine through <Timelines>). Only meaningful for non-root
+   * compositions: the root composition has no owner layer, so spawnTimelines() returns early and
+   * this is always false on it. To tell an animated document apart from a purely static one, walk
+   * the runtime tree and query each child composition (the playground's PAGXView does this with
+   * its own recursive helper).
    */
   bool hasTimelines() const {
     return !timelines.empty();

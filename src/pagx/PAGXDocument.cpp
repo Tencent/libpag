@@ -299,6 +299,28 @@ namespace {
 // fall back to applyLayout. Kept small since the reset set covers only the edited Layers, their
 // ancestor chains and the edited Layers' content elements, never full subtrees.
 constexpr size_t MAX_INCREMENTAL_LAYOUT_LAYERS = 64;
+
+// Collects a content element into resetNodes, recursing through nested Group::elements: a group's
+// measure reads its children's preferred sizes, so a nested element's stale memo leaks through
+// the group exactly like a top-level content element's would. Returns false when the total reset
+// set exceeds the incremental cap.
+bool CollectContentResetNodes(Element* element, std::unordered_set<LayoutNode*>* resetNodes) {
+  auto* contentNode = LayoutNode::AsLayoutNode(element);
+  if (contentNode == nullptr || !resetNodes->insert(contentNode).second) {
+    return true;
+  }
+  if (resetNodes->size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+    return false;
+  }
+  if (element->nodeType() == NodeType::Group) {
+    for (auto* child : static_cast<Group*>(element)->elements) {
+      if (!CollectContentResetNodes(child, resetNodes)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 }  // namespace
 
 void PAGXDocument::rebuildParentOfCache() {
@@ -336,19 +358,42 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
   // Child -> parent map over every Layer (document and composition trees alike). Top-level layers
   // have no entry, so the ancestor walk below naturally stops at each tree's root. The map is
   // cached across calls and invalidated only by removeNodes(); attribute edits do not touch
-  // Layer::children, so a single build covers many incremental applies.
+  // Layer::children, so a single build covers many incremental applies. Host-side structural
+  // child-list edits are caught by the consistency check below, which falls back to the full
+  // path.
   if (!parentOfCacheValid) {
     rebuildParentOfCache();
   }
   const auto& parentOf = parentOfCache;
+  // Layer::children is public, so a host can make a structural child-list edit (add / remove /
+  // move) and report the container Layer with layoutChanged. The cached map predates such an
+  // edit: a newly added child has no entry (it would be treated as a root), a moved child still
+  // maps to its old parent (outside the reset set), and the edited container's own cached parent
+  // may no longer hold it. Verify the dirty containers against the cache and fall back to the
+  // full path on any mismatch — short of removeNodes(), the full rebuild is the only correct
+  // handling of structural changes.
+  for (auto* layer : changedLayers) {
+    for (auto* child : layer->children) {
+      auto it = parentOf.find(child);
+      if (it == parentOf.end() || it->second != layer) {
+        return false;
+      }
+    }
+    auto parentIt = parentOf.find(layer);
+    if (parentIt != parentOf.end() &&
+        std::find(parentIt->second->children.begin(), parentIt->second->children.end(), layer) ==
+            parentIt->second->children.end()) {
+      return false;
+    }
+  }
   // Reset set: each edited Layer plus its ancestor chain up to the root, plus the edited Layers'
   // content elements. Resetting the whole chain is required — if any ancestor kept its memo it
   // would be skipped on the top-down pass and its edited descendant would never be revisited.
-  // Content elements must be reset as well because a content-node edit is reported with the host
-  // Layer dirty; their stale preferred sizes would otherwise leak through MeasureChildNodes and
-  // the layer would keep its pre-edit geometry. Child Layers and sibling subtrees are
-  // intentionally left memoized; target-size changes cascade to them through the per-node
-  // constraint memo.
+  // Content elements must be reset as well (recursing through nested Group::elements) because a
+  // content-node edit is reported with the host Layer dirty; their stale preferred sizes would
+  // otherwise leak through MeasureChildNodes and the layer would keep its pre-edit geometry.
+  // Child Layers and sibling subtrees are intentionally left memoized; target-size changes
+  // cascade to them through the per-node constraint memo.
   std::unordered_set<LayoutNode*> resetNodes = {};
   for (auto* layer : changedLayers) {
     Layer* cursor = layer;
@@ -362,9 +407,7 @@ bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
       cursor = it != parentOf.end() ? it->second : nullptr;
     }
     for (auto* element : layer->contents) {
-      auto* contentNode = LayoutNode::AsLayoutNode(element);
-      if (contentNode != nullptr && resetNodes.insert(contentNode).second &&
-          resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
+      if (!CollectContentResetNodes(element, &resetNodes)) {
         LOGI("applyLayoutIncremental: falling back to full layout (reset=%zu > max=%zu).",
              resetNodes.size(), MAX_INCREMENTAL_LAYOUT_LAYERS);
         return false;

@@ -413,8 +413,10 @@ class PAGXDocument : public Node {
   // Lazily built child -> parent map over every Layer in the document (and its inner composition
   // trees). Used by applyLayoutIncremental to walk each edited Layer's ancestor chain without
   // rebuilding the map on every incremental call. Layer::children is only mutated during import /
-  // optimizer passes and by removeNodes(), so the cache is invalidated only by removeNodes(); pure
-  // attribute edits do not touch parent relationships.
+  // optimizer passes, by removeNodes(), and by host-side structural child-list edits reported
+  // through notifyChange; the cache is invalidated by removeNodes(), and the structural-edit case
+  // is caught by a per-call consistency check in applyLayoutIncremental that falls back to the
+  // full layout, so pure attribute edits do not touch parent relationships.
   std::unordered_map<const Layer*, Layer*> parentOfCache = {};
   bool parentOfCacheValid = false;
 

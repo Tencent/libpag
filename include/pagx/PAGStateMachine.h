@@ -115,7 +115,8 @@ class PAGStateMachine : public PAGTimeline,
    * pending transitions, and consumed triggers are discarded), and every input value returns to
    * its declared default. Call apply() afterwards to reflect the reset state on the content. A
    * state machine whose once-regions have finished cannot be resumed by advancing; reset() is the
-   * way to play it again. No-op once the owning PAGScene has been destroyed.
+   * way to play it again. State-change listeners are notified for every region whose current
+   * state actually changes. No-op once the owning PAGScene has been destroyed.
    */
   void reset();
 
@@ -196,6 +197,7 @@ class PAGStateMachine : public PAGTimeline,
   bool advanceMix(RegionInstance& ri, int64_t deltaUs);
   bool tryChangeState(RegionInstance& ri);
   void changeState(RegionInstance& ri, const StateTransition* t);
+  void notifyStateChange(const RegionInstance& ri);
   std::shared_ptr<PAGAnimation> createTimelineForState(const State* state);
 
   // Marks every inner PAGAnimation (each region's current timeline and any crossfading-out ones)
