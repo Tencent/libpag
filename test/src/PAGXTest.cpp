@@ -14653,15 +14653,17 @@ PAGX_TEST(PAGXTest, SMResetRestoresStateInputsAndNotifies) {
         notified.emplace_back(regionName, stateName);
       });
 
-  // Transition away from the initial state and play the once animation to its end.
+  // Transition away from the initial state. The zero-duration transition lands mid-advance, and
+  // the newly created timeline sits at frame 0 for that frame's apply, so the first apply writes
+  // the animation's first-frame value.
   ASSERT_TRUE(timeline->setBool("go", true));
   ASSERT_TRUE(timeline->setNumber("level", 42.0f));
   timeline->advanceAndApply(2'000'000);
   EXPECT_EQ(timeline->getCurrentState("main"), "active");
-  auto* tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
   ASSERT_TRUE(tgfxLayer != nullptr);
-  EXPECT_NEAR(tgfxLayer->alpha(), 1.0f, 1.0e-3f);
-  // Advancing past the end of a once animation holds the last frame.
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.0f, 1.0e-3f);
+  // The once animation runs 60 frames at 60fps (1s); advancing past its end holds the last frame.
   timeline->advanceAndApply(1'000'000);
   EXPECT_NEAR(tgfxLayer->alpha(), 1.0f, 1.0e-3f);
 
@@ -14682,10 +14684,14 @@ PAGX_TEST(PAGXTest, SMResetRestoresStateInputsAndNotifies) {
   // The reset did not corrupt the input table: setters keep working.
   ASSERT_TRUE(timeline->setNumber("level", 8.0f));
 
-  // The once animation is replayable: transition again and the alpha restarts from 0.
+  // The once animation is replayable: transition again. The transition frame itself shows the
+  // restarted animation's first frame (alpha = 0), and the next 500ms advance reaches 30 frames,
+  // i.e. the halfway point of the 0 -> 1 alpha ramp.
   ASSERT_TRUE(timeline->setBool("go", true));
   timeline->advanceAndApply(500'000);
   EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.0f, 1.0e-3f);
+  timeline->advanceAndApply(500'000);
   EXPECT_NEAR(tgfxLayer->alpha(), 0.5f, 1.0e-3f);
 }
 
