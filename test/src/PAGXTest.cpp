@@ -7678,6 +7678,251 @@ PAGX_TEST(PAGXTest, Int64AttributeRejectsMalformedAndOutOfRange) {
   EXPECT_TRUE(hasRangeError);
 }
 
+/**
+ * Test case: a sibling <TextLayout/> (legacy exporter descriptor) is converted into a TextBox
+ * wrapping the preceding <Text>, instead of being rejected as an unknown element.
+ */
+PAGX_TEST(PAGXTest, LegacyTextLayoutSiblingConvertsToTextBox) {
+  std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Layer>
+    <Text text="Hello"><GlyphRun fontSize="15" glyphs="1" positions="0,0"/></Text>
+    <TextLayout width="267" textAlign="center" lineHeight="1.2"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_EQ(doc->layers[0]->contents.size(), 1u);
+  auto* textBox = static_cast<pagx::TextBox*>(doc->layers[0]->contents[0]);
+  EXPECT_EQ(textBox->nodeType(), pagx::NodeType::TextBox);
+  ASSERT_EQ(textBox->elements.size(), 1u);
+  EXPECT_EQ(textBox->elements[0]->nodeType(), pagx::NodeType::Text);
+  EXPECT_FLOAT_EQ(textBox->width, 267.0f);
+  EXPECT_EQ(textBox->textAlign, pagx::TextAlign::Center);
+  EXPECT_FLOAT_EQ(textBox->lineHeight, 1.2f);
+}
+
+/**
+ * Test case: a <TextLayout/> without a preceding <Text> sibling is reported as an error and
+ * produces no content element.
+ */
+PAGX_TEST(PAGXTest, LegacyTextLayoutWithoutTextReportsError) {
+  std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Layer>
+    <TextLayout width="267"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_FALSE(doc->errors.empty());
+  bool hasTextLayoutError = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("TextLayout") != std::string::npos) {
+      hasTextLayoutError = true;
+    }
+  }
+  EXPECT_TRUE(hasTextLayoutError);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_TRUE(doc->layers[0]->contents.empty());
+}
+
+/**
+ * Test case: an internal Composition reference whose host Layer carries a <Timelines> driver
+ * builds and advances without crashing, and the nested layer is animated by its own binding.
+ */
+PAGX_TEST(PAGXTest, NestedCompositionTimelinesDriveAnimations) {
+  // Same XML as the driving case below but parsed-and-destroyed immediately, to cover the
+  // doc-teardown path that differs between native and wexception wasm builds.
+  {
+    auto xml = R"(<pagx width="640" height="500">
+  <Resources>
+    <Composition id="orbit" width="640" height="400">
+      <Layer id="ball" x="80" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Layer id="loopB" x="240" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill id="fillLoopB" color="#3B82F6"/>
+      </Layer>
+      <Layer id="ppB" x="40" y="340" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="8"/>
+        <Fill id="fillPpB" color="#10B981"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="boxA" x="40" y="25" width="60" height="60">
+    <Rectangle width="60" height="60" roundness="10"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <Layer x="0" y="90" composition="@orbit">
+    <Timelines>
+      <Animation ref="@bobAnim" playing="true"/>
+      <Animation ref="@gradAnim" playing="true"/>
+      <Animation ref="@ppAnim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="slideAnim" duration="180" frameRate="60" loop="once">
+      <Object target="boxA">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="180" value="352"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="bobAnim" duration="120" frameRate="60" loop="loop">
+      <Object target="ball">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+          <Key time="120" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="gradAnim" duration="300" frameRate="60" loop="loop">
+      <Object target="loopB">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="150" value="100" interpolation="linear"/>
+          <Key time="300" value="20"/>
+        </Channel>
+      </Object>
+      <Object target="fillLoopB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#3B82F6" interpolation="linear"/>
+          <Key time="150" value="#EC4899" interpolation="linear"/>
+          <Key time="300" value="#3B82F6"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="ppAnim" duration="360" frameRate="60" loop="pingPong">
+      <Object target="ppB">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="360" value="560"/>
+        </Channel>
+      </Object>
+      <Object target="fillPpB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#10B981" interpolation="linear"/>
+          <Key time="360" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(doc != nullptr);
+    EXPECT_TRUE(doc->errors.empty());
+  }  // doc destroyed here while still holding nested-composition timelines.
+
+  auto xml = R"(<pagx width="640" height="500">
+  <Resources>
+    <Composition id="orbit" width="640" height="400">
+      <Layer id="ball" x="80" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Layer id="loopB" x="240" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill id="fillLoopB" color="#3B82F6"/>
+      </Layer>
+      <Layer id="ppB" x="40" y="340" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="8"/>
+        <Fill id="fillPpB" color="#10B981"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="boxA" x="40" y="25" width="60" height="60">
+    <Rectangle width="60" height="60" roundness="10"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <Layer x="0" y="90" composition="@orbit">
+    <Timelines>
+      <Animation ref="@bobAnim" playing="true"/>
+      <Animation ref="@gradAnim" playing="true"/>
+      <Animation ref="@ppAnim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="slideAnim" duration="180" frameRate="60" loop="once">
+      <Object target="boxA">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="180" value="352"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="bobAnim" duration="120" frameRate="60" loop="loop">
+      <Object target="ball">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+          <Key time="120" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="gradAnim" duration="300" frameRate="60" loop="loop">
+      <Object target="loopB">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="150" value="100" interpolation="linear"/>
+          <Key time="300" value="20"/>
+        </Channel>
+      </Object>
+      <Object target="fillLoopB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#3B82F6" interpolation="linear"/>
+          <Key time="150" value="#EC4899" interpolation="linear"/>
+          <Key time="300" value="#3B82F6"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="ppAnim" duration="360" frameRate="60" loop="pingPong">
+      <Object target="ppB">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="360" value="560"/>
+        </Channel>
+      </Object>
+      <Object target="fillPpB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#10B981" interpolation="linear"/>
+          <Key time="360" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  doc->applyLayout();  // Mirror the viewer's load order: layout before scene construction.
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  // Mirror PAGXView::buildLayers: the default timeline comes from the scene and is driven by the
+  // view itself, while the scene tree advances the nested composition timelines.
+  auto defaultTimeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(defaultTimeline != nullptr);
+  ASSERT_EQ(defaultTimeline->type(), pagx::TimelineType::Animation);
+  defaultTimeline->advanceAndApply(0);
+  scene->advanceAndApply(0);
+  defaultTimeline->advanceAndApply(500000);
+  scene->advanceAndApply(500000);  // 0.5s: ball should sit mid-bob at y=56.
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_EQ(rootChildren.size(), 2u);
+  ASSERT_EQ(rootChildren[1]->layerType(), pagx::LayerType::Composition);
+  ASSERT_EQ(rootChildren[1]->children.size(), 3u);
+  auto* ballRuntime = rootChildren[1]->children[0]->runtimeLayer.get();
+  ASSERT_TRUE(ballRuntime != nullptr);
+  EXPECT_FLOAT_EQ(ballRuntime->matrix().getTranslateY(), 60.0f);
+  auto surface = pagx::PAGSurface::MakeOffscreen(480, 160);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+}
+
 PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   ASSERT_TRUE(doc != nullptr);
@@ -14010,6 +14255,198 @@ PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
   vmBool->value(true);
   smTimeline->advance(0);
   EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
+}
+
+/**
+ * Test case: reset() returns every region to its initialState, restores input values to their
+ * declared defaults, makes a finished once-region playable again, and notifies state-change
+ * listeners for regions whose state actually changed (reset() does not go through changeState(),
+ * so the notification must be dispatched explicitly).
+ */
+PAGX_TEST(PAGXTest, SMResetRestoresStateInputsAndNotifies) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("mainLayer");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "mainLayer";
+  anim->objects.push_back(object);
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaProp->name = "alpha";
+  alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(alphaProp);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  input->defaultBool = false;
+  sm->inputs.push_back(input);
+  auto level = doc->makeNode<pagx::StateMachineInput>();
+  level->name = "level";
+  level->type = pagx::StateMachineInputType::Number;
+  level->defaultNumber = 7.0f;
+  sm->inputs.push_back(level);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto stateIdle = doc->makeNode<pagx::AnimationState>();
+  stateIdle->name = "idle";
+  region->states.push_back(stateIdle);
+  auto stateActive = doc->makeNode<pagx::AnimationState>();
+  stateActive->name = "active";
+  stateActive->animationId = "anim";
+  region->states.push_back(stateActive);
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "idle";
+  transition->to = "active";
+  transition->duration = 0;
+  auto condition = doc->makeNode<pagx::TransitionCondition>();
+  condition->inputName = "go";
+  condition->op = pagx::TransitionConditionOp::Equal;
+  condition->valueBool = true;
+  transition->conditions.push_back(condition);
+  region->transitions.push_back(transition);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  std::vector<std::pair<std::string, std::string>> notified;
+  auto listenerHandle = timeline->addStateChangeListener(
+      [&](const std::string& regionName, const std::string& stateName) {
+        notified.emplace_back(regionName, stateName);
+      });
+
+  // Transition away from the initial state and play the once animation to its end.
+  ASSERT_TRUE(timeline->setBool("go", true));
+  ASSERT_TRUE(timeline->setNumber("level", 42.0f));
+  timeline->advanceAndApply(2'000'000);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  auto* tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  EXPECT_NEAR(tgfxLayer->alpha(), 1.0f, 1.0e-3f);
+  // Advancing past the end of a once animation holds the last frame.
+  timeline->advanceAndApply(1'000'000);
+  EXPECT_NEAR(tgfxLayer->alpha(), 1.0f, 1.0e-3f);
+
+  notified.clear();
+  timeline->reset();
+  timeline->apply();
+
+  // The region is back at initialState and the listener was told about the change.
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  ASSERT_EQ(notified.size(), 1u);
+  EXPECT_EQ(notified[0].first, "main");
+  EXPECT_EQ(notified[0].second, "idle");
+
+  // Inputs are back at their defaults: with go == false the idle -> active transition no longer
+  // fires on advance.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // The reset did not corrupt the input table: setters keep working.
+  ASSERT_TRUE(timeline->setNumber("level", 8.0f));
+
+  // The once animation is replayable: transition again and the alpha restarts from 0.
+  ASSERT_TRUE(timeline->setBool("go", true));
+  timeline->advanceAndApply(500'000);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.5f, 1.0e-3f);
+}
+
+/**
+ * Test case: hitTest() inside a <Layer composition="@X"> instance resolves to the referencing
+ * host layer rather than the internal definition layer, and reports the instance's on-screen
+ * bounds. A click in the empty area returns index -1.
+ */
+PAGX_TEST(PAGXTest, HitTestResolvesCompositionReference) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
+  <Resources>
+    <Composition id="inner" width="40" height="40">
+      <Layer id="innerLayer" x="0" y="0" width="40" height="40">
+        <Rectangle width="40" height="40"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="host" x="50" y="50" width="40" height="40" composition="@inner"/>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  auto* host = doc->findNode<pagx::Layer>("host");
+  auto* innerLayer = doc->findNode<pagx::Layer>("innerLayer");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(innerLayer, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+
+  // A click inside the composition instance resolves to the referencing host layer, not the
+  // internal definition layer.
+  auto hit = scene->hitTest(70, 70);
+  EXPECT_EQ(hit.index, host->index);
+  EXPECT_NE(hit.index, innerLayer->index);
+  EXPECT_FALSE(hit.bounds.isEmpty());
+
+  // A click in the empty area hits nothing.
+  EXPECT_EQ(scene->hitTest(10, 10).index, -1);
+}
+
+/**
+ * Test case: an incremental layout triggered by notifyChange({owningLayer}, layoutChanged=true)
+ * after editing an element nested inside a Group produces the same geometry as a full re-layout.
+ * The nested element is deeper than layer->contents' top level, so the reset collection must
+ * recurse through Group::elements to reach it.
+ */
+PAGX_TEST(PAGXTest, IncrementalLayoutMatchesFullLayoutForNestedGroupContents) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
+  <Layer id="host" x="10" y="10" width="180" height="180">
+    <Group>
+      <Rectangle id="r1" width="40" height="40"/>
+      <Fill color="#3B82F6"/>
+      <Group>
+        <Rectangle id="r2" width="30" height="30"/>
+        <Fill color="#10B981"/>
+      </Group>
+    </Group>
+  </Layer>
+</pagx>)";
+  auto incrementalDoc = pagx::PAGXImporter::FromXML(xml);
+  auto fullDoc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(incrementalDoc, nullptr);
+  ASSERT_NE(fullDoc, nullptr);
+  incrementalDoc->applyLayout();
+  fullDoc->applyLayout();
+
+  auto* incrementalHost = incrementalDoc->findNode<pagx::Layer>("host");
+  auto* fullHost = fullDoc->findNode<pagx::Layer>("host");
+  auto* incrementalR2 = incrementalDoc->findNode<pagx::Rectangle>("r2");
+  auto* fullR2 = fullDoc->findNode<pagx::Rectangle>("r2");
+  ASSERT_NE(incrementalHost, nullptr);
+  ASSERT_NE(fullHost, nullptr);
+  ASSERT_NE(incrementalR2, nullptr);
+  ASSERT_NE(fullR2, nullptr);
+
+  // Edit an element nested inside the inner Group and report the owning Layer: notifyChange's
+  // documented "prefer passing the owning Layer" route, which takes the incremental path.
+  incrementalR2->height = 90;
+  fullR2->height = 90;
+  incrementalDoc->notifyChange({incrementalHost}, /*layoutChanged=*/true);
+  fullDoc->applyLayout();
+
+  EXPECT_EQ(incrementalHost->layoutBounds(), fullHost->layoutBounds());
 }
 
 // Verifies the demo pagx's animation and viewmodel both reshape text through the runtime holder:
