@@ -392,6 +392,26 @@ CLI_TEST(PAGXCliTest, Render_Background) {
                                "PAGXCliTest/RenderBackground"));
 }
 
+CLI_TEST(PAGXCliTest, Render_BackdropStyles) {
+  auto inputPath = TestResourcePath("render_layer_backdrop.pagx");
+  std::vector<std::string> args = {"render", inputPath};
+  std::vector<char*> argv;
+  for (auto& arg : args) {
+    argv.push_back(arg.data());
+  }
+  auto bitmap = pagx::cli::RenderToBitmap(static_cast<int>(argv.size()), argv.data());
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_EQ(bitmap.width(), 320);
+  EXPECT_EQ(bitmap.height(), 180);
+
+  auto blurredRed = bitmap.getColor(90, 55);
+  auto glassBlue = bitmap.getColor(230, 55);
+  EXPECT_GT(blurredRed.red, blurredRed.blue);
+  EXPECT_GT(glassBlue.blue, glassBlue.red);
+  EXPECT_GT(blurredRed.alpha, 0.99f);
+  EXPECT_GT(glassBlue.alpha, 0.99f);
+}
+
 CLI_TEST(PAGXCliTest, Render_WebpFormat) {
   auto inputPath = TestResourcePath("render_basic.pagx");
   auto outputPath = TempDir() + "/RenderWebpFormat.webp";
@@ -818,6 +838,19 @@ CLI_TEST(PAGXCliTest, Verify_C10_ComplexPath) {
 
 CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCost) {
   auto inputPath = TestResourcePath("verify_c11_low_opacity.pagx");
+  std::streambuf* old = std::cerr.rdbuf();
+  std::ostringstream oss;
+  std::cerr.rdbuf(oss.rdbuf());
+  auto ret = CallRun(pagx::cli::RunVerify, {"verify", "--skip-render", "--skip-layout", inputPath});
+  std::cerr.rdbuf(old);
+  auto output = oss.str();
+  EXPECT_NE(ret, 0);
+  EXPECT_TRUE(output.find("opacity") != std::string::npos);
+  EXPECT_TRUE(output.find("high-cost children") != std::string::npos);
+}
+
+CLI_TEST(PAGXCliTest, Verify_C11_LowOpacityHighCostGlassStyle) {
+  auto inputPath = TestResourcePath("verify_c11_low_opacity_glass.pagx");
   std::streambuf* old = std::cerr.rdbuf();
   std::ostringstream oss;
   std::cerr.rdbuf(oss.rdbuf());

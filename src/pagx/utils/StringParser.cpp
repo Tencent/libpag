@@ -91,6 +91,8 @@ const char* NodeTypeName(NodeType type) {
       return "BackgroundBlurStyle";
     case NodeType::NoiseStyle:
       return "NoiseStyle";
+    case NodeType::GlassStyle:
+      return "GlassStyle";
     case NodeType::BlurFilter:
       return "BlurFilter";
     case NodeType::DropShadowFilter:

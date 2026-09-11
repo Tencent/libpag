@@ -36,6 +36,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -100,6 +101,7 @@
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/Ellipse.h"
@@ -144,10 +146,14 @@ void RuntimeBinding::remove(const Node* node) {
 //
 // PAG_DISABLE_BACKGROUND_BLUR_STYLE: skips BackgroundBlurStyle (offscreen background snapshot
 //   plus blur pass; usually the heaviest single category in dense designs).
+// PAG_DISABLE_GLASS_STYLE:           skips GlassStyle (offscreen background snapshot with
+//   refraction / dispersion / frost / edge-light passes; cost is comparable to or higher than
+//   BackgroundBlurStyle since it runs the full glass shader on the sampled background).
 // PAG_DISABLE_SHADOW_STYLES:         skips DropShadowStyle and InnerShadowStyle.
 // PAG_DISABLE_LAYER_FILTERS:         skips all LayerFilters (BlurFilter, DropShadow/InnerShadow
 //   filters, BlendFilter, ColorMatrixFilter). BlurFilter with very large sigma dominates here.
 #define PAG_DISABLE_BACKGROUND_BLUR_STYLE 0
+#define PAG_DISABLE_GLASS_STYLE 0
 #define PAG_DISABLE_SHADOW_STYLES 0
 #define PAG_DISABLE_LAYER_FILTERS 0
 
@@ -2471,6 +2477,22 @@ class LayerBuilderContext {
         return tgfxStyle;
 #endif
       }
+      case NodeType::GlassStyle: {
+#if PAG_DISABLE_GLASS_STYLE
+        return nullptr;
+#else
+        auto style = static_cast<const pagx::GlassStyle*>(node);
+        auto tgfxStyle =
+            tgfx::GlassStyle::Make(style->refraction, style->depth, style->frost, style->dispersion,
+                                   style->splay, style->lightAngle, style->lightIntensity);
+        if (node->blendMode != BlendMode::Normal) {
+          tgfxStyle->setBlendMode(ToTGFX(node->blendMode));
+        }
+        _result.binding.set(style, tgfxStyle);
+        bindGlassStyleChannels(style);
+        return tgfxStyle;
+#endif
+      }
       case NodeType::NoiseStyle: {
         auto style = static_cast<const pagx::NoiseStyle*>(node);
         if (style->size <= 0.0f) {
@@ -2666,6 +2688,37 @@ class LayerBuilderContext {
     _result.binding.setAccessor(
         node, "blurY", WriteBackgroundBlurStyleBlurY,
         ReadScalar<tgfx::BackgroundBlurStyle, &tgfx::BackgroundBlurStyle::blurrinessY>);
+  }
+
+  void bindGlassStyleChannels(const pagx::GlassStyle* node) {
+    _result.binding.setAccessor(node, "refraction",
+                                WriteMixedFloat<tgfx::GlassStyle, &tgfx::GlassStyle::refraction,
+                                                &tgfx::GlassStyle::setRefraction>,
+                                ReadScalar<tgfx::GlassStyle, &tgfx::GlassStyle::refraction>);
+    _result.binding.setAccessor(
+        node, "depth",
+        WriteMixedFloat<tgfx::GlassStyle, &tgfx::GlassStyle::depth, &tgfx::GlassStyle::setDepth>,
+        ReadScalar<tgfx::GlassStyle, &tgfx::GlassStyle::depth>);
+    _result.binding.setAccessor(
+        node, "frost",
+        WriteMixedFloat<tgfx::GlassStyle, &tgfx::GlassStyle::frost, &tgfx::GlassStyle::setFrost>,
+        ReadScalar<tgfx::GlassStyle, &tgfx::GlassStyle::frost>);
+    _result.binding.setAccessor(node, "dispersion",
+                                WriteMixedFloat<tgfx::GlassStyle, &tgfx::GlassStyle::dispersion,
+                                                &tgfx::GlassStyle::setDispersion>,
+                                ReadScalar<tgfx::GlassStyle, &tgfx::GlassStyle::dispersion>);
+    _result.binding.setAccessor(
+        node, "splay",
+        WriteMixedFloat<tgfx::GlassStyle, &tgfx::GlassStyle::splay, &tgfx::GlassStyle::setSplay>,
+        ReadScalar<tgfx::GlassStyle, &tgfx::GlassStyle::splay>);
+    _result.binding.setAccessor(node, "lightAngle",
+                                WriteMixedFloat<tgfx::GlassStyle, &tgfx::GlassStyle::lightAngle,
+                                                &tgfx::GlassStyle::setLightAngle>,
+                                ReadScalar<tgfx::GlassStyle, &tgfx::GlassStyle::lightAngle>);
+    _result.binding.setAccessor(node, "lightIntensity",
+                                WriteMixedFloat<tgfx::GlassStyle, &tgfx::GlassStyle::lightIntensity,
+                                                &tgfx::GlassStyle::setLightIntensity>,
+                                ReadScalar<tgfx::GlassStyle, &tgfx::GlassStyle::lightIntensity>);
   }
 
   static void WriteNoiseStyleSize(void* object, const KeyValue& value, float mix) {

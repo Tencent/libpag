@@ -60,6 +60,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -131,6 +132,7 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/NoiseFilter.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/GlassStyle.h"
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/Gradient.h"
@@ -479,6 +481,273 @@ PAGX_TEST(PAGXTest, PAGXDocumentRoundTrip) {
   EXPECT_FLOAT_EQ(doc2->width, 200.0f);
   EXPECT_FLOAT_EQ(doc2->height, 150.0f);
   EXPECT_GE(doc2->layers.size(), 1u);
+}
+
+// NoiseStyle and NoiseFilter declare the same noise parameters, so one template covers both. The
+// fields belonging to the inactive modes are compared too, because the exporter must keep them.
+template <typename T>
+static void ExpectNoiseFieldsEqual(const T* expected, const T* actual, const std::string& label) {
+  ASSERT_TRUE(actual != nullptr) << label;
+  EXPECT_EQ(actual->mode, expected->mode) << label;
+  EXPECT_FLOAT_EQ(actual->size, expected->size) << label;
+  EXPECT_FLOAT_EQ(actual->density, expected->density) << label;
+  EXPECT_FLOAT_EQ(actual->seed, expected->seed) << label;
+  EXPECT_EQ(actual->blendMode, expected->blendMode) << label;
+  EXPECT_TRUE(actual->color == expected->color) << label;
+  EXPECT_TRUE(actual->firstColor == expected->firstColor) << label;
+  EXPECT_TRUE(actual->secondColor == expected->secondColor) << label;
+  EXPECT_FLOAT_EQ(actual->opacity, expected->opacity) << label;
+}
+
+// Checks that the channel table for a noise node type lists exactly the expected animatable fields,
+// which is the set LayerBuilder binds at runtime.
+static void ExpectAnimatableChannels(pagx::NodeType type, std::vector<std::string> expected,
+                                     const std::string& label) {
+  std::vector<std::string> animatable = {};
+  for (const auto& channel : pagx::ChannelsFor(type)) {
+    if (pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
+      animatable.push_back(channel.channel);
+    }
+  }
+  std::sort(animatable.begin(), animatable.end());
+  std::sort(expected.begin(), expected.end());
+  EXPECT_EQ(animatable, expected) << label;
+}
+
+/**
+ * Test case: NoiseStyle and NoiseFilter survive an export -> import round-trip without losing any
+ * field, for every noise mode and for both the all-defaults and the all-custom case. Also checks
+ * that the exported XML passes schema validation through `pagx verify`.
+ */
+PAGX_TEST(PAGXTest, NoiseRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(200, 150);
+  ASSERT_TRUE(doc != nullptr);
+
+  auto addContents = [&](pagx::Layer* layer) {
+    auto rect = doc->makeNode<pagx::Rectangle>();
+    rect->size = {80, 60};
+    auto fill = doc->makeNode<pagx::Fill>();
+    auto solidColor = doc->makeNode<pagx::SolidColor>();
+    solidColor->color = {0, 1, 0, 1};
+    fill->color = solidColor;
+    layer->contents.push_back(rect);
+    layer->contents.push_back(fill);
+  };
+
+  const pagx::NoiseMode modes[] = {pagx::NoiseMode::Mono, pagx::NoiseMode::Duo,
+                                   pagx::NoiseMode::Multi};
+  for (auto mode : modes) {
+    auto layer = doc->makeNode<pagx::Layer>();
+    addContents(layer);
+
+    // Every field is set to a non-default value, including the colors and opacity that the current
+    // mode ignores: dropping them on export would lose data as soon as the mode changes.
+    auto style = doc->makeNode<pagx::NoiseStyle>();
+    style->mode = mode;
+    style->size = 7;
+    style->density = 0.25f;
+    style->seed = 3;
+    style->blendMode = pagx::BlendMode::Multiply;
+    style->excludeChildEffects = true;
+    style->color = {1, 0, 0, 1};
+    style->firstColor = {0, 0, 1, 1};
+    style->secondColor = {0, 1, 0, 1};
+    style->opacity = 0.75f;
+    layer->styles.push_back(style);
+
+    auto filter = doc->makeNode<pagx::NoiseFilter>();
+    filter->mode = mode;
+    filter->size = 9;
+    filter->density = 0.75f;
+    filter->seed = 5;
+    filter->blendMode = pagx::BlendMode::Screen;
+    filter->color = {0, 1, 1, 1};
+    filter->firstColor = {1, 1, 0, 1};
+    filter->secondColor = {1, 0, 1, 1};
+    filter->opacity = 0.25f;
+    layer->filters.push_back(filter);
+
+    doc->layers.push_back(layer);
+  }
+
+  // Nodes that keep every default: the exporter omits all attributes and the importer must restore
+  // the same defaults.
+  auto defaultLayer = doc->makeNode<pagx::Layer>();
+  addContents(defaultLayer);
+  defaultLayer->styles.push_back(doc->makeNode<pagx::NoiseStyle>());
+  defaultLayer->filters.push_back(doc->makeNode<pagx::NoiseFilter>());
+  doc->layers.push_back(defaultLayer);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  ASSERT_FALSE(xml.empty());
+  EXPECT_NE(xml.find("<NoiseStyle"), std::string::npos);
+  EXPECT_NE(xml.find("<NoiseFilter"), std::string::npos);
+
+  // The default nodes must serialize as bare tags: the exporter omits every attribute that still
+  // holds its default, so an exporter regression that writes all defaults is caught right here
+  // instead of going unnoticed.
+  //
+  // This uses a separate document that holds only the default nodes, so each tag appears exactly
+  // once and can be located directly instead of depending on element order. Ids are not an option
+  // for locating them: an id turns the node into a resource, and `pagx verify` reports an
+  // unreferenced one, while these styles are inlined rather than referenced.
+  auto defaultDoc = pagx::PAGXDocument::Make(200, 150);
+  ASSERT_TRUE(defaultDoc != nullptr);
+  auto defaultOnlyLayer = defaultDoc->makeNode<pagx::Layer>();
+  auto defaultRect = defaultDoc->makeNode<pagx::Rectangle>();
+  defaultRect->size = {80, 60};
+  auto defaultFill = defaultDoc->makeNode<pagx::Fill>();
+  auto defaultSolidColor = defaultDoc->makeNode<pagx::SolidColor>();
+  defaultSolidColor->color = {0, 1, 0, 1};
+  defaultFill->color = defaultSolidColor;
+  defaultOnlyLayer->contents.push_back(defaultRect);
+  defaultOnlyLayer->contents.push_back(defaultFill);
+  defaultOnlyLayer->styles.push_back(defaultDoc->makeNode<pagx::NoiseStyle>());
+  defaultOnlyLayer->filters.push_back(defaultDoc->makeNode<pagx::NoiseFilter>());
+  defaultDoc->layers.push_back(defaultOnlyLayer);
+
+  auto defaultXml = pagx::PAGXExporter::ToXML(*defaultDoc);
+  ASSERT_FALSE(defaultXml.empty());
+  auto expectBareTag = [&](const std::string& tag) {
+    auto open = defaultXml.find("<" + tag);
+    ASSERT_NE(open, std::string::npos) << tag;
+    auto close = defaultXml.find("/>", open);
+    ASSERT_NE(close, std::string::npos) << tag;
+    auto element = defaultXml.substr(open, close - open);
+    for (const auto* attribute : {"mode", "size", "density", "seed", "blendMode", "color",
+                                  "firstColor", "secondColor", "opacity", "excludeChildEffects"}) {
+      EXPECT_EQ(element.find(attribute), std::string::npos)
+          << "the default <" << tag << "> should omit '" << attribute << "' but wrote: " << element;
+    }
+  };
+  expectBareTag("NoiseStyle");
+  expectBareTag("NoiseFilter");
+
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(reloaded != nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+  ASSERT_EQ(reloaded->layers.size(), doc->layers.size());
+
+  for (size_t i = 0; i < doc->layers.size(); i++) {
+    auto label = "layer " + std::to_string(i);
+    auto* sourceLayer = doc->layers[i];
+    auto* targetLayer = reloaded->layers[i];
+    ASSERT_EQ(targetLayer->styles.size(), 1u) << label;
+    ASSERT_EQ(targetLayer->filters.size(), 1u) << label;
+    ASSERT_EQ(targetLayer->styles[0]->nodeType(), pagx::NodeType::NoiseStyle) << label;
+    ASSERT_EQ(targetLayer->filters[0]->nodeType(), pagx::NodeType::NoiseFilter) << label;
+
+    auto* expectedStyle = static_cast<pagx::NoiseStyle*>(sourceLayer->styles[0]);
+    auto* actualStyle = static_cast<pagx::NoiseStyle*>(targetLayer->styles[0]);
+    ExpectNoiseFieldsEqual(expectedStyle, actualStyle, label);
+    EXPECT_EQ(actualStyle->excludeChildEffects, expectedStyle->excludeChildEffects) << label;
+
+    ExpectNoiseFieldsEqual(static_cast<pagx::NoiseFilter*>(sourceLayer->filters[0]),
+                           static_cast<pagx::NoiseFilter*>(targetLayer->filters[0]), label);
+  }
+
+  auto pagxPath = SavePAGXFile(xml, "PAGXTest/noise_roundtrip.pagx");
+  VerifyFile(pagxPath, "noise_roundtrip");
+
+  // The grain parameters carry channels in every mode; the colors and opacity do so per mode, so
+  // the table lists them all and the renderer decides which ones resolve at runtime.
+  ExpectAnimatableChannels(
+      pagx::NodeType::NoiseStyle,
+      {"size", "density", "seed", "color", "firstColor", "secondColor", "opacity"}, "NoiseStyle");
+  ExpectAnimatableChannels(
+      pagx::NodeType::NoiseFilter,
+      {"size", "density", "seed", "color", "firstColor", "secondColor", "opacity"}, "NoiseFilter");
+}
+
+/**
+ * Test case: GlassStyle survives PAGX round-trip and maps all animatable fields to TGFX.
+ */
+PAGX_TEST(PAGXTest, GlassStyleRoundTripAndRuntime) {
+  auto doc = pagx::PAGXDocument::Make(200, 150);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->width = 200;
+  layer->height = 150;
+
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 75};
+  rect->size = {120, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto color = doc->makeNode<pagx::SolidColor>();
+  color->color = {1, 1, 1, 0.5f};
+  fill->color = color;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+
+  auto glass = doc->makeNode<pagx::GlassStyle>("glass");
+  glass->refraction = 12;
+  glass->depth = 24;
+  glass->frost = 6;
+  glass->dispersion = 36;
+  glass->splay = 48;
+  glass->lightAngle = -30;
+  glass->lightIntensity = 72;
+  glass->excludeChildEffects = true;
+  glass->blendMode = pagx::BlendMode::Screen;
+  layer->styles.push_back(glass);
+  doc->layers.push_back(layer);
+
+  auto animation = doc->makeNode<pagx::Animation>("glass-animation");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  doc->animations.push_back(animation);
+  auto object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "glass";
+  animation->objects.push_back(object);
+  auto refraction = doc->makeNode<pagx::TypedChannel<float>>();
+  refraction->name = "refraction";
+  refraction->keyframes.push_back({0, 30.0f, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(refraction);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("<GlassStyle"), std::string::npos);
+  EXPECT_NE(xml.find("refraction=\"12\""), std::string::npos);
+  EXPECT_NE(xml.find("lightIntensity=\"72\""), std::string::npos);
+  EXPECT_EQ(xml.find("backgroundRef"), std::string::npos);
+
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(reloaded != nullptr);
+  ASSERT_TRUE(reloaded->errors.empty());
+  auto reloadedGlass = reloaded->findNode<pagx::GlassStyle>("glass");
+  ASSERT_TRUE(reloadedGlass != nullptr);
+  EXPECT_FLOAT_EQ(reloadedGlass->refraction, 12);
+  EXPECT_FLOAT_EQ(reloadedGlass->depth, 24);
+  EXPECT_FLOAT_EQ(reloadedGlass->frost, 6);
+  EXPECT_FLOAT_EQ(reloadedGlass->dispersion, 36);
+  EXPECT_FLOAT_EQ(reloadedGlass->splay, 48);
+  EXPECT_FLOAT_EQ(reloadedGlass->lightAngle, -30);
+  EXPECT_FLOAT_EQ(reloadedGlass->lightIntensity, 72);
+  EXPECT_TRUE(reloadedGlass->excludeChildEffects);
+  EXPECT_EQ(reloadedGlass->blendMode, pagx::BlendMode::Screen);
+
+  const char* channels[] = {"refraction", "depth",      "frost",         "dispersion",
+                            "splay",      "lightAngle", "lightIntensity"};
+  for (const auto* channel : channels) {
+    EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::GlassStyle, channel));
+  }
+
+  reloaded->applyLayout();
+  auto scene = pagx::PAGScene::Make(reloaded);
+  ASSERT_TRUE(scene != nullptr);
+  auto binding = scene->mutableBinding();
+  ASSERT_TRUE(binding != nullptr);
+  auto runtimeGlass = binding->get<tgfx::GlassStyle>(reloadedGlass);
+  ASSERT_TRUE(runtimeGlass != nullptr);
+  EXPECT_FLOAT_EQ(runtimeGlass->depth(), 24);
+  EXPECT_FLOAT_EQ(runtimeGlass->frost(), 6);
+  EXPECT_FLOAT_EQ(runtimeGlass->dispersion(), 36);
+  EXPECT_FLOAT_EQ(runtimeGlass->splay(), 48);
+  EXPECT_FLOAT_EQ(runtimeGlass->lightAngle(), -30);
+  EXPECT_FLOAT_EQ(runtimeGlass->lightIntensity(), 72);
+
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_TRUE(timeline != nullptr);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(runtimeGlass->refraction(), 30);
 }
 
 /**
@@ -10266,6 +10535,8 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   layer->styles.push_back(innerStyle);
   auto backgroundBlurStyle = doc->makeNode<pagx::BackgroundBlurStyle>();
   layer->styles.push_back(backgroundBlurStyle);
+  auto glassStyle = doc->makeNode<pagx::GlassStyle>();
+  layer->styles.push_back(glassStyle);
   auto blurFilter = doc->makeNode<pagx::BlurFilter>();
   layer->filters.push_back(blurFilter);
   auto dropFilter = doc->makeNode<pagx::DropShadowFilter>();
@@ -10274,6 +10545,27 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   layer->filters.push_back(innerFilter);
   auto blendFilter = doc->makeNode<pagx::BlendFilter>();
   layer->filters.push_back(blendFilter);
+
+  // One noise style and one noise filter per mode: their color/opacity channels are bound per mode,
+  // so every mode has to be built to cover the writers that resolve for it.
+  auto monoStyle = doc->makeNode<pagx::NoiseStyle>();
+  monoStyle->mode = pagx::NoiseMode::Mono;
+  layer->styles.push_back(monoStyle);
+  auto duoStyle = doc->makeNode<pagx::NoiseStyle>();
+  duoStyle->mode = pagx::NoiseMode::Duo;
+  layer->styles.push_back(duoStyle);
+  auto multiStyle = doc->makeNode<pagx::NoiseStyle>();
+  multiStyle->mode = pagx::NoiseMode::Multi;
+  layer->styles.push_back(multiStyle);
+  auto monoFilter = doc->makeNode<pagx::NoiseFilter>();
+  monoFilter->mode = pagx::NoiseMode::Mono;
+  layer->filters.push_back(monoFilter);
+  auto duoFilter = doc->makeNode<pagx::NoiseFilter>();
+  duoFilter->mode = pagx::NoiseMode::Duo;
+  layer->filters.push_back(duoFilter);
+  auto multiFilter = doc->makeNode<pagx::NoiseFilter>();
+  multiFilter->mode = pagx::NoiseMode::Multi;
+  layer->filters.push_back(multiFilter);
 
   // Text needs a registered fallback font to shape; apply layout with one before the scene build
   // so the Text node's runtime target (and TextHolder) are created.
@@ -10289,19 +10581,20 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
   ASSERT_TRUE(binding != nullptr);
 
   // For each built node, every Animatable channel in the registry must have a runtime writer.
-  pagx::Node* nodes[] = {layer,       rect,
-                         ellipse,     polystar,
-                         trim,        roundCorner,
-                         repeater,    fill,
-                         stroke,      solid,
-                         group,       linear,
-                         linearStop,  radial,
-                         conic,       diamond,
-                         modifier,    selector,
-                         text,        dropStyle,
-                         innerStyle,  backgroundBlurStyle,
-                         blurFilter,  dropFilter,
-                         innerFilter, blendFilter};
+  pagx::Node* nodes[] = {layer,      rect,
+                         ellipse,    polystar,
+                         trim,       roundCorner,
+                         repeater,   fill,
+                         stroke,     solid,
+                         group,      linear,
+                         linearStop, radial,
+                         conic,      diamond,
+                         modifier,   selector,
+                         text,       dropStyle,
+                         innerStyle, backgroundBlurStyle,
+                         glassStyle, blurFilter,
+                         dropFilter, innerFilter,
+                         blendFilter};
   for (auto* node : nodes) {
     for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
       if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
@@ -10312,6 +10605,36 @@ PAGX_TEST(PAGXTest, AnimatableChannelsHaveWriters) {
           << "' is Animatable but has no runtime writer";
     }
   }
+
+  // Noise nodes bind the grain channels (size/density/seed) for every mode, but the color and
+  // opacity channels are bound per mode: Mono -> color, Duo -> firstColor/secondColor,
+  // Multi -> opacity. The channel registry is type-level and lists every field that can carry a
+  // channel, so a field belonging to another mode intentionally has no runtime writer. Assert both
+  // halves of that contract so the exemption stays explicit instead of implicit.
+  auto expectNoiseModeChannels = [&](pagx::Node* node, std::vector<std::string> activeChannels) {
+    for (const auto& channel : pagx::ChannelsFor(node->nodeType())) {
+      if (!pagx::HasFlag(channel.flags, pagx::ChannelFlags::Animatable)) {
+        continue;
+      }
+      bool isActiveModeChannel = std::find(activeChannels.begin(), activeChannels.end(),
+                                           channel.channel) != activeChannels.end();
+      if (isActiveModeChannel) {
+        EXPECT_TRUE(binding->hasWriter(node, channel.channel))
+            << "channel '" << channel.channel
+            << "' is Animatable and active for this noise mode but has no runtime writer";
+      } else {
+        EXPECT_FALSE(binding->hasWriter(node, channel.channel))
+            << "channel '" << channel.channel
+            << "' belongs to another noise mode and is expected to stay unbound";
+      }
+    }
+  };
+  expectNoiseModeChannels(monoStyle, {"size", "density", "seed", "color"});
+  expectNoiseModeChannels(duoStyle, {"size", "density", "seed", "firstColor", "secondColor"});
+  expectNoiseModeChannels(multiStyle, {"size", "density", "seed", "opacity"});
+  expectNoiseModeChannels(monoFilter, {"size", "density", "seed", "color"});
+  expectNoiseModeChannels(duoFilter, {"size", "density", "seed", "firstColor", "secondColor"});
+  expectNoiseModeChannels(multiFilter, {"size", "density", "seed", "opacity"});
 }
 
 /**

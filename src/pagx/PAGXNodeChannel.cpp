@@ -36,6 +36,7 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -46,6 +47,8 @@
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
@@ -801,6 +804,40 @@ static std::vector<ChannelDef> BuildBackgroundBlurStyleFields() {
   };
 }
 
+static std::vector<ChannelDef> BuildGlassStyleFields() {
+  return {
+      FIELD_ENUM(GlassStyle, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_BOOL(GlassStyle, "excludeChildEffects", excludeChildEffects, NoFlags),
+      FIELD_FLOAT(GlassStyle, "refraction", refraction, Anim),
+      FIELD_FLOAT(GlassStyle, "depth", depth, Anim),
+      FIELD_FLOAT(GlassStyle, "frost", frost, Anim),
+      FIELD_FLOAT(GlassStyle, "dispersion", dispersion, Anim),
+      FIELD_FLOAT(GlassStyle, "splay", splay, Anim),
+      FIELD_FLOAT(GlassStyle, "lightAngle", lightAngle, Anim),
+      FIELD_FLOAT(GlassStyle, "lightIntensity", lightIntensity, Anim),
+  };
+}
+
+// The animatable set mirrors LayerBuilder::bindNoiseStyleChannels: the grain parameters are always
+// bound, while the colors and opacity are bound per mode. This table is mode-independent because it
+// declares which fields can carry a channel; the renderer decides which ones resolve at runtime, so
+// a field belonging to another mode has no runtime writer. That exemption is asserted explicitly
+// (both halves) by PAGXTest.AnimatableChannelsHaveWriters.
+static std::vector<ChannelDef> BuildNoiseStyleFields() {
+  return {
+      FIELD_ENUM(NoiseStyle, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_BOOL(NoiseStyle, "excludeChildEffects", excludeChildEffects, NoFlags),
+      FIELD_ENUM(NoiseStyle, "mode", mode, NoFlags, NoiseMode),
+      FIELD_FLOAT(NoiseStyle, "size", size, Anim),
+      FIELD_FLOAT(NoiseStyle, "density", density, Anim),
+      FIELD_FLOAT(NoiseStyle, "seed", seed, Anim),
+      FIELD_COLOR(NoiseStyle, "color", color, Anim),
+      FIELD_COLOR(NoiseStyle, "firstColor", firstColor, Anim),
+      FIELD_COLOR(NoiseStyle, "secondColor", secondColor, Anim),
+      FIELD_FLOAT(NoiseStyle, "opacity", opacity, Anim),
+  };
+}
+
 static std::vector<ChannelDef> BuildBlurFilterFields() {
   return {
       FIELD_FLOAT(BlurFilter, "blurX", blurX, Anim),
@@ -835,6 +872,23 @@ static std::vector<ChannelDef> BuildBlendFilterFields() {
   return {
       FIELD_COLOR(BlendFilter, "color", color, Anim),
       FIELD_ENUM(BlendFilter, "blendMode", blendMode, NoFlags, BlendMode),
+  };
+}
+
+// NoiseFilter carries the same noise parameters as NoiseStyle but declares its own blendMode and has
+// no excludeChildEffects, so the two tables cannot be shared. The mode-dependent binding of the
+// color and opacity channels matches NoiseStyle (see BuildNoiseStyleFields).
+static std::vector<ChannelDef> BuildNoiseFilterFields() {
+  return {
+      FIELD_ENUM(NoiseFilter, "mode", mode, NoFlags, NoiseMode),
+      FIELD_FLOAT(NoiseFilter, "size", size, Anim),
+      FIELD_FLOAT(NoiseFilter, "density", density, Anim),
+      FIELD_FLOAT(NoiseFilter, "seed", seed, Anim),
+      FIELD_ENUM(NoiseFilter, "blendMode", blendMode, NoFlags, BlendMode),
+      FIELD_COLOR(NoiseFilter, "color", color, Anim),
+      FIELD_COLOR(NoiseFilter, "firstColor", firstColor, Anim),
+      FIELD_COLOR(NoiseFilter, "secondColor", secondColor, Anim),
+      FIELD_FLOAT(NoiseFilter, "opacity", opacity, Anim),
   };
 }
 
@@ -951,6 +1005,14 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
       static const std::vector<ChannelDef> table = BuildBackgroundBlurStyleFields();
       return table;
     }
+    case NodeType::GlassStyle: {
+      static const std::vector<ChannelDef> table = BuildGlassStyleFields();
+      return table;
+    }
+    case NodeType::NoiseStyle: {
+      static const std::vector<ChannelDef> table = BuildNoiseStyleFields();
+      return table;
+    }
     case NodeType::BlurFilter: {
       static const std::vector<ChannelDef> table = BuildBlurFilterFields();
       return table;
@@ -965,6 +1027,10 @@ const std::vector<ChannelDef>& ChannelsFor(NodeType type) {
     }
     case NodeType::BlendFilter: {
       static const std::vector<ChannelDef> table = BuildBlendFilterFields();
+      return table;
+    }
+    case NodeType::NoiseFilter: {
+      static const std::vector<ChannelDef> table = BuildNoiseFilterFields();
       return table;
     }
     default:
