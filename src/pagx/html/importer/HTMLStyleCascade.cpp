@@ -381,9 +381,14 @@ void HTMLStyleCascade::parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode
     return;
   }
   std::vector<std::string> droppedAtRules;
-  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules);
+  std::vector<CssKeyframesRule> keyframesRules;
+  auto rules = TokenizeStyleSheet(textChild->name, droppedAtRules, keyframesRules);
   for (auto& at : droppedAtRules) {
     _diagnostics.warn("html: at-rule '" + at + "' not supported in <style>; dropped");
+  }
+  // Keep `@keyframes` so the animation builder can map them onto PAGX animations (see §13).
+  for (auto& kf : keyframesRules) {
+    _keyframes[kf.name] = std::move(kf);
   }
   for (auto& rule : rules) {
     if (rule.declarations.empty()) continue;
@@ -629,6 +634,19 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
+  // html-snapshot keeps Chromium's measured width in CSS while flex inference runs, then marks
+  // boxes whose source `width:auto` was genuinely content-sized. Consume that internal marker
+  // only at Layer construction time so inference can still use the measured child geometry.
+  // The marker is deliberately exact and private; arbitrary author data-* attributes retain
+  // their normal customData behaviour.
+  const auto* intrinsicWidth = element->findAttribute("data-pagx-intrinsic-width");
+  if (intrinsicWidth != nullptr) {
+    auto mode = ToLower(Trim(*intrinsicWidth));
+    if (mode == "true" || mode == "center") {
+      box.widthPx = NAN;
+      box.widthPct = NAN;
+    }
+  }
   parseBoxPositioning(box, props);
   parseBoxLayout(box, props);
   parseBoxVisuals(box, props);

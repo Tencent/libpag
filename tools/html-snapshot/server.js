@@ -45,14 +45,14 @@
  *       - Accept: application/json (any
  *         single-format request)           → { html|pagx, width, height }.
  *     The `options` object accepts: viewportWidth, viewportHeight, waitMs,
- *     selector, inlineIconFonts, plus cookies / headers for URL inputs
- *     (all optional).
+ *     selector, inlineIconFonts, captureAnimations, plus cookies / headers for
+ *     URL inputs (all optional).
  *
  *   GET /snapshot?url=<http(s)-url>&format=html|pagx|both&...options
  *     Convenience route for "fetch this page and snapshot it" — no body
  *     required. Same response semantics as POST. Supported query params:
  *       url (required), format, viewportWidth, viewportHeight, waitMs,
- *       selector, inlineIconFonts.
+ *       selector, inlineIconFonts, captureAnimations.
  *
  *   GET /health
  *     200 { status: "ok", engine, pagxBin, pagxBinExists, activeRequests }
@@ -135,7 +135,8 @@ Endpoints:
                            requires Accept: application/json.
   GET  /snapshot?url=…   — fetch the URL and run the same pipeline (no body).
                            Optional query params: format, viewportWidth,
-                           viewportHeight, waitMs, selector, inlineIconFonts.
+                           viewportHeight, waitMs, selector, inlineIconFonts,
+                           captureAnimations.
   GET  /health           — liveness probe.`);
 }
 
@@ -437,6 +438,7 @@ function parseGetSource(req) {
   setNumberParam(params, queryOptions, 'waitMs');
   setStringParam(params, queryOptions, 'selector');
   setBoolParam(params, queryOptions, 'inlineIconFonts');
+  setBoolParam(params, queryOptions, 'captureAnimations');
   const format = normaliseFormat(params.get('format'));
   return { url, options: queryOptions, format };
 }
@@ -457,6 +459,7 @@ function resolveOptions(reqOptions, forUrl) {
   if (Number.isFinite(r.waitMs) && r.waitMs >= 0) out.waitMs = r.waitMs;
   if (typeof r.selector === 'string') out.selector = r.selector;
   if (typeof r.inlineIconFonts === 'boolean') out.inlineIconFonts = r.inlineIconFonts;
+  if (typeof r.captureAnimations === 'boolean') out.captureAnimations = r.captureAnimations;
   if (forUrl) {
     // cookies: [{ name, value }] only — anything else is dropped (validators
     // shared with the CLI live in lib/cli.js).

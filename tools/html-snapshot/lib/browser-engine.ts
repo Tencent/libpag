@@ -118,8 +118,22 @@ export async function launchBrowser(opts?: LaunchOptions): Promise<EngineWrapper
     // `--no-sandbox` is needed inside most CI/Docker environments where
     // Chromium's sandbox can't be set up. `--font-render-hinting=none` keeps
     // glyph metrics stable across machines so the baseline and subset PNGs
-    // diff cleanly. Both engines accept these flags identically.
-    args: (opts && opts.args) || ['--no-sandbox', '--font-render-hinting=none'],
+    // diff cleanly.
+    //
+    // `--allow-file-access-from-files` lifts the file:// CORS lock-down. By
+    // default Chromium treats every file:// document as an opaque origin: any
+    // CSS image value consumed by `mask-image: url(...)` (or other resources
+    // routed through CORS-aware fetches) fails with "blocked by CORS policy"
+    // and the affected layer silently disappears from the rendered page.
+    // Authors hit this for any local HTML that uses PNG masks for glow /
+    // mix-blend overlays. The flag only relaxes the policy for `file://`
+    // navigations — remote (`http(s)://`) loads still go through the normal
+    // cross-origin path. Both engines accept it identically.
+    args: (opts && opts.args) || [
+      '--no-sandbox',
+      '--font-render-hinting=none',
+      '--allow-file-access-from-files',
+    ],
   };
   // Engine-specific executablePath plumbing:
   //   - puppeteer auto-reads PUPPETEER_EXECUTABLE_PATH; we don't have to

@@ -222,21 +222,23 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
       return {0, 0, 0, 1, ColorSpace::SRGB};
     }
   }
-  if (value.compare(0, 3, "rgb") == 0) {
+  if (lowered.compare(0, 3, "rgb") == 0) {
     auto open = value.find('(');
     auto close = value.find(')');
     if (open != std::string::npos && close != std::string::npos) {
       std::string inner = value.substr(open + 1, close - open - 1);
       auto comps = ParseFloatList(inner);
+      if (comps.size() < 3) {
+        _diagnostics.warn("html: malformed rgb() value '" + value +
+                          "'; falling back to opaque black");
+        return {0, 0, 0, 1, ColorSpace::SRGB};
+      }
       Color color = {};
       color.colorSpace = ColorSpace::SRGB;
-      float r = 0, g = 0, b = 0, a = 1.0f;
-      if (comps.size() >= 3) {
-        r = comps[0];
-        g = comps[1];
-        b = comps[2];
-        if (comps.size() >= 4) a = comps[3];
-      }
+      float r = comps[0];
+      float g = comps[1];
+      float b = comps[2];
+      float a = comps.size() >= 4 ? comps[3] : 1.0f;
       color.red = r / 255.0f;
       color.green = g / 255.0f;
       color.blue = b / 255.0f;
@@ -247,7 +249,10 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
   // CSS Color 4 color() function. The exporter round-trips DisplayP3 fills as
   // `color(display-p3 r g b)` / `color(display-p3 r g b / a)` with channels already in [0, 1],
   // so without this branch every wide-gamut swatch falls through to the unrecognised-color
-  // path and renders opaque black.
+  // path and renders opaque black. Chrome's getComputedStyle also normalises colors mixed with
+  // currentColor or color-mix into `color(srgb ...)` even when the source was plain rgba(), so
+  // the srgb form is recovered too (via ParseCSSColorFunction). Any other color space cannot be
+  // mapped to PAGX's sRGB pipeline, so it degrades to opaque black with a targeted diagnostic.
   if (lowered.compare(0, 6, "color(") == 0) {
     auto open = value.find('(');
     auto close = value.rfind(')');
@@ -278,7 +283,14 @@ Color HTMLValueParser::parseColor(const std::string& valueRaw) {
         }
       }
     }
-    _diagnostics.warn("html: unsupported color() value '" + value +
+    Color colorFn = {};
+    if (ParseCSSColorFunction(value, colorFn)) {
+      return colorFn;
+    }
+    // Reach here only when the value is well-formed CSS but uses a color space we cannot map
+    // to PAGX's sRGB pipeline. Emitting a dedicated diagnostic prevents users from chasing
+    // the generic "unrecognised color value" message which would suggest a typo instead.
+    _diagnostics.warn("html: unsupported color() with non-sRGB color space '" + value +
                       "'; falling back to opaque black");
     return {0, 0, 0, 1, ColorSpace::SRGB};
   }
@@ -326,8 +338,8 @@ float HTMLValueParser::parseAbsoluteLengthPx(const std::string& valueRaw) {
     }
     return px;
   }
-  _diagnostics.warn("html: length unit '" + suffix + "' not supported; treated as px");
-  return num;
+  _diagnostics.warn("html: length unit '" + suffix + "' not supported; value ignored");
+  return NAN;
 }
 
 float HTMLValueParser::resolveLineHeightPx(const std::string& valueRaw, float fontSizePx) {
@@ -539,10 +551,10 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, f
   float dirY = std::sin(angle);
   bool boxKnown =
       !(std::isnan(boxWidth) || std::isnan(boxHeight) || boxWidth <= 0.0f || boxHeight <= 0.0f);
-
   // The CSS gradient-line length is the "magic corners" extent L = |W*cosφ| + |H*sinφ| (φ is the
   // PAGX angle, 0deg = +X), centred on the box, so the 0% / 100% stops land exactly on the
-  // covering corners. Only meaningful when the box size is known.
+  // covering corners. Only meaningful when the box size is known. It is also the px extent a px
+  // stop offset is measured against.
   float lineLength = boxKnown ? std::abs(boxWidth * dirX) + std::abs(boxHeight * dirY) : NAN;
 
   // `repeating-linear-gradient` has no native PAGX equivalent (gradients carry no spread mode), so
@@ -554,7 +566,7 @@ LinearGradient* HTMLValueParser::parseLinearGradient(const std::string& value, f
     tiled = buildRepeatingLinearStops(parts, stopStart, lineLength, stops);
   }
   if (!tiled) {
-    stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false);
+    stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, lineLength);
     if (!finaliseGradientStops(stops)) return nullptr;
     if (repeating) {
       _diagnostics.warn(
@@ -893,15 +905,42 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value, f
   std::vector<std::string> parts;
   if (!ExtractGradientParts(value, parts)) return nullptr;
   size_t stopStart = 0;
-  // Allow leading shape descriptor like "circle at center", "ellipse 50% 50%", etc.
+  // CSS Color 4 lets the first comma-separated segment declare the gradient shape (`circle`,
+  // `ellipse`), an explicit size (`closest-side`, `farthest-side`, `closest-corner`,
+  // `farthest-corner`, or two <length-percentage>s), and the center via `at <position>`. We
+  // ignore the geometry for now — the gradient is mapped onto the box like a normalized 50%
+  // disc — but we must recognise the header so its tokens are not parsed as the first color
+  // stop. The earlier check only saw the literal words "circle"/"ellipse"/"at", which let the
+  // common `radial-gradient(closest-side, …)` form fall through and produced a bogus
+  // "unrecognised color value 'closest-side'" diagnostic followed by an opaque-black stop.
+  static constexpr const char* kShapeKeywords[] = {
+      "circle",       "ellipse",        " at ",          "at ",
+      "closest-side", "closest-corner", "farthest-side", "farthest-corner",
+  };
   std::string first = ToLower(Trim(parts[0]));
-  bool hasDescriptor = first.find("circle") != std::string::npos ||
-                       first.find("ellipse") != std::string::npos ||
-                       first.find("at") != std::string::npos;
+  bool hasDescriptor = false;
+  for (const char* kw : kShapeKeywords) {
+    if (first.find(kw) != std::string::npos) {
+      hasDescriptor = true;
+      break;
+    }
+  }
+  // Two-number form e.g. "60% 40%" / "120px 90px" (followed optionally by "at ..."). A pure
+  // numeric/length token would never start a valid color stop in CSS, so treat any leading
+  // segment that begins with a digit, sign or dot as the shape header. Authors who wrote a
+  // single bare number per color stop hit `parseGradientStops`'s offset handling, which
+  // expects the offset to follow the color, not precede it — so the leading-digit form is
+  // unambiguous here.
+  if (!hasDescriptor && !first.empty()) {
+    char c = first[0];
+    if (c == '-' || c == '+' || c == '.' || (c >= '0' && c <= '9')) hasDescriptor = true;
+  }
   if (hasDescriptor) {
     stopStart = 1;
   }
 
+  // Resolve the descriptor (center / radius / coordinate space) before parsing stops so px stop
+  // offsets can be normalised against the gradient's radius in px.
   auto grad = _document->makeNode<RadialGradient>();
   grad->center = {0.5f, 0.5f};
   grad->radius = 0.5f;
@@ -909,20 +948,24 @@ RadialGradient* HTMLValueParser::parseRadialGradient(const std::string& value, f
     parseRadialDescriptor(first, boxWidth, boxHeight, grad);
   }
 
+  // The gradient's px extent is its radius in px, used both to tile a repeating period and to
+  // normalise px-positioned stops onto the [0,1] radius axis. With the default fitsToGeometry model
+  // the exporter scales the normalised radius by box width, so recover px as `radius * boxWidth`; a
+  // px circle already stores its radius in px. NaN when the box size is unknown.
+  float radiusPx = NAN;
+  if (!std::isnan(boxWidth) && boxWidth > 0.0f) {
+    radiusPx = grad->fitsToGeometry ? grad->radius * boxWidth : grad->radius;
+  }
+
   // `repeating-radial-gradient` tiles the authored period across the normalised radius (offset
-  // 1.0 == the gradient radius). The period's pixel domain is the radius in px: with the default
-  // fitsToGeometry model the exporter scales the normalised radius by box width, so recover px as
-  // `radius * boxWidth`; a px circle already stores its radius in px.
+  // 1.0 == the gradient radius).
   GradientStops stops;
   bool tiled = false;
-  if (repeating && !std::isnan(boxWidth) && boxWidth > 0.0f) {
-    float radiusPx = grad->fitsToGeometry ? grad->radius * boxWidth : grad->radius;
-    if (radiusPx > 0.0f) {
-      tiled = buildRepeatingLinearStops(parts, stopStart, radiusPx, stops);
-    }
+  if (repeating && std::isfinite(radiusPx) && radiusPx > 0.0f) {
+    tiled = buildRepeatingLinearStops(parts, stopStart, radiusPx, stops);
   }
   if (!tiled) {
-    stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false);
+    stops = parseGradientStops(parts, stopStart, /*interpretAngularOffset=*/false, radiusPx);
     if (!finaliseGradientStops(stops)) return nullptr;
     if (repeating) {
       _diagnostics.warn(
@@ -1100,7 +1143,9 @@ ConicGradient* HTMLValueParser::parseConicGradient(const std::string& value, boo
 }
 
 HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
-    const std::vector<std::string>& parts, size_t startIndex, bool interpretAngularOffset) {
+    const std::vector<std::string>& parts, size_t startIndex, bool interpretAngularOffset,
+    float pxOffsetScale) {
+  const bool normalisePx = std::isfinite(pxOffsetScale) && pxOffsetScale > 0.0f;
   GradientStops stops;
   for (size_t i = startIndex; i < parts.size(); i++) {
     auto tokens = SplitTopLevelWhitespace(parts[i]);
@@ -1124,7 +1169,14 @@ HTMLValueParser::GradientStops HTMLValueParser::parseGradientStops(
         offset = ParseAngle(off) / 360.0f;
       } else if (!interpretAngularOffset) {
         float v = parseAbsoluteLengthPx(off);
-        if (!std::isnan(v)) offset = v;
+        if (!std::isnan(v)) {
+          // A px stop offset is an absolute distance along the gradient ray. PAGX color-stop
+          // offsets are normalised to [0,1] where 1.0 is the gradient's extent, so divide by that
+          // extent (line length / radius) when it is known. e.g. `radial-gradient(#f80 1.4px,
+          // transparent 1.6px)` on a large box would otherwise store 1.4 / 1.6 — both past the 1.0
+          // edge — and paint the whole box with the first color instead of a tiny dot.
+          offset = normalisePx ? v / pxOffsetScale : v;
+        }
       }
     }
     stops.emplace_back(offset, color);

@@ -76,12 +76,18 @@ static float LerpComponent(float a, float b, double t) {
 }
 
 Color LerpColor(const Color& a, const Color& b, double t) {
+  // Bezier easing factors may overshoot below 0 or above 1 to support back-style ease curves.
+  // Color components are defined in [0, 1], so we clamp the resulting channels rather than the
+  // factor itself: clamping `t` would flatten the overshoot peak when both endpoints share a
+  // channel value (the lerp would produce that same value all the way through), losing the
+  // intended visual oscillation. Clamping per-channel preserves the overshoot direction while
+  // keeping outputs renderable.
   Color end = a.colorSpace == b.colorSpace ? b : ConvertColorSpace(b, a.colorSpace);
   Color result = {};
-  result.red = LerpComponent(a.red, end.red, t);
-  result.green = LerpComponent(a.green, end.green, t);
-  result.blue = LerpComponent(a.blue, end.blue, t);
-  result.alpha = LerpComponent(a.alpha, end.alpha, t);
+  result.red = std::clamp(LerpComponent(a.red, end.red, t), 0.0f, 1.0f);
+  result.green = std::clamp(LerpComponent(a.green, end.green, t), 0.0f, 1.0f);
+  result.blue = std::clamp(LerpComponent(a.blue, end.blue, t), 0.0f, 1.0f);
+  result.alpha = std::clamp(LerpComponent(a.alpha, end.alpha, t), 0.0f, 1.0f);
   result.colorSpace = a.colorSpace;
   return result;
 }

@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
@@ -40,6 +41,15 @@ namespace pagx {
 using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
+
+static bool ParseInternalFloat(const std::string& value, float* result) {
+  if (value.empty() || result == nullptr) return false;
+  char* end = nullptr;
+  float parsed = std::strtof(value.c_str(), &end);
+  if (end == value.c_str() || *end != '\0' || !std::isfinite(parsed)) return false;
+  *result = parsed;
+  return true;
+}
 
 std::shared_ptr<PAGXDocument> SVGImporter::Parse(const std::string& filePath,
                                                  const Options& options) {
@@ -244,18 +254,15 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // Merge adjacent layers with the same geometry (optimize Fill + Stroke into one Layer).
   mergeAdjacentLayers(convertedLayers);
 
-  // Apply content transform if needed. When there is exactly one converted layer, embed
-  // the transform as a Group inside that layer (avoids an extra wrapper layer). Otherwise,
-  // wrap all layers in a root layer with the transform matrix.
+  // Apply content transform if needed. The viewBox -> target mapping must affect both the
+  // converted layer's own contents AND any child layers (e.g. nested <g>) it owns. When there
+  // is exactly one converted layer, pre-multiply the transform onto that layer's matrix so the
+  // mapping covers the whole subtree without introducing an extra wrapper. Otherwise wrap all
+  // layers in a fresh root layer that carries the transform.
   if (needsContentTransform) {
     if (convertedLayers.size() == 1) {
       auto* singleLayer = convertedLayers[0];
-      auto* group = _document->makeNode<Group>();
-      group->elements = std::move(singleLayer->contents);
-      group->position = {contentMatrix.tx, contentMatrix.ty};
-      group->scale = {contentMatrix.a, contentMatrix.d};
-      singleLayer->contents.clear();
-      singleLayer->contents.push_back(group);
+      singleLayer->matrix = contentMatrix * singleLayer->matrix;
       _document->layers.push_back(singleLayer);
     } else {
       auto rootLayer = _document->makeNode<Layer>();
@@ -554,10 +561,48 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
         layer->mask == nullptr && layer->filters.empty() && layer->styles.empty()) {
       return nullptr;
     }
+  } else if (tag == "use") {
+    // A <use> may reference a container (<symbol>/<g>/<svg>) or a leaf (<image>/shape). Container
+    // references must be instantiated as child layers: convertElement (used by the leaf path below)
+    // only handles leaf shapes and returns null for containers, which would drop the referenced
+    // sub-tree entirely (e.g. glyph <symbol>s referenced by digit slots).
+    std::string refId = resolveUrl(getHrefAttribute(element));
+    auto refIt = refId.empty() ? _defs.end() : _defs.find(refId);
+    bool handledAsContainer = false;
+    if (_options.expandUseReferences && refIt != _defs.end() && _useStack.count(refId) == 0 &&
+        (refIt->second->name == "symbol" || refIt->second->name == "g" ||
+         refIt->second->name == "svg")) {
+      auto* useGroup = convertUseContainer(element, refIt->second, inheritedStyle, depth);
+      if (useGroup) {
+        layer->children.push_back(useGroup);
+      }
+      handledAsContainer = true;
+    }
+    if (!handledAsContainer) {
+      convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
+    }
   } else {
     // Shape element: convert to vector contents.
     // Pass the shadow-only type to determine how to handle fill.
     convertChildren(element, layer->contents, inheritedStyle, shadowOnlyType);
+
+    // HTMLImporter marks transform-animated inline-SVG leaf shapes with a private Group id and a
+    // resolved pixel pivot. Wrapping the vector elements here lets the HTML animation builder emit
+    // a scalar Group.rotation channel for pure rotations. The static position and anchor cancel,
+    // so the wrapper is visually neutral before animation is applied.
+    std::string rotationGroupId = getAttribute(element, "pagx-rotation-group");
+    float rotationOriginX = 0.0f;
+    float rotationOriginY = 0.0f;
+    if (!rotationGroupId.empty() &&
+        ParseInternalFloat(getAttribute(element, "pagx-rotation-origin-x"), &rotationOriginX) &&
+        ParseInternalFloat(getAttribute(element, "pagx-rotation-origin-y"), &rotationOriginY) &&
+        !layer->contents.empty()) {
+      auto* rotationGroup = _document->makeNode<Group>(rotationGroupId);
+      rotationGroup->anchor = {rotationOriginX, rotationOriginY};
+      rotationGroup->position = rotationGroup->anchor;
+      rotationGroup->elements = std::move(layer->contents);
+      layer->contents.push_back(rotationGroup);
+    }
   }
 
   // Expand SVG marker references into additional child layers.
@@ -1280,6 +1325,101 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   // group->name (removed) = "_useRef:" + refId;
   return group;
 }
+// Maps a viewBox (minX minY width height) into a viewport of size (vpW × vpH) honouring the SVG
+// preserveAspectRatio rules ("[defer] <align> [meet|slice]", default "xMidYMid meet"). The returned
+// matrix converts points from viewBox coordinates into the viewport's local space.
+static Matrix ComputeViewBoxMatrix(const std::vector<float>& viewBox, float vpW, float vpH,
+                                   const std::string& preserveAspectRatio) {
+  float vbX = viewBox[0];
+  float vbY = viewBox[1];
+  float vbW = viewBox[2];
+  float vbH = viewBox[3];
+
+  std::string align = "xMidYMid";
+  std::string meetOrSlice = "meet";
+  {
+    std::istringstream iss(preserveAspectRatio);
+    std::vector<std::string> tokens;
+    std::string token;
+    while (iss >> token) {
+      tokens.push_back(token);
+    }
+    size_t i = 0;
+    if (i < tokens.size() && tokens[i] == "defer") {
+      i++;
+    }
+    if (i < tokens.size()) {
+      align = tokens[i++];
+    }
+    if (i < tokens.size()) {
+      meetOrSlice = tokens[i++];
+    }
+  }
+
+  float scaleX = vpW / vbW;
+  float scaleY = vpH / vbH;
+  if (align != "none") {
+    float uniform = (meetOrSlice == "slice") ? std::max(scaleX, scaleY) : std::min(scaleX, scaleY);
+    scaleX = uniform;
+    scaleY = uniform;
+  }
+
+  float tx = -vbX * scaleX;
+  float ty = -vbY * scaleY;
+  if (align.find("xMid") != std::string::npos) {
+    tx += (vpW - vbW * scaleX) / 2.0f;
+  } else if (align.find("xMax") != std::string::npos) {
+    tx += vpW - vbW * scaleX;
+  }
+  if (align.find("YMid") != std::string::npos) {
+    ty += (vpH - vbH * scaleY) / 2.0f;
+  } else if (align.find("YMax") != std::string::npos) {
+    ty += vpH - vbH * scaleY;
+  }
+  return Matrix::Translate(tx, ty) * Matrix::Scale(scaleX, scaleY);
+}
+Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& useElement,
+                                             const std::shared_ptr<DOMNode>& refElement,
+                                             const InheritedStyle& inheritedStyle, int depth) {
+  std::string refId = resolveUrl(getHrefAttribute(useElement));
+  float x = parseLength(getAttribute(useElement, "x"), _viewBoxWidth);
+  float y = parseLength(getAttribute(useElement, "y"), _viewBoxHeight);
+
+  // The use's x/y establishes the referenced content's origin. For <symbol>/<svg> the use's
+  // width/height define a viewport that the referenced viewBox is fitted into (per
+  // preserveAspectRatio); a plain <g> has no viewport of its own.
+  Matrix contentMatrix = Matrix::Translate(x, y);
+  if (refElement->name == "symbol" || refElement->name == "svg") {
+    auto viewBox = parseViewBox(getAttribute(refElement, "viewBox"));
+    float useWidth = parseLength(getAttribute(useElement, "width"), _viewBoxWidth);
+    float useHeight = parseLength(getAttribute(useElement, "height"), _viewBoxHeight);
+    if (viewBox.size() >= 4 && viewBox[2] > 0 && viewBox[3] > 0 && useWidth > 0 && useHeight > 0) {
+      contentMatrix =
+          contentMatrix * ComputeViewBoxMatrix(viewBox, useWidth, useHeight,
+                                               getAttribute(refElement, "preserveAspectRatio"));
+    }
+  }
+
+  auto group = _document->makeNode<Layer>();
+  group->matrix = contentMatrix;
+
+  InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
+  _useStack.insert(refId);
+  auto child = refElement->getFirstChild();
+  while (child) {
+    auto childLayer = convertToLayer(child, refStyle, depth + 1);
+    if (childLayer) {
+      group->children.push_back(childLayer);
+    }
+    child = child->getNextSibling();
+  }
+  _useStack.erase(refId);
+
+  if (group->children.empty()) {
+    return nullptr;
+  }
+  return group;
+}
 // Builds a Rectangle + ImagePattern fill group rendering an image at the given box. Shared by the
 // direct <image> element and <use> references to an image. The box (x, y, width, height) is in the
 // element's own coordinate space; any transform on the host element is applied by the parent Layer.
@@ -1548,7 +1688,7 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
   while (child) {
     if (child->name == "rect" || child->name == "circle" || child->name == "ellipse" ||
         child->name == "path" || child->name == "polygon" || child->name == "polyline" ||
-        child->name == "use") {
+        child->name == "use" || child->name == "image") {
       InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
       std::string transformStr = getAttribute(child, "transform");
       Matrix combinedMatrix = parentMatrix;
@@ -1562,7 +1702,15 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
         convertChildren(child, subLayer->contents, inheritedStyle);
         maskLayer->children.push_back(subLayer);
       } else {
-        convertChildren(child, maskLayer->contents, inheritedStyle);
+        // Each SVG shape carries its own paint, so wrap it in a Group to isolate the fill/stroke.
+        // Otherwise multiple shapes sharing the mask layer's flat contents list would let a later
+        // shape's Fill paint all preceding geometry (e.g. a white rect followed by black holes
+        // would collapse into an all-black mask, blanking a luminance mask).
+        auto group = _document->makeNode<Group>();
+        convertChildren(child, group->elements, inheritedStyle);
+        if (!group->elements.empty()) {
+          maskLayer->contents.push_back(group);
+        }
       }
     } else if (child->name == "g") {
       InheritedStyle inheritedStyle = computeInheritedStyle(child, parentStyle);
@@ -1850,6 +1998,13 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   }
   FillRule effectiveFillRule = (fillRule == "evenodd") ? FillRule::EvenOdd : FillRule::Winding;
 
+  // A shape carrying a DOM `id` (assigned by the HTML importer for animated inline-SVG shapes) gets
+  // deterministic painter ids so the pre-resolve animation objects can target its Fill / Stroke by
+  // string. Empty when the shape has no id (the common static case), which leaves the node id blank.
+  std::string elementId = getAttribute(element, "id");
+  std::string fillId = elementId.empty() ? std::string() : elementId + "__fill";
+  std::string strokeId = elementId.empty() ? std::string() : elementId + "__stroke";
+
   // Only add fill if we have an effective fill value that is not "none".
   // If fill is empty and no inherited value, SVG default is black fill.
   // But if inherited value is "none", we skip fill entirely.
@@ -1857,6 +2012,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     if (fill.empty()) {
       // No fill specified anywhere - use SVG default black.
       auto fillNode = _document->makeNode<Fill>();
+      fillNode->id = fillId;
       auto solidColor = _document->makeNode<SolidColor>();
       solidColor->color = {0, 0, 0, 1, ColorSpace::SRGB};
       fillNode->color = solidColor;
@@ -1864,6 +2020,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       contents.push_back(fillNode);
     } else if (fill.compare(0, 4, "url(") == 0) {
       auto fillNode = _document->makeNode<Fill>();
+      fillNode->id = fillId;
       std::string refId = resolveUrl(fill);
       // Use getColorSourceForRef which handles reference counting.
       if (!boundsComputed) {
@@ -1883,6 +2040,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
       contents.push_back(fillNode);
     } else {
       auto fillNode = _document->makeNode<Fill>();
+      fillNode->id = fillId;
 
       // Determine effective fill-opacity.
       std::string fillOpacity = getAttribute(element, "fill-opacity");
@@ -1927,6 +2085,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
     }
 
     auto strokeNode = _document->makeNode<Stroke>();
+    strokeNode->id = strokeId;
 
     // Determine effective stroke-opacity. Applies to both url() and solid color strokes.
     std::string strokeOpacity = getAttribute(element, "stroke-opacity");
@@ -2767,22 +2926,39 @@ PathData SVGParserContext::parsePoints(const std::string& value, bool closed) {
   return path;
 }
 std::string SVGParserContext::resolveUrl(const std::string& url) {
-  if (url.empty()) {
+  auto trim = [](const std::string& value) {
+    size_t first = 0;
+    while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first]))) first++;
+    size_t last = value.size();
+    while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1]))) last--;
+    return value.substr(first, last - first);
+  };
+  std::string value = trim(url);
+  if (value.empty()) {
     return "";
   }
-  // Handle url(#id) format.
-  if (url.compare(0, 4, "url(") == 0) {
-    size_t start = url.find('#');
-    size_t end = url.find(')');
-    if (start != std::string::npos && end != std::string::npos) {
-      return url.substr(start + 1, end - start - 1);
+  // Handle CSS url(#id), url("#id") and url('#id') forms. Computed SVG
+  // presentation attributes emitted by Chromium commonly retain the quotes;
+  // including the closing quote in the lookup key makes the gradient/filter
+  // reference miss and leaves the painter black.
+  if (value.compare(0, 4, "url(") == 0) {
+    size_t end = value.rfind(')');
+    if (end != std::string::npos && end >= 4) {
+      std::string inner = trim(value.substr(4, end - 4));
+      if (inner.size() >= 2 && ((inner.front() == '"' && inner.back() == '"') ||
+                                (inner.front() == '\'' && inner.back() == '\''))) {
+        inner = trim(inner.substr(1, inner.size() - 2));
+      }
+      if (!inner.empty() && inner.front() == '#') {
+        return inner.substr(1);
+      }
     }
   }
   // Handle #id format.
-  if (url[0] == '#') {
-    return url.substr(1);
+  if (value[0] == '#') {
+    return value.substr(1);
   }
-  return url;
+  return value;
 }
 std::pair<float, float> SVGParserContext::parseFilterOffset(const std::shared_ptr<DOMNode>& node) {
   std::string dx = getAttribute(node, "dx", "0");
