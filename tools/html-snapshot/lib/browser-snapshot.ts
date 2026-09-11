@@ -4713,19 +4713,72 @@ function measureCanvas() {
   const savedPosition = body.style.position;
   body.style.position = '';
   void body.offsetHeight;
-  const width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  let width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  let height = Math.max(body.scrollHeight, Math.round(bodyRect.height));
+  // Fixed-canvas mocks routinely position EVERY child out of flow
+  // (`.stage { position: absolute; width: 672px; height: 480px }` with nothing
+  // else in the body). An out-of-flow child contributes no content size to its
+  // parent, and the scroll read above deliberately drops the injected
+  // `relative` so the body is back to its authored `static` role — which takes
+  // those children out of its scrollable overflow too. Both `scrollHeight` and
+  // `getBoundingClientRect().height` then read 0 even though the page paints
+  // normally in a browser. A zero canvas emits an empty <body> and the importer
+  // rejects the subset outright, so fall back to the union of the visible boxes
+  // — for the mock above that recovers exactly 672x480.
+  //
+  // `documentElement` is NOT a usable fallback here for the reason above: it is
+  // stretched to the viewport, so it would report the 1400x900 default rather
+  // than the design's own canvas. Each axis falls back independently: a body
+  // can collapse on the block axis alone (the common case, since the inline
+  // axis is filled by the containing block).
+  if (width <= 0 || height <= 0) {
+    const content = visibleContentExtent();
+    if (width <= 0 && content.right > 0) width = Math.ceil(content.right);
+    if (height <= 0 && content.bottom > 0) height = Math.ceil(content.bottom);
+  }
   // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
   // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
   // (embedded as a literal in PAYLOAD_CONSTANTS_SRC) keeps the output renderable
   // and matches the same clamp baseline.js applies, so the two stay aligned.
-  const height = Math.min(
-    MAX_CAPTURE_HEIGHT_PX,
-    Math.max(body.scrollHeight, Math.round(bodyRect.height)),
-  );
+  height = Math.min(MAX_CAPTURE_HEIGHT_PX, height);
   body.style.position = savedPosition;
   void body.offsetHeight;
   resetRootScroll();
   return { width, height };
+}
+
+// Far edges of every painted box in the body, measured from the canvas origin.
+// Only consulted when the body's own box has collapsed (see `measureCanvas`),
+// so the O(n) walk never runs for a page that measures normally.
+//
+// Rects are viewport-relative and the root scroll is already pinned to (0,0) by
+// `prepareBodyForSnapshot`, so `right`/`bottom` are already canvas coordinates.
+// Only the far edges matter: the canvas always starts at the origin, and a
+// child at a negative offset is clipped by `pagx render` the same way the
+// browser clips it above/left of the body.
+//
+// Visibility uses the same `isVisible` predicate as the snapshot walker — and
+// passes `el` so a capture-animated element whose resting state is
+// `opacity: 0` / `visibility: hidden` still counts, matching what the walker
+// will emit. A genuinely hidden subtree cannot inflate the canvas.
+// `getElementsByTagName('*')` does not descend into shadow roots, matching the
+// walker's own reach.
+function visibleContentExtent() {
+  let right = 0;
+  let bottom = 0;
+  const body = document.body;
+  if (!body) return { right, bottom };
+  const all = body.getElementsByTagName('*');
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    const computed = getComputedStyle(el);
+    if (!isVisible(computed, el)) continue;
+    const rect = el.getBoundingClientRect();
+    if (!nonZero(rect)) continue;
+    if (rect.right > right) right = rect.right;
+    if (rect.bottom > bottom) bottom = rect.bottom;
+  }
+  return { right, bottom };
 }
 
 function snapshotMainImpl(opts) {
@@ -5128,6 +5181,7 @@ const HELPER_FNS = [
   resetRootScroll,
   canvasRootRect,
   prepareBodyForSnapshot,
+  visibleContentExtent,
   measureCanvas,
   snapshotMainImpl,
   snapshotMain,
