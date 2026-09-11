@@ -18,10 +18,13 @@
 
 #pragma once
 
+#include <thread>
 #include "pag/pag.h"
 #include "tgfx/core/Task.h"
 
 namespace pag {
+class AnimatorUpdateTask;
+
 /**
  * PAGAnimator provides a simple timing engine for running animations.
  */
@@ -63,8 +66,9 @@ class PAGAnimator {
     }
 
     /**
-     * Notifies another frame of the animation will occur. This will only be called from the UI
-     * thread. Note: onAnimationWillUpdate and onAnimationUpdate will always appear in pairs.
+     * Notifies another frame of the animation will occur. This is called from the UI thread for
+     * playback updates and from a worker thread for updateAsync(). Note: onAnimationWillUpdate and
+     * onAnimationUpdate will always appear in pairs.
      */
     virtual void onAnimationWillUpdate(PAGAnimator*) {
     }
@@ -151,11 +155,20 @@ class PAGAnimator {
    */
   void update();
 
+  /**
+   * Updates an asynchronous animation on a background thread. Synchronous animations retain the
+   * behavior of update().
+   */
+  void updateAsync();
+
  private:
   std::mutex locker = {};
   std::weak_ptr<PAGAnimator> weakThis;
   std::weak_ptr<Listener> weakListener;
   std::shared_ptr<tgfx::Task> task = nullptr;
+  std::thread::id asyncTaskThread = {};
+  bool taskCanCancel = false;
+  bool asyncUpdateRequested = false;
   int64_t _startTime = INT64_MIN;
   int64_t _duration = 0;
   int _repeatCount = 1;
@@ -163,6 +176,7 @@ class PAGAnimator {
   bool _isSync = false;
   bool _isRunning = false;
   bool isAnimating = false;
+  bool isEnding = false;
   bool isEnded = false;
   int playedCount = 0;
 
@@ -173,11 +187,13 @@ class PAGAnimator {
   void advance();
   std::vector<int> doAdvance();
   void doUpdate(bool setStartTime);
+  void onAsyncFlush(AnimatorUpdateTask* currentTask);
   void onFlush(bool setStartTime);
   void startAnimation();
   void cancelAnimation();
   void resetStartTime();
 
   friend class AnimationTicker;
+  friend class AnimatorUpdateTask;
 };
 }  // namespace pag
