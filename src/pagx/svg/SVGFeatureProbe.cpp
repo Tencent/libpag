@@ -86,6 +86,11 @@ SVGFeatureFlags ProbeLayerFeaturesForSVG(const Layer* layer) {
   if (layer == nullptr || !layer->visible) {
     return out;
   }
+  if (layer->mask != nullptr && (layer->maskType == MaskType::AlphaInverted ||
+                                 layer->maskType == MaskType::LuminanceInverted ||
+                                 layer->maskType == MaskType::ContourInverted)) {
+    out.hasInvertedMask = true;
+  }
   // Aggregating descendant flags here would force the smallest enclosing layer to bake the
   // entire sub-tree into one PNG when any grandchild trips the probe, which both blows up the
   // output size and turns surrounding native content into non-editable raster. Composition

@@ -66,7 +66,7 @@ Basic container for content, child layers, styles, and filters.
 | `composition` | idref | — | Composition reference "@id" for content reuse |
 | `import` | string | — | Path to external file to import (relative to the PAGX file); format inferred from extension |
 | `importFormat` | string | — | Force import format (e.g., `svg`); inferred from file extension when omitted |
-| `maskType` | MaskType | alpha | Mask type (alpha, luminance, or contour) |
+| `maskType` | MaskType | alpha | Mask type (alpha, luminance, contour, alphaInverted, luminanceInverted, or contourInverted) |
 
 Layer also supports all constraint attributes. See §Constraint Attributes below.
 
@@ -574,7 +574,7 @@ Path `data` uses SVG `<path d="...">` syntax exactly. Uppercase = absolute, lowe
 | Enum | Values |
 |------|--------|
 | **BlendMode** | `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `colorDodge`, `colorBurn`, `hardLight`, `softLight`, `difference`, `exclusion`, `hue`, `saturation`, `color`, `luminosity`, `plusLighter`, `plusDarker` |
-| **MaskType** | `alpha`, `luminance`, `contour` |
+| **MaskType** | `alpha`, `luminance`, `contour`, `alphaInverted`, `luminanceInverted`, `contourInverted` |
 | **TileMode** | `clamp`, `repeat`, `mirror`, `decal` |
 | **FilterMode** | `nearest`, `linear` |
 | **MipmapMode** | `none`, `nearest`, `linear` |

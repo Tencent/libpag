@@ -443,7 +443,10 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
     }
   }
 
-  bool useFillColor = (type == MaskType::Luminance && maskFill != nullptr && maskFill->color);
+  bool isLuminance = (type == MaskType::Luminance || type == MaskType::LuminanceInverted);
+  bool inverted = (type == MaskType::AlphaInverted || type == MaskType::LuminanceInverted ||
+                   type == MaskType::ContourInverted);
+  bool useFillColor = (isLuminance && maskFill != nullptr && maskFill->color);
   std::string fillAttr = "white";
   float fillOpacity = 1.0f;
 
@@ -672,30 +675,45 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
     }
   }
   std::string dataURI = "url('data:image/svg+xml," + encoded + "')";
-  std::string css = ";-webkit-mask-image:" + dataURI;
-  css += ";mask-image:" + dataURI;
-  if (type == MaskType::Luminance) {
+  // CSS masks have no inversion operator. Composite the mask layer with a fully opaque cover
+  // layer (white works for both alpha and luminance modes): exclude/destination-out computes
+  // cover minus shape, i.e. the inverted mask.
+  std::string coverLayer = inverted ? ",linear-gradient(#fff,#fff)" : "";
+  std::string css = ";-webkit-mask-image:" + dataURI + coverLayer;
+  css += ";mask-image:" + dataURI + coverLayer;
+  if (inverted) {
+    css += ";-webkit-mask-composite:destination-out;mask-composite:exclude";
+  }
+  if (isLuminance) {
     css += ";-webkit-mask-mode:luminance;mask-mode:luminance";
   } else {
     css += ";-webkit-mask-mode:alpha;mask-mode:alpha";
   }
   // The mask SVG uses document-absolute coordinates (the maskLayer sits at the document
-  // origin), but CSS mask-image starts at the masked element's own (0,0). Shift the mask
-  // back by the masked layer's render position so the two coordinate systems align.
-  if (!FloatNearlyZero(maskedLayerPos.x) || !FloatNearlyZero(maskedLayerPos.y)) {
-    std::string px = CssFloatToString(-maskedLayerPos.x) + "px";
-    std::string py = CssFloatToString(-maskedLayerPos.y) + "px";
-    css += ";-webkit-mask-position:" + px + " " + py;
-    css += ";mask-position:" + px + " " + py;
+  // origin), but CSS mask-image starts at the masked element's own (0,0). The SVG's viewBox
+  // begins at (minX, minY), so the mask image's top-left already sits at that offset in mask
+  // space: the shift is (min - maskedLayerPos), not just -maskedLayerPos. The cover layer needs
+  // no shift, it fills the element.
+  std::string coverPos = inverted ? ",0px 0px" : "";
+  float shiftX = minX - maskedLayerPos.x;
+  float shiftY = minY - maskedLayerPos.y;
+  if (!FloatNearlyZero(shiftX) || !FloatNearlyZero(shiftY) || inverted) {
+    std::string px = CssFloatToString(shiftX) + "px";
+    std::string py = CssFloatToString(shiftY) + "px";
+    css += ";-webkit-mask-position:" + px + " " + py + coverPos;
+    css += ";mask-position:" + px + " " + py + coverPos;
   }
   // mask-size and mask-repeat must always be pinned, not just when mask-position is used.
   // CSS defaults to `mask-size:auto` which resolves to `cover` in some browsers and to the
   // SVG's intrinsic size in others, and `mask-repeat:repeat` which would tile the mask SVG
   // across the masked element. Without explicit values a 100×100 mask on a 200×200 element
   // either stretches to fill (mask loses its clipping geometry, D1 section of
-  // optimizer_all_rules) or tiles into a checkerboard.
-  css += ";-webkit-mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
-  css += ";mask-size:" + CssFloatToString(maxX) + "px " + CssFloatToString(maxY) + "px";
+  // optimizer_all_rules) or tiles into a checkerboard. The size must match the SVG's intrinsic
+  // size (svgW × svgH), which spans min..max rather than 0..max.
+  std::string coverSize = inverted ? ",100% 100%" : "";
+  css += ";-webkit-mask-size:" + CssFloatToString(svgW) + "px " + CssFloatToString(svgH) + "px" +
+         coverSize;
+  css += ";mask-size:" + CssFloatToString(svgW) + "px " + CssFloatToString(svgH) + "px" + coverSize;
   css += ";-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat";
   return css;
 }

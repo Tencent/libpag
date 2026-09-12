@@ -151,10 +151,20 @@ ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
   return ScaleMode::Stretch;
 }
 
+// Returns the first comma-separated layer of a CSS layer list, trimmed. Mask longhands accept one
+// value per mask layer; the exporter puts the shape layer first and an inverted mask's opaque cover
+// layer second, so callers that model a single mask only ever want the leading layer.
+std::string FirstCssLayer(const std::string& value) {
+  auto layers = SplitTopLevelCommas(value);
+  return Trim(layers.empty() ? value : layers.front());
+}
+
 // Extracts the source string from a CSS `url(...)` token, stripping the wrapper, surrounding
-// whitespace, and matching quotes. Returns empty when `value` is not a `url(...)` form.
+// whitespace, and matching quotes. Returns empty when `value` is not a `url(...)` form. Only the
+// first comma-separated layer is considered, so an inverted mask's `url(...),linear-gradient(...)`
+// list resolves to the shape layer's url instead of running past it.
 std::string ExtractCssUrl(const std::string& value) {
-  std::string trimmed = Trim(value);
+  std::string trimmed = FirstCssLayer(value);
   std::string lower = ToLower(trimmed);
   auto open = lower.find("url(");
   if (open == std::string::npos) return {};
@@ -637,6 +647,12 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
       return;
     }
     maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+    // The exporter marks inverted masks by compositing the shape layer with an opaque cover layer
+    // via mask-composite:exclude, so `exclude` maps back to the inverted variant.
+    if (box.maskComposite == "exclude") {
+      maskType =
+          (maskType == MaskType::Luminance) ? MaskType::LuminanceInverted : MaskType::AlphaInverted;
+    }
   } else {
     // CSS `clip-path`: either a `url(#id)` reference to a hidden <clipPath> def, or a basic shape
     // (`polygon()/path()/circle()/ellipse()/inset()`). Both are rebuilt into a contour mask framed
@@ -815,7 +831,9 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
   // background/mask sizing model; the exporter's own output is the two-length form.
   float scaleX = 1.0f;
   float scaleY = 1.0f;
-  auto sizeTokens = SplitTopLevelWhitespace(box.maskSize);
+  // Only the first layer applies: an inverted mask pairs the shape layer with a cover layer, and
+  // the shape layer's descriptor leads both lists.
+  auto sizeTokens = SplitTopLevelWhitespace(FirstCssLayer(box.maskSize));
   std::string sizeW = sizeTokens.size() > 0 ? sizeTokens[0] : "";
   std::string sizeH = sizeTokens.size() > 1 ? sizeTokens[1] : "";
   if (sizeW == "contain" || sizeW == "cover") {
@@ -846,7 +864,7 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
   // The scaled mask box used to resolve percentage / keyword `mask-position` against the element.
   float scaledW = intrinsicW * scaleX;
   float scaledH = intrinsicH * scaleY;
-  auto posTokens = SplitTopLevelWhitespace(box.maskPosition);
+  auto posTokens = SplitTopLevelWhitespace(FirstCssLayer(box.maskPosition));
   std::string posX = posTokens.size() > 0 ? posTokens[0] : "";
   // CSS resolves a single `mask-position` value as the horizontal axis with the vertical defaulting
   // to `center`, not to the leading edge. Two empty tokens keep the `0 0` top-left default below.

@@ -252,6 +252,12 @@ tgfx::LayerMaskType ToTGFXMaskType(MaskType type) {
       return tgfx::LayerMaskType::Luminance;
     case MaskType::Contour:
       return tgfx::LayerMaskType::Contour;
+    case MaskType::AlphaInverted:
+      return tgfx::LayerMaskType::AlphaInverted;
+    case MaskType::LuminanceInverted:
+      return tgfx::LayerMaskType::LuminanceInverted;
+    case MaskType::ContourInverted:
+      return tgfx::LayerMaskType::ContourInverted;
   }
   return tgfx::LayerMaskType::Alpha;
 }

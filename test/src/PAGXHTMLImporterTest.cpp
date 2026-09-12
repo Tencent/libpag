@@ -8222,6 +8222,34 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
 }
 
+// An inverted mask is exported as a two-layer `mask-image` list (shape plus an opaque cover layer)
+// composited with `mask-composite: exclude`. The importer must read only the first layer's url and
+// map the exclude keyword back to the inverted MaskType, otherwise the round trip either drops the
+// whole mask (url parsing hits the cover layer's bracket) or silently loses the inversion.
+PAG_TEST(PAGXHTMLImporterTest, MaskCompositeExcludeRebuildsInvertedMask) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:110px;height:110px">
+      <div style="width:110px;height:110px;mask-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22110%22 height=%22110%22 viewBox=%220 0 110 110%22%3E%3Cellipse cx=%2255%22 cy=%2255%22 rx=%2255%22 ry=%2255%22 fill=%22white%22/%3E%3C/svg%3E'),linear-gradient(#fff,#fff);mask-composite:exclude;mask-mode:alpha;mask-size:110px 110px,100% 100%;mask-repeat:no-repeat">
+        <div style="width:110px;height:110px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr) << "the two-layer mask list must still yield a mask layer";
+  EXPECT_EQ(masked->maskType, pagx::MaskType::AlphaInverted)
+      << "mask-composite:exclude must map back to the inverted mask type";
+  auto* ellipse = FindElementOfType<pagx::Ellipse>(masked->mask);
+  ASSERT_NE(ellipse, nullptr) << "the shape layer's SVG must still be decoded";
+  // mask-size / mask-position are per-layer lists too. Only the shape layer's descriptor applies:
+  // reading the cover layer's `100% 100%` as the height token would scale the mask geometry.
+  EXPECT_TRUE(NearlyEqual(ellipse->size.width, 110.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.a, 1.0f, 0.01f))
+      << "the shape layer's own mask-size must not be mixed with the cover layer's";
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.d, 1.0f, 0.01f));
+}
+
 // A `mask-size` larger than the mask SVG's intrinsic size scales the rebuilt mask layer by the
 // per-axis ratio so the mask geometry covers the element CSS rendered it across, rather than
 // staying pinned at the smaller intrinsic size in the top-left corner. The ratios differ per axis

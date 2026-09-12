@@ -133,8 +133,8 @@ class Layer : public Node, public LayoutNode {
   Layer* mask = nullptr;
 
   /**
-   * The type of masking to apply (Alpha, Luminance, or Contour).
-   * The default value is Alpha.
+   * The type of masking to apply (Alpha, Luminance, Contour, AlphaInverted, LuminanceInverted,
+   * or ContourInverted). The default value is Alpha.
    */
   MaskType maskType = MaskType::Alpha;
 

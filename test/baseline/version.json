@@ -8571,6 +8571,7 @@
     "PAGXTest": {
         "GetRequiredFontsCrossDocument": "8b84d883",
         "LayerBuilderAPIConsistency": "60a88e548",
+        "MaskInverted": "f3076fa68",
         "NoiseFilterAllElements": "60a88e548",
         "NoiseFilterAnimation": {
             "frame_0": "60a88e548",
