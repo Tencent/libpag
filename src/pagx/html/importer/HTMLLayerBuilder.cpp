@@ -728,7 +728,20 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
     // PAGX's internal camelCase names and would reject the multi-word CSS values.
     layer->blendMode = SVGBlendModeFromString(box.mixBlendMode);
   }
-  if (box.clipOverflow) layer->clipToBounds = true;
+  if (box.clipOverflow) {
+    layer->clipToBounds = true;
+    // A zero visible area (width/height: 0 combined with a clipping overflow) renders nothing in a
+    // browser. PAGX carries the clip through clipToBounds, which layout later expands into a
+    // scrollRect sized from the layer bounds, but an empty scrollRect is treated as "no clipping"
+    // by the renderer. Mark the layer invisible here instead of relying on that inference.
+    bool zeroArea = (!std::isnan(box.widthPx) && box.widthPx <= 0) ||
+                    (!std::isnan(box.heightPx) && box.heightPx <= 0) ||
+                    (!std::isnan(box.widthPct) && box.widthPct <= 0) ||
+                    (!std::isnan(box.heightPct) && box.heightPct <= 0);
+    if (zeroArea) {
+      layer->visible = false;
+    }
+  }
 
   // filter chain (excluding backdrop-filter, which is handled as a Layer style).
   if (!box.filter.empty()) {

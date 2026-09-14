@@ -1561,6 +1561,30 @@ PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenMapsToClipToBounds) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   EXPECT_TRUE(div->clipToBounds);
+  EXPECT_TRUE(div->visible);
+}
+
+// A zero-area clip box (width or height 0 with a clipping overflow) renders nothing in a browser.
+// PAGX carries the clip through clipToBounds, which layout expands into a scrollRect sized from the
+// layer bounds, and the renderer treats an empty scrollRect as "no clipping" — so the importer has
+// to mark such layers invisible to preserve the hidden state.
+PAG_TEST(PAGXHTMLImporterTest, ZeroAreaOverflowClipHidesLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <div style="width:80px;height:0;overflow:hidden">
+        <div style="width:80px;height:20px;background-color:#000"></div>
+      </div>
+      <div style="width:0;height:80px;overflow:hidden"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_TRUE(doc->layers.front()->children.size() >= 2);
+  auto* zeroHeight = doc->layers.front()->children[0];
+  auto* zeroWidth = doc->layers.front()->children[1];
+  EXPECT_FALSE(zeroHeight->visible);
+  EXPECT_TRUE(zeroHeight->clipToBounds);
+  EXPECT_FALSE(zeroWidth->visible);
+  EXPECT_TRUE(zeroWidth->clipToBounds);
 }
 
 // Chromium emits the two-value `overflow` shorthand for per-axis CSS (`overflow-x: auto;
