@@ -17,9 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/Verify.h"
+#include "codec/utils/H264SPSParser.h"
 #include "pag/file.h"
 
 namespace pag {
+// The exporter packs the alpha plane next to the color plane, so the encoded frame is at most twice
+// the image size plus the alignment padding it adds. A larger alphaStartX or alphaStartY means the
+// file declares a video that the decoder will never produce.
+static constexpr int64_t MAX_ALPHA_PACKING_PADDING = 8;
+
 VideoFrame::~VideoFrame() {
   delete fileBytes;
 }
@@ -38,6 +44,29 @@ VideoSequence::~VideoSequence() {
 
 bool VideoSequence::verify() const {
   if (!Sequence::verify() || frames.empty()) {
+    VerifyFailed();
+    return false;
+  }
+  // alphaStartX and alphaStartY come straight from the file without any other check.
+  // getVideoWidth() and getVideoHeight() add them to width and height, and that size is used both to
+  // configure the decoder and to read the decoder's frame buffer, while the buffer is sized from the
+  // bitstream. A file that declares a larger video than the stream contains would make that read go
+  // out of bounds, so compare the declared size against the coded size in the sequence parameter set
+  // and keep the offsets within the packing layout the exporter produces.
+  auto maxAlphaStartX = static_cast<int64_t>(width) + MAX_ALPHA_PACKING_PADDING;
+  auto maxAlphaStartY = static_cast<int64_t>(height) + MAX_ALPHA_PACKING_PADDING;
+  if (alphaStartX < 0 || alphaStartY < 0 || alphaStartX > maxAlphaStartX ||
+      alphaStartY > maxAlphaStartY) {
+    VerifyFailed();
+    return false;
+  }
+  H264FrameSize frameSize = {};
+  if (headers.empty() || headers[0] == nullptr ||
+      !ParseH264SPSFrameSize(headers[0]->data(), headers[0]->length(), &frameSize)) {
+    VerifyFailed();
+    return false;
+  }
+  if (getVideoWidth() > frameSize.width || getVideoHeight() > frameSize.height) {
     VerifyFailed();
     return false;
   }
