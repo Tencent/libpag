@@ -172,8 +172,9 @@ bool SkipFieldsBeforeFrameSize(BitReader* reader, uint32_t profileIdc) {
     if (chromaFormatIdc == 3 && !reader->readBit(&separateColourPlaneFlag)) {
       return false;
     }
-    if (!reader->readUnsigned(&bitDepthLumaMinus8) || !reader->readUnsigned(&bitDepthChromaMinus8) ||
-        !reader->readBit(&transformBypassFlag) || !reader->readBit(&scalingMatrixPresentFlag)) {
+    if (!reader->readUnsigned(&bitDepthLumaMinus8) ||
+        !reader->readUnsigned(&bitDepthChromaMinus8) || !reader->readBit(&transformBypassFlag) ||
+        !reader->readBit(&scalingMatrixPresentFlag)) {
       return false;
     }
     if (scalingMatrixPresentFlag != 0) {

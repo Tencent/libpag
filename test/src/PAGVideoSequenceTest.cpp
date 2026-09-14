@@ -60,7 +60,7 @@ static void EncodeInt32(uint8_t* out, int32_t value) {
 // The value is chosen to need the same number of bytes as the original, so the rest of the file
 // stays readable.
 static std::shared_ptr<tgfx::Data> MakeSample(const SequenceHeader& header, size_t offset,
-                                             int32_t value, size_t fieldLength) {
+                                              int32_t value, size_t fieldLength) {
   auto bytes = ReadFile(header.path);
   if (bytes == nullptr || bytes->size() <= offset + fieldLength) {
     return nullptr;
