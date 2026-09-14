@@ -19,6 +19,7 @@
 #include "pagx/FontConfig.h"
 #include <memory>
 #include "FontConfigData.h"
+#include "SystemFonts.h"
 #include "pagx/types/Data.h"
 #include "tgfx/core/Typeface.h"
 
@@ -199,7 +200,7 @@ void FontConfig::addFallbackFont(const void* bytes, size_t length, int ttcIndex,
 }
 
 bool FontConfig::registerSystemFont(const std::string& fontFamily, const std::string& fontStyle) {
-  auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+  auto typeface = SystemFonts::ResolveTypeface(fontFamily, fontStyle);
   if (typeface == nullptr) {
     return false;
   }
@@ -218,7 +219,7 @@ bool FontConfig::registerSystemFont(const PAGFont& font) {
 
 bool FontConfig::addFallbackSystemFont(const std::string& fontFamily,
                                        const std::string& fontStyle) {
-  auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+  auto typeface = SystemFonts::ResolveTypeface(fontFamily, fontStyle);
   if (typeface == nullptr) {
     return false;
   }

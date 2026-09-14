@@ -18,8 +18,13 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
+
+namespace tgfx {
+class Typeface;
+}
 
 namespace pagx {
 
@@ -77,6 +82,14 @@ class SystemFonts {
    * FontLocation (empty path) if no match is found.
    */
   static FontLocation FindFont(const std::string& family, const std::string& style);
+
+  /**
+   * Resolves a system typeface by family and style. If the requested style is unavailable, falls
+   * back to another style from the same family. Platform substitutions to a different family are
+   * rejected. Returns nullptr when the requested family cannot be resolved.
+   */
+  static std::shared_ptr<tgfx::Typeface> ResolveTypeface(const std::string& family,
+                                                         const std::string& style);
 };
 
 }  // namespace pagx

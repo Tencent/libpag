@@ -36,6 +36,21 @@ static int StylePriority(const std::string& style) {
   return 3;
 }
 
+static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& fontFamily,
+                                                             const std::string& fontStyle) {
+  auto namedTypeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+  auto exactLocation = SystemFonts::FindFont(fontFamily, fontStyle);
+  bool exactStyleExists =
+      !exactLocation.path.empty() && (fontStyle.empty() || exactLocation.fontStyle == fontStyle);
+  if (exactStyleExists) {
+    // Preserve the platform's existing exact-style behavior. Some FreeType configurations cannot
+    // load an installed exact face by name, and changing that behavior affects established layout
+    // metrics. The same-family fallback below is only needed when the requested style is absent.
+    return namedTypeface;
+  }
+  return SystemFonts::ResolveTypeface(fontFamily, fontStyle);
+}
+
 LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
 }
 
@@ -43,7 +58,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
                                                             const std::string& fontStyle) {
   if (fontConfig == nullptr) {
     if (!fontFamily.empty()) {
-      return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+      return ResolveLayoutTypeface(fontFamily, fontStyle);
     }
     return nullptr;
   }
@@ -96,9 +111,10 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
   }
 #endif
 
-  // Stage 5: System font lookup via MakeFromName
+  // Stage 5: System font lookup, including another available style when the requested one is
+  // absent from the family.
   if (!fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    auto typeface = ResolveLayoutTypeface(fontFamily, fontStyle);
     if (typeface != nullptr) {
       return typeface;
     }

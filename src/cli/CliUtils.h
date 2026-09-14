@@ -34,66 +34,12 @@
 
 namespace pagx::cli {
 
-static inline bool FontFamilyMatch(const std::string& requested, const std::string& actual) {
-  if (requested.size() != actual.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < requested.size(); i++) {
-    if (std::tolower(static_cast<unsigned char>(requested[i])) !=
-        std::tolower(static_cast<unsigned char>(actual[i]))) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static inline bool FontStyleMatch(const std::string& requested, const std::string& actual) {
-  if (requested.empty()) {
-    return true;
-  }
-  if (requested.size() != actual.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < requested.size(); i++) {
-    if (std::tolower(static_cast<unsigned char>(requested[i])) !=
-        std::tolower(static_cast<unsigned char>(actual[i]))) {
-      return false;
-    }
-  }
-  return true;
-}
-
 /**
- * Resolves a system font by family and style with fallback. First attempts MakeFromName for an
- * exact match. If MakeFromName is unavailable (e.g. FreeType backend on macOS), falls back to
- * SystemFonts::FindFont to locate the font file path and loads via MakeFromPath.
+ * Resolves a system font by family and style through the shared PAGX font resolver.
  */
 static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::string& family,
                                                                     const std::string& style) {
-  auto typeface = tgfx::Typeface::MakeFromName(family, style);
-  if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
-      FontStyleMatch(style, typeface->fontStyle())) {
-    return typeface;
-  }
-  if (!style.empty()) {
-    typeface = tgfx::Typeface::MakeFromName(family, "");
-    if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
-        FontStyleMatch(style, typeface->fontStyle())) {
-      return typeface;
-    }
-  }
-  // Fallback: locate the font file via platform APIs and load by path.
-  auto location = pagx::SystemFonts::FindFont(family, style);
-  if (!location.path.empty()) {
-    return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
-  }
-  if (!style.empty()) {
-    location = pagx::SystemFonts::FindFont(family, "");
-    if (!location.path.empty()) {
-      return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
-    }
-  }
-  return nullptr;
+  return pagx::SystemFonts::ResolveTypeface(family, style);
 }
 
 inline size_t FindLastPathSeparator(const std::string& path) {
