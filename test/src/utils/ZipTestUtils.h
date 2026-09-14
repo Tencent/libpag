@@ -18,33 +18,19 @@
 
 #pragma once
 
-#include "pagx/types/BlendMode.h"
-#include "pagx/nodes/Node.h"
+#include <string>
+#include <unordered_map>
 
 namespace pagx {
+class Data;
+}
 
-/**
- * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle,
- * GlassStyle).
- */
-class LayerStyle : public Node {
- public:
-  /**
-   * The blend mode used when compositing the style. The default value is Normal.
-   */
-  BlendMode blendMode = BlendMode::Normal;
+namespace pag {
 
-  /**
-   * Whether to exclude child layer effects when computing this style. The default value is false.
-   */
-  bool excludeChildEffects = false;
+// Extracts every entry from an in-memory ZIP. Reading through minizip validates
+// the central directory and each entry's CRC in addition to returning its data.
+bool ExtractZipEntries(const pagx::Data* data,
+                       std::unordered_map<std::string, std::string>* entries,
+                       std::string* errorMsg = nullptr);
 
-  ~LayerStyle() override = default;
-
- protected:
-  LayerStyle() = default;
-
-  friend class PAGXDocument;
-};
-
-}  // namespace pagx
+}  // namespace pag

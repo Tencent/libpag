@@ -22,11 +22,12 @@
 #include "pagx/nodes/ConicGradient.h"
 #include "pagx/nodes/DiamondGradient.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "tgfx/core/Data.h"
 
 namespace pagx {
 
 // Renders shapes filled with color sources that HTML/CSS cannot express natively
-// (DiamondGradient and tiled ImagePattern) into a standalone PNG on disk. Internally spins up a
+// (DiamondGradient and tiled ImagePattern) into an in-memory PNG buffer. Internally spins up a
 // short-lived tgfx GL context, builds a minimal one-element PAGXDocument, and reuses the full
 // LayerBuilder pipeline so the rasterized result is visually identical to a native PAGX render.
 class HTMLStaticImageRenderer {
@@ -35,35 +36,41 @@ class HTMLStaticImageRenderer {
   // `left/top/width/height` describe the rectangle in its enclosing layer's coordinate space;
   // the gradient's center/matrix are assumed to be in that same space. `rasterScale` controls
   // the output PNG's pixel density relative to CSS pixels (usually 2.0 for @2x output).
-  // Returns true on success; false on any failure (no GL, surface creation, encode, file I/O).
-  static bool RenderDiamondToPng(float left, float top, float width, float height, float roundness,
-                                 const DiamondGradient* gradient, float rasterScale,
-                                 const std::string& outputPath);
+  // Returns the encoded PNG bytes on success; nullptr on any failure (no GL, surface creation,
+  // encode).
+  static std::shared_ptr<tgfx::Data> RenderDiamondToPng(float left, float top, float width,
+                                                        float height, float roundness,
+                                                        const DiamondGradient* gradient,
+                                                        float rasterScale);
 
   // Rasterizes an ellipse filled with the given DiamondGradient. Same coordinate conventions as
   // RenderDiamondToPng.
-  static bool RenderDiamondEllipseToPng(float left, float top, float width, float height,
-                                        const DiamondGradient* gradient, float rasterScale,
-                                        const std::string& outputPath);
+  static std::shared_ptr<tgfx::Data> RenderDiamondEllipseToPng(float left, float top, float width,
+                                                               float height,
+                                                               const DiamondGradient* gradient,
+                                                               float rasterScale);
 
   // Rasterizes a rounded rectangle (or 0-corner rectangle) filled with the given ImagePattern.
   // Useful when tileMode is Repeat/Mirror (CSS background-image handles Decal adequately but
   // cannot reproduce Mirror, and its Repeat semantics differ from tgfx's matrix-based tiling).
-  static bool RenderImagePatternToPng(float left, float top, float width, float height,
-                                      float roundness, const ImagePattern* pattern,
-                                      float rasterScale, const std::string& outputPath);
+  static std::shared_ptr<tgfx::Data> RenderImagePatternToPng(float left, float top, float width,
+                                                             float height, float roundness,
+                                                             const ImagePattern* pattern,
+                                                             float rasterScale);
 
   // Rasterizes an ellipse filled with the given ImagePattern.
-  static bool RenderImagePatternEllipseToPng(float left, float top, float width, float height,
-                                             const ImagePattern* pattern, float rasterScale,
-                                             const std::string& outputPath);
+  static std::shared_ptr<tgfx::Data> RenderImagePatternEllipseToPng(float left, float top,
+                                                                    float width, float height,
+                                                                    const ImagePattern* pattern,
+                                                                    float rasterScale);
 
   // Rasterizes a rectangle region filled with the given ConicGradient. The caller is responsible
   // for clipping the resulting <img> to the actual geometry shape. `left/top/width/height` are
   // in the SVG user-coordinate space; the gradient is evaluated in that same space.
-  static bool RenderConicGradientToPng(float left, float top, float width, float height,
-                                       const ConicGradient* gradient, float rasterScale,
-                                       const std::string& outputPath);
+  static std::shared_ptr<tgfx::Data> RenderConicGradientToPng(float left, float top, float width,
+                                                              float height,
+                                                              const ConicGradient* gradient,
+                                                              float rasterScale);
 };
 
 }  // namespace pagx

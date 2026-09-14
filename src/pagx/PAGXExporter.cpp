@@ -39,6 +39,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -48,6 +49,8 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
@@ -1219,6 +1222,38 @@ static void WriteShadowAttributes(XMLBuilder& xml, float offsetX, float offsetY,
   xml.addAttribute("color", ColorToHexString(color, color.alpha < 1.0f));
 }
 
+// NoiseStyle and NoiseFilter share the same noise parameters, so these two helpers serve both.
+// They are split because the two nodes place blendMode differently: NoiseStyle writes it up front
+// with the other LayerStyle attributes, while NoiseFilter writes it between the grain and color
+// parameters. Both orders mirror the importer and the XSD attribute declarations.
+template <typename T>
+static void WriteNoiseGrainAttributes(XMLBuilder& xml, const T* node) {
+  if (node->mode != Default<T>().mode) {
+    xml.addAttribute("mode", NoiseModeToString(node->mode));
+  }
+  xml.addAttribute("size", node->size, Default<T>().size);
+  xml.addAttribute("density", node->density, Default<T>().density);
+  xml.addAttribute("seed", node->seed, Default<T>().seed);
+}
+
+// Writes every non-default color and the opacity regardless of the active mode: the inactive
+// mode's fields must survive a round-trip so that changing mode later does not surface lost data.
+template <typename T>
+static void WriteNoiseColorAttributes(XMLBuilder& xml, const T* node) {
+  if (node->color != Default<T>().color) {
+    xml.addAttribute("color", ColorToHexString(node->color, node->color.alpha < 1.0f));
+  }
+  if (node->firstColor != Default<T>().firstColor) {
+    xml.addAttribute("firstColor",
+                     ColorToHexString(node->firstColor, node->firstColor.alpha < 1.0f));
+  }
+  if (node->secondColor != Default<T>().secondColor) {
+    xml.addAttribute("secondColor",
+                     ColorToHexString(node->secondColor, node->secondColor.alpha < 1.0f));
+  }
+  xml.addAttribute("opacity", node->opacity, Default<T>().opacity);
+}
+
 static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
   switch (node->nodeType()) {
     case NodeType::DropShadowStyle: {
@@ -1267,6 +1302,42 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->tileMode != Default<BackgroundBlurStyle>().tileMode) {
         xml.addAttribute("tileMode", TileModeToString(style->tileMode));
       }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::GlassStyle: {
+      auto style = static_cast<const GlassStyle*>(node);
+      xml.openElement("GlassStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<GlassStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<GlassStyle>().excludeChildEffects);
+      xml.addAttribute("refraction", style->refraction, Default<GlassStyle>().refraction);
+      xml.addAttribute("depth", style->depth, Default<GlassStyle>().depth);
+      xml.addAttribute("frost", style->frost, Default<GlassStyle>().frost);
+      xml.addAttribute("dispersion", style->dispersion, Default<GlassStyle>().dispersion);
+      xml.addAttribute("splay", style->splay, Default<GlassStyle>().splay);
+      xml.addAttribute("lightAngle", style->lightAngle, Default<GlassStyle>().lightAngle);
+      xml.addAttribute("lightIntensity", style->lightIntensity,
+                       Default<GlassStyle>().lightIntensity);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::NoiseStyle: {
+      auto style = static_cast<const NoiseStyle*>(node);
+      xml.openElement("NoiseStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<NoiseStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<NoiseStyle>().excludeChildEffects);
+      WriteNoiseGrainAttributes(xml, style);
+      WriteNoiseColorAttributes(xml, style);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -1334,6 +1405,19 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.openElement("ColorMatrixFilter");
       xml.addAttribute("id", filter->id);
       xml.addAttribute("matrix", FloatListToString(filter->matrix.data(), filter->matrix.size()));
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::NoiseFilter: {
+      auto filter = static_cast<const NoiseFilter*>(node);
+      xml.openElement("NoiseFilter");
+      xml.addAttribute("id", filter->id);
+      WriteNoiseGrainAttributes(xml, filter);
+      if (filter->blendMode != Default<NoiseFilter>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
+      }
+      WriteNoiseColorAttributes(xml, filter);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;

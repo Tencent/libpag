@@ -18,33 +18,36 @@
 
 #pragma once
 
-#include "pagx/types/BlendMode.h"
-#include "pagx/nodes/Node.h"
+#include <cstddef>
+#include <memory>
+#include <string>
+#include "pagx/types/Data.h"
+#include "pagx/utils/MemZip.h"
+#include "zip.h"
 
 namespace pagx {
 
-/**
- * Base class for layer styles (DropShadowStyle, InnerShadowStyle, BackgroundBlurStyle, NoiseStyle,
- * GlassStyle).
- */
-class LayerStyle : public Node {
+// ZIP output used exclusively by HTMLExporter::ToData. The writer owns the
+// partial archive until finish() transfers its allocation into a Data object.
+class HTMLZipWriter {
  public:
-  /**
-   * The blend mode used when compositing the style. The default value is Normal.
-   */
-  BlendMode blendMode = BlendMode::Normal;
+  HTMLZipWriter();
+  ~HTMLZipWriter();
 
-  /**
-   * Whether to exclude child layer effects when computing this style. The default value is false.
-   */
-  bool excludeChildEffects = false;
+  HTMLZipWriter(const HTMLZipWriter&) = delete;
+  HTMLZipWriter& operator=(const HTMLZipWriter&) = delete;
 
-  ~LayerStyle() override = default;
+  // entryPath is the complete, '/'-separated path inside the archive, such as
+  // "index.html" or "assets/img0.png".
+  bool write(const std::string& entryPath, const void* bytes, size_t size, std::string* errorMsg);
 
- protected:
-  LayerStyle() = default;
+  // Closes the archive and transfers its bytes into Data without copying them.
+  // Returns nullptr on failure.
+  std::shared_ptr<Data> finish(std::string* errorMsg);
 
-  friend class PAGXDocument;
+ private:
+  MemZipBuffer _buffer;
+  zipFile _zip = nullptr;
 };
 
 }  // namespace pagx

@@ -2270,6 +2270,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       if (hasBlendMode) {
         belowStyles.push_back({NodeType::BackgroundBlurStyle, ls});
       }
+    } else if (ls->nodeType() == NodeType::GlassStyle) {
+      // GlassStyle (frost / refraction / chromatic dispersion / edge lighting) is a GPU-shader
+      // backdrop effect that CSS cannot reproduce faithfully — a bare `backdrop-filter: blur()`
+      // would only capture the frost component and misrepresent the rest. Intentionally skipped
+      // so the layer's base content still renders and no wrong approximation is emitted.
     }
   }
   if (!pendingFilterDropShadows.empty()) {

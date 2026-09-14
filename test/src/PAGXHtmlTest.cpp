@@ -278,6 +278,26 @@ CLI_TEST(PAGXHtmlTest, LayerGroupOpacity) {
   EXPECT_NE(html.find("opacity: 0.5"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, GlassStylePreservesBaseContent) {
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(R"(
+<pagx width="120" height="120">
+  <Layer id="glass-layer" left="0" right="0" top="0" bottom="0">
+    <Rectangle position="60,60" size="80,60" roundness="12"/>
+    <Fill color="#336699"/>
+    <GlassStyle refraction="70" frost="8"/>
+  </Layer>
+</pagx>)",
+                                options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("id=\"glass-layer\""), std::string::npos);
+  EXPECT_TRUE(html.find("width:80px") != std::string::npos ||
+              html.find("width: 80px") != std::string::npos);
+  EXPECT_EQ(html.find("backdrop-filter"), std::string::npos);
+  EXPECT_EQ(html.find("GlassStyle"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, MultipleDropShadowStylesUseOneFilterSource) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;

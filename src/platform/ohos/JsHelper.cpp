@@ -67,16 +67,17 @@ static bool SetConstructor(napi_env env, napi_value constructor, const std::stri
       return false;
     }
   }
+  if (envMap.find(name) != envMap.end()) {
+    // Reuse the existing reference instead of deleting and recreating it. Multiple taskpool
+    // threads sharing the same napi_env can enter module init concurrently, and deleting a
+    // reference created on another thread corrupts the underlying global handle pool.
+    return true;
+  }
   napi_ref ref = nullptr;
   auto refStatus = napi_create_reference(env, constructor, 1, &ref);
   if (refStatus != napi_ok) {
     LOGE("SetConstructor napi_create_reference failed :%d", refStatus);
     return false;
-  }
-  auto refIt = envMap.find(name);
-  if (refIt != envMap.end()) {
-    napi_delete_reference(env, refIt->second);
-    envMap.erase(refIt);
   }
   envMap[name] = ref;
   return true;

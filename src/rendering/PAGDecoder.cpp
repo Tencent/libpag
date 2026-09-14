@@ -120,15 +120,23 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   auto width = roundf(static_cast<float>(composition->width()) * scale);
   auto height = roundf(static_cast<float>(composition->height()) * scale);
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
-  return std::shared_ptr<PAGDecoder>(new PAGDecoder(std::move(composition), static_cast<int>(width),
-                                                    static_cast<int>(height), result.first,
-                                                    result.second, maxFrameRate, sharedContext));
+  // Turn the caller's current GL context into a self-owned shared device right away, while the
+  // context is still guaranteed to be alive. GLDevice::Make() creates a brand-new context that only
+  // shares the sharegroup and reads the caller's context exactly once, so the decoder no longer
+  // depends on the lifetime of that context afterwards. This removes the use-after-free that
+  // happened when the raw context pointer was dereferenced later on a background thread in
+  // readFrame().
+  auto sharedDevice = sharedContext != nullptr ? tgfx::GLDevice::Make(sharedContext) : nullptr;
+  return std::shared_ptr<PAGDecoder>(
+      new PAGDecoder(std::move(composition), static_cast<int>(width), static_cast<int>(height),
+                     result.first, result.second, maxFrameRate, std::move(sharedDevice)));
 }
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
-                       int numFrames, float frameRate, float maxFrameRate, void* sharedContext)
+                       int numFrames, float frameRate, float maxFrameRate,
+                       std::shared_ptr<tgfx::GLDevice> sharedDevice)
     : _width(width), _height(height), _numFrames(numFrames), _frameRate(frameRate),
-      maxFrameRate(maxFrameRate), sharedContext(sharedContext) {
+      maxFrameRate(maxFrameRate), sharedDevice(std::move(sharedDevice)) {
   container = PAGComposition::Make(width, height);
   container->addLayer(composition);
   staticTimeRanges = GetStaticTimeRange(composition, _numFrames);
@@ -230,7 +238,7 @@ bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int in
     return false;
   }
   if (reader == nullptr) {
-    reader = CompositionReader::Make(_width, _height, sharedContext);
+    reader = CompositionReader::Make(_width, _height, sharedDevice);
     if (reader == nullptr) {
       LOGE("PAGDecoder::renderFrame() Failed to create a CompositionReader!");
       return false;

@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include "pagx/PAGXDocument.h"
+#include "pagx/types/Data.h"
 
 namespace pagx {
 
@@ -155,6 +157,31 @@ class HTMLExporter {
    */
   static bool ToFile(PAGXDocument& document, const std::string& filePath,
                      const Options& options = {}, std::string* errorMsg = nullptr);
+
+  /**
+   * Exports a PAGXDocument to an in-memory ZIP archive containing a full HTML
+   * document at index.html and all auxiliary resources under assets/. The
+   * archive is returned as a single buffer without writing any output file;
+   * callers decide whether to save it, upload it, or hand it to another layer.
+   *
+   * Image::data takes precedence (populated via PAGXDocument::loadFileDataMap()).
+   * A base64 data URI in filePath is decoded into the archive; other local filePath
+   * references are read from disk. References that resolve to neither (e.g. a
+   * "hash:" URI whose download is owned by the caller) degrade gracefully: the
+   * image is omitted from the archive and the archive stays valid.
+   *
+   * Returns nullptr when the archive cannot be produced. If errorMsg is non-null,
+   * a human-readable description is written to *errorMsg.
+   *
+   * @param document The PAGX document to export. Layout is applied automatically
+   *                 if needed.
+   * @param options Export options controlling output formatting.
+   * @param errorMsg Optional pointer to receive a human-readable error
+   *                 description on failure.
+   * @return The complete HTML ZIP archive as Data, or nullptr on failure.
+   */
+  static std::shared_ptr<Data> ToData(PAGXDocument& document, const Options& options = {},
+                                      std::string* errorMsg = nullptr);
 };
 
 }  // namespace pagx

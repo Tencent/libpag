@@ -42,6 +42,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -66,10 +67,12 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/ppt/PPTBoilerplate.h"
+#include "pagx/ppt/PPTFeatureProbe.h"
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
+#include "utils/PAGXImageTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
@@ -2917,92 +2920,6 @@ PAGX_TEST(PAGXPPTTest, BlurFilterIgnored) {
   ASSERT_TRUE(ExportAndVerify(*doc, "blur_filter_ignored"));
 }
 
-static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
-  // Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced)
-  static const uint8_t kMinimalPNG[] = {
-      0x89,
-      0x50,
-      0x4E,
-      0x47,
-      0x0D,
-      0x0A,
-      0x1A,
-      0x0A,  // PNG signature
-      // IHDR
-      0x00,
-      0x00,
-      0x00,
-      0x0D,
-      0x49,
-      0x48,
-      0x44,
-      0x52,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x08,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0xFD,
-      0xD4,
-      0x9A,
-      0x73,
-      // IDAT (compressed pixel data)
-      0x00,
-      0x00,
-      0x00,
-      0x14,
-      0x49,
-      0x44,
-      0x41,
-      0x54,
-      0x78,
-      0x9C,
-      0x62,
-      0xF8,
-      0xCF,
-      0xC0,
-      0xF0,
-      0x1F,
-      0x01,
-      0x18,
-      0x18,
-      0x18,
-      0x00,
-      0x09,
-      0x04,
-      0x01,
-      0x01,
-      0xE2,
-      0x2D,
-      0x42,
-      0xA3,
-      // IEND
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x49,
-      0x45,
-      0x4E,
-      0x44,
-      0xAE,
-      0x42,
-      0x60,
-      0x82,
-  };
-  auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(kMinimalPNG, sizeof(kMinimalPNG));
-  return image;
-}
-
 PAGX_TEST(PAGXPPTTest, ImagePatternFill_Stretch) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -4836,6 +4753,42 @@ PAGX_TEST(PAGXPPTTest, BackgroundBlurStyleEmitted) {
 
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "bg_blur_style"));
+}
+
+PAGX_TEST(PAGXPPTTest, GlassStyleUsesBackdropRasterization) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* background = doc->makeNode<pagx::Layer>();
+  auto* backgroundRect = doc->makeNode<pagx::Rectangle>();
+  backgroundRect->position = {200, 150};
+  backgroundRect->size = {400, 300};
+  background->contents.push_back(backgroundRect);
+  background->contents.push_back(MakeSolidFill(doc.get(), {0.2f, 0.4f, 0.8f, 1.0f}));
+  doc->layers.push_back(background);
+
+  auto* glassLayer = doc->makeNode<pagx::Layer>();
+  auto* glassRect = doc->makeNode<pagx::Rectangle>();
+  glassRect->position = {200, 150};
+  glassRect->size = {180, 120};
+  glassRect->roundness = 24;
+  glassLayer->contents.push_back(glassRect);
+  glassLayer->contents.push_back(MakeSolidFill(doc.get(), {1.0f, 1.0f, 1.0f, 0.35f}));
+  glassLayer->styles.push_back(doc->makeNode<pagx::GlassStyle>());
+  doc->layers.push_back(glassLayer);
+
+  auto features = pagx::ProbeLayerFeatures(glassLayer);
+  EXPECT_TRUE(features.hasBackdropStyle);
+  EXPECT_TRUE(features.needsRasterization(true));
+  EXPECT_TRUE(features.requiresBackdrop(true));
+  EXPECT_FALSE(features.needsRasterization(false));
+  EXPECT_FALSE(features.requiresBackdrop(false));
+
+  pagx::PPTExportOptions options;
+  options.bakeUnsupported = true;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/media/image1.png"), std::string::npos);
+  ASSERT_TRUE(ExportAndVerify(*doc, "glass_style_with_backdrop", options));
 }
 
 PAGX_TEST(PAGXPPTTest, MultipleShadowStylesAndFilters) {
@@ -6876,7 +6829,9 @@ PAGX_TEST(PAGXPPTTest, MultiPage_EmptyListFails) {
   std::vector<pagx::PAGXDocument*> docs;
   auto path = PPTOutDir() + "/multi_page_empty.pptx";
   EXPECT_FALSE(pagx::PPTExporter::ToFile(docs, path));
-  EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
+  std::string error;
+  EXPECT_EQ(pagx::PPTExporter::ToData(docs, {}, &error), nullptr);
+  EXPECT_FALSE(error.empty());
 }
 
 PAGX_TEST(PAGXPPTTest, MultiPage_NullEntryFails) {
