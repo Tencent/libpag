@@ -4820,6 +4820,49 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatMapsToNoneTiled) {
   EXPECT_FLOAT_EQ(pattern->matrix.ty, -30.0f);
 }
 
+// Chromium's computed value for `background-position: center` is `50% 50%`, and a percentage
+// resolves against the slack between the element box and the on-screen tile. A px-only parse
+// dropped that offset, so a small icon in a large box landed in the top-left corner.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImagePercentPositionResolvesAgainstTileSlack) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:90px;height:90px">
+      <div style="width:90px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=);
+                  background-size:30px 30px;background-repeat:no-repeat;
+                  background-position:50% 50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
+  // (90 - 30) * 50% = 30 on both axes.
+  EXPECT_FLOAT_EQ(pattern->matrix.tx, 30.0f);
+  EXPECT_FLOAT_EQ(pattern->matrix.ty, 30.0f);
+}
+
+// A single `background-position` value sets the horizontal axis and the vertical axis defaults to
+// `center` rather than to the leading edge.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSingleValuePositionDefaultsYToCenter) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:90px;height:90px">
+      <div style="width:90px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=);
+                  background-size:30px 30px;background-repeat:no-repeat;
+                  background-position:center"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_FLOAT_EQ(pattern->matrix.tx, 30.0f);
+  EXPECT_FLOAT_EQ(pattern->matrix.ty, 30.0f);
+}
+
 // `background-repeat: repeat-x` is a single-axis shorthand — X tiles, Y clamps to Decal.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatXTilesHorizontalOnly) {
   auto doc = ParseFromString(R"HTML(

@@ -1168,19 +1168,34 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
       pattern->matrix.d = tileH / static_cast<float>(nativeSize.second);
     }
 
-    // `background-position: <x>px <y>px` is the tile origin relative to this element's own box.
-    // Each re-imported card is a standalone Layer whose contents share the box origin, so the
-    // position maps straight onto the pattern matrix translation (the exporter writes the same
-    // value back, offset by the layer's own left/top which is zero in the standalone case).
+    // `background-position` is the tile origin relative to this element's own box. Each
+    // re-imported card is a standalone Layer whose contents share the box origin, so the position
+    // maps straight onto the pattern matrix translation (the exporter writes the same value back,
+    // offset by the layer's own left/top which is zero in the standalone case). Percentages and
+    // the `center` / `right` / `bottom` keywords resolve against the slack between the box and the
+    // on-screen tile, exactly like `mask-position` above. Chromium's computed value for
+    // `background-position: center` is `50% 50%`, so a px-only parse would silently drop the
+    // offset — a 30px icon in a 90px circle lands in the top-left corner instead of being centred.
+    float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+    float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+    // Without an explicit `background-size` the matrix stays at scale 1 and the tile is the image's
+    // native pixel box; an unknown native size leaves the percentage/keyword forms unresolvable.
+    float tileOnScreenW = (!std::isnan(tileW) && tileW > 0)
+                              ? tileW
+                              : (nativeSize.first > 0 ? static_cast<float>(nativeSize.first) : NAN);
+    float tileOnScreenH =
+        (!std::isnan(tileH) && tileH > 0)
+            ? tileH
+            : (nativeSize.second > 0 ? static_cast<float>(nativeSize.second) : NAN);
     auto posTokens = SplitTopLevelWhitespace(box.backgroundPosition);
-    if (posTokens.size() > 0) {
-      float posX = _valueParser->parseAbsoluteLengthPx(posTokens[0]);
-      if (!std::isnan(posX)) pattern->matrix.tx = posX;
-    }
-    if (posTokens.size() > 1) {
-      float posY = _valueParser->parseAbsoluteLengthPx(posTokens[1]);
-      if (!std::isnan(posY)) pattern->matrix.ty = posY;
-    }
+    std::string posX = posTokens.size() > 0 ? posTokens[0] : "";
+    // CSS resolves a single `background-position` value as the horizontal axis with the vertical
+    // defaulting to `center`, not to the leading edge.
+    std::string posY = posTokens.size() > 1 ? posTokens[1] : posTokens.size() == 1 ? "center" : "";
+    float tx = resolveMaskPositionAxis(posX, boxW, tileOnScreenW);
+    float ty = resolveMaskPositionAxis(posY, boxH, tileOnScreenH);
+    if (!std::isnan(tx)) pattern->matrix.tx = tx;
+    if (!std::isnan(ty)) pattern->matrix.ty = ty;
   }
 
   auto fill = _document->makeNode<Fill>();
