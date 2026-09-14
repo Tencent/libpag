@@ -24,6 +24,9 @@ namespace {
 // A frame wider or taller than this cannot come from a stream that any decoder supports, and
 // rejecting it also keeps the size arithmetic below well inside the range of an int.
 constexpr uint32_t MAX_FRAME_DIMENSION = 16384;
+// The coded size is measured in 16 pixel macroblocks, so this is the same bound as a macroblock
+// count, which also keeps the multiplication below in range.
+constexpr uint32_t MAX_FRAME_DIMENSION_IN_MBS = MAX_FRAME_DIMENSION / 16;
 
 // The offset cycle in pic_order_cnt_type 1 holds at most this many entries.
 constexpr uint32_t MAX_ORDER_COUNT_CYCLE = 255;
@@ -255,12 +258,12 @@ bool ParseH264SPSFrameSize(const uint8_t* data, size_t length, H264FrameSize* fr
       return false;
     }
   }
-  if (widthInMbs >= MAX_FRAME_DIMENSION / 16 || heightInMapUnits >= MAX_FRAME_DIMENSION / 16) {
+  if (widthInMbs >= MAX_FRAME_DIMENSION_IN_MBS || heightInMapUnits >= MAX_FRAME_DIMENSION_IN_MBS) {
     return false;
   }
   auto width = (widthInMbs + 1) * 16;
   auto height = (heightInMapUnits + 1) * 16 * (2 - frameMbsOnly);
-  if (width == 0 || height == 0) {
+  if (width == 0 || height == 0 || width > MAX_FRAME_DIMENSION || height > MAX_FRAME_DIMENSION) {
     return false;
   }
   frameSize->width = static_cast<int>(width);

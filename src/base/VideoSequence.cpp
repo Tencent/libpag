@@ -21,11 +21,6 @@
 #include "pag/file.h"
 
 namespace pag {
-// The exporter packs the alpha plane next to the color plane, so the encoded frame is at most twice
-// the image size plus the alignment padding it adds. A larger alphaStartX or alphaStartY means the
-// file declares a video that the decoder will never produce.
-static constexpr int64_t MAX_ALPHA_PACKING_PADDING = 8;
-
 VideoFrame::~VideoFrame() {
   delete fileBytes;
 }
@@ -51,15 +46,11 @@ bool VideoSequence::verify() const {
   // getVideoWidth() and getVideoHeight() add them to width and height, and that size is used both to
   // configure the decoder and to read the decoder's frame buffer, while the buffer is sized from the
   // bitstream. A file that declares a larger video than the stream contains would make that read go
-  // out of bounds, so compare the declared size against the coded size in the sequence parameter set
-  // and keep the offsets within the packing layout the exporter produces.
-  auto maxAlphaStartX = static_cast<int64_t>(width) + MAX_ALPHA_PACKING_PADDING;
-  auto maxAlphaStartY = static_cast<int64_t>(height) + MAX_ALPHA_PACKING_PADDING;
-  if (alphaStartX < 0 || alphaStartY < 0 || alphaStartX > maxAlphaStartX ||
-      alphaStartY > maxAlphaStartY) {
-    VerifyFailed();
-    return false;
-  }
+  // out of bounds, so the declared size may not exceed the coded size in the sequence parameter set.
+  // The coded size is a little larger than the cropped size a decoder displays, so this bounds the
+  // height of the read but not the width of one row. The software decoder path additionally rejects
+  // a frame whose planes are narrower than the declared width, see
+  // SoftwareDecoderWrapper::onRenderFrame().
   H264FrameSize frameSize = {};
   if (headers.empty() || headers[0] == nullptr ||
       !ParseH264SPSFrameSize(headers[0]->data(), headers[0]->length(), &frameSize)) {

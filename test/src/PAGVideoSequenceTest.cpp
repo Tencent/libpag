@@ -29,22 +29,30 @@ namespace pag {
 struct SequenceHeader {
   const char* path;
   size_t heightOffset;
-  size_t alphaStartXOffset;
-  size_t alphaStartYOffset;
+  int32_t height;
+  size_t alphaOffset;
+  int32_t alphaValue;
 };
 
+// wz_mvp.pag packs the alpha plane below the color plane, so it sets alphaStartY.
+// RootLayerVideoOffset.pag packs it side by side, so it sets alphaStartX. Both fields patched below
+// are stored in two bytes in these assets.
 static constexpr SequenceHeader SEQUENCE_HEADERS[] = {
-    {"resources/apitest/wz_mvp.pag", 103, 109, 110},
-    {"assets/RootLayerVideoOffset.pag", 92, 98, 100},
+    {"resources/apitest/wz_mvp.pag", 103, 253, 110, 258},
+    {"assets/RootLayerVideoOffset.pag", 92, 1080, 98, 720},
 };
 
-static void EncodeInt32(uint8_t* out, int32_t value) {
+// Encodes value the way the PAG writer does and fails when it does not fit in capacity.
+static bool EncodeInt32(uint8_t* out, size_t capacity, int32_t value, size_t* encodedLength) {
   auto encoded = static_cast<uint32_t>(value < 0 ? -value : value) << 1;
   if (value < 0) {
     encoded |= 1;
   }
-  int count = 0;
+  size_t count = 0;
   while (true) {
+    if (count >= capacity) {
+      return false;
+    }
     auto group = static_cast<uint8_t>(encoded & 0x7F);
     encoded >>= 7;
     if (encoded != 0) {
@@ -54,21 +62,50 @@ static void EncodeInt32(uint8_t* out, int32_t value) {
       break;
     }
   }
+  *encodedLength = count;
+  return true;
 }
 
-// Returns a copy of the asset with the given field of its video sequence header replaced by value.
-// The value is chosen to need the same number of bytes as the original, so the rest of the file
-// stays readable.
+// Decodes the value stored in fieldLength bytes, to check a sample still starts from the value the
+// asset declares.
+static bool DecodeInt32(const uint8_t* data, size_t fieldLength, int32_t* value) {
+  uint32_t encoded = 0;
+  for (size_t i = 0; i < fieldLength; i++) {
+    encoded |= static_cast<uint32_t>(data[i] & 0x7F) << (7 * i);
+    if ((data[i] & 0x80) == 0) {
+      if (i + 1 != fieldLength) {
+        return false;
+      }
+      auto magnitude = static_cast<int32_t>(encoded >> 1);
+      *value = (encoded & 1) != 0 ? -magnitude : magnitude;
+      return true;
+    }
+  }
+  return false;
+}
+
+// Returns a copy of the asset with the given field of its video sequence header replaced by
+// newValue. The field currently has to hold originalValue and the new value has to need the same
+// number of bytes, so the rest of the file stays readable. Returns nullptr if the asset does not
+// have the expected layout.
 static std::shared_ptr<tgfx::Data> MakeSample(const SequenceHeader& header, size_t offset,
-                                              int32_t value, size_t fieldLength) {
+                                              int32_t originalValue, int32_t newValue) {
   auto bytes = ReadFile(header.path);
+  constexpr size_t fieldLength = 2;
   if (bytes == nullptr || bytes->size() <= offset + fieldLength) {
+    return nullptr;
+  }
+  auto raw = static_cast<const uint8_t*>(bytes->data());
+  int32_t value = 0;
+  uint8_t encoded[4] = {};
+  size_t encodedLength = 0;
+  if (!DecodeInt32(raw + offset, fieldLength, &value) || value != originalValue ||
+      !EncodeInt32(encoded, sizeof(encoded), newValue, &encodedLength) ||
+      encodedLength != fieldLength) {
     return nullptr;
   }
   auto sample = tgfx::Data::MakeWithCopy(bytes->data(), bytes->size());
   auto writable = const_cast<uint8_t*>(static_cast<const uint8_t*>(sample->data()));
-  uint8_t encoded[4] = {};
-  EncodeInt32(encoded, value);
   memcpy(writable + offset, encoded, fieldLength);
   return sample;
 }
@@ -97,18 +134,16 @@ PAG_TEST(PAGVideoSequenceTest, AcceptsDeclaredSizeMatchingStream) {
 // contain, which used to make the upload read past the decoder's frame buffer.
 PAG_TEST(PAGVideoSequenceTest, RejectsDeclaredHeightLargerThanStream) {
   for (auto& header : SEQUENCE_HEADERS) {
-    ExpectLoadResult(MakeSample(header, header.heightOffset, 4095, 2), false);
+    ExpectLoadResult(MakeSample(header, header.heightOffset, header.height, 4095), false);
   }
 }
 
 // The alpha offsets are added to the declared width and height, so a large one inflates the
 // declared video size in the same way.
 PAG_TEST(PAGVideoSequenceTest, RejectsAlphaStartBeyondImageSize) {
-  // wz_mvp.pag packs alpha vertically, RootLayerVideoOffset.pag packs it side by side.
-  ExpectLoadResult(MakeSample(SEQUENCE_HEADERS[0], SEQUENCE_HEADERS[0].alphaStartYOffset, 4000, 2),
-                   false);
-  ExpectLoadResult(MakeSample(SEQUENCE_HEADERS[1], SEQUENCE_HEADERS[1].alphaStartXOffset, 4000, 2),
-                   false);
+  for (auto& header : SEQUENCE_HEADERS) {
+    ExpectLoadResult(MakeSample(header, header.alphaOffset, header.alphaValue, 4000), false);
+  }
 }
 
 }  // namespace pag
