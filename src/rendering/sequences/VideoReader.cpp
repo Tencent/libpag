@@ -27,10 +27,17 @@
 namespace pag {
 
 static constexpr int MAX_TRY_DECODE_COUNT = 100;
+static constexpr int64_t MAX_STALL_TIME_US = 500000;
+static constexpr int64_t MAX_TOTAL_DECODE_TIME_US = 2000000;
 static constexpr int FORCE_SOFTWARE_SIZE = 160000;  // 400x400
 
 VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
-    : demuxer(videoDemuxer.release()) {
+    : VideoReader(std::move(videoDemuxer), Platform::Current()->getVideoDecoderFactories()) {
+}
+
+VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer,
+                         std::vector<const VideoDecoderFactory*> decoderFactories)
+    : demuxer(videoDemuxer.release()), decoderFactories(std::move(decoderFactories)) {
   auto videoFormat = demuxer->getFormat();
   frameRate = videoFormat.frameRate;
   // Force using software decoders only when external decoders are available, because the built-in
@@ -47,8 +54,14 @@ VideoReader::~VideoReader() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) {
+  auto deadline = tgfx::Clock::Now() + MAX_TOTAL_DECODE_TIME_US;
   // Need a locker here in case there are other threads are decoding at the same time.
   std::lock_guard<std::mutex> autoLock(locker);
+  if (fallbackPending) {
+    destroyVideoDecoder();
+    factoryIndex++;
+    fallbackPending = false;
+  }
   auto targetTime = FrameToTime(targetFrame, frameRate);
   auto sampleTime = demuxer->getSampleTimeAt(targetTime);
   if (sampleTime == currentRenderedTime) {
@@ -56,24 +69,26 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
   }
   lastBuffer = nullptr;
   currentRenderedTime = INT64_MIN;
-  if (!checkVideoDecoder()) {
+  if (!checkVideoDecoder() || tgfx::Clock::Now() >= deadline) {
     return nullptr;
   }
-  auto success = decodeFrame(sampleTime);
-  if (!success) {
-    // retry once.
+  auto status = decodeFrame(sampleTime, deadline);
+  if (status == DecodeStatus::Stalled) {
+    fallbackPending = true;
+    return nullptr;
+  }
+  if (status == DecodeStatus::Error && tgfx::Clock::Now() < deadline) {
     resetParams();
-    success = decodeFrame(sampleTime);
-    if (!success) {
-      // fallback to software decoder.
+    status = decodeFrame(sampleTime, deadline);
+    if (status == DecodeStatus::Error && tgfx::Clock::Now() < deadline) {
       destroyVideoDecoder();
       factoryIndex++;
-      if (checkVideoDecoder()) {
-        success = decodeFrame(sampleTime);
+      if (checkVideoDecoder() && tgfx::Clock::Now() < deadline) {
+        status = decodeFrame(sampleTime, deadline);
       }
     }
   }
-  if (!success) {
+  if (status != DecodeStatus::Success) {
     LOGE("VideoDecoder: Error on decoding frame.\n");
     return nullptr;
   }
@@ -81,6 +96,8 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
     lastBuffer = videoDecoder->onRenderFrame();
     if (lastBuffer) {
       currentRenderedTime = currentDecodedTime;
+    } else {
+      fallbackPending = true;
     }
   }
   return lastBuffer;
@@ -128,34 +145,41 @@ bool VideoReader::sendSampleData() {
   return true;
 }
 
-bool VideoReader::decodeFrame(int64_t sampleTime) {
+VideoReader::DecodeStatus VideoReader::decodeFrame(int64_t sampleTime, int64_t deadline) {
   if (demuxer->needSeeking(currentDecodedTime, sampleTime)) {
     resetParams();
     videoDecoder->onFlush();
     demuxer->seekTo(sampleTime);
   }
+  auto lastProgressTime = tgfx::Clock::Now();
   int tryDecodeCount = 0;
   while (currentDecodedTime < sampleTime) {
+    if (tgfx::Clock::Now() >= deadline) {
+      return DecodeStatus::Stalled;
+    }
     if (!sendSampleData()) {
-      return false;
+      return DecodeStatus::Error;
     }
     auto result = videoDecoder->onDecodeFrame();
     if (result == DecodingResult::Error) {
-      return false;
+      return DecodeStatus::Error;
     } else if (result == DecodingResult::Success) {
       tryDecodeCount = 0;
+      lastProgressTime = tgfx::Clock::Now();
       currentDecodedTime = videoDecoder->presentationTime();
     } else if (result == DecodingResult::EndOfStream) {
       outputEndOfStream = true;
-      return true;
+      return DecodeStatus::Success;
     } else if (result == DecodingResult::TryAgainLater) {
-      if ((tryDecodeCount++) >= MAX_TRY_DECODE_COUNT) {
-        LOGE("VideoDecoder: try decoding frame count reach limit %d.\n", MAX_TRY_DECODE_COUNT);
-        return false;
+      auto currentTime = tgfx::Clock::Now();
+      if (++tryDecodeCount >= MAX_TRY_DECODE_COUNT ||
+          currentTime - lastProgressTime >= MAX_STALL_TIME_US || currentTime >= deadline) {
+        LOGE("VideoDecoder: decoding frame stalled after %d attempts.\n", tryDecodeCount);
+        return DecodeStatus::Stalled;
       }
     }
   }
-  return true;
+  return DecodeStatus::Success;
 }
 
 bool VideoReader::checkVideoDecoder() {
@@ -193,9 +217,8 @@ void VideoReader::resetParams() {
 }
 
 std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
-  static const auto factories = Platform::Current()->getVideoDecoderFactories();
-  while (factoryIndex < static_cast<int>(factories.size())) {
-    auto factory = factories[factoryIndex];
+  while (factoryIndex < static_cast<int>(decoderFactories.size())) {
+    auto factory = decoderFactories[factoryIndex];
     if (factory->isHardwareBacked() && preferSoftware) {
       factoryIndex++;
       continue;

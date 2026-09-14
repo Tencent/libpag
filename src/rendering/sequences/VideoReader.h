@@ -19,6 +19,7 @@
 #pragma once
 
 #include <atomic>
+#include <vector>
 #include "SequenceReader.h"
 #include "rendering/video/VideoDecoderFactory.h"
 #include "rendering/video/VideoDemuxer.h"
@@ -27,6 +28,9 @@ namespace pag {
 class VideoReader : public SequenceReader {
  public:
   explicit VideoReader(std::unique_ptr<VideoDemuxer> demuxer);
+
+  VideoReader(std::unique_ptr<VideoDemuxer> demuxer,
+              std::vector<const VideoDecoderFactory*> decoderFactories);
 
   ~VideoReader() override;
 
@@ -44,11 +48,19 @@ class VideoReader : public SequenceReader {
   void onReportPerformance(Performance* performance, int64_t decodingTime) override;
 
  private:
+  enum class DecodeStatus {
+    Success,
+    Error,
+    Stalled,
+  };
+
   std::mutex locker = {};
   VideoDemuxer* demuxer = nullptr;
+  std::vector<const VideoDecoderFactory*> decoderFactories = {};
   float frameRate = 0.0;
   int factoryIndex = 0;
   bool preferSoftware = false;
+  bool fallbackPending = false;
   VideoDecoder* videoDecoder = nullptr;
   VideoSample videoSample = {};
   std::shared_ptr<tgfx::ImageBuffer> lastBuffer = nullptr;
@@ -67,7 +79,7 @@ class VideoReader : public SequenceReader {
 
   bool sendSampleData();
 
-  bool decodeFrame(int64_t sampleTime);
+  DecodeStatus decodeFrame(int64_t sampleTime, int64_t deadline);
 
   std::unique_ptr<VideoDecoder> makeVideoDecoder();
 };

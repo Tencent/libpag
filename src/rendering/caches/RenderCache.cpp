@@ -88,8 +88,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   auto sequence = Sequence::Get(composition);
   auto info = SequenceInfo::Make(sequence);
   if (composition->staticContent()) {
-    SequenceImageProxy proxy(info, 0);
-    prepareAssetImage(composition->uniqueID, &proxy);
+    prepareStaticSequenceImage(info);
     return;
   }
   auto result = sequenceCaches.find(composition->uniqueID);
@@ -117,13 +116,41 @@ void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
 }
 
 void RenderCache::prepareNextFrame() {
+  checkSequenceDecodeFailure();
 #ifndef PAG_BUILD_FOR_WEB
   for (auto& item : usedSequences) {
     for (auto& map : item.second) {
-      map.second->prepareNextImage();
+      map.second.queue->prepareNextImage();
     }
   }
 #endif
+}
+
+void RenderCache::checkSequenceDecodeFailure() {
+  for (auto& item : usedStaticSequences) {
+    auto& result = item.second;
+    if (result == nullptr ||
+        result->status.load(std::memory_order_acquire) != SequenceReadStatus::Failed) {
+      continue;
+    }
+    lastFrameHasSequenceDecodeFailure = true;
+    _sequenceCacheInvalidated = true;
+    assetImages.erase(item.first);
+    decodedAssetImages.erase(item.first);
+    staticSequenceResults.erase(item.first);
+  }
+  for (auto& item : usedSequences) {
+    for (auto& map : item.second) {
+      auto& usage = map.second;
+      if (usage.result == nullptr ||
+          usage.result->status.load(std::memory_order_acquire) != SequenceReadStatus::Failed) {
+        continue;
+      }
+      lastFrameHasSequenceDecodeFailure = true;
+      _sequenceCacheInvalidated = true;
+      usage.queue->invalidateFailedRequest(usage.result->requestID, usage.result->targetFrame);
+    }
+  }
 }
 
 void RenderCache::clearExpiredSequences() {
@@ -152,7 +179,9 @@ void RenderCache::setSnapshotEnabled(bool value) {
 
 void RenderCache::beginFrame() {
   usedAssets = {};
+  usedStaticSequences = {};
   usedSequences = {};
+  lastFrameHasSequenceDecodeFailure = false;
   resetPerformance();
 }
 
@@ -174,6 +203,8 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forDrawing) {
     removeSnapshot(assetID);
     assetImages.erase(assetID);
     decodedAssetImages.erase(assetID);
+    staticSequenceResults.erase(assetID);
+    usedStaticSequences.erase(assetID);
     clearSequenceCache(assetID);
   }
 }
@@ -379,11 +410,69 @@ void RenderCache::clearExpiredDecodedImages() {
 
 //===================================== sequence caches =====================================
 
+void RenderCache::prepareStaticSequenceImage(std::shared_ptr<SequenceInfo> sequence) {
+  auto assetID = sequence->uniqueID();
+  usedAssets.insert(assetID);
+  if (decodedAssetImages.count(assetID) != 0 || hasSnapshot(assetID)) {
+    return;
+  }
+  auto image = assetImages[assetID];
+  if (image == nullptr) {
+    auto result = std::make_shared<SequenceReadResult>();
+    result->requestID = 1;
+    result->targetFrame = 0;
+    image = sequence->makeStaticImage(getFileByAssetID(assetID), _useDiskCache, result);
+    if (image == nullptr) {
+      result->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+      return;
+    }
+    assetImages[assetID] = image;
+    staticSequenceResults[assetID] = result;
+  }
+  auto decodedImage = image->makeDecoded(context);
+  if (decodedImage != image) {
+    decodedAssetImages[assetID] = decodedImage;
+  }
+}
+
+std::shared_ptr<tgfx::Image> RenderCache::getStaticSequenceImage(
+    std::shared_ptr<SequenceInfo> sequence) {
+  auto assetID = sequence->uniqueID();
+  usedAssets.insert(assetID);
+  usedStaticSequences[assetID] = staticSequenceResults[assetID];
+  auto result = decodedAssetImages.find(assetID);
+  if (result != decodedAssetImages.end()) {
+    auto decodedImage = result->second;
+    decodedAssetImages.erase(result);
+    return decodedImage;
+  }
+  auto image = assetImages[assetID];
+  if (image != nullptr) {
+    return image;
+  }
+  auto readResult = std::make_shared<SequenceReadResult>();
+  readResult->requestID = 1;
+  readResult->targetFrame = 0;
+  image = sequence->makeStaticImage(getFileByAssetID(assetID), _useDiskCache, readResult);
+  if (image == nullptr) {
+    readResult->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+    usedStaticSequences[assetID] = readResult;
+    return nullptr;
+  }
+  assetImages[assetID] = image;
+  staticSequenceResults[assetID] = readResult;
+  usedStaticSequences[assetID] = readResult;
+  return image;
+}
+
 void RenderCache::prepareSequenceImage(std::shared_ptr<SequenceInfo> sequence, Frame targetFrame) {
   auto queue = getSequenceImageQueue(sequence, targetFrame);
-  if (queue != nullptr) {
-    queue->prepare(targetFrame);
+  if (queue == nullptr) {
+    return;
   }
+  std::shared_ptr<SequenceReadResult> result = nullptr;
+  queue->prepare(targetFrame, &result);
+  usedSequences[sequence->uniqueID()][targetFrame].result = std::move(result);
 }
 
 std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(std::shared_ptr<SequenceInfo> sequence,
@@ -392,8 +481,11 @@ std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(std::shared_ptr<Seque
   if (queue == nullptr) {
     return nullptr;
   }
+  std::shared_ptr<SequenceReadResult> result = nullptr;
+  auto image = queue->getImage(targetFrame, &result);
+  usedSequences[sequence->uniqueID()][targetFrame].result = std::move(result);
   // We don't check mipmaps for sequences since there is currently no backend support yet.
-  return queue->getImage(targetFrame);
+  return image;
 }
 
 SequenceImageQueue* RenderCache::getSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
@@ -410,14 +502,14 @@ SequenceImageQueue* RenderCache::getSequenceImageQueue(std::shared_ptr<SequenceI
   auto& sequenceMap = usedSequences[assetID];
   auto result = sequenceMap.find(targetFrame);
   if (result != sequenceMap.end()) {
-    return result->second;
+    return result->second.queue;
   }
   auto queue = findNearestSequenceImageQueue(sequence, targetFrame);
   if (queue == nullptr) {
     queue = makeSequenceImageQueue(sequence);
   }
   if (queue != nullptr) {
-    sequenceMap[targetFrame] = queue;
+    sequenceMap[targetFrame].queue = queue;
   }
   return queue;
 }
@@ -432,7 +524,7 @@ SequenceImageQueue* RenderCache::findNearestSequenceImageQueue(
   auto& sequenceMap = usedSequences[assetID];
   std::unordered_set<SequenceImageQueue*> usedQueues = {};
   for (auto& item : sequenceMap) {
-    usedQueues.insert(item.second);
+    usedQueues.insert(item.second.queue);
   }
   std::vector<SequenceImageQueue*> freeQueues = {};
   for (auto& item : result->second) {
@@ -481,6 +573,8 @@ SequenceImageQueue* RenderCache::makeSequenceImageQueue(std::shared_ptr<Sequence
 }
 
 void RenderCache::clearAllSequenceCaches() {
+  staticSequenceResults.clear();
+  usedStaticSequences.clear();
   for (auto& item : sequenceCaches) {
     removeSnapshot(item.first);
     for (auto queue : item.second) {
@@ -491,6 +585,8 @@ void RenderCache::clearAllSequenceCaches() {
 }
 
 void RenderCache::clearSequenceCache(ID uniqueID) {
+  staticSequenceResults.erase(uniqueID);
+  usedStaticSequences.erase(uniqueID);
   auto result = sequenceCaches.find(uniqueID);
   if (result != sequenceCaches.end()) {
     removeSnapshot(result->first);

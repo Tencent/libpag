@@ -148,9 +148,8 @@ class PAGAnimator {
 
     /**
      * Manually update the animation to the current progress without altering its playing status. If
-     * isSync is set to false, the calling thread won't be blocked. Please note that if the
-     * animation already has an ongoing asynchronous flushing task, this action won't have any
-     * effect.
+     * isSync is set to false, the calling thread won't be blocked. Updates requested while an
+     * asynchronous flush is running are merged into one additional flush using the latest progress.
      */
     public native void update();
 

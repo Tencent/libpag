@@ -23,10 +23,15 @@
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 
 namespace pag {
-std::shared_ptr<tgfx::ImageBuffer> SequenceReader::readBuffer(Frame targetFrame) {
+std::shared_ptr<tgfx::ImageBuffer> SequenceReader::readBuffer(
+    Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result) {
   tgfx::Clock clock = {};
   auto buffer = onMakeBuffer(targetFrame);
   decodingTime += clock.measure();
+  if (result != nullptr) {
+    auto status = buffer != nullptr ? SequenceReadStatus::Succeeded : SequenceReadStatus::Failed;
+    result->status.store(status, std::memory_order_release);
+  }
   return buffer;
 }
 

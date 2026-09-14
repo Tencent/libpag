@@ -41,41 +41,109 @@ SequenceImageQueue::SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
 }
 
 void SequenceImageQueue::prepareNextImage() {
-  auto nextFrame = currentFrame + 1;
+  auto nextFrame = lastRequestedFrame + 1;
   if (nextFrame >= totalFrames) {
     nextFrame = firstFrame;
   }
   prepare(nextFrame);
 }
 
-void SequenceImageQueue::prepare(Frame targetFrame) {
-  if (preparedImage != nullptr || targetFrame < 0 || targetFrame >= totalFrames) {
+void SequenceImageQueue::prepare(Frame targetFrame, std::shared_ptr<SequenceReadResult>* result) {
+  if (targetFrame < 0 || targetFrame >= totalFrames) {
     return;
   }
-  auto image = sequence->makeFrameImage(reader, targetFrame, useDiskCache);
-  preparedImage = image->makeDecoded();
-  preparedFrame = targetFrame;
+  if (preparedImage != nullptr) {
+    if (result != nullptr && targetFrame == preparedFrame) {
+      *result = preparedResult;
+    }
+    return;
+  }
+  auto readResult = std::make_shared<SequenceReadResult>();
+  readResult->requestID = ++nextRequestID;
+  readResult->targetFrame = targetFrame;
+  auto image = sequence->makeFrameImage(reader, targetFrame, useDiskCache, readResult);
+  if (image != nullptr) {
+    preparedImage = image->makeDecoded();
+  }
+  if (preparedImage == nullptr) {
+    readResult->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+  } else {
+    preparedFrame = targetFrame;
+    preparedResult = readResult;
+    lastRequestedFrame = targetFrame;
+  }
+  if (result != nullptr) {
+    *result = readResult;
+  }
 }
 
-std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(Frame targetFrame) {
+std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(
+    Frame targetFrame, std::shared_ptr<SequenceReadResult>* result) {
+  lastRequestedFrame = targetFrame;
   if (targetFrame == currentFrame) {
+    if (result != nullptr) {
+      *result = currentResult;
+    }
     return currentImage;
   }
   if (targetFrame == preparedFrame) {
     currentImage = preparedImage;
-    preparedImage = nullptr;
     currentFrame = preparedFrame;
+    currentResult = preparedResult;
+    preparedImage = nullptr;
+    preparedFrame = -1;
+    preparedResult = nullptr;
+    if (result != nullptr) {
+      *result = currentResult;
+    }
     return currentImage;
   }
-  auto image = sequence->makeFrameImage(reader, targetFrame, useDiskCache);
+  auto readResult = std::make_shared<SequenceReadResult>();
+  readResult->requestID = ++nextRequestID;
+  readResult->targetFrame = targetFrame;
+  auto image = sequence->makeFrameImage(reader, targetFrame, useDiskCache, readResult);
   if (image == nullptr) {
+    readResult->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+    if (result != nullptr) {
+      *result = readResult;
+    }
     return nullptr;
   }
-  currentImage = image->makeDecoded();
-  preparedImage = nullptr;
+  auto decodedImage = image->makeDecoded();
+  if (decodedImage == nullptr) {
+    readResult->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+    if (result != nullptr) {
+      *result = readResult;
+    }
+    return nullptr;
+  }
+  currentImage = std::move(decodedImage);
   currentFrame = targetFrame;
-  preparedFrame = targetFrame;
+  currentResult = readResult;
+  preparedImage = nullptr;
+  preparedFrame = -1;
+  preparedResult = nullptr;
+  if (result != nullptr) {
+    *result = currentResult;
+  }
   return currentImage;
+}
+
+void SequenceImageQueue::invalidateFailedRequest(uint64_t requestID, Frame targetFrame) {
+  if (currentResult != nullptr && currentResult->requestID == requestID &&
+      currentResult->targetFrame == targetFrame &&
+      currentResult->status.load(std::memory_order_acquire) == SequenceReadStatus::Failed) {
+    currentFrame = -1;
+    currentImage = nullptr;
+    currentResult = nullptr;
+  }
+  if (preparedResult != nullptr && preparedResult->requestID == requestID &&
+      preparedResult->targetFrame == targetFrame &&
+      preparedResult->status.load(std::memory_order_acquire) == SequenceReadStatus::Failed) {
+    preparedFrame = -1;
+    preparedImage = nullptr;
+    preparedResult = nullptr;
+  }
 }
 
 void SequenceImageQueue::reportPerformance(Performance* performance) {
