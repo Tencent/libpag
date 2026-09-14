@@ -30,10 +30,14 @@ namespace pag {
 // constructor context on the current JS realm's global object so an address reused by another
 // engine cannot expose references owned by the destroyed engine. napi_set_instance_data is not
 // used here because OHOS provides only one instance-data slot shared by all native modules.
+// The stored value is validated with napi_get_value_external plus the magic field. napi_type_tag
+// cannot be used because it only accepts ArkTS objects and the context is held by an external,
+// which is reported as napi_external instead of napi_object.
 static constexpr uint64_t CONSTRUCTOR_CONTEXT_MAGIC = 0x504147434F4E5458ULL;
 static constexpr char CONSTRUCTOR_CONTEXT_KEY[] = "__libpag_ohos_constructor_context_v1__";
-static const napi_type_tag ConstructorContextTypeTag = {0x4C49425041474F48ULL,
-                                                        0x4F53434F4E544558ULL};
+// Configurable so an invalid entry can always be replaced instead of leaving the realm permanently
+// unable to initialize. Not writable so JS cannot overwrite it by a plain assignment.
+static constexpr napi_property_attributes CONSTRUCTOR_CONTEXT_ATTRIBUTES = napi_configurable;
 
 enum class ConstructorContextState {
   Initializing,
@@ -86,12 +90,6 @@ static ConstructorContext* GetConstructorContext(napi_env env) {
     LOGE("GetConstructorContext napi_get_property failed :%d", status);
     return nullptr;
   }
-  bool matches = false;
-  status = napi_check_object_type_tag(env, external, &ConstructorContextTypeTag, &matches);
-  if (status != napi_ok || !matches) {
-    LOGE("GetConstructorContext invalid type tag :%d", status);
-    return nullptr;
-  }
   void* data = nullptr;
   status = napi_get_value_external(env, external, &data);
   if (status != napi_ok || data == nullptr) {
@@ -121,13 +119,14 @@ static ConstructorContext* CreateConstructorContext(napi_env env) {
     LOGE("CreateConstructorContext napi_create_external failed :%d", status);
     return nullptr;
   }
-  status = napi_type_tag_object(env, external, &ConstructorContextTypeTag);
-  if (status != napi_ok) {
-    LOGE("CreateConstructorContext napi_type_tag_object failed :%d", status);
-    return nullptr;
-  }
-  napi_property_descriptor property = {
-      CONSTRUCTOR_CONTEXT_KEY, nullptr, nullptr, nullptr, nullptr, external, napi_default, nullptr};
+  napi_property_descriptor property = {CONSTRUCTOR_CONTEXT_KEY,
+                                       nullptr,
+                                       nullptr,
+                                       nullptr,
+                                       nullptr,
+                                       external,
+                                       CONSTRUCTOR_CONTEXT_ATTRIBUTES,
+                                       nullptr};
   status = napi_define_properties(env, global, 1, &property);
   if (status != napi_ok) {
     LOGE("CreateConstructorContext napi_define_properties failed :%d", status);
@@ -159,14 +158,17 @@ bool PrepareConstructorContext(napi_env env, bool* needsInitialization) {
     *needsInitialization = true;
     return true;
   }
-  if (context->state == ConstructorContextState::Failed) {
+  if (context->state != ConstructorContextState::Ready) {
+    // Either a previous init failed or it aborted before FinishConstructorContext could run.
+    // PAGInitMutex serializes init, so restarting is safe and keeps the realm usable instead of
+    // failing every later init. Leftover entries are dropped without deleting the references: they
+    // belong to an attempt that may have run on another thread, and the engine releases them
+    // during teardown.
+    LOGE("PrepareConstructorContext restart from state :%d", static_cast<int>(context->state));
+    context->constructors.clear();
     context->state = ConstructorContextState::Initializing;
     *needsInitialization = true;
     return true;
-  }
-  if (context->state != ConstructorContextState::Ready) {
-    LOGE("PrepareConstructorContext invalid state :%d", static_cast<int>(context->state));
-    return false;
   }
   *needsInitialization = false;
   return true;
