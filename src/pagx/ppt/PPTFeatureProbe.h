@@ -51,11 +51,12 @@ struct PPTFeatureFlags {
                                      // translation, rotation, and axis-aligned scale/flip). The
                                      // exporter's matrix decomposition silently drops the shear,
                                      // producing a visibly wrong shape unless the layer is baked.
-  bool hasBackgroundBlur = false;    // BackgroundBlurStyle is a frosted-glass / backdrop-filter
-                                     // effect; OOXML has no native backdrop-blur primitive
-                                     // (a:blur blurs the shape itself, including its strokes and
-                                     // rounded corners, so it is not a valid stand-in). On the
-                                     // vector path the style is silently dropped; only the
+  bool hasBackdropStyle = false;     // A backdrop-sampling layer style (BackgroundBlurStyle or
+                                     // GlassStyle). Both are shader-based effects that sample the
+                                     // pixels behind the layer (frosted blur for BackgroundBlur;
+                                     // refraction / dispersion / edge lighting for Glass). OOXML
+                                     // has no primitive that can reproduce either; on the vector
+                                     // path the style is silently dropped, and only the
                                      // backdrop-aware raster fallback can reproduce it.
 
   /**
@@ -63,7 +64,7 @@ struct PPTFeatureFlags {
    * back to baking the layer to a PNG patch. Features with no meaningful vector fallback
    * (TextPath, TextModifier, ColorMatrix, conic/diamond gradients, shear transforms) always
    * trigger a bake. Features that have a degraded-but-valid vector fallback (unsupported blend
-   * modes fall back to Normal, wide-gamut colors clamp to sRGB, background blur is dropped)
+   * modes fall back to Normal, wide-gamut colors clamp to sRGB, backdrop styles are dropped)
    * trigger a bake only when the caller opts in via `bakeUnsupported`.
    */
   bool needsRasterization(bool bakeUnsupported) const {
@@ -71,7 +72,7 @@ struct PPTFeatureFlags {
         hasDiamondGradient || hasShearTransform) {
       return true;
     }
-    if (bakeUnsupported && (hasUnsupportedBlend || hasWideGamutColor || hasBackgroundBlur)) {
+    if (bakeUnsupported && (hasUnsupportedBlend || hasWideGamutColor || hasBackdropStyle)) {
       return true;
     }
     return false;
@@ -79,11 +80,11 @@ struct PPTFeatureFlags {
 
   /**
    * Returns true when reproducing the unsupported feature requires compositing the layer against
-   * the real backdrop pixels (non-Normal blend mode, BackgroundBlurStyle). Self-contained features
+   * the real backdrop pixels (non-Normal blend mode, backdrop styles). Self-contained features
    * (TextPath, ColorMatrix, wide-gamut color, etc.) render fine against an empty canvas.
    */
   bool requiresBackdrop(bool bakeUnsupported) const {
-    return bakeUnsupported && (hasUnsupportedBlend || hasBackgroundBlur);
+    return bakeUnsupported && (hasUnsupportedBlend || hasBackdropStyle);
   }
 };
 
