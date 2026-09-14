@@ -175,6 +175,14 @@
     </xs:restriction>
   </xs:simpleType>
 
+  <xs:simpleType name="NoiseModeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="mono"/>
+      <xs:enumeration value="duo"/>
+      <xs:enumeration value="multi"/>
+    </xs:restriction>
+  </xs:simpleType>
+
   <xs:simpleType name="FilterModeType">
     <xs:restriction base="xs:string">
       <xs:enumeration value="nearest"/>
@@ -775,6 +783,35 @@
     <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
   </xs:complexType>
 
+  <!-- GlassStyle -->
+  <xs:complexType name="GlassStyleType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="refraction" type="xs:decimal" default="80"/>
+    <xs:attribute name="depth" type="xs:decimal" default="20"/>
+    <xs:attribute name="frost" type="xs:decimal" default="5"/>
+    <xs:attribute name="dispersion" type="xs:decimal" default="50"/>
+    <xs:attribute name="splay" type="xs:decimal" default="0"/>
+    <xs:attribute name="lightAngle" type="xs:decimal" default="45"/>
+    <xs:attribute name="lightIntensity" type="xs:decimal" default="80"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
+  </xs:complexType>
+
+  <!-- NoiseStyle -->
+  <xs:complexType name="NoiseStyleType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="excludeChildEffects" type="BoolType" default="false"/>
+    <xs:attribute name="mode" type="NoiseModeType" default="mono"/>
+    <xs:attribute name="size" type="xs:decimal" default="4"/>
+    <xs:attribute name="density" type="xs:decimal" default="0.5"/>
+    <xs:attribute name="seed" type="xs:decimal" default="0"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:attribute name="firstColor" type="ColorType" default="#000000"/>
+    <xs:attribute name="secondColor" type="ColorType" default="#FFFFFF"/>
+    <xs:attribute name="opacity" type="xs:decimal" default="0.15"/>
+  </xs:complexType>
+
   <!-- ========================= Layer Filters ========================= -->
 
   <!-- BlurFilter -->
@@ -818,6 +855,20 @@
   <xs:complexType name="ColorMatrixFilterType">
     <xs:attributeGroup ref="CommonAttributes"/>
     <xs:attribute name="matrix" type="ColorMatrixType"/>
+  </xs:complexType>
+
+  <!-- NoiseFilter -->
+  <xs:complexType name="NoiseFilterType">
+    <xs:attributeGroup ref="CommonAttributes"/>
+    <xs:attribute name="mode" type="NoiseModeType" default="mono"/>
+    <xs:attribute name="size" type="xs:decimal" default="4"/>
+    <xs:attribute name="density" type="xs:decimal" default="0.5"/>
+    <xs:attribute name="seed" type="xs:decimal" default="0"/>
+    <xs:attribute name="blendMode" type="BlendModeType" default="normal"/>
+    <xs:attribute name="color" type="ColorType" default="#000000"/>
+    <xs:attribute name="firstColor" type="ColorType" default="#000000"/>
+    <xs:attribute name="secondColor" type="ColorType" default="#FFFFFF"/>
+    <xs:attribute name="opacity" type="xs:decimal" default="0.15"/>
   </xs:complexType>
 
   <!-- ========================= VectorElement Group ========================= -->
@@ -887,12 +938,15 @@
       <xs:element name="DropShadowStyle" type="DropShadowStyleType"/>
       <xs:element name="InnerShadowStyle" type="InnerShadowStyleType"/>
       <xs:element name="BackgroundBlurStyle" type="BackgroundBlurStyleType"/>
+      <xs:element name="GlassStyle" type="GlassStyleType"/>
+      <xs:element name="NoiseStyle" type="NoiseStyleType"/>
       <!-- Layer Filters -->
       <xs:element name="BlurFilter" type="BlurFilterType"/>
       <xs:element name="DropShadowFilter" type="DropShadowFilterType"/>
       <xs:element name="InnerShadowFilter" type="InnerShadowFilterType"/>
       <xs:element name="BlendFilter" type="BlendFilterType"/>
       <xs:element name="ColorMatrixFilter" type="ColorMatrixFilterType"/>
+      <xs:element name="NoiseFilter" type="NoiseFilterType"/>
       <!-- Timeline drivers -->
       <xs:element name="Timelines" type="TimelinesType"/>
       <!-- Child Layers -->

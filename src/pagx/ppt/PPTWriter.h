@@ -571,10 +571,10 @@ struct EffectSources {
   const DropShadowFilter* dropShadowFilter = nullptr;
   const DropShadowStyle* dropShadowStyle = nullptr;
 
-  // BackgroundBlurStyle is intentionally not tracked: it has no faithful OOXML
-  // primitive (a:blur blurs the shape itself, not the backdrop) and the writer
-  // drops it on the vector path. When `bakeUnsupported` is enabled, the feature
-  // probe bakes the layer (with backdrop) to a PNG patch instead.
+  // BackgroundBlurStyle and GlassStyle are intentionally not tracked: they have no
+  // faithful OOXML primitive (a:blur blurs the shape itself, not the backdrop) and
+  // the writer drops them on the vector path. When `bakeUnsupported` is enabled, the
+  // feature probe bakes the layer (with backdrop) to a PNG patch instead.
   bool empty() const {
     return !blur && !blend && !innerShadowFilter && !innerShadowStyle && !dropShadowFilter &&
            !dropShadowStyle;

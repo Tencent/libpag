@@ -797,7 +797,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   // blends, ColorMatrix filters, or wide-gamut colors.
   auto features = ProbeLayerFeatures(layer);
   if (features.needsRasterization(_bakeUnsupported)) {
-    // Backdrop-aware features (non-Normal blend mode, BackgroundBlurStyle)
+    // Backdrop-aware features (non-Normal blend mode, backdrop styles)
     // require rendering the whole scene clipped to the layer's bounds —
     // this turns any editable native content beneath the patch into baked
     // pixels, which is the main reason a caller might disable
