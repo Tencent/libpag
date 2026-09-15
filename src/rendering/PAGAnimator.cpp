@@ -103,6 +103,11 @@ class AnimationTicker {
   bool displayLinkRunning = false;
 
   void updateDisplayLinkState() {
+    // Some headless platforms do not provide display link support. Cleanup and state transitions
+    // must remain safe even when no display link was created.
+    if (displayLink == nullptr) {
+      return;
+    }
     std::lock_guard<std::mutex> displayLinkLock(displayLinkLocker);
     bool shouldRun = false;
     {
