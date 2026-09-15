@@ -73,6 +73,15 @@ class PAGViewEventDispatcher {
   void dispatch(napi_env currentEnv, uint8_t type, uint8_t state);
 };
 
+// Prepares constructor storage for the current JS realm and reports whether classes need defining.
+bool PrepareConstructorContext(napi_env env, bool* needsInitialization);
+
+// Marks constructor initialization for the current JS realm as succeeded or failed.
+bool FinishConstructorContext(napi_env env, bool success);
+
+// Exports the constructors already registered for the current JS realm.
+bool ExportConstructors(napi_env env, napi_value exports);
+
 napi_status DefineClass(napi_env env, napi_value exports, const std::string& utf8name,
                         size_t propertyCount, const napi_property_descriptor* properties,
                         napi_callback constructor, const std::string& parentName);
