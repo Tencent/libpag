@@ -16,8 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <thread>
+#include <vector>
 #include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/caches/DiskCache.h"
@@ -537,6 +541,59 @@ PAG_TEST(PAGDiskCacheTest, DiskIOWorker) {
   }
   worker->waitAll();
   EXPECT_EQ(counter.load(), 100);
+}
+
+/**
+ * Concurrency stress test around issue #3684. It repeatedly creates, uses, and destroys independent
+ * PAGDecoders on multiple threads (each thread owns its own PAGFile and decoder, running the
+ * teardown chain ~PAGDecoder -> ~CompositionReader -> ~PAGPlayer -> ~VideoReader) while the shared
+ * disk cache is cleared concurrently. Note that this does NOT deterministically reproduce the
+ * intra-decoder teardown race: within a single thread the decoder is created, used, and destroyed
+ * sequentially, so a teardown never overlaps an in-flight readFrame() on the same decoder. It
+ * exercises the destructor locking and the shared DiskCache paths under concurrent load, guarding
+ * against regressions of #3684 without pinning down the exact race window.
+ */
+PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
+  pag::PAGDiskCache::RemoveAll();
+  std::vector<std::shared_ptr<PAGFile>> pagFiles;
+  for (int i = 0; i < 4; i++) {
+    auto pagFile = LoadPAGFile("resources/apitest/video_sequence_size.pag");
+    ASSERT_TRUE(pagFile != nullptr);
+    pagFiles.push_back(pagFile);
+  }
+
+  std::atomic<bool> stopped = {false};
+  std::thread cacheCleaner([&] {
+    while (!stopped.load()) {
+      PAGDiskCache::RemoveAll();
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+  });
+
+  std::vector<std::thread> readers;
+  for (int i = 0; i < 4; i++) {
+    readers.emplace_back([&, i] {
+      for (int round = 0; round < 3; round++) {
+        auto decoder = PAGDecoder::MakeFrom(pagFiles[i], 60, 1.0f);
+        if (decoder == nullptr) {
+          continue;
+        }
+        tgfx::Bitmap bitmap(decoder->width(), decoder->height(), false, false);
+        tgfx::Pixmap pixmap(bitmap);
+        auto frameCount = std::min(decoder->numFrames(), 10);
+        for (int frame = 0; frame < frameCount; frame++) {
+          decoder->readFrame(frame, pixmap.writablePixels(), pixmap.rowBytes());
+        }
+      }
+    });
+  }
+  for (auto& reader : readers) {
+    reader.join();
+  }
+  stopped = true;
+  cacheCleaner.join();
+
+  pag::PAGDiskCache::RemoveAll();
 }
 
 }  // namespace pag

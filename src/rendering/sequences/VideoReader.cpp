@@ -42,7 +42,12 @@ VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
 }
 
 VideoReader::~VideoReader() {
+  // Hold the locker to wait out any in-flight onMakeBuffer() call before releasing the demuxer and
+  // the video decoder, so that a teardown racing with a background decoding task cannot free
+  // them while decodeFrame() is still using them (issue #3684).
+  std::lock_guard<std::mutex> autoLock(locker);
   destroyVideoDecoder();
+  lastBuffer = nullptr;
   delete demuxer;
 }
 
