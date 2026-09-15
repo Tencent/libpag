@@ -475,7 +475,8 @@ std::string HTMLStyleCascade::getStyleProperty(const std::shared_ptr<DOMNode>& n
 }
 
 HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
-                                                           const HTMLInheritedStyle& parent) {
+                                                           const HTMLInheritedStyle& parent,
+                                                           bool recordFontFallbacks) {
   HTMLInheritedStyle out = parent;
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
@@ -516,7 +517,7 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
         }
       }
     }
-    if (_fontFallbackThunk) {
+    if (recordFontFallbacks && _fontFallbackThunk) {
       _fontFallbackThunk(_fontFallbackUserData, out.fontFamilyChain);
     }
   }

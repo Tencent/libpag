@@ -656,12 +656,31 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
   }
 }
 
+// data-pagx-* attributes of the PAGX text round-trip protocol are consumed by the importer
+// itself (convertElement / HTMLTextFragmentBuilder) and must not surface in Layer::customData.
+// data-pagx-version and every other data-* attribute are still forwarded.
+static bool IsInternalPagxTextProtocolKey(const std::string& key) {
+  static const char* const kProtocolKeys[] = {
+      "pagx-text",           "pagx-text-part", "pagx-font-family", "pagx-font-style",
+      "pagx-letter-spacing", "pagx-faux-bold", "pagx-faux-italic",
+  };
+  for (const char* protocolKey : kProtocolKeys) {
+    if (key == protocolKey) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void HTMLLayerBuilder::forwardDataAttributes(Layer* layer,
                                              const std::shared_ptr<DOMNode>& element) {
   if (layer == nullptr || element == nullptr) return;
   for (const auto& attr : element->attributes) {
     if (attr.name.compare(0, 5, "data-") != 0) continue;
     std::string key = attr.name.substr(5);
+    if (IsInternalPagxTextProtocolKey(key)) {
+      continue;
+    }
     if (IsValidCustomDataKey(key)) {
       auto existing = layer->customData.find(key);
       if (existing != layer->customData.end() && existing->second != attr.value) {

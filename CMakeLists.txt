@@ -934,6 +934,14 @@ if (PAG_BUILD_TESTS)
     # Build minizip's reader into test binaries only, so archive-producing tests
     # validate the central directory, entry data, and CRCs by actually extracting.
     list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES} ${MINIZIP_DIR}/unzip.c)
+    # woff2 decoder + brotli dec, test-only: lets font-export tests decompress the generated
+    # WOFF2 data and validate the embedded CFF structure (the pag library only embeds the encoder).
+    if (PAG_BUILD_PAGX)
+        file(GLOB BROTLI_DEC_SOURCES ${BROTLI_DIR}/c/dec/*.c)
+        list(APPEND PAG_TEST_FILES ${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES})
+        set_source_files_properties(${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES}
+                PROPERTIES COMPILE_OPTIONS "-w")
+    endif ()
     list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src
