@@ -77,32 +77,48 @@ class AnimationTicker {
   }
 
   void addAnimator(std::shared_ptr<PAGAnimator> animator) {
-    locker.lock();
-    auto needStart = animators.empty();
-    animators.push_back(std::move(animator));
-    locker.unlock();
-    if (needStart) {
-      displayLink->start();
+    {
+      std::lock_guard<std::mutex> autoLock(locker);
+      animators.push_back(std::move(animator));
     }
+    updateDisplayLinkState();
   }
 
   void removeAnimator(std::shared_ptr<PAGAnimator> animator) {
-    locker.lock();
-    auto index = std::find(animators.begin(), animators.end(), animator);
-    if (index != animators.end()) {
-      animators.erase(index);
+    {
+      std::lock_guard<std::mutex> autoLock(locker);
+      auto index = std::find(animators.begin(), animators.end(), animator);
+      if (index != animators.end()) {
+        animators.erase(index);
+      }
     }
-    auto needStop = animators.empty();
-    locker.unlock();
-    if (needStop) {
-      displayLink->stop();
-    }
+    updateDisplayLinkState();
   }
 
  private:
   std::mutex locker = {};
+  std::mutex displayLinkLocker = {};
   std::shared_ptr<DisplayLink> displayLink = nullptr;
   std::vector<std::shared_ptr<PAGAnimator>> animators = {};
+  bool displayLinkRunning = false;
+
+  void updateDisplayLinkState() {
+    std::lock_guard<std::mutex> displayLinkLock(displayLinkLocker);
+    bool shouldRun = false;
+    {
+      std::lock_guard<std::mutex> autoLock(locker);
+      shouldRun = !animators.empty();
+    }
+    if (shouldRun == displayLinkRunning) {
+      return;
+    }
+    displayLinkRunning = shouldRun;
+    if (shouldRun) {
+      displayLink->start();
+    } else {
+      displayLink->stop();
+    }
+  }
 
   void onFrameAvailable() {
     locker.lock();
@@ -141,6 +157,9 @@ void PAGAnimator::setSync(bool value) {
     return;
   }
   _isSync = value;
+  if (isEnding) {
+    return;
+  }
   if (task) {
     extractAndWaitTask(lock);
   }
@@ -158,6 +177,17 @@ void PAGAnimator::setDuration(int64_t duration) {
   }
   _duration = duration;
   if (!_isRunning) {
+    if (isEnding && _duration <= 0) {
+      isEnding = false;
+      endingUpdatePending = false;
+      endingFlushSynchronously = false;
+      endingUpdateRequested = false;
+      startAfterEnd = false;
+      hasPendingProgress = false;
+      asyncUpdateRequested = false;
+      cancelAnimation();
+      extractAndWaitTask(lock);
+    }
     return;
   }
   if (_duration > 0) {
@@ -211,6 +241,10 @@ void PAGAnimator::start() {
     if (_isRunning) {
       return;
     }
+    if (isEnding) {
+      startAfterEnd = true;
+      return;
+    }
     _isRunning = true;
     if (isEnded) {
       isEnded = false;
@@ -229,7 +263,14 @@ void PAGAnimator::cancel() {
   std::unique_lock<std::mutex> lock(locker);
   if (!_isRunning) {
     if (isEnding) {
+      isEnding = false;
+      endingUpdatePending = false;
+      endingFlushSynchronously = false;
+      endingUpdateRequested = false;
+      startAfterEnd = false;
+      hasPendingProgress = false;
       asyncUpdateRequested = false;
+      cancelAnimation();
     }
     if (task != nullptr) {
       extractAndWaitTask(lock);
@@ -250,7 +291,7 @@ void PAGAnimator::update() {
   {
     std::lock_guard<std::mutex> autoLock(locker);
     if (isEnding) {
-      asyncUpdateRequested = true;
+      endingUpdateRequested = true;
       return;
     }
     if (_isSync) {
@@ -321,8 +362,13 @@ void PAGAnimator::advance() {
   if (listener == nullptr) {
     std::lock_guard<std::mutex> autoLock(locker);
     isEnding = false;
+    endingUpdatePending = false;
+    endingFlushSynchronously = false;
+    endingUpdateRequested = false;
+    startAfterEnd = false;
     hasPendingProgress = false;
     asyncUpdateRequested = false;
+    cancelAnimation();
     return;
   }
   for (auto& type : events) {
@@ -330,19 +376,26 @@ void PAGAnimator::advance() {
       case AnimationTypeEnd: {
         listener->onAnimationEnd(this);
         bool updateAfterEnd = false;
+        bool restartAfterEnd = false;
         {
           std::lock_guard<std::mutex> autoLock(locker);
           isEnding = false;
+          endingUpdatePending = false;
+          endingFlushSynchronously = false;
           if (hasPendingProgress) {
             _progress = pendingProgress;
             hasPendingProgress = false;
             isEnded = false;
             resetStartTime();
           }
-          updateAfterEnd = asyncUpdateRequested;
-          asyncUpdateRequested = false;
+          updateAfterEnd = endingUpdateRequested;
+          endingUpdateRequested = false;
+          restartAfterEnd = startAfterEnd;
+          startAfterEnd = false;
         }
-        if (updateAfterEnd) {
+        if (restartAfterEnd) {
+          start();
+        } else if (updateAfterEnd) {
           update();
         }
         break;
@@ -360,6 +413,13 @@ void PAGAnimator::advance() {
 
 std::vector<int> PAGAnimator::doAdvance() {
   std::unique_lock<std::mutex> lock(locker);
+  if (isEnding) {
+    if (endingUpdatePending || isTaskRunning()) {
+      return {};
+    }
+    cancelAnimation();
+    return {AnimationTypeEnd};
+  }
   if (!_isRunning || _duration <= 0) {
     return {};
   }
@@ -391,9 +451,9 @@ std::vector<int> PAGAnimator::doAdvance() {
   isEnded = true;
   _isRunning = false;
   isEnding = true;
-  cancelAnimation();
-  extractAndWaitTask(lock);
-  return {AnimationTypeUpdate, AnimationTypeEnd};
+  endingUpdatePending = true;
+  endingFlushSynchronously = _isSync && !isTaskRunning();
+  return {AnimationTypeUpdate};
 }
 
 void PAGAnimator::doUpdate(bool setStartTime) {
@@ -402,14 +462,26 @@ void PAGAnimator::doUpdate(bool setStartTime) {
   {
     std::lock_guard<std::mutex> autoLock(locker);
     if (isTaskRunning()) {
+      if (asyncTaskRunning) {
+        asyncUpdateRequested = true;
+        if (isEnding) {
+          endingUpdatePending = false;
+        }
+      }
       return;
     }
-    shouldFlushSynchronously = _isSync || !_isRunning;
+    shouldFlushSynchronously = isEnding ? endingFlushSynchronously : _isSync;
     if (!shouldFlushSynchronously) {
       updateTask = std::make_shared<AnimatorUpdateTask>(weakThis, setStartTime);
       task = updateTask;
       asyncTaskRunning = true;
       asyncUpdateRequested = false;
+      if (isEnding) {
+        endingUpdatePending = false;
+      }
+    }
+    if (isEnding && shouldFlushSynchronously) {
+      endingUpdatePending = false;
     }
   }
   if (shouldFlushSynchronously) {

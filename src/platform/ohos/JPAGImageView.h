@@ -29,6 +29,8 @@
 #include "tgfx/gpu/Window.h"
 
 namespace pag {
+class PAGViewEventDispatcher;
+
 class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
  public:
   static bool Init(napi_env env, napi_value exports);
@@ -36,8 +38,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
     return "JPAGImageView";
   }
 
-  explicit JPAGImageView(const std::string& id) : id(std::move(id)) {
-  }
+  JPAGImageView(const std::string& id, napi_env env);
 
   virtual ~JPAGImageView() {
     release();
@@ -93,9 +94,9 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   void release();
 
-  void setProgressCallback(napi_threadsafe_function callback);
+  void setProgressCallback(napi_value callback);
 
-  void setPlayingStateCallback(napi_threadsafe_function callback);
+  void setPlayingStateCallback(napi_value callback);
 
   std::string id;
 
@@ -105,6 +106,8 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
   std::shared_ptr<PAGDecoder> getDecoderInternal();
 
   void invalidSize();
+
+  void clearSurface();
 
   void invalidDecoder();
 
@@ -116,8 +119,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   bool present(std::shared_ptr<tgfx::Image> image);
 
-  napi_threadsafe_function progressCallback = nullptr;
-  napi_threadsafe_function playingStateCallback = nullptr;
+  std::shared_ptr<PAGViewEventDispatcher> eventDispatcher = nullptr;
 
   std::mutex locker;
   int _width = 0;

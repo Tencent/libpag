@@ -73,10 +73,6 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
     return nullptr;
   }
   auto status = decodeFrame(sampleTime, deadline);
-  if (status == DecodeStatus::Stalled) {
-    fallbackPending = true;
-    return nullptr;
-  }
   if (status == DecodeStatus::Error && tgfx::Clock::Now() < deadline) {
     resetParams();
     status = decodeFrame(sampleTime, deadline);
@@ -87,6 +83,10 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
         status = decodeFrame(sampleTime, deadline);
       }
     }
+  }
+  if (status == DecodeStatus::Stalled) {
+    fallbackPending = true;
+    return nullptr;
   }
   if (status != DecodeStatus::Success) {
     LOGE("VideoDecoder: Error on decoding frame.\n");
@@ -104,17 +104,16 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
 }
 
 void VideoReader::onReportPerformance(Performance* performance, int64_t decodingTime) {
-  if (videoDecoder == nullptr) {
+  auto decoderType = lastDecoderType.load(std::memory_order_acquire);
+  if (decoderType == DecoderType::Unknown) {
     return;
   }
-  if (videoDecoder->isHardwareBacked()) {
+  if (decoderType == DecoderType::Hardware) {
     performance->hardwareDecodingTime += decodingTime;
-    performance->hardwareDecodingInitialTime += hardDecodingInitialTime;
-    hardDecodingInitialTime = 0;  // 只记录一次。
+    performance->hardwareDecodingInitialTime += hardDecodingInitialTime.exchange(0);
   } else {
     performance->softwareDecodingTime += decodingTime;
-    performance->softwareDecodingInitialTime += softDecodingInitialTime;
-    softDecodingInitialTime = 0;
+    performance->softwareDecodingInitialTime += softDecodingInitialTime.exchange(0);
   }
 }
 
@@ -227,8 +226,10 @@ std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
     auto decoder = factory->createDecoder(demuxer->getFormat());
     if (decoder != nullptr) {
       if (decoder->isHardwareBacked()) {
+        lastDecoderType.store(DecoderType::Hardware, std::memory_order_release);
         hardDecodingInitialTime = clock.elapsedTime();
       } else {
+        lastDecoderType.store(DecoderType::Software, std::memory_order_release);
         softDecodingInitialTime = clock.elapsedTime();
       }
       return decoder;

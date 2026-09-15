@@ -19,15 +19,217 @@
 #include "JPAGView.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include <cstdint>
+#include <thread>
 #include "base/utils/UniqueID.h"
 #include "platform/ohos/GPUDrawable.h"
 #include "platform/ohos/JPAGLayerHandle.h"
 #include "platform/ohos/JsHelper.h"
 #include "platform/ohos/XComponentHandler.h"
+#include "tgfx/core/Task.h"
 
 namespace pag {
 
 static std::unordered_map<std::string, std::shared_ptr<JPAGView>> ViewMap = {};
+static std::mutex ViewMapLocker = {};
+
+class JPAGViewRenderSession;
+
+class JPAGViewRenderTask : public tgfx::Task {
+ public:
+  explicit JPAGViewRenderTask(std::shared_ptr<JPAGViewRenderSession> session)
+      : session(std::move(session)) {
+  }
+
+ protected:
+  void onExecute() override;
+
+ private:
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+};
+
+class PAGAnimatorCancelTask : public tgfx::Task {
+ public:
+  explicit PAGAnimatorCancelTask(std::shared_ptr<PAGAnimator> animator)
+      : animator(std::move(animator)) {
+  }
+
+ protected:
+  void onExecute() override {
+    animator->cancel();
+  }
+
+ private:
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+};
+
+static void RunJPAGViewTask(std::shared_ptr<tgfx::Task> task) {
+  tgfx::Task::Run(std::move(task));
+}
+
+static void SubmitJPAGViewTask(std::shared_ptr<tgfx::Task> task) {
+  std::thread worker(RunJPAGViewTask, std::move(task));
+  worker.detach();
+}
+
+class JPAGViewRenderSession : public std::enable_shared_from_this<JPAGViewRenderSession> {
+ public:
+  explicit JPAGViewRenderSession(std::shared_ptr<PAGPlayer> player) : player(std::move(player)) {
+  }
+
+  std::shared_ptr<PAGPlayer> getPlayer() {
+    std::lock_guard<std::mutex> autoLock(stateLocker);
+    return released ? nullptr : player;
+  }
+
+  void updateFrame(double progress) {
+    std::lock_guard<std::mutex> operationLock(operationLocker);
+    applyPendingState();
+    std::shared_ptr<PAGPlayer> currentPlayer = nullptr;
+    {
+      std::lock_guard<std::mutex> stateLock(stateLocker);
+      if (!released) {
+        currentPlayer = player;
+      }
+    }
+    if (currentPlayer != nullptr) {
+      currentPlayer->setProgress(progress);
+      currentPlayer->flush();
+    }
+  }
+
+  void setSurface(std::shared_ptr<PAGSurface> surface) {
+    bool shouldSchedule = false;
+    {
+      std::lock_guard<std::mutex> autoLock(stateLocker);
+      if (released) {
+        return;
+      }
+      pendingSurface = std::move(surface);
+      surfaceVersion++;
+      shouldSchedule = markTaskScheduled();
+    }
+    scheduleTask(shouldSchedule);
+  }
+
+  void updateSize() {
+    bool shouldSchedule = false;
+    {
+      std::lock_guard<std::mutex> autoLock(stateLocker);
+      if (released) {
+        return;
+      }
+      sizeVersion++;
+      shouldSchedule = markTaskScheduled();
+    }
+    scheduleTask(shouldSchedule);
+  }
+
+  void release() {
+    bool shouldSchedule = false;
+    {
+      std::lock_guard<std::mutex> autoLock(stateLocker);
+      if (released) {
+        return;
+      }
+      released = true;
+      pendingSurface = nullptr;
+      surfaceVersion++;
+      shouldSchedule = markTaskScheduled();
+    }
+    scheduleTask(shouldSchedule);
+  }
+
+  void processPendingState() {
+    std::lock_guard<std::mutex> operationLock(operationLocker);
+    while (true) {
+      applyPendingState();
+      std::lock_guard<std::mutex> stateLock(stateLocker);
+      if (!hasPendingState()) {
+        taskScheduled = false;
+        return;
+      }
+    }
+  }
+
+ private:
+  std::mutex stateLocker = {};
+  std::mutex operationLocker = {};
+  std::shared_ptr<PAGPlayer> player = nullptr;
+  std::shared_ptr<PAGSurface> pendingSurface = nullptr;
+  uint64_t surfaceVersion = 0;
+  uint64_t sizeVersion = 0;
+  uint64_t appliedSurfaceVersion = 0;
+  uint64_t appliedSizeVersion = 0;
+  bool released = false;
+  bool taskScheduled = false;
+
+  bool markTaskScheduled() {
+    if (taskScheduled) {
+      return false;
+    }
+    taskScheduled = true;
+    return true;
+  }
+
+  void scheduleTask(bool shouldSchedule) {
+    if (!shouldSchedule) {
+      return;
+    }
+    SubmitJPAGViewTask(std::make_shared<JPAGViewRenderTask>(shared_from_this()));
+  }
+
+  bool hasPendingState() const {
+    return surfaceVersion != appliedSurfaceVersion || sizeVersion != appliedSizeVersion ||
+           (released && player != nullptr);
+  }
+
+  void applyPendingState() {
+    std::shared_ptr<PAGPlayer> currentPlayer = nullptr;
+    std::shared_ptr<PAGSurface> surface = nullptr;
+    uint64_t targetSurfaceVersion = 0;
+    uint64_t targetSizeVersion = 0;
+    bool shouldRelease = false;
+    {
+      std::lock_guard<std::mutex> autoLock(stateLocker);
+      currentPlayer = player;
+      surface = pendingSurface;
+      targetSurfaceVersion = surfaceVersion;
+      targetSizeVersion = sizeVersion;
+      shouldRelease = released;
+    }
+    if (currentPlayer == nullptr) {
+      appliedSurfaceVersion = targetSurfaceVersion;
+      appliedSizeVersion = targetSizeVersion;
+      return;
+    }
+    if (appliedSurfaceVersion != targetSurfaceVersion) {
+      currentPlayer->setSurface(surface);
+      appliedSurfaceVersion = targetSurfaceVersion;
+    }
+    if (appliedSizeVersion != targetSizeVersion) {
+      auto currentSurface = currentPlayer->getSurface();
+      if (currentSurface != nullptr) {
+        currentSurface->updateSize();
+      }
+      appliedSizeVersion = targetSizeVersion;
+    }
+    if (shouldRelease) {
+      std::lock_guard<std::mutex> autoLock(stateLocker);
+      if (player == currentPlayer) {
+        player = nullptr;
+      }
+    }
+  }
+};
+
+void JPAGViewRenderTask::onExecute() {
+  session->processPendingState();
+}
+
+JPAGView::JPAGView(const std::string& id, napi_env env) : id(id) {
+  renderSession = std::make_shared<JPAGViewRenderSession>(std::make_shared<PAGPlayer>());
+  eventDispatcher = PAGViewEventDispatcher::Make(env, "PAGViewEventDispatcher");
+}
 
 static napi_value Flush(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
@@ -246,16 +448,6 @@ static napi_value UniqueID(napi_env env, napi_callback_info info) {
   return result;
 }
 
-static void StateChangeCallback(napi_env env, napi_value callback, void*, void* data) {
-  uint8_t state = *static_cast<uint8_t*>(data);
-  size_t argc = 1;
-  napi_value argv[1] = {0};
-  napi_create_uint32(env, static_cast<uint32_t>(state), &argv[0]);
-  napi_value undefined;
-  napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, callback, argc, argv, nullptr);
-}
-
 static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 1;
@@ -270,19 +462,8 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
     return nullptr;
   }
 
-  napi_value resourceName = nullptr;
-  napi_create_string_utf8(env, "PAGViewStateChangeCallback", NAPI_AUTO_LENGTH, &resourceName);
-  napi_threadsafe_function callback = nullptr;
-  napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr, view,
-                                  StateChangeCallback, &callback);
-  view->setPlayingStateCallback(callback);
+  view->setPlayingStateCallback(args[0]);
   return nullptr;
-}
-
-static void ProgressCallback(napi_env env, napi_value callback, void*, void*) {
-  napi_value undefined;
-  napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, callback, 0, nullptr, nullptr);
 }
 
 static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info info) {
@@ -299,12 +480,7 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
     return nullptr;
   }
 
-  napi_value resourceName = nullptr;
-  napi_create_string_utf8(env, "PAGViewProgressCallback", NAPI_AUTO_LENGTH, &resourceName);
-  napi_threadsafe_function callback = nullptr;
-  napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
-                                  nullptr, ProgressCallback, &callback);
-  view->setProgressCallback(callback);
+  view->setProgressCallback(args[0]);
   return nullptr;
 }
 
@@ -773,24 +949,35 @@ static napi_value SetVisible(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static void FinalizeJPAGView(napi_env, void* finalizeData, void*) {
+  auto view = static_cast<JPAGView*>(finalizeData);
+  XComponentHandler::RemoveListener(view->id);
+  std::shared_ptr<JPAGView> pagView = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(ViewMapLocker);
+    auto result = ViewMap.find(view->id);
+    if (result == ViewMap.end()) {
+      return;
+    }
+    pagView = std::move(result->second);
+    ViewMap.erase(result);
+  }
+}
+
 napi_value JPAGView::Constructor(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
   napi_value args[1] = {0};
   napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
   std::string id = "PAGView" + std::to_string(UniqueID::Next());
-  auto cView = std::make_shared<JPAGView>(id);
+  auto cView = std::make_shared<JPAGView>(id, env);
   cView->animator = PAGAnimator::MakeFrom(cView);
   XComponentHandler::AddListener(id, cView);
-  napi_wrap(
-      env, jsView, cView.get(),
-      [](napi_env, void* finalize_data, void*) {
-        JPAGView* view = static_cast<JPAGView*>(finalize_data);
-        XComponentHandler::RemoveListener(view->id);
-        ViewMap.erase(view->id);
-      },
-      nullptr, nullptr);
-  ViewMap.emplace(id, cView);
+  napi_wrap(env, jsView, cView.get(), FinalizeJPAGView, nullptr, nullptr);
+  {
+    std::lock_guard<std::mutex> autoLock(ViewMapLocker);
+    ViewMap.emplace(id, cView);
+  }
   return jsView;
 }
 
@@ -846,183 +1033,205 @@ JPAGView::~JPAGView() {
 
 void JPAGView::onAnimationStart(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::Start),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (!released && eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::Start);
   }
 }
 
 void JPAGView::onAnimationCancel(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::Cancel),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (!released && eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::Cancel);
   }
 }
 
 void JPAGView::onAnimationEnd(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::End),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (!released && eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::End);
   }
 }
 
 void JPAGView::onAnimationRepeat(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::Repeat),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (!released && eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::Repeat);
   }
 }
 
 void JPAGView::onAnimationUpdate(PAGAnimator* animator) {
-  std::lock_guard lock_guard(locker);
-  if (progressCallback) {
-    napi_call_threadsafe_function(progressCallback, nullptr,
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (released) {
+      return;
+    }
+    session = renderSession;
   }
-
-  if (player) {
-    player->setProgress(animator->progress());
-    player->flush();
+  if (session != nullptr) {
+    session->updateFrame(animator->progress());
+  }
+  std::lock_guard lock_guard(locker);
+  if (!released && eventDispatcher != nullptr) {
+    eventDispatcher->notifyProgress();
   }
 }
 
 void JPAGView::onSurfaceCreated(NativeWindow* window) {
-  std::lock_guard lock_guard(locker);
   auto drawable = pag::GPUDrawable::FromWindow(window, EGL_NO_CONTEXT, false);
-  if (player == nullptr || animator == nullptr) {
-    return;
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  player->setSurface(pag::PAGSurface::MakeFrom(drawable));
+  if (session != nullptr) {
+    session->setSurface(std::move(surface));
+  }
 }
 
 void JPAGView::onSurfaceSizeChanged() {
-  std::lock_guard lock_guard(locker);
-  if (player == nullptr) {
-    return;
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  auto surface = player->getSurface();
-  if (surface) {
-    surface->updateSize();
+  if (session != nullptr) {
+    session->updateSize();
   }
 }
 
 void JPAGView::onSurfaceDestroyed() {
-  std::lock_guard lock_guard(locker);
-  if (player == nullptr) {
-    return;
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  player->setSurface(nullptr);
+  if (session != nullptr) {
+    session->setSurface(nullptr);
+  }
 }
 
 void JPAGView::release() {
   XComponentHandler::RemoveListener(id);
-  // A memory leak may occur if the timer is not cancelled upon release.
-  if (animator) {
-    animator->cancel();
+  std::shared_ptr<PAGAnimator> currentAnimator = nullptr;
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (released) {
+      return;
+    }
+    released = true;
+    isVisible = false;
+    currentAnimator = std::move(animator);
+    session = std::move(renderSession);
+    dispatcher = std::move(eventDispatcher);
   }
-
-  std::lock_guard lock_guard(locker);
-  if (progressCallback != nullptr) {
-    napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);
-    progressCallback = nullptr;
+  if (dispatcher != nullptr) {
+    dispatcher->release();
   }
-  if (playingStateCallback != nullptr) {
-    napi_release_threadsafe_function(playingStateCallback, napi_tsfn_abort);
-    playingStateCallback = nullptr;
+  if (session != nullptr) {
+    session->release();
   }
-
-  if (animator) {
-    animator = nullptr;
+  if (currentAnimator != nullptr) {
+    SubmitJPAGViewTask(std::make_shared<PAGAnimatorCancelTask>(std::move(currentAnimator)));
   }
-
-  if (player) {
-    player->setSurface(nullptr);
-    player = nullptr;
-  }
-  isVisible = false;
 }
 
 std::shared_ptr<PAGAnimator> JPAGView::getAnimator() {
   std::lock_guard lock_guard(locker);
-  return animator;
+  return released ? nullptr : animator;
 }
 
 std::shared_ptr<PAGPlayer> JPAGView::getPlayer() {
-  std::lock_guard lock_guard(locker);
-  return player;
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  return session == nullptr ? nullptr : session->getPlayer();
 }
 
 void JPAGView::setComposition(std::shared_ptr<PAGComposition> composition) {
-  std::shared_ptr<PAGPlayer> player = nullptr;
-  std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  std::shared_ptr<PAGAnimator> currentAnimator = nullptr;
   bool visible = false;
   {
     std::lock_guard lock_guard(locker);
-    player = this->player;
-    animator = this->animator;
+    if (released) {
+      return;
+    }
+    session = renderSession;
+    currentAnimator = animator;
     visible = isVisible;
   }
-  if (player == nullptr || animator == nullptr) {
+  auto currentPlayer = session == nullptr ? nullptr : session->getPlayer();
+  if (currentPlayer == nullptr || currentAnimator == nullptr) {
     return;
   }
-  player->setComposition(composition);
-  animator->setProgress(player->getProgress());
+  currentPlayer->setComposition(composition);
+  currentAnimator->setProgress(currentPlayer->getProgress());
   int64_t duration = (composition != nullptr && visible) ? composition->duration() : 0;
-  animator->setDuration(duration);
+  currentAnimator->setDuration(duration);
   if (visible) {
-    animator->update();
+    currentAnimator->update();
   }
 }
 
 void JPAGView::setVisible(bool visible) {
-  std::shared_ptr<PAGPlayer> player = nullptr;
-  std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::shared_ptr<JPAGViewRenderSession> session = nullptr;
+  std::shared_ptr<PAGAnimator> currentAnimator = nullptr;
   {
     std::lock_guard lock_guard(locker);
-    if (isVisible == visible) {
+    if (released || isVisible == visible) {
       return;
     }
     isVisible = visible;
-    player = this->player;
-    animator = this->animator;
+    session = renderSession;
+    currentAnimator = animator;
   }
-  if (animator == nullptr) {
+  if (currentAnimator == nullptr) {
     return;
   }
-  animator->setDuration(visible && player != nullptr ? player->duration() : 0);
+  auto currentPlayer = session == nullptr ? nullptr : session->getPlayer();
+  currentAnimator->setDuration(visible && currentPlayer != nullptr ? currentPlayer->duration() : 0);
   if (visible) {
-    animator->update();
+    currentAnimator->update();
   }
 }
 
-void JPAGView::setProgressCallback(napi_threadsafe_function callback) {
-  napi_threadsafe_function previous = nullptr;
+void JPAGView::setProgressCallback(napi_value callback) {
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
     std::lock_guard lock_guard(locker);
-    previous = progressCallback;
-    progressCallback = callback;
+    if (!released) {
+      dispatcher = eventDispatcher;
+    }
   }
-  if (previous != nullptr) {
-    napi_release_threadsafe_function(previous, napi_tsfn_release);
+  if (dispatcher != nullptr) {
+    dispatcher->setProgressCallback(callback);
   }
 }
 
-void JPAGView::setPlayingStateCallback(napi_threadsafe_function callback) {
-  napi_threadsafe_function previous = nullptr;
+void JPAGView::setPlayingStateCallback(napi_value callback) {
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
     std::lock_guard lock_guard(locker);
-    previous = playingStateCallback;
-    playingStateCallback = callback;
+    if (!released) {
+      dispatcher = eventDispatcher;
+    }
   }
-  if (previous != nullptr) {
-    napi_release_threadsafe_function(previous, napi_tsfn_release);
+  if (dispatcher != nullptr) {
+    dispatcher->setStateCallback(callback);
   }
 }
 }  // namespace pag

@@ -67,15 +67,15 @@ class PAGAnimator {
 
     /**
      * Notifies another frame of the animation will occur. This may be called from an arbitrary
-     * thread if the animation is running asynchronously. Note: onAnimationWillUpdate and
-     * onAnimationUpdate will always appear in pairs.
+     * thread when isSync is false. Note: onAnimationWillUpdate and onAnimationUpdate will always
+     * appear in pairs.
      */
     virtual void onAnimationWillUpdate(PAGAnimator*) {
     }
 
     /**
      * Notifies another frame of the animation has occurred. This may be called from an arbitrary
-     * thread if the animation is running asynchronously.
+     * thread when isSync is false.
      */
     virtual void onAnimationUpdate(PAGAnimator* animator) = 0;
 
@@ -171,6 +171,10 @@ class PAGAnimator {
   bool _isRunning = false;
   bool isAnimating = false;
   bool isEnding = false;
+  bool endingUpdatePending = false;
+  bool endingFlushSynchronously = false;
+  bool endingUpdateRequested = false;
+  bool startAfterEnd = false;
   bool hasPendingProgress = false;
   double pendingProgress = 0;
   bool isEnded = false;

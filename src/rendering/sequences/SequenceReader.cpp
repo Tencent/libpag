@@ -36,9 +36,9 @@ std::shared_ptr<tgfx::ImageBuffer> SequenceReader::readBuffer(
 }
 
 void SequenceReader::reportPerformance(Performance* performance) {
-  if (decodingTime > 0) {
-    onReportPerformance(performance, decodingTime);
-    decodingTime = 0;
+  auto currentDecodingTime = decodingTime.exchange(0);
+  if (currentDecodingTime > 0) {
+    onReportPerformance(performance, currentDecodingTime);
   }
 }
 }  // namespace pag

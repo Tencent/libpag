@@ -54,6 +54,12 @@ class VideoReader : public SequenceReader {
     Stalled,
   };
 
+  enum class DecoderType {
+    Unknown,
+    Hardware,
+    Software,
+  };
+
   std::mutex locker = {};
   VideoDemuxer* demuxer = nullptr;
   std::vector<const VideoDecoderFactory*> decoderFactories = {};
@@ -68,6 +74,7 @@ class VideoReader : public SequenceReader {
   bool inputEndOfStream = false;
   int64_t currentDecodedTime = INT64_MIN;
   int64_t currentRenderedTime = INT64_MIN;
+  std::atomic<DecoderType> lastDecoderType = DecoderType::Unknown;
   std::atomic_int64_t hardDecodingInitialTime = 0;
   std::atomic_int64_t softDecodingInitialTime = 0;
 

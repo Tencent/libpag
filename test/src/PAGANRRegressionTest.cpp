@@ -68,7 +68,38 @@ class ANRAnimatorListener : public PAGAnimator::Listener {
     return updateThreads.front();
   }
 
+  bool hasEnded() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    return ended;
+  }
+
+  bool endArrivedAfterUpdate() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    return endAfterUpdate;
+  }
+
+  void restartOnEnd(PAGAnimator* animator) {
+    std::lock_guard<std::mutex> autoLock(locker);
+    animatorToRestart = animator;
+  }
+
  protected:
+  void onAnimationEnd(PAGAnimator*) override {
+    PAGAnimator* animator = nullptr;
+    {
+      std::lock_guard<std::mutex> autoLock(locker);
+      ended = true;
+      endAfterUpdate = !updateThreads.empty();
+      animator = animatorToRestart;
+      animatorToRestart = nullptr;
+      condition.notify_all();
+    }
+    if (animator != nullptr) {
+      animator->setDuration(1000000);
+      animator->start();
+    }
+  }
+
   void onAnimationUpdate(PAGAnimator*) override {
     std::unique_lock<std::mutex> autoLock(locker);
     activeUpdates++;
@@ -90,6 +121,9 @@ class ANRAnimatorListener : public PAGAnimator::Listener {
   int maximumActiveUpdates = 0;
   bool shouldBlockFirstUpdate = false;
   bool firstUpdateReleased = false;
+  bool ended = false;
+  bool endAfterUpdate = false;
+  PAGAnimator* animatorToRestart = nullptr;
 };
 
 static std::shared_ptr<PAGAnimator> MakeANRAnimator(
@@ -206,6 +240,47 @@ class ANRVideoDecoderFactory : public VideoDecoderFactory {
   mutable std::atomic_int decoderCreateCount = 0;
 };
 
+class ANRErrorThenStallDecoder : public VideoDecoder {
+ public:
+  DecodingResult onSendBytes(void*, size_t, int64_t) override {
+    return DecodingResult::Success;
+  }
+
+  DecodingResult onEndOfStream() override {
+    return DecodingResult::Success;
+  }
+
+  DecodingResult onDecodeFrame() override {
+    return decodeCount++ == 0 ? DecodingResult::Error : DecodingResult::TryAgainLater;
+  }
+
+  void onFlush() override {
+  }
+
+  std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override {
+    return nullptr;
+  }
+
+  int64_t presentationTime() override {
+    return -1;
+  }
+
+ private:
+  int decodeCount = 0;
+};
+
+class ANRErrorThenStallDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return false;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat&) const override {
+    return std::make_unique<ANRErrorThenStallDecoder>();
+  }
+};
+
 class ANRFailThenSucceedReader : public SequenceReader {
  public:
   int width() const override {
@@ -280,6 +355,153 @@ PAG_TEST(PAGANRRegressionTest, ManualUpdateRunsOffCallingThread) {
   EXPECT_NE(listener->firstUpdateThread(), callingThread);
 }
 
+PAG_TEST(PAGANRRegressionTest, FinalUpdateRunsOffCallingThread) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  auto animator = MakeANRAnimator(listener);
+  auto callingThread = std::this_thread::get_id();
+  animator->_duration = 1;
+  animator->_repeatCount = 1;
+  animator->_isRunning = true;
+  animator->_startTime = 0;
+
+  animator->advance();
+
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+  EXPECT_NE(listener->firstUpdateThread(), callingThread);
+  EXPECT_FALSE(listener->hasEnded());
+
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (!listener->hasEnded() && std::chrono::steady_clock::now() < deadline) {
+    animator->advance();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  EXPECT_TRUE(listener->hasEnded());
+  EXPECT_TRUE(listener->endArrivedAfterUpdate());
+}
+
+PAG_TEST(PAGANRRegressionTest, EndWaitsUntilFinalUpdateIsSubmitted) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  auto animator = MakeANRAnimator(listener);
+  animator->_duration = 1;
+  animator->_repeatCount = 1;
+  animator->_isRunning = true;
+  animator->_startTime = 0;
+
+  auto updateEvents = animator->doAdvance();
+  EXPECT_EQ(updateEvents.size(), 1U);
+  EXPECT_TRUE(animator->doAdvance().empty());
+
+  animator->doUpdate(true);
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+  std::vector<int> endEvents = {};
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (endEvents.empty() && std::chrono::steady_clock::now() < deadline) {
+    endEvents = animator->doAdvance();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_EQ(endEvents.size(), 1U);
+}
+
+PAG_TEST(PAGANRRegressionTest, EndCallbackCanRestartAnimation) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  auto animator = MakeANRAnimator(listener);
+  animator->_duration = 1;
+  animator->_repeatCount = 1;
+  animator->_isRunning = true;
+  animator->_startTime = 0;
+  listener->restartOnEnd(animator.get());
+
+  animator->advance();
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (!listener->hasEnded() && std::chrono::steady_clock::now() < deadline) {
+    animator->advance();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  EXPECT_TRUE(listener->hasEnded());
+  EXPECT_TRUE(animator->isRunning());
+  animator->cancel();
+}
+
+PAG_TEST(PAGANRRegressionTest, UpdateRequestedDuringEndingRunsAfterEnd) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  auto animator = MakeANRAnimator(listener);
+  animator->_duration = 1;
+  animator->_repeatCount = 1;
+  animator->_isRunning = true;
+  animator->_startTime = 0;
+
+  animator->advance();
+  animator->setProgress(0.5);
+  animator->update();
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (listener->updateCount() < 2 && std::chrono::steady_clock::now() < deadline) {
+    animator->advance();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+
+  EXPECT_EQ(listener->updateCount(), 2U);
+  EXPECT_TRUE(listener->hasEnded());
+}
+
+PAG_TEST(PAGANRRegressionTest, StartDuringEndingRunsAfterEnd) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  auto animator = MakeANRAnimator(listener);
+  animator->_duration = 1000000;
+  animator->isEnding = true;
+  animator->isAnimating = true;
+
+  animator->start();
+  EXPECT_FALSE(animator->isRunning());
+  animator->advance();
+
+  EXPECT_TRUE(animator->isRunning());
+  animator->cancel();
+}
+
+PAG_TEST(PAGANRRegressionTest, EndingUpdateStaysAsynchronousAfterSyncChange) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  auto animator = MakeANRAnimator(listener);
+  auto callingThread = std::this_thread::get_id();
+  animator->isEnding = true;
+  animator->_isSync = true;
+
+  animator->doUpdate(true);
+
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+  EXPECT_NE(listener->firstUpdateThread(), callingThread);
+}
+
+PAG_TEST(PAGANRRegressionTest, FinalUpdateSurvivesSyncChangeTimeout) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  listener->blockFirstUpdate();
+  auto animator = MakeANRAnimator(listener);
+  animator->_duration = 1;
+  animator->_repeatCount = 1;
+  animator->_isRunning = true;
+
+  animator->update();
+  ASSERT_TRUE(listener->waitForUpdateCount(1));
+  animator->setSync(true);
+  animator->_startTime = 0;
+  animator->advance();
+  listener->releaseFirstUpdate();
+
+  ASSERT_TRUE(listener->waitForUpdateCount(2));
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (!listener->hasEnded() && std::chrono::steady_clock::now() < deadline) {
+    animator->advance();
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  EXPECT_TRUE(listener->hasEnded());
+  EXPECT_TRUE(listener->endArrivedAfterUpdate());
+  EXPECT_EQ(listener->maximumConcurrentUpdates(), 1);
+}
+
 PAG_TEST(PAGANRRegressionTest, TimedOutUpdateRemainsSerialized) {
   auto listener = std::make_shared<ANRAnimatorListener>();
   listener->blockFirstUpdate();
@@ -307,6 +529,21 @@ PAG_TEST(PAGANRRegressionTest, StalledDecoderFallsBackOnNextRequest) {
   EXPECT_EQ(stalledFactory.createCount(), 1);
   EXPECT_EQ(fallbackFactory.createCount(), 0);
   EXPECT_EQ(stalledDecodeCount.load(), 100);
+
+  EXPECT_NE(reader.readBuffer(0), nullptr);
+  EXPECT_EQ(fallbackFactory.createCount(), 1);
+  EXPECT_EQ(fallbackDecodeCount.load(), 1);
+}
+
+PAG_TEST(PAGANRRegressionTest, DecoderStalledDuringRetryFallsBackOnNextRequest) {
+  std::atomic_int fallbackDecodeCount = 0;
+  ANRErrorThenStallDecoderFactory errorThenStallFactory = {};
+  ANRVideoDecoderFactory fallbackFactory(false, &fallbackDecodeCount);
+  std::vector<const VideoDecoderFactory*> factories = {&errorThenStallFactory, &fallbackFactory};
+  VideoReader reader(std::make_unique<ANRVideoDemuxer>(), std::move(factories));
+
+  EXPECT_EQ(reader.readBuffer(0), nullptr);
+  EXPECT_EQ(fallbackFactory.createCount(), 0);
 
   EXPECT_NE(reader.readBuffer(0), nullptr);
   EXPECT_EQ(fallbackFactory.createCount(), 1);

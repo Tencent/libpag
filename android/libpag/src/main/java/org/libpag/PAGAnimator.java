@@ -41,7 +41,7 @@ class PAGAnimator {
 
         /**
          * Notifies another frame of the animation has occurred. This may be called from an
-         * arbitrary thread if the animation is running asynchronously.
+         * arbitrary thread when isSync is false.
          */
         void onAnimationUpdate(PAGAnimator animator);
     }

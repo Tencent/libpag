@@ -35,6 +35,7 @@
 
 namespace pag {
 static std::unordered_map<std::string, std::shared_ptr<JPAGImageView>> ViewMap = {};
+static std::mutex ViewMapLocker = {};
 
 static napi_value Flush(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
@@ -61,8 +62,11 @@ static napi_value Update(napi_env env, napi_callback_info info) {
 
   JPAGImageView* view = nullptr;
   napi_unwrap(env, jsView, reinterpret_cast<void**>(&view));
+  if (view == nullptr) {
+    return nullptr;
+  }
   auto animator = view->getAnimator();
-  if (view != nullptr && animator != nullptr) {
+  if (animator != nullptr) {
     animator->update();
   }
   return nullptr;
@@ -315,16 +319,6 @@ static napi_value NumFrame(napi_env env, napi_callback_info info) {
   return result;
 }
 
-static void StateChangeCallback(napi_env env, napi_value callback, void*, void* data) {
-  uint8_t state = *static_cast<uint8_t*>(data);
-  size_t argc = 1;
-  napi_value argv[1] = {0};
-  napi_create_uint32(env, static_cast<uint32_t>(state), &argv[0]);
-  napi_value undefined;
-  napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, callback, argc, argv, nullptr);
-}
-
 static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 1;
@@ -339,19 +333,8 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
     return nullptr;
   }
 
-  napi_value resourceName = nullptr;
-  napi_create_string_utf8(env, "PAGViewStateChangeCallback", NAPI_AUTO_LENGTH, &resourceName);
-  napi_threadsafe_function callback = nullptr;
-  napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr, view,
-                                  StateChangeCallback, &callback);
-  view->setPlayingStateCallback(callback);
+  view->setPlayingStateCallback(args[0]);
   return nullptr;
-}
-
-static void ProgressCallback(napi_env env, napi_value callback, void*, void*) {
-  napi_value undefined;
-  napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, callback, 0, nullptr, nullptr);
 }
 
 static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info info) {
@@ -368,12 +351,7 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
     return nullptr;
   }
 
-  napi_value resourceName = nullptr;
-  napi_create_string_utf8(env, "PAGViewProgressCallback", NAPI_AUTO_LENGTH, &resourceName);
-  napi_threadsafe_function callback = nullptr;
-  napi_create_threadsafe_function(env, args[0], nullptr, resourceName, 0, 1, nullptr, nullptr,
-                                  nullptr, ProgressCallback, &callback);
-  view->setProgressCallback(callback);
+  view->setProgressCallback(args[0]);
   return nullptr;
 }
 
@@ -489,24 +467,35 @@ static napi_value Release(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
+static void FinalizeJPAGImageView(napi_env, void* finalizeData, void*) {
+  auto view = static_cast<JPAGImageView*>(finalizeData);
+  XComponentHandler::RemoveListener(view->id);
+  std::shared_ptr<JPAGImageView> imageView = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(ViewMapLocker);
+    auto result = ViewMap.find(view->id);
+    if (result == ViewMap.end()) {
+      return;
+    }
+    imageView = std::move(result->second);
+    ViewMap.erase(result);
+  }
+}
+
 napi_value JPAGImageView::Constructor(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
   size_t argc = 0;
   napi_value args[1] = {0};
   napi_get_cb_info(env, info, &argc, args, &jsView, nullptr);
   std::string id = "PAImageView" + std::to_string(UniqueID::Next());
-  auto cView = std::make_shared<JPAGImageView>(id);
+  auto cView = std::make_shared<JPAGImageView>(id, env);
   cView->_animator = PAGAnimator::MakeFrom(cView);
   XComponentHandler::AddListener(id, cView);
-  napi_wrap(
-      env, jsView, cView.get(),
-      [](napi_env, void* finalize_data, void*) {
-        JPAGImageView* view = static_cast<JPAGImageView*>(finalize_data);
-        XComponentHandler::RemoveListener(view->id);
-        ViewMap.erase(view->id);
-      },
-      nullptr, nullptr);
-  ViewMap.emplace(id, cView);
+  napi_wrap(env, jsView, cView.get(), FinalizeJPAGImageView, nullptr, nullptr);
+  {
+    std::lock_guard<std::mutex> autoLock(ViewMapLocker);
+    ViewMap.emplace(id, cView);
+  }
   return jsView;
 }
 
@@ -564,65 +553,66 @@ bool JPAGImageView::Init(napi_env env, napi_value exports) {
   return true;
 }
 
+JPAGImageView::JPAGImageView(const std::string& id, napi_env env) : id(id) {
+  eventDispatcher = PAGViewEventDispatcher::Make(env, "PAGImageViewEventDispatcher");
+}
+
 void JPAGImageView::onAnimationStart(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::Start),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::Start);
   }
 }
 
 void JPAGImageView::onAnimationCancel(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::Cancel),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::Cancel);
   }
 }
 
 void JPAGImageView::onAnimationEnd(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::End),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::End);
   }
 }
 
 void JPAGImageView::onAnimationRepeat(PAGAnimator*) {
   std::lock_guard lock_guard(locker);
-  if (playingStateCallback) {
-    napi_call_threadsafe_function(playingStateCallback,
-                                  const_cast<uint8_t*>(&PAGAnimatorState::Repeat),
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
+  if (eventDispatcher != nullptr) {
+    eventDispatcher->notifyState(PAGAnimatorState::Repeat);
   }
 }
 
 void JPAGImageView::onAnimationUpdate(PAGAnimator* animator) {
+  auto progress = animator->progress();
   std::lock_guard lock_guard(locker);
-  if (progressCallback) {
-    napi_call_threadsafe_function(progressCallback, nullptr,
-                                  napi_threadsafe_function_call_mode::napi_tsfn_nonblocking);
-  }
   Frame frame = 0;
   auto decoder = getDecoderInternal();
   if (_composition != nullptr && decoder != nullptr) {
-    frame = ProgressToFrame(animator->progress(), _decoder->numFrames());
+    frame = ProgressToFrame(progress, _decoder->numFrames());
   }
   handleFrame(frame);
+  if (eventDispatcher != nullptr) {
+    eventDispatcher->notifyProgress();
+  }
 }
 
 void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
+  if (OH_NativeWindow_NativeObjectReference(window) != 0) {
+    return;
+  }
   std::shared_ptr<PAGAnimator> animator = nullptr;
   {
     std::lock_guard lock_guard(locker);
     if (_animator == nullptr) {
+      OH_NativeWindow_NativeObjectUnreference(window);
       return;
     }
+    clearSurface();
     _window = window;
-    targetWindow = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(_window));
+    targetWindow = MakeEGLWindow(_window);
     invalidSize();
     animator = _animator;
   }
@@ -642,9 +632,7 @@ void JPAGImageView::onSurfaceSizeChanged() {
 
 void JPAGImageView::onSurfaceDestroyed() {
   std::lock_guard lock_guard(locker);
-  _window = nullptr;
-  targetWindow = nullptr;
-  invalidSize();
+  clearSurface();
 }
 
 std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
@@ -663,6 +651,16 @@ void JPAGImageView::invalidSize() {
   invalidDecoder();
 }
 
+void JPAGImageView::clearSurface() {
+  renderSurface = nullptr;
+  targetWindow = nullptr;
+  if (_window != nullptr) {
+    OH_NativeWindow_NativeObjectUnreference(_window);
+    _window = nullptr;
+  }
+  invalidSize();
+}
+
 void JPAGImageView::invalidDecoder() {
   _decoder = nullptr;
   images.clear();
@@ -674,19 +672,31 @@ std::shared_ptr<PAGAnimator> JPAGImageView::getAnimator() {
 }
 
 void JPAGImageView::setCurrentFrame(Frame currentFrame) {
-  std::lock_guard lock_guard(locker);
-  if (_animator == nullptr || _composition == nullptr || _decoder == nullptr) {
-    return;
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  double progress = 0;
+  {
+    std::lock_guard lock_guard(locker);
+    if (_animator == nullptr || _composition == nullptr || _decoder == nullptr) {
+      return;
+    }
+    animator = _animator;
+    progress = FrameToProgress(currentFrame, _decoder->numFrames());
   }
-  _animator->setProgress(FrameToProgress(currentFrame, _decoder->numFrames()));
+  animator->setProgress(progress);
 }
 
 Frame JPAGImageView::currentFrame() {
-  std::lock_guard lock_guard(locker);
-  if (_animator == nullptr || _decoder == nullptr) {
-    return 0;
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  Frame numFrames = 0;
+  {
+    std::lock_guard lock_guard(locker);
+    if (_animator == nullptr || _decoder == nullptr) {
+      return 0;
+    }
+    animator = _animator;
+    numFrames = _decoder->numFrames();
   }
-  return ProgressToFrame(_animator->progress(), _decoder->numFrames());
+  return ProgressToFrame(animator->progress(), numFrames);
 }
 
 void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, float frameRate) {
@@ -796,12 +806,17 @@ bool JPAGImageView::cacheAllFramesInMemory() {
 }
 
 bool JPAGImageView::flush() {
+  auto animator = getAnimator();
+  if (animator == nullptr) {
+    return false;
+  }
+  auto progress = animator->progress();
   std::lock_guard lock_guard(locker);
   auto decoder = getDecoderInternal();
-  if (decoder && _animator) {
-    return handleFrame(ProgressToFrame(_animator->progress(), decoder->numFrames()));
+  if (decoder == nullptr) {
+    return false;
   }
-  return false;
+  return handleFrame(ProgressToFrame(progress, decoder->numFrames()));
 }
 
 void JPAGImageView::refreshMatrixFromScaleMode() {
@@ -932,50 +947,43 @@ napi_value JPAGImageView::getCurrentPixelMap(napi_env env) {
 
 void JPAGImageView::release() {
   XComponentHandler::RemoveListener(id);
+  std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    animator = std::move(_animator);
+    dispatcher = std::move(eventDispatcher);
+    isVisible = false;
+    clearSurface();
+  }
+  if (dispatcher != nullptr) {
+    dispatcher->release();
+  }
   // A memory leak may occur if the timer is not cancelled upon release.
-  if (_animator) {
-    _animator->cancel();
-  }
-
-  std::lock_guard lock_guard(locker);
-  if (progressCallback != nullptr) {
-    napi_release_threadsafe_function(progressCallback, napi_tsfn_abort);
-    progressCallback = nullptr;
-  }
-  if (playingStateCallback != nullptr) {
-    napi_release_threadsafe_function(playingStateCallback, napi_tsfn_abort);
-    playingStateCallback = nullptr;
-  }
-
-  if (_animator) {
-    _animator = nullptr;
-  }
-
-  isVisible = false;
-  invalidDecoder();
-}
-
-void JPAGImageView::setProgressCallback(napi_threadsafe_function callback) {
-  napi_threadsafe_function previous = nullptr;
-  {
-    std::lock_guard lock_guard(locker);
-    previous = progressCallback;
-    progressCallback = callback;
-  }
-  if (previous != nullptr) {
-    napi_release_threadsafe_function(previous, napi_tsfn_release);
+  if (animator != nullptr) {
+    animator->cancel();
   }
 }
 
-void JPAGImageView::setPlayingStateCallback(napi_threadsafe_function callback) {
-  napi_threadsafe_function previous = nullptr;
+void JPAGImageView::setProgressCallback(napi_value callback) {
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
     std::lock_guard lock_guard(locker);
-    previous = playingStateCallback;
-    playingStateCallback = callback;
+    dispatcher = eventDispatcher;
   }
-  if (previous != nullptr) {
-    napi_release_threadsafe_function(previous, napi_tsfn_release);
+  if (dispatcher != nullptr) {
+    dispatcher->setProgressCallback(callback);
+  }
+}
+
+void JPAGImageView::setPlayingStateCallback(napi_value callback) {
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  {
+    std::lock_guard lock_guard(locker);
+    dispatcher = eventDispatcher;
+  }
+  if (dispatcher != nullptr) {
+    dispatcher->setStateCallback(callback);
   }
 }
 

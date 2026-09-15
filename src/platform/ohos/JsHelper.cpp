@@ -39,6 +39,166 @@ namespace pag {
 static std::mutex ConstructorRefMapMutex;
 static std::unordered_map<napi_env, std::unordered_map<std::string, napi_ref>> ConstructorRefMap;
 
+static constexpr uint8_t PAG_VIEW_EVENT_PROGRESS = 0;
+static constexpr uint8_t PAG_VIEW_EVENT_STATE = 1;
+
+struct PAGViewEvent {
+  uint8_t type = PAG_VIEW_EVENT_PROGRESS;
+  uint8_t state = 0;
+};
+
+std::shared_ptr<PAGViewEventDispatcher> PAGViewEventDispatcher::Make(
+    napi_env env, const std::string& resourceName) {
+  auto result = std::shared_ptr<PAGViewEventDispatcher>(new PAGViewEventDispatcher(env));
+  napi_value name = nullptr;
+  if (napi_create_string_utf8(env, resourceName.c_str(), NAPI_AUTO_LENGTH, &name) != napi_ok) {
+    return nullptr;
+  }
+  auto holder = new std::shared_ptr<PAGViewEventDispatcher>(result);
+  auto status = napi_create_threadsafe_function(env, nullptr, nullptr, name, 0, 1, holder, Finalize,
+                                                result.get(), Dispatch, &result->dispatcher);
+  if (status != napi_ok) {
+    delete holder;
+    return nullptr;
+  }
+  return result;
+}
+
+void PAGViewEventDispatcher::Finalize(napi_env env, void* finalizeData, void*) {
+  auto holder = static_cast<std::shared_ptr<PAGViewEventDispatcher>*>(finalizeData);
+  (*holder)->finalize(env);
+  delete holder;
+}
+
+void PAGViewEventDispatcher::Dispatch(napi_env env, napi_value, void* context, void* data) {
+  std::unique_ptr<PAGViewEvent> event(static_cast<PAGViewEvent*>(data));
+  if (env == nullptr || context == nullptr || event == nullptr) {
+    return;
+  }
+  static_cast<PAGViewEventDispatcher*>(context)->dispatch(env, event->type, event->state);
+}
+
+void PAGViewEventDispatcher::setProgressCallback(napi_value callback) {
+  napi_ref reference = nullptr;
+  if (callback != nullptr && napi_create_reference(env, callback, 1, &reference) != napi_ok) {
+    return;
+  }
+  napi_ref previous = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (released) {
+      previous = reference;
+    } else {
+      previous = progressCallback;
+      progressCallback = reference;
+    }
+  }
+  if (previous != nullptr) {
+    napi_delete_reference(env, previous);
+  }
+}
+
+void PAGViewEventDispatcher::setStateCallback(napi_value callback) {
+  napi_ref reference = nullptr;
+  if (callback != nullptr && napi_create_reference(env, callback, 1, &reference) != napi_ok) {
+    return;
+  }
+  napi_ref previous = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (released) {
+      previous = reference;
+    } else {
+      previous = stateCallback;
+      stateCallback = reference;
+    }
+  }
+  if (previous != nullptr) {
+    napi_delete_reference(env, previous);
+  }
+}
+
+void PAGViewEventDispatcher::notifyProgress() {
+  notify(PAG_VIEW_EVENT_PROGRESS, 0);
+}
+
+void PAGViewEventDispatcher::notifyState(uint8_t state) {
+  notify(PAG_VIEW_EVENT_STATE, state);
+}
+
+void PAGViewEventDispatcher::notify(uint8_t type, uint8_t state) {
+  auto event = std::make_unique<PAGViewEvent>();
+  event->type = type;
+  event->state = state;
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (released || dispatcher == nullptr ||
+      napi_call_threadsafe_function(dispatcher, event.get(), napi_tsfn_nonblocking) != napi_ok) {
+    return;
+  }
+  event.release();
+}
+
+void PAGViewEventDispatcher::dispatch(napi_env currentEnv, uint8_t type, uint8_t state) {
+  napi_value callback = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (released) {
+      return;
+    }
+    auto reference = type == PAG_VIEW_EVENT_PROGRESS ? progressCallback : stateCallback;
+    if (reference == nullptr ||
+        napi_get_reference_value(currentEnv, reference, &callback) != napi_ok) {
+      return;
+    }
+  }
+  if (callback == nullptr) {
+    return;
+  }
+  napi_value undefined = nullptr;
+  napi_get_undefined(currentEnv, &undefined);
+  if (type == PAG_VIEW_EVENT_PROGRESS) {
+    napi_call_function(currentEnv, undefined, callback, 0, nullptr, nullptr);
+    return;
+  }
+  napi_value argument = nullptr;
+  napi_create_uint32(currentEnv, static_cast<uint32_t>(state), &argument);
+  napi_call_function(currentEnv, undefined, callback, 1, &argument, nullptr);
+}
+
+void PAGViewEventDispatcher::release() {
+  napi_threadsafe_function currentDispatcher = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (released) {
+      return;
+    }
+    released = true;
+    currentDispatcher = dispatcher;
+  }
+  if (currentDispatcher != nullptr) {
+    napi_release_threadsafe_function(currentDispatcher, napi_tsfn_abort);
+  }
+}
+
+void PAGViewEventDispatcher::finalize(napi_env currentEnv) {
+  napi_ref currentProgressCallback = nullptr;
+  napi_ref currentStateCallback = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    dispatcher = nullptr;
+    currentProgressCallback = progressCallback;
+    progressCallback = nullptr;
+    currentStateCallback = stateCallback;
+    stateCallback = nullptr;
+  }
+  if (currentEnv != nullptr && currentProgressCallback != nullptr) {
+    napi_delete_reference(currentEnv, currentProgressCallback);
+  }
+  if (currentEnv != nullptr && currentStateCallback != nullptr) {
+    napi_delete_reference(currentEnv, currentStateCallback);
+  }
+}
+
 static void CleanupConstructorRefs(void* arg) {
   auto env = static_cast<napi_env>(arg);
   std::lock_guard<std::mutex> autoLock(ConstructorRefMapMutex);
