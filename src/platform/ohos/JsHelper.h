@@ -19,6 +19,8 @@
 #pragma once
 #include <napi/native_api.h>
 #include <rawfile/raw_file_manager.h>
+#include <memory>
+#include <mutex>
 #include <string>
 #include "pag/pag.h"
 #include "pag/types.h"
@@ -36,6 +38,39 @@ class PAGAnimatorState {
   inline static const uint8_t Cancel = 1;
   inline static const uint8_t End = 2;
   inline static const uint8_t Repeat = 3;
+};
+
+class PAGViewEventDispatcher {
+ public:
+  static std::shared_ptr<PAGViewEventDispatcher> Make(napi_env env,
+                                                      const std::string& resourceName);
+
+  void setProgressCallback(napi_value callback);
+
+  void setStateCallback(napi_value callback);
+
+  void notifyProgress();
+
+  void notifyState(uint8_t state);
+
+  void release();
+
+ private:
+  explicit PAGViewEventDispatcher(napi_env env) : env(env) {
+  }
+
+  napi_env env = nullptr;
+  napi_threadsafe_function dispatcher = nullptr;
+  napi_ref progressCallback = nullptr;
+  napi_ref stateCallback = nullptr;
+  std::mutex locker = {};
+  bool released = false;
+
+  static void Finalize(napi_env env, void* finalizeData, void* finalizeHint);
+  static void Dispatch(napi_env env, napi_value callback, void* context, void* data);
+  void finalize(napi_env currentEnv);
+  void notify(uint8_t type, uint8_t state);
+  void dispatch(napi_env currentEnv, uint8_t type, uint8_t state);
 };
 
 // Prepares constructor storage for the current JS realm and reports whether classes need defining.

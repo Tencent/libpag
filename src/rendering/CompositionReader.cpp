@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CompositionReader.h"
+#include "rendering/caches/RenderCache.h"
 
 namespace pag {
 std::shared_ptr<CompositionReader> CompositionReader::Make(
@@ -60,7 +61,8 @@ bool CompositionReader::readFrame(double progress, std::shared_ptr<BitmapBuffer>
 
 bool CompositionReader::renderFrame(double progress) {
   pagPlayer->setProgress(progress);
-  pagPlayer->flush();
-  return drawable->isPixelCopied();
+  auto success = pagPlayer->flush();
+  return success && drawable->isPixelCopied() &&
+         !pagPlayer->renderCache->hasSequenceDecodeFailure();
 }
 }  // namespace pag
