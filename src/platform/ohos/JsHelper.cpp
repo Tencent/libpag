@@ -113,14 +113,9 @@ static ConstructorContext* CreateConstructorContext(napi_env env) {
     LOGE("CreateConstructorContext napi_create_external failed :%d", status);
     return nullptr;
   }
-  napi_property_descriptor property = {CONSTRUCTOR_CONTEXT_KEY,
-                                       nullptr,
-                                       nullptr,
-                                       nullptr,
-                                       nullptr,
-                                       external,
-                                       CONSTRUCTOR_CONTEXT_ATTRIBUTES,
-                                       nullptr};
+  napi_property_descriptor property = {
+      CONSTRUCTOR_CONTEXT_KEY,        nullptr, nullptr, nullptr, nullptr, external,
+      CONSTRUCTOR_CONTEXT_ATTRIBUTES, nullptr};
   status = napi_define_properties(env, global, 1, &property);
   if (status != napi_ok) {
     LOGE("CreateConstructorContext napi_define_properties failed :%d", status);
