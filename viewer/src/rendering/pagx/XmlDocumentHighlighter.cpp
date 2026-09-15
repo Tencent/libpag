@@ -1,0 +1,253 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "rendering/pagx/XmlDocumentHighlighter.h"
+#include <QRegularExpression>
+
+namespace pag {
+
+// Matches an attribute inside a tag: optional leading whitespace, the name, the '=' separator,
+// and an optional double- or single-quoted value. Leading whitespace is optional so attributes
+// that wrap to the start of a continuation line are still recognized.
+static const QRegularExpression AttributePattern =
+    QRegularExpression("(\\s*)([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\\s*=\\s*)(\"[^\"]*\"|'[^']*')?");
+
+static QTextCharFormat MakeColorFormat(const char* hexColor) {
+  QTextCharFormat format = {};
+  format.setForeground(QColor(hexColor));
+  return format;
+}
+
+// Allocation-free prefix check; QString::mid would allocate on every scanned character and
+// dominate rehighlight time when large ranges are reformatted (e.g. big multi-line deletions).
+static bool StartsWithAt(const QString& text, qsizetype index, QLatin1StringView prefix) {
+  if (index + prefix.size() > text.size()) {
+    return false;
+  }
+  for (auto i = 0; i < prefix.size(); ++i) {
+    if (text.at(index + i) != prefix.at(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Finds the '>' that closes a tag starting at or after 'from', skipping any '>' that sits inside
+// a single- or double-quoted attribute value. Returns -1 when no unquoted '>' is on this line.
+// Quote state is only tracked within the line, so a value split across lines is not carried over
+// (rare for the source this editor targets).
+static int FindTagEnd(const QString& text, int from, int length) {
+  auto quote = QChar(u'\0');
+  for (auto i = from; i < length; ++i) {
+    const auto ch = text.at(i);
+    if (quote != u'\0') {
+      if (ch == quote) {
+        quote = u'\0';
+      }
+      continue;
+    }
+    if (ch == u'"' || ch == u'\'') {
+      quote = ch;
+      continue;
+    }
+    if (ch == u'>') {
+      return i;
+    }
+  }
+  return -1;
+}
+
+XmlDocumentHighlighter::XmlDocumentHighlighter(QTextDocument* document)
+    : QSyntaxHighlighter(document) {
+  tagFormat = MakeColorFormat("#569CD6");
+  attrNameFormat = MakeColorFormat("#9CDCFE");
+  attrValueFormat = MakeColorFormat("#CE9178");
+  commentFormat = MakeColorFormat("#6A9955");
+  grayFormat = MakeColorFormat("#808080");
+  textFormat = MakeColorFormat("#D4D4D4");
+}
+
+void XmlDocumentHighlighter::highlightBlock(const QString& text) {
+  const auto length = static_cast<int>(text.length());
+  auto state = previousBlockState();
+  if (state < StateNormal || state > StateInTag) {
+    state = StateNormal;
+  }
+  setCurrentBlockState(StateNormal);
+
+  if (length > MaxHighlightLength) {
+    setFormat(0, length, textFormat);
+    return;
+  }
+
+  auto index = 0;
+  while (index < length) {
+    if (state == StateInTag) {
+      // Continuation of a tag opened on an earlier line: keep coloring attribute name/value
+      // pairs until the closing '>' (quote-aware) is found on this line.
+      const auto tagEnd = FindTagEnd(text, index, length);
+      if (tagEnd < 0) {
+        highlightAttributes(text, index, length);
+        setCurrentBlockState(StateInTag);
+        return;
+      }
+      auto tailStart = tagEnd;
+      if (tagEnd > index && text.at(tagEnd - 1) == u'/') {
+        tailStart = tagEnd - 1;
+      }
+      if (index < tailStart) {
+        highlightAttributes(text, index, tailStart);
+      }
+      setFormat(tailStart, tagEnd - tailStart + 1, tagFormat);
+      index = tagEnd + 1;
+      state = StateNormal;
+      continue;
+    }
+
+    if (state != StateNormal) {
+      // Continuation of a multi-line comment / CDATA / processing instruction started on an
+      // earlier line: paint the whole region with the construct's color until its terminator is
+      // found on this line.
+      const char* terminator = "-->";
+      const QTextCharFormat* format = &commentFormat;
+      switch (state) {
+        case StateInCData:
+          terminator = "]]>";
+          format = &grayFormat;
+          break;
+        case StateInProcessingInstruction:
+          terminator = "?>";
+          format = &grayFormat;
+          break;
+        default:
+          break;
+      }
+      const auto end = text.indexOf(QLatin1String(terminator), index);
+      if (end < 0) {
+        setFormat(index, length - index, *format);
+        setCurrentBlockState(state);
+        return;
+      }
+      const auto stop = end + static_cast<int>(qstrlen(terminator));
+      setFormat(index, stop - index, *format);
+      index = stop;
+      state = StateNormal;
+      continue;
+    }
+
+    if (StartsWithAt(text, index, QLatin1String("<!--"))) {
+      const auto end = text.indexOf(QLatin1String("-->"), index);
+      if (end < 0) {
+        setFormat(index, length - index, commentFormat);
+        setCurrentBlockState(StateInComment);
+        return;
+      }
+      setFormat(index, end + 3 - index, commentFormat);
+      index = end + 3;
+      continue;
+    }
+
+    if (StartsWithAt(text, index, QLatin1String("<![CDATA["))) {
+      const auto end = text.indexOf(QLatin1String("]]>"), index);
+      if (end < 0) {
+        setFormat(index, length - index, grayFormat);
+        setCurrentBlockState(StateInCData);
+        return;
+      }
+      setFormat(index, end + 3 - index, grayFormat);
+      index = end + 3;
+      continue;
+    }
+
+    if (StartsWithAt(text, index, QLatin1String("<?"))) {
+      const auto end = text.indexOf(QLatin1String("?>"), index);
+      if (end < 0) {
+        setFormat(index, length - index, grayFormat);
+        setCurrentBlockState(StateInProcessingInstruction);
+        return;
+      }
+      setFormat(index, end + 2 - index, grayFormat);
+      index = end + 2;
+      continue;
+    }
+
+    if (text.at(index) == u'<') {
+      const auto tagEnd = FindTagEnd(text, index, length);
+      if (tagEnd < 0) {
+        // A tag split across lines: highlight the tag name and any attributes present on this
+        // line, then resume after the closing '>' is found on a later line.
+        highlightTag(text, index, length, false);
+        setCurrentBlockState(StateInTag);
+        return;
+      }
+      highlightTag(text, index, tagEnd, true);
+      index = tagEnd + 1;
+      continue;
+    }
+
+    auto nextTag = text.indexOf(u'<', index);
+    if (nextTag < 0) {
+      nextTag = length;
+    }
+    setFormat(index, nextTag - index, textFormat);
+    index = nextTag;
+  }
+}
+
+void XmlDocumentHighlighter::highlightTag(const QString& text, int start, int end, bool closed) {
+  if (StartsWithAt(text, start, QLatin1String("</"))) {
+    // Closing tags keep a single tag color for the whole region, matching the web editor.
+    setFormat(start, end - start + (closed ? 1 : 0), tagFormat);
+    return;
+  }
+  setFormat(start, 1, tagFormat);
+  auto nameStart = start + 1;
+  auto nameEnd = nameStart;
+  while (nameEnd < end && !text.at(nameEnd).isSpace()) {
+    ++nameEnd;
+  }
+  setFormat(nameStart, nameEnd - nameStart, tagFormat);
+  auto tailStart = end;
+  if (closed && end > nameStart && text.at(end - 1) == u'/') {
+    tailStart = end - 1;
+  }
+  if (nameEnd < tailStart) {
+    highlightAttributes(text, nameEnd, tailStart);
+  }
+  if (closed) {
+    setFormat(tailStart, end - tailStart + 1, tagFormat);
+  }
+}
+
+void XmlDocumentHighlighter::highlightAttributes(const QString& text, int from, int to) {
+  const auto segment = text.mid(from, to - from);
+  auto iterator = AttributePattern.globalMatch(segment);
+  while (iterator.hasNext()) {
+    const auto match = iterator.next();
+    const auto nameLength = static_cast<int>(match.capturedLength(2));
+    if (nameLength > 0) {
+      setFormat(from + static_cast<int>(match.capturedStart(2)), nameLength, attrNameFormat);
+    }
+    const auto valueLength = static_cast<int>(match.capturedLength(4));
+    if (valueLength > 0) {
+      setFormat(from + static_cast<int>(match.capturedStart(4)), valueLength, attrValueFormat);
+    }
+  }
+}
+
+}  // namespace pag
