@@ -189,6 +189,8 @@ CLI_TEST(PAGTypefaceCacheTest, ClearEmbedResetsFontTypeface) {
   auto* fontNode = FindFirstEmbeddedFont(doc.get());
   ASSERT_NE(fontNode, nullptr);
   ASSERT_TRUE(CachedTypeface(fontNode) != nullptr);
+  // clearEmbed() preserves file-backed Font nodes, allowing their reset cache to be inspected.
+  fontNode->file = "preserved-font.otf";
 
   doc->clearEmbed();
   EXPECT_EQ(CachedTypeface(fontNode), nullptr);
