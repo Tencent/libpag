@@ -5537,13 +5537,16 @@ async function inlineExternalImages(cachedMap) {
     const url = firstCssUrl(bg);
     if (!url || /^file:/i.test(url)) continue;
     if (url.startsWith('data:')) {
-      bgInlinePending.push({ el, src: url });
+      bgInlinePending.push({ el, src: url, current: url });
       continue;
     }
     if (!/^https?:/i.test(url)) continue;
     const cached = cache[url];
     if (cached) {
-      bgInlinePending.push({ el, src: cached });
+      // `current` records what the element still declares: a cache hit has to be written back even
+      // when the cached bytes already are in a portable format, because the element is carrying
+      // the remote URL that entry replaces.
+      bgInlinePending.push({ el, src: cached, current: url });
       continue;
     }
     bgPending.push({ el, url });
@@ -5565,9 +5568,11 @@ async function inlineExternalImages(cachedMap) {
 
   async function applyInlineBgSource(entry) {
     const normalized = await normalizeSource(entry.src);
-    // An already-inline data URI that needed no re-encode stays untouched, so a page full of
-    // icon data URIs does not pay for a pointless style invalidation per element.
-    if (normalized !== entry.src) {
+    // Skip the write only when the element already declares the value it would receive: an
+    // authored data URI that needed no re-encode stays untouched, so a page full of icon data
+    // URIs does not pay for a pointless style invalidation per element. Everything else — a cache
+    // hit above all — has to replace whatever the element declares now.
+    if (normalized !== entry.current) {
       entry.el.style.backgroundImage = `url("${normalized.replace(/"/g, '\\"')}")`;
     }
   }
