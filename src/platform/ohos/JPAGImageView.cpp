@@ -552,7 +552,6 @@ bool JPAGImageView::Init(napi_env env, napi_value exports) {
       PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(setVisible, SetVisible),
       PAG_DEFAULT_METHOD_ENTRY(numFrame, NumFrame),
-      PAG_DEFAULT_METHOD_ENTRY(setCurrentFrame, SetCurrentFrame),
       PAG_DEFAULT_METHOD_ENTRY(currentImage, CurrentImage),
       PAG_DEFAULT_METHOD_ENTRY(update, Update),
       PAG_DEFAULT_METHOD_ENTRY(release, Release)};
