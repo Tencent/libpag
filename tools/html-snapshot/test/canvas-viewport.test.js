@@ -90,7 +90,7 @@ describe('applyCanvasViewport', () => {
     const page = {
       evaluate: jest.fn()
         .mockResolvedValueOnce({ score: 0, height: 900 })
-        .mockResolvedValueOnce({ score: 0, height: 1023 }),
+        .mockResolvedValueOnce({ score: 0, height: 1300 }),
       setViewportSize: jest.fn().mockResolvedValue(undefined),
     };
     const log = jest.fn();
@@ -112,7 +112,58 @@ describe('applyCanvasViewport', () => {
       height: 900,
     });
     expect(log).toHaveBeenCalledWith(expect.stringContaining(
-      'ballooned layout (height 1000→1023px)',
+      'ballooned layout (height 1000→1300px)',
+    ));
+  });
+
+  test('keeps a single-screen fit-to-window stage that reflows within the viewport increase', async () => {
+    // A fixed stage (canvas ≈ one viewport) rescaled by a `fit()` resize handler
+    // grows the body by up to the viewport-height increase (990 → up to ~1082
+    // for a 90px viewport grow). That is a benign fit reflow, not a balloon, so
+    // the resize is kept.
+    const page = puppeteerPage(
+      { score: 50, height: 990 },
+      { score: 50, height: 1080 },
+    );
+
+    await expect(applyCanvasViewport(
+      page,
+      'puppeteer',
+      { width: 1660, height: 990 },
+      { width: 1400, height: 900 },
+    )).resolves.toEqual({ reverted: false });
+
+    expect(page.setViewport).toHaveBeenCalledTimes(1);
+  });
+
+  test('reverts a long page whose viewport-height hero balloons the canvas', async () => {
+    // Regression: a long scrolling page (canvas many viewports tall) with a
+    // single `100vh` hero. Resizing to the tall canvas inflates the hero and
+    // grows the body (6695 → 9417) — LESS than the huge `viewportGrew` (5795),
+    // so the fit-to-window relaxation would wrongly keep it and leave a big empty
+    // gap. Because the canvas is multi-screen the strict bound applies and it
+    // reverts to the settle viewport instead. (codebuddy.cn)
+    const page = puppeteerPage(
+      { score: 100, height: 6695 },
+      { score: 100, height: 9417 },
+    );
+    const log = jest.fn();
+
+    await expect(applyCanvasViewport(
+      page,
+      'puppeteer',
+      { width: 1400, height: 6695 },
+      { width: 1400, height: 900 },
+      log,
+    )).resolves.toEqual({ reverted: true });
+
+    expect(page.setViewport).toHaveBeenNthCalledWith(2, {
+      width: 1400,
+      height: 900,
+      deviceScaleFactor: 1,
+    });
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(
+      'ballooned layout (height 6695→9417px)',
     ));
   });
 

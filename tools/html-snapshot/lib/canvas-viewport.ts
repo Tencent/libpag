@@ -107,7 +107,34 @@ export async function applyCanvasViewport(
   );
 
   const lostContent = beforeScore > 0 && afterScore < beforeScore * 0.85;
-  const ballooned = afterHeight > canvas.height * 1.02 + 2;
+  // Distinguish a viewport-proportional (`vh`/`dvh`) balloon from the benign
+  // reflow a fixed-size stage produces when a `fit()`-style resize handler
+  // rescales it to the new viewport. Resizing from the settle viewport up to the
+  // canvas enlarges it by `viewportGrew` px vertically. A fixed stage (a
+  // 1920x1080 mock scaled by `transform: scale(min(w/W, h/H))` on `resize`)
+  // reflows by a bounded amount that does NOT track the viewport, so its growth
+  // stays at or below that delta — for those pages we allow growth up to the
+  // viewport increase (with a 2% slack floor for sub-pixel reflow jitter) so
+  // fit-to-window stages keep the resize and fill the canvas instead of freezing
+  // at the smaller settle-viewport scale.
+  //
+  // BUT that `viewportGrew` relaxation is only safe for a single-screen stage
+  // (canvas ≈ one viewport). On a long scrolling page the settle-measured canvas
+  // is many viewports tall, so `viewportGrew` is huge (e.g. a 6695px page vs a
+  // 900px viewport → ~5795px) and a single `100vh` hero that inflates with the
+  // viewport grows the body by LESS than that delta — sneaking under the relaxed
+  // bound while leaving a big empty gap where the ballooned hero pushed the rest
+  // of the page down (codebuddy.cn: hero balloons, canvas 6695→9417). Such a
+  // page is genuinely viewport-dependent and must revert. So only grant the
+  // `viewportGrew` allowance when the canvas is roughly a single screen; for a
+  // taller (multi-screen) canvas fall back to the strict `canvas * 0.02 + 2`
+  // bound so any real growth counts as a balloon.
+  const viewportGrew = Math.max(0, canvas.height - settleViewport.height);
+  const singleScreenCanvas = canvas.height <= settleViewport.height * 1.5;
+  const balloonAllowance = singleScreenCanvas
+    ? Math.max(viewportGrew, canvas.height * 0.02) + 2
+    : canvas.height * 0.02 + 2;
+  const ballooned = afterHeight > canvas.height + balloonAllowance;
   if (lostContent || ballooned) {
     if (log) {
       const why = lostContent
