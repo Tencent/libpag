@@ -28,6 +28,26 @@ globalThis.isWxWebAssembly = true;
 // eslint-disable-next-line no-global-assign
 window = globalThis;
 
+// WeChat Mini Program has no global crypto, so Expat aborts while requesting entropy during
+// PAGX parsing. Fall back to Math.random(): the hash salt only needs to be unpredictable, not
+// cryptographically secure.
+if (!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== 'function') {
+  const getRandomValues = (array: any) => {
+    if (array && ArrayBuffer.isView(array)) {
+      const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = Math.floor(Math.random() * 256);
+      }
+    }
+    return array;
+  };
+  if (globalThis.crypto) {
+    globalThis.crypto.getRandomValues = getRandomValues;
+  } else {
+    globalThis.crypto = { getRandomValues };
+  }
+}
+
 // Keep this file a module so the ambient `declare const globalThis` above stays module-scoped;
 // without an import/export it becomes a global script and clashes with the built-in globalThis.
 export {};
