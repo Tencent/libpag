@@ -616,6 +616,28 @@ PAG_TEST(PAGANRRegressionTest, FailedStaticSequenceRequestRemovesSnapshot) {
   EXPECT_TRUE(cache.sequenceCacheInvalidated());
 }
 
+PAG_TEST(PAGANRRegressionTest, ClearAllSequenceCachesRemovesStaticSequenceImages) {
+  auto stage = PAGStage::Make(2, 2);
+  RenderCache cache(stage.get());
+  auto image = MakeANRTestImage();
+  ASSERT_NE(image, nullptr);
+  constexpr ID assetID = 1;
+  constexpr ID unrelatedAssetID = 2;
+  cache.assetImages[assetID] = image;
+  cache.assetImages[unrelatedAssetID] = image;
+  cache.decodedAssetImages[assetID] = image;
+  cache.staticSequenceResults[assetID] = std::make_shared<SequenceReadResult>();
+  AddANRTestSnapshot(&cache, assetID, image);
+
+  cache.clearAllSequenceCaches();
+
+  EXPECT_EQ(cache.assetImages.count(assetID), 0U);
+  EXPECT_EQ(cache.decodedAssetImages.count(assetID), 0U);
+  EXPECT_EQ(cache.staticSequenceResults.count(assetID), 0U);
+  EXPECT_FALSE(cache.hasSnapshot(assetID));
+  EXPECT_EQ(cache.assetImages.count(unrelatedAssetID), 1U);
+}
+
 PAG_TEST(PAGANRRegressionTest, FailedSequenceRequestCanRetry) {
   auto sequence = std::make_shared<ANRSequenceInfo>();
   auto reader = std::make_shared<ANRFailThenSucceedReader>();

@@ -576,6 +576,12 @@ SequenceImageQueue* RenderCache::makeSequenceImageQueue(std::shared_ptr<Sequence
 }
 
 void RenderCache::clearAllSequenceCaches() {
+  // Static sequence images retain their async decode results, so clear both together.
+  for (auto& item : staticSequenceResults) {
+    removeSnapshot(item.first);
+    assetImages.erase(item.first);
+    decodedAssetImages.erase(item.first);
+  }
   staticSequenceResults.clear();
   usedStaticSequences.clear();
   for (auto& item : sequenceCaches) {
