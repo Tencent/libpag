@@ -133,6 +133,10 @@ static std::shared_ptr<PAGAnimator> MakeANRAnimator(
   return animator;
 }
 
+static void RunANRAnimatorUpdate(PAGAnimator* animator) {
+  animator->doUpdate(true);
+}
+
 class ANRVideoDemuxer : public VideoDemuxer {
  public:
   VideoFormat getFormat() override {
@@ -461,6 +465,31 @@ PAG_TEST(PAGANRRegressionTest, StartDuringEndingRunsAfterEnd) {
 
   EXPECT_TRUE(animator->isRunning());
   animator->cancel();
+}
+
+PAG_TEST(PAGANRRegressionTest, EndWaitsForSynchronousFinalUpdate) {
+  auto listener = std::make_shared<ANRAnimatorListener>();
+  listener->blockFirstUpdate();
+  auto animator = MakeANRAnimator(listener);
+  animator->isEnding = true;
+  animator->endingUpdatePending = true;
+  animator->endingFlushSynchronously = true;
+  animator->_isSync = true;
+
+  std::thread updateThread(RunANRAnimatorUpdate, animator.get());
+  auto updateStarted = listener->waitForUpdateCount(1);
+  EXPECT_TRUE(updateStarted);
+  if (!updateStarted) {
+    listener->releaseFirstUpdate();
+    updateThread.join();
+    return;
+  }
+  EXPECT_TRUE(animator->doAdvance().empty());
+  listener->releaseFirstUpdate();
+  updateThread.join();
+
+  auto endEvents = animator->doAdvance();
+  EXPECT_EQ(endEvents.size(), 1U);
 }
 
 PAG_TEST(PAGANRRegressionTest, EndingUpdateStaysAsynchronousAfterSyncChange) {

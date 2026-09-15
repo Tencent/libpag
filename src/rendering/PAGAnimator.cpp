@@ -480,9 +480,6 @@ void PAGAnimator::doUpdate(bool setStartTime) {
         endingUpdatePending = false;
       }
     }
-    if (isEnding && shouldFlushSynchronously) {
-      endingUpdatePending = false;
-    }
   }
   if (shouldFlushSynchronously) {
     auto listener = weakListener.lock();
@@ -490,6 +487,10 @@ void PAGAnimator::doUpdate(bool setStartTime) {
       listener->onAnimationWillUpdate(this);
     }
     onFlush(setStartTime);
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (isEnding) {
+      endingUpdatePending = false;
+    }
     return;
   }
   SubmitAnimatorUpdateTask(std::move(updateTask));
