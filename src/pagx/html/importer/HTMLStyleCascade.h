@@ -59,6 +59,12 @@ class HTMLStyleCascade {
   // -data shape as `FontFallbackThunk` so the cascade stays free of `<functional>`.
   using FontAvailabilityThunk = bool (*)(void* userData, const std::string& family);
 
+  // Rewrites a resolved (family, style) pair in place to the names the platform resolves it to, so
+  // the pair written to `Text::fontFamily` / `Text::fontStyle` can be looked up by name outside
+  // this process — an editor consuming the exported PAGX resolves fonts with its own, usually
+  // exact-matching, font lookup. Same function-pointer + opaque-user-data shape as the sinks above.
+  using FontFaceNameThunk = void (*)(void* userData, std::string& family, std::string& style);
+
   HTMLStyleCascade(HTMLDiagnosticSink& sink, HTMLValueParser& valueParser);
 
   /** Wires the callback that receives concrete font-family chains discovered by
@@ -68,6 +74,10 @@ class HTMLStyleCascade {
   /** Wires the predicate that reports whether a concrete family resolves to a matching typeface.
    *  When unset, `resolveInheritedStyle` keeps the stack's first concrete family verbatim. */
   void setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData);
+
+  /** Wires the in-place normaliser mapping a resolved pair to the platform's own spelling.
+   *  When unset, `resolveInheritedStyle` keeps both names verbatim. */
+  void setFontFaceNameSink(FontFaceNameThunk thunk, void* userData);
 
   /** Walks `<head>` and populates the class / element rule tables from `<style>` blocks. */
   void collectStyles(const std::shared_ptr<DOMNode>& head);
@@ -128,12 +138,19 @@ class HTMLStyleCascade {
   // the project's "no lambda" rule is honoured.
   void applyMarginLonghand(const PropertyMap& props, const char* propName, float& outPx);
 
+  // Reports the platform's own spelling for `out`'s resolved font pair through the font-face-name
+  // sink. Skipped for pairs the parent already produced, which keeps the platform lookup to one
+  // call per distinct pair instead of one per element.
+  void applyFontFaceNames(HTMLInheritedStyle& out, const HTMLInheritedStyle& parent);
+
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
   FontFallbackThunk _fontFallbackThunk = nullptr;
   void* _fontFallbackUserData = nullptr;
   FontAvailabilityThunk _fontAvailabilityThunk = nullptr;
   void* _fontAvailabilityUserData = nullptr;
+  FontFaceNameThunk _fontFaceNameThunk = nullptr;
+  void* _fontFaceNameUserData = nullptr;
 
   // CSS class selectors (key = class name without the dot). Pre-parsed at <style>-collection
   // time so per-element resolution can copy entries instead of re-running ParseStyleString

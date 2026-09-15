@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -34,6 +35,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -3751,16 +3753,26 @@ PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceFallsBackWithoutFauxBold) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
-  auto doc = ParseFromString(R"HTML(
+  // Registered families are resolved by LayoutContext through an exact (family, style) key, so the
+  // importer must report their names verbatim — including an authored style label the platform has
+  // no face for. Registering keeps this assertion independent of the fonts installed on the host.
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          "HTML Medium Test", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:200px;height:40px">
-      <span style="font-weight:500">Medium</span>
+      <span style="font-family:'HTML Medium Test';font-weight:500">Medium</span>
     </body></html>
-  )HTML");
+  )HTML",
+                                             opts);
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
   // Medium stays a real-face style label so font lookup can select it precisely. The importer does
   // not bake a faux flag when that face is unavailable.
+  EXPECT_EQ(text->fontFamily, "HTML Medium Test");
   EXPECT_EQ(text->fontStyle, "Medium");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
@@ -4018,6 +4030,202 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackDedupesAcrossElements) {
   EXPECT_EQ(interCount, 1u);
   EXPECT_NE(std::find(names.begin(), names.end(), "Roboto"), names.end());
   EXPECT_NE(std::find(names.begin(), names.end(), "Noto Sans"), names.end());
+}
+
+// Case-insensitive comparison of two font names, mirroring how the importer decides whether the
+// face the platform resolved still belongs to the requested family.
+static bool FontNamesMatchIgnoreCase(const std::string& first, const std::string& second) {
+  if (first.size() != second.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < first.size(); index++) {
+    if (std::tolower(static_cast<unsigned char>(first[index])) !=
+        std::tolower(static_cast<unsigned char>(second[index]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static std::string LowercaseAscii(const std::string& text) {
+  std::string out = text;
+  for (auto& character : out) {
+    character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+  }
+  return out;
+}
+
+// Returns a system family the platform resolves both under its own spelling and under the
+// lower-cased one, so feeding the lower-cased form to the importer proves the exported name is the
+// platform's spelling rather than what the CSS said. Empty when the host offers no such family.
+static std::string FindSystemFamilyWithCaseVariantSpelling() {
+  for (const auto& entry : pagx::SystemFonts::AllFontFamilies()) {
+    if (entry.family.empty()) {
+      continue;
+    }
+    auto lowercase = LowercaseAscii(entry.family);
+    if (lowercase == entry.family) {
+      continue;
+    }
+    auto typeface = pagx::SystemFonts::ResolveTypeface(lowercase, "");
+    if (typeface == nullptr || !FontNamesMatchIgnoreCase(entry.family, typeface->fontFamily())) {
+      continue;
+    }
+    if (typeface->fontFamily() == entry.family) {
+      return entry.family;
+    }
+  }
+  return {};
+}
+
+// Returns a system family that ships no Regular face, so the face the platform picks for an
+// unstyled request carries a different style name. Empty when every family has a Regular face.
+static std::string FindSystemFamilyWithoutRegularFace() {
+  for (const auto& entry : pagx::SystemFonts::AllFontFamilies()) {
+    if (entry.family.empty()) {
+      continue;
+    }
+    auto regular = pagx::SystemFonts::FindFont(entry.family, "Regular");
+    if (!regular.path.empty() && FontNamesMatchIgnoreCase(regular.fontStyle, "Regular")) {
+      continue;
+    }
+    auto typeface = pagx::SystemFonts::ResolveTypeface(entry.family, "");
+    if (typeface == nullptr || typeface->fontFamily() != entry.family) {
+      continue;
+    }
+    if (!typeface->fontStyle().empty()) {
+      return entry.family;
+    }
+  }
+  return {};
+}
+
+// Returns a system family without a Medium face, so `font-weight:500` names a face the family does
+// not ship. Empty when every installed family has a Medium face.
+static std::string FindSystemFamilyWithoutMediumFace() {
+  for (const auto& entry : pagx::SystemFonts::AllFontFamilies()) {
+    if (entry.family.empty()) {
+      continue;
+    }
+    auto medium = pagx::SystemFonts::FindFont(entry.family, "Medium");
+    if (!medium.path.empty() && FontNamesMatchIgnoreCase(medium.fontStyle, "Medium")) {
+      continue;
+    }
+    auto typeface = pagx::SystemFonts::ResolveTypeface(entry.family, "Medium");
+    if (typeface == nullptr || typeface->fontFamily() != entry.family) {
+      continue;
+    }
+    if (typeface->fontStyle().empty() || typeface->fontStyle() == "Medium") {
+      continue;
+    }
+    return entry.family;
+  }
+  return {};
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyNameIsWrittenInPlatformSpelling) {
+  auto family = FindSystemFamilyWithCaseVariantSpelling();
+  if (family.empty()) {
+    GTEST_SKIP() << "No system font family resolves under a case-variant spelling";
+  }
+  auto typeface = pagx::SystemFonts::ResolveTypeface(LowercaseAscii(family), "");
+  ASSERT_NE(typeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<span style=\"font-family:'" +
+      LowercaseAscii(family) + "'\">Hi</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  // A host process that looks fonts up with an exact family match cannot resolve the authored
+  // spelling, so the exported name is the spelling the platform itself reports.
+  EXPECT_EQ(text->fontFamily, typeface->fontFamily());
+  EXPECT_EQ(text->fontFamily, family);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, MissingStyleIsWrittenAsResolvedFaceStyle) {
+  auto family = FindSystemFamilyWithoutMediumFace();
+  if (family.empty()) {
+    GTEST_SKIP() << "Every installed system font family ships a Medium face";
+  }
+  auto typeface = pagx::SystemFonts::ResolveTypeface(family, "Medium");
+  ASSERT_NE(typeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<span style=\"font-family:'" +
+      family + "';font-weight:500\">Hi</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  // "Medium" names no face in this family, so the exported pair reports the face the platform
+  // actually resolves instead of a label no font lookup can hit.
+  EXPECT_EQ(text->fontFamily, typeface->fontFamily());
+  EXPECT_EQ(text->fontStyle, typeface->fontStyle());
+  EXPECT_NE(text->fontStyle, "Medium");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FamilyWithoutRegularFaceUsesDefaultFaceStyle) {
+  auto family = FindSystemFamilyWithoutRegularFace();
+  if (family.empty()) {
+    GTEST_SKIP() << "Every installed system font family ships a Regular face";
+  }
+  auto typeface = pagx::SystemFonts::ResolveTypeface(family, "");
+  ASSERT_NE(typeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<span style=\"font-family:'" +
+      family + "'\">Hi</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  // An unstyled request would otherwise be exported with the substituted "Regular" style label,
+  // which resolves nowhere for a family that has no Regular face.
+  EXPECT_EQ(text->fontFamily, typeface->fontFamily());
+  EXPECT_EQ(text->fontStyle, typeface->fontStyle());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, SubstitutedFamilyKeepsAuthoredName) {
+  // The platform substitutes a default face for an unknown family on some backends; the authored
+  // name must survive so the substitution is not baked into the exported document.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'No Such Font 24680';font-weight:500">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "No Such Font 24680");
+  EXPECT_EQ(text->fontStyle, "Medium");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InheritedFontFaceNamesStayConsistent) {
+  auto family = FindSystemFamilyWithCaseVariantSpelling();
+  if (family.empty()) {
+    GTEST_SKIP() << "No system font family resolves under a case-variant spelling";
+  }
+  auto boldTypeface = pagx::SystemFonts::ResolveTypeface(family, "Bold");
+  ASSERT_NE(boldTypeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:60px\">"
+      "<div style=\"font-family:'" +
+      LowercaseAscii(family) +
+      "'\"><span>One</span>"
+      "<span style=\"font-weight:700\">Two</span></div>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* divLayer = doc->layers.front()->children.front();
+  ASSERT_FALSE(divLayer->children.empty());
+  ASSERT_GE(divLayer->children.size(), 2u);
+  auto* plain = FindElementOfType<pagx::Text>(divLayer->children.front());
+  auto* heavy = FindElementOfType<pagx::Text>(divLayer->children[1]);
+  ASSERT_NE(plain, nullptr);
+  ASSERT_NE(heavy, nullptr);
+  // The child that only changes the weight inherits the already-normalised family, and each child's
+  // style is the face the platform resolves for its own request.
+  EXPECT_EQ(plain->fontFamily, family);
+  EXPECT_EQ(heavy->fontFamily, family);
+  EXPECT_EQ(heavy->fontStyle, boldTypeface->fontStyle());
 }
 
 PAG_TEST(PAGXHTMLImporterTest, TextAlignAndLineHeightOnParagraph) {

@@ -302,6 +302,10 @@ class HTMLParserContext {
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
 
+  // Memoises `resolveFontFaceNames` (family + '\n' + style -> the resolved pair) so each distinct
+  // authored pair pays for the platform font lookup at most once.
+  std::unordered_map<std::string, std::pair<std::string, std::string>> _fontFaceNameCache = {};
+
   float _canvasWidth = 0;
   float _canvasHeight = 0;
   // Records concrete family names from a font-family stack into the document-wide
@@ -323,6 +327,17 @@ class HTMLParserContext {
 
   // Static trampoline adapting the cascade's `FontAvailabilityThunk` to `isFontFamilyAvailable`.
   static bool IsFontFamilyAvailableThunk(void* userData, const std::string& family);
+
+  // Rewrites `family` / `style` in place to the names the platform resolves for the pair, so the
+  // exported PAGX carries names a host process can look up with an exact-matching font lookup
+  // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
+  // Families registered or embedded in the document's FontConfig keep their names verbatim,
+  // because `LayoutContext` resolves those through an exact key; a family the platform substitutes
+  // with a different one also keeps the authored name. Results are memoised in `_fontFaceNameCache`.
+  void resolveFontFaceNames(std::string& family, std::string& style);
+
+  // Static trampoline adapting the cascade's `FontFaceNameThunk` to `resolveFontFaceNames`.
+  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack

@@ -353,6 +353,26 @@ void HTMLStyleCascade::setFontAvailabilitySink(FontAvailabilityThunk thunk, void
   _fontAvailabilityUserData = userData;
 }
 
+void HTMLStyleCascade::setFontFaceNameSink(FontFaceNameThunk thunk, void* userData) {
+  _fontFaceNameThunk = thunk;
+  _fontFaceNameUserData = userData;
+}
+
+void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
+                                          const HTMLInheritedStyle& parent) {
+  if (_fontFaceNameThunk == nullptr || out.primaryFontFamily.empty()) {
+    return;
+  }
+  // The parent's pair was already normalised, so a child that neither changed the family nor the
+  // weight inherits it as-is. Only a pair this element actually introduced needs the platform
+  // lookup, which keeps the one-lookup-per-distinct-pair cost.
+  if (out.primaryFontFamily == parent.primaryFontFamily &&
+      out.fontStyleName == parent.fontStyleName) {
+    return;
+  }
+  _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName);
+}
+
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
   while (child) {
@@ -575,6 +595,7 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   out.fontStyleName = fontSynthesis.fontStyleName;
   out.fauxBold = fontSynthesis.fauxBold;
   out.fauxItalic = fontSynthesis.fauxItalic;
+  applyFontFaceNames(out, parent);
 
   static const char* TextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",
