@@ -73,21 +73,15 @@ static ConstructorContext* GetConstructorContext(napi_env env) {
     LOGE("GetConstructorContext napi_get_global failed :%d", status);
     return nullptr;
   }
-  napi_value key = nullptr;
-  status = napi_create_string_utf8(env, CONSTRUCTOR_CONTEXT_KEY, NAPI_AUTO_LENGTH, &key);
-  if (status != napi_ok) {
-    LOGE("GetConstructorContext napi_create_string_utf8 failed :%d", status);
-    return nullptr;
-  }
   bool hasContext = false;
-  status = napi_has_own_property(env, global, key, &hasContext);
+  status = napi_has_named_property(env, global, CONSTRUCTOR_CONTEXT_KEY, &hasContext);
   if (status != napi_ok || !hasContext) {
     return nullptr;
   }
   napi_value external = nullptr;
-  status = napi_get_property(env, global, key, &external);
+  status = napi_get_named_property(env, global, CONSTRUCTOR_CONTEXT_KEY, &external);
   if (status != napi_ok) {
-    LOGE("GetConstructorContext napi_get_property failed :%d", status);
+    LOGE("GetConstructorContext napi_get_named_property failed :%d", status);
     return nullptr;
   }
   void* data = nullptr;
