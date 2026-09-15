@@ -105,6 +105,27 @@ class HTMLParserContext {
   // background geometry must already be present (added by `applyBackgroundVisuals`).
   bool applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer);
 
+  // Recovers a CSS `url(...)` background whose source is an SVG — an inline `data:image/svg+xml`
+  // URI (`svgContent` carries the decoded payload) or an external `.svg` reference
+  // (`svgContent` empty, `svgSource` the path) — as an inline-`<svg>` import directive instead of
+  // a raster `ImagePattern`. `<Image>` only carries the formats every renderer is required to
+  // decode (PNG/JPEG/WebP/GIF), so an SVG registered as an image would never paint anywhere;
+  // routing it through the directive keeps the icon as editable vector nodes after `pagx resolve`.
+  // `background-size` / `background-position` replay onto the directive host with the same CSS
+  // model as the raster path. A tiling `background-repeat` whose tile is smaller than the element
+  // box needs repeated copies that a single directive cannot express, and returns false so the
+  // caller falls back to the raster path. Returns true when the directive was emitted. The layer's
+  // background geometry must already be present (added by `applyBackgroundVisuals`).
+  bool applyVectorBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer,
+                                      const std::string& svgSource, const std::string& svgContent);
+
+  // Intrinsic size in CSS pixels of the SVG payload `svgContent`, or {NaN, NaN} when the payload
+  // does not parse or carries no resolvable size. This is the coordinate frame the CSS
+  // `background-size` / `background-position` model resolves against, and parsing the payload is
+  // the only way to establish it (an SVG's size lives in its own attributes / viewBox, not in a
+  // format header), so the result is memoised per payload.
+  std::pair<float, float> resolveSvgIntrinsicSize(const std::string& svgContent);
+
   // Folds the standard CSS rounded-image wrapper pattern (a container whose only role is
   // to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into a
   // single Layer whose rounded Rectangle is filled directly by the image. PAGX's only
@@ -182,8 +203,16 @@ class HTMLParserContext {
   // while a bare length is the offset from the box's leading edge.
   float resolveMaskPositionAxis(const std::string& token, float boxAxis, float maskAxis);
 
-  // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
+  // Image resource registration. Thin forwarder to `_imageResources->registerResource`, preceded
+  // by `warnIfUnsupportedImageSource`.
   Image* registerImageResource(const std::string& imageSource);
+
+  // Warns when a `data:` image source carries a format outside the `<Image>` supported set
+  // (PNG/JPEG/WebP/GIF), which the exported PAGX preserves verbatim and no renderer is required to
+  // decode. Reporting it at import time — with the element context the diagnostics carry — is the
+  // earliest point the author can act on it; a renderer that cannot decode the payload simply
+  // paints nothing. Non-`data:` sources are left alone: a file path is read by the renderer.
+  void warnIfUnsupportedImageSource(const std::string& imageSource);
 
   // Decodes an `Image` node's native pixel size (from inline data, a `data:` URI, or a file
   // path). Returns {0, 0} when the bytes cannot be decoded. Used to recover the per-axis scale
@@ -305,6 +334,10 @@ class HTMLParserContext {
   // Memoises `resolveFontFaceNames` (family + '\n' + style -> the resolved pair) so each distinct
   // authored pair pays for the platform font lookup at most once.
   std::unordered_map<std::string, std::pair<std::string, std::string>> _fontFaceNameCache = {};
+
+  // Memoises `resolveSvgIntrinsicSize` (SVG payload -> intrinsic size in CSS pixels) so a payload
+  // shared by many background layers is parsed once.
+  std::unordered_map<std::string, std::pair<float, float>> _svgIntrinsicSizeCache = {};
 
   float _canvasWidth = 0;
   float _canvasHeight = 0;

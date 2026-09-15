@@ -5327,6 +5327,87 @@ async function inlineExternalImages(cachedMap) {
     return `data:${mime};base64,${btoa(binary)}`;
   }
 
+  // Formats `<Image>` is allowed to carry, plus SVG (which the HTML importer routes to native
+  // vector nodes instead of a raster). Everything else has to be re-encoded: PAGX consumers are
+  // only required to decode PNG/JPEG/WebP/GIF, so an AVIF or HEIC that a CDN served would render
+  // on the machine that happens to have the codec and silently vanish everywhere else — Windows
+  // ships no AV1 decoder by default, and a design tool that reads the file with a narrow codec
+  // set drops it outright.
+  const PASSTHROUGH_MIMES = [
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/webp',
+    'image/gif',
+    'image/svg+xml',
+  ];
+
+  // WebP keeps alpha and is in the PAGX supported set with a software decoder in the engine, so it
+  // is the one target that every consumer can read. Quality is high enough that a lossy re-encode
+  // of an already-lossy source is not visible at the sizes these images are composited at.
+  const WEBP_QUALITY = 0.92;
+
+  // Media type declared by a `data:` URI, lower-cased and without parameters. Empty when the URI
+  // declares none (`data:;base64,…`), which is treated as "not known to be supported".
+  function dataUriMime(src) {
+    const match = /^data:([^;,]+)/i.exec(src);
+    return match ? match[1].toLowerCase() : '';
+  }
+
+  // Chromium is the only image codec available on this side of the pipeline (the Node side carries
+  // no AVIF/HEIC decoder), so the re-encode happens here: decode the blob, draw it 1:1 and let the
+  // browser's own WebP encoder produce the replacement bytes.
+  async function transcodeToWebpDataUri(blob) {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    const encoded = await canvas.convertToBlob({ type: 'image/webp', quality: WEBP_QUALITY });
+    // A browser without a WebP encoder hands back a PNG blob; labelling that as WebP would lie
+    // about the payload, so treat it as a failure and keep the original bytes.
+    if (encoded.type !== 'image/webp') {
+      throw new Error('no webp encoder');
+    }
+    return await blobToDataUri(encoded);
+  }
+
+  // Normalises the bytes of one fetched blob for the snapshot. A format PAGX can carry is inlined
+  // as-is; anything else is replaced by its WebP re-encode. Re-encoding failures keep the original
+  // bytes and warn — a kept AVIF still renders wherever the codec exists, whereas dropping the
+  // image would lose it everywhere.
+  async function blobToNormalizedDataUri(blob) {
+    const mime = (blob.type || '').split(';')[0].trim().toLowerCase();
+    if (PASSTHROUGH_MIMES.indexOf(mime) >= 0) {
+      return await blobToDataUri(blob);
+    }
+    try {
+      return await transcodeToWebpDataUri(blob);
+    } catch (err) {
+      console.warn(
+        `html-snapshot: keeping ${mime || 'unlabelled'} image as-is (${err && err.message})`,
+      );
+      return await blobToDataUri(blob);
+    }
+  }
+
+  // Normalises an already-resolved source string: a data URI whose format PAGX cannot carry is
+  // re-encoded, while a supported format is returned unchanged. Two forms are left alone by
+  // design: a remote URL (the callers fetch those separately) and a filesystem path — the shape
+  // `--download-images` passes, whose bytes never reach the browser, so the on-disk file keeps
+  // whatever format the server sent. That mode is a capture artifact rather than the input the
+  // PAGX pipeline consumes, so it is not re-encoded.
+  async function normalizeSource(src) {
+    if (!src.startsWith('data:')) return src;
+    if (PASSTHROUGH_MIMES.indexOf(dataUriMime(src)) >= 0) return src;
+    try {
+      const res = await fetch(src);
+      return await blobToNormalizedDataUri(await res.blob());
+    } catch (err) {
+      const mime = dataUriMime(src) || 'unlabelled';
+      console.warn(`html-snapshot: keeping ${mime} image as-is (${err && err.message})`);
+      return src;
+    }
+  }
+
   // Convert a `file://` URL (the absolute form the browser resolves a local /
   // relative <img src> into) back to a plain filesystem path. PAGX's importer
   // treats a leading `/` (POSIX) or `C:/` (Windows) as absolute and reads the
@@ -5349,7 +5430,10 @@ async function inlineExternalImages(cachedMap) {
 
   const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
+  // `pending` needs a fetch; `inlinePending` already holds its bytes (a response-cache hit, or a
+  // data URI the page authored) and only needs normalising.
   const pending = [];
+  const inlinePending = [];
   for (const img of imgs) {
     // A placeholder <img> whose `src`/`srcset` attributes are empty or missing
     // is not a real image, but the IDL getters below (`currentSrc` / `img.src`)
@@ -5371,7 +5455,13 @@ async function inlineExternalImages(cachedMap) {
     if ((img.getAttribute('data-snapshot-src') || '').trim()) continue;
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
     if (!src) continue;
-    if (src.startsWith('data:')) continue;
+    if (src.startsWith('data:')) {
+      // A page that inlines its own images still has to be normalised: the data URI may carry a
+      // format PAGX cannot (an AVIF the author embedded, for instance), and no later stage would
+      // re-encode it. A supported format is returned unchanged, so this costs a string compare.
+      inlinePending.push({ img, src });
+      continue;
+    }
     // Local image referenced by a relative (or absolute-but-relative-to-the-
     // source) path: the browser has already resolved it to an absolute
     // `file://` URL. Emit that as a plain absolute filesystem path so the
@@ -5388,7 +5478,9 @@ async function inlineExternalImages(cachedMap) {
     if (!/^https?:/i.test(src)) continue;
     const cached = cache[src];
     if (cached) {
-      img.setAttribute('data-snapshot-src', cached);
+      // Re-encoding an unsupported format needs the browser's codec, so it runs in the same
+      // chunked pass as the fetches below instead of one await per element here.
+      inlinePending.push({ img, src: cached });
       continue;
     }
     pending.push({ img, src });
@@ -5401,7 +5493,7 @@ async function inlineExternalImages(cachedMap) {
         console.warn(`html-snapshot: image fetch ${res.status} for ${entry.src}`);
         return;
       }
-      const dataUri = await blobToDataUri(await res.blob());
+      const dataUri = await blobToNormalizedDataUri(await res.blob());
       entry.img.setAttribute('data-snapshot-src', dataUri);
     } catch (err) {
       console.warn(`html-snapshot: failed to inline ${entry.src}: ${err && err.message}`);
@@ -5412,6 +5504,13 @@ async function inlineExternalImages(cachedMap) {
   // throttle aggressively past that. Keeping the in-flight window at 8
   // lets us saturate the bottleneck without queueing surprises.
   const FETCH_CHUNK_SIZE = 8;
+  async function applyInlineSource(entry) {
+    entry.img.setAttribute('data-snapshot-src', await normalizeSource(entry.src));
+  }
+  for (let i = 0; i < inlinePending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = inlinePending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(applyInlineSource));
+  }
   for (let i = 0; i < pending.length; i += FETCH_CHUNK_SIZE) {
     const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOne));
@@ -5430,16 +5529,21 @@ async function inlineExternalImages(cachedMap) {
   }
 
   const bgPending = [];
+  const bgInlinePending = [];
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
     const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
     if (!bg || !/^url\(/i.test(bg)) continue;
     const url = firstCssUrl(bg);
-    if (!url || url.startsWith('data:') || /^file:/i.test(url)) continue;
+    if (!url || /^file:/i.test(url)) continue;
+    if (url.startsWith('data:')) {
+      bgInlinePending.push({ el, src: url });
+      continue;
+    }
     if (!/^https?:/i.test(url)) continue;
     const cached = cache[url];
     if (cached) {
-      el.style.backgroundImage = `url("${cached.replace(/"/g, '\\"')}")`;
+      bgInlinePending.push({ el, src: cached });
       continue;
     }
     bgPending.push({ el, url });
@@ -5452,13 +5556,25 @@ async function inlineExternalImages(cachedMap) {
         console.warn(`html-snapshot: bg-image fetch ${res.status} for ${entry.url}`);
         return;
       }
-      const dataUri = await blobToDataUri(await res.blob());
+      const dataUri = await blobToNormalizedDataUri(await res.blob());
       entry.el.style.backgroundImage = `url("${dataUri.replace(/"/g, '\\"')}")`;
     } catch (err) {
       console.warn(`html-snapshot: failed to inline bg ${entry.url}: ${err && err.message}`);
     }
   }
 
+  async function applyInlineBgSource(entry) {
+    const normalized = await normalizeSource(entry.src);
+    // An already-inline data URI that needed no re-encode stays untouched, so a page full of
+    // icon data URIs does not pay for a pointless style invalidation per element.
+    if (normalized !== entry.src) {
+      entry.el.style.backgroundImage = `url("${normalized.replace(/"/g, '\\"')}")`;
+    }
+  }
+  for (let i = 0; i < bgInlinePending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = bgInlinePending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(applyInlineBgSource));
+  }
   for (let i = 0; i < bgPending.length; i += FETCH_CHUNK_SIZE) {
     const slice = bgPending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOneBg));

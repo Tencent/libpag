@@ -8624,6 +8624,72 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgDataUriChild) {
   EXPECT_FALSE(HasImagePatternFill(wrapper));
 }
 
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSvgDataUriRoutesAsImportDirective) {
+  // A `background-image` whose source is an SVG rides the inline-<svg> import directive exactly
+  // like an `<img>` SVG does, instead of being registered as a raster `Image`: `<Image>` only
+  // carries the formats every renderer is required to decode (PNG/JPEG/WebP/GIF), so an SVG
+  // payload registered there never paints on any platform.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==');
+                  background-size:cover;background-repeat:no-repeat;background-position:50% 50%">
+        <div style="width:10px;height:10px;background-color:#f00"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  auto* host = FindSvgImportLayer(layer);
+  ASSERT_NE(host, nullptr);
+  EXPECT_FALSE(HasImagePatternFill(layer));
+  EXPECT_NE(host->importDirective.content.find("<path"), std::string::npos);
+  // The 24x24 icon covers the 50x50 box at 50/24 on both axes, so the fitted box is the element
+  // box and no clip wrapper is needed.
+  EXPECT_FLOAT_EQ(host->width, 50.0f);
+  EXPECT_FLOAT_EQ(host->height, 50.0f);
+  // A zero offset stays unset: an out-of-flow layer without left/top already sits at its parent's
+  // origin, and an explicit `left="0"` would only add an attribute for `pagx verify` to flag.
+  EXPECT_TRUE(std::isnan(host->left));
+  EXPECT_TRUE(std::isnan(host->top));
+  // Paint order: the background host comes before the element's own content, mirroring CSS (a
+  // Layer's contents paint behind its children, so the host cannot simply be appended).
+  ASSERT_GE(layer->children.size(), 2u);
+  EXPECT_EQ(layer->children.front(), host);
+}
+
+// A repeating SVG background whose tile is smaller than the element box would need the tile drawn
+// several times, which a single import directive cannot express, so it stays on the raster path.
+PAG_TEST(PAGXHTMLImporterTest, TiledSvgBackgroundFallsBackToRasterImage) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-image:url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==');
+                  background-size:24px 24px;background-repeat:repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_TRUE(HasImagePatternFill(layer));
+  EXPECT_EQ(FindSvgImportLayer(layer), nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "tiled SVG background"));
+}
+
+// An image whose format sits outside the `<Image>` supported set is persisted into the exported
+// PAGX verbatim, so the failure would only surface at render time on whichever platform lacks a
+// decoder for it. The importer names the format instead.
+PAG_TEST(PAGXHTMLImporterTest, UnsupportedImageFormatWarnsAtImport) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:url('data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWY=');
+                  background-size:50px 50px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "image/avif"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "outside the <Image> supported set"));
+}
+
 //==================================================================================================
 // HTMLSubsetTransformer::Builder — public custom-pipeline API
 //==================================================================================================

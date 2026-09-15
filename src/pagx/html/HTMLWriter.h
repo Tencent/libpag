@@ -97,7 +97,7 @@ std::string PaddingToCSS(const Padding& padding);
 bool TextStartsWithRTL(const std::string& utf8Text);
 
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx);
-// DetectImageMime / DetectImageMimeOrPNG now live in pagx/utils/ImageMime.h.
+// DetectImageMime / IsSupportedImageMime now live in pagx/utils/ImageMime.h.
 // Include that header directly when sniffing image data.
 
 /**

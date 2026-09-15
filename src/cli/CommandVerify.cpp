@@ -78,6 +78,8 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -1798,11 +1800,45 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   }
 }
 
+// `<Image>` may only carry PNG/JPEG/WebP/GIF (spec "支持格式"): every renderer is required to
+// decode those and nothing guarantees any other format. A `data:` payload outside that set — an
+// AVIF or SVG inlined by an upstream tool, or bytes whose format cannot be identified at all — is
+// reported here so the offending resource is visible before it silently fails to paint on a
+// platform whose decoder does not happen to cover it. Only inline payloads are inspected: an
+// external `filePath` is not read, so a referenced file's format stays the author's concern.
+static void DetectUnsupportedImageFormats(const PAGXDocument* doc,
+                                          std::vector<VerifyDiagnostic>& diagnostics) {
+  for (const auto& nodePtr : doc->nodes) {
+    auto* node = nodePtr.get();
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<const Image*>(node);
+    std::shared_ptr<Data> inlineData = image->data;
+    if (inlineData == nullptr && image->filePath.compare(0, 5, "data:") == 0) {
+      inlineData = DecodeBase64DataURI(image->filePath);
+    }
+    if (inlineData == nullptr || inlineData->size() == 0) {
+      continue;
+    }
+    const char* mime = DetectImageMime(inlineData->bytes(), inlineData->size());
+    if (IsSupportedImageMime(mime)) {
+      continue;
+    }
+    std::string format = mime != nullptr ? std::string("data:") + mime : std::string("an unknown");
+    AddDiagnostic(diagnostics, node->sourceLine,
+                  "resource <Image> id=\"" + image->id + "\" carries " + format +
+                      " payload, outside the supported set (PNG/JPEG/WebP/GIF). Fix: transcode the "
+                      "image before inlining it, or reference a supported format");
+  }
+}
+
 static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                std::vector<VerifyDiagnostic>& diagnostics,
                                const Layer* targetLayer = nullptr) {
   if (targetLayer == nullptr) {
     DetectUnreferencedResources(doc, diagnostics);
+    DetectUnsupportedImageFormats(doc, diagnostics);
     DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
     DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
     DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
