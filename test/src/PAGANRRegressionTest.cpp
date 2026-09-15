@@ -23,6 +23,7 @@
 #include <thread>
 #include <vector>
 #include "rendering/PAGAnimator.h"
+#include "rendering/caches/RenderCache.h"
 #include "rendering/sequences/SequenceImageQueue.h"
 #include "rendering/sequences/VideoReader.h"
 #include "tgfx/core/Bitmap.h"
@@ -348,6 +349,24 @@ static bool WaitForANRSequenceResult(const std::shared_ptr<SequenceReadResult>& 
   return false;
 }
 
+static std::shared_ptr<tgfx::Image> MakeANRTestImage() {
+  tgfx::Bitmap bitmap = {};
+  if (!bitmap.allocPixels(2, 2, false, false)) {
+    return nullptr;
+  }
+  return tgfx::Image::MakeFrom(bitmap);
+}
+
+static void AddANRTestSnapshot(RenderCache* cache, ID assetID,
+                               const std::shared_ptr<tgfx::Image>& image) {
+  auto snapshot = new Snapshot(image, tgfx::Matrix::I());
+  snapshot->assetID = assetID;
+  cache->graphicsMemory += snapshot->memoryUsage();
+  cache->snapshotCaches[assetID] = snapshot;
+  cache->snapshotLRU.push_front(snapshot);
+  cache->snapshotPositions[snapshot] = cache->snapshotLRU.begin();
+}
+
 PAG_TEST(PAGANRRegressionTest, ManualUpdateRunsOffCallingThread) {
   auto listener = std::make_shared<ANRAnimatorListener>();
   auto animator = MakeANRAnimator(listener);
@@ -577,6 +596,24 @@ PAG_TEST(PAGANRRegressionTest, DecoderStalledDuringRetryFallsBackOnNextRequest) 
   EXPECT_NE(reader.readBuffer(0), nullptr);
   EXPECT_EQ(fallbackFactory.createCount(), 1);
   EXPECT_EQ(fallbackDecodeCount.load(), 1);
+}
+
+PAG_TEST(PAGANRRegressionTest, FailedStaticSequenceRequestRemovesSnapshot) {
+  auto stage = PAGStage::Make(2, 2);
+  RenderCache cache(stage.get());
+  auto image = MakeANRTestImage();
+  ASSERT_NE(image, nullptr);
+  constexpr ID assetID = 1;
+  AddANRTestSnapshot(&cache, assetID, image);
+  auto result = std::make_shared<SequenceReadResult>();
+  result->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+  cache.usedStaticSequences[assetID] = result;
+
+  cache.checkSequenceDecodeFailure();
+
+  EXPECT_FALSE(cache.hasSnapshot(assetID));
+  EXPECT_TRUE(cache.hasSequenceDecodeFailure());
+  EXPECT_TRUE(cache.sequenceCacheInvalidated());
 }
 
 PAG_TEST(PAGANRRegressionTest, FailedSequenceRequestCanRetry) {

@@ -135,6 +135,9 @@ void RenderCache::checkSequenceDecodeFailure() {
     }
     lastFrameHasSequenceDecodeFailure = true;
     _sequenceCacheInvalidated = true;
+    // A snapshot bypasses the sequence image path, so remove it to allow the failed request to
+    // retry.
+    removeSnapshot(item.first);
     assetImages.erase(item.first);
     decodedAssetImages.erase(item.first);
     staticSequenceResults.erase(item.first);
