@@ -89,6 +89,11 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
     return nullptr;
   }
   if (status != DecodeStatus::Success) {
+    // A platform call may return an error only after crossing the deadline. Defer fallback to the
+    // next request so this request still respects the shared decoding budget.
+    if (tgfx::Clock::Now() >= deadline) {
+      fallbackPending = true;
+    }
     LOGE("VideoDecoder: Error on decoding frame.\n");
     return nullptr;
   }

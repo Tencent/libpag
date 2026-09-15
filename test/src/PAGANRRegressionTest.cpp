@@ -286,6 +286,53 @@ class ANRErrorThenStallDecoderFactory : public VideoDecoderFactory {
   }
 };
 
+class ANRLateErrorDecoder : public VideoDecoder {
+ public:
+  DecodingResult onSendBytes(void*, size_t, int64_t) override {
+    return DecodingResult::Success;
+  }
+
+  DecodingResult onEndOfStream() override {
+    return DecodingResult::Success;
+  }
+
+  DecodingResult onDecodeFrame() override {
+    std::this_thread::sleep_for(std::chrono::milliseconds(2100));
+    return DecodingResult::Error;
+  }
+
+  void onFlush() override {
+  }
+
+  std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override {
+    return nullptr;
+  }
+
+  int64_t presentationTime() override {
+    return -1;
+  }
+};
+
+class ANRLateErrorDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return false;
+  }
+
+  int createCount() const {
+    return decoderCreateCount.load();
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat&) const override {
+    decoderCreateCount++;
+    return std::make_unique<ANRLateErrorDecoder>();
+  }
+
+ private:
+  mutable std::atomic_int decoderCreateCount = 0;
+};
+
 class ANRFailThenSucceedReader : public SequenceReader {
  public:
   int width() const override {
@@ -594,6 +641,23 @@ PAG_TEST(PAGANRRegressionTest, DecoderStalledDuringRetryFallsBackOnNextRequest) 
   EXPECT_EQ(fallbackFactory.createCount(), 0);
 
   EXPECT_NE(reader.readBuffer(0), nullptr);
+  EXPECT_EQ(fallbackFactory.createCount(), 1);
+  EXPECT_EQ(fallbackDecodeCount.load(), 1);
+}
+
+PAG_TEST(PAGANRRegressionTest, DecoderErrorAfterDeadlineFallsBackOnNextRequest) {
+  std::atomic_int fallbackDecodeCount = 0;
+  ANRLateErrorDecoderFactory lateErrorFactory = {};
+  ANRVideoDecoderFactory fallbackFactory(false, &fallbackDecodeCount);
+  std::vector<const VideoDecoderFactory*> factories = {&lateErrorFactory, &fallbackFactory};
+  VideoReader reader(std::make_unique<ANRVideoDemuxer>(), std::move(factories));
+
+  EXPECT_EQ(reader.readBuffer(0), nullptr);
+  EXPECT_EQ(lateErrorFactory.createCount(), 1);
+  EXPECT_EQ(fallbackFactory.createCount(), 0);
+
+  EXPECT_NE(reader.readBuffer(0), nullptr);
+  EXPECT_EQ(lateErrorFactory.createCount(), 1);
   EXPECT_EQ(fallbackFactory.createCount(), 1);
   EXPECT_EQ(fallbackDecodeCount.load(), 1);
 }
