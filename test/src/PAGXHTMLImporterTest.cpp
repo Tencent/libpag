@@ -8690,6 +8690,43 @@ PAG_TEST(PAGXHTMLImporterTest, UnsupportedImageFormatWarnsAtImport) {
   EXPECT_TRUE(HasDiagnosticContaining(doc, "outside the <Image> supported set"));
 }
 
+// A remote `.svg` background that the snapshot failed to inline cannot ride the import-directive
+// path: `pagx resolve` reads a directive's `source` from disk, so expanding an http(s) reference
+// fails and the layer is dropped. Such a reference stays on the raster path, exactly as it did
+// before the vector path existed, so the document remains resolvable.
+PAG_TEST(PAGXHTMLImporterTest, RemoteSvgBackgroundStaysOnRasterPath) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:url('https://cdn.example.com/icon.svg');
+                  background-size:50px 50px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_EQ(FindSvgImportLayer(layer), nullptr);
+  EXPECT_TRUE(HasImagePatternFill(layer));
+}
+
+// An external `.svg` file reference is read from disk at resolve time, so it rides the directive
+// path like an inline payload does.
+PAG_TEST(PAGXHTMLImporterTest, LocalSvgFileBackgroundRidesImportDirective) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:url(icon.svg);
+                  background-size:50px 50px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  auto* host = FindSvgImportLayer(layer);
+  ASSERT_NE(host, nullptr);
+  EXPECT_FALSE(HasImagePatternFill(layer));
+  EXPECT_NE(host->importDirective.source.find("icon.svg"), std::string::npos);
+}
+
 //==================================================================================================
 // HTMLSubsetTransformer::Builder — public custom-pipeline API
 //==================================================================================================

@@ -60,6 +60,21 @@ bool IsExternalSvgSrc(const std::string& src) {
   return ToLower(src.substr(src.size() - 4)) == ".svg";
 }
 
+// True for an `http(s):` reference. An import directive's `source` is read from disk by
+// `pagx resolve`, so a remote `.svg` can never be expanded — its bytes only reach the document
+// once the snapshot has inlined them, which turns the reference into a `data:` URI.
+bool IsRemoteUrl(const std::string& src) {
+  return src.compare(0, 7, "http://") == 0 || src.compare(0, 8, "https://") == 0;
+}
+
+// True when an SVG background source can actually be expanded by `pagx resolve`: an inline
+// `data:` payload (`decoded` non-empty) or a file reference. A remote URL cannot, and it only
+// survives to this point when the snapshot could not inline its bytes.
+bool IsResolvableSvgSource(const std::string& src, const std::string& decoded) {
+  if (!decoded.empty()) return true;
+  return !IsRemoteUrl(src);
+}
+
 void SetDOMAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
                      const std::string& value) {
   if (node == nullptr) return;
@@ -1154,8 +1169,12 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
   // An SVG background rides the inline-`<svg>` import directive rather than a raster image:
   // registering it as an `Image` would hand every consumer a payload no decoder is required to
   // read (the supported set is PNG/JPEG/WebP/GIF), so the icon would silently never paint.
+  // A remote `.svg` URL is the one exception: `pagx resolve` reads a directive's `source` from
+  // disk, so expanding such a reference fails and drops the layer. It only reaches this point when
+  // the snapshot could not inline the bytes, and the raster path at least keeps the document
+  // resolvable, so that case stays where it was.
   std::string svgContent;
-  if (IsSvgImportSource(src, &svgContent) || IsExternalSvgSrc(src)) {
+  if (IsSvgImportSource(src, &svgContent) && IsResolvableSvgSource(src, svgContent)) {
     if (applyVectorBackgroundImageFill(box, layer, src, svgContent)) {
       return true;
     }
