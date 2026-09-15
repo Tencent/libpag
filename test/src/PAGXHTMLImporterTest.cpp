@@ -4381,6 +4381,95 @@ PAG_TEST(PAGXHTMLImporterTest, GradientBackgroundWithoutClipKeepsRectangle) {
   EXPECT_NE(As<pagx::LinearGradient>(fill->color), nullptr);
 }
 
+// Verifies the solid-colour half of the `background-clip: text` technique: with no gradient
+// layer the element's `background-color` is what paints the glyphs, so it must become the text
+// fill while the rectangle behind the text is suppressed. Sites drive their tab / link
+// hover-and-active colour changes this way, pairing an inherited transparent text-fill with a
+// background that swaps between a solid colour and a gradient.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesSolidColorToTextFill) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-color:rgba(0,0,0,0.9);background-clip:text">
+        <span style="font-size:32px;font-weight:700">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  // No Rectangle on the clip-to-text wrapper: the colour is consumed by the text fill instead
+  // of painting a block behind the glyphs.
+  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 0u);
+  EXPECT_EQ(FindElementOfType<pagx::Fill>(outer), nullptr);
+  // The text leaf carries the background colour as its glyph fill, outranking the default
+  // text colour that the snapshot omits (CSS inherits a transparent text-fill-color).
+  auto* textLeaf = outer->children.front();
+  ASSERT_NE(textLeaf, nullptr);
+  auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
+  pagx::Fill* textFill = nullptr;
+  if (textBox) {
+    textFill = FindElement<pagx::Fill>(textBox->elements);
+  } else {
+    textFill = FindElementOfType<pagx::Fill>(textLeaf);
+  }
+  ASSERT_NE(textFill, nullptr);
+  auto* solid = As<pagx::SolidColor>(textFill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x000000, 0.9f)));
+}
+
+// Negative control: without `background-clip: text` a solid `background-color` must still paint
+// the rectangle behind the text (the existing behaviour must not regress).
+PAG_TEST(PAGXHTMLImporterTest, SolidBackgroundWithoutClipKeepsRectangle) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-color:rgba(0,0,0,0.9)">
+        <span style="font-size:32px;font-weight:700">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 1u);
+  auto* fill = FindElementOfType<pagx::Fill>(outer);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = As<pagx::SolidColor>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x000000, 0.9f)));
+}
+
+// A fully transparent `background-color` carries no paint, so `background-clip: text` must stay
+// a no-op for that element and leave the text on its own resolved `color`.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextTransparentColorKeepsTextColor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-color:rgba(0,0,0,0);background-clip:text">
+        <span style="font-size:32px;font-weight:700;color:#123456">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  auto* textLeaf = outer->children.front();
+  ASSERT_NE(textLeaf, nullptr);
+  pagx::Fill* textFill = nullptr;
+  auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
+  if (textBox) {
+    textFill = FindElement<pagx::Fill>(textBox->elements);
+  } else {
+    textFill = FindElementOfType<pagx::Fill>(textLeaf);
+  }
+  ASSERT_NE(textFill, nullptr);
+  auto* solid = As<pagx::SolidColor>(textFill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnchorHrefStoredAsCustomData) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
@@ -11760,6 +11849,67 @@ PAG_TEST(PAGXHTMLStyleCascadeTest, EmptyStylePropertyFallbackAndShorthandGradien
   // The second lookup returns the already-resolved map from the cache.
   EXPECT_EQ(cascade.getResolvedStyle(custom).at("background-image"),
             "linear-gradient(90deg, red, blue)");
+}
+
+// Verifies that `background-clip: text` supplies the glyph paint in both of its forms: a solid
+// `background-color` becomes `textFillSolid` (outranking `color`, exactly as the gradient form
+// does), a gradient `background-image` wins over the solid colour and clears the solid channel,
+// and a fully transparent colour leaves the glyphs on their own `color`. The fill also
+// propagates to descendants, which is what lets one wrapper paint the glyphs of its inner spans.
+PAG_TEST(PAGXHTMLStyleCascadeTest, BackgroundClipTextSuppliesGlyphFill) {
+  auto root = ParseHtml(R"HTML(
+    <html>
+      <body style="width:100px;height:50px">
+        <solid style="background-color:rgba(0,0,0,0.9);background-clip:text;color:#123456">
+          <inner/>
+        </solid>
+        <grad style="background-image:linear-gradient(90deg, red, blue);
+                     background-color:rgba(0,0,0,0.9);background-clip:text;color:#123456"/>
+        <clear style="background-color:transparent;background-clip:text;color:#123456"/>
+      </body>
+    </html>
+  )HTML");
+  ASSERT_NE(root, nullptr);
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  auto solid = body->getFirstChild("solid");
+  auto grad = body->getFirstChild("grad");
+  auto clear = body->getFirstChild("clear");
+  ASSERT_NE(solid, nullptr);
+  ASSERT_NE(grad, nullptr);
+  ASSERT_NE(clear, nullptr);
+
+  float canvasWidth = 100.0f;
+  float canvasHeight = 50.0f;
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  pagx::HTMLValueParser valueParser(diagnostics, canvasWidth, canvasHeight);
+  pagx::HTMLStyleCascade cascade(diagnostics, valueParser);
+
+  // The solid colour is the glyph paint; `color` still resolves normally but no longer decides
+  // how the text is filled.
+  auto solidStyle = cascade.resolveInheritedStyle(solid, pagx::HTMLInheritedStyle{});
+  EXPECT_TRUE(solidStyle.textFillSolidSet);
+  EXPECT_TRUE(ColorNear(solidStyle.textFillSolid, HexColor(0x000000, 0.9f)));
+  EXPECT_TRUE(solidStyle.textFillImage.empty());
+  EXPECT_TRUE(ColorNear(solidStyle.resolvedTextColor, HexColor(0x123456)));
+
+  // The fill propagates: the clip-to-text wrapper paints the glyphs of the spans inside it.
+  auto inner = solid->getFirstChild("inner");
+  ASSERT_NE(inner, nullptr);
+  auto innerStyle = cascade.resolveInheritedStyle(inner, solidStyle);
+  EXPECT_TRUE(innerStyle.textFillSolidSet);
+  EXPECT_TRUE(ColorNear(innerStyle.textFillSolid, HexColor(0x000000, 0.9f)));
+
+  // A gradient layer wins over the solid colour, matching CSS layer order, and clears the solid
+  // channel so the text does not keep two competing paints.
+  auto gradStyle = cascade.resolveInheritedStyle(grad, pagx::HTMLInheritedStyle{});
+  EXPECT_FALSE(gradStyle.textFillSolidSet);
+  EXPECT_EQ(gradStyle.textFillImage, "linear-gradient(90deg, red, blue)");
+
+  // A fully transparent colour carries no paint and leaves the glyphs on `color`.
+  auto clearStyle = cascade.resolveInheritedStyle(clear, pagx::HTMLInheritedStyle{});
+  EXPECT_FALSE(clearStyle.textFillSolidSet);
+  EXPECT_TRUE(clearStyle.textFillImage.empty());
 }
 
 PAG_TEST(PAGXHTMLValueParserTest, FilterDefaultsAndRepeatingGradientBoundaries) {

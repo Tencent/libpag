@@ -124,12 +124,17 @@ void ResetLayoutAnchors(Layer* inner) {
   inner->flex = 0.0f;
 }
 
-// `background-clip: text` redirects gradient backgrounds to descendant text fills. Keep this
-// predicate separate from the visual-emission code because replaced elements may still have a
-// foreground fill, border, shadow, or backdrop filter that must survive the redirect.
-bool ClipsGradientBackgroundToText(const HTMLBoxAttributes& box) {
-  return box.backgroundClipText &&
-         ToLower(box.backgroundImage).find("gradient(") != std::string::npos;
+// `background-clip: text` paints the glyphs with the element's background, so the rectangle that
+// would otherwise paint behind the text must not be emitted — the paint is consumed by the
+// descendant text fill instead (a gradient through `textFillImage`, a solid colour through
+// `textFillSolid`). Without a gradient layer or a solid `background-color` there is nothing to
+// redirect and the element keeps its normal box background. Keep this predicate separate from
+// the visual-emission code because replaced elements may still have a foreground fill, border,
+// shadow, or backdrop filter that must survive the redirect.
+bool ClipsBackgroundToText(const HTMLBoxAttributes& box) {
+  if (!box.backgroundClipText) return false;
+  if (ToLower(box.backgroundImage).find("gradient(") != std::string::npos) return true;
+  return box.backgroundImage.empty() && box.backgroundColorSet && box.backgroundColor.alpha > 0.0f;
 }
 
 }  // namespace
@@ -156,8 +161,8 @@ void HTMLLayerBuilder::bindDocument(PAGXDocument* document) {
 }
 
 bool HTMLLayerBuilder::hasBackgroundVisuals(const HTMLBoxAttributes& box) {
-  bool hasBoxBackground = !ClipsGradientBackgroundToText(box) &&
-                          (box.backgroundColorSet || !box.backgroundImage.empty());
+  bool hasBoxBackground =
+      !ClipsBackgroundToText(box) && (box.backgroundColorSet || !box.backgroundImage.empty());
   return hasBoxBackground || box.borderRadiusSet || box.borderSet || !box.boxShadow.empty() ||
          !box.backdropFilter.empty();
 }
@@ -352,23 +357,23 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
 
 bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
                                               Fill* foregroundFill) {
-  // `background-clip: text` redirects the gradient to descendant text fills (see
-  // `convertTextLeaf` -> `buildTextFill`). When the element also has a gradient
-  // `background-image`, suppress only that box background. Replaced-element foregrounds and
-  // independent box visuals (border, shadow, backdrop filter) must still be emitted.
-  bool clipsGradientToText = ClipsGradientBackgroundToText(box);
+  // `background-clip: text` redirects the background to descendant text fills (see
+  // `convertTextLeaf` -> `buildTextFill`, and `HTMLStyleCascade::resolveInheritedStyle` for the
+  // gradient / solid channels). Suppress only that box background. Replaced-element foregrounds
+  // and independent box visuals (border, shadow, backdrop filter) must still be emitted.
+  bool clipsBackgroundToText = ClipsBackgroundToText(box);
   bool emitted = false;
   // `geometry` is the shape node (Rectangle or Path) that anchors the Fill / Stroke chain
   // emitted below. We only allocate it when the box actually carries a paintable visual.
   Element* geometry = nullptr;
   bool hasBoxBackground =
-      !clipsGradientToText && (box.backgroundColorSet || !box.backgroundImage.empty());
+      !clipsBackgroundToText && (box.backgroundColorSet || !box.backgroundImage.empty());
   if (foregroundFill != nullptr || hasBoxBackground || box.borderRadiusSet || box.borderSet) {
     geometry = buildBackgroundGeometry(box);
     layer->contents.push_back(geometry);
     emitted = true;
   }
-  if (!clipsGradientToText) {
+  if (!clipsBackgroundToText) {
     applyBackgroundFill(layer, box, geometry, emitted);
   }
   if (foregroundFill != nullptr) {

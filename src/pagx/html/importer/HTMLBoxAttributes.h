@@ -103,6 +103,13 @@ struct HTMLInheritedStyle {
   // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
   // `background-image`. Empty means descendants paint text with their own solid `color`.
   std::string textFillImage = {};
+  // Solid colour inherited from the nearest ancestor that combined `background-clip: text`
+  // with a solid `background-color` (the same CSS technique as `textFillImage`, without a
+  // gradient layer). In CSS the background clipped to the glyphs is what paints the text, so
+  // this outranks `color`; `textFillSolidSet` stays false when no such ancestor exists and
+  // descendants keep painting with their own resolved `color`.
+  Color textFillSolid = {0, 0, 0, 1, ColorSpace::SRGB};
+  bool textFillSolidSet = false;
 
   // Pre-resolved numeric forms of the cascade. Kept in lock-step with the string fields by
   // `resolveInheritedStyle` so text-leaf conversion doesn't re-parse the same `font-size` /

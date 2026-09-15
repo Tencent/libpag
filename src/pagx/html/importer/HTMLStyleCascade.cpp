@@ -536,9 +536,12 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   CopyProperty(props, "text-decoration-color", out.textDecorationColor);
   CopyProperty(props, "white-space", out.whiteSpace);
   CopyProperty(props, "writing-mode", out.writingMode);
-  // Propagate gradient text fill from the nearest clip-to-text ancestor. `out.textFillImage`
-  // already inherits the parent's value via `out = parent`; we only override when this element
-  // itself sets `background-clip: text` together with a gradient `background-image`.
+  // Propagate the glyph fill from the nearest clip-to-text ancestor. Both `textFillImage` and
+  // `textFillSolid` already inherit the parent's values via `out = parent`; we only override
+  // when this element itself sets `background-clip: text`. Such an element's own background
+  // paints its glyphs, so it replaces the inherited fill of the other channel and outranks
+  // `color` — CSS inherits a transparent text-fill-color through the subtree, leaving the
+  // clipped background as the only glyph paint.
   std::string ownBgImage = LookupProperty(props, "background-image");
   if (ownBgImage.empty()) {
     const std::string& sh = LookupProperty(props, "background");
@@ -546,9 +549,20 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
       ownBgImage = sh;
     }
   }
-  if (LookupLowerTrimmed(props, "background-clip") == "text" && !ownBgImage.empty() &&
-      ownBgImage.find("gradient") != std::string::npos) {
-    out.textFillImage = ownBgImage;
+  if (LookupLowerTrimmed(props, "background-clip") == "text") {
+    if (!ownBgImage.empty() && ownBgImage.find("gradient") != std::string::npos) {
+      out.textFillImage = ownBgImage;
+      out.textFillSolidSet = false;
+    } else if (ownBgImage.empty()) {
+      // The solid-colour half of the same technique. A fully transparent colour carries no
+      // paint, so it keeps the box path untouched rather than blanking the text.
+      Color background = {};
+      if (resolveBackgroundColor(props, &background) && background.alpha > 0.0f) {
+        out.textFillSolid = background;
+        out.textFillSolidSet = true;
+        out.textFillImage.clear();
+      }
+    }
   }
   // Split the CSS font-weight / font-style request into the real-face style label PAGX Text
   // resolves plus the synthetic (faux) italic axis the renderer may emboss on top. Both axes are
@@ -816,16 +830,23 @@ void HTMLStyleCascade::parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap&
   applyMarginLonghand(props, "margin-left", box.marginLeftPx);
 }
 
-void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
+bool HTMLStyleCascade::resolveBackgroundColor(const PropertyMap& props, Color* out) {
   std::string bgColor = LookupProperty(props, "background-color");
   if (bgColor.empty()) {
     bgColor = LookupProperty(props, "background");  // accept shorthand if it's color-only
   }
   // `parseColor` accepts hex, named colors, and `rgb()/rgba()` literals. We only need to bail
   // out when the value is actually a non-color shorthand (gradient / url-image).
-  if (!bgColor.empty() && bgColor.find("gradient") == std::string::npos &&
-      bgColor.find("url(") == std::string::npos) {
-    box.backgroundColor = _valueParser.parseColor(bgColor);
+  if (bgColor.empty() || bgColor.find("gradient") != std::string::npos ||
+      bgColor.find("url(") != std::string::npos) {
+    return false;
+  }
+  *out = _valueParser.parseColor(bgColor);
+  return true;
+}
+
+void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
+  if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
   std::string bgImage = LookupProperty(props, "background-image");

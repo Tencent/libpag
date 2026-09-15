@@ -114,6 +114,11 @@ class HTMLStyleCascade {
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBorder(HTMLBoxAttributes& box, const std::string& border);
 
+  // Resolves the element's background paint colour — the `background-color` longhand, falling
+  // back to a colour-only `background` shorthand — into `out`. Returns false when no colour
+  // layer is declared, or when the value is a gradient / url image rather than a colour.
+  bool resolveBackgroundColor(const PropertyMap& props, Color* out);
+
   // Resolves `-webkit-text-stroke` (shorthand or longhands) into `out.textStrokeWidthPx` /
   // `out.textStrokeColor`. Called at the tail of `resolveInheritedStyle` once the resolved text
   // colour is known, since the stroke colour defaults to it.
