@@ -27,6 +27,7 @@
 #import "PAGFile.h"
 #import "platform/cocoa/PAGDiskCache.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
 #import "platform/cocoa/private/PAGLayer+Internal.h"
 #import "platform/cocoa/private/PAGLayerImpl+Internal.h"
 #import "platform/cocoa/private/PixelBufferUtil.h"
@@ -67,12 +68,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 @end
 
-@interface PAGImageView () <PAGAnimatorUpdater, PAGAnimatorListener>
+@interface PAGImageView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
 
 @implementation PAGImageView {
   NSString* filePath;
   PAGAnimator* animator;
+  PAGAnimatorListenerProxy* animatorListenerProxy;
   std::shared_ptr<pag::PAGComposition> pagComposition;
   std::shared_ptr<pag::PAGDecoder> pagDecoder;
   int64_t duration;
@@ -115,7 +117,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   self.backgroundColor = [UIColor clearColor];
   animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
   listeners = [[NSHashTable weakObjectsHashTable] retain];
-  [animator addListener:self];
+  animatorListenerProxy = [[PAGAnimatorListenerProxy alloc] initWithForwarder:self];
+  [animator addListener:animatorListenerProxy];
 
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)
@@ -133,7 +136,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 // against any lingering flush.
 - (void)dealloc {
   [animator cancel];
+  [animatorListenerProxy detach];
   [animator release];
+  [animatorListenerProxy release];
   {
     std::lock_guard<std::mutex> autoLock(imageViewLock);
     [self reset];
@@ -539,27 +544,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [listeners removeObject:listener];
 }
 
-#pragma mark - PAGAnimatorListener
-
-- (void)onAnimationStart:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationStart:)];
-}
-
-- (void)onAnimationEnd:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationEnd:)];
-}
-
-- (void)onAnimationCancel:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationCancel:)];
-}
-
-- (void)onAnimationRepeat:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationRepeat:)];
-}
-
-- (void)onAnimationUpdate:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationUpdate:)];
-}
+#pragma mark - Listener dispatch
 
 - (void)dispatchListenerEvent:(SEL)selector {
   if ([NSThread isMainThread]) {
