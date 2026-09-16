@@ -483,6 +483,50 @@ export function pagxTransformToMatrix6(value: string): number[] | null {
   return null;
 }
 
+// Chromium resolves `transform-origin` on an SVG graphics element against its selected
+// `transform-box`, but serialises a fill-box origin as an offset from that box's top-left. The
+// PAGX SVG importer consumes the captured pixels in SVG user space, where the corresponding pivot
+// is absolute. Convert the fill-box-relative value before freezing it inline. HTML boxes and SVG
+// view-box origins are already expressed in the coordinate system the importer expects.
+export function pagxResolveCapturedTransformOrigin(
+  el: Element,
+  computed: CSSStyleDeclaration,
+): string {
+  const raw = (computed.transformOrigin || '').trim();
+  if (!raw || !el || el.namespaceURI !== 'http://www.w3.org/2000/svg') return raw;
+  const transformBox = (
+    computed.transformBox ||
+    (typeof computed.getPropertyValue === 'function'
+      ? computed.getPropertyValue('transform-box')
+      : '') ||
+    ''
+  ).trim().toLowerCase();
+  if (transformBox !== 'fill-box' || typeof (el as SVGGraphicsElement).getBBox !== 'function') {
+    return raw;
+  }
+
+  const tokens = raw.split(/\s+/);
+  if (tokens.length < 2) return raw;
+  const parsePx = (token: string): number | null => {
+    const match = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)px$/i.exec(token);
+    if (!match) return null;
+    const value = parseFloat(match[1]);
+    return isFinite(value) ? value : null;
+  };
+  const x = parsePx(tokens[0]);
+  const y = parsePx(tokens[1]);
+  if (x == null || y == null) return raw;
+
+  try {
+    const bounds = (el as SVGGraphicsElement).getBBox();
+    if (!bounds || !isFinite(bounds.x) || !isFinite(bounds.y)) return raw;
+    const format = (value: number): string => String(Math.round(value * 10000) / 10000);
+    return `${format(bounds.x + x)}px ${format(bounds.y + y)}px`;
+  } catch (_) {
+    return raw;
+  }
+}
+
 export function pagxPickProp(
   obj: Record<string, unknown>,
   kebab: string,
@@ -3344,7 +3388,15 @@ export function pagxEmitCaptured(
     void document.body.offsetHeight;
     const baseStyle = getComputedStyle(cap.el);
     const baseT = pagxExtractTransform(baseStyle.transform || '', elBox);
-    const baseOrigin = baseStyle.transformOrigin || '';
+    const baseOriginRaw = baseStyle.transformOrigin || '';
+    const baseTransformBox = (
+      baseStyle.transformBox ||
+      (typeof baseStyle.getPropertyValue === 'function'
+        ? baseStyle.getPropertyValue('transform-box')
+        : '') ||
+      ''
+    ).trim().toLowerCase();
+    const baseOrigin = pagxResolveCapturedTransformOrigin(cap.el, baseStyle);
     if (blocker.parentNode) blocker.parentNode.removeChild(blocker);
     cap.el.style.transform = keyframesDriveTransform ? 'none' : (baseT || 'none');
     // `freezeSvg` serialises descendant SVG presentation from inline values.
@@ -3353,6 +3405,13 @@ export function pagxEmitCaptured(
     // SVG's default top-left pivot in the emitted subset.
     if (keyframesDriveTransform && baseOrigin) {
       cap.el.style.transformOrigin = baseOrigin;
+      // If a fill-box origin was converted to SVG user coordinates, switch the reference box too.
+      // This keeps the emitted subset HTML itself faithful when the author originally declared
+      // transform-box inline; otherwise the absolute origin would be offset by the fill box again.
+      if (cap.el.namespaceURI === 'http://www.w3.org/2000/svg' &&
+          baseTransformBox === 'fill-box' && baseOrigin !== baseOriginRaw) {
+        cap.el.style.transformBox = 'view-box';
+      }
     }
     cap.el.style.animation = built.animationShorthand;
     names.push(built.name);
@@ -3484,6 +3543,7 @@ const PAGX_ANIM_FNS = [
   pagxExtractTranslate,
   pagxExtractTransform,
   pagxTransformToMatrix6,
+  pagxResolveCapturedTransformOrigin,
   pagxPickProp,
   pagxNormalizeProps,
   pagxFillOffsets,

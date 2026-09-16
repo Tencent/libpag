@@ -675,6 +675,21 @@ static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
   }
 }
 
+static pagx::Layer* FindFirstMaskedLayer(pagx::Layer* layer) {
+  if (layer == nullptr) {
+    return nullptr;
+  }
+  if (layer->mask != nullptr) {
+    return layer;
+  }
+  for (auto child : layer->children) {
+    if (auto* found = FindFirstMaskedLayer(child)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
 /**
  * Test SVG import: a <text> element with a <textPath href="#..."> child resolves the referenced
  * path into a TextPath modifier alongside a Text node, so path-following text imports instead of
@@ -863,6 +878,38 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MaskAndClipPathWrapsLayer) {
     }
   }
   EXPECT_TRUE(anyMasked);
+}
+
+/**
+ * Test SVG import: a clipPath may instantiate geometry through <use>, and the referenced element
+ * may live in a nested <defs> rather than a root-level one. SVG href resolution is document-wide;
+ * limiting shape lookup to the root defs table produces an empty mask that clips everything out.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ClipPathUseResolvesNestedDefinition) {
+  std::string svg =
+      "<svg xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"100\" height=\"100\""
+      " viewBox=\"0 0 100 100\">"
+      "<g><defs><path id=\"clipShape\" d=\"M10 10H90V90H10Z\"/></defs>"
+      "<clipPath id=\"clip\"><use xlink:href=\"#clipShape\"/></clipPath>"
+      "<rect width=\"100\" height=\"100\" fill=\"#EF4444\" clip-path=\"url(#clip)\"/>"
+      "</g></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+
+  pagx::Layer* masked = nullptr;
+  for (auto* layer : doc->layers) {
+    masked = FindFirstMaskedLayer(layer);
+    if (masked != nullptr) break;
+  }
+  ASSERT_NE(masked, nullptr);
+  ASSERT_NE(masked->mask, nullptr);
+
+  std::vector<pagx::Element*> paths;
+  CollectElementsByType(masked->mask, pagx::NodeType::Path, paths);
+  ASSERT_EQ(paths.size(), 1u);
+  auto* path = static_cast<pagx::Path*>(paths.front());
+  ASSERT_NE(path->data, nullptr);
+  EXPECT_FALSE(path->data->isEmpty());
 }
 
 /**

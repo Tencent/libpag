@@ -244,7 +244,13 @@ class SVGParserContext {
 
   SVGImporter::Options _options = {};
   std::shared_ptr<PAGXDocument> _document = nullptr;
+  // Paint servers and effect definitions addressable through url(#id). Keep this narrower than
+  // the general id index below so a malformed fill="url(#ordinary-shape)" does not accidentally
+  // start behaving like a paint server.
   std::unordered_map<std::string, std::shared_ptr<DOMNode>> _defs = {};
+  // Every id-bearing SVG element is addressable by href from <use> / <textPath>, regardless of
+  // whether it lives in a root-level <defs>, a nested <defs>, or the rendered subtree.
+  std::unordered_map<std::string, std::shared_ptr<DOMNode>> _elementsById = {};
   std::vector<Layer*> _maskLayers = {};
   std::unordered_map<std::string, Image*> _imageSourceToId =
       {};                                             // Maps image source to resource node.

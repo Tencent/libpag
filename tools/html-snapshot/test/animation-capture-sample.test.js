@@ -18,6 +18,7 @@ const {
   pagxBuildTextOverlays,
   pagxBuildUseOverlays,
   pagxEmitCaptured,
+  pagxResolveCapturedTransformOrigin,
   pagxAnimMain,
 } = require('../dist/lib/animation-capture');
 
@@ -541,6 +542,8 @@ describe('pagxEmitCaptured', () => {
     const el = {
       isConnected: true,
       style: {},
+      namespaceURI: 'http://www.w3.org/2000/svg',
+      getBBox: () => ({ x: 20, y: 30, width: 80, height: 80 }),
       getBoundingClientRect: () => ({ width: 80, height: 80, left: 0, top: 0 }),
     };
     const captured = [{
@@ -562,10 +565,46 @@ describe('pagxEmitCaptured', () => {
       getElementById: () => null,
       body: { offsetHeight: 0 },
     };
-    global.getComputedStyle = () => ({ transform: 'none', transformOrigin: '40px 40px' });
+    global.getComputedStyle = () => ({
+      transform: 'none',
+      transformOrigin: '40px 40px',
+      transformBox: 'fill-box',
+      getPropertyValue: () => '',
+    });
 
     expect(pagxEmitCaptured(captured, PAGX_ANIM_PREFIX, PAGX_ANIM_STYLE_ID).count).toBe(1);
-    expect(el.style.transformOrigin).toBe('40px 40px');
+    expect(el.style.transformOrigin).toBe('60px 70px');
+    expect(el.style.transformBox).toBe('view-box');
+  });
+
+  test('converts an SVG fill-box transform-origin to absolute SVG user coordinates', () => {
+    const el = {
+      namespaceURI: 'http://www.w3.org/2000/svg',
+      getBBox: () => ({ x: 82.563, y: 101.667, width: 5.332, height: 5.332 }),
+    };
+    const computed = {
+      transformOrigin: '2.666px 2.666px',
+      transformBox: 'fill-box',
+      getPropertyValue: () => '',
+    };
+
+    expect(pagxResolveCapturedTransformOrigin(el, computed)).toBe('85.229px 104.333px');
+  });
+
+  test('keeps HTML and SVG view-box transform origins unchanged', () => {
+    const htmlEl = { namespaceURI: 'http://www.w3.org/1999/xhtml' };
+    const svgEl = {
+      namespaceURI: 'http://www.w3.org/2000/svg',
+      getBBox: () => ({ x: 25, y: 35, width: 10, height: 10 }),
+    };
+    const viewBoxStyle = {
+      transformOrigin: '40px 50px',
+      transformBox: 'view-box',
+      getPropertyValue: () => '',
+    };
+
+    expect(pagxResolveCapturedTransformOrigin(htmlEl, viewBoxStyle)).toBe('40px 50px');
+    expect(pagxResolveCapturedTransformOrigin(svgEl, viewBoxStyle)).toBe('40px 50px');
   });
 });
 

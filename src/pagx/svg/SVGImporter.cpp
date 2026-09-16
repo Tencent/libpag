@@ -567,9 +567,10 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     // only handles leaf shapes and returns null for containers, which would drop the referenced
     // sub-tree entirely (e.g. glyph <symbol>s referenced by digit slots).
     std::string refId = resolveUrl(getHrefAttribute(element));
-    auto refIt = refId.empty() ? _defs.end() : _defs.find(refId);
+    auto refIt = refId.empty() ? _elementsById.end() : _elementsById.find(refId);
     bool handledAsContainer = false;
-    if (_options.expandUseReferences && refIt != _defs.end() && _useStack.count(refId) == 0 &&
+    if (_options.expandUseReferences && refIt != _elementsById.end() &&
+        _useStack.count(refId) == 0 &&
         (refIt->second->name == "symbol" || refIt->second->name == "g" ||
          refIt->second->name == "svg")) {
       auto* useGroup = convertUseContainer(element, refIt->second, inheritedStyle, depth);
@@ -900,8 +901,8 @@ void SVGParserContext::convertChildren(const std::shared_ptr<DOMNode>& element,
     skipFillStroke = true;
   } else if (tag == "use") {
     std::string refId = resolveUrl(getHrefAttribute(element));
-    auto it = _defs.find(refId);
-    if (it != _defs.end() && it->second->name == "image") {
+    auto it = _elementsById.find(refId);
+    if (it != _elementsById.end() && it->second->name == "image") {
       skipFillStroke = true;
     }
   }
@@ -1230,8 +1231,8 @@ TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& text
   if (refId.empty()) {
     return nullptr;
   }
-  auto it = _defs.find(refId);
-  if (it == _defs.end() || it->second->name != "path") {
+  auto it = _elementsById.find(refId);
+  if (it == _elementsById.end() || it->second->name != "path") {
     return nullptr;
   }
   std::string d = getAttribute(it->second, "d");
@@ -1279,8 +1280,8 @@ Element* SVGParserContext::convertUse(const std::shared_ptr<DOMNode>& element) {
   if (refId.empty() || _useStack.count(refId) > 0) {
     return nullptr;
   }
-  auto it = _defs.find(refId);
-  if (it == _defs.end()) {
+  auto it = _elementsById.find(refId);
+  if (it == _elementsById.end()) {
     return nullptr;
   }
 
@@ -1597,8 +1598,8 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
       std::string imageId = resolveUrl(getHrefAttribute(child));
 
       // Find the referenced image in defs.
-      auto imgIt = _defs.find(imageId);
-      if (imgIt != _defs.end() && imgIt->second->name == "image") {
+      auto imgIt = _elementsById.find(imageId);
+      if (imgIt != _elementsById.end() && imgIt->second->name == "image") {
         std::string imageHref = getHrefAttribute(imgIt->second);
 
         // Register the image resource and use the reference pointer.
@@ -2279,8 +2280,8 @@ Rect SVGParserContext::getShapeBounds(const std::shared_ptr<DOMNode>& element) {
     if (refId.empty() || _useStack.count(refId) > 0) {
       return Rect::MakeXYWH(0, 0, 0, 0);
     }
-    auto it = _defs.find(refId);
-    if (it != _defs.end()) {
+    auto it = _elementsById.find(refId);
+    if (it != _elementsById.end()) {
       _useStack.insert(refId);
       Rect refBounds = getShapeBounds(it->second);
       _useStack.erase(refId);
@@ -3297,6 +3298,7 @@ void SVGParserContext::collectAllIds(const std::shared_ptr<DOMNode>& node) {
   if (idPtr && !idPtr->empty()) {
     const std::string& id = *idPtr;
     _existingIds.insert(id);
+    _elementsById[id] = node;
     // Also collect referenceable elements (mask, clipPath, filter, etc.) to _defs,
     // even if they are defined inline (not inside <defs>).
     const auto& name = node->name;
