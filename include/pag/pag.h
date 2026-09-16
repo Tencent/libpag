@@ -1573,6 +1573,15 @@ class BitmapBuffer;
  * image frames as a sequence file on the disk, which may significantly speed up the reading process
  * depending on the complexity of the PAG files. You can use the PAGDiskCache::SetMaxDiskSize()
  * method to manage the cache limit of the disk usage.
+ *
+ * Thread safety: a readFrame() call and the release of the last strong reference to the same
+ * PAGDecoder may happen concurrently on different threads. The destructor waits for an in-flight
+ * readFrame() call to finish before tearing the decoder down, so a call that has already entered
+ * readFrame() will always run to completion. However, this only covers calls that have already
+ * entered the method; it does NOT cover the window between reading a raw pointer to the decoder and
+ * actually entering the call. Therefore the caller must hold a strong reference (the
+ * std::shared_ptr) to the PAGDecoder for the entire duration of every readFrame() call rather than
+ * borrowing it through a raw pointer.
  */
 class PAG_API PAGDecoder {
  public:

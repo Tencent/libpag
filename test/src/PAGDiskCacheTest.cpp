@@ -570,6 +570,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
     }
   });
 
+  std::atomic<int> successFrames = {0};
   std::vector<std::thread> readers;
   for (int i = 0; i < 4; i++) {
     readers.emplace_back([&, i] {
@@ -582,7 +583,9 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
         tgfx::Pixmap pixmap(bitmap);
         auto frameCount = std::min(decoder->numFrames(), 10);
         for (int frame = 0; frame < frameCount; frame++) {
-          decoder->readFrame(frame, pixmap.writablePixels(), pixmap.rowBytes());
+          if (decoder->readFrame(frame, pixmap.writablePixels(), pixmap.rowBytes())) {
+            successFrames++;
+          }
         }
       }
     });
@@ -593,6 +596,7 @@ PAG_TEST(PAGDiskCacheTest, PAGDecoderTeardownRace) {
   stopped = true;
   cacheCleaner.join();
 
+  EXPECT_GT(successFrames.load(), 0);
   pag::PAGDiskCache::RemoveAll();
 }
 
