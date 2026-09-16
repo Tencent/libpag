@@ -19,7 +19,7 @@
 #import "PAGAnimatorListenerProxy.h"
 
 @implementation PAGAnimatorListenerProxy {
-  __unsafe_unretained id<PAGViewAnimatorForwarder> forwarder;
+  __weak id<PAGViewAnimatorForwarder> forwarder;
 }
 
 - (instancetype)initWithForwarder:(id<PAGViewAnimatorForwarder>)value {
@@ -27,10 +27,6 @@
     forwarder = value;
   }
   return self;
-}
-
-- (void)detach {
-  forwarder = nil;
 }
 
 - (void)onAnimationStart:(id<PAGAnimatorUpdater>)updater {

@@ -44,16 +44,10 @@
 @interface PAGAnimatorListenerProxy : NSObject <PAGAnimatorListener>
 
 /**
- * Initializes the proxy with the forwarder that receives the relayed events. The proxy holds an
- * unretained reference to the forwarder, so the forwarder must outlive the proxy or call detach
- * before it is deallocated.
+ * Initializes the proxy with the forwarder that receives the relayed events. The proxy holds a
+ * zeroing weak reference to the forwarder, so once the forwarder is deallocated the reference
+ * becomes nil automatically and no further event is relayed.
  */
 - (instancetype)initWithForwarder:(id<PAGViewAnimatorForwarder>)forwarder;
-
-/**
- * Drops the reference to the forwarder. Must be called before the forwarder is deallocated so that
- * no event is relayed to a dangling forwarder.
- */
-- (void)detach;
 
 @end

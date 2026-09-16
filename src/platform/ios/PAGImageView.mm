@@ -136,7 +136,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 // against any lingering flush.
 - (void)dealloc {
   [animator cancel];
-  [animatorListenerProxy detach];
   [animator release];
   [animatorListenerProxy release];
   {

@@ -66,7 +66,6 @@
 
 - (void)dealloc {
   [animator cancel];
-  [animatorListenerProxy detach];
   [animator release];
   [animatorListenerProxy release];
   [pagPlayer release];

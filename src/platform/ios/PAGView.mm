@@ -71,7 +71,6 @@
 
 - (void)dealloc {
   [animator cancel];
-  [animatorListenerProxy detach];
   {
     std::lock_guard<std::mutex> autoLock(lock);
     [pagPlayer release];

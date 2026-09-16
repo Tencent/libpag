@@ -459,6 +459,10 @@ elseif (IOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
@@ -498,6 +502,10 @@ elseif (MACOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
