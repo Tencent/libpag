@@ -40,14 +40,7 @@ endif ()
 # pagx-renderer / pagx-viewer). Must be set before add_subdirectory so those targets compile to
 # LLVM bitcode; the final link step then performs whole-program optimization. Vendor libraries
 # (expat / SheenBidi / harfbuzz) are prebuilt by an external `node vendor-build` process and do
-# not participate in LTO, so no cross-library inlining happens against them. Kept out of Debug
-# builds to preserve fast iteration and debuggability.
-#
-# Measured on a 13843x9218 design document (numbers recorded in PR #3702): XML parse -58%,
-# first-frame submit -49%, at the cost of +7.6% wasm.br size. The XML gain does not come from
-# inlining into expat (it is outside LTO, see above): it comes from inlining the pagx-side
-# parsing glue plus the link-level -O3 whole-module pass, which re-optimizes the non-LTO vendor
-# code as well. Function-call elimination is amplified under the no-JIT iOS WeChat interpreter.
+# not participate in LTO. Kept out of Debug builds to preserve fast iteration and debuggability.
 if (DEFINED EMSCRIPTEN AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(STATUS "WASM LTO enabled (-flto)")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
