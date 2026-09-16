@@ -34,6 +34,8 @@ export interface SnapshotCliOptions {
   headers: ParsedHeader[];
   reducedMotion: boolean;
   inlineIconFonts: boolean;
+  captureAnimations: boolean;
+  scrollReveal: boolean;
   downloadFonts: boolean;
   fontDir: string;
   fontManifest: string;
@@ -110,6 +112,27 @@ const FLAGS: FlagSpec[] = [
   // legacy font-named span path (faster, no font fetch, but the PAGX file
   // becomes non-portable).
   { names: ['--no-inline-icon-fonts'], takesArg: false, set: (o) => { o.inlineIconFonts = false; } },
+  // Capture the page's animations into the subset. Off by default: the snapshot
+  // emits a single static frame. Animation capture must observe the page's real
+  // motion, so it also opts out of the static snapshot's reduced-motion media
+  // emulation. Otherwise a common accessibility rule turns every duration into
+  // 0.01ms while leaving its delay intact, producing a one-frame jump instead of
+  // the authored timeline. The animation-capture pass
+  // (lib/animation-capture.ts) installs a virtual clock + transition recorder,
+  // then reads running CSS `@keyframes` / WAAPI / GSAP / anime.js animations and
+  // rewrites them as canonical `@keyframes pagxAnim<N>` + inline `animation`
+  // shorthands so the importer can replay the motion in PAGX.
+  { names: ['--capture-animations'], takesArg: false, set: (o) => {
+    o.captureAnimations = true;
+    o.reducedMotion = false;
+  } },
+  // Walk the page from top to bottom (then back to the top) before taking the
+  // snapshot. This fires scroll-triggered reveal animations (sections kept at
+  // `opacity: 0` until an IntersectionObserver flips them visible) and forces
+  // `loading="lazy"` media to load, so below-the-fold content is captured
+  // instead of dropped. Off by default — it adds a few seconds per page and is
+  // a no-op for pages whose content is already visible at scroll (0,0).
+  { names: ['--scroll-reveal'], takesArg: false, set: (o) => { o.scrollReveal = true; } },
   // Download every web font the page actually uses (each unicode-range
   // subset the browser fetched) and write it to disk as a plain SFNT
   // (TTF/OTF). Off by default. The files can then be handed to
@@ -180,6 +203,16 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     // See lib/icon-font.ts for the pipeline; toggle via
     // `--no-inline-icon-fonts`.
     inlineIconFonts: true,
+    // Animation capture: off by default (static single frame). When enabled via
+    // `--capture-animations`, the page's motion is normalised into the subset as
+    // `@keyframes` + `animation` so the importer can replay it. See the FLAGS
+    // entry above and lib/animation-capture.ts.
+    captureAnimations: false,
+    // Scroll-reveal pre-pass: when true, the page is walked top-to-bottom
+    // (then scrolled back to the top) before the snapshot so scroll-triggered
+    // reveal animations fire and lazy media loads. Off by default; toggle via
+    // `--scroll-reveal`. See lib/snapshot-runner.ts's scrollThroughPage.
+    scrollReveal: false,
     // Web-font download: when true, every font file the browser fetched
     // while rendering is written to `fontDir` as a plain SFNT (TTF/OTF) so
     // downstream `pagx render`/`pagx font embed` can use the real typeface
@@ -330,6 +363,17 @@ Options:
                              self-contained and renders identically on any
                              machine, regardless of which icon fonts are
                              installed).
+  --capture-animations       Capture the page's animations (CSS @keyframes, Web
+                             Animations, GSAP, anime.js) into the subset as
+                             @keyframes + animation so the importer can replay
+                             the motion. Implies --no-reduced-motion. Default:
+                             disabled (a single static frame is emitted).
+  --scroll-reveal            Walk the page top-to-bottom (then back to the top)
+                             before snapshotting so scroll-triggered reveal
+                             animations fire and lazy-loaded media is fetched.
+                             Default: disabled. Use for pages that keep
+                             below-the-fold sections hidden (opacity:0) until
+                             scrolled into view.
   --download-fonts           Save every web font the page uses (each
                              unicode-range subset the browser fetched) to disk
                              as a plain SFNT (TTF/OTF). Default: disabled. Hand

@@ -68,6 +68,14 @@ Options (any unknown flag is forwarded to snapshot.js):
                              that is removed after import); default keeps it
   --no-inline-icon-fonts     Forwarded to snapshot.js: disable webfont-glyph
                              → inline SVG conversion (default: enabled)
+  --capture-animations       Forwarded to snapshot.js: capture the page's
+                             animations (CSS @keyframes, WAAPI, GSAP, anime.js)
+                             into the subset so the .pagx replays the motion.
+                             Default: disabled (a single static frame).
+  --scroll-reveal            Forwarded to snapshot.js: walk the page top-to-
+                             bottom before snapshotting so scroll-triggered
+                             reveal animations fire and lazy media loads
+                             (default: disabled)
   --download-fonts           Download the web fonts the page uses and register
                              them as render fallbacks so text in uninstalled
                              web fonts renders correctly. The fonts are not
@@ -126,6 +134,8 @@ function parseArgs(argv) {
     doRender: true,
     keepSubsetHtml: true,
     inlineIconFonts: true,
+    captureAnimations: false,
+    scrollReveal: false,
     downloadFonts: false,
     embedFonts: false,
     fontDir: '',
@@ -198,6 +208,12 @@ function parseArgs(argv) {
         break;
       case '--no-inline-icon-fonts':
         opts.inlineIconFonts = false;
+        break;
+      case '--capture-animations':
+        opts.captureAnimations = true;
+        break;
+      case '--scroll-reveal':
+        opts.scrollReveal = true;
         break;
       case '--download-fonts':
         opts.downloadFonts = true;
@@ -393,6 +409,8 @@ async function main() {
         pagxImages: opts.pagxImages,
         browserEngine: opts.browserEngine,
         inlineIconFonts: opts.inlineIconFonts,
+        captureAnimations: opts.captureAnimations,
+        scrollReveal: opts.scrollReveal,
         cookies: opts.cookies,
         headers: opts.headers,
         viewportWidth: opts.viewportWidth,
@@ -437,6 +455,8 @@ async function main() {
       pagxImages: opts.pagxImages,
       browserEngine: opts.browserEngine,
       inlineIconFonts: opts.inlineIconFonts,
+      captureAnimations: opts.captureAnimations,
+      scrollReveal: opts.scrollReveal,
       cookies: opts.cookies,
       headers: opts.headers,
       viewportWidth: opts.viewportWidth,
