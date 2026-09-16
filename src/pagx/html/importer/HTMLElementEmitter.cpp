@@ -245,11 +245,41 @@ int HexDigitValue(char h) {
   return -1;
 }
 
+// Returns the offset of the first non-whitespace byte at or after `offset`.
+size_t SkipSvgWhitespace(const std::string& text, size_t offset) {
+  while (offset < text.size() && (text[offset] == ' ' || text[offset] == '\t' ||
+                                  text[offset] == '\r' || text[offset] == '\n')) {
+    offset++;
+  }
+  return offset;
+}
+
+// Removes a leading `<?xml ... ?>` prolog — together with any UTF-8 BOM and whitespace in front of
+// it — from SVG text. Payloads without a prolog are returned untouched.
+// A prolog is only legal at the very start of a document, so SVG bytes that keep one cannot be
+// embedded as an inline `<svg>` import directive: the stray declaration makes the entire PAGX
+// unparseable, and `pagx resolve` could never load the document to expand the directive it came
+// from. Hand-exported files (Sketch / Figma / Illustrator) inlined verbatim as data URIs by
+// html-snapshot are the usual source of one.
+std::string StripXmlProlog(std::string svg) {
+  size_t probe = svg.compare(0, 3, "\xEF\xBB\xBF") == 0 ? 3 : 0;
+  probe = SkipSvgWhitespace(svg, probe);
+  if (svg.compare(probe, 5, "<?xml") != 0) {
+    return svg;
+  }
+  auto close = svg.find("?>", probe);
+  if (close == std::string::npos) {
+    return svg;
+  }
+  return svg.substr(SkipSvgWhitespace(svg, close + 2));
+}
+
 // Decodes a `data:image/svg+xml,...` URI payload into raw SVG text. Two encodings are accepted:
 // base64 (what html-snapshot pages embed in `<img src>` for inline SVG icons) and percent-encoded
 // (what the HTML exporter emits for mask SVGs, where only the `%XX` escapes it produced — `<`,
 // `>`, `#`, `"`, `'` — plus any stray ones need undoing). Returns empty when `dataUri` is not an
-// `image/svg+xml` data URI or the payload fails to decode.
+// `image/svg+xml` data URI or the payload fails to decode. A leading XML prolog is dropped, since
+// the result is embedded as a document fragment rather than parsed as a document of its own.
 std::string DecodeSvgDataUri(const std::string& dataUri) {
   static const char* Prefix = "data:image/svg+xml";
   if (dataUri.compare(0, std::strlen(Prefix), Prefix) != 0) return {};
@@ -259,7 +289,7 @@ std::string DecodeSvgDataUri(const std::string& dataUri) {
   if (ToLower(meta).find("base64") != std::string::npos) {
     auto data = DecodeBase64DataURI(dataUri);
     if (data == nullptr || data->size() == 0) return {};
-    return std::string(reinterpret_cast<const char*>(data->bytes()), data->size());
+    return StripXmlProlog(std::string(reinterpret_cast<const char*>(data->bytes()), data->size()));
   }
   std::string out;
   out.reserve(dataUri.size() - comma);
@@ -276,7 +306,7 @@ std::string DecodeSvgDataUri(const std::string& dataUri) {
     }
     out.push_back(c);
   }
-  return out;
+  return StripXmlProlog(std::move(out));
 }
 
 // True when `src` should ride the SVG import-directive path instead of a raster image fill:

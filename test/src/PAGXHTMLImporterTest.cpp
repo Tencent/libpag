@@ -8606,6 +8606,34 @@ PAG_TEST(PAGXHTMLImporterTest, ImgSvgDataUriRoutesAsImportDirective) {
   EXPECT_FALSE(HasImagePatternFill(layer));
 }
 
+PAG_TEST(PAGXHTMLImporterTest, SvgDataUriPrologStrippedFromImportDirective) {
+  // Hand-exported SVG files (Sketch / Figma / Illustrator) open with an `<?xml ... ?>` prolog, and
+  // html-snapshot inlines them verbatim as data URIs. A prolog is only legal at the very start of a
+  // document, so keeping one inside the import directive made the exported PAGX unparseable —
+  // every command that loads the file failed, including `pagx resolve`, which is the command that
+  // expands the directive. The content must therefore start at `<svg`.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBmaWxsPSJub25lIi8+PC9zdmc+Cg=="
+           style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  ASSERT_EQ(layer->importDirective.format, "svg");
+  EXPECT_EQ(layer->importDirective.content.compare(0, 4, "<svg"), 0);
+  EXPECT_EQ(layer->importDirective.content.find("<?xml"), std::string::npos);
+
+  // The document's own prolog stays the only one, so the exported text loads again.
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(xml.find("<?xml"), 0u);
+  EXPECT_EQ(xml.find("<?xml", 1), std::string::npos);
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+}
+
 PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgDataUriChild) {
   // An SVG data-URI <img> inside a rounded wrapper must not fold into a raster ImagePattern; it
   // keeps riding the import-directive path like an external `.svg` child.
