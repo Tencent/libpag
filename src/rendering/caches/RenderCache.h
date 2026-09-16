@@ -244,8 +244,7 @@ class RenderCache : public Performance {
 
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  std::shared_ptr<tgfx::Image> applyAssetMipmaps(ID assetID,
-                                                 std::shared_ptr<tgfx::Image> image);
+  std::shared_ptr<tgfx::Image> applyAssetMipmaps(ID assetID, std::shared_ptr<tgfx::Image> image);
   std::shared_ptr<tgfx::Image> getAssetImageInternal(ID assetID, const ImageProxy* proxy);
   void recordPerformance();
 

@@ -412,8 +412,8 @@ std::shared_ptr<tgfx::Image> RenderCache::getAssetImage(ID assetID, const ImageP
   return getAssetImageInternal(assetID, proxy);
 }
 
-std::shared_ptr<tgfx::Image> RenderCache::applyAssetMipmaps(
-    ID assetID, std::shared_ptr<tgfx::Image> image) {
+std::shared_ptr<tgfx::Image> RenderCache::applyAssetMipmaps(ID assetID,
+                                                            std::shared_ptr<tgfx::Image> image) {
   if (image != nullptr && stage->getAssetMinScale(assetID) < MIPMAP_ENABLED_THRESHOLD) {
     image = image->makeMipmapped(true);
   }
@@ -657,8 +657,7 @@ void RenderCache::recordSequenceFailure(ID uniqueID) {
   auto& state = sequenceFailureStates[uniqueID];
   auto shift = std::min<uint32_t>(state.consecutiveFailures, 5);
   state.consecutiveFailures++;
-  auto delay = std::min<int64_t>(SEQUENCE_RETRY_INITIAL_DELAY << shift,
-                                 SEQUENCE_RETRY_MAX_DELAY);
+  auto delay = std::min<int64_t>(SEQUENCE_RETRY_INITIAL_DELAY << shift, SEQUENCE_RETRY_MAX_DELAY);
   state.retryAfterTime = tgfx::Clock::Now() + delay;
 }
 

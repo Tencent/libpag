@@ -38,8 +38,7 @@ namespace pag {
 static std::unordered_map<std::string, std::shared_ptr<JPAGImageView>> ViewMap = {};
 static std::mutex ViewMapLocker = {};
 
-class JPAGImageViewRenderSession
-    : public std::enable_shared_from_this<JPAGImageViewRenderSession> {
+class JPAGImageViewRenderSession : public std::enable_shared_from_this<JPAGImageViewRenderSession> {
  public:
   ~JPAGImageViewRenderSession() {
     clearSurface();
@@ -278,7 +277,8 @@ class JPAGImageViewRenderSession
       }
     }
     tgfx::Bitmap bitmap = {};
-    if (decoder == nullptr || !bitmap.allocPixels(decoder->width(), decoder->height(), false, false)) {
+    if (decoder == nullptr ||
+        !bitmap.allocPixels(decoder->width(), decoder->height(), false, false)) {
       return {{}, nullptr};
     }
     auto pixels = bitmap.lockPixels();

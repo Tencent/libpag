@@ -149,9 +149,8 @@ void PAGViewEventDispatcher::notify(uint8_t type, uint8_t state) {
                event.state != PAGAnimatorState::End;
       });
       if (replaceable == pendingEvents.end()) {
-        replaceable = std::find_if(pendingEvents.begin(), pendingEvents.end(), [](auto& event) {
-          return event.type == PAG_VIEW_EVENT_STATE;
-        });
+        replaceable = std::find_if(pendingEvents.begin(), pendingEvents.end(),
+                                   [](auto& event) { return event.type == PAG_VIEW_EVENT_STATE; });
       }
       if (replaceable != pendingEvents.end()) {
         pendingEvents.erase(replaceable);
@@ -194,7 +193,8 @@ void PAGViewEventDispatcher::drain(napi_env currentEnv) {
       continue;
     }
     napi_value callback = nullptr;
-    if (napi_get_reference_value(currentEnv, reference, &callback) != napi_ok || callback == nullptr) {
+    if (napi_get_reference_value(currentEnv, reference, &callback) != napi_ok ||
+        callback == nullptr) {
       continue;
     }
     napi_value undefined = nullptr;
