@@ -6974,6 +6974,68 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationRotateUsesStructuralPivotMatrixChannel) 
   }
 }
 
+// A structural rotation pivot moves every visual attribute onto its innermost child. Filter and
+// clip-path animations must follow that move: leaving either one on the emptied outer layer would
+// render the static and animated effects on different coordinate spaces, and newly minted targets
+// could be detached from the visual subtree after optimization.
+PAG_TEST(PAGXHTMLImporterTest, AnimationRotateKeepsFilterAndClipOnVisualPivotChild) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes spinFx {
+        0%   { transform: rotate(0deg);   filter: drop-shadow(0 0 0 #FF0000);
+               clip-path: path("M 0 0 L 0 0 L 0 10 L 0 10 Z"); }
+        25%  { transform: rotate(90deg);  filter: drop-shadow(8px 0 0 #FF0000);
+               clip-path: path("M 0 0 L 2 0 L 2 10 L 0 10 Z"); }
+        50%  { transform: rotate(180deg); filter: drop-shadow(16px 0 0 #FF0000);
+               clip-path: path("M 0 0 L 5 0 L 5 10 L 0 10 Z"); }
+        75%  { transform: rotate(270deg); filter: drop-shadow(24px 0 0 #FF0000);
+               clip-path: path("M 0 0 L 8 0 L 8 10 L 0 10 Z"); }
+        100% { transform: rotate(360deg); filter: drop-shadow(30px 0 0 #FF0000);
+               clip-path: path("M 0 0 L 10 0 L 10 10 L 0 10 Z"); }
+      }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="d" style="width:10px;height:10px;background-color:#000;
+                         filter:drop-shadow(10px 0 0 #0000FF);
+                         clip-path:path('M 0 0 L 0 0 L 0 10 L 0 10 Z');
+                         animation:spinFx 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* anim = static_cast<pagx::Animation*>(doc->animations.front());
+
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_EQ(outer->children.size(), 1u);
+  auto* pivot = outer->children.front();
+  ASSERT_EQ(pivot->children.size(), 1u);
+  auto* visual = pivot->children.front();
+
+  EXPECT_TRUE(outer->filters.empty());
+  EXPECT_EQ(outer->mask, nullptr);
+  EXPECT_TRUE(pivot->filters.empty());
+  EXPECT_EQ(pivot->mask, nullptr);
+
+  pagx::DropShadowFilter* drop = nullptr;
+  for (auto* filter : visual->filters) {
+    if (auto* candidate = As<pagx::DropShadowFilter>(filter)) {
+      drop = candidate;
+      break;
+    }
+  }
+  ASSERT_NE(drop, nullptr);
+  EXPECT_NE(FindObjectByTarget(anim, drop->id), nullptr);
+
+  ASSERT_NE(visual->mask, nullptr);
+  EXPECT_EQ(visual->maskType, pagx::MaskType::Contour);
+  auto* maskPath = FindElementOfType<pagx::Path>(visual->mask);
+  ASSERT_NE(maskPath, nullptr);
+  EXPECT_NE(FindObjectByTarget(anim, maskPath->id), nullptr);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationScaleProducesMatrixChannel) {
   // `transform: scale(...)` is animatable through the `matrix` channel. The pivot is baked from
   // the element's box centre so the keyframe matrices mirror the static applyBoxTransform path.

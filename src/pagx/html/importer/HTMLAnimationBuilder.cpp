@@ -1454,6 +1454,13 @@ bool HTMLAnimationBuilder::buildForElement(
     xyTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
   }
 
+  // Tracks the innermost layer that still owns the element's renderable state after any
+  // transform wrappers are introduced. Filter and clip-path animations must be attached here:
+  // targeting an outer wrapper after its contents, filters and mask have been moved inward would
+  // duplicate static effects and can leave newly-created animation targets outside the visual
+  // subtree.
+  Layer* visualTarget = xyTarget != nullptr ? xyTarget : layer;
+
   // Keep a pure rotation's pivot outside the animated matrix. The first split preserves the
   // element's parent-facing layout slot; the second creates a visual child that carries every
   // renderable attribute and descendant. Positioning the matrix target at +pivot and the visual
@@ -1463,7 +1470,7 @@ bool HTMLAnimationBuilder::buildForElement(
   Layer* matrixTarget = layer;
   if (!matrixKeys.empty() && matrixUsesStructuralPivot) {
     auto* pivotTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
-    auto* visualTarget = SplitForTransformAnimation(pivotTarget, _document, _idAllocator);
+    visualTarget = SplitForTransformAnimation(pivotTarget, _document, _idAllocator);
     // These wrappers are percentage-sized and excluded from flow. Use explicit positional
     // constraints rather than x/y preferred positions: constraint layout intentionally ignores
     // preferred positions for such children, which would leave both wrappers at the origin and
@@ -1550,12 +1557,12 @@ bool HTMLAnimationBuilder::buildForElement(
   // Filter channels (glow / shadow / blur). The runtime animates the parameters of a
   // DropShadowFilter (offsetX/offsetY/blurX/blurY/color) and a BlurFilter (blurX/blurY) in place, so
   // a `filter: drop-shadow(...)` / `blur(...)` keyframe animation lowers onto those channels. The
-  // filter node lives on whichever layer holds the visual content — the inner wrapper when an x/y
-  // split happened, otherwise the layer itself (a scale/matrix animation does not split). An
-  // existing static filter node is reused as the animation target; otherwise a zero/transparent
-  // baseline node is minted so the channel has something to drive and fill-mode can restore "off".
+  // filter node lives on whichever layer holds the visual content after transform wrappers are
+  // introduced. An existing static filter node is reused as the animation target; otherwise a
+  // zero/transparent baseline node is minted so the channel has something to drive and fill-mode
+  // can restore "off".
   if (filterHasShadow || filterHasBlur) {
-    Layer* fxLayer = xyTarget != nullptr ? xyTarget : layer;
+    Layer* fxLayer = visualTarget;
 
     if (filterHasShadow) {
       // One DropShadowFilter per concurrent authored shadow ("slot"). Slot k tracks
@@ -1712,7 +1719,7 @@ bool HTMLAnimationBuilder::buildForElement(
   // keyframe, replacing whatever static geometry the settled-state clip synthesis produced. This
   // runs after the transform split so the mask lands on the layer that actually holds the content.
   if (clipUsable) {
-    Layer* clipTarget = (xyTarget != nullptr) ? xyTarget : layer;
+    Layer* clipTarget = visualTarget;
 
     // Base geometry = first stop; the mask's static Path shows this when no animation is active.
     Path* maskPath = BuildContourMaskPath(clipTarget, clipVerbs, clipStops.front().points,
