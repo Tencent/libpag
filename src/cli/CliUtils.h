@@ -220,6 +220,18 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
                     const std::vector<std::string>& fallbacks, const std::string& command);
 
 /**
+ * Converts the document's text into pre-shaped glyph runs so that it renders without the original
+ * fonts. Registers the document's own <Font> resources plus the given fallback specifiers for
+ * shaping, runs layout, and writes the resulting glyph outlines back into the document.
+ * `outputBaseDir` is the directory that external font sources are written relative to;
+ * `embedFontData` inlines the font bytes as base64 data URIs instead. Prints errors to stderr
+ * using the given command name as prefix. Returns false on failure.
+ */
+bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
+                const std::vector<std::string>& fallbacks, bool embedFontData,
+                const std::string& command);
+
+/**
  * Writes a string to a file. Prints errors to stderr using the given command name as prefix.
  * On success, prints a "wrote <path>" message to stdout and returns true.
  */

@@ -513,8 +513,12 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     });
     assertStepOk('pagx resolve', resolveResult);
 
-    if (embedFonts && fonts.length > 0) {
-      log(`[font-embed] ${pagxFile} (${fonts.length} font file(s))`);
+    // Downloaded faces are only one source of glyphs: the importer also records system font names
+    // on every Text, and `pagx embed` resolves those through the host font manager. Running the
+    // step unconditionally keeps pages that rely on system fonts (most sites) self-contained too;
+    // `fontFiles` stays empty for them, which just means nothing extra is registered for shaping.
+    if (embedFonts) {
+      log(`[font-embed] ${pagxFile} (${fonts.length} downloaded font file(s))`);
       const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts });
       assertStepOk('pagx embed', embedResult);
     }

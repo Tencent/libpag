@@ -131,46 +131,8 @@ int RunEmbed(int argc, char* argv[]) {
   }
 
   if (!options.skipFonts) {
-    FontConfig fontConfig = {};
-    if (!LoadFontConfig(&fontConfig, {}, options.fallbacks, "pagx embed")) {
-      return 1;
-    }
-    for (auto& node : document->nodes) {
-      if (node->nodeType() == NodeType::Font) {
-        auto* font = static_cast<Font*>(node.get());
-        if (font->data != nullptr) {
-          // Inline font source: register the embedded bytes directly.
-          auto typeface = tgfx::Typeface::MakeFromBytes(font->data->bytes(), font->data->size());
-          if (typeface == nullptr) {
-            std::cerr << "pagx embed: failed to load embedded font data\n";
-            return 1;
-          }
-          fontConfig.registerFont(font->data->bytes(), font->data->size(), 0,
-                                  typeface->fontFamily(), typeface->fontStyle());
-          fontConfig.addFallbackFont(font->data->bytes(), font->data->size(), 0,
-                                     typeface->fontFamily(), typeface->fontStyle());
-        } else if (!font->file.empty()) {
-          auto typeface = tgfx::Typeface::MakeFromPath(font->file);
-          if (typeface == nullptr) {
-            std::cerr << "pagx embed: failed to load font '" << font->file << "'\n";
-            return 1;
-          }
-          fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
-          // Also reach this file through the fallback chain: a (family, style) key holds one
-          // primary registration, so unicode-range subset files sharing that key would otherwise
-          // overwrite each other and drop every glyph that lives in an earlier subset.
-          fontConfig.addFallbackFont(font->file, 0);
-        }
-      }
-    }
-    FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
-    document->applyLayout(&fontConfig);
-    FontEmbedder embedder = {};
-    FontEmbedder::EmbedOptions embedOptions = {};
-    embedOptions.outputBaseDir = GetDirectory(options.outputFile);
-    embedOptions.embedFontData = options.embedFontData;
-    if (!embedder.embed(document.get(), embedOptions)) {
-      std::cerr << "pagx embed: font embedding failed\n";
+    if (!EmbedFonts(document.get(), GetDirectory(options.outputFile), options.fallbacks,
+                    options.embedFontData, "pagx embed")) {
       return 1;
     }
   }

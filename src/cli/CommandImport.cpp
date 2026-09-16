@@ -30,6 +30,7 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <vector>
 #include "cli/CliUtils.h"
 #include "cli/CommandResolve.h"
 #include "cli/ImageStorage.h"
@@ -493,6 +494,33 @@ ImportResult ImportString(const std::string& content, const std::string& format,
 // CLI entry point
 //--------------------------------------------------------------------------------------------------
 
+// How `--fonts` stores text in the imported document. Imported text is normally kept as plain
+// text plus font attributes, which lets an editor re-flow it with whatever fonts it has. The two
+// embedding modes convert it into pre-shaped glyph runs instead, so the output renders the same
+// everywhere without the original fonts: External writes font sources next to the output as
+// relative paths, Embed also inlines the font bytes as base64 data URIs.
+enum class FontStorageMode {
+  None,
+  External,
+  Embed,
+};
+
+static bool ParseFontStorageMode(const std::string& value, FontStorageMode* mode) {
+  if (value == "none") {
+    *mode = FontStorageMode::None;
+    return true;
+  }
+  if (value == "external") {
+    *mode = FontStorageMode::External;
+    return true;
+  }
+  if (value == "embed") {
+    *mode = FontStorageMode::Embed;
+    return true;
+  }
+  return false;
+}
+
 struct ImportOptions {
   std::string inputFile = {};
   std::string outputFile = {};
@@ -512,6 +540,12 @@ struct ImportOptions {
   // Directory used to resolve relative image `source` paths to real files. Defaults to the input
   // file's directory. Only meaningful for local (non-URL) inputs.
   std::string imageBaseDir = {};
+  // Whether to convert text into pre-shaped glyph runs. Defaults to None (text stays runtime
+  // shaped). The embedding modes also need the fonts the page was laid out with: system fonts are
+  // resolved by name, and `--fallback` supplies downloaded web fonts.
+  FontStorageMode fontStorage = FontStorageMode::None;
+  // Font files or "family[,style]" system font names to shape with before embedding.
+  std::vector<std::string> fontFallbacks = {};
 };
 
 static void PrintUsage() {
@@ -534,6 +568,13 @@ static void PrintUsage() {
       << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
       << "  --image-base-dir <dir>         Directory to resolve relative image paths against\n"
       << "                                 (default: the input file's directory)\n"
+      << "  --fonts <mode>                 How text is stored: 'none' (default; keep runtime\n"
+      << "                                 shaping so fonts stay editable) or embed the glyph\n"
+      << "                                 outlines the page was laid out with, either\n"
+      << "                                 'external' (font files referenced by relative path) or\n"
+      << "                                 'embed' (font bytes inlined as base64 data URIs)\n"
+      << "  --fallback <path|name>         Font file or system font name to shape with before\n"
+      << "                                 embedding (repeatable; only used by --fonts)\n"
       << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
@@ -547,6 +588,7 @@ static void PrintUsage() {
       << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
       << "  pagx import --input page.html --no-resolve        # keep import directives\n"
       << "  pagx import --input page.html --capture-animations # replay page animations in PAGX\n"
+      << "  pagx import --input page.html --fonts embed        # bake the page's glyphs in\n"
       << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
 }
 
@@ -573,6 +615,15 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       }
     } else if (arg == "--image-base-dir" && i + 1 < argc) {
       options->imageBaseDir = argv[++i];
+    } else if (arg == "--fonts" && i + 1 < argc) {
+      std::string mode = argv[++i];
+      if (!ParseFontStorageMode(mode, &options->fontStorage)) {
+        std::cerr << "pagx import: error: invalid --fonts value '" << mode
+                  << "' (expected 'none', 'external' or 'embed')\n";
+        return 1;
+      }
+    } else if (arg == "--fallback" && i + 1 < argc) {
+      options->fontFallbacks.push_back(argv[++i]);
     } else if (arg == "--verbose" || arg == "-v") {
       options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
@@ -593,6 +644,11 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
 
   if (options->inputFile.empty()) {
     std::cerr << "pagx import: error: missing --input\n";
+    return 1;
+  }
+
+  if (options->fontStorage == FontStorageMode::None && !options->fontFallbacks.empty()) {
+    std::cerr << "pagx import: error: --fallback requires --fonts\n";
     return 1;
   }
 
@@ -670,6 +726,17 @@ int RunImport(int argc, char* argv[]) {
     imageOptions.documentDir = inputDir;
     imageOptions.outputDir = GetDirectory(options.outputFile);
     ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
+  }
+
+  // Bakes the glyphs the page was laid out with into the document so it no longer depends on the
+  // fonts being installed. Runs after image storage so that both modes settle on their final
+  // resources before the export pass.
+  if (options.fontStorage != FontStorageMode::None) {
+    bool embedFontData = options.fontStorage == FontStorageMode::Embed;
+    if (!EmbedFonts(result.document.get(), GetDirectory(options.outputFile), options.fontFallbacks,
+                    embedFontData, "pagx import")) {
+      return 1;
+    }
   }
 
   auto xml = PAGXExporter::ToXML(*result.document);
