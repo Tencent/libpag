@@ -46,7 +46,9 @@ Rectangle {
     property bool needsDocumentLoad: false
 
     // Viewport position to restore once loading finishes: kept for Discard (stay where the
-    // user was editing), zero for fresh file loads.
+    // user was editing), zero for fresh file loads. Both axes are saved so a horizontally
+    // scrolled long line is not yanked back to column 0 on a full-reload Discard.
+    property real savedScrollX: 0
     property real savedScrollY: 0
 
     // Chunked loading progress in the 0..1 range, fed by editorLoadProgress.
@@ -98,6 +100,7 @@ Rectangle {
         baselineXml = xml;
         maxLineWidth = 0;
         loadProgress = 0;
+        savedScrollX = (keepScrollPosition === true) ? flick.contentX : 0;
         savedScrollY = (keepScrollPosition === true) ? flick.contentY : 0;
         if (keepScrollPosition !== true) {
             flick.contentX = 0;
@@ -113,7 +116,13 @@ Rectangle {
             busy = true;
             viewModel.loadEditorText(textArea.textDocument, xml);
         } else {
+            // Fallback for a non-PAGX (or missing) viewModel: no chunked loader will run, so no
+            // editorLoadFinished arrives to converge the state. Clear dirty/busy here, otherwise
+            // onTextChanged leaves dirty true and a busy flag left over from an aborted chunked
+            // load would wedge the buttons until the next PAGX load.
             textArea.text = xml;
+            busy = false;
+            dirty = false;
         }
     }
 
@@ -164,6 +173,7 @@ Rectangle {
             baselineXml = text;
             dirty = false;
             showToast(qsTr("Changes applied"), true);
+            refoldIfNeeded(editorText, text);
         } else {
             showToast(error, false);
         }
@@ -195,8 +205,22 @@ Rectangle {
             baselineXml = text;
             dirty = false;
             showToast(qsTr("File saved"), true);
+            refoldIfNeeded(editorText, text);
         } else {
             showToast(saveError, false);
+        }
+    }
+
+    // A megabyte-scale line pasted into the editor mid-session is never folded (folding only
+    // runs on the load path), so every later keystroke pays that line's full relayout — the
+    // quadratic stall the loader deliberately avoids. After a successful Apply/Save, if the
+    // editor still holds such an unfolded long line, reload the restored source through the
+    // folding path (keeping the scroll position). Normal edits contain no long line and skip
+    // the reload, so the common case stays cheap.
+    function refoldIfNeeded(editorText, restoredText) {
+        if (viewModel && typeof viewModel.hasUnfoldedLongLine === "function"
+                && viewModel.hasUnfoldedLongLine(editorText)) {
+            loadXml(restoredText, true);
         }
     }
 
@@ -212,8 +236,8 @@ Rectangle {
         function onEditorLoadFinished(maxLineWidth) {
             root.maxLineWidth = maxLineWidth;
             // Clearing the document pulls the caret to position 0, which drags the viewport
-            // to the top; restore the saved position after the content is complete.
-            flick.contentX = 0;
+            // to the top-left; restore the saved position after the content is complete.
+            flick.contentX = root.savedScrollX;
             flick.contentY = root.savedScrollY;
             dirty = false;
             busy = false;
@@ -233,6 +257,13 @@ Rectangle {
 
     function connectViewModel() {
         if (!viewModel || !textArea || connectedViewModel === viewModel) {
+            return;
+        }
+        // A view-type switch can rebind viewModel to a non-PAGX one (e.g. PAGViewModel for a
+        // .pag file) that has no attachHighlighter/documentXml members. Bail out before touching
+        // them so the switch does not throw; connectedViewModel is left unset so a later rebind
+        // back to a PAGX model still wires up correctly.
+        if (typeof viewModel.attachHighlighter !== "function") {
             return;
         }
         connectedViewModel = viewModel;

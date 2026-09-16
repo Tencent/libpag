@@ -34,11 +34,12 @@ class QTimer;
 
 namespace pag {
 
-// A long data line folded out of the editor: the exact placeholder line shown in the editor
-// plus the original full line it stands for.
+// A long data line folded out of the editor: the exact placeholder line shown in the editor,
+// the original full line it stands for, and the unique fold marker embedded in the placeholder.
 struct ElidedLine {
   QString placeholder = {};
   QString fullLine = {};
+  QString marker = {};
 };
 
 /**
@@ -103,7 +104,7 @@ class PAGXViewModel : public ContentViewModel {
    * Replaces the editor document's text. Large documents are appended in chunks driven by a
    * 16ms-interval timer so the attached highlighter only ever rehighlights one chunk at a
    * time and the UI thread is never blocked for long. editorLoadFinished() is emitted when
-   * the document is ready for editing. Lines longer than FoldLineThreshold are folded into
+   * the document is ready for editing. Lines longer than FOLD_LINE_THRESHOLD are folded into
    * short placeholders (see ElidedLine) before loading, so megabyte-long base64 lines never
    * reach the text layout engine.
    */
@@ -115,6 +116,14 @@ class PAGXViewModel : public ContentViewModel {
    * and Save refuse to run in that state; the user must Discard to restore the line.
    */
   Q_INVOKABLE bool elideBroken(const QString& editorText) const;
+
+  /**
+   * Returns true if the editor text still contains a line long enough to be folded (e.g. a
+   * megabyte base64 line pasted during editing). Such a line was never folded by the loader,
+   * so the caller reloads the source through the folding path after a successful Apply/Save to
+   * avoid the quadratic relayout stall on future edits.
+   */
+  Q_INVOKABLE bool hasUnfoldedLongLine(const QString& editorText) const;
 
   /**
    * Rebuilds the full source text by substituting every intact folded placeholder back with

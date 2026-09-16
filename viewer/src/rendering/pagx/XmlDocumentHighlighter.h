@@ -32,7 +32,7 @@ namespace pag {
 class XmlDocumentHighlighter : public QSyntaxHighlighter {
   Q_OBJECT
  public:
-  explicit XmlDocumentHighlighter(QTextDocument* document);
+  explicit XmlDocumentHighlighter(QObject* parent = nullptr);
 
  protected:
   void highlightBlock(const QString& text) override;
@@ -56,7 +56,7 @@ class XmlDocumentHighlighter : public QSyntaxHighlighter {
 
   // Lines longer than this skip token-level highlighting (e.g. embedded base64 payloads),
   // matching the previous per-line highlighter's performance guard.
-  static constexpr qsizetype MaxHighlightLength = 10000;
+  static constexpr qsizetype MAX_HIGHLIGHT_LENGTH = 10000;
 
   QTextCharFormat tagFormat;
   QTextCharFormat attrNameFormat;

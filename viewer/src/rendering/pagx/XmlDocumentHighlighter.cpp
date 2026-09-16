@@ -72,8 +72,7 @@ static int FindTagEnd(const QString& text, int from, int length) {
   return -1;
 }
 
-XmlDocumentHighlighter::XmlDocumentHighlighter(QTextDocument* document)
-    : QSyntaxHighlighter(document) {
+XmlDocumentHighlighter::XmlDocumentHighlighter(QObject* parent) : QSyntaxHighlighter(parent) {
   tagFormat = MakeColorFormat("#569CD6");
   attrNameFormat = MakeColorFormat("#9CDCFE");
   attrValueFormat = MakeColorFormat("#CE9178");
@@ -90,7 +89,7 @@ void XmlDocumentHighlighter::highlightBlock(const QString& text) {
   }
   setCurrentBlockState(StateNormal);
 
-  if (length > MaxHighlightLength) {
+  if (length > MAX_HIGHLIGHT_LENGTH) {
     setFormat(0, length, textFormat);
     return;
   }

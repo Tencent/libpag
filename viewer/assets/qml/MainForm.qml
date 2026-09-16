@@ -63,13 +63,17 @@ SplitView {
 
     // Mirror of the web playground's bare-L shortcut that toggles the source editor panel.
     // Disabled whenever any text input holds focus so typing "l" is never swallowed; the
-    // source editor's TextArea is a TextEdit, so this also covers the editor itself.
+    // source editor's TextArea is a TextEdit, so this also covers the editor itself. tabBar
+    // lives inside rightItemLoader's inline component (its own id scope) and only exists while
+    // the edit panel is open, so the toggle is routed through rightItemLoader.item and guarded
+    // on isEditPanelOpen.
     Shortcut {
         sequence: "L"
-        enabled: currentViewType === "pagx" && hasPAGFile &&
+        enabled: currentViewType === "pagx" && hasPAGFile && isEditPanelOpen &&
+                  rightItemLoader.item &&
                   !(splitView.focusedItem instanceof TextInput ||
                     splitView.focusedItem instanceof TextEdit)
-        onActivated: tabBar.currentIndex = tabBar.currentIndex === 1 ? 0 : 1
+        onActivated: rightItemLoader.item.toggleSourceEditor()
     }
 
     anchors.fill: parent
@@ -364,6 +368,13 @@ SplitView {
 
             // Expose xmlSourceEditor for external access
             property alias xmlSourceEditor: xmlSourceEditor
+
+            // Toggles between the Edit Layer tab and the Source Editor tab. Exposed so the
+            // root-scope "L" Shortcut can drive tabBar, which is otherwise unreachable from
+            // outside this inline component's id scope.
+            function toggleSourceEditor() {
+                tabBar.currentIndex = tabBar.currentIndex === 1 ? 0 : 1;
+            }
 
             // Check if Source Editor tab is selected for PAGX
             property bool isSourceEditorActive: currentViewType === "pagx" && tabBar.currentIndex === 1

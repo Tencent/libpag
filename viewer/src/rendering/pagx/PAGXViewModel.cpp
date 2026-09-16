@@ -45,20 +45,47 @@ static void EditorLog(const QString& message) {
 // editor: the text layout engine chokes on megabyte-long lines with multi-second synchronous
 // layouts, and they are useless to read or edit by hand anyway. Thresholds and marker format
 // live next to the folding implementation.
-constexpr qsizetype FoldLineThreshold = 4096;
-constexpr qsizetype FoldVisibleEdge = 1024;
-constexpr const char* FoldMarkerPrefix = "<!--FOLDED-";
+constexpr qsizetype FOLD_LINE_THRESHOLD = 4096;
+constexpr qsizetype FOLD_VISIBLE_EDGE = 1024;
+constexpr const char* FOLD_MARKER_PREFIX = "<!--FOLDED-";
 
 static QString BuildFoldMarker(const QString& fullLine) {
   const auto hash = QCryptographicHash::hash(fullLine.toUtf8(), QCryptographicHash::Sha1);
-  return QString(FoldMarkerPrefix) + QString::fromLatin1(hash.toHex().left(16)) + "-->";
+  return QString(FOLD_MARKER_PREFIX) + QString::fromLatin1(hash.toHex().left(16)) + "-->";
+}
+
+// Scans for the first line longer than FOLD_LINE_THRESHOLD without copying anything, so callers
+// can cheaply decide whether folding (or refolding) is needed at all.
+static bool HasLongLine(const QString& text) {
+  qsizetype start = 0;
+  while (start < text.size()) {
+    auto end = text.indexOf(u'\n', start);
+    if (end < 0) {
+      end = text.size();
+    }
+    if (end - start > FOLD_LINE_THRESHOLD) {
+      return true;
+    }
+    if (end >= text.size()) {
+      break;
+    }
+    start = end + 1;
+  }
+  return false;
 }
 
 static void BuildElidedText(const QString& text, QString* elidedText,
                             QList<ElidedLine>* elidedLines) {
+  elidedLines->clear();
+  // Fast path: with no over-long line there is nothing to fold, so share the original text
+  // (QString is copy-on-write) instead of allocating and rebuilding a byte-identical copy,
+  // which would transiently double memory on large documents.
+  if (!HasLongLine(text)) {
+    *elidedText = text;
+    return;
+  }
   elidedText->clear();
   elidedText->reserve(text.size());
-  elidedLines->clear();
   qsizetype start = 0;
   while (start < text.size()) {
     auto end = text.indexOf(u'\n', start);
@@ -66,11 +93,12 @@ static void BuildElidedText(const QString& text, QString* elidedText,
       end = text.size();
     }
     const auto lineLength = end - start;
-    if (lineLength > FoldLineThreshold) {
+    if (lineLength > FOLD_LINE_THRESHOLD) {
       const auto fullLine = text.mid(start, lineLength);
-      const auto placeholder = text.mid(start, FoldVisibleEdge) + BuildFoldMarker(fullLine) +
-                               text.mid(end - FoldVisibleEdge, FoldVisibleEdge);
-      elidedLines->append({placeholder, fullLine});
+      const auto marker = BuildFoldMarker(fullLine);
+      const auto placeholder = text.mid(start, FOLD_VISIBLE_EDGE) + marker +
+                               text.mid(end - FOLD_VISIBLE_EDGE, FOLD_VISIBLE_EDGE);
+      elidedLines->append({placeholder, fullLine, marker});
       elidedText->append(placeholder);
     } else {
       elidedText->append(QStringView(text).mid(start, lineLength));
@@ -502,6 +530,10 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   Q_EMIT heightChanged(pagxHeight);
   emitContentStateReset();
   Q_EMIT contentSizeChanged();
+  // Match loadFile: a changed document size must drive the window geometry adjustment that
+  // PAGXView performs on preferredSizeChanged, otherwise Apply that resizes the document leaves
+  // the window sized to the old preferred size.
+  Q_EMIT preferredSizeChanged();
   Q_EMIT pagxDocumentChanged(pagxDocument);
   Q_EMIT requestFlush();
 
@@ -552,11 +584,6 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
     return;
   }
   auto* document = quickDocument->textDocument();
-  if (highlighter != nullptr && highlighter->document() == document) {
-    return;
-  }
-  // A previous highlighter can only belong to a previous editor instance's document; replace
-  // it so a recreated editor is never left unhighlighted.
   // QQuickTextEdit only builds text nodes for blocks inside the viewport when this flag is
   // set, and Qt sets it in setText() only for documents over 10000 characters. The chunked
   // loader bypasses setText, so enable it explicitly: without the flag every scroll frame
@@ -564,8 +591,16 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   if (auto* editorItem = qobject_cast<QQuickItem*>(quickDocument->parent())) {
     editorItem->setFlag(QQuickItem::ItemObservesViewport, true);
   }
-  delete highlighter;
-  highlighter = new XmlDocumentHighlighter(document);
+  // The highlighter is owned by this ViewModel (not by the persistent editor document), so it
+  // is destroyed together with the ViewModel when the view type switches away from PAGX. This
+  // avoids leaking a highlighter onto the long-lived document and, on repeated pagx->pag->pagx
+  // switches, accumulating many highlighters that each run a full rehighlight on every edit.
+  if (highlighter == nullptr) {
+    highlighter = new XmlDocumentHighlighter(this);
+  }
+  if (highlighter->document() != document) {
+    highlighter->setDocument(document);
+  }
 }
 
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
@@ -591,8 +626,8 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
   auto* document = quickDocument->textDocument();
   QString textToLoad = text;
   BuildElidedText(text, &textToLoad, &elidedLines);
-  constexpr qsizetype SmallDocumentThreshold = 256 * 1024;
-  if (textToLoad.size() <= SmallDocumentThreshold) {
+  constexpr qsizetype SMALL_DOCUMENT_THRESHOLD = 256 * 1024;
+  if (textToLoad.size() <= SMALL_DOCUMENT_THRESHOLD) {
     QElapsedTimer timer;
     timer.start();
     document->setPlainText(textToLoad);
@@ -723,24 +758,45 @@ bool PAGXViewModel::elideBroken(const QString& editorText) const {
       end = editorText.size();
     }
     const auto line = QStringView(editorText).mid(start, end - start);
-    // Deleting a whole folded line is a legitimate edit (its marker simply disappears);
-    // only a line that still carries the marker but no longer matches the placeholder
-    // verbatim means the folded payload can no longer be restored safely.
-    if (line.contains(QLatin1String(FoldMarkerPrefix))) {
-      auto intact = false;
+    auto intact = false;
+    for (const auto& elided : elidedLines) {
+      if (line == QStringView(elided.placeholder)) {
+        intact = true;
+        break;
+      }
+    }
+    // A folded line is restorable only when it still matches its placeholder verbatim. Deleting
+    // the whole line, or replacing it with entirely new content, is a legitimate edit and leaves
+    // no trace of the placeholder. But an edit that keeps a recognizable fragment of a placeholder
+    // (its unique marker, or its head/tail edge) while no longer matching it exactly means the
+    // folded payload can no longer be mapped back: restoreElidedLines would keep the mangled line
+    // and silently corrupt the data. Checking against the real per-line marker (a content hash),
+    // rather than the bare marker prefix, also avoids misreading a hand-written comment that merely
+    // begins with the prefix as a broken fold.
+    if (!intact) {
       for (const auto& elided : elidedLines) {
-        if (line == QStringView(elided.placeholder)) {
-          intact = true;
-          break;
+        const auto placeholder = QStringView(elided.placeholder);
+        const auto edge = qMin<qsizetype>(FOLD_VISIBLE_EDGE, placeholder.size());
+        if (line.contains(QStringView(elided.marker)) ||
+            (line.size() >= edge &&
+             (line.startsWith(placeholder.left(edge)) || line.endsWith(placeholder.right(edge))))) {
+          return true;
         }
       }
-      if (!intact) {
-        return true;
-      }
+    }
+    if (end >= editorText.size()) {
+      break;
     }
     start = end + 1;
   }
   return false;
+}
+
+bool PAGXViewModel::hasUnfoldedLongLine(const QString& editorText) const {
+  // Folded placeholders are always shorter than FOLD_LINE_THRESHOLD (two FOLD_VISIBLE_EDGE
+  // fragments plus a short marker), so any editor line still over the threshold is a genuinely
+  // long line the loader never folded (e.g. pasted mid-edit) and warrants a refold.
+  return HasLongLine(editorText);
 }
 
 QString PAGXViewModel::restoreElidedLines(const QString& editorText) const {
