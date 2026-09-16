@@ -108,6 +108,11 @@ class TextLayoutContext {
     tgfx::GlyphID glyphID = 0;
     tgfx::Font font = {};
     float advance = 0;
+    // The advance the glyph actually occupies after CJK punctuation squash. Squash shrinks the
+    // space next to a punctuation glyph without changing `advance`, which line breaking and
+    // justification are computed from. Measured bounds have to use this one so that a text block
+    // measures exactly as wide as its squashed line.
+    float squashedAdvance = 0;
     float xPosition = 0;
     int32_t unichar = 0;
     float fontSize = 0;
@@ -709,6 +714,7 @@ class TextLayoutContext {
       for (size_t i = 0; i < glyphCount; i++) {
         line.glyphs[i].xPosition = xPos - leadingSquash[i];
         float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
+        line.glyphs[i].squashedAdvance = effectiveAdvance;
         float ls = line.glyphs[i].letterSpacing;
         xPos += effectiveAdvance + ls;
       }
@@ -1136,14 +1142,15 @@ class TextLayoutContext {
         pg.x = g.xPosition + xOffset + justifyOffset + g.xOffset;
         pg.y = baselineY - g.yOffset;
         result.horizontalGlyphs[g.sourceText].push_back(pg);
-        // Update per-Text linebox bounds in layout coordinate system.
-        float glyphRight = pg.x + g.advance;
+        // Update per-Text linebox bounds in layout coordinate system. Uses the squashed advance
+        // so the bounds agree with the line width the TextBox was measured with.
+        float glyphRight = pg.x + g.squashedAdvance;
         float lineTop = relativeTop - line.maxLineHeight + yOffset;
         float lineBottom = relativeTop + yOffset;
         auto it = result.perTextBounds.find(g.sourceText);
         if (it == result.perTextBounds.end()) {
           result.perTextBounds[g.sourceText] =
-              Rect::MakeXYWH(pg.x, lineTop, g.advance, lineBottom - lineTop);
+              Rect::MakeXYWH(pg.x, lineTop, g.squashedAdvance, lineBottom - lineTop);
         } else {
           auto& tb = it->second;
           float left = std::min(tb.x, pg.x);
