@@ -19,6 +19,7 @@
 #include "JsHelper.h"
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
+#include <algorithm>
 #include <cstdint>
 #include <unordered_map>
 #include "base/utils/Log.h"
@@ -38,6 +39,217 @@ static constexpr char CONSTRUCTOR_CONTEXT_KEY[] = "__libpag_ohos_constructor_con
 // Configurable so an invalid entry can always be replaced instead of leaving the realm permanently
 // unable to initialize. Not writable so JS cannot overwrite it by a plain assignment.
 static constexpr napi_property_attributes CONSTRUCTOR_CONTEXT_ATTRIBUTES = napi_configurable;
+
+static constexpr uint8_t PAG_VIEW_EVENT_PROGRESS = 0;
+static constexpr uint8_t PAG_VIEW_EVENT_STATE = 1;
+static constexpr size_t PAG_VIEW_MAX_PENDING_STATES = 64;
+
+std::shared_ptr<PAGViewEventDispatcher> PAGViewEventDispatcher::Make(
+    napi_env env, const std::string& resourceName) {
+  auto result = std::shared_ptr<PAGViewEventDispatcher>(new PAGViewEventDispatcher());
+  napi_value name = nullptr;
+  if (napi_create_string_utf8(env, resourceName.c_str(), NAPI_AUTO_LENGTH, &name) != napi_ok) {
+    return nullptr;
+  }
+  auto holder = new std::shared_ptr<PAGViewEventDispatcher>(result);
+  // The native pending queue is bounded and wakeScheduled limits this TSFN to one logical token.
+  // Keep the TSFN queue unbounded so a callback that is just finishing cannot reject its successor
+  // with napi_queue_full and leave native events without a wake-up.
+  auto status = napi_create_threadsafe_function(env, nullptr, nullptr, name, 0, 1, holder, Finalize,
+                                                result.get(), Dispatch, &result->dispatcher);
+  if (status != napi_ok) {
+    delete holder;
+    return nullptr;
+  }
+  return result;
+}
+
+void PAGViewEventDispatcher::Finalize(napi_env, void* finalizeData, void*) {
+  auto holder = static_cast<std::shared_ptr<PAGViewEventDispatcher>*>(finalizeData);
+  (*holder)->finalize();
+  delete holder;
+}
+
+void PAGViewEventDispatcher::Dispatch(napi_env env, napi_value, void* context, void*) {
+  if (context == nullptr) {
+    return;
+  }
+  auto dispatcher = static_cast<PAGViewEventDispatcher*>(context);
+  if (env == nullptr) {
+    dispatcher->finalize();
+    return;
+  }
+  dispatcher->drain(env);
+}
+
+void PAGViewEventDispatcher::setProgressCallback(napi_env env, napi_value callback) {
+  napi_ref reference = nullptr;
+  if (callback != nullptr && napi_create_reference(env, callback, 1, &reference) != napi_ok) {
+    return;
+  }
+  napi_ref previous = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (released) {
+      previous = reference;
+    } else {
+      previous = progressCallback;
+      progressCallback = reference;
+    }
+  }
+  if (previous != nullptr) {
+    napi_delete_reference(env, previous);
+  }
+}
+
+void PAGViewEventDispatcher::setStateCallback(napi_env env, napi_value callback) {
+  napi_ref reference = nullptr;
+  if (callback != nullptr && napi_create_reference(env, callback, 1, &reference) != napi_ok) {
+    return;
+  }
+  napi_ref previous = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (released) {
+      previous = reference;
+    } else {
+      previous = stateCallback;
+      stateCallback = reference;
+    }
+  }
+  if (previous != nullptr) {
+    napi_delete_reference(env, previous);
+  }
+}
+
+void PAGViewEventDispatcher::notifyProgress() {
+  notify(PAG_VIEW_EVENT_PROGRESS, 0);
+}
+
+void PAGViewEventDispatcher::notifyState(uint8_t state) {
+  notify(PAG_VIEW_EVENT_STATE, state);
+}
+
+void PAGViewEventDispatcher::notify(uint8_t type, uint8_t state) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (released || dispatcher == nullptr) {
+    return;
+  }
+  if (type == PAG_VIEW_EVENT_PROGRESS) {
+    if (pendingEvents.empty() || pendingEvents.back().type != PAG_VIEW_EVENT_PROGRESS) {
+      pendingEvents.push_back({type, state});
+    }
+  } else {
+    if (pendingStateCount >= PAG_VIEW_MAX_PENDING_STATES) {
+      if (state != PAGAnimatorState::Cancel && state != PAGAnimatorState::End) {
+        return;
+      }
+      auto replaceable = std::find_if(pendingEvents.begin(), pendingEvents.end(), [](auto& event) {
+        return event.type == PAG_VIEW_EVENT_STATE && event.state != PAGAnimatorState::Cancel &&
+               event.state != PAGAnimatorState::End;
+      });
+      if (replaceable == pendingEvents.end()) {
+        replaceable = std::find_if(pendingEvents.begin(), pendingEvents.end(),
+                                   [](auto& event) { return event.type == PAG_VIEW_EVENT_STATE; });
+      }
+      if (replaceable != pendingEvents.end()) {
+        pendingEvents.erase(replaceable);
+        pendingStateCount--;
+      }
+    }
+    pendingEvents.push_back({type, state});
+    pendingStateCount++;
+  }
+  if (wakeScheduled) {
+    return;
+  }
+  wakeScheduled = true;
+  auto status = napi_call_threadsafe_function(dispatcher, nullptr, napi_tsfn_nonblocking);
+  if (status != napi_ok) {
+    wakeScheduled = false;
+    pendingEvents.clear();
+    pendingStateCount = 0;
+  }
+}
+
+void PAGViewEventDispatcher::drain(napi_env currentEnv) {
+  while (true) {
+    PendingEvent event = {};
+    napi_ref reference = nullptr;
+    {
+      std::lock_guard<std::mutex> autoLock(locker);
+      if (released || pendingEvents.empty()) {
+        wakeScheduled = false;
+        return;
+      }
+      event = pendingEvents.front();
+      pendingEvents.pop_front();
+      if (event.type == PAG_VIEW_EVENT_STATE) {
+        pendingStateCount--;
+      }
+      reference = event.type == PAG_VIEW_EVENT_PROGRESS ? progressCallback : stateCallback;
+    }
+    if (reference == nullptr) {
+      continue;
+    }
+    napi_value callback = nullptr;
+    if (napi_get_reference_value(currentEnv, reference, &callback) != napi_ok ||
+        callback == nullptr) {
+      continue;
+    }
+    napi_value undefined = nullptr;
+    napi_get_undefined(currentEnv, &undefined);
+    if (event.type == PAG_VIEW_EVENT_PROGRESS) {
+      napi_call_function(currentEnv, undefined, callback, 0, nullptr, nullptr);
+    } else {
+      napi_value argument = nullptr;
+      napi_create_uint32(currentEnv, static_cast<uint32_t>(event.state), &argument);
+      napi_call_function(currentEnv, undefined, callback, 1, &argument, nullptr);
+    }
+  }
+}
+
+void PAGViewEventDispatcher::release(napi_env env) {
+  napi_threadsafe_function currentDispatcher = nullptr;
+  napi_ref currentProgressCallback = nullptr;
+  napi_ref currentStateCallback = nullptr;
+  {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (released) {
+      return;
+    }
+    released = true;
+    pendingEvents.clear();
+    pendingStateCount = 0;
+    currentDispatcher = dispatcher;
+    currentProgressCallback = progressCallback;
+    progressCallback = nullptr;
+    currentStateCallback = stateCallback;
+    stateCallback = nullptr;
+  }
+  if (env != nullptr && currentProgressCallback != nullptr) {
+    napi_delete_reference(env, currentProgressCallback);
+  }
+  if (env != nullptr && currentStateCallback != nullptr) {
+    napi_delete_reference(env, currentStateCallback);
+  }
+  if (currentDispatcher != nullptr) {
+    napi_release_threadsafe_function(currentDispatcher, napi_tsfn_abort);
+  }
+}
+
+void PAGViewEventDispatcher::finalize() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  released = true;
+  dispatcher = nullptr;
+  // The NativeEngine may already be marked destroyed here. Do not call N-API from this finalizer;
+  // its reference table releases any remaining callback refs during engine teardown.
+  progressCallback = nullptr;
+  stateCallback = nullptr;
+  pendingEvents.clear();
+  pendingStateCount = 0;
+  wakeScheduled = false;
+}
 
 enum class ConstructorContextState {
   Initializing,
