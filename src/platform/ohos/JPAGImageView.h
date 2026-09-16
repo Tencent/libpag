@@ -25,6 +25,9 @@
 #include "tgfx/gpu/Window.h"
 
 namespace pag {
+class PAGViewEventDispatcher;
+class JPAGImageViewRenderSession;
+
 class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
  public:
   static bool Init(napi_env env, napi_value exports);
@@ -32,8 +35,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
     return "JPAGImageView";
   }
 
-  explicit JPAGImageView(const std::string& id) : id(std::move(id)) {
-  }
+  JPAGImageView(const std::string& id, napi_env env);
 
   virtual ~JPAGImageView() {
     release();
@@ -55,7 +57,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   void onSurfaceDestroyed() override;
 
-  std::shared_ptr<PAGDecoder> getDecoder();
+  Frame numFrames();
 
   std::shared_ptr<PAGAnimator> getAnimator();
 
@@ -87,53 +89,24 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
 
   napi_value getCurrentPixelMap(napi_env env);
 
-  void release();
+  void release(napi_env env = nullptr);
 
-  void setProgressCallback(napi_threadsafe_function callback);
+  void setProgressCallback(napi_env env, napi_value callback);
 
-  void setPlayingStateCallback(napi_threadsafe_function callback);
+  void setPlayingStateCallback(napi_env env, napi_value callback);
 
   std::string id;
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
 
-  std::shared_ptr<PAGDecoder> getDecoderInternal();
-
-  void invalidSize();
-
-  void invalidDecoder();
-
-  void refreshMatrixFromScaleMode();
-
-  bool handleFrame(Frame frame);
-
-  std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>> getImage(Frame frame);
-
-  bool present(std::shared_ptr<tgfx::Image> image);
-
-  napi_threadsafe_function progressCallback = nullptr;
-  napi_threadsafe_function playingStateCallback = nullptr;
-
-  std::mutex locker;
-  int _width = 0;
-  int _height = 0;
-  float _renderScale = 1.0f;
-  float _frameRate = 30.0f;
-  PAGScaleMode _scaleMode = PAGScaleMode::LetterBox;
-  tgfx::Matrix _matrix = tgfx::Matrix::I();
-  bool _cacheAllFramesInMemory = false;
-  bool isVisible = false;
-  std::shared_ptr<PAGComposition> _composition = nullptr;
+  std::shared_ptr<JPAGImageViewRenderSession> renderSession = nullptr;
+  std::shared_ptr<PAGViewEventDispatcher> eventDispatcher = nullptr;
   std::shared_ptr<PAGAnimator> _animator = nullptr;
-  std::shared_ptr<PAGDecoder> _decoder = nullptr;
-
-  NativeWindow* _window = nullptr;
-  std::shared_ptr<tgfx::Window> targetWindow = nullptr;
-
-  std::shared_ptr<tgfx::Image> currentImage = nullptr;
-  tgfx::Bitmap currentBitmap;
-
-  std::unordered_map<Frame, std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>>> images;
+  bool isVisible = false;
+  int64_t compositionDuration = 0;
+  uint64_t callbackGeneration = 0;
+  bool released = false;
+  std::mutex locker;
 };
 }  // namespace pag

@@ -1564,6 +1564,7 @@ class PAG_API PAGPlayer {
   int64_t durationInternal();
 
   friend class PAGSurface;
+  friend class CompositionReader;
 };
 
 class SequenceFile;

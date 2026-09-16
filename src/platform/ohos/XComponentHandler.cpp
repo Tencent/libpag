@@ -18,10 +18,21 @@
 
 #include "XComponentHandler.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
+#include <mutex>
 
 namespace pag {
 
 std::unordered_map<std::string, std::weak_ptr<XComponentListener>> XComponentListeners;
+static std::mutex XComponentListenersLocker = {};
+
+static std::shared_ptr<XComponentListener> GetXComponentListener(const std::string& id) {
+  std::lock_guard<std::mutex> autoLock(XComponentListenersLocker);
+  auto result = XComponentListeners.find(id);
+  if (result == XComponentListeners.end()) {
+    return nullptr;
+  }
+  return result->second.lock();
+}
 
 void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* window) {
   if ((component == nullptr) || (window == nullptr)) {
@@ -36,10 +47,7 @@ void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* window) {
   }
 
   std::string id(idStr);
-  if (XComponentListeners.find(id) == XComponentListeners.end()) {
-    return;
-  }
-  auto listener = XComponentListeners[id].lock();
+  auto listener = GetXComponentListener(id);
   if (listener) {
     listener->onSurfaceCreated(static_cast<NativeWindow*>(window));
   }
@@ -57,7 +65,7 @@ void OnSurfaceChangedCB(OH_NativeXComponent* component, void* window) {
     return;
   }
   std::string id(idStr);
-  auto listener = XComponentListeners[id].lock();
+  auto listener = GetXComponentListener(id);
   if (listener) {
     listener->onSurfaceSizeChanged();
   }
@@ -76,7 +84,7 @@ void OnSurfaceDestroyedCB(OH_NativeXComponent* component, void* window) {
   }
 
   std::string id(idStr);
-  auto listener = XComponentListeners[id].lock();
+  auto listener = GetXComponentListener(id);
   if (listener) {
     listener->onSurfaceDestroyed();
   }
@@ -108,6 +116,7 @@ bool XComponentHandler::Init(napi_env env, napi_value exports) {
 
 bool XComponentHandler::AddListener(const std::string& xComponentID,
                                     std::weak_ptr<XComponentListener> listener) {
+  std::lock_guard<std::mutex> autoLock(XComponentListenersLocker);
   if (XComponentListeners.find(xComponentID) != XComponentListeners.end()) {
     return false;
   }
@@ -116,6 +125,7 @@ bool XComponentHandler::AddListener(const std::string& xComponentID,
 }
 
 bool XComponentHandler::RemoveListener(const std::string& xComponentID) {
+  std::lock_guard<std::mutex> autoLock(XComponentListenersLocker);
   if (XComponentListeners.find(xComponentID) == XComponentListeners.end()) {
     return false;
   }

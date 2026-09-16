@@ -18,14 +18,27 @@
 
 #include "GPUDrawable.h"
 #include <native_window/external_window.h>
+#include <mutex>
 #include "base/utils/Log.h"
 #include "tgfx/core/Surface.h"
 
 namespace pag {
+std::shared_ptr<tgfx::EGLWindow> MakeEGLWindow(NativeWindow* nativeWindow,
+                                               EGLContext sharedContext) {
+  static std::mutex creationLocker = {};
+  std::lock_guard<std::mutex> autoLock(creationLocker);
+  return tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow),
+                                   sharedContext);
+}
+
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(NativeWindow* nativeWindow,
                                                      EGLContext sharedContext, bool ownsWindow) {
   if (!nativeWindow) {
     LOGE("GPUDrawable.FromWindow() The nativeWindow is invalid.");
+    return nullptr;
+  }
+  if (!ownsWindow && OH_NativeWindow_NativeObjectReference(nativeWindow) != 0) {
+    LOGE("GPUDrawable.FromWindow() Failed to retain the NativeWindow.");
     return nullptr;
   }
   return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext, ownsWindow));
@@ -37,8 +50,14 @@ GPUDrawable::GPUDrawable(NativeWindow* nativeWindow, EGLContext eglContext, bool
 }
 
 GPUDrawable::~GPUDrawable() {
-  if (ownsWindow && nativeWindow) {
+  window = nullptr;
+  if (nativeWindow == nullptr) {
+    return;
+  }
+  if (ownsWindow) {
     OH_NativeWindow_DestroyNativeWindow(nativeWindow);
+  } else {
+    OH_NativeWindow_NativeObjectUnreference(nativeWindow);
   }
 }
 
@@ -54,8 +73,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (!window) {
-    window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow),
-                                       sharedContext);
+    window = MakeEGLWindow(nativeWindow, sharedContext);
   }
   return window ? window->getDevice() : nullptr;
 }
