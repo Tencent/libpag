@@ -55,8 +55,12 @@ VideoReader::~VideoReader() {
 
 std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) {
   auto deadline = tgfx::Clock::Now() + MAX_TOTAL_DECODE_TIME_US;
-  // Need a locker here in case there are other threads are decoding at the same time.
+  // The deadline includes lock contention so each readBuffer() request has one shared wall-clock
+  // budget. A single blocking platform codec call still cannot be interrupted by this soft budget.
   std::lock_guard<std::mutex> autoLock(locker);
+  if (tgfx::Clock::Now() >= deadline) {
+    return nullptr;
+  }
   if (fallbackPending) {
     destroyVideoDecoder();
     factoryIndex++;
@@ -69,7 +73,8 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
   }
   lastBuffer = nullptr;
   currentRenderedTime = INT64_MIN;
-  if (!checkVideoDecoder() || tgfx::Clock::Now() >= deadline) {
+  if (tgfx::Clock::Now() >= deadline || !checkVideoDecoder(deadline) ||
+      tgfx::Clock::Now() >= deadline) {
     return nullptr;
   }
   auto status = decodeFrame(sampleTime, deadline);
@@ -79,7 +84,8 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
     if (status == DecodeStatus::Error && tgfx::Clock::Now() < deadline) {
       destroyVideoDecoder();
       factoryIndex++;
-      if (checkVideoDecoder() && tgfx::Clock::Now() < deadline) {
+      if (tgfx::Clock::Now() < deadline && checkVideoDecoder(deadline) &&
+          tgfx::Clock::Now() < deadline) {
         status = decodeFrame(sampleTime, deadline);
       }
     }
@@ -98,6 +104,10 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
     return nullptr;
   }
   if (!outputEndOfStream) {
+    if (tgfx::Clock::Now() >= deadline) {
+      fallbackPending = true;
+      return nullptr;
+    }
     lastBuffer = videoDecoder->onRenderFrame();
     if (lastBuffer) {
       currentRenderedTime = currentDecodedTime;
@@ -152,7 +162,13 @@ bool VideoReader::sendSampleData() {
 VideoReader::DecodeStatus VideoReader::decodeFrame(int64_t sampleTime, int64_t deadline) {
   if (demuxer->needSeeking(currentDecodedTime, sampleTime)) {
     resetParams();
+    if (tgfx::Clock::Now() >= deadline) {
+      return DecodeStatus::Stalled;
+    }
     videoDecoder->onFlush();
+    if (tgfx::Clock::Now() >= deadline) {
+      return DecodeStatus::Stalled;
+    }
     demuxer->seekTo(sampleTime);
   }
   auto lastProgressTime = tgfx::Clock::Now();
@@ -163,6 +179,9 @@ VideoReader::DecodeStatus VideoReader::decodeFrame(int64_t sampleTime, int64_t d
     }
     if (!sendSampleData()) {
       return DecodeStatus::Error;
+    }
+    if (tgfx::Clock::Now() >= deadline) {
+      return DecodeStatus::Stalled;
     }
     auto result = videoDecoder->onDecodeFrame();
     if (result == DecodingResult::Error) {
@@ -186,11 +205,14 @@ VideoReader::DecodeStatus VideoReader::decodeFrame(int64_t sampleTime, int64_t d
   return DecodeStatus::Success;
 }
 
-bool VideoReader::checkVideoDecoder() {
+bool VideoReader::checkVideoDecoder(int64_t deadline) {
   if (videoDecoder) {
     return true;
   }
-  videoDecoder = makeVideoDecoder().release();
+  if (tgfx::Clock::Now() >= deadline) {
+    return false;
+  }
+  videoDecoder = makeVideoDecoder(deadline).release();
   if (videoDecoder) {
 #ifdef PAG_BUILD_FOR_WEB
     auto tmpDemuxer = static_cast<WebVideoSequenceDemuxer*>(demuxer);
@@ -220,8 +242,11 @@ void VideoReader::resetParams() {
   demuxer->reset();
 }
 
-std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
+std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder(int64_t deadline) {
   while (factoryIndex < static_cast<int>(decoderFactories.size())) {
+    if (tgfx::Clock::Now() >= deadline) {
+      return nullptr;
+    }
     auto factory = decoderFactories[factoryIndex];
     if (factory->isHardwareBacked() && preferSoftware) {
       factoryIndex++;

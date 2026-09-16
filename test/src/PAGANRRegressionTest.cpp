@@ -297,6 +297,7 @@ class ANRLateErrorDecoder : public VideoDecoder {
   }
 
   DecodingResult onDecodeFrame() override {
+    // This delay must exceed VideoReader's total decode budget so fallback is deferred.
     std::this_thread::sleep_for(std::chrono::milliseconds(2100));
     return DecodingResult::Error;
   }
@@ -563,7 +564,7 @@ PAG_TEST(PAGANRRegressionTest, EndingUpdateStaysAsynchronousAfterSyncChange) {
   auto animator = MakeANRAnimator(listener);
   auto callingThread = std::this_thread::get_id();
   animator->isEnding = true;
-  animator->_isSync = true;
+  animator->setSync(true);
 
   animator->doUpdate(true);
 
@@ -623,7 +624,7 @@ PAG_TEST(PAGANRRegressionTest, StalledDecoderFallsBackOnNextRequest) {
   EXPECT_EQ(reader.readBuffer(0), nullptr);
   EXPECT_EQ(stalledFactory.createCount(), 1);
   EXPECT_EQ(fallbackFactory.createCount(), 0);
-  EXPECT_EQ(stalledDecodeCount.load(), 100);
+  EXPECT_GE(stalledDecodeCount.load(), 1);
 
   EXPECT_NE(reader.readBuffer(0), nullptr);
   EXPECT_EQ(fallbackFactory.createCount(), 1);
@@ -700,6 +701,59 @@ PAG_TEST(PAGANRRegressionTest, ClearAllSequenceCachesRemovesStaticSequenceImages
   EXPECT_EQ(cache.staticSequenceResults.count(assetID), 0U);
   EXPECT_FALSE(cache.hasSnapshot(assetID));
   EXPECT_EQ(cache.assetImages.count(unrelatedAssetID), 1U);
+}
+
+PAG_TEST(PAGANRRegressionTest, StaticSequenceUsesAssetMipmaps) {
+  auto stage = PAGStage::Make(2, 2);
+  RenderCache cache(stage.get());
+  constexpr ID assetID = 1;
+  stage->scaleFactorCache[assetID] = {1.0f, 0.1f};
+  auto image = MakeANRTestImage();
+  ASSERT_NE(image, nullptr);
+  EXPECT_FALSE(image->hasMipmaps());
+
+  auto mipmapped = cache.applyAssetMipmaps(assetID, image);
+
+  ASSERT_NE(mipmapped, nullptr);
+  EXPECT_TRUE(mipmapped->hasMipmaps());
+}
+
+PAG_TEST(PAGANRRegressionTest, DisablingVideoPreservesStaticBitmapCache) {
+  auto stage = PAGStage::Make(2, 2);
+  RenderCache cache(stage.get());
+  auto image = MakeANRTestImage();
+  ASSERT_NE(image, nullptr);
+  constexpr ID videoAssetID = 1;
+  constexpr ID bitmapAssetID = 2;
+  cache.assetImages[videoAssetID] = image;
+  cache.assetImages[bitmapAssetID] = image;
+  cache.staticSequenceResults[videoAssetID] = std::make_shared<SequenceReadResult>();
+  cache.staticSequenceResults[bitmapAssetID] = std::make_shared<SequenceReadResult>();
+  cache.staticVideoSequenceIDs.insert(videoAssetID);
+
+  cache.setVideoEnabled(false);
+
+  EXPECT_EQ(cache.assetImages.count(videoAssetID), 0U);
+  EXPECT_EQ(cache.staticSequenceResults.count(videoAssetID), 0U);
+  EXPECT_EQ(cache.assetImages.count(bitmapAssetID), 1U);
+  EXPECT_EQ(cache.staticSequenceResults.count(bitmapAssetID), 1U);
+  EXPECT_TRUE(cache.sequenceCacheInvalidated());
+}
+
+PAG_TEST(PAGANRRegressionTest, FailedSequenceRequestsBackOffAndRecover) {
+  auto stage = PAGStage::Make(2, 2);
+  RenderCache cache(stage.get());
+  constexpr ID assetID = 1;
+
+  cache.recordSequenceFailure(assetID);
+  cache.beginFrame();
+  EXPECT_FALSE(cache.canRetrySequence(assetID));
+  EXPECT_TRUE(cache.hasSequenceDecodeFailure());
+  cache.sequenceFailureStates[assetID].retryAfterTime = 0;
+  EXPECT_TRUE(cache.canRetrySequence(assetID));
+
+  cache.recordSequenceSuccess(assetID);
+  EXPECT_EQ(cache.sequenceFailureStates.count(assetID), 0U);
 }
 
 PAG_TEST(PAGANRRegressionTest, FailedSequenceRequestCanRetry) {

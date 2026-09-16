@@ -80,7 +80,7 @@ class VideoReader : public SequenceReader {
 
   void destroyVideoDecoder();
 
-  bool checkVideoDecoder();
+  bool checkVideoDecoder(int64_t deadline);
 
   void resetParams();
 
@@ -88,6 +88,6 @@ class VideoReader : public SequenceReader {
 
   DecodeStatus decodeFrame(int64_t sampleTime, int64_t deadline);
 
-  std::unique_ptr<VideoDecoder> makeVideoDecoder();
+  std::unique_ptr<VideoDecoder> makeVideoDecoder(int64_t deadline);
 };
 }  // namespace pag

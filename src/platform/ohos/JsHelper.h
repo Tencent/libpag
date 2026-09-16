@@ -19,6 +19,7 @@
 #pragma once
 #include <napi/native_api.h>
 #include <rawfile/raw_file_manager.h>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -45,32 +46,38 @@ class PAGViewEventDispatcher {
   static std::shared_ptr<PAGViewEventDispatcher> Make(napi_env env,
                                                       const std::string& resourceName);
 
-  void setProgressCallback(napi_value callback);
+  void setProgressCallback(napi_env env, napi_value callback);
 
-  void setStateCallback(napi_value callback);
+  void setStateCallback(napi_env env, napi_value callback);
 
   void notifyProgress();
 
   void notifyState(uint8_t state);
 
-  void release();
+  void release(napi_env env = nullptr);
 
  private:
-  explicit PAGViewEventDispatcher(napi_env env) : env(env) {
-  }
+  struct PendingEvent {
+    uint8_t type = 0;
+    uint8_t state = 0;
+  };
 
-  napi_env env = nullptr;
+  PAGViewEventDispatcher() = default;
+
   napi_threadsafe_function dispatcher = nullptr;
   napi_ref progressCallback = nullptr;
   napi_ref stateCallback = nullptr;
   std::mutex locker = {};
+  std::deque<PendingEvent> pendingEvents = {};
+  size_t pendingStateCount = 0;
+  bool wakeScheduled = false;
   bool released = false;
 
   static void Finalize(napi_env env, void* finalizeData, void* finalizeHint);
   static void Dispatch(napi_env env, napi_value callback, void* context, void* data);
-  void finalize(napi_env currentEnv);
+  void finalize();
   void notify(uint8_t type, uint8_t state);
-  void dispatch(napi_env currentEnv, uint8_t type, uint8_t state);
+  void drain(napi_env currentEnv);
 };
 
 // Prepares constructor storage for the current JS realm and reports whether classes need defining.

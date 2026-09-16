@@ -53,7 +53,7 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
 
   void onSurfaceSizeChanged() override;
 
-  void release();
+  void release(napi_env env = nullptr);
 
   std::shared_ptr<PAGPlayer> getPlayer();
 
@@ -63,9 +63,9 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
 
   void setVisible(bool visible);
 
-  void setProgressCallback(napi_value callback);
+  void setProgressCallback(napi_env env, napi_value callback);
 
-  void setPlayingStateCallback(napi_value callback);
+  void setPlayingStateCallback(napi_env env, napi_value callback);
 
   std::string id;
 

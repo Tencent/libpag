@@ -31,11 +31,310 @@
 #include "platform/ohos/JsHelper.h"
 #include "rendering/utils/ApplyScaleMode.h"
 #include "tgfx/core/ColorType.h"
+#include "tgfx/core/Task.h"
 #include "tgfx/platform/ohos/OHOSPixelMap.h"
 
 namespace pag {
 static std::unordered_map<std::string, std::shared_ptr<JPAGImageView>> ViewMap = {};
 static std::mutex ViewMapLocker = {};
+
+class JPAGImageViewRenderSession
+    : public std::enable_shared_from_this<JPAGImageViewRenderSession> {
+ public:
+  ~JPAGImageViewRenderSession() {
+    clearSurface();
+  }
+
+  bool updateFrame(double progress) {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    if (released.load()) {
+      return false;
+    }
+    auto decoder = getDecoder();
+    if (decoder == nullptr) {
+      return false;
+    }
+    return handleFrame(ProgressToFrame(progress, decoder->numFrames()));
+  }
+
+  void setWindow(NativeWindow* window) {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    if (released.load()) {
+      if (window != nullptr) {
+        OH_NativeWindow_NativeObjectUnreference(window);
+      }
+      return;
+    }
+    clearSurface();
+    nativeWindow = window;
+    targetWindow = MakeEGLWindow(nativeWindow);
+    invalidSize();
+  }
+
+  void updateSize() {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    if (!released.load()) {
+      invalidSize();
+    }
+  }
+
+  void clearWindow() {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    clearSurface();
+  }
+
+  void setComposition(std::shared_ptr<PAGComposition> value, float valueFrameRate) {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    if (released.load()) {
+      return;
+    }
+    composition = std::move(value);
+    frameRate = valueFrameRate;
+    invalidDecoder();
+  }
+
+  Frame numFrames() {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    auto decoder = released.load() ? nullptr : getDecoder();
+    return decoder == nullptr ? 0 : decoder->numFrames();
+  }
+
+  void setScaleMode(PAGScaleMode value) {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    scaleMode = value;
+    refreshMatrixFromScaleMode();
+  }
+
+  PAGScaleMode getScaleMode() {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    return scaleMode;
+  }
+
+  void setMatrix(const Matrix& value) {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    matrix = ToTGFX(value);
+    scaleMode = PAGScaleMode::None;
+  }
+
+  Matrix getMatrix() {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    return ToPAG(matrix);
+  }
+
+  void setRenderScale(float value) {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    if (value <= 0.0 || value > 1.0) {
+      value = 1.0;
+    }
+    if (renderScale == value) {
+      return;
+    }
+    renderScale = value;
+    invalidDecoder();
+  }
+
+  float getRenderScale() {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    return renderScale;
+  }
+
+  void setCacheAllFramesInMemory(bool value) {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    if (cacheAllFramesInMemory == value) {
+      return;
+    }
+    cacheAllFramesInMemory = value;
+    if (!value) {
+      images.clear();
+    }
+  }
+
+  bool getCacheAllFramesInMemory() {
+    std::lock_guard<std::mutex> autoLock(operationLocker);
+    return cacheAllFramesInMemory;
+  }
+
+  tgfx::Bitmap getCurrentBitmap() {
+    std::lock_guard<std::mutex> autoLock(imageLocker);
+    return currentBitmap;
+  }
+
+  void release() {
+    if (released.exchange(true)) {
+      return;
+    }
+    auto session = shared_from_this();
+    tgfx::Task::Run([session]() {
+      std::lock_guard<std::mutex> autoLock(session->operationLocker);
+      session->clearSurface();
+      session->invalidDecoder();
+      session->composition = nullptr;
+      std::lock_guard<std::mutex> imageLock(session->imageLocker);
+      session->currentBitmap = {};
+      session->currentImage = nullptr;
+    });
+  }
+
+ private:
+  std::mutex operationLocker = {};
+  std::mutex imageLocker = {};
+  std::atomic_bool released = false;
+  int width = 0;
+  int height = 0;
+  float renderScale = 1.0f;
+  float frameRate = 30.0f;
+  PAGScaleMode scaleMode = PAGScaleMode::LetterBox;
+  tgfx::Matrix matrix = tgfx::Matrix::I();
+  bool cacheAllFramesInMemory = false;
+  std::shared_ptr<PAGComposition> composition = nullptr;
+  std::shared_ptr<PAGDecoder> decoder = nullptr;
+  NativeWindow* nativeWindow = nullptr;
+  std::shared_ptr<tgfx::Window> targetWindow = nullptr;
+  std::shared_ptr<tgfx::Surface> renderSurface = nullptr;
+  std::shared_ptr<tgfx::Image> currentImage = nullptr;
+  tgfx::Bitmap currentBitmap = {};
+  std::unordered_map<Frame, std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>>> images = {};
+
+  std::shared_ptr<PAGDecoder> getDecoder() {
+    if (targetWindow == nullptr || composition == nullptr || released.load()) {
+      invalidDecoder();
+      return nullptr;
+    }
+    if (decoder == nullptr) {
+      float scaleFactor = 1.0f;
+      if (width >= height) {
+        scaleFactor = renderScale * static_cast<float>(width) / composition->width();
+      } else {
+        scaleFactor = renderScale * static_cast<float>(height) / composition->height();
+      }
+      decoder = PAGDecoder::MakeFrom(composition, frameRate, scaleFactor);
+      refreshMatrixFromScaleMode();
+    }
+    return decoder;
+  }
+
+  void invalidSize() {
+    if (targetWindow != nullptr && nativeWindow != nullptr) {
+      renderSurface = nullptr;
+      OH_NativeWindow_NativeWindowHandleOpt(nativeWindow, GET_BUFFER_GEOMETRY, &height, &width);
+    } else {
+      width = 0;
+      height = 0;
+    }
+    invalidDecoder();
+  }
+
+  void clearSurface() {
+    renderSurface = nullptr;
+    targetWindow = nullptr;
+    if (nativeWindow != nullptr) {
+      OH_NativeWindow_NativeObjectUnreference(nativeWindow);
+      nativeWindow = nullptr;
+    }
+    invalidSize();
+  }
+
+  void invalidDecoder() {
+    decoder = nullptr;
+    images.clear();
+  }
+
+  void refreshMatrixFromScaleMode() {
+    if (decoder == nullptr || scaleMode == PAGScaleMode::None) {
+      return;
+    }
+    matrix = ToTGFX(ApplyScaleMode(scaleMode, decoder->width() / renderScale,
+                                   decoder->height() / renderScale, width, height));
+  }
+
+  bool handleFrame(Frame frame) {
+    auto currentDecoder = getDecoder();
+    if (currentDecoder == nullptr) {
+      return false;
+    }
+    if (!currentDecoder->checkFrameChanged(frame) && currentImage != nullptr) {
+      return present(currentImage);
+    }
+    auto image = getImage(frame);
+    if (image.second == nullptr || released.load()) {
+      return false;
+    }
+    if (!present(image.second)) {
+      return false;
+    }
+    {
+      std::lock_guard<std::mutex> autoLock(imageLocker);
+      currentBitmap = image.first;
+      currentImage = image.second;
+    }
+    return true;
+  }
+
+  std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>> getImage(Frame frame) {
+    if (cacheAllFramesInMemory) {
+      auto result = images.find(frame);
+      if (result != images.end()) {
+        return result->second;
+      }
+    }
+    tgfx::Bitmap bitmap = {};
+    if (decoder == nullptr || !bitmap.allocPixels(decoder->width(), decoder->height(), false, false)) {
+      return {{}, nullptr};
+    }
+    auto pixels = bitmap.lockPixels();
+    if (pixels == nullptr) {
+      return {{}, nullptr};
+    }
+    auto success = decoder->readFrame(frame, pixels, bitmap.rowBytes());
+    bitmap.unlockPixels();
+    if (!success) {
+      return {{}, nullptr};
+    }
+    auto image = tgfx::Image::MakeFrom(bitmap);
+    if (image != nullptr && cacheAllFramesInMemory) {
+      images[frame] = {bitmap, image};
+    }
+    return {bitmap, image};
+  }
+
+  bool present(const std::shared_ptr<tgfx::Image>& image) {
+    if (targetWindow == nullptr || image == nullptr || released.load()) {
+      return false;
+    }
+    auto device = targetWindow->getDevice();
+    if (device == nullptr) {
+      return false;
+    }
+    auto context = device->lockContext();
+    if (context == nullptr) {
+      return false;
+    }
+    if (renderSurface == nullptr) {
+      renderSurface = tgfx::Surface::MakeFrom(context, targetWindow);
+    }
+    auto surface = renderSurface;
+    if (surface == nullptr) {
+      device->unlock();
+      return false;
+    }
+    auto canvas = surface->getCanvas();
+    if (canvas == nullptr) {
+      device->unlock();
+      return false;
+    }
+    canvas->clear();
+    auto imageMatrix = tgfx::Matrix::MakeScale(1.0 / renderScale);
+    imageMatrix.postConcat(matrix);
+    canvas->save();
+    canvas->concat(imageMatrix);
+    canvas->drawImage(image);
+    canvas->restore();
+    context->flushAndSubmit();
+    context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
+    device->unlock();
+    return true;
+  }
+};
 
 static napi_value Flush(napi_env env, napi_callback_info info) {
   napi_value jsView = nullptr;
@@ -310,12 +609,7 @@ static napi_value NumFrame(napi_env env, napi_callback_info info) {
     return nullptr;
   }
   napi_value result;
-  auto decoder = view->getDecoder();
-  if (decoder) {
-    napi_create_int64(env, decoder->numFrames(), &result);
-  } else {
-    napi_create_int64(env, 0, &result);
-  }
+  napi_create_int64(env, view->numFrames(), &result);
   return result;
 }
 
@@ -333,7 +627,7 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
     return nullptr;
   }
 
-  view->setPlayingStateCallback(args[0]);
+  view->setPlayingStateCallback(env, args[0]);
   return nullptr;
 }
 
@@ -351,7 +645,7 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
     return nullptr;
   }
 
-  view->setProgressCallback(args[0]);
+  view->setProgressCallback(env, args[0]);
   return nullptr;
 }
 
@@ -463,7 +757,7 @@ static napi_value Release(napi_env env, napi_callback_info info) {
   if (view == nullptr) {
     return nullptr;
   }
-  view->release();
+  view->release(env);
   return nullptr;
 }
 
@@ -497,24 +791,6 @@ napi_value JPAGImageView::Constructor(napi_env env, napi_callback_info info) {
     ViewMap.emplace(id, cView);
   }
   return jsView;
-}
-
-std::shared_ptr<PAGDecoder> JPAGImageView::getDecoderInternal() {
-  if (targetWindow == nullptr || _composition == nullptr) {
-    invalidDecoder();
-    return nullptr;
-  }
-  if (_decoder == nullptr) {
-    float scaleFactor = 1.0;
-    if (_width >= _height) {
-      scaleFactor = static_cast<float>(_renderScale * (_width * 1.0 / _composition->width()));
-    } else {
-      scaleFactor = static_cast<float>(_renderScale * (_height * 1.0 / _composition->height()));
-    }
-    _decoder = PAGDecoder::MakeFrom(_composition, _frameRate, scaleFactor);
-    refreshMatrixFromScaleMode();
-  }
-  return _decoder;
 }
 
 bool JPAGImageView::Init(napi_env env, napi_value exports) {
@@ -553,48 +829,88 @@ bool JPAGImageView::Init(napi_env env, napi_value exports) {
 }
 
 JPAGImageView::JPAGImageView(const std::string& id, napi_env env) : id(id) {
+  renderSession = std::make_shared<JPAGImageViewRenderSession>();
   eventDispatcher = PAGViewEventDispatcher::Make(env, "PAGImageViewEventDispatcher");
 }
 
 void JPAGImageView::onAnimationStart(PAGAnimator*) {
-  std::lock_guard lock_guard(locker);
-  if (eventDispatcher != nullptr) {
-    eventDispatcher->notifyState(PAGAnimatorState::Start);
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      dispatcher = eventDispatcher;
+    }
+  }
+  if (dispatcher != nullptr) {
+    dispatcher->notifyState(PAGAnimatorState::Start);
   }
 }
 
 void JPAGImageView::onAnimationCancel(PAGAnimator*) {
-  std::lock_guard lock_guard(locker);
-  if (eventDispatcher != nullptr) {
-    eventDispatcher->notifyState(PAGAnimatorState::Cancel);
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      callbackGeneration++;
+      dispatcher = eventDispatcher;
+    }
+  }
+  if (dispatcher != nullptr) {
+    dispatcher->notifyState(PAGAnimatorState::Cancel);
   }
 }
 
 void JPAGImageView::onAnimationEnd(PAGAnimator*) {
-  std::lock_guard lock_guard(locker);
-  if (eventDispatcher != nullptr) {
-    eventDispatcher->notifyState(PAGAnimatorState::End);
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      dispatcher = eventDispatcher;
+    }
+  }
+  if (dispatcher != nullptr) {
+    dispatcher->notifyState(PAGAnimatorState::End);
   }
 }
 
 void JPAGImageView::onAnimationRepeat(PAGAnimator*) {
-  std::lock_guard lock_guard(locker);
-  if (eventDispatcher != nullptr) {
-    eventDispatcher->notifyState(PAGAnimatorState::Repeat);
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      dispatcher = eventDispatcher;
+    }
+  }
+  if (dispatcher != nullptr) {
+    dispatcher->notifyState(PAGAnimatorState::Repeat);
   }
 }
 
 void JPAGImageView::onAnimationUpdate(PAGAnimator* animator) {
   auto progress = animator->progress();
-  std::lock_guard lock_guard(locker);
-  Frame frame = 0;
-  auto decoder = getDecoderInternal();
-  if (_composition != nullptr && decoder != nullptr) {
-    frame = ProgressToFrame(progress, _decoder->numFrames());
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
+  uint64_t generation = 0;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+      dispatcher = eventDispatcher;
+      generation = callbackGeneration;
+    }
   }
-  handleFrame(frame);
-  if (eventDispatcher != nullptr) {
-    eventDispatcher->notifyProgress();
+  if (session == nullptr) {
+    return;
+  }
+  session->updateFrame(progress);
+  {
+    std::lock_guard lockGuard(locker);
+    if (released || renderSession != session || callbackGeneration != generation) {
+      dispatcher = nullptr;
+    }
+  }
+  if (dispatcher != nullptr) {
+    dispatcher->notifyProgress();
   }
 }
 
@@ -602,126 +918,101 @@ void JPAGImageView::onSurfaceCreated(NativeWindow* window) {
   if (OH_NativeWindow_NativeObjectReference(window) != 0) {
     return;
   }
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
   std::shared_ptr<PAGAnimator> animator = nullptr;
   {
-    std::lock_guard lock_guard(locker);
-    if (_animator == nullptr) {
-      OH_NativeWindow_NativeObjectUnreference(window);
-      return;
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+      animator = _animator;
     }
-    clearSurface();
-    _window = window;
-    targetWindow = MakeEGLWindow(_window);
-    invalidSize();
-    animator = _animator;
   }
-  // animator->update() can synchronously flow back into onAnimationUpdate,
-  // which also acquires `locker`. Call it outside the critical section to
-  // avoid re-entering the same non-recursive mutex on the caller thread.
+  if (session == nullptr || animator == nullptr) {
+    OH_NativeWindow_NativeObjectUnreference(window);
+    return;
+  }
+  session->setWindow(window);
   animator->update();
 }
 
 void JPAGImageView::onSurfaceSizeChanged() {
-  std::lock_guard lock_guard(locker);
-  if (_animator == nullptr) {
-    return;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  invalidSize();
+  if (session != nullptr) {
+    session->updateSize();
+  }
 }
 
 void JPAGImageView::onSurfaceDestroyed() {
-  std::lock_guard lock_guard(locker);
-  clearSurface();
-}
-
-std::shared_ptr<PAGDecoder> JPAGImageView::getDecoder() {
-  std::lock_guard lock_guard(locker);
-  return getDecoderInternal();
-}
-
-void JPAGImageView::invalidSize() {
-  if (targetWindow && _window) {
-    renderSurface = nullptr;
-    OH_NativeWindow_NativeWindowHandleOpt(_window, GET_BUFFER_GEOMETRY, &_height, &_width);
-  } else {
-    _width = 0;
-    _height = 0;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  invalidDecoder();
-}
-
-void JPAGImageView::clearSurface() {
-  renderSurface = nullptr;
-  targetWindow = nullptr;
-  if (_window != nullptr) {
-    OH_NativeWindow_NativeObjectUnreference(_window);
-    _window = nullptr;
+  if (session != nullptr) {
+    session->clearWindow();
   }
-  invalidSize();
 }
 
-void JPAGImageView::invalidDecoder() {
-  _decoder = nullptr;
-  images.clear();
+Frame JPAGImageView::numFrames() {
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  return session == nullptr ? 0 : session->numFrames();
 }
 
 std::shared_ptr<PAGAnimator> JPAGImageView::getAnimator() {
-  std::lock_guard lock_guard(locker);
-  return _animator;
+  std::lock_guard lockGuard(locker);
+  return released ? nullptr : _animator;
 }
 
 void JPAGImageView::setCurrentFrame(Frame currentFrame) {
-  std::shared_ptr<PAGAnimator> animator = nullptr;
-  double progress = 0;
-  {
-    std::lock_guard lock_guard(locker);
-    if (_animator == nullptr || _composition == nullptr || _decoder == nullptr) {
-      return;
-    }
-    animator = _animator;
-    progress = FrameToProgress(currentFrame, _decoder->numFrames());
+  auto animator = getAnimator();
+  auto frames = numFrames();
+  if (animator != nullptr && frames > 0) {
+    animator->setProgress(FrameToProgress(currentFrame, frames));
   }
-  animator->setProgress(progress);
 }
 
 Frame JPAGImageView::currentFrame() {
-  std::shared_ptr<PAGAnimator> animator = nullptr;
-  Frame numFrames = 0;
-  {
-    std::lock_guard lock_guard(locker);
-    if (_animator == nullptr || _decoder == nullptr) {
-      return 0;
-    }
-    animator = _animator;
-    numFrames = _decoder->numFrames();
-  }
-  return ProgressToFrame(animator->progress(), numFrames);
+  auto animator = getAnimator();
+  auto frames = numFrames();
+  return animator == nullptr || frames <= 0 ? 0 : ProgressToFrame(animator->progress(), frames);
 }
 
 void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, float frameRate) {
+  auto progress = composition != nullptr ? composition->getProgress() : 0.0;
+  auto duration = composition != nullptr ? composition->duration() : 0;
   std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
   bool visible = false;
   {
-    std::lock_guard lock_guard(locker);
-    animator = _animator;
-    if (animator == nullptr) {
+    std::lock_guard lockGuard(locker);
+    if (released) {
       return;
     }
-    _composition = composition;
-    _frameRate = frameRate;
-    invalidDecoder();
+    animator = _animator;
+    session = renderSession;
+    compositionDuration = duration;
     visible = isVisible;
   }
-  int64_t duration = 0;
-  if (composition != nullptr && visible) {
-    duration = composition->duration();
+  if (animator == nullptr || session == nullptr) {
+    return;
   }
-  // The animator keeps a progress that is independent of the composition, so it must be reset to
-  // the new composition's progress when the resource is switched. Otherwise a switch triggered
-  // during playback keeps the previous progress and the new animation starts from the middle.
-  // This matches the behavior of the Android and iOS PAGImageView.
-  animator->setProgress(composition != nullptr ? composition->getProgress() : 0.0);
-  animator->setDuration(duration);
+  session->setComposition(std::move(composition), frameRate);
+  animator->setProgress(progress);
+  animator->setDuration(visible ? duration : 0);
   if (visible) {
     animator->update();
   }
@@ -729,22 +1020,18 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, 
 
 void JPAGImageView::setVisible(bool visible) {
   std::shared_ptr<PAGAnimator> animator = nullptr;
-  std::shared_ptr<PAGComposition> composition = nullptr;
+  int64_t duration = 0;
   {
-    std::lock_guard lock_guard(locker);
-    if (isVisible == visible) {
+    std::lock_guard lockGuard(locker);
+    if (released || isVisible == visible) {
       return;
     }
     isVisible = visible;
     animator = _animator;
-    composition = _composition;
+    duration = compositionDuration;
   }
   if (animator == nullptr) {
     return;
-  }
-  int64_t duration = 0;
-  if (visible && composition != nullptr) {
-    duration = composition->duration();
   }
   animator->setDuration(visible ? duration : 0);
   if (visible) {
@@ -753,236 +1040,212 @@ void JPAGImageView::setVisible(bool visible) {
 }
 
 void JPAGImageView::setScaleMode(PAGScaleMode scaleMode) {
-  std::lock_guard lock_guard(locker);
-  _scaleMode = scaleMode;
-  refreshMatrixFromScaleMode();
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  if (session != nullptr) {
+    session->setScaleMode(scaleMode);
+  }
 }
 
 PAGScaleMode JPAGImageView::scaleMode() {
-  return _scaleMode;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  return session == nullptr ? PAGScaleMode::LetterBox : session->getScaleMode();
 }
 
 void JPAGImageView::setMatrix(const class Matrix& matrix) {
-  std::lock_guard lock_guard(locker);
-  _matrix = ToTGFX(matrix);
-  _scaleMode = PAGScaleMode::None;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  if (session != nullptr) {
+    session->setMatrix(matrix);
+  }
 }
 
 class Matrix JPAGImageView::matrix() {
-  std::lock_guard lock_guard(locker);
-  return ToPAG(_matrix);
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  return session == nullptr ? Matrix::I() : session->getMatrix();
 }
 
 void JPAGImageView::setRenderScale(float renderScale) {
-  std::lock_guard lock_guard(locker);
-  if (renderScale <= 0.0 || renderScale > 1.0) {
-    renderScale = 1.0;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  if (_renderScale == renderScale) {
-    return;
+  if (session != nullptr) {
+    session->setRenderScale(renderScale);
   }
-  _renderScale = renderScale;
-  invalidDecoder();
 }
 
 float JPAGImageView::renderScale() {
-  return _renderScale;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  return session == nullptr ? 1.0f : session->getRenderScale();
 }
 
 void JPAGImageView::setCacheAllFramesInMemory(bool cacheAllFramesInMemory) {
-  std::lock_guard lock_guard(locker);
-  if (_cacheAllFramesInMemory == cacheAllFramesInMemory) {
-    return;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  _cacheAllFramesInMemory = cacheAllFramesInMemory;
-  if (!_cacheAllFramesInMemory) {
-    images.clear();
+  if (session != nullptr) {
+    session->setCacheAllFramesInMemory(cacheAllFramesInMemory);
   }
 }
 
 bool JPAGImageView::cacheAllFramesInMemory() {
-  return _cacheAllFramesInMemory;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  return session != nullptr && session->getCacheAllFramesInMemory();
 }
 
 bool JPAGImageView::flush() {
   auto animator = getAnimator();
-  if (animator == nullptr) {
-    return false;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
   }
-  auto progress = animator->progress();
-  std::lock_guard lock_guard(locker);
-  auto decoder = getDecoderInternal();
-  if (decoder == nullptr) {
-    return false;
-  }
-  return handleFrame(ProgressToFrame(progress, decoder->numFrames()));
-}
-
-void JPAGImageView::refreshMatrixFromScaleMode() {
-  if (_decoder == nullptr) {
-    return;
-  }
-  _matrix = ToTGFX(ApplyScaleMode(_scaleMode, _decoder->width() / _renderScale,
-                                  _decoder->height() / _renderScale, _width, _height));
-}
-
-bool JPAGImageView::handleFrame(Frame frame) {
-  auto decoder = getDecoderInternal();
-  if (!decoder) {
-    return false;
-  }
-  if (!decoder->checkFrameChanged(frame)) {
-    return true;
-  }
-  auto image = getImage(frame);
-  if (!image.second) {
-    return false;
-  }
-  currentBitmap = image.first;
-  currentImage = image.second;
-  return present(currentImage);
-}
-
-std::pair<tgfx::Bitmap, std::shared_ptr<tgfx::Image>> JPAGImageView::getImage(Frame frame) {
-  if (_cacheAllFramesInMemory && images.find(frame) != images.end()) {
-    return images[frame];
-  }
-
-  tgfx::Bitmap bitmap;
-  if (!bitmap.allocPixels(_decoder->width(), _decoder->height(), false, false)) {
-    return {{}, nullptr};
-  }
-  auto pixels = bitmap.lockPixels();
-  if (pixels == nullptr) {
-    return {{}, nullptr};
-  }
-  _decoder->readFrame(frame, pixels, bitmap.rowBytes());
-  bitmap.unlockPixels();
-  auto image = tgfx::Image::MakeFrom(bitmap);
-
-  if (image == nullptr) {
-    return {{}, nullptr};
-  }
-  if (_cacheAllFramesInMemory) {
-    images[frame] = {bitmap, image};
-  }
-  return {bitmap, image};
-}
-
-bool JPAGImageView::present(std::shared_ptr<tgfx::Image> image) {
-  if (!targetWindow && image) {
-    return false;
-  }
-  auto device = targetWindow->getDevice();
-  if (!device) {
-    return false;
-  }
-  auto context = device->lockContext();
-  if (!context) {
-    return false;
-  }
-  if (renderSurface == nullptr) {
-    renderSurface = tgfx::Surface::MakeFrom(context, targetWindow);
-  }
-  auto surface = renderSurface;
-  if (!surface) {
-    device->unlock();
-    return false;
-  }
-  auto canvas = surface->getCanvas();
-  if (!canvas) {
-    device->unlock();
-    return false;
-  }
-  canvas->clear();
-  tgfx::Matrix imageMatrix = tgfx::Matrix::MakeScale(1.0 / _renderScale);
-  imageMatrix.postConcat(_matrix);
-  canvas->save();
-  canvas->concat(imageMatrix);
-  canvas->drawImage(image);
-  canvas->restore();
-  context->flushAndSubmit();
-  context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
-  device->unlock();
-  return true;
+  return animator != nullptr && session != nullptr && session->updateFrame(animator->progress());
 }
 
 napi_value JPAGImageView::getCurrentPixelMap(napi_env env) {
-  std::lock_guard lock_guard(locker);
-  if (currentBitmap.isEmpty()) {
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
+  {
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      session = renderSession;
+    }
+  }
+  if (session == nullptr) {
     return nullptr;
   }
-
-  // create PixelMap
-  OhosPixelMapCreateOps ops;
-  ops.width = currentBitmap.width();
-  ops.height = currentBitmap.height();
-  ops.pixelFormat = currentBitmap.colorType() == tgfx::ColorType::RGBA_8888
-                        ? PIXEL_FORMAT_RGBA_8888
-                        : PIXEL_FORMAT_BGRA_8888;
+  auto bitmap = session->getCurrentBitmap();
+  if (bitmap.isEmpty()) {
+    return nullptr;
+  }
+  OhosPixelMapCreateOps ops = {};
+  ops.width = bitmap.width();
+  ops.height = bitmap.height();
+  ops.pixelFormat = bitmap.colorType() == tgfx::ColorType::RGBA_8888 ? PIXEL_FORMAT_RGBA_8888
+                                                                     : PIXEL_FORMAT_BGRA_8888;
   ops.alphaType = OHOS_PIXEL_MAP_ALPHA_TYPE_PREMUL;
   ops.editable = false;
-  napi_value pixelMap;
-  auto pixels = currentBitmap.lockPixels();
-  auto status = OH_PixelMap_CreatePixelMapWithStride(env, ops, pixels, currentBitmap.byteSize(),
-                                                     currentBitmap.rowBytes(), &pixelMap);
-  currentBitmap.unlockPixels();
-
-  // readPixels
+  auto pixels = bitmap.lockPixels();
+  if (pixels == nullptr) {
+    return nullptr;
+  }
+  napi_value pixelMap = nullptr;
+  auto status = OH_PixelMap_CreatePixelMapWithStride(env, ops, pixels, bitmap.byteSize(),
+                                                     bitmap.rowBytes(), &pixelMap);
+  bitmap.unlockPixels();
+  if (status != napi_ok || pixelMap == nullptr) {
+    return nullptr;
+  }
   auto nativePixelMap = OH_PixelMap_InitNativePixelMap(env, pixelMap);
-  if (!nativePixelMap) {
+  if (nativePixelMap == nullptr) {
     return nullptr;
   }
   void* pixelMapAddress = nullptr;
-  OH_PixelMap_AccessPixels(nativePixelMap, &pixelMapAddress);
-  currentBitmap.readPixels(currentBitmap.info(), pixelMapAddress);
-  OH_PixelMap_UnAccessPixels(nativePixelMap);
-  if (status == napi_ok) {
-    return pixelMap;
-  } else {
+  if (OH_PixelMap_AccessPixels(nativePixelMap, &pixelMapAddress) != IMAGE_RESULT_SUCCESS ||
+      pixelMapAddress == nullptr) {
     return nullptr;
   }
+  bitmap.readPixels(bitmap.info(), pixelMapAddress);
+  OH_PixelMap_UnAccessPixels(nativePixelMap);
+  return pixelMap;
 }
 
-void JPAGImageView::release() {
+void JPAGImageView::release(napi_env env) {
   XComponentHandler::RemoveListener(id);
   std::shared_ptr<PAGAnimator> animator = nullptr;
+  std::shared_ptr<JPAGImageViewRenderSession> session = nullptr;
   std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
-    std::lock_guard lock_guard(locker);
-    animator = std::move(_animator);
-    dispatcher = std::move(eventDispatcher);
+    std::lock_guard lockGuard(locker);
+    if (released) {
+      return;
+    }
+    released = true;
+    callbackGeneration++;
     isVisible = false;
-    clearSurface();
+    compositionDuration = 0;
+    animator = std::move(_animator);
+    session = std::move(renderSession);
+    dispatcher = std::move(eventDispatcher);
   }
   if (dispatcher != nullptr) {
-    dispatcher->release();
+    dispatcher->release(env);
   }
-  // A memory leak may occur if the timer is not cancelled upon release.
+  if (session != nullptr) {
+    session->release();
+  }
   if (animator != nullptr) {
-    animator->cancel();
+    tgfx::Task::Run([animator = std::move(animator)]() { animator->cancel(); });
   }
 }
 
-void JPAGImageView::setProgressCallback(napi_value callback) {
+void JPAGImageView::setProgressCallback(napi_env env, napi_value callback) {
   std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
-    std::lock_guard lock_guard(locker);
-    dispatcher = eventDispatcher;
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      dispatcher = eventDispatcher;
+    }
   }
   if (dispatcher != nullptr) {
-    dispatcher->setProgressCallback(callback);
+    dispatcher->setProgressCallback(env, callback);
   }
 }
 
-void JPAGImageView::setPlayingStateCallback(napi_value callback) {
+void JPAGImageView::setPlayingStateCallback(napi_env env, napi_value callback) {
   std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
-    std::lock_guard lock_guard(locker);
-    dispatcher = eventDispatcher;
+    std::lock_guard lockGuard(locker);
+    if (!released) {
+      dispatcher = eventDispatcher;
+    }
   }
   if (dispatcher != nullptr) {
-    dispatcher->setStateCallback(callback);
+    dispatcher->setStateCallback(env, callback);
   }
 }
 

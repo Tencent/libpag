@@ -19,7 +19,6 @@
 #include "JPAGView.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include <cstdint>
-#include <thread>
 #include "base/utils/UniqueID.h"
 #include "platform/ohos/GPUDrawable.h"
 #include "platform/ohos/JPAGLayerHandle.h"
@@ -62,13 +61,8 @@ class PAGAnimatorCancelTask : public tgfx::Task {
   std::shared_ptr<PAGAnimator> animator = nullptr;
 };
 
-static void RunJPAGViewTask(std::shared_ptr<tgfx::Task> task) {
-  tgfx::Task::Run(std::move(task));
-}
-
 static void SubmitJPAGViewTask(std::shared_ptr<tgfx::Task> task) {
-  std::thread worker(RunJPAGViewTask, std::move(task));
-  worker.detach();
+  tgfx::Task::Run(std::move(task));
 }
 
 class JPAGViewRenderSession : public std::enable_shared_from_this<JPAGViewRenderSession> {
@@ -462,7 +456,7 @@ static napi_value SetStateChangeCallback(napi_env env, napi_callback_info info) 
     return nullptr;
   }
 
-  view->setPlayingStateCallback(args[0]);
+  view->setPlayingStateCallback(env, args[0]);
   return nullptr;
 }
 
@@ -480,7 +474,7 @@ static napi_value SetProgressUpdateCallback(napi_env env, napi_callback_info inf
     return nullptr;
   }
 
-  view->setProgressCallback(args[0]);
+  view->setProgressCallback(env, args[0]);
   return nullptr;
 }
 
@@ -927,7 +921,7 @@ static napi_value Release(napi_env env, napi_callback_info info) {
   if (view == nullptr) {
     return nullptr;
   }
-  view->release();
+  view->release(env);
   return nullptr;
 }
 
@@ -1118,7 +1112,7 @@ void JPAGView::onSurfaceDestroyed() {
   }
 }
 
-void JPAGView::release() {
+void JPAGView::release(napi_env env) {
   XComponentHandler::RemoveListener(id);
   std::shared_ptr<PAGAnimator> currentAnimator = nullptr;
   std::shared_ptr<JPAGViewRenderSession> session = nullptr;
@@ -1135,7 +1129,7 @@ void JPAGView::release() {
     dispatcher = std::move(eventDispatcher);
   }
   if (dispatcher != nullptr) {
-    dispatcher->release();
+    dispatcher->release(env);
   }
   if (session != nullptr) {
     session->release();
@@ -1209,7 +1203,7 @@ void JPAGView::setVisible(bool visible) {
   }
 }
 
-void JPAGView::setProgressCallback(napi_value callback) {
+void JPAGView::setProgressCallback(napi_env env, napi_value callback) {
   std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
     std::lock_guard lock_guard(locker);
@@ -1218,11 +1212,11 @@ void JPAGView::setProgressCallback(napi_value callback) {
     }
   }
   if (dispatcher != nullptr) {
-    dispatcher->setProgressCallback(callback);
+    dispatcher->setProgressCallback(env, callback);
   }
 }
 
-void JPAGView::setPlayingStateCallback(napi_value callback) {
+void JPAGView::setPlayingStateCallback(napi_env env, napi_value callback) {
   std::shared_ptr<PAGViewEventDispatcher> dispatcher = nullptr;
   {
     std::lock_guard lock_guard(locker);
@@ -1231,7 +1225,7 @@ void JPAGView::setPlayingStateCallback(napi_value callback) {
     }
   }
   if (dispatcher != nullptr) {
-    dispatcher->setStateCallback(callback);
+    dispatcher->setStateCallback(env, callback);
   }
 }
 }  // namespace pag

@@ -203,10 +203,17 @@ class RenderCache : public Performance {
   };
 
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
+  struct SequenceFailureState {
+    uint32_t consecutiveFailures = 0;
+    int64_t retryAfterTime = 0;
+  };
+
   std::unordered_map<ID, std::shared_ptr<SequenceReadResult>> staticSequenceResults = {};
   std::unordered_map<ID, std::shared_ptr<SequenceReadResult>> usedStaticSequences = {};
+  std::unordered_set<ID> staticVideoSequenceIDs = {};
   std::unordered_map<ID, std::vector<SequenceImageQueue*>> sequenceCaches = {};
   std::unordered_map<ID, std::unordered_map<Frame, SequenceUsage>> usedSequences = {};
+  std::unordered_map<ID, SequenceFailureState> sequenceFailureStates = {};
   bool lastFrameHasSequenceDecodeFailure = false;
   bool _sequenceCacheInvalidated = false;
 
@@ -226,12 +233,19 @@ class RenderCache : public Performance {
                                                     Frame targetFrame);
   SequenceImageQueue* makeSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence);
   void clearAllSequenceCaches();
+  void clearVideoSequenceCaches();
+  void clearStaticSequenceCache(ID uniqueID);
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();
   void checkSequenceDecodeFailure();
+  bool canRetrySequence(ID uniqueID);
+  void recordSequenceFailure(ID uniqueID);
+  void recordSequenceSuccess(ID uniqueID);
 
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
+  std::shared_ptr<tgfx::Image> applyAssetMipmaps(ID assetID,
+                                                 std::shared_ptr<tgfx::Image> image);
   std::shared_ptr<tgfx::Image> getAssetImageInternal(ID assetID, const ImageProxy* proxy);
   void recordPerformance();
 

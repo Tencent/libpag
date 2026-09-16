@@ -48,13 +48,8 @@ class AnimatorUpdateTask : public tgfx::Task {
   bool setStartTime = false;
 };
 
-static void RunAnimatorUpdateTask(std::shared_ptr<tgfx::Task> task) {
-  tgfx::Task::Run(std::move(task));
-}
-
 static void SubmitAnimatorUpdateTask(std::shared_ptr<tgfx::Task> task) {
-  std::thread worker(RunAnimatorUpdateTask, std::move(task));
-  worker.detach();
+  tgfx::Task::Run(std::move(task));
 }
 
 class AnimationTicker {
@@ -277,9 +272,8 @@ void PAGAnimator::cancel() {
       asyncUpdateRequested = false;
       cancelAnimation();
     }
-    if (task != nullptr) {
-      extractAndWaitTask(lock);
-    }
+    // cancel() on an already stopped animator preserves its historical non-blocking behavior.
+    // An in-flight manual update remains serialized and observes any newer update request.
     return;
   }
   _isRunning = false;
