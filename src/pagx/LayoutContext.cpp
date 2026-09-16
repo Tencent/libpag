@@ -40,8 +40,8 @@ static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& 
                                                              const std::string& fontStyle) {
   auto namedTypeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   auto exactLocation = SystemFonts::FindFont(fontFamily, fontStyle);
-  bool exactStyleExists =
-      !exactLocation.path.empty() && (fontStyle.empty() || exactLocation.fontStyle == fontStyle);
+  bool exactStyleExists = namedTypeface != nullptr && !exactLocation.path.empty() &&
+                          (fontStyle.empty() || exactLocation.fontStyle == fontStyle);
   if (exactStyleExists) {
     // Preserve the platform's existing exact-style behavior. Some FreeType configurations cannot
     // load an installed exact face by name, and changing that behavior affects established layout
@@ -114,9 +114,14 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
   // Stage 5: System font lookup, including another available style when the requested one is
   // absent from the family.
   if (!fontFamily.empty()) {
-    auto typeface = ResolveLayoutTypeface(fontFamily, fontStyle);
-    if (typeface != nullptr) {
-      return typeface;
+    auto cacheKey = fontFamily + "\x1f" + fontStyle;
+    auto it = systemTypefaceCache.find(cacheKey);
+    if (it == systemTypefaceCache.end()) {
+      auto typeface = ResolveLayoutTypeface(fontFamily, fontStyle);
+      it = systemTypefaceCache.emplace(cacheKey, std::move(typeface)).first;
+    }
+    if (it->second != nullptr) {
+      return it->second;
     }
   }
 
