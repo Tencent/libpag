@@ -21,8 +21,8 @@
 // Every captured animation is rewritten into one canonical form:
 //   - a `@keyframes pagxAnim<N>` rule injected into a dedicated
 //     `<style id="__pagx_anim_keyframes">` block in `<head>`, restricted to
-//     the channels the runtime can play (`opacity`, `transform: translate`,
-//     `color`, `background-color`);
+//     the channels the runtime can play (`opacity`, 2D `transform`, colour,
+//     supported `filter` functions, and geometric `clip-path`);
 //   - an inline `animation: pagxAnim<N> <dur> <timing> <delay> <iter> <dir>`
 //     on the element.
 //
@@ -558,9 +558,9 @@ export function pagxNormalizeProps(
   if (col != null) out['color'] = col;
   const bg = pagxPickProp(raw, 'background-color', 'backgroundColor');
   if (bg != null) out['background-color'] = bg;
-  // `filter` (glow / shadow / blur). Kept verbatim (including `none`) so a
-  // none <-> drop-shadow(...) transition is preserved as a varying channel; the
-  // importer lowers it onto animatable DropShadowFilter / BlurFilter channels.
+  // `filter` (glow / shadow / blur / colour adjustment). Kept verbatim (including `none`) so a
+  // transition to or from the identity state is preserved as a varying channel; the importer
+  // lowers drop-shadow / blur onto their filter channels and approximates brightness with opacity.
   // An animated `box-shadow` glow is folded in as an equivalent drop-shadow so
   // it rides the same channel (the runtime has no box-shadow animation channel).
   const flt = pagxPickProp(raw, 'filter', 'filter');
@@ -1089,10 +1089,8 @@ export function pagxParseColorChannels(value: string): number[] | null {
 // stacks several offset-only shadows), because the importer lowers each onto its
 // own animated DropShadowFilter slot — so the decimator must watch every shadow or
 // it could drop a frame where only a secondary ghost moves. Every `blur()` still
-// folds onto a single radius. `none` (or no recognised function) yields an empty
-// shadow list so a none <-> shadow transition reads as an alpha / blur ramp from
-// zero. Unrecognised functions (brightness, contrast, …) are ignored (dropped, as
-// the runtime has no channel for them).
+// folds onto a single radius. `brightness()` is tracked as one scalar so the opacity-based
+// approximation in the importer keeps its interior peaks. `none` yields brightness 1.
 export interface PagxShadowChannels {
   fdx: number; fdy: number; fdb: number;
   fdr: number; fdg: number; fdbl: number; fda: number;
@@ -1100,11 +1098,21 @@ export interface PagxShadowChannels {
 export function pagxParseFilterChannels(value: string): {
   shadows: PagxShadowChannels[];
   fblur: number;
+  fbrightness: number;
 } {
   const s = (value || '').trim();
-  if (!s || s.toLowerCase() === 'none') return { shadows: [], fblur: 0 };
+  if (!s || s.toLowerCase() === 'none') return { shadows: [], fblur: 0, fbrightness: 1 };
   const shadows: PagxShadowChannels[] = [];
   let fblur = 0;
+  let fbrightness = 1;
+  const parseAmount = (raw: string, defaultValue: number): number | null => {
+    const token = raw.trim();
+    if (!token) return defaultValue;
+    if (!/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?%?$/i.test(token)) return null;
+    const parsed = parseFloat(token);
+    if (!isFinite(parsed)) return null;
+    return token.endsWith('%') ? parsed / 100 : parsed;
+  };
   // Paren-aware walk of `name( args )` functions (drop-shadow args themselves
   // contain `rgb(...)`, so a naive regex would mis-split them).
   let i = 0;
@@ -1138,10 +1146,13 @@ export function pagxParseFilterChannels(value: string): {
     } else if (name === 'blur') {
       const m = args.match(/-?[\d.]+/);
       if (m) fblur = Math.max(fblur, parseFloat(m[0]));
+    } else if (name === 'brightness') {
+      const v = parseAmount(args, 1);
+      if (v != null) fbrightness *= Math.max(0, v);
     }
     i = j;
   }
-  return { shadows, fblur };
+  return { shadows, fblur, fbrightness };
 }
 
 // Parse the x/y pixels of a normalised `translate(xpx, ypx)` string (the shape
@@ -1174,7 +1185,9 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
   });
   let maxShadowSlots = 0;
   for (const f of filterByStop) {
-    if (f) maxShadowSlots = Math.max(maxShadowSlots, f.shadows.length);
+    if (f) {
+      maxShadowSlots = Math.max(maxShadowSlots, f.shadows.length);
+    }
   }
   for (let i = 0; i < stops.length; i++) {
     const p = stops[i].props || {};
@@ -1252,6 +1265,7 @@ export function pagxStopScalarSeries(stops: PagxAnimStop[]): Record<string, numb
         put('fd' + k + 'a', i, sh ? sh.fda : 0);
       }
       put('fblur', i, f.fblur);
+      put('fbrightness', i, f.fbrightness);
     }
     // clip-path is emitted as `path("<d>")`; expose each coordinate number as its own scalar
     // channel (cp0, cp1, ...) so RDP keeps the frames where the mask geometry actually moves. All
@@ -2124,10 +2138,10 @@ function pagxReadAnimChannels(
   el: Element,
   cs: CSSStyleDeclaration,
 ): Record<string, string | null> {
-  // `filter` carries glow / shadow / blur animations (e.g. a click "halo"
-  // authored as `filter: drop-shadow(...) ...`). Kept verbatim as the computed
-  // string; the importer maps a varying drop-shadow / blur onto the runtime's
-  // animatable DropShadowFilter / BlurFilter channels. An animated `box-shadow`
+  // `filter` carries glow / shadow / blur / colour-adjustment animations (e.g. a click "halo"
+  // authored as `filter: drop-shadow(...) ...`). Kept verbatim as the computed string; the
+  // importer maps drop-shadow / blur onto their filter channels and approximates brightness with
+  // opacity. An animated `box-shadow`
   // glow (e.g. a `.on` class toggled by JS) has no channel of its own, so it is
   // folded into the filter channel here as an equivalent drop-shadow (constant
   // shadows stay flat and get dropped by pagxWhichVary — see pagxBoxShadowToFilter).

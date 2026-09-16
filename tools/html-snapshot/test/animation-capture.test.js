@@ -294,9 +294,9 @@ describe('pagxParseColorChannels', () => {
 });
 
 describe('pagxParseFilterChannels', () => {
-  test('none / empty yields no shadows', () => {
-    expect(pagxParseFilterChannels('none')).toEqual({ shadows: [], fblur: 0 });
-    expect(pagxParseFilterChannels('')).toEqual({ shadows: [], fblur: 0 });
+  test('none / empty yields neutral filter channels', () => {
+    expect(pagxParseFilterChannels('none')).toEqual({ shadows: [], fblur: 0, fbrightness: 1 });
+    expect(pagxParseFilterChannels('')).toEqual({ shadows: [], fblur: 0, fbrightness: 1 });
   });
   test('parses a color-first drop-shadow (computed serialization)', () => {
     const f = pagxParseFilterChannels('drop-shadow(rgb(40, 224, 208) 0px 0px 16px)');
@@ -322,10 +322,11 @@ describe('pagxParseFilterChannels', () => {
     expect(f.shadows[1].fda).toBeCloseTo(0.4, 5);
     expect([f.shadows[1].fdr, f.shadows[1].fdg, f.shadows[1].fdbl]).toEqual([255, 0, 90]);
   });
-  test('captures a blur() radius and ignores unsupported functions', () => {
+  test('captures blur and brightness together', () => {
     const f = pagxParseFilterChannels('blur(5px) brightness(1.2)');
     expect(f.fblur).toBe(5);
     expect(f.shadows).toEqual([]);
+    expect(f.fbrightness).toBeCloseTo(1.2, 6);
   });
 });
 

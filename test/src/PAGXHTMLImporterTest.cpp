@@ -6737,6 +6737,83 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationFilterBlurMapsToBlurChannels) {
   EXPECT_NEAR(maxBlur, 8.0f, 0.01f);
 }
 
+// CSS brightness is approximated with a dedicated nested Layer alpha so it composes with an
+// independently authored opacity channel. Opacity cannot brighten, so values above one clamp to
+// one while dimming values retain their curve.
+PAG_TEST(PAGXHTMLImporterTest, AnimationFilterBrightnessMapsToNestedOpacity) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes flash {
+        0%   { filter: brightness(0.6); }
+        50%  { filter: brightness(1.4); }
+        100% { filter: brightness(0.6); }
+      }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div id="bulb" style="width:50px;height:50px;background-color:#FFD600;
+                             animation:flash 1s linear infinite"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* layer = doc->layers.front()->children.front();
+  ASSERT_EQ(layer->children.size(), 1u);
+  auto* brightnessLayer = layer->children.front();
+  auto* object = FindObjectByTarget(animation, brightnessLayer->id);
+  ASSERT_NE(object, nullptr);
+  ASSERT_EQ(object->channels.size(), 1u);
+  auto* channel = dynamic_cast<pagx::TypedChannel<float>*>(object->channels.front());
+  ASSERT_NE(channel, nullptr);
+  EXPECT_EQ(channel->name, "alpha");
+  ASSERT_EQ(channel->keyframes.size(), 3u);
+  EXPECT_NEAR(channel->keyframes[0].value, 0.6f, 0.001f);
+  EXPECT_NEAR(channel->keyframes[1].value, 1.0f, 0.001f);
+  EXPECT_NEAR(channel->keyframes[2].value, 0.6f, 0.001f);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "subset:animation-filter-approximated"));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, AnimationBrightnessComposesWithOpacityAndWarnsForOtherFilters) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes adjust {
+        0%   { opacity: 0.5; filter: none; }
+        100% { opacity: 0.8; filter: brightness(0.5) saturate(0); }
+      }
+    </style></head>
+    <body style="width:100px;height:100px">
+      <div style="width:50px;height:50px;background-color:#40A0FF;
+                  animation:adjust 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* layer = doc->layers.front()->children.front();
+  ASSERT_EQ(layer->children.size(), 1u);
+  auto* brightnessLayer = layer->children.front();
+  auto* opacityObject = FindObjectByTarget(animation, layer->id);
+  auto* brightnessObject = FindObjectByTarget(animation, brightnessLayer->id);
+  ASSERT_NE(opacityObject, nullptr);
+  ASSERT_NE(brightnessObject, nullptr);
+  auto* opacityChannel = dynamic_cast<pagx::TypedChannel<float>*>(opacityObject->channels.front());
+  auto* brightnessChannel =
+      dynamic_cast<pagx::TypedChannel<float>*>(brightnessObject->channels.front());
+  ASSERT_NE(opacityChannel, nullptr);
+  ASSERT_NE(brightnessChannel, nullptr);
+  EXPECT_NEAR(opacityChannel->keyframes.front().value, 0.5f, 0.001f);
+  EXPECT_NEAR(opacityChannel->keyframes.back().value, 0.8f, 0.001f);
+  EXPECT_NEAR(brightnessChannel->keyframes.front().value, 1.0f, 0.001f);
+  EXPECT_NEAR(brightnessChannel->keyframes.back().value, 0.5f, 0.001f);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "saturate(0)"));
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationAlternateDirectionIsPingPong) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;

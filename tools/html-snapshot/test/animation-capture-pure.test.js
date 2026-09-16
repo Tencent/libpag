@@ -7,6 +7,7 @@ const {
   pagxParseFilterChannels,
   pagxParseTranslateXY,
   pagxStopScalarSeries,
+  pagxDecimateStops,
   pagxBuildCanonicalAnimation,
   pagxClipFullBoxD,
   pagxResolveClipNoneSamples,
@@ -84,9 +85,9 @@ describe('pagxTransformToMatrix6', () => {
 });
 
 describe('pagxParseFilterChannels', () => {
-  test('none / empty yields no shadows and no blur', () => {
-    expect(pagxParseFilterChannels('none')).toEqual({ shadows: [], fblur: 0 });
-    expect(pagxParseFilterChannels('')).toEqual({ shadows: [], fblur: 0 });
+  test('none / empty yields neutral filter channels', () => {
+    expect(pagxParseFilterChannels('none')).toEqual({ shadows: [], fblur: 0, fbrightness: 1 });
+    expect(pagxParseFilterChannels('')).toEqual({ shadows: [], fblur: 0, fbrightness: 1 });
   });
 
   test('a single drop-shadow captures colour, offsets and blur', () => {
@@ -116,8 +117,13 @@ describe('pagxParseFilterChannels', () => {
     expect(f.shadows).toEqual([]);
   });
 
-  test('an unrecognised function (brightness) is ignored', () => {
-    expect(pagxParseFilterChannels('brightness(1.5)')).toEqual({ shadows: [], fblur: 0 });
+  test('brightness is tracked as a scalar product', () => {
+    const f = pagxParseFilterChannels('brightness(1.5)');
+    expect(f.shadows).toEqual([]);
+    expect(f.fblur).toBe(0);
+    expect(f.fbrightness).toBeCloseTo(1.5, 6);
+    expect(pagxParseFilterChannels('brightness(80%) brightness(0.5)').fbrightness)
+      .toBeCloseTo(0.4, 6);
   });
 });
 
@@ -137,6 +143,17 @@ describe('pagxParseTranslateXY', () => {
 });
 
 describe('pagxStopScalarSeries', () => {
+  test('tracks brightness so opacity-approximation curves keep interior samples', () => {
+    const stops = [
+      { offset: 0, props: { filter: 'brightness(0.6)' } },
+      { offset: 0.5, props: { filter: 'brightness(1.4)' } },
+      { offset: 1, props: { filter: 'brightness(0.6)' } },
+    ];
+    const series = pagxStopScalarSeries(stops);
+    expect(series.fbrightness).toEqual([0.6, 1.4, 0.6]);
+    expect(pagxDecimateStops(stops).map((s) => s.offset)).toEqual([0, 0.5, 1]);
+  });
+
   test('opacity plus a matrix / translate transform decompose per affine channel', () => {
     const stops = [
       { offset: 0, props: { opacity: '0.25', transform: 'matrix(2, 0, 0, 3, 10, 20)' } },

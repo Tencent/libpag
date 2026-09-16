@@ -114,7 +114,8 @@ that actually animate) so still cases don't inflate the score.
 
 - The runtime plays only the channels the subset supports — `opacity`, `transform`
   (translate via `x`/`y`, and scale / rotate / skew / `matrix` via the full affine `matrix`
-  channel), `color`, `background-color`. 3D transforms (`matrix3d` / `rotate3d` / `perspective`)
+  channel), `color`, `background-color`, filter `drop-shadow` / `blur`, opacity-approximated
+  `brightness`, and geometric `clip-path`. 3D transforms (`matrix3d` / `rotate3d` / `perspective`)
   and layout-affecting animations still diff against a baseline that *does* show them, so those
   cases stay bounded below 1.0 SSIM by design (same philosophy as the static eval, which strips
   JS and subpixel detail).

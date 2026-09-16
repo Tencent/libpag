@@ -187,7 +187,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
-| `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>` |
+| `filter: blur(X) drop-shadow(X Y B C)` | chain of `<BlurFilter>` / `<DropShadowFilter>`; static colour adjustments use `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
 | `transform-origin` | forwarded; honoured when it resolves to the box center (`50% 50%`, `center`, `center center`, or px values equal to the box center); other origins warn |
@@ -496,6 +496,7 @@ Everything else inside a `@keyframes` stop is warned and dropped
 | `color` / `background-color` | `color` | the `SolidColor` inside the element's `Fill` | color |
 | `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | a `DropShadowFilter` on the element's `Layer` | float / color |
 | `filter: blur(...)` | `blurX` / `blurY` | a `BlurFilter` on the element's `Layer` | float |
+| `filter: brightness(...)` | `alpha` (clamped to `[0,1]`) | a generated nested `Layer` | float |
 | `clip-path` (geometric `inset`/`circle`/`ellipse`/`polygon`/`path`) | `point{i}.x` / `point{i}.y` | a `Path` inside a contour-mask `Layer` | float |
 
 `transform` is parsed per keyframe into a 2D affine matrix (single functions and space-separated
@@ -519,15 +520,18 @@ The animated element's `Layer` is given a generated `id` (prefix `anim`) when it
 element to paint a solid `background-color` (or, for text, a solid `color`); when no `SolidColor`
 fill is present the `color` channel is dropped (`subset:animation-unsupported-property`).
 
-**Filter animation.** A `filter` chain animated between `none` and `drop-shadow(...)` / `blur(...)`
+**Filter animation.** A `filter` chain animated between `none` and supported filter functions
 (or an animated `box-shadow`, which the capture layer folds into an equivalent `drop-shadow`) lowers
-onto the runtime's animatable filter nodes. Every `drop-shadow` in the chain is kept in author order
+onto runtime animation channels. Every `drop-shadow` in the chain is kept in author order
 — a "chromatic aberration" stack of several offset-only shadows becomes one animated
 `DropShadowFilter` per slot, so the whole stack composites rather than a single representative. A
 stop that omits a given shadow slot drives that slot's `color` alpha to zero so the ghost fades in
 and out instead of snapping. `blur(...)` folds onto a single `BlurFilter` radius. An existing static
 filter node on the element is reused as the animation target; otherwise a zero/transparent baseline
-node is minted so fill-mode can restore the "off" state.
+node is minted so fill-mode can restore the "off" state. `brightness()` is approximated by an
+independent nested Layer opacity so it composes with authored `opacity`; values above `1` clamp to
+`1` because opacity cannot amplify RGB. Other animated colour-adjustment functions are dropped with
+`subset:animation-unsupported-property`.
 
 **Clip-path animation.** A `clip-path` animated through geometric shapes (`inset()` / `circle()` /
 `ellipse()` / `polygon()` / `path()`) becomes an animated contour mask — a wipe / reveal / iris.
@@ -618,6 +622,7 @@ idiom `animation: draw 1s …, fill 0.4s …` is the common case).
 | Code | Meaning |
 |------|---------|
 | `subset:animation-unsupported-property` | a `@keyframes` declaration targets a property/channel the runtime cannot play; dropped |
+| `subset:animation-filter-approximated` | animated `brightness()` is mapped to opacity and values above 1 are clamped |
 | `subset:animation-unknown-keyframes` | `animation` references a `@keyframes` name that was not defined; the animation is dropped |
 | `subset:animation-finite-count` | `animation-iteration-count` is a finite value > 1; coerced to `once` |
 | `subset:animation-multiple` | a comma-separated `animation` list was truncated to its first entry |

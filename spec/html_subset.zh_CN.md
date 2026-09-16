@@ -174,7 +174,7 @@
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
-| `filter: blur(X) drop-shadow(X Y B C)` | `<BlurFilter>` / `<DropShadowFilter>` 链 |
+| `filter: blur(X) drop-shadow(X Y B C)` | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | 映射到 `Layer.matrix`。支持单函数形式（`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`）以及 `matrix3d(...)`（投影为其 2D 仿射分量）；复合链与其它 3D 变体（`rotate3d`/`perspective`）告警丢弃 |
 | `transform-origin` | 透传；当其等于盒子中心（`50% 50%`、`center`、`center center`，或等于盒心的 px 值）时被尊重，其它原点告警 |
@@ -457,6 +457,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | `color` / `background-color` | `color` | 元素 `Fill` 内的 `SolidColor` | color |
 | `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | 元素 `Layer` 上的 `DropShadowFilter` | float / color |
 | `filter: blur(...)` | `blurX` / `blurY` | 元素 `Layer` 上的 `BlurFilter` | float |
+| `filter: brightness(...)` | `alpha`（钳制到 `[0,1]`） | 自动生成的嵌套 `Layer` | float |
 | `clip-path`（几何形式 `inset`/`circle`/`ellipse`/`polygon`/`path`） | `point{i}.x` / `point{i}.y` | 轮廓 mask `Layer` 内的 `Path` | float |
 
 `transform` 会逐关键帧解析为一个 2D 仿射矩阵（单函数与空格分隔的复合链——`translate[X|Y]` /
@@ -476,12 +477,15 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 `<Object target="…">` 能引用它。`color` 动画要求元素绘制了一个实色 `background-color`（对文本则是实色
 `color`）；当没有 `SolidColor` 填充时，`color` 通道被丢弃（`subset:animation-unsupported-property`）。
 
-**滤镜动画。** 在 `none` 与 `drop-shadow(...)` / `blur(...)` 之间做动画的 `filter` 链（或做动画的
+**滤镜动画。** 在 `none` 与受支持滤镜函数之间做动画的 `filter` 链（或做动画的
 `box-shadow`，捕获层会把它折叠为等价的 `drop-shadow`）会被下沉到运行时可动画的滤镜节点。链中的每个
 `drop-shadow` 都按作者顺序保留——一组由多个纯偏移阴影组成的"色差"堆叠会变成每个槽一个可动画的
 `DropShadowFilter`，从而整叠一起合成，而非只取一个代表。某个停靠点若省略了某个阴影槽，会把该槽的
 `color` 透明度驱动为零，使残影淡入淡出而非突变。`blur(...)` 折叠到单个 `BlurFilter` 半径。元素上已有的
 静态滤镜节点会被复用作动画目标；否则会新建一个零值/透明的基线节点，以便 fill-mode 能恢复"关闭"状态。
+`brightness()` 使用独立嵌套 Layer 的 opacity 近似，因此可与作者声明的 `opacity` 正确相乘；大于 `1` 的值
+会钳制为 `1`，因为 opacity 无法增强 RGB。其它颜色调整动画会以
+`subset:animation-unsupported-property` 告警并丢弃。
 
 **clip-path 动画。** 在几何形状（`inset()` / `circle()` / `ellipse()` / `polygon()` / `path()`）之间做
 动画的 `clip-path` 会变成一个可动画的轮廓 mask——擦除 / 揭示 / 光圈效果。这比静态路径更宽泛：静态路径
@@ -563,6 +567,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | 代码 | 含义 |
 |------|------|
 | `subset:animation-unsupported-property` | 某个 `@keyframes` 声明面向运行时无法回放的属性/通道；已丢弃 |
+| `subset:animation-filter-approximated` | 动画 `brightness()` 被映射为 opacity，大于 1 的值会被钳制 |
 | `subset:animation-unknown-keyframes` | `animation` 引用了未定义的 `@keyframes` 名称；该动画被丢弃 |
 | `subset:animation-finite-count` | `animation-iteration-count` 是有限值 > 1；被强制为 `once` |
 | `subset:animation-multiple` | 以逗号分隔的 `animation` 列表被截断为第一项 |

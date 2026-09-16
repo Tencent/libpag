@@ -1093,6 +1093,7 @@ bool HTMLAnimationBuilder::buildForElement(
 
   // Per-channel keyframe collection.
   std::vector<Keyframe<float>> alphaKeys;
+  std::vector<Keyframe<float>> brightnessAlphaKeys;
   std::vector<Keyframe<float>> xKeys;
   std::vector<Keyframe<float>> yKeys;
   std::vector<Keyframe<Matrix>> matrixKeys;
@@ -1135,8 +1136,12 @@ bool HTMLAnimationBuilder::buildForElement(
     std::vector<ShadowStop> shadows;  // author (chain) order; empty == no shadow
     bool hasBlur = false;
     float blur = 0.0f;
+    bool hasBrightness = false;
+    float brightness = 1.0f;
   };
   std::vector<FilterStop> filterStops;
+  bool warnedUnsupportedFilter = false;
+  bool warnedBrightnessApproximation = false;
 
   // Per-keyframe clip-path geometry (animated contour mask). The capture pipeline normalizes every
   // clip-path shape to a canonical `path("d")` in border-box pixels; each stop stores that path's
@@ -1210,6 +1215,34 @@ bool HTMLAnimationBuilder::buildForElement(
             } else if (st.kind == HTMLValueParser::FilterStep::Kind::Blur) {
               fs.hasBlur = true;
               fs.blur = std::max(fs.blur, st.blurX);
+            } else if (st.kind == HTMLValueParser::FilterStep::Kind::ColorMatrix) {
+              std::string filterName;
+              std::string filterArgs;
+              if (ParseCssFunctionCall(st.raw, filterName, filterArgs) &&
+                  ToLower(filterName) == "brightness") {
+                // PAGX has no animatable ColorMatrixFilter channel. Approximate brightness through
+                // a nested Layer alpha: values below one dim correctly; values above one clamp to
+                // one because opacity cannot amplify colour. Multiple brightness() functions in a
+                // chain multiply, matching CSS filter composition for this operation.
+                fs.hasBrightness = true;
+                fs.brightness *= st.matrix[0];
+                if (!warnedBrightnessApproximation) {
+                  _diagnostics.warn(
+                      "html: animated filter brightness() is approximated with opacity; values "
+                      "above 1 are clamped [subset:animation-filter-approximated]");
+                  warnedBrightnessApproximation = true;
+                }
+              } else if (!warnedUnsupportedFilter) {
+                _diagnostics.warn("html: animated filter component '" + st.raw +
+                                  "' is not supported; dropped "
+                                  "[subset:animation-unsupported-property]");
+                warnedUnsupportedFilter = true;
+              }
+            } else if (!warnedUnsupportedFilter) {
+              _diagnostics.warn("html: animated filter component '" + st.raw +
+                                "' is not supported; dropped "
+                                "[subset:animation-unsupported-property]");
+              warnedUnsupportedFilter = true;
             }
           }
         }
@@ -1301,16 +1334,28 @@ bool HTMLAnimationBuilder::buildForElement(
     ExpandSteps(colorKeys, easing.stepCount, easing.stepJump);
   }
 
-  // Whether the filter channel carries any playable motion: at least one stop must actually name a
-  // drop-shadow / blur (a timeline of only `none` varies nowhere and is skipped by the capture, but
-  // guard here too so an all-`none` filter never mints an empty filter node).
+  // Whether the filter channel carries playable motion: at least one stop must name a drop-shadow,
+  // blur, or a brightness value that survives the opacity clamp. A timeline of only `none` varies
+  // nowhere and is skipped by capture, but guard here too so it never mints an empty target.
   bool filterHasShadow = false;
   bool filterHasBlur = false;
+  bool filterHasBrightness = false;
   size_t maxShadows = 0;
   for (const auto& fs : filterStops) {
     if (!fs.shadows.empty()) filterHasShadow = true;
     maxShadows = std::max(maxShadows, fs.shadows.size());
     if (fs.hasBlur) filterHasBlur = true;
+    float brightness = fs.hasBrightness ? std::clamp(fs.brightness, 0.0f, 1.0f) : 1.0f;
+    brightnessAlphaKeys.push_back({fs.time, brightness, interp, {}, {}});
+    if (brightness < 1.0f) filterHasBrightness = true;
+  }
+  if (!filterHasBrightness) {
+    brightnessAlphaKeys.clear();
+  } else {
+    ApplyBezierHandles(brightnessAlphaKeys, interp, easing.x1, easing.y1, easing.x2, easing.y2);
+    if (easing.kind == ResolvedEasing::Kind::Steps) {
+      ExpandSteps(brightnessAlphaKeys, easing.stepCount, easing.stepJump);
+    }
   }
 
   // An animated clip-path is usable only when every stop resolved to a compatible geometry (same
@@ -1325,7 +1370,8 @@ bool HTMLAnimationBuilder::buildForElement(
   }
 
   if (alphaKeys.empty() && xKeys.empty() && yKeys.empty() && matrixKeys.empty() &&
-      colorKeys.empty() && !filterHasShadow && !filterHasBlur && !clipUsable) {
+      colorKeys.empty() && !filterHasShadow && !filterHasBlur && !filterHasBrightness &&
+      !clipUsable) {
     return false;
   }
 
@@ -1397,6 +1443,7 @@ bool HTMLAnimationBuilder::buildForElement(
   ApplyFillMode(xKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
   ApplyFillMode(yKeys, spec.fillMode, baselineXY, loopOnce, activeEnd);
   ApplyFillMode(matrixKeys, spec.fillMode, matrixChannelBaseline, loopOnce, activeEnd);
+  ApplyFillMode(brightnessAlphaKeys, spec.fillMode, 1.0f, loopOnce, activeEnd);
   // Color channel fill-mode is conditional on having a target SolidColor; if the lookup failed
   // the channel is dropped below, so the fill-mode mutation would be wasted work and the
   // diagnostic message would be misleading.
@@ -1485,6 +1532,25 @@ bool HTMLAnimationBuilder::buildForElement(
     matrixTarget = pivotTarget;
   }
 
+  // Keep brightness-as-opacity independent from the element's authored opacity and transform
+  // channels by placing it on a dedicated visual wrapper. SplitForTransformAnimation already
+  // moves the complete rendered subtree; restore the transform on the outer target so existing
+  // matrix/x/y animation bindings retain their original coordinate space.
+  Layer* brightnessTarget = nullptr;
+  if (!brightnessAlphaKeys.empty()) {
+    Matrix savedMatrix = visualTarget->matrix;
+    Matrix3D savedMatrix3D = visualTarget->matrix3D;
+    bool savedPreserve3D = visualTarget->preserve3D;
+    brightnessTarget = SplitForTransformAnimation(visualTarget, _document, _idAllocator);
+    visualTarget->matrix = savedMatrix;
+    visualTarget->matrix3D = savedMatrix3D;
+    visualTarget->preserve3D = savedPreserve3D;
+    brightnessTarget->matrix = Matrix::Identity();
+    brightnessTarget->matrix3D = {};
+    brightnessTarget->preserve3D = false;
+    visualTarget = brightnessTarget;
+  }
+
   // Layer-targeted alpha channel — stays on the original `layer` so the existing id keeps
   // identifying the alpha-animated element.
   if (!alphaKeys.empty()) {
@@ -1531,6 +1597,16 @@ bool HTMLAnimationBuilder::buildForElement(
     animation->objects.push_back(object);
   }
 
+  if (brightnessTarget != nullptr) {
+    auto* object = _document->makeNode<AnimationObject>();
+    object->target = brightnessTarget->id;
+    auto* channel = _document->makeNode<TypedChannel<float>>();
+    channel->name = "alpha";
+    channel->keyframes = std::move(brightnessAlphaKeys);
+    object->channels.push_back(channel);
+    animation->objects.push_back(object);
+  }
+
   // SolidColor-targeted channel (color / background-color). The fill was located before
   // SplitForTransformAnimation moved contents into the inner wrapper; the SolidColor pointer
   // remains stable across the split so the cached `baselineSolid` is reused as the channel
@@ -1554,13 +1630,10 @@ bool HTMLAnimationBuilder::buildForElement(
     }
   }
 
-  // Filter channels (glow / shadow / blur). The runtime animates the parameters of a
-  // DropShadowFilter (offsetX/offsetY/blurX/blurY/color) and a BlurFilter (blurX/blurY) in place, so
-  // a `filter: drop-shadow(...)` / `blur(...)` keyframe animation lowers onto those channels. The
-  // filter node lives on whichever layer holds the visual content after transform wrappers are
-  // introduced. An existing static filter node is reused as the animation target; otherwise a
-  // zero/transparent baseline node is minted so the channel has something to drive and fill-mode
-  // can restore "off".
+  // Filter channels. Drop-shadow / blur parameters map to their native scalar channels. The filter
+  // nodes live on whichever layer still owns the visual content after transform/opacity wrappers
+  // are introduced. Existing static filters are reused in slot order; missing slots are minted
+  // with their off value so fill-mode can restore the underlying presentation.
   if (filterHasShadow || filterHasBlur) {
     Layer* fxLayer = visualTarget;
 
