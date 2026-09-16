@@ -19,6 +19,8 @@
 /* global globalThis */
 // Polyfills for WeChat Mini Program environment: registers WXWebAssembly as WebAssembly
 // and ensures globalThis/window are available for Emscripten module initialization.
+// Any new entry point that loads the wasm module must import this file first, otherwise the
+// Expat crash described below will resurface.
 
 declare const WXWebAssembly: typeof WebAssembly;
 declare const globalThis: any;
@@ -29,8 +31,10 @@ globalThis.isWxWebAssembly = true;
 window = globalThis;
 
 // WeChat Mini Program has no global crypto, so Expat aborts while requesting entropy during
-// PAGX parsing. Fall back to Math.random(): the hash salt only needs to be unpredictable, not
-// cryptographically secure.
+// PAGX parsing. The seed salts Expat's internal hash table to mitigate hash-flooding DoS.
+// Math.random() is not cryptographically secure, but that is acceptable under the mini program
+// threat model: a malicious PAGX can at worst deny service to the user's own mini program
+// instance, and this fallback is the remedy Emscripten itself suggests in its abort message.
 if (!globalThis.crypto || typeof globalThis.crypto.getRandomValues !== 'function') {
   const getRandomValues = (array: any) => {
     if (array && ArrayBuffer.isView(array)) {
