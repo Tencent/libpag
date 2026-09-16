@@ -12699,4 +12699,138 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceJustifyUsesPercentageChildrenAndGap
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: flex-start"));
 }
 
+// HTMLSubsetTransformer — SpaceEvenlyPaddingCompensation
+//
+// `space-evenly` puts `g = free / (n + 1)` before, between and after the children. Consumers that
+// fold it onto the `space-between` formula render both ends flush with the padding box, so the
+// pass rewrites the container to `space-between` with `g` added to the main-axis padding. The
+// rewritten form is what every consumer renders identically, including PAGX itself.
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyRewrittenToBetweenWithPadding) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:300px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // free = 300 - 150 = 150, step = 150 / (2 + 1) = 50.
+  EXPECT_TRUE(StyleContains(container, "padding: 0px 50px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationAddsToExistingPadding) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:320px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;padding:10px;"
+      "width:320px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // free = 320 - 20 - 150 = 150, step = 50; vertical padding stays 10.
+  EXPECT_TRUE(StyleContains(container, "padding: 10px 60px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationUsesBlockAxisForColumn) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:100px;height:300px\">"
+      "<div style=\"display:flex;flex-direction:column;justify-content:space-evenly;"
+      "width:100px;height:300px\">"
+      "<div style=\"height:100px\"></div><div style=\"height:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // Column flex pads the block axis: 150 / 3 = 50 on top and bottom.
+  EXPECT_TRUE(StyleContains(container, "padding: 50px 0px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationHandlesSingleChild) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:100px;height:20px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:100px;height:20px\">"
+      "<div style=\"width:20px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // A lone child is centred: free = 80, step = 80 / 2 = 40.
+  EXPECT_TRUE(StyleContains(container, "padding: 0px 40px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsOverflowingLine) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:100px;height:20px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:100px;height:20px\">"
+      "<div style=\"width:60px\"></div><div style=\"width:60px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // The overflow pass owns this container and pins it to flex-start.
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-justify-collapsed-on-overflow"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+}
+
+// PAGX lays flex containers out as a single line — `flex-wrap` is dropped by the subset filter and
+// the runtime has no multi-line model — so the single-line equivalence still holds for containers
+// that declared `flex-wrap` in the source.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationTreatsWrapContainerAsSingleLine) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;flex-wrap:wrap;justify-content:space-evenly;"
+      "width:300px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  EXPECT_TRUE(StyleContains(container, "padding: 0px 50px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsPercentageChildren) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:300px;height:100px\">"
+      "<div style=\"width:30%\"></div><div style=\"width:20px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // A percentage child re-resolves against the compensated content box, so the rewrite would
+  // change its size instead of preserving the layout.
+  EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: space-evenly"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsFlexGrowChild) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:300px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"flex:1;width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: space-evenly"));
+}
+
 }  // namespace pag
