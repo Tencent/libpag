@@ -1893,20 +1893,23 @@ static bool RectsOverlap(const SpatialRect& a, const SpatialRect& b) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
-// Sibling overlap needs a small tolerance because auto-layout rounds child positions to integers
-// while child sizes can carry fractional text-measurement remainders. Adjacent siblings may then
-// appear to overlap by a fraction of a pixel even though the layout is visually correct.
+// Auto-layout snaps geometry to whole pixels while sizes stay fractional: LayoutNode::layoutChildren
+// rounds every child position with std::round and ceils sizes derived from constraints or percent,
+// whereas authored and content-measured sizes keep their exact values. Two related nodes can
+// therefore disagree by just under one pixel — an adjacent pair overlaps, or a child pokes past its
+// parent — without any visual defect, so cross-node comparisons need to tolerate a full pixel.
+static constexpr float kLayoutSnapTolerance = 1.0f;
+
 static bool SiblingsOverlap(const SpatialRect& a, const SpatialRect& b) {
-  constexpr float TOLERANCE = 0.5f;
-  return a.x + TOLERANCE < b.x + b.width && a.x + a.width > b.x + TOLERANCE &&
-         a.y + TOLERANCE < b.y + b.height && a.y + a.height > b.y + TOLERANCE;
+  return a.x + kLayoutSnapTolerance < b.x + b.width && a.x + a.width > b.x + kLayoutSnapTolerance &&
+         a.y + kLayoutSnapTolerance < b.y + b.height && a.y + a.height > b.y + kLayoutSnapTolerance;
 }
 
 static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
-  static constexpr float TOLERANCE = 0.5f;
-  return (child.x + TOLERANCE) >= parent.x && (child.y + TOLERANCE) >= parent.y &&
-         (child.x + child.width) <= (parent.x + parent.width + TOLERANCE) &&
-         (child.y + child.height) <= (parent.y + parent.height + TOLERANCE);
+  return (child.x + kLayoutSnapTolerance) >= parent.x &&
+         (child.y + kLayoutSnapTolerance) >= parent.y &&
+         (child.x + child.width) <= (parent.x + parent.width + kLayoutSnapTolerance) &&
+         (child.y + child.height) <= (parent.y + parent.height + kLayoutSnapTolerance);
 }
 
 static bool ElementsHaveLeafContent(const std::vector<Element*>& elements);
