@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Device.h"
 
@@ -41,10 +40,12 @@ class Drawable {
   virtual ~Drawable() = default;
 
   /**
-   * Creates a Drawable that takes ownership of the given tgfx::Surface. The surface is returned
-   * from getSurface() and kept alive for the lifetime of the Drawable.
+   * Creates a Drawable that renders into the given tgfx::Surface on the given tgfx::Device. The
+   * device must be the one the surface was created from. Both are kept alive for the lifetime of
+   * the Drawable.
    */
-  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Surface> surface);
+  static std::shared_ptr<Drawable> MakeFrom(std::shared_ptr<tgfx::Device> device,
+                                            std::shared_ptr<tgfx::Surface> surface);
 
   virtual int width() const {
     return surface ? surface->width() : 0;
@@ -54,18 +55,7 @@ class Drawable {
   }
 
   virtual std::shared_ptr<tgfx::Device> getDevice() {
-    // The wrapped surface was created from a specific device; walk back to it so this default
-    // implementation also works on backends without a thread-local "current context" (Metal /
-    // D3D12 / Vulkan / WebGPU), where AdoptCurrent() returns nothing. Fall back to AdoptCurrent()
-    // when no surface is held yet (GL semantics).
-    if (surface != nullptr) {
-      auto* context = surface->getContext();
-      if (context == nullptr) {
-        return nullptr;
-      }
-      return context->device()->lockSelf();
-    }
-    return pag::Devices::AdoptCurrent().device;
+    return device;
   }
 
   virtual std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) {
@@ -90,9 +80,11 @@ class Drawable {
 
  protected:
   Drawable() = default;
-  explicit Drawable(std::shared_ptr<tgfx::Surface> surface) : surface(std::move(surface)) {
+  Drawable(std::shared_ptr<tgfx::Device> device, std::shared_ptr<tgfx::Surface> surface)
+      : device(std::move(device)), surface(std::move(surface)) {
   }
 
+  std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
 };
 

@@ -103,8 +103,9 @@ bool PAGSurface::readPixels(void* dstPixels, size_t dstRowBytes) {
   return ok;
 }
 
-std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Surface>& surface) {
-  return PAGSurface::MakeFrom(Drawable::MakeFrom(surface));
+std::shared_ptr<PAGSurface> MakeFrom(const std::shared_ptr<tgfx::Device>& device,
+                                     const std::shared_ptr<tgfx::Surface>& surface) {
+  return PAGSurface::MakeFrom(Drawable::MakeFrom(device, surface));
 }
 
 }  // namespace pagx
