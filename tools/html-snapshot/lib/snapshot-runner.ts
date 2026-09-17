@@ -531,13 +531,35 @@ export async function runSnapshot(
     };
     await inlineCapturedImages();
 
+    // Capture each <canvas>'s live bitmap as a data URI so the snapshot
+    // walker can emit it as an <img>. Without this, every chart / scripted
+    // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
+    //
+    // Runs before the sticky-scrollytelling expansion below: `cloneNode`
+    // clears a <canvas>'s bitmap, so a panel cloned first would carry an empty
+    // chart in every tiled segment.
+    //
+    // Non-capture path only: the real clock has already let each chart's
+    // entrance animation finish during settle, so a plain t=0 read gets the
+    // settled frame. In animation-capture mode the virtual clock froze rAF at
+    // t=0 (the chart's series has not grown yet), so canvases are settled and
+    // inlined AFTER the sampler instead — see `settleAndInlineCanvasesOnPage`
+    // below. Doing it here too would bake in the empty first frame.
+    if (!captureAnimations) {
+      await page.evaluate(inlineCanvases);
+    }
+
     // Expand scrollytelling blocks (a sticky panel inside a tall scroll track
     // whose steps cross-fade as the page scrolls — Flect's "How Flect works"
     // is the canonical case) into N vertically tiled panels so the exported
     // PAGX shows every step instead of the frozen top frame plus blank track.
-    // Runs after image inlining (clones carry the inlined data URIs) and
-    // before every other pass (canvas/icon-font/animation capture and the
-    // snapshot walker all see the expanded DOM). Opt out with
+    // Runs after image and canvas inlining — the clones copy the attributes
+    // those passes stamp on the source nodes — and before every remaining pass
+    // (placeholder normalisation, icon-font, pseudo materialisation, animation
+    // capture and the snapshot walker all see the expanded DOM). In
+    // animation-capture mode the canvas settle pass runs after the sampler, so
+    // a canvas inside an expanded panel is inlined on the original only and
+    // its tiled copies stay empty. Opt out with
     // HTML_SNAPSHOT_NO_STICKY_EXPAND=1. Best-effort: a failure falls back to
     // the unexpanded snapshot rather than aborting.
     if (process.env.HTML_SNAPSHOT_NO_STICKY_EXPAND !== '1') {
@@ -555,24 +577,10 @@ export async function runSnapshot(
     // Chromium renders an empty/missing-src <img> with non-empty alt text as
     // fallback glyphs and ignores even explicit CSS width/height in that
     // state. Neutralise the alt text for source-less placeholders that have a
-    // real authored two-axis box before canvas/element measurement. The
-    // snapshot entry restores the live DOM after preserving the original alt
-    // in its emitted markup.
+    // real authored two-axis box before element measurement. The snapshot
+    // entry restores the live DOM after preserving the original alt in its
+    // emitted markup.
     await page.evaluate(normalizeEmptyImagePlaceholders);
-
-    // Capture each <canvas>'s live bitmap as a data URI so the snapshot
-    // walker can emit it as an <img>. Without this, every chart / scripted
-    // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
-    //
-    // Non-capture path only: the real clock has already let each chart's
-    // entrance animation finish during settle, so a plain t=0 read gets the
-    // settled frame. In animation-capture mode the virtual clock froze rAF at
-    // t=0 (the chart's series has not grown yet), so canvases are settled and
-    // inlined AFTER the sampler instead — see `settleAndInlineCanvasesOnPage`
-    // below. Doing it here too would bake in the empty first frame.
-    if (!captureAnimations) {
-      await page.evaluate(inlineCanvases);
-    }
 
     if (inlineIconFonts) {
       try {
