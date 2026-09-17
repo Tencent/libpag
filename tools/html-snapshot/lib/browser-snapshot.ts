@@ -6161,6 +6161,10 @@ function expandStickyScrollytelling() {
       panel.style.position = 'absolute';
       panel.style.top = (i * segmentHeight + (segmentHeight - elRect.height) / 2) + 'px';
       panel.style.left = panelLeft + 'px';
+      // `panelWidth` is a measured border-box width, so pin the sizing model before writing it:
+      // a content-box panel would otherwise grow by its own padding and border, shifting every
+      // measured child (the same hazard the track-height pin below handles).
+      panel.style.boxSizing = 'border-box';
       panel.style.width = panelWidth + 'px';
       panel.style.removeProperty('right');
       panel.style.removeProperty('bottom');
