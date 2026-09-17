@@ -551,6 +551,13 @@ Babel-compiled at runtime.
   captured in whatever state they are in; use `--wait-ms` or `--selector` to
   land on the desired frame. Some pages instead hide or remove animated content
   in their reduced-motion styles; use `--no-reduced-motion` for those pages.
+- `position: sticky` scrollytelling blocks — a pinned panel inside a tall
+  scroll track whose step layers cross-fade as the page scrolls — are expanded
+  before the snapshot: the panel is tiled once per step so the static output
+  shows every step instead of the frozen top frame plus blank track. The
+  detection is heuristic (a track at least twice the panel's height, stacked
+  same-size absolute layers with mutually exclusive opacities) and the
+  expansion is opt-out via `HTML_SNAPSHOT_NO_STICKY_EXPAND=1`.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
 - `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
@@ -561,6 +568,12 @@ Babel-compiled at runtime.
   and WebGL canvases created without `preserveDrawingBuffer: true` (the
   back buffer may be empty by the time we read it). Such canvases are
   dropped and render as empty boxes.
+- Images whose declared format is not PNG / JPEG / WebP / GIF — an AVIF or
+  HEIC served by a CDN, for instance — are re-encoded to WebP in the browser,
+  because PAGX consumers are only required to decode those four formats. An
+  animated source outside that set keeps only its first frame, a re-encode
+  failure keeps the original bytes and warns, and images saved by
+  `--download-images` are written to disk untouched.
 - Asymmetric borders are downgraded to overlay rectangles. Per-side `dashed` /
   `dotted` borders are coerced to `solid` (the closest visual approximation
   available in the subset).
