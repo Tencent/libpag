@@ -1806,8 +1806,10 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
 // reported here so the offending resource is visible before it silently fails to paint on a
 // platform whose decoder does not happen to cover it. Only inline payloads are inspected: an
 // external `filePath` is not read, so a referenced file's format stays the author's concern.
-static void DetectUnsupportedImageFormats(const PAGXDocument* doc,
-                                          std::vector<VerifyDiagnostic>& diagnostics) {
+// Reported as a warning rather than a diagnostic: the HTML importer keeps such payloads on purpose
+// (it warns about them at import time), so failing the document here would turn a legitimate import
+// into a verify failure.
+static void WarnUnsupportedImageFormats(const PAGXDocument* doc) {
   for (const auto& nodePtr : doc->nodes) {
     auto* node = nodePtr.get();
     if (node->nodeType() != NodeType::Image) {
@@ -1826,10 +1828,10 @@ static void DetectUnsupportedImageFormats(const PAGXDocument* doc,
       continue;
     }
     std::string format = mime != nullptr ? std::string("data:") + mime : std::string("an unknown");
-    AddDiagnostic(diagnostics, node->sourceLine,
-                  "resource <Image> id=\"" + image->id + "\" carries " + format +
-                      " payload, outside the supported set (PNG/JPEG/WebP/GIF). Fix: transcode the "
-                      "image before inlining it, or reference a supported format");
+    std::cerr << "pagx verify: warning: resource <Image> id=\"" << image->id << "\" (line "
+              << node->sourceLine << ") carries " << format
+              << " payload, outside the supported set (PNG/JPEG/WebP/GIF); transcode it before "
+                 "inlining or reference a supported format\n";
   }
 }
 
@@ -1838,7 +1840,7 @@ static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineN
                                const Layer* targetLayer = nullptr) {
   if (targetLayer == nullptr) {
     DetectUnreferencedResources(doc, diagnostics);
-    DetectUnsupportedImageFormats(doc, diagnostics);
+    WarnUnsupportedImageFormats(doc);
     DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
     DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
     DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
