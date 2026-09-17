@@ -441,11 +441,18 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   std::string bg = Trim(box.backgroundImage);
   auto layers = SplitTopLevelCommas(bg);
   std::vector<ColorSource*> colors;
+  // CSS layer index of each parsed gradient, kept alongside `colors` so the per-layer
+  // `background-clip` list below can be indexed by the authored layer position even when a sibling
+  // layer did not parse into a gradient.
+  std::vector<size_t> colorLayerIndices;
   colors.reserve(layers.size());
+  colorLayerIndices.reserve(layers.size());
   bool anyUnsupported = false;
-  for (const auto& part : layers) {
+  for (size_t i = 0; i < layers.size(); i++) {
+    const std::string& part = layers[i];
     if (auto* color = parseGradientByValue(part, box.widthPx, box.heightPx)) {
       colors.push_back(color);
+      colorLayerIndices.push_back(i);
     } else {
       anyUnsupported = true;
       std::string lower = ToLower(part);
@@ -475,7 +482,7 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
     if (useInsetLayers) {
       bool sawBorderBox = false;
       for (size_t i = 0; i < colors.size(); i++) {
-        const std::string& clip = clips[i % clips.size()];
+        const std::string& clip = clips[colorLayerIndices[i] % clips.size()];
         if (clip == "border-box") {
           sawBorderBox = true;
         } else if (sawBorderBox) {
@@ -531,8 +538,9 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
     // contents (bottom of the paint stack); each tighter clip becomes an inset child layer,
     // pushed bottom-most-first so the CSS-topmost layer ends up as the topmost child.
     for (auto it = colors.rbegin(); it != colors.rend(); ++it) {
-      const size_t cssIndex = static_cast<size_t>(std::distance(it, colors.rend())) - 1;
-      const std::string& clip = clips.empty() ? std::string() : clips[cssIndex % clips.size()];
+      const size_t colorIndex = static_cast<size_t>(std::distance(it, colors.rend())) - 1;
+      const std::string& clip =
+          clips.empty() ? std::string() : clips[colorLayerIndices[colorIndex] % clips.size()];
       if (clip == "padding-box" || clip == "content-box") {
         Padding inset = {};
         inset.top = inset.right = inset.bottom = inset.left = box.borderWidthPx;
