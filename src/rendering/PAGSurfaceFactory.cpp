@@ -58,11 +58,12 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
   std::shared_ptr<tgfx::Device> device = nullptr;
   bool externalContext = false;
   if (forAsyncThread) {
-    // Prefer a share-context device derived from the caller's current host context so the async
-    // worker can access the caller's external texture; if no host context is current on this
-    // thread, fall back to a standalone default device (matches the original behavior of
-    // GLDevice::Make(nullptr), which returned an independent device).
-    device = Devices::MakeForAsyncThread();
+    // Prefer a device that can actually access the caller's external texture. Backends that can
+    // reach a device back-reference from the texture handle (Metal / D3D12) derive the worker
+    // device from the texture itself. GL cannot, so its MakeForAsyncThread(texture) still derives
+    // a share-context device from the calling thread's current context (matching the original
+    // behavior of GLDevice::Make(nullptr) fallback, which returned an independent device).
+    device = Devices::MakeForAsyncThread(ToTGFX(texture));
     if (device == nullptr) {
       device = Devices::MakeDefault();
     }

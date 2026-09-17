@@ -60,6 +60,17 @@ std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   return tgfx::MetalDevice::Make();
 }
 
+std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread(const tgfx::BackendTexture& texture) {
+  // The async worker renders into the caller's external texture, whose own MTLDevice is the only
+  // device allowed to touch it. Fall back to the default device when the texture does not carry
+  // a valid Metal texture handle.
+  auto device = MakeForTexture(texture);
+  if (device == nullptr) {
+    device = MakeDefault();
+  }
+  return device;
+}
+
 Devices::AdoptedDevice Devices::AdoptCurrent() {
   // Metal has no thread-local "current device" to adopt. Return an empty AdoptedDevice so that
   // callers wanting an external-context device fall through to whatever fallback they define

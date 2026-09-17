@@ -89,9 +89,24 @@ class Devices {
    *           caller's GL context without contending on it.
    *   Other backends: Equivalent to MakeDefault(); those backends have thread-safe command
    *           encoding by design and require no per-thread device derivation.
-   * Used by PAGDecoder and by PAGSurface::MakeFrom(BackendTexture, forAsyncThread=true).
+   * Used by PAGDecoder.
    */
   static std::shared_ptr<tgfx::Device> MakeForAsyncThread();
+
+  /**
+   * Same as MakeForAsyncThread() but for a worker that renders into the given external backend
+   * texture.
+   *   OpenGL: Identical to MakeForAsyncThread(); OpenGL cannot walk from a texture id back to
+   *           its owning context, so the worker device is still derived from the calling
+   *           thread's current context. The texture parameter is unused on this backend but
+   *           kept for signature parity.
+   *   Metal:  Derives the device from the texture's own MTLDevice (via MakeForTexture) — Metal
+   *           forbids using a texture on a different MTLDevice, so the texture's device is the
+   *           only valid choice for the worker. Falls back to MakeDefault() when the texture
+   *           does not carry a valid Metal texture handle.
+   * Used by PAGSurface::MakeFrom(BackendTexture, forAsyncThread=true).
+   */
+  static std::shared_ptr<tgfx::Device> MakeForAsyncThread(const tgfx::BackendTexture& texture);
 
   /**
    * A device that was "adopted" from the caller's environment, together with a flag indicating
