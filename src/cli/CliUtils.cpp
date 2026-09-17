@@ -93,6 +93,11 @@ bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
   if (!LoadFontConfig(&fontConfig, {}, fallbacks, command)) {
     return false;
   }
+  // A source file is the only record of the family/style it provides, so a missing one cannot be
+  // proven unused while any Text still asks for a font: shaping would silently fall back to a
+  // substituted font with different outlines. Only a document that needs no font at all can skip
+  // such a source.
+  bool requiresFonts = !document->getRequiredFonts().empty();
   for (auto& node : document->nodes) {
     if (node->nodeType() != NodeType::Font) {
       continue;
@@ -112,8 +117,13 @@ bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
     } else if (!font->file.empty()) {
       auto typeface = tgfx::Typeface::MakeFromPath(font->file);
       if (typeface == nullptr) {
-        std::cerr << command << ": failed to load font '" << font->file << "'\n";
-        return false;
+        if (requiresFonts) {
+          std::cerr << command << ": failed to load font '" << font->file << "'\n";
+          return false;
+        }
+        std::cerr << command << ": font source '" << font->file
+                  << "' not found, skipped because the document needs no font\n";
+        continue;
       }
       fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
       // Also reach this file through the fallback chain: a (family, style) key holds one primary
