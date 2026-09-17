@@ -194,8 +194,10 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
 | `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
 
-`background-clip: border-box` / `padding-box` / `content-box` are silent no-ops (only the
-`text` keyword has a PAGX effect, see above).
+`background-clip: text` fills the glyphs (see the row above). `border-box` is the default and
+collapses silently. `padding-box` / `content-box` are kept: each gradient layer carrying one is
+rebuilt as an inset child layer, which is how CSS paints gradient borders (a plain
+`background-color` still paints the border box). Any other value is dropped with a diagnostic.
 
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
 `outline`, `perspective`, geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/

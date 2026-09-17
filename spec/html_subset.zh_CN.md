@@ -180,8 +180,9 @@
 | `transform-origin` | 透传；当其等于盒子中心（`50% 50%`、`center`、`center center`，或等于盒心的 px 值）时被尊重，其它原点告警 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
 
-`background-clip: border-box` / `padding-box` / `content-box` 均为静默无操作（仅 `text` 关键字
-在 PAGX 有效,见上）。
+`background-clip: text` 用于字形填充（见上表）。`border-box`（默认）静默折叠。`padding-box` /
+`content-box` 会保留：携带该关键字的每个渐变层重建为内缩子层，即 CSS 绘制渐变边框的方式（纯色
+`background-color` 仍按 border box 绘制）。其它未知值告警丢弃。
 
 禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、`perspective`、
 几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非
