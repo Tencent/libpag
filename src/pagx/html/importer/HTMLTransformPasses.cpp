@@ -935,7 +935,10 @@ void TryCompensateSpaceEvenly(const std::shared_ptr<DOMNode>& parent, HTMLTransf
   if (inFlowCount == 0) return;
 
   // Overflow already collapsed to `flex-start` upstream; no free space means no compensation.
-  float freeSpace = availableMain - total;
+  // The authored `gap` between adjacent children already consumes part of the content box and is
+  // replayed verbatim by the rewritten container, so only the space left after those `n - 1` gaps
+  // is distributed into the space-evenly steps.
+  float freeSpace = availableMain - total - gap * static_cast<float>(inFlowCount - 1);
   if (freeSpace <= 0.5f) return;
 
   float step = freeSpace / static_cast<float>(inFlowCount + 1);
