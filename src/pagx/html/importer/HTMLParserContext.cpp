@@ -641,6 +641,23 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   }
   const std::string& tag = element->name;
 
+  // PAGX round-trip text groups (WOFF2/PUA export output). The host element carries the
+  // original Text semantics in data-pagx-* attributes; part elements only repeat the
+  // pre-shaped PUA characters and are skipped entirely so the glyphs never leak into the
+  // restored document. Host detection wins when both markers are present, so an edited
+  // element that still carries the semantics is never dropped.
+  bool isPagxTextHost = element->findAttribute("data-pagx-text") != nullptr;
+  if (!isPagxTextHost && element->findAttribute("data-pagx-text-part") != nullptr) {
+    return nullptr;
+  }
+  if (isPagxTextHost && IsContainerTag(tag)) {
+    // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
+    // single semantic Text layer instead of recursing into its PUA glyph spans.
+    HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    return _layerBuilder->wrapForMargin(
+        _textFragmentBuilder->convertPAGXTextHost(element, inherited), box);
+  }
+
   if (tag == "br") {
     auto layer = _document->makeNode<Layer>();
     auto text = _document->makeNode<Text>();
@@ -663,7 +680,8 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
-  HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(element, inherited);
+  HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
+      element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
 
   if (IsContainerTag(tag)) {
@@ -674,6 +692,10 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // (<div>, <svg>, <img>, ...). Strict text-leaf handling would drop them. When we
     // detect any non-inline-run element child, fall back to container handling so
     // both the text fragments and the block children survive as sibling layers.
+    // A data-pagx-text host is exempt: its text semantics live in the attribute and its
+    // DOM content is PUA glyph characters, so converting it as a container would leak the
+    // glyphs as stray text. The host is restored by convertTextLeaf even when an editor
+    // added block children to it.
     bool hasBlockChild = false;
     for (auto c = element->getFirstChild(); c; c = c->getNextSibling()) {
       if (c->type != DOMNodeType::Element) continue;
@@ -681,9 +703,12 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
       hasBlockChild = true;
       break;
     }
-    if (hasBlockChild) {
+    if (hasBlockChild && !isPagxTextHost) {
       return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth),
                                           box);
+    }
+    if (hasBlockChild) {
+      warn("html: block children inside a data-pagx-text host are ignored");
     }
     return _layerBuilder->wrapForMargin(convertTextLeaf(element, box, childInherited), box);
   }
