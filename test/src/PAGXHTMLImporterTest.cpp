@@ -10745,6 +10745,69 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
 }
 
+// A `mask-image` that is a CSS gradient function carries no `url()` payload — the browser hands over
+// the computed gradient itself — so it is rebuilt as a gradient-filled mask layer instead of being
+// dropped. An alpha mask reads the alpha channel, which is exactly the per-stop alpha authored.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageLinearGradientRebuildsGradientMaskLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="width:200px;height:100px;
+                  mask-image:linear-gradient(90deg, rgba(0,0,0,0), rgb(0,0,0) 12%, rgb(0,0,0) 88%, rgba(0,0,0,0))">
+        <div style="width:200px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+  EXPECT_FALSE(masked->mask->includeInLayout);
+  // With no `mask-size`, the gradient paints into the masked element's own box.
+  auto* rect = FindElementOfType<pagx::Rectangle>(masked->mask);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_TRUE(NearlyEqual(rect->size.width, 200.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rect->size.height, 100.0f, 0.01f));
+  auto* fill = FindElementOfType<pagx::Fill>(masked->mask);
+  ASSERT_NE(fill, nullptr);
+  auto* gradient = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(gradient, nullptr);
+  // A horizontal gradient line across the 200x100 box, in absolute pixels.
+  EXPECT_FALSE(gradient->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(gradient->startPoint.x, 0.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(gradient->startPoint.y, 50.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(gradient->endPoint.x, 200.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(gradient->endPoint.y, 50.0f, 0.01f));
+  ASSERT_EQ(gradient->colorStops.size(), 4u);
+  EXPECT_TRUE(NearlyEqual(gradient->colorStops.front()->color.alpha, 0.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(gradient->colorStops[1]->color.alpha, 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(gradient->colorStops.back()->color.alpha, 0.0f, 0.001f));
+}
+
+// `mask-position` offsets the gradient tile inside the element, the same slack-resolution the image
+// mask paths apply; here a 100px tile in a 200px box centred by `50%` lands at x = 50.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageLinearGradientAppliesMaskPosition) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="width:200px;height:100px;
+                  mask-image:linear-gradient(90deg, rgba(0,0,0,0), rgb(0,0,0));
+                  mask-size:100px 100px;mask-position:50% 50%">
+        <div style="width:200px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  // The gradient's own geometry is computed for the 100x100 tile rather than the whole element.
+  auto* fill = FindElementOfType<pagx::Fill>(masked->mask);
+  ASSERT_NE(fill, nullptr);
+  auto* gradient = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(gradient, nullptr);
+  EXPECT_TRUE(NearlyEqual(gradient->endPoint.x, 100.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.tx, 50.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 0.0f, 0.01f));
+}
+
 // A raster `mask-image: url(...)` (a PNG here, referenced via a `data:image/png` URI) is rebuilt
 // into an image-backed alpha mask layer rather than dropped: the mask layer holds a Rectangle sized
 // to the image's native pixels filled by an ImagePattern of that image, attached invisibly and

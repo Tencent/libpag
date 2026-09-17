@@ -173,6 +173,17 @@ class HTMLParserContext {
   // mask. The complement of the SVG data-URI branch handled directly in `applyMaskOrClip`.
   bool applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box, const std::string& url);
 
+  // Rebuilds an alpha / luminance mask layer from a `mask-image` that is a CSS gradient function
+  // (`linear-gradient(...)` / `radial-gradient(...)` / `conic-gradient(...)`, incl. `repeating-*`).
+  // The browser hands those over as the computed gradient itself rather than as a `url(...)`, so
+  // there is no payload to unpack: the gradient is resolved into the mask positioning area
+  // (`mask-size` / `mask-position` applied) and carried by a mask layer's own Fill, which is the
+  // form `HTMLWriter::writeMaskGeometry` emits back as an SVG gradient. `mask-repeat` is not
+  // modelled — PAGX gradients cannot tile, so an explicit `mask-size` smaller than the element
+  // paints one tile rather than repeating it. Returns false when the box is unsized or the value
+  // does not parse as a gradient, so the caller can fall back to its other mask sources.
+  bool applyGradientImageMask(Layer* layer, const HTMLBoxAttributes& box);
+
   // Replaces the rectangular `overflow: hidden` clip (`clipToBounds`) with a mask shaped like the
   // element's `border-radius` geometry, so descendants are clipped to the rounded outline rather
   // than the layer rectangle. PAGX's only native clip primitive (`clipToBounds`) squares off the

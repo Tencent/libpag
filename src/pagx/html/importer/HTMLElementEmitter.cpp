@@ -943,6 +943,12 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   std::string svgContent;
   MaskType maskType = MaskType::Alpha;
   if (hasMaskImage) {
+    // Chromium's computed value for a gradient mask is the gradient function itself — the
+    // `url(data:image/svg+xml,...)` wrapper only appears on a PAGX→HTML round-trip — so it has no
+    // `url()` for the branches below to unpack and is rebuilt straight into a gradient fill.
+    if (applyGradientImageMask(layer, box)) {
+      return;
+    }
     std::string url = ExtractCssUrl(box.maskImage);
     svgContent = DecodeSvgDataUri(url);
     if (svgContent.empty()) {
@@ -1095,6 +1101,57 @@ bool HTMLParserContext::applyRasterImageMask(Layer* layer, const HTMLBoxAttribut
   layer->mask = maskLayer;
   // A raster `mask-image` defaults to `mask-mode: match-source`, which for an image source reads its
   // alpha channel; `mask-mode: luminance` opts into the luma-keyed form instead.
+  layer->maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+  layer->children.push_back(maskLayer);
+  return true;
+}
+
+bool HTMLParserContext::applyGradientImageMask(Layer* layer, const HTMLBoxAttributes& box) {
+  float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+  float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+  if (!(boxW > 0) || !(boxH > 0)) return false;
+  // A gradient carries no intrinsic size: CSS paints it into the mask positioning area, which is
+  // the masked element's own box unless `mask-size` states another tile. Resolving the tile first
+  // keeps `mask-size` faithful — the gradient's own geometry is then computed for that box rather
+  // than the rendered gradient being stretched.
+  auto tile = ResolveCssTileSize(box.maskSize, boxW, boxH, boxW, boxH, *_valueParser);
+  if (std::isnan(tile.first) || std::isnan(tile.second) || !(tile.first > 0) ||
+      !(tile.second > 0)) {
+    return false;
+  }
+  auto* gradient = _layerBuilder->parseGradientByValue(box.maskImage, tile.first, tile.second);
+  if (gradient == nullptr) return false;
+
+  // The gradient is the mask's own paint, so the mask layer holds a Rectangle covering that tile
+  // and a Fill carrying the gradient. An alpha mask reads the alpha channel, which is exactly the
+  // per-stop alpha the CSS gradient authored.
+  auto* maskLayer = _document->makeNode<Layer>();
+  maskLayer->width = tile.first;
+  maskLayer->height = tile.second;
+  maskLayer->includeInLayout = false;
+  auto* rect = _document->makeNode<Rectangle>();
+  rect->size = {tile.first, tile.second};
+  maskLayer->contents.push_back(rect);
+  auto* fill = _document->makeNode<Fill>();
+  fill->color = gradient;
+  maskLayer->contents.push_back(fill);
+
+  // `mask-position` places the tile inside the element, resolved against the same box/tile slack the
+  // image paths use. The mask layer shares the masked layer's local origin, so the offset rides on
+  // its own matrix.
+  std::string posX;
+  std::string posY;
+  SplitPositionTokens(box.maskPosition, posX, posY);
+  float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+  float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
+  if (!std::isnan(tx) && !std::isnan(ty) && (tx != 0.0f || ty != 0.0f)) {
+    maskLayer->matrix = Matrix::Translate(tx, ty);
+  }
+  maskLayer->id = _idAllocator->generateUnique("mask");
+
+  layer->mask = maskLayer;
+  // `mask-mode: match-source` resolves to the alpha channel for a gradient, which is also the
+  // form the HTML exporter rebuilds from an alpha mask layer.
   layer->maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
   layer->children.push_back(maskLayer);
   return true;
