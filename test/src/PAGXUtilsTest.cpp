@@ -2470,8 +2470,8 @@ PAGX_TEST(PAGXUtilsTest, DetectImageMimeNamesFormatsOutsideTheSupportedSet) {
                           'i', 'c', 0, 0,    0,   0,   'm', 'i', 'f', '1'};
   EXPECT_STREQ(pagx::DetectImageMime(heic, sizeof(heic)), "image/heic");
   // The generic major brand with the real codec named only in the compatible-brand list.
-  const uint8_t avifGenericBrand[] = {0, 0, 0, 0x14, 'f', 't', 'y', 'p', 'm', 'i', 'f', '1',
-                                      0, 0, 0, 0,    'a', 'v', 'i', 'f'};
+  const uint8_t avifGenericBrand[] = {0,   0,   0, 0x14, 'f', 't', 'y', 'p', 'm', 'i',
+                                      'f', '1', 0, 0,    0,   0,   'a', 'v', 'i', 'f'};
   EXPECT_STREQ(pagx::DetectImageMime(avifGenericBrand, sizeof(avifGenericBrand)), "image/avif");
 
   const std::string svg = "<svg width=\"14\" height=\"5\"></svg>";
