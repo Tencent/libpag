@@ -262,6 +262,7 @@ file(GLOB_RECURSE SRC_FILES
 # compiling an empty .mm. Drop it from the source list outside of Apple.
 if (NOT APPLE)
     list(FILTER SRC_FILES EXCLUDE REGEX "src/rendering/gpu/Devices_Metal\\.mm$")
+    list(FILTER SRC_FILES EXCLUDE REGEX "src/base/utils/TGFXCast_Metal\\.mm$")
 endif ()
 list(APPEND PAG_FILES ${SRC_FILES})
 

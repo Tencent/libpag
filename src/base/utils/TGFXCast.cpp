@@ -19,6 +19,18 @@
 #include "TGFXCast.h"
 
 namespace pag {
+#if defined(TGFX_USE_METAL)
+// Defined in TGFXCast_Metal.mm: reads the actual MTLPixelFormat from the MTLTexture, so the
+// pixel format never depends on a caller-supplied value.
+unsigned GetMetalTexturePixelFormat(const void* mtlTexture);
+#else
+static unsigned GetMetalTexturePixelFormat(const void*) {
+  return 0;
+}
+#endif
+}  // namespace pag
+
+namespace pag {
 static constexpr std::pair<BlendMode, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Normal, tgfx::BlendMode::SrcOver},
     {BlendMode::Multiply, tgfx::BlendMode::Multiply},
@@ -175,7 +187,7 @@ tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
       }
       tgfx::MetalTextureInfo sampler = {};
       sampler.texture = mtlInfo.texture;
-      sampler.format = mtlInfo.format;
+      sampler.format = GetMetalTexturePixelFormat(mtlInfo.texture);
       return tgfx::BackendTexture{sampler, texture.width(), texture.height()};
     }
     case Backend::VULKAN:
@@ -208,7 +220,6 @@ BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
       // pag::MtlTextureInfo predates that and uses void*. The pointer is treated as an opaque
       // handle by libpag — the const_cast is safe because no writer path exists downstream.
       sampler.texture = const_cast<void*>(mtlInfo.texture);
-      sampler.format = mtlInfo.format;
       return {sampler, texture.width(), texture.height()};
     }
     default:
@@ -235,7 +246,7 @@ tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
       }
       tgfx::MetalTextureInfo sampler = {};
       sampler.texture = mtlInfo.texture;
-      sampler.format = mtlInfo.format;
+      sampler.format = GetMetalTexturePixelFormat(mtlInfo.texture);
       return tgfx::BackendRenderTarget(sampler, renderTarget.width(), renderTarget.height());
     }
     case Backend::VULKAN:

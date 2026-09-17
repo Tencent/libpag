@@ -31,7 +31,6 @@ BackendTexture ToBackendTexture(const tgfx::MetalTextureInfo& texture, int width
   // pag::MtlTextureInfo::texture is void*; tgfx::MetalTextureInfo::texture is const void*.
   // The pointer is treated as an opaque id<MTLTexture> handle downstream.
   info.texture = const_cast<void*>(texture.texture);
-  info.format = texture.format;
   return {info, width, height};
 }
 
@@ -39,11 +38,10 @@ BackendRenderTarget ToBackendRenderTarget(const tgfx::MetalTextureInfo& texture,
                                           int height) {
   MtlTextureInfo info = {};
   info.texture = const_cast<void*>(texture.texture);
-  info.format = texture.format;
   return {info, width, height};
 }
 
-bool CreateMetalTexture(tgfx::Context* context, int width, int height,
+bool CreateMetalTexture(tgfx::Context* context, int width, int height, unsigned pixelFormat,
                         tgfx::MetalTextureInfo* texture) {
   if (context == nullptr || texture == nullptr || width <= 0 || height <= 0) {
     return false;
@@ -56,11 +54,11 @@ bool CreateMetalTexture(tgfx::Context* context, int width, int height,
   if (mtlDevice == nil) {
     return false;
   }
-  MTLTextureDescriptor* descriptor =
-      [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
-                                                         width:(NSUInteger)width
-                                                        height:(NSUInteger)height
-                                                     mipmapped:NO];
+  MTLTextureDescriptor* descriptor = [MTLTextureDescriptor
+      texture2DDescriptorWithPixelFormat:static_cast<MTLPixelFormat>(pixelFormat)
+                                     width:(NSUInteger)width
+                                    height:(NSUInteger)height
+                                 mipmapped:NO];
   descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
   id<MTLTexture> mtlTexture = [mtlDevice newTextureWithDescriptor:descriptor];
   if (mtlTexture == nil) {
@@ -70,8 +68,13 @@ bool CreateMetalTexture(tgfx::Context* context, int width, int height,
   // with a +1 retain count that we hand over to the caller. ReleaseMetalTexture() balances the
   // retain — letting the void* fall out of scope leaks the MTLTexture.
   texture->texture = mtlTexture;
-  texture->format = MTLPixelFormatRGBA8Unorm;
+  texture->format = pixelFormat;
   return true;
+}
+
+bool CreateMetalTexture(tgfx::Context* context, int width, int height,
+                        tgfx::MetalTextureInfo* texture) {
+  return CreateMetalTexture(context, width, height, MTLPixelFormatRGBA8Unorm, texture);
 }
 
 void ReleaseMetalTexture(tgfx::MetalTextureInfo* texture) {

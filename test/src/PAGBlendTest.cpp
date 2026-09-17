@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/utils/TGFXCast.h"
 #include "utils/TestUtils.h"
 
 namespace pag {
@@ -320,6 +321,30 @@ PAG_TEST(PAGBlendMetalTest, BothBottomLeft) {
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendMetalTest/BothBottomLeft"));
 
   ReleaseMetalTexture(&replaceTextureInfo);
+  ReleaseMetalTexture(&textureInfo);
+}
+
+/**
+ * 用例描述: BGRA 纹理经 ToTGFX 转换后 format 必须来自真实 MTLTexture 的 pixelFormat
+ */
+PAG_TEST(PAGBlendMetalTest, TextureFormatFromRealTexture) {
+  auto device = DevicePool::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, 100, 100, 80u, &textureInfo));
+  device->unlock();
+
+  MtlTextureInfo pagInfo = {};
+  pagInfo.texture = const_cast<void*>(textureInfo.texture);
+  BackendRenderTarget pagRenderTarget(pagInfo, 100, 100);
+  auto tgfxRenderTarget = ToTGFX(pagRenderTarget);
+  tgfx::MetalTextureInfo converted = {};
+  ASSERT_TRUE(tgfxRenderTarget.getMetalTextureInfo(&converted));
+  // 80 == MTLPixelFormatBGRA8Unorm: the format must be read from the real MTLTexture instead of
+  // any caller-supplied or default value, otherwise readback paths silently swap red and blue.
+  EXPECT_EQ(converted.format, 80u);
+
   ReleaseMetalTexture(&textureInfo);
 }
 

@@ -103,9 +103,6 @@ typedef struct pag_vk_image_info {
 
 typedef struct pag_mtl_texture_info {
   void* texture = nullptr;
-  // Raw MTLPixelFormat value. Defaults to MTLPixelFormatRGBA8Unorm (70). Set explicitly when the
-  // MTLTexture uses a different pixel format so tgfx can bind it correctly.
-  unsigned format = 70;
 } pag_mtl_texture_info;
 
 // Sync info for an id<MTLEvent>. Always timeline-style (event pointer + signal value).

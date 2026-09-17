@@ -55,6 +55,8 @@ BackendRenderTarget ToBackendRenderTarget(const tgfx::MetalTextureInfo& texture,
                                           int height);
 bool CreateMetalTexture(tgfx::Context* context, int width, int height,
                         tgfx::MetalTextureInfo* texture);
+bool CreateMetalTexture(tgfx::Context* context, int width, int height, unsigned pixelFormat,
+                        tgfx::MetalTextureInfo* texture);
 void ReleaseMetalTexture(tgfx::MetalTextureInfo* texture);
 #endif
 
