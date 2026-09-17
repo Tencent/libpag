@@ -1385,12 +1385,12 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
   // path. A repeat along an axis the tile already covers is a no-op, so only a genuinely tiled axis
   // disqualifies. The epsilon absorbs the sub-pixel slack of an authored size that was rounded
   // against the box (e.g. a native 80px icon in a 78px slot).
-  constexpr float kTileSlack = 0.5f;
+  constexpr float TILE_SLACK = 0.5f;
   TileMode tileX = TileMode::Decal;
   TileMode tileY = TileMode::Decal;
   ResolveBackgroundRepeat(box.backgroundRepeat, tileX, tileY);
-  if ((tileX == TileMode::Repeat && onScreenW + kTileSlack < boxW) ||
-      (tileY == TileMode::Repeat && onScreenH + kTileSlack < boxH)) {
+  if ((tileX == TileMode::Repeat && onScreenW + TILE_SLACK < boxW) ||
+      (tileY == TileMode::Repeat && onScreenH + TILE_SLACK < boxH)) {
     warn("html: tiled SVG background needs repeated tiles; kept as a raster image");
     return false;
   }
@@ -1432,7 +1432,7 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
   host->importDirective.format = "svg";
 
   Layer* backgroundHost = host;
-  if (onScreenW > boxW + kTileSlack || onScreenH > boxH + kTileSlack) {
+  if (onScreenW > boxW + TILE_SLACK || onScreenH > boxH + TILE_SLACK) {
     // `cover`, and an authored size larger than the box, paint past the element box while CSS
     // clips a background to it. The clip sits on a dedicated wrapper so it cannot clip the
     // element's own content. Known difference: the wrapper clips to a rectangle, so an element's
