@@ -576,7 +576,7 @@ class HTMLWriter {
   static bool NeedsMirrorTiling(const Layer* layer);
 
   // Mask/clip defs
-  std::string writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos = {});
+  std::string writeMaskCSS(const Layer* mask, MaskType type);
   std::string writeClipDef(const Layer* mask);
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 

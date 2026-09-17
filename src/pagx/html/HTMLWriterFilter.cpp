@@ -438,7 +438,7 @@ void HTMLWriter::registerFilterId(const std::string& signature, const std::strin
 // HTMLWriter – mask / clip defs
 //==============================================================================
 
-std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos) {
+std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type) {
   // Compute bounding box of mask geometry for SVG viewBox. Track both min and max
   // extents so that masks positioned at negative coordinates are fully enclosed.
   float minX = 1e9f;
@@ -512,11 +512,12 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
   } else {
     css += ";-webkit-mask-mode:alpha;mask-mode:alpha";
   }
-  // The mask SVG covers the geometry bounds starting at (minX, minY) in the mask layer's
-  // coordinate space, but CSS mask-image starts at the masked element's own (0,0). Shift by
-  // the bounds origin relative to the masked layer's render position so the two align.
-  float posX = minX - maskedLayerPos.x;
-  float posY = minY - maskedLayerPos.y;
+  // The mask SVG covers the geometry bounds starting at (minX, minY), which `collectMaskBounds`
+  // resolves in the masked layer's own coordinate space — the same space CSS measures
+  // `mask-position` in, because the mask layer shares the masked layer's origin. The bounds origin
+  // is therefore the position verbatim, and a mask anchored at that origin emits nothing.
+  float posX = minX;
+  float posY = minY;
   if (!FloatNearlyZero(posX) || !FloatNearlyZero(posY)) {
     std::string px = CssFloatToString(posX) + "px";
     std::string py = CssFloatToString(posY) + "px";
