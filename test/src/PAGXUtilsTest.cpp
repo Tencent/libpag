@@ -2459,14 +2459,20 @@ PAGX_TEST(PAGXUtilsTest, DetectImageMimeNamesFormatsOutsideTheSupportedSet) {
   const uint8_t gif[] = {'G', 'I', 'F', '8', '9', 'a'};
   EXPECT_STREQ(pagx::DetectImageMime(gif, sizeof(gif)), "image/gif");
 
-  // ISO-BMFF containers are told apart by their brand; the generic `mif1` major brand that both
-  // AVIF and HEIC files ship is resolved through the compatible-brand list.
+  // ISO-BMFF containers are told apart by their brand: the major brand, or — for files that
+  // declare the generic `mif1` major brand — a compatible brand listed later in the `ftyp` box.
+  // AVIF has to be tested before HEIC because a `mif1` major brand matches the HEIC brand set
+  // too, so only the compatible-brand list tells the two apart.
   const uint8_t avif[] = {0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'a', 'v', 'i', 'f',
                           0, 0, 0, 0,    'a', 'v', 'i', 'f', 'm', 'i', 'f', '1'};
   EXPECT_STREQ(pagx::DetectImageMime(avif, sizeof(avif)), "image/avif");
   const uint8_t heic[] = {0,   0,   0, 0x14, 'f', 't', 'y', 'p', 'h', 'e',
                           'i', 'c', 0, 0,    0,   0,   'm', 'i', 'f', '1'};
   EXPECT_STREQ(pagx::DetectImageMime(heic, sizeof(heic)), "image/heic");
+  // The generic major brand with the real codec named only in the compatible-brand list.
+  const uint8_t avifGenericBrand[] = {0, 0, 0, 0x14, 'f', 't', 'y', 'p', 'm', 'i', 'f', '1',
+                                      0, 0, 0, 0,    'a', 'v', 'i', 'f'};
+  EXPECT_STREQ(pagx::DetectImageMime(avifGenericBrand, sizeof(avifGenericBrand)), "image/avif");
 
   const std::string svg = "<svg width=\"14\" height=\"5\"></svg>";
   EXPECT_STREQ(pagx::DetectImageMime(reinterpret_cast<const uint8_t*>(svg.data()), svg.size()),
