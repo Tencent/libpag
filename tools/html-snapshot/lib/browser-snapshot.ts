@@ -4023,21 +4023,20 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   // Chromium width and replaces the baked `left` offset with a PAGX centerX constraint. Merely
   // dropping width would make an edited line grow only to the right and cease to be centered.
   //
-  // The `text-align: center` -> `intrinsic-width=center` promotion only applies to text leaves
-  // whose own box is a real fixed-width host (`display: block` or `inline-block`). An inline-
-  // level leaf (`display: inline`, e.g. `<em>` inside a centered paragraph) inherits its
-  // `text-align: center` for inline-flow character placement, NOT for the line fragment as a
-  // whole — Chromium measures each inline fragment at its inline-flow position, and marking
-  // those fragments `intrinsic-width=center` would re-center them inside the inline parent
-  // (e.g. putting "feel" at the em-container's horizontal centre instead of the line-end
-  // Chromium reported), breaking inline layout. `inline-block` keeps the centre-against-host
-  // semantics: its parent is a real fixed-width box whose centre is meaningful.
+  // The `text-align: center` -> `intrinsic-width=center` promotion applies to text leaves whose
+  // own box is a fixed-width host: every block-level display (`block`, `flex`, `grid`,
+  // `table-cell`, `list-item`, …) plus `inline-block`, whose parent is a real fixed-width box. An
+  // inline-level leaf that shares its line box with adjacent content (`display: inline`, e.g.
+  // `<em>` inside a centered paragraph) inherits its `text-align: center` for inline-flow
+  // character placement, NOT for the line fragment as a whole — Chromium measures each inline
+  // fragment at its inline-flow position, and marking those fragments `intrinsic-width=center`
+  // would re-center them inside the inline parent (e.g. putting "feel" at the em-container's
+  // horizontal centre instead of the line-end Chromium reported), breaking inline layout.
+  // `inline-flex` / `inline-grid` / `inline-table` are inline-level the same way and stay out.
   const textAlign = String(computed.getPropertyValue('text-align') || '').trim().toLowerCase();
   const display = String(computed.display || '').trim().toLowerCase();
-  const intrinsicWidth = (textAlign === 'center' &&
-                          (display === 'block' || display === 'inline-block'))
-      ? 'center'
-      : false;
+  const inlineLevelDisplay = display.startsWith('inline') && display !== 'inline-block';
+  const intrinsicWidth = (textAlign === 'center' && !inlineLevelDisplay) ? 'center' : false;
   const lineSpans = textNode
     ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed, { intrinsicWidth })
     : [];
