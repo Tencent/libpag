@@ -71,7 +71,9 @@ const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
 // whitespace except NBSP (\S is the negated whitespace class, so its complement minus NBSP is
 // exactly the collapsible set). The PAGX importer already treats NBSP as a real glyph
 // (see BOUNDARY_SPACE) and LineBreaker maps it to the GL (glue) class, so a preserved NBSP
-// keeps its no-break meaning downstream. Re-declared in PAYLOAD_CONSTANTS_SRC for the
+// keeps its no-break meaning downstream. Note that every call site pairs the collapse with a
+// `.trim()`, which strips a leading/trailing NBSP as well, so only NBSPs inside the text are
+// preserved. Re-declared in PAYLOAD_CONSTANTS_SRC for the
 // browser payload (same pattern as BOUNDARY_SPACE).
 const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
 
@@ -2359,8 +2361,10 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   // (nowrap) span carries no stray hard break; leading/internal spaces — i.e.
   // indentation — stay intact. The line's vertical offset is already encoded in
   // its rect, so dropping the break characters never loses positioning.
-  // Collapsing modes fold + trim all whitespace as before, except NBSP which
-  // carries the source page's no-break glue semantics (see COLLAPSIBLE_WS).
+  // Collapsing modes fold whitespace as before, except NBSP which carries the
+  // source page's no-break glue semantics (see COLLAPSIBLE_WS). The `.trim()`
+  // below still drops a leading/trailing NBSP, so only NBSPs inside the text
+  // survive.
   const cleanLine = (s) => {
     const stripped = s.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
     return preserve ? stripped : stripped.replace(COLLAPSIBLE_WS, ' ').trim();
