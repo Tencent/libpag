@@ -487,6 +487,9 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
           sawBorderBox = true;
         } else if (sawBorderBox) {
           useInsetLayers = false;
+          _diagnostics.warn(
+              "html: background-clip border-box layer above a tighter layer; painting every "
+              "layer to the border box");
           break;
         }
       }
