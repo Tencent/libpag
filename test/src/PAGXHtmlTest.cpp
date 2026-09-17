@@ -1599,6 +1599,32 @@ CLI_TEST(PAGXHtmlTest, MaskPositionIsBoundsOriginWithinMaskedLayer) {
   EXPECT_NE(html.find("mask-position:130px 70px"), std::string::npos);
 }
 
+// The coordinate rounding pass rewrites every `<number>px` in a style attribute, so it has to step
+// over `url(...)` payloads: a base64 data URI can contain runs that read as a zero length (`0px`)
+// or a zero-prefixed one (`07px`), and rewriting those leaves the browser bytes it cannot decode.
+CLI_TEST(PAGXHtmlTest, StyleRoundingSkipsUrlPayloads) {
+  // "iVBORw0KGgo" is the PNG signature's base64; the two groups after it spell `0px` and `07px`.
+  const std::string payload = "iVBORw0KGgo0pxA07pxAAAAAA==";
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\">"
+      "  <Layer width=\"100\" height=\"100\">"
+      "    <Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "    <Fill><ImagePattern image=\"@img\"/></Fill>"
+      "  </Layer>"
+      "  <Resources><Image id=\"img\" source=\"data:image/png;base64," +
+      payload +
+      "\"/></Resources>"
+      "</pagx>";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find(payload), std::string::npos)
+      << "the embedded payload must reach the browser verbatim";
+  EXPECT_EQ(html.find("0A7pxAAAAAA=="), std::string::npos)
+      << "rounding must not swallow a payload's `px` suffix or a leading zero";
+}
+
 // Descendants resolve their own mask painter. Their layer alpha, Fill alpha, and source alpha all
 // participate in the emitted SVG opacity instead of reusing the root mask's paint.
 CLI_TEST(PAGXHtmlTest, NestedLuminanceMaskPreservesLayerPaintAndAlpha) {
