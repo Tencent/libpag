@@ -1374,29 +1374,36 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
     }
   }
 
-  // A repeat whose tile is smaller than the element box needs the tile drawn several times, which
-  // a single import directive cannot express, so the caller falls back to the raster path. A
-  // repeat along an axis the tile already covers is a no-op, so only a genuinely tiled axis
+  // The on-screen paint box. A fitted keyword states it directly in `paintW` / `paintH` (scale 1),
+  // while `100% 100%` / an explicit pixel pair keeps the intrinsic size on the host and carries the
+  // rescale on its matrix — so the CSS tile size is always `paint * scale`.
+  const float onScreenW = paintW * scaleX;
+  const float onScreenH = paintH * scaleY;
+
+  // A repeat whose on-screen tile is smaller than the element box needs the tile drawn several
+  // times, which a single import directive cannot express, so the caller falls back to the raster
+  // path. A repeat along an axis the tile already covers is a no-op, so only a genuinely tiled axis
   // disqualifies. The epsilon absorbs the sub-pixel slack of an authored size that was rounded
   // against the box (e.g. a native 80px icon in a 78px slot).
   constexpr float kTileSlack = 0.5f;
   TileMode tileX = TileMode::Decal;
   TileMode tileY = TileMode::Decal;
   ResolveBackgroundRepeat(box.backgroundRepeat, tileX, tileY);
-  if ((tileX == TileMode::Repeat && paintW + kTileSlack < boxW) ||
-      (tileY == TileMode::Repeat && paintH + kTileSlack < boxH)) {
+  if ((tileX == TileMode::Repeat && onScreenW + kTileSlack < boxW) ||
+      (tileY == TileMode::Repeat && onScreenH + kTileSlack < boxH)) {
     warn("html: tiled SVG background needs repeated tiles; kept as a raster image");
     return false;
   }
 
   // `background-position` places the paint box inside the element box. Both are expressed in the
   // element's own coordinate space and the host's slot is relative to its parent, so the resolved
-  // offset maps straight onto the host's left/top.
+  // offset maps straight onto the host's left/top. Percentages and the centring keywords resolve
+  // against the slack between the box and the *on-screen* tile, exactly like `mask-position`.
   std::string posX;
   std::string posY;
   SplitPositionTokens(box.backgroundPosition, posX, posY);
-  float tx = resolveMaskPositionAxis(posX, boxW, paintW);
-  float ty = resolveMaskPositionAxis(posY, boxH, paintH);
+  float tx = resolveMaskPositionAxis(posX, boxW, onScreenW);
+  float ty = resolveMaskPositionAxis(posY, boxH, onScreenH);
 
   // The directive host must hold nothing but the directive: `pagx resolve` refuses to expand one
   // on a layer that also carries contents or children. It therefore lives in a child layer of the
@@ -1425,7 +1432,7 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
   host->importDirective.format = "svg";
 
   Layer* backgroundHost = host;
-  if (paintW > boxW + kTileSlack || paintH > boxH + kTileSlack) {
+  if (onScreenW > boxW + kTileSlack || onScreenH > boxH + kTileSlack) {
     // `cover`, and an authored size larger than the box, paint past the element box while CSS
     // clips a background to it. The clip sits on a dedicated wrapper so it cannot clip the
     // element's own content. Known difference: the wrapper clips to a rectangle, so an element's
