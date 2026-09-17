@@ -27,6 +27,7 @@
 #include "pagx/nodes/ColorMatrixFilter.h"
 #include "pagx/nodes/DropShadowFilter.h"
 #include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Group.h"
 #include "pagx/nodes/InnerShadowFilter.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/Path.h"
@@ -34,6 +35,7 @@
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/nodes/SolidColor.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -536,7 +538,10 @@ std::string HTMLWriter::writeMaskCSS(const Layer* mask, MaskType type, Point mas
 }
 
 void HTMLWriter::ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
-                                     float& minY, float& maxX, float& maxY) {
+                                     float& minY, float& maxX, float& maxY, int depth) {
+  if (depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
+    return;
+  }
   float ax = 0;
   float ay = 0;
   float bx = 0;
@@ -591,6 +596,16 @@ void HTMLWriter::ExpandElementBounds(const Element* element, const Matrix& combi
       by = pos.y + r;
       break;
     }
+    case NodeType::Group: {
+      // Groups are the common way to wrap mask shapes; fold the group transform and recurse so
+      // their geometry reaches the mask SVG instead of being dropped.
+      auto group = static_cast<const Group*>(element);
+      Matrix groupMatrix = combined * BuildGroupMatrix(group);
+      for (auto* child : group->elements) {
+        ExpandElementBounds(child, groupMatrix, minX, minY, maxX, maxY, depth + 1);
+      }
+      return;
+    }
     default:
       return;
   }
@@ -617,9 +632,13 @@ void HTMLWriter::collectMaskBounds(const Layer* layer, const Matrix& parent, flo
   }
   Matrix combined = parent * lm;
   for (auto* e : layer->contents) {
-    ExpandElementBounds(e, combined, minX, minY, maxX, maxY);
+    ExpandElementBounds(e, combined, minX, minY, maxX, maxY, 0);
   }
   for (auto* child : layer->children) {
+    // Keep the bounds in sync with writeMaskGeometry, which skips invisible subtrees.
+    if (!child->visible) {
+      continue;
+    }
     collectMaskBounds(child, combined, minX, minY, maxX, maxY);
   }
   if (layer->composition != nullptr) {
@@ -629,31 +648,28 @@ void HTMLWriter::collectMaskBounds(const Layer* layer, const Matrix& parent, flo
   }
 }
 
-void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent,
-                                   MaskType type, float inheritedAlpha, int& gradientIndex) {
-  RecursionGuard guard(_ctx);
-  if (guard.overflowed()) {
+void HTMLWriter::writeMaskElements(HTMLBuilder& out, const std::vector<Element*>& elements,
+                                   const Matrix& combined, MaskType type, float inheritedAlpha,
+                                   float inheritedFillOpacity, const std::string& inheritedFillAttr,
+                                   int& gradientIndex, int depth) {
+  if (depth >= HTMLWriterContext::MAX_RECURSION_DEPTH) {
     return;
   }
-  Matrix lm = layer->matrix;
-  auto position = layer->renderPosition();
-  if (!FloatNearlyZero(position.x) || !FloatNearlyZero(position.y)) {
-    lm = Matrix::Translate(position.x, position.y) * lm;
-  }
-  Matrix combined = parent * lm;
   std::string tr = combined.isIdentity() ? "" : MatrixToCSS(combined);
 
   const Fill* fill = nullptr;
-  for (auto* element : layer->contents) {
+  for (auto* element : elements) {
     if (element->nodeType() == NodeType::Fill) {
       fill = static_cast<const Fill*>(element);
       break;
     }
   }
-  float fillOpacity = inheritedAlpha * layer->alpha;
-  std::string fillAttr = "white";
+  // A list without a Fill of its own keeps the paint of the enclosing list. The layer entry point
+  // passes an empty attribute, which resolves to the opaque default.
+  float fillOpacity = inheritedFillOpacity;
+  std::string fillAttr = inheritedFillAttr.empty() ? "white" : inheritedFillAttr;
   if (fill != nullptr) {
-    fillOpacity *= fill->alpha;
+    fillOpacity = inheritedAlpha * fill->alpha;
     auto* source = fill->color;
     if (source != nullptr && source->nodeType() == NodeType::SolidColor) {
       auto* solid = static_cast<const SolidColor*>(source);
@@ -718,7 +734,7 @@ void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const M
   }
   // Alpha masks still need the source alpha (including gradient-stop alpha), but their RGB can
   // stay white. Luminance masks consume both the resolved source color and alpha.
-  for (auto* e : layer->contents) {
+  for (auto* e : elements) {
     if (e->nodeType() == NodeType::Rectangle) {
       auto rect = static_cast<const Rectangle*>(e);
       // Use renderPosition/renderSize so that Rectangle instances authored as
@@ -798,15 +814,46 @@ void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const M
         }
         out.closeTagSelfClosing();
       }
+    } else if (e->nodeType() == NodeType::Group) {
+      // Groups wrap mask shapes in the common authored form
+      // (<Group><Rectangle/><Fill/></Group>); fold the group matrix and recurse so the geometry
+      // reaches the mask SVG. Text and Image contents stay unsupported here — the mask SVG has
+      // no font or raster pipeline — and are dropped like any other unrecognized element.
+      auto group = static_cast<const Group*>(e);
+      writeMaskElements(out, group->elements, combined * BuildGroupMatrix(group), type,
+                        inheritedAlpha * group->alpha, fillOpacity, fillAttr, gradientIndex,
+                        depth + 1);
     }
   }
+}
+
+void HTMLWriter::writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent,
+                                   MaskType type, float inheritedAlpha, int& gradientIndex) {
+  RecursionGuard guard(_ctx);
+  if (guard.overflowed()) {
+    return;
+  }
+  Matrix lm = layer->matrix;
+  auto position = layer->renderPosition();
+  if (!FloatNearlyZero(position.x) || !FloatNearlyZero(position.y)) {
+    lm = Matrix::Translate(position.x, position.y) * lm;
+  }
+  Matrix combined = parent * lm;
+  float layerAlpha = inheritedAlpha * layer->alpha;
+  writeMaskElements(out, layer->contents, combined, type, layerAlpha, layerAlpha, "", gradientIndex,
+                    0);
   for (auto* child : layer->children) {
-    writeMaskGeometry(out, child, combined, type, inheritedAlpha * layer->alpha, gradientIndex);
+    // tgfx skips invisible layers together with their subtree when it draws the mask, while the
+    // mask root itself is forced visible (LayerBuilder::resolvePendingMasks). Mirror that here:
+    // the root reaches this function without a visibility check, children do not.
+    if (!child->visible) {
+      continue;
+    }
+    writeMaskGeometry(out, child, combined, type, layerAlpha, gradientIndex);
   }
   if (layer->composition != nullptr) {
     for (auto* compLayer : layer->composition->layers) {
-      writeMaskGeometry(out, compLayer, combined, type, inheritedAlpha * layer->alpha,
-                        gradientIndex);
+      writeMaskGeometry(out, compLayer, combined, type, layerAlpha, gradientIndex);
     }
   }
 }

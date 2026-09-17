@@ -261,6 +261,14 @@ class HTMLWriterContext {
   // to emit @font-face + PUA <span> (WOFF2 path) or fall back to the SVG <path> path.
   std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
 
+  // Text nodes whose data-pagx-text host metadata has already been emitted. The attribute marks
+  // "one restored Text" and must appear at most once per node, while writeLayerContents runs a
+  // Background and a Foreground pass over the same element list and both passes can paint the
+  // same Text (its Fill and Stroke may sit in different placements). A second host would be
+  // restored as a second Text, duplicating the content on round-trip, so later occurrences are
+  // marked as parts instead.
+  std::unordered_set<const Text*> textHostsEmitted = {};
+
   // Cache: path d-string → assigned ID in global <defs>. Used to deduplicate repeated SVG paths
   // (e.g. from Repeater nodes) by emitting <path id="p0" d="..."/> once and referencing via <use>.
   std::unordered_map<std::string, std::string> pathDefIds = {};
@@ -529,6 +537,10 @@ class HTMLWriter {
   // WOFF2 fonts, using PUA Unicode characters.
   void writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text, const Fill* fill,
                                       const Stroke* stroke, float alpha);
+  // Marks `text` as the semantic host of its PUA glyph group, exactly once per Text node.
+  // Subsequent marks — a second glyph span of the same Text, or a second paint of the same Text
+  // in another placement pass — become part markers, which the importer skips.
+  void emitTextHostMarker(HTMLBuilder& out, const Text* text);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups
@@ -578,8 +590,16 @@ class HTMLWriter {
                          float& maxX, float& maxY);
   void writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent, MaskType type,
                          float inheritedAlpha, int& gradientIndex);
+  // Shared element walk for writeMaskGeometry: emits one SVG shape per geometry element and
+  // recurses into Group containers with their matrix folded in. `inheritedFillAttr` /
+  // `inheritedFillOpacity` describe the paint of the enclosing element list and cover shapes that
+  // no Fill in their own list provides.
+  void writeMaskElements(HTMLBuilder& out, const std::vector<Element*>& elements,
+                         const Matrix& combined, MaskType type, float inheritedAlpha,
+                         float inheritedFillOpacity, const std::string& inheritedFillAttr,
+                         int& gradientIndex, int depth);
   static void ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
-                                  float& minY, float& maxX, float& maxY);
+                                  float& minY, float& maxX, float& maxY, int depth);
 
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX = 0, float bboxY = 0,

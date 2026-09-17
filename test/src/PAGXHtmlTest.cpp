@@ -19,6 +19,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -28,10 +29,12 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Ellipse.h"
+#include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/PathData.h"
+#include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGPathParser.h"
@@ -93,6 +96,10 @@ struct DecodedCharStringBounds {
   bool valid = false;
   float minX = 0;
   float maxX = 0;
+  // Number of rmoveto operators, i.e. how many contours the program starts. The encoder may emit
+  // several rmoveto for one source contour when a single movement is split, so this equals the
+  // contour count only for outlines whose deltas fit the operand range.
+  int moveToCount = 0;
 };
 
 static DecodedCharStringBounds DecodeCharStringXBounds(const std::vector<uint8_t>& charString) {
@@ -131,6 +138,9 @@ static DecodedCharStringBounds DecodeCharStringXBounds(const std::vector<uint8_t
       continue;
     }
     if ((value == 21 || value == 5) && operands.size() == 2) {
+      if (value == 21) {
+        result.moveToCount++;
+      }
       x += operands[0];
     } else if (value == 8 && operands.size() == 6) {
       x += operands[0] + operands[2] + operands[4];
@@ -697,135 +707,12 @@ CLI_TEST(PAGXHtmlTest, ShapeGlyphRun) {
   EXPECT_EQ(html.find("<path"), std::string::npos);
 }
 
-CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/unit/low_units_per_em_font.pagx"));
-  ASSERT_NE(doc, nullptr);
-  const pagx::Font* font = nullptr;
-  for (const auto& node : doc->nodes) {
-    if (node->nodeType() == pagx::NodeType::Font) {
-      font = static_cast<const pagx::Font*>(node.get());
-      break;
-    }
-  }
-  ASSERT_NE(font, nullptr);
-  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
-  ASSERT_FALSE(fontResult.woff2Data.empty());
-  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(16));
-  EXPECT_NEAR(fontResult.designScale, 16.0f, 0.001f);
-
-  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/low-upem-assets");
-  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
-  ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("@font-face"), std::string::npos);
-  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
-  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
-  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
-  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
-  ASSERT_TRUE(std::filesystem::exists(fontPath));
-  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
-}
-
-CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsLargeCharstringOperands) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/unit/large_charstring_operands_font.pagx"));
-  ASSERT_NE(doc, nullptr);
-  const pagx::Font* font = nullptr;
-  for (const auto& node : doc->nodes) {
-    if (node->nodeType() == pagx::NodeType::Font) {
-      font = static_cast<const pagx::Font*>(node.get());
-      break;
-    }
-  }
-  ASSERT_NE(font, nullptr);
-  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
-  ASSERT_FALSE(fontResult.woff2Data.empty());
-  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(2048));
-  EXPECT_NEAR(fontResult.designScale, 1.0f, 0.001f);
-
-  // The exported font lands on disk so tools/scripts can verify the charstring bytes: coordinate
-  // deltas here exceed the 2-byte CFF integer range, which must not be emitted as the DICT-only
-  // 29-prefixed form (that byte is callgsubr inside a charstring).
-  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/large-operand-assets");
-  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
-  ASSERT_FALSE(html.empty());
-  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
-  ASSERT_TRUE(std::filesystem::exists(fontPath));
-  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
-}
-
-CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSplitsOversizedCharstringMovements) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto* font = doc->makeNode<pagx::Font>();
-  font->unitsPerEm = 2048;
-  auto* glyph = doc->makeNode<pagx::Glyph>();
-  glyph->path = doc->makeNode<pagx::PathData>();
-  // Every coordinate is representable by CFF, but each horizontal edge has a 41000-unit delta.
-  // Clamping that delta makes the decoder stop at x=12767 while the encoder advances its own
-  // current point to x=21000, corrupting the rest of the contour.
-  *glyph->path = pagx::PathDataFromSVGString("M-20000 0 L21000 0 L21000 1000 L-20000 1000 Z");
-  glyph->advance = 2048;
-  font->glyphs.push_back(glyph);
-
-  auto charString = pagx::BuildWoff2GlyphCharString(*glyph->path);
-  ASSERT_FALSE(charString.empty());
-  auto bounds = DecodeCharStringXBounds(charString);
-  ASSERT_TRUE(bounds.valid);
-  EXPECT_NEAR(bounds.minX, -20000.0f, 0.01f);
-  EXPECT_NEAR(bounds.maxX, 21000.0f, 0.01f);
-
-  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
-  ASSERT_FALSE(fontResult.woff2Data.empty());
-}
-
-CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
-  auto doc = pagx::PAGXImporter::FromFile(
-      ProjectPath::Absolute("resources/pagx_to_html/unit/custom_cff_charset_strings.pagx"));
-  ASSERT_NE(doc, nullptr);
-  const pagx::Font* font = nullptr;
-  for (const auto& node : doc->nodes) {
-    if (node->nodeType() == pagx::NodeType::Font) {
-      font = static_cast<const pagx::Font*>(node.get());
-      break;
-    }
-  }
-  ASSERT_NE(font, nullptr);
-  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
-  ASSERT_FALSE(fontResult.woff2Data.empty());
-
-  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/custom-charset-assets");
-  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
-  ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("@font-face"), std::string::npos);
-  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
-  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
-  ASSERT_TRUE(std::filesystem::exists(fontPath));
-  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
-}
-
-CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontRemovesOverlappingContours) {
-  auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto* font = doc->makeNode<pagx::Font>();
-  font->unitsPerEm = 1000;
-  auto* glyph = doc->makeNode<pagx::Glyph>();
-  glyph->path = doc->makeNode<pagx::PathData>();
-  // A plus sign assembled from two same-winding rectangles. Leaving the contours overlapped makes
-  // parity-based CFF rasterizers punch a hole through the centre where the two strokes intersect.
-  *glyph->path = pagx::PathDataFromSVGString(
-      "M400 0L600 0L600 1000L400 1000Z M0 400L1000 400L1000 600L0 600Z");
-  glyph->advance = 1000;
-  font->glyphs.push_back(glyph);
-
-  auto resolvedPath = pagx::ResolveWoff2GlyphPath(*glyph->path);
-  ASSERT_FALSE(resolvedPath.isEmpty());
-  auto bounds = resolvedPath.getBounds();
-  resolvedPath.setFillType(tgfx::PathFillType::EvenOdd);
-  EXPECT_TRUE(resolvedPath.contains(bounds.x() + bounds.width() * 0.5f,
-                                    bounds.y() + bounds.height() * 0.5f));
-
-  auto fontResult = pagx::BuildWoff2FromFont(font, "overlap");
-  ASSERT_FALSE(fontResult.woff2Data.empty());
-}
+// =============================================================================
+// Embedded-font charstring inspection helpers
+//
+// These decode generated WOFF2 / CFF output so the font tests below can assert on the actual
+// bytes instead of only on the presence of an asset file.
+// =============================================================================
 
 static uint16_t ReadTestU16(const std::vector<uint8_t>& data, size_t offset) {
   return static_cast<uint16_t>((data[offset] << 8) | data[offset + 1]);
@@ -975,6 +862,267 @@ static bool ScanTestCharString(const std::vector<uint8_t>& cff, size_t start, si
   return i == end;
 }
 
+// Decodes a WOFF2 blob and returns the raw CFF table plus the byte range of every CharString in
+// glyph order (.notdef first). Returns false when the container or any CFF INDEX is malformed.
+static bool ExtractWoff2CharStrings(const std::vector<uint8_t>& woff2Data,
+                                    std::vector<uint8_t>* cff,
+                                    std::vector<std::pair<size_t, size_t>>* charStrings) {
+  auto finalSize = woff2::ComputeWOFF2FinalSize(woff2Data.data(), woff2Data.size());
+  if (finalSize == 0) {
+    return false;
+  }
+  std::vector<uint8_t> ttf(finalSize);
+  if (!woff2::ConvertWOFF2ToTTF(ttf.data(), ttf.size(), woff2Data.data(), woff2Data.size())) {
+    return false;
+  }
+  size_t cffOffset = 0;
+  size_t cffLength = 0;
+  if (!FindTestTable(ttf, "CFF ", &cffOffset, &cffLength)) {
+    return false;
+  }
+  cff->assign(ttf.begin() + static_cast<long>(cffOffset),
+              ttf.begin() + static_cast<long>(cffOffset + cffLength));
+
+  auto headerSize = static_cast<size_t>((*cff)[2]);
+  std::vector<std::pair<size_t, size_t>> nameItems;
+  if (ParseCFFTestIndex(*cff, headerSize, &nameItems) == 0 || nameItems.size() != 1) {
+    return false;
+  }
+  std::vector<std::pair<size_t, size_t>> topDictItems;
+  if (ParseCFFTestIndex(*cff, nameItems[0].second, &topDictItems) == 0 || topDictItems.empty()) {
+    return false;
+  }
+  std::vector<uint8_t> topDict(cff->begin() + static_cast<long>(topDictItems[0].first),
+                               cff->begin() + static_cast<long>(topDictItems[0].second));
+  int32_t charStringsOffset = 0;
+  if (!FindTestDictOperand(topDict, 17, &charStringsOffset) || charStringsOffset <= 0 ||
+      static_cast<size_t>(charStringsOffset) >= cff->size()) {
+    return false;
+  }
+  if (ParseCFFTestIndex(*cff, static_cast<size_t>(charStringsOffset), charStrings) == 0) {
+    return false;
+  }
+  return !charStrings->empty();
+}
+
+// Reads an exported .woff2 asset from disk and scans every CharString for bytes that would make a
+// rasterizer reject the font. Returns false when the file is missing or malformed.
+static bool ScanWoff2AssetCharStrings(const std::string& path, bool* usesShortint) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file) {
+    return false;
+  }
+  std::vector<uint8_t> woff2Data((std::istreambuf_iterator<char>(file)),
+                                 std::istreambuf_iterator<char>());
+  if (woff2Data.empty()) {
+    return false;
+  }
+  std::vector<uint8_t> cff;
+  std::vector<std::pair<size_t, size_t>> charStrings;
+  if (!ExtractWoff2CharStrings(woff2Data, &cff, &charStrings)) {
+    return false;
+  }
+  for (auto& range : charStrings) {
+    if (!ScanTestCharString(cff, range.first, range.second, usesShortint)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontNormalizesLowUnitsPerEm) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/low_units_per_em_font.pagx"));
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(16));
+  EXPECT_NEAR(fontResult.designScale, 16.0f, 0.001f);
+
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/low-upem-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("pagx-font-"), std::string::npos);
+  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsLargeCharstringOperands) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/large_charstring_operands_font.pagx"));
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+  EXPECT_EQ(fontResult.unitsPerEm, static_cast<uint16_t>(2048));
+  EXPECT_NEAR(fontResult.designScale, 1.0f, 0.001f);
+
+  // The exported font is read back from disk and every CharString is scanned: coordinate deltas
+  // here exceed the 2-byte CFF integer range, which must be encoded with the Type 2 shortint form
+  // (28) and never as the DICT-only 29-prefixed form (that byte is callgsubr inside a charstring,
+  // where it makes a rasterizer abandon the rest of the glyph).
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/large-operand-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+  bool usesShortint = false;
+  EXPECT_TRUE(ScanWoff2AssetCharStrings(fontPath, &usesShortint))
+      << "exported charstrings must not contain callgsubr / callsubr operators";
+  EXPECT_TRUE(usesShortint) << "deltas beyond the 2-byte range must use the shortint form";
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSplitsOversizedCharstringMovements) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 2048;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  // Every coordinate is representable by CFF, but each horizontal edge has a 41000-unit delta.
+  // Clamping that delta makes the decoder stop at x=12767 while the encoder advances its own
+  // current point to x=21000, corrupting the rest of the contour.
+  *glyph->path = pagx::PathDataFromSVGString("M-20000 0 L21000 0 L21000 1000 L-20000 1000 Z");
+  glyph->advance = 2048;
+  font->glyphs.push_back(glyph);
+
+  auto charString = pagx::BuildWoff2GlyphCharString(*glyph->path);
+  ASSERT_FALSE(charString.empty());
+  auto bounds = DecodeCharStringXBounds(charString);
+  ASSERT_TRUE(bounds.valid);
+  EXPECT_NEAR(bounds.minX, -20000.0f, 0.01f);
+  EXPECT_NEAR(bounds.maxX, 21000.0f, 0.01f);
+
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSupportsCustomCFFCharsetStrings) {
+  auto doc = pagx::PAGXImporter::FromFile(
+      ProjectPath::Absolute("resources/pagx_to_html/unit/custom_cff_charset_strings.pagx"));
+  ASSERT_NE(doc, nullptr);
+  const pagx::Font* font = nullptr;
+  for (const auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      font = static_cast<const pagx::Font*>(node.get());
+      break;
+    }
+  }
+  ASSERT_NE(font, nullptr);
+  auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/custom-charset-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("@font-face"), std::string::npos);
+  EXPECT_NE(html.find("font_f0.woff2"), std::string::npos);
+  auto fontPath = tmpAssets + "/fonts/font_f0.woff2";
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  EXPECT_GT(std::filesystem::file_size(fontPath), static_cast<uintmax_t>(0));
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontRemovesOverlappingContours) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  // A plus sign assembled from two same-winding rectangles. Leaving the contours overlapped makes
+  // parity-based CFF rasterizers punch a hole through the centre where the two strokes intersect.
+  *glyph->path = pagx::PathDataFromSVGString(
+      "M400 0L600 0L600 1000L400 1000Z M0 400L1000 400L1000 600L0 600Z");
+  glyph->advance = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto resolvedPath = pagx::ResolveWoff2GlyphPath(*glyph->path);
+  ASSERT_FALSE(resolvedPath.isEmpty());
+  auto bounds = resolvedPath.getBounds();
+  resolvedPath.setFillType(tgfx::PathFillType::EvenOdd);
+  EXPECT_TRUE(resolvedPath.contains(bounds.x() + bounds.width() * 0.5f,
+                                    bounds.y() + bounds.height() * 0.5f));
+
+  // The encoded program must consume the normalized outline: the two source contours merge into
+  // one, so a single rmoveto starts the glyph. Asserting only on the intermediate tgfx path would
+  // keep passing if BuildCharString ever stopped calling ResolveWoff2GlyphPath.
+  auto charString = pagx::BuildWoff2GlyphCharString(*glyph->path);
+  ASSERT_FALSE(charString.empty());
+  auto decoded = DecodeCharStringXBounds(charString);
+  ASSERT_TRUE(decoded.valid);
+  EXPECT_EQ(decoded.moveToCount, 1) << "overlapping contours must be merged into one";
+
+  auto fontResult = pagx::BuildWoff2FromFont(font, "overlap");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontSubdividesOversizedCurves) {
+  // Control-point deltas of 60000 exceed the operand range, so the cubic has to be subdivided
+  // before it is encoded. Clamping the deltas instead would end the contour short of x=40000,
+  // and a subdivision that never terminates would hang the export.
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M0 0 C0 60000 40000 60000 40000 0 Z");
+  glyph->advance = 1000;
+  font->glyphs.push_back(glyph);
+
+  auto charString = pagx::BuildWoff2GlyphCharString(*glyph->path);
+  ASSERT_FALSE(charString.empty());
+  auto decoded = DecodeCharStringXBounds(charString);
+  ASSERT_TRUE(decoded.valid);
+  EXPECT_NEAR(decoded.minX, 0.0f, 0.5f);
+  EXPECT_NEAR(decoded.maxX, 40000.0f, 0.5f);
+
+  auto fontResult = pagx::BuildWoff2FromFont(font, "curves");
+  ASSERT_FALSE(fontResult.woff2Data.empty());
+}
+
+CLI_TEST(PAGXHtmlTest, EmbeddedVectorFontRejectsUnencodableCoordinates) {
+  // Path attributes are parsed with strtof and are not range-checked, so a malformed document can
+  // carry non-finite or arbitrarily large coordinates. Both must degrade to a blank glyph
+  // (endchar only) instead of overflowing the segment count or recursing forever.
+  auto huge = pagx::PathDataFromSVGString("M0 0 L1e9 0 L1e9 1e9 Z");
+  auto hugeCharString = pagx::BuildWoff2GlyphCharString(huge);
+  ASSERT_EQ(hugeCharString.size(), static_cast<size_t>(1));
+  EXPECT_EQ(hugeCharString[0], 14);
+
+  // A numeric literal beyond the float range still parses and overflows to infinity.
+  auto infinite = pagx::PathDataFromSVGString("M0 0 L1e999 0 L0 10 Z");
+  auto infiniteCharString = pagx::BuildWoff2GlyphCharString(infinite);
+  ASSERT_EQ(infiniteCharString.size(), static_cast<size_t>(1));
+  EXPECT_EQ(infiniteCharString[0], 14);
+
+  // Non-finite coordinates can also arrive through programmatic construction.
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* nanPath = doc->makeNode<pagx::PathData>();
+  nanPath->moveTo(0, 0);
+  nanPath->cubicTo(std::nanf(""), std::nanf(""), std::nanf(""), std::nanf(""), 100, 100);
+  auto nanCharString = pagx::BuildWoff2GlyphCharString(*nanPath);
+  ASSERT_EQ(nanCharString.size(), static_cast<size_t>(1));
+  EXPECT_EQ(nanCharString[0], 14);
+}
+
 CLI_TEST(PAGXHtmlTest, Woff2LargeCoordinateGlyphsUseCharStringEncoding) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   ASSERT_NE(doc, nullptr);
@@ -1012,29 +1160,17 @@ CLI_TEST(PAGXHtmlTest, Woff2LargeCoordinateGlyphsUseCharStringEncoding) {
   auto fontResult = pagx::BuildWoff2FromFont(font, "f0");
   ASSERT_FALSE(fontResult.woff2Data.empty());
 
-  auto finalSize =
-      woff2::ComputeWOFF2FinalSize(fontResult.woff2Data.data(), fontResult.woff2Data.size());
-  ASSERT_GT(finalSize, static_cast<size_t>(0));
-  std::vector<uint8_t> ttf(finalSize);
-  ASSERT_TRUE(woff2::ConvertWOFF2ToTTF(ttf.data(), ttf.size(), fontResult.woff2Data.data(),
-                                       fontResult.woff2Data.size()));
+  std::vector<uint8_t> cff;
+  std::vector<std::pair<size_t, size_t>> charStringItems;
+  ASSERT_TRUE(ExtractWoff2CharStrings(fontResult.woff2Data, &cff, &charStringItems));
 
-  size_t cffOffset = 0;
-  size_t cffLength = 0;
-  ASSERT_TRUE(FindTestTable(ttf, "CFF ", &cffOffset, &cffLength));
-  std::vector<uint8_t> cff(ttf.begin() + static_cast<long>(cffOffset),
-                           ttf.begin() + static_cast<long>(cffOffset + cffLength));
-
-  auto headerSize = static_cast<size_t>(cff[2]);
   std::vector<std::pair<size_t, size_t>> nameItems;
-  ASSERT_GT(ParseCFFTestIndex(cff, headerSize, &nameItems), static_cast<size_t>(0));
+  ASSERT_GT(ParseCFFTestIndex(cff, static_cast<size_t>(cff[2]), &nameItems),
+            static_cast<size_t>(0));
   ASSERT_EQ(nameItems.size(), static_cast<size_t>(1));
-
   std::vector<std::pair<size_t, size_t>> topDictItems;
-  auto afterTopDict = ParseCFFTestIndex(cff, nameItems[0].second, &topDictItems);
-  ASSERT_GT(afterTopDict, static_cast<size_t>(0));
+  ASSERT_GT(ParseCFFTestIndex(cff, nameItems[0].second, &topDictItems), static_cast<size_t>(0));
   ASSERT_EQ(topDictItems.size(), static_cast<size_t>(1));
-
   std::vector<uint8_t> topDict(cff.begin() + static_cast<long>(topDictItems[0].first),
                                cff.begin() + static_cast<long>(topDictItems[0].second));
   int32_t charsetOffset = 0;
@@ -1043,14 +1179,6 @@ CLI_TEST(PAGXHtmlTest, Woff2LargeCoordinateGlyphsUseCharStringEncoding) {
   ASSERT_LT(static_cast<size_t>(charsetOffset), cff.size());
   // The generator always writes a format-2 charset; anything else means the offset is stale.
   EXPECT_EQ(cff[static_cast<size_t>(charsetOffset)], 2);
-  int32_t charStringsOffset = 0;
-  ASSERT_TRUE(FindTestDictOperand(topDict, 17, &charStringsOffset));
-  ASSERT_GT(static_cast<size_t>(charStringsOffset), static_cast<size_t>(0));
-  ASSERT_LT(static_cast<size_t>(charStringsOffset), cff.size());
-
-  std::vector<std::pair<size_t, size_t>> charStringItems;
-  ASSERT_GT(ParseCFFTestIndex(cff, static_cast<size_t>(charStringsOffset), &charStringItems),
-            static_cast<size_t>(0));
   // .notdef + 2 explicit + 12 filler glyphs
   ASSERT_EQ(charStringItems.size(), static_cast<size_t>(15));
 
@@ -1506,6 +1634,62 @@ CLI_TEST(PAGXHtmlTest, MaskSizeMatchesTranslatedBounds) {
   EXPECT_NE(html.find("transform=%22matrix(1,0,0,1,-60,-80)%22"), std::string::npos);
   EXPECT_EQ(html.find("mask-size:140px 120px"), std::string::npos)
       << "mask-size must be the intrinsic size, not the bounds max extent";
+}
+
+// Mask shapes are commonly wrapped in a Group. Dropping the Group's contents leaves an empty mask
+// SVG, which makes the masked layer fully transparent.
+CLI_TEST(PAGXHtmlTest, MaskGeometryIncludesGroupContents) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Group position=\"20,30\">"
+      "        <Rectangle position=\"50,50\" size=\"40,20\"/>"
+      "      </Group>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // The rect covers x 30..70 / y 40..60 and the group shifts it by (20,30), so the mask SVG is
+  // 40x20 at position (50,70) relative to the un-transformed masked layer.
+  EXPECT_NE(html.find("mask-size:40px 20px"), std::string::npos);
+  EXPECT_NE(html.find("mask-position:50px 70px"), std::string::npos);
+}
+
+// tgfx skips invisible layers together with their subtree when it draws the mask, while the mask
+// root itself is forced visible. An invisible child must therefore contribute no mask geometry.
+CLI_TEST(PAGXHtmlTest, MaskSkipsInvisibleChildLayers) {
+  std::string xml =
+      "<pagx width=\"200\" height=\"200\">"
+      "  <Layer width=\"200\" height=\"200\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Rectangle position=\"100,100\" size=\"40,40\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "      <Layer visible=\"false\">"
+      "        <Rectangle position=\"120,120\" size=\"400,400\"/>"
+      "        <Fill color=\"#FFFFFF\"/>"
+      "      </Layer>"
+      "    </Layer>"
+      "    <Layer mask=\"@m\" maskType=\"alpha\">"
+      "      <Rectangle position=\"100,100\" size=\"200,200\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // Only the visible 40x40 rect at (100,100) counts; the invisible 400x400 rect would expand the
+  // bounds to include the whole document.
+  EXPECT_NE(html.find("mask-size:40px 40px"), std::string::npos);
+  EXPECT_NE(html.find("mask-position:80px 80px"), std::string::npos);
+  EXPECT_EQ(html.find("mask-size:400px 400px"), std::string::npos)
+      << "geometry of an invisible child layer must not reach the mask";
 }
 
 // Locates the first layer carrying a mask reference, depth first.
@@ -1970,6 +2154,30 @@ std::vector<pagx::Text*> CollectAllTexts(const std::shared_ptr<pagx::PAGXDocumen
   return texts;
 }
 
+// Returns the layer that owns `text`, whose left/top carry the position the round trip restored.
+pagx::Layer* FindTextHostLayer(const std::shared_ptr<pagx::PAGXDocument>& doc, pagx::Text* text) {
+  if (doc == nullptr || text == nullptr) {
+    return nullptr;
+  }
+  std::vector<pagx::Layer*> stack = {};
+  for (auto* layer : doc->layers) {
+    stack.push_back(layer);
+  }
+  while (!stack.empty()) {
+    auto* layer = stack.back();
+    stack.pop_back();
+    for (auto* element : layer->contents) {
+      if (element == text) {
+        return layer;
+      }
+    }
+    for (auto* child : layer->children) {
+      stack.push_back(child);
+    }
+  }
+  return nullptr;
+}
+
 // Exports the XML fixture to an HTML fragment and re-imports it as a full document.
 // htmlOut (optional) receives the exported fragment for further manipulation.
 std::shared_ptr<pagx::PAGXDocument> RoundTripXmlToPAGX(
@@ -2078,30 +2286,157 @@ CLI_TEST(PAGXHtmlTest, Woff2RoundTripPerGlyphPositioning) {
   EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
 
   // Locate the layer that hosts the restored Text and check its absolute position.
-  auto* text = texts[0];
-  pagx::Layer* textLayer = nullptr;
-  std::vector<pagx::Layer*> stack = {};
-  for (auto* layer : doc->layers) {
-    stack.push_back(layer);
-  }
-  while (!stack.empty() && textLayer == nullptr) {
-    auto* layer = stack.back();
-    stack.pop_back();
-    for (auto* element : layer->contents) {
-      if (element == text) {
-        textLayer = layer;
-        break;
-      }
-    }
-    for (auto* child : layer->children) {
-      stack.push_back(child);
-    }
-  }
+  auto* textLayer = FindTextHostLayer(doc, texts[0]);
   ASSERT_NE(textLayer, nullptr);
   ASSERT_FALSE(std::isnan(textLayer->left));
   ASSERT_FALSE(std::isnan(textLayer->top));
   EXPECT_FLOAT_EQ(textLayer->left, 30.0f);
   EXPECT_FLOAT_EQ(textLayer->top, 38.0f);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2RoundTripPerGlyphTransformKeepsPosition) {
+  // Same fixture as Woff2RoundTripPerGlyphPositioning, with a rotation on the first glyph. The
+  // glyph transform must not carry the position: the Text host restores its offset from the
+  // span's left/top only, so a matrix that also holds the translation loses roughly one font
+  // size of it on round-trip.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"AB\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2\" x=\"10\" y=\"24\" "
+      "positions=\"0,0;16,0\" rotations=\"45,0\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "</Layer></pagx>";
+  auto doc = RoundTripXmlToPAGX(xml);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "AB");
+
+  auto* textLayer = FindTextHostLayer(doc, texts[0]);
+  ASSERT_NE(textLayer, nullptr);
+  ASSERT_FALSE(std::isnan(textLayer->left));
+  ASSERT_FALSE(std::isnan(textLayer->top));
+  EXPECT_FLOAT_EQ(textLayer->left, 30.0f);
+  EXPECT_FLOAT_EQ(textLayer->top, 38.0f);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2TextHostEmittedOnceAcrossPlacements) {
+  // The Background and Foreground placement passes both paint the Text (its Fill is a background
+  // painter, its Stroke a foreground one). Only one data-pagx-text host may survive: the importer
+  // restores one Text per host, so a second host duplicates the content on round-trip.
+  std::string xml =
+      "<pagx width=\"200\" height=\"100\">" + std::string(RoundTripFontResources()) +
+      "<Layer width=\"200\" height=\"100\">"
+      "<Text text=\"Pair\" fontFamily=\"CustomFont\" fontSize=\"16\" position=\"20,30\">"
+      "<GlyphRun font=\"@rtFont\" fontSize=\"16\" glyphs=\"1,2,1,2\"/>"
+      "</Text>"
+      "<Fill color=\"#3B82F6\"/>"
+      "<Stroke placement=\"foreground\" color=\"#FFFFFF\" width=\"2\"/>"
+      "</Layer></pagx>";
+  std::string html;
+  auto doc = RoundTripXmlToPAGX(xml, &html);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(CountOccurrences(html, "data-pagx-text="), static_cast<size_t>(1))
+      << "a Text painted by both placement passes must be marked as a host once";
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "Pair");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2EmptyHostContainerRestoresText) {
+  // The exporter opens the host container before it knows whether any run emits a glyph, so a
+  // text whose glyph ids are all blank leaves an empty container that still carries the
+  // semantics. It has to be restored from the container's own cascade, not dropped.
+  std::string fragment =
+      "<div data-pagx-text=\"Kept\" data-pagx-font-family=\"CustomFont\" "
+      "data-pagx-font-style=\"\" data-pagx-faux-bold=\"0\" data-pagx-faux-italic=\"0\" "
+      "style=\"position:absolute;left:10px;top:20px;font-size:16px\"></div>";
+  auto wrapped = "<html><body style=\"width:200px;height:100px\">" + fragment + "</body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(wrapped);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "Kept");
+  EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+  EXPECT_FLOAT_EQ(texts[0]->fontSize, 16.0f);
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2HostSpanWithBlockChildKeepsText) {
+  // An editor that pastes a block element into a host span must not turn the PUA glyph text into
+  // stray content: the host marker stays authoritative.
+  std::string fragment =
+      "<span data-pagx-text=\"Host\" data-pagx-font-family=\"CustomFont\" "
+      "data-pagx-font-style=\"\" data-pagx-faux-bold=\"0\" data-pagx-faux-italic=\"0\" "
+      "style=\"position:absolute;left:10px;top:20px;font-size:16px\">"
+      "\xEE\x80\x80"
+      "<div style=\"position:absolute;left:0;top:0;width:5px;height:5px\"></div>"
+      "</span>";
+  auto wrapped = "<html><body style=\"width:200px;height:100px\">" + fragment + "</body></html>";
+  auto doc = pagx::HTMLImporter::ParseString(wrapped);
+  ASSERT_NE(doc, nullptr);
+  auto texts = CollectAllTexts(doc);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text, "Host");
+}
+
+CLI_TEST(PAGXHtmlTest, Woff2ControlCharactersStayParseable) {
+  // A text carrying a C0 control character (here a vertical tab) must not produce a document the
+  // importer rejects: XML 1.0 forbids the character even as a numeric reference, so the exporter
+  // replaces it with U+FFFD instead of emitting an unparseable attribute.
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* font = doc->makeNode<pagx::Font>();
+  font->unitsPerEm = 1000;
+  auto* glyph = doc->makeNode<pagx::Glyph>();
+  glyph->advance = 500;
+  glyph->path = doc->makeNode<pagx::PathData>();
+  *glyph->path = pagx::PathDataFromSVGString("M0 0L500 0L500 700L0 700Z");
+  font->glyphs.push_back(glyph);
+
+  auto* layer = doc->makeNode<pagx::Layer>();
+  layer->width = 200;
+  layer->height = 100;
+  auto* text = doc->makeNode<pagx::Text>();
+  // Split the literal so the hex escape cannot swallow the following 'B'.
+  text->text = std::string(
+      "A\x0B"
+      "B");
+  text->fontFamily = "CustomFont";
+  text->fontSize = 16;
+  text->position = {20, 30};
+  auto* run = doc->makeNode<pagx::GlyphRun>();
+  run->font = font;
+  run->fontSize = 16;
+  run->glyphs = {1, 1, 1};
+  text->glyphRuns.push_back(run);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.23f, 0.51f, 0.96f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(text);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto tmpAssets = ProjectPath::Absolute("test/out/PAGXHtmlTest/control-char-assets");
+  auto html = pagx::HTMLExporter::ToHTML(*doc, tmpAssets, pagx::HTMLOutputMode::Fragment);
+  ASSERT_FALSE(html.empty());
+  EXPECT_EQ(html.find('\x0B'), std::string::npos)
+      << "control characters must not reach the attribute verbatim";
+  // Split the literal so the hex escape cannot swallow the following 'B'.
+  EXPECT_NE(html.find("A\xEF\xBF\xBD"
+                      "B"),
+            std::string::npos)
+      << "expected the U+FFFD replacement";
+
+  auto wrapped = "<html><body style=\"width:200px;height:100px\">" + html + "</body></html>";
+  auto reimported = pagx::HTMLImporter::ParseString(wrapped);
+  ASSERT_NE(reimported, nullptr) << "the exported document must still parse";
+  auto texts = CollectAllTexts(reimported);
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(texts[0]->text,
+            "A\xEF\xBF\xBD"
+            "B");
 }
 
 CLI_TEST(PAGXHtmlTest, Woff2RoundTripMultiRun) {

@@ -1963,6 +1963,11 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   std::string style;
   style.reserve(300);
 
+  // Origin of this layer's div in the parent's coordinate space, tracking the Repeater and child
+  // layer shifts applied below. A mask image is positioned against that origin, so it must follow
+  // the div rather than the layer's un-shifted render position.
+  Point layerDivOrigin = layer->renderPosition();
+
   if (isFlexItem) {
     // Flex item: positioned by parent's flexbox, no absolute positioning needed.
     //
@@ -2056,6 +2061,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       _ctx->childLayerOffsetX = 0;
       _ctx->childLayerOffsetY = 0;
     }
+    layerDivOrigin = renderPos;
     std::string transform = LayerTransformCSS(layer);
     // `positionSet` becomes true after we emit `left/top`. The Repeater branch below may need
     // to shift `renderPos` by the union-bounds offset (uL, uT) so the layer div extends into
@@ -2151,6 +2157,8 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           repeaterOffsetX = uL;
           repeaterOffsetY = uT;
         }
+        layerDivOrigin.x = renderPos.x + repeaterOffsetX;
+        layerDivOrigin.y = renderPos.y + repeaterOffsetY;
         EmitLeftTopCss(style, positionSet, renderPos.x + repeaterOffsetX,
                        renderPos.y + repeaterOffsetY);
         if (uw > 0) {
@@ -2469,6 +2477,13 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         style += ";clip-path:url(#" + clipId + ")";
       } else {
         style += ";overflow:hidden";
+        // The mask radius deliberately overrides the border-radius written by the box-shadow
+        // fallback above: overflow:hidden has to clip along the mask outline, so when the mask
+        // and the layer's own fill shape disagree the shadow traces the mask corners instead.
+        // The width/height override below applies to the same element for the same reason,
+        // which also moves the box-shadow and the belowStyles `inset:0` sibling div. clip-path
+        // is not an alternative here: it makes the layer a Backdrop Root and starves the
+        // backdrop-filter this branch exists to preserve.
         if (maskBox.radius != "0") {
           style += ";border-radius:" + maskBox.radius;
         }
@@ -2480,8 +2495,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         }
       }
     } else {
-      auto pos = layer->renderPosition();
-      style += writeMaskCSS(layer->mask, layer->maskType, pos);
+      style += writeMaskCSS(layer->mask, layer->maskType, layerDivOrigin);
     }
   }
 

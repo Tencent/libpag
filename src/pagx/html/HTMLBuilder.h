@@ -270,7 +270,16 @@ class HTMLBuilder {
           r += "&#9;";
           break;
         default:
-          r += c;
+          // XML 1.0 forbids the remaining C0 control characters even as numeric character
+          // references, and a strict parser (Expat, which the HTML importer uses) rejects the
+          // whole document on encountering one. User text travels through data-pagx-*
+          // attributes, so replace such a character with U+FFFD instead of emitting a document
+          // that cannot be parsed back.
+          if (static_cast<unsigned char>(c) < 0x20) {
+            r += "\xEF\xBF\xBD";
+          } else {
+            r += c;
+          }
       }
     }
     return r;

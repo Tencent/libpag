@@ -484,6 +484,10 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // (<div>, <svg>, <img>, ...). Strict text-leaf handling would drop them. When we
     // detect any non-inline-run element child, fall back to container handling so
     // both the text fragments and the block children survive as sibling layers.
+    // A data-pagx-text host is exempt: its text semantics live in the attribute and its
+    // DOM content is PUA glyph characters, so converting it as a container would leak the
+    // glyphs as stray text. The host is restored by convertTextLeaf even when an editor
+    // added block children to it.
     bool hasBlockChild = false;
     for (auto c = element->getFirstChild(); c; c = c->getNextSibling()) {
       if (c->type != DOMNodeType::Element) continue;
@@ -491,9 +495,12 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
       hasBlockChild = true;
       break;
     }
-    if (hasBlockChild) {
+    if (hasBlockChild && !isPagxTextHost) {
       return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth),
                                           box);
+    }
+    if (hasBlockChild) {
+      warn("html: block children inside a data-pagx-text host are ignored");
     }
     return _layerBuilder->wrapForMargin(convertTextLeaf(element, box, childInherited), box);
   }

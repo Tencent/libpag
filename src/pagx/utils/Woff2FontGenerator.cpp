@@ -236,6 +236,34 @@ static void EncodeCFFFixed(std::vector<uint8_t>& buf, float val) {
 // above this limit before they reach the number encoder.
 static constexpr float MaxCharStringOperand = 32767.0f;
 
+// Largest number of segments a single design-space displacement may be split into. Bounding the
+// segment count keeps the float-to-int conversion in emitLinearMovement well inside the int range
+// and keeps the emitted charstring small.
+static constexpr int MaxCharStringSegmentsPerEdge = 256;
+
+// Largest magnitude accepted for a single design-space coordinate. Since a displacement is at most
+// twice this bound, the segment count stays below MaxCharStringSegmentsPerEdge and the de
+// Casteljau subdivision in emitCubic terminates within a few levels.
+static constexpr float MaxCharStringCoordinate =
+    MaxCharStringOperand * static_cast<float>(MaxCharStringSegmentsPerEdge) * 0.5f;
+
+// Path attributes are parsed with strtof and are not range-checked, so a malformed document can
+// hand the charstring writer NaN, infinity or arbitrarily large coordinates. Both the segment
+// splitting in emitLinearMovement (out-of-range segment count) and the subdivision in emitCubic
+// (a delta that stays non-finite forever) rely on every coordinate being finite and bounded, so
+// validate all points once at the entry instead of guarding each helper.
+static bool HasEncodableCoordinates(const PathData& path, float designScale) {
+  for (const auto& point : path.points()) {
+    float x = point.x * designScale;
+    float y = point.y * designScale;
+    if (!std::isfinite(x) || !std::isfinite(y) || std::abs(x) > MaxCharStringCoordinate ||
+        std::abs(y) > MaxCharStringCoordinate) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Encodes a number for a Type 2 charstring. The available forms are the 1- and 2-byte short
 // integers, a 3-byte integer introduced by byte 28, and 16.16 fixed introduced by byte 255.
 // Byte 29 is the callgsubr operator here, so the DICT 5-byte form must never be used: emitting
@@ -347,6 +375,8 @@ struct CFFCharStringVisitor {
     float startX = curX;
     float startY = curY;
     float maxDelta = std::max(std::abs(targetX - startX), std::abs(targetY - startY));
+    // HasEncodableCoordinates bounds every coordinate, so maxDelta stays far below the range
+    // where this conversion could overflow.
     int segmentCount = std::max(1, static_cast<int>(std::ceil(maxDelta / MaxCharStringOperand)));
     for (int index = 1; index <= segmentCount; index++) {
       float amount = static_cast<float>(index) / static_cast<float>(segmentCount);
@@ -436,29 +466,6 @@ struct CFFCharStringVisitor {
     float endY = -sourceEndY * designScale;
     emitCubic(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
   }
-
-  void operator()(PathVerb verb, const Point* pts) {
-    switch (verb) {
-      case PathVerb::Move: {
-        moveTo(pts[0].x, pts[0].y);
-        break;
-      }
-      case PathVerb::Line: {
-        lineTo(pts[0].x, pts[0].y);
-        break;
-      }
-      case PathVerb::Quad: {
-        quadTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
-        break;
-      }
-      case PathVerb::Cubic: {
-        cubicTo(pts[0].x, pts[0].y, pts[1].x, pts[1].y, pts[2].x, pts[2].y);
-        break;
-      }
-      case PathVerb::Close:
-        break;
-    }
-  }
 };
 
 static void WriteTGFXPathToCharString(const tgfx::Path& path, CFFCharStringVisitor* visitor) {
@@ -503,7 +510,10 @@ tgfx::Path ResolveWoff2GlyphPath(const PathData& path) {
 static std::vector<uint8_t> BuildCharString(const PathData* path,
                                             const FontExportMetrics& metrics) {
   std::vector<uint8_t> cs;
-  if (path == nullptr || path->isEmpty()) {
+  // Unencodable outlines degrade to an endchar-only (blank) glyph, matching how a glyph without a
+  // path is encoded. The alternative — writing overflowing or non-finite operands — corrupts the
+  // interpreter's current point for the remainder of the contour, or never terminates.
+  if (path == nullptr || path->isEmpty() || !HasEncodableCoordinates(*path, metrics.designScale)) {
     WriteU8(cs, 14);  // endchar
     return cs;
   }

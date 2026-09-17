@@ -189,16 +189,21 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
     }
   }
   if (!firstSpan) {
-    return nullptr;
+    // The exporter opens the host container before it knows whether any glyph is emitted, so a
+    // text whose glyph ids are all blank still produces an empty container carrying the
+    // semantics. Restore it from the container's own cascade rather than dropping the text.
+    _diagnostics.warn("html: data-pagx-text host has no glyph span; restored from container style");
   }
   // Resolve the style chain through the container so any styles it contributes still apply,
   // then through the first span. Both resolves are local to this host: the synthetic
   // pagx-font-* family must not be forwarded to the FontConfig fallback sink.
   HTMLInheritedStyle containerStyle =
       _styleCascade.resolveInheritedStyle(element, inherited, /*recordFontFallbacks=*/false);
-  HTMLInheritedStyle spanStyle =
-      _styleCascade.resolveInheritedStyle(firstSpan, containerStyle, /*recordFontFallbacks=*/false);
-  TextFragment frag = makeFragment(spanStyle);
+  HTMLInheritedStyle runStyle =
+      firstSpan ? _styleCascade.resolveInheritedStyle(firstSpan, containerStyle,
+                                                      /*recordFontFallbacks=*/false)
+                : containerStyle;
+  TextFragment frag = makeFragment(runStyle);
   applyPagxTextMetadata(frag, element.get());
   if (frag.text.empty()) {
     return nullptr;
@@ -208,18 +213,20 @@ Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNod
   // as container + first-child offset. Only left/top are honoured — per-glyph transforms
   // (rotation / scale / skew) belong to individual glyphs and cannot apply to the whole run.
   HTMLBoxAttributes containerBox = _styleCascade.computeBoxAttributes(element);
-  HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
   HTMLBoxAttributes box = containerBox;
-  float left = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) +
-               (std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx);
-  float top = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) +
-              (std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx);
-  box.leftPx = left;
-  box.topPx = top;
+  if (firstSpan) {
+    HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
+    float left = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) +
+                 (std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx);
+    float top = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) +
+                (std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx);
+    box.leftPx = left;
+    box.topPx = top;
+  }
   box.rightPx = NAN;
   box.bottomPx = NAN;
 
-  return buildPAGXTextHost(element, std::vector<TextFragment>{std::move(frag)}, box, spanStyle);
+  return buildPAGXTextHost(element, std::vector<TextFragment>{std::move(frag)}, box, runStyle);
 }
 
 HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
