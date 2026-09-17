@@ -580,8 +580,12 @@ void HTMLLayerBuilder::emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttri
                                                 BlendMode blendMode) {
   auto inner = _document->makeNode<Layer>();
   inner->includeInLayout = false;
-  inner->x = inset.left;
-  inner->y = inset.top;
+  // Constraints (`left` / `top`) rather than `x` / `y`: an out-of-flow child is still constraint
+  // laid out against its parent's padding box, so `x` / `y` would be dropped whenever the host
+  // carries padding. The vector-background host in `HTMLParserContext` positions itself the same
+  // way.
+  inner->left = inset.left;
+  inner->top = inset.top;
   inner->width = box.widthPx - inset.left - inset.right;
   inner->height = box.heightPx - inset.top - inset.bottom;
   auto* rect = _document->makeNode<Rectangle>();
