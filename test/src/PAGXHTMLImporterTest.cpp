@@ -292,6 +292,25 @@ inline bool HasImagePatternFill(pagx::Layer* layer) {
   return false;
 }
 
+// The tile Layer a single (non-tiled) background image rides: a tile-sized child inserted at the
+// front of the element, wrapped in a box-sized clip layer when the tile overflows the element box.
+inline pagx::Layer* FindBackgroundTileLayer(pagx::Layer* layer) {
+  if (!layer || layer->children.empty() || !layer->children.front()) return nullptr;
+  auto* child = layer->children.front();
+  if (child->contents.empty() && child->clipToBounds && !child->children.empty()) {
+    return child->children.front();
+  }
+  return child;
+}
+
+// The image Fill of the tile Layer the raster background path emits, or nullptr when the element
+// carries no single-tile background.
+inline pagx::Fill* FindBackgroundTileFill(pagx::Layer* layer) {
+  auto* tile = FindBackgroundTileLayer(layer);
+  if (!tile) return nullptr;
+  return FindElementOfType<pagx::Fill>(tile);
+}
+
 // Returns the first Channel named `name` across all AnimationObjects of `anim`, or nullptr.
 inline pagx::Channel* FindChannel(pagx::Animation* anim, const std::string& name) {
   if (!anim) return nullptr;
@@ -5175,14 +5194,18 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImagePercentPositionResolvesAgainstTile
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_FLOAT_EQ(tile->width, 30.0f);
+  EXPECT_FLOAT_EQ(tile->height, 30.0f);
+  // (90 - 30) * 50% = 30 on both axes.
+  EXPECT_FLOAT_EQ(tile->left, 30.0f);
+  EXPECT_FLOAT_EQ(tile->top, 30.0f);
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
-  // (90 - 30) * 50% = 30 on both axes.
-  EXPECT_FLOAT_EQ(pattern->matrix.tx, 30.0f);
-  EXPECT_FLOAT_EQ(pattern->matrix.ty, 30.0f);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // `background-size: auto 100%` states the height only, so the width follows the image's aspect
@@ -5198,17 +5221,25 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeAutoHeightKeepsAspectRatio) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  // The 4x2 image fills the 90px height and keeps its 2:1 ratio, so the tile is 180x90.
+  EXPECT_FLOAT_EQ(tile->width, 180.0f);
+  EXPECT_FLOAT_EQ(tile->height, 90.0f);
+  // A 180px tile in a 160px box leaves -20px of slack, centred by the 50% position.
+  EXPECT_FLOAT_EQ(tile->left, -10.0f);
+  // The tile overflows the element box, so it rides a box-sized clip slot — CSS clips a background
+  // to the border box.
+  auto* clip = layer->children.front();
+  ASSERT_NE(clip, nullptr);
+  EXPECT_TRUE(clip->clipToBounds);
+  EXPECT_FLOAT_EQ(clip->width, 160.0f);
+  EXPECT_FLOAT_EQ(clip->height, 90.0f);
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
-  // The 4x2 image fills the 90px height and keeps its 2:1 ratio, so the tile is 180x90.
-  EXPECT_FLOAT_EQ(pattern->matrix.a, 45.0f);
-  EXPECT_FLOAT_EQ(pattern->matrix.d, 45.0f);
-  // A 180px tile in a 160px box leaves -20px of slack, centred by the 50% position.
-  EXPECT_FLOAT_EQ(pattern->matrix.tx, -10.0f);
-  EXPECT_FLOAT_EQ(pattern->matrix.ty, 0.0f);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // A single-value `background-size` sets the width only; the height follows the aspect ratio
@@ -5222,13 +5253,16 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeSingleLengthKeepsAspectRatio) 
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  // A 60px tile over a 4x2 image is 60x30, painted at exactly that size.
+  EXPECT_FLOAT_EQ(tile->width, 60.0f);
+  EXPECT_FLOAT_EQ(tile->height, 30.0f);
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  // A 60px tile over a 4x2 image is 60x30, i.e. 15x on both axes.
-  EXPECT_FLOAT_EQ(pattern->matrix.a, 15.0f);
-  EXPECT_FLOAT_EQ(pattern->matrix.d, 15.0f);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // A percentage `background-size` resolves against the element's own box, on the width axis here
@@ -5242,13 +5276,16 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizePercentWidthKeepsAspectRatio) 
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  // 50% of the 160px box is an 80px tile, whose height is 40px by the 2:1 ratio.
+  EXPECT_FLOAT_EQ(tile->width, 80.0f);
+  EXPECT_FLOAT_EQ(tile->height, 40.0f);
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  // 50% of the 160px box is an 80px tile, whose height is 40px by the 2:1 ratio.
-  EXPECT_FLOAT_EQ(pattern->matrix.a, 20.0f);
-  EXPECT_FLOAT_EQ(pattern->matrix.d, 20.0f);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // A single `background-position` value sets the horizontal axis and the vertical axis defaults to
@@ -5263,12 +5300,10 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSingleValuePositionDefaultsYToCent
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
-  ASSERT_NE(fill, nullptr);
-  auto* pattern = As<pagx::ImagePattern>(fill->color);
-  ASSERT_NE(pattern, nullptr);
-  EXPECT_FLOAT_EQ(pattern->matrix.tx, 30.0f);
-  EXPECT_FLOAT_EQ(pattern->matrix.ty, 30.0f);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_FLOAT_EQ(tile->left, 30.0f);
+  EXPECT_FLOAT_EQ(tile->top, 30.0f);
 }
 
 // `background-repeat: repeat-x` is a single-axis shorthand — X tiles, Y clamps to Decal.
@@ -5307,7 +5342,8 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatYTilesVerticalOnly) {
   EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Repeat);
 }
 
-// `background-repeat: no-repeat` clamps both axes to Decal so the image paints once.
+// `background-repeat: no-repeat` paints the image once, so the tile rides its own layer with a
+// fitted fill rather than a repeated pattern.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundImageNoRepeatClampsBothAxes) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:160px;height:120px">
@@ -5317,12 +5353,15 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageNoRepeatClampsBothAxes) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_FLOAT_EQ(tile->width, 40.0f);
+  EXPECT_FLOAT_EQ(tile->height, 40.0f);
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Decal);
-  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Decal);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // Folding rule also handles asymmetric `border-radius`: the image-pattern fill rides on top
@@ -10713,13 +10752,15 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundDataImageExplicitSizeUsesNativeDimensio
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_TRUE(NearlyEqual(tile->width, 20.0f));
+  EXPECT_TRUE(NearlyEqual(tile->height, 30.0f));
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
-  EXPECT_TRUE(NearlyEqual(pattern->matrix.a, 20.0f));
-  EXPECT_TRUE(NearlyEqual(pattern->matrix.d, 30.0f));
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // CSS `mask-image: url(data:image/svg+xml,...)` with `mask-mode: alpha` rebuilds an alpha mask

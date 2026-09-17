@@ -1293,9 +1293,6 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
   }
 
   if (!fitted) {
-    pattern->scaleMode = ScaleMode::None;
-    ResolveBackgroundRepeat(box.backgroundRepeat, pattern->tileModeX, pattern->tileModeY);
-
     float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
     float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
     // Per-axis scale: the on-screen tile size (`background-size`) divided by the image's native
@@ -1307,22 +1304,103 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
     auto nativeSize = decodeImageNativeSize(imageNode);
     auto tile = ResolveCssTileSize(size, boxW, boxH, static_cast<float>(nativeSize.first),
                                    static_cast<float>(nativeSize.second), *_valueParser);
+    TileMode tileX = TileMode::Decal;
+    TileMode tileY = TileMode::Decal;
+    ResolveBackgroundRepeat(box.backgroundRepeat, tileX, tileY);
+
+    // A single, fully resolved tile rides a child Layer sized to the tile instead of a
+    // ScaleMode::None pattern whose matrix states the placement in the image's own pixel space.
+    // Both express the same picture, but the two forms are not equally portable: a consumer that
+    // models an image fill as a *normalized* transform (the Ardot editor importer stores
+    // paint.transform in 0..1 space, so the renderer can rebuild the sampling matrix as
+    // `S(image) · transform · S(1/node)`) reads the pixel-space numbers as a normalized crop
+    // window and samples thousands of pixels outside the image — a 30px icon in a 90px circle
+    // silently disappears. An exactly tile-sized layer carries no placement at all: the fitted
+    // fill below fits the box by construction.
+    constexpr float TILE_SLACK = 0.5f;
+    bool tileResolved =
+        !std::isnan(tile.first) && tile.first > 0 && !std::isnan(tile.second) && tile.second > 0;
+    // A repeat whose tile already covers the box needs no tiling either — the declared repeat is
+    // a no-op there, so the single-tile form stays exact. The epsilon absorbs the sub-pixel slack
+    // of a size rounded against the box.
+    bool needsTiling = (tileX == TileMode::Repeat && tile.first + TILE_SLACK < boxW) ||
+                       (tileY == TileMode::Repeat && tile.second + TILE_SLACK < boxH);
+
+    if (tileResolved && !needsTiling) {
+      pattern->scaleMode = ScaleMode::Stretch;
+
+      // `background-position` places the tile origin inside this element's own box. Both are
+      // expressed in the element's coordinate space and the child's slot is relative to its
+      // parent's, so the resolved offset maps straight onto the child's left/top. Percentages and
+      // the `center` / `right` / `bottom` keywords resolve against the slack between the box and
+      // the on-screen tile, exactly like `mask-position`. Chromium's computed value for
+      // `background-position: center` is `50% 50%`, so a px-only parse would silently drop the
+      // offset — a 30px icon in a 90px circle lands in the top-left corner instead of being
+      // centred.
+      auto* host = _document->makeNode<Layer>();
+      host->width = tile.first;
+      host->height = tile.second;
+      std::string posX;
+      std::string posY;
+      SplitPositionTokens(box.backgroundPosition, posX, posY);
+      float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+      float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
+      // An unset offset and a zero offset both place an out-of-flow layer at its parent's origin,
+      // so only a real offset is written (an explicit `left="0"` is redundant, and `pagx verify`
+      // says so).
+      if (!std::isnan(tx) && tx != 0.0f) {
+        host->left = tx;
+      }
+      if (!std::isnan(ty) && ty != 0.0f) {
+        host->top = ty;
+      }
+      host->includeInLayout = false;
+
+      auto* rect = _document->makeNode<Rectangle>();
+      rect->percentWidth = 100.0f;
+      rect->percentHeight = 100.0f;
+      host->contents.push_back(rect);
+
+      auto* tileFill = _document->makeNode<Fill>();
+      tileFill->color = pattern;
+      host->contents.push_back(tileFill);
+
+      // A `background-blend-mode` blends this image against the background-color the element
+      // paints underneath it (the fill emitted by applyBackgroundVisuals) — for a tile layer the
+      // blend therefore belongs on the layer, which composites against what is already drawn.
+      if (box.backgroundColorSet) {
+        host->blendMode = HTMLLayerBuilder::resolveBackgroundBlendMode(box.backgroundBlendMode);
+      }
+
+      // CSS clips a background to the element's border box, which the pattern-matrix form gets for
+      // free from its host geometry. An oversized tile (`background-size` larger than the box)
+      // paints past the element instead, so it needs an explicit clip slot — sized to the box and
+      // sharing the tile's coordinate origin, exactly like the vector background path.
+      Layer* tileHost = host;
+      if (tile.first > boxW + TILE_SLACK || tile.second > boxH + TILE_SLACK) {
+        auto* clip = _document->makeNode<Layer>();
+        clip->width = boxW;
+        clip->height = boxH;
+        clip->includeInLayout = false;
+        clip->clipToBounds = true;
+        clip->children.push_back(host);
+        tileHost = clip;
+      }
+      // A Layer's own contents render behind its children, and a CSS background paints behind the
+      // element's content, so the tile takes the leading child slot.
+      layer->children.insert(layer->children.begin(), tileHost);
+      return true;
+    }
+
+    pattern->scaleMode = ScaleMode::None;
+    pattern->tileModeX = tileX;
+    pattern->tileModeY = tileY;
     if (!std::isnan(tile.first) && tile.first > 0 && nativeSize.first > 0) {
       pattern->matrix.a = tile.first / static_cast<float>(nativeSize.first);
     }
     if (!std::isnan(tile.second) && tile.second > 0 && nativeSize.second > 0) {
       pattern->matrix.d = tile.second / static_cast<float>(nativeSize.second);
     }
-
-    // `background-position` is the tile origin relative to this element's own box. Each
-    // re-imported card is a standalone Layer whose contents share the box origin, so the position
-    // maps straight onto the pattern matrix translation (the exporter writes the same value back,
-    // offset by the layer's own left/top which is zero in the standalone case). Percentages and
-    // the `center` / `right` / `bottom` keywords resolve against the slack between the box and the
-    // on-screen tile, exactly like `mask-position` above. Chromium's computed value for
-    // `background-position: center` is `50% 50%`, so a px-only parse would silently drop the
-    // offset — a 30px icon in a 90px circle lands in the top-left corner instead of being centred.
-    // An unknown native size leaves the percentage/keyword forms unresolvable.
     std::string posX;
     std::string posY;
     SplitPositionTokens(box.backgroundPosition, posX, posY);

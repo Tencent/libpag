@@ -5789,6 +5789,21 @@ async function materializeDecorativePseudoElements() {
     return out;
   }
 
+  // Local copy of the Node-side `applyTextTransform` (see the file's top section). A materialised
+  // pseudo carries its glyphs on the stand-in, so `text-transform` has to be baked into that text
+  // node the same way `renderPseudoTextLeaf` bakes it into its <span>.
+  function applyPseudoTextTransform(text, computed) {
+    if (!text) return text;
+    const tt = String(computed.getPropertyValue('text-transform') || '').trim().toLowerCase();
+    if (!tt || tt === 'none') return text;
+    if (tt === 'uppercase') return text.toUpperCase();
+    if (tt === 'lowercase') return text.toLowerCase();
+    if (tt === 'capitalize') {
+      return text.replace(/(^|\s)(\S)/g, (_, prefix, ch) => prefix + ch.toUpperCase());
+    }
+    return text;
+  }
+
   // Decide whether a pseudo with the given resolved style should be
   // materialised. A pseudo with no visible box (no width / height) is
   // skipped — there's nothing to render anyway. Out-of-flow pseudos
@@ -5800,21 +5815,31 @@ async function materializeDecorativePseudoElements() {
   // measured layout is unchanged while the decorative box survives the
   // snapshot. `sticky` keeps its old rejection: the stand-in would freeze it
   // at the current scroll position and lose the sticky semantics.
+  //
+  // A *text*-bearing pseudo normally stays on `renderPseudoTextLeaf`, which re-emits the glyphs
+  // inside the host's own flow — the right approximation while the glyphs really do ride that
+  // flow. An out-of-flow pseudo carries a box of its own instead (`position` / `inset` /
+  // `width` / `height` / `background` / `transform`), and the text-only path drops every one of
+  // those: baidu-pan's "current device" badge is `position:absolute;bottom:-3px;width:90px;
+  // height:22px;background:rgba(73,83,102,.1);content:"本机"`, which would land flush with the
+  // host's leading edge — no band, wrong axis — instead of sitting on the circle's bottom edge.
+  // Such a pseudo materialises like any other box, with its text carried on the stand-in.
   function shouldMaterialise(cs, pseudoText) {
-    if (pseudoText !== '') {
-      return { ok: false, reason: 'text-content' };
-    }
     const position = (cs.getPropertyValue('position') || '').trim();
     if (position !== 'absolute' && position !== 'fixed' &&
         position !== 'static' && position !== 'relative') {
       return { ok: false, reason: 'position-' + (position || 'unknown') };
+    }
+    const outOfFlow = position === 'absolute' || position === 'fixed';
+    if (pseudoText !== '' && !outOfFlow) {
+      return { ok: false, reason: 'text-content' };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
     if (widthPx <= 0 && heightPx <= 0) {
       return { ok: false, reason: 'zero-size' };
     }
-    return { ok: true, inFlow: position === 'static' || position === 'relative' };
+    return { ok: true, inFlow: !outOfFlow };
   }
 
   function emitInlineStyle(cs) {
@@ -5897,12 +5922,17 @@ async function materializeDecorativePseudoElements() {
     // stack a second stand-in next to the first.
     if (el.hasAttribute('data-snapshot-pseudo')) continue;
     if (el.hasAttribute('data-snapshot-pseudo-host')) continue;
+    // A host whose icon-font pseudo was already converted to an inline `<svg>` (the icon-font pass
+    // runs before this one) is rendered by `renderInlineIconSvg`; materialising its pseudo box too
+    // would draw the raw glyph next to the converted icon.
+    if (el.hasAttribute('data-snapshot-icon-svg-id')) continue;
 
-    // Two-phase decision: first read both pseudos so we know whether the
-    // host carries a text-bearing pseudo. If it does, leave the host alone
-    // — `renderPseudoTextLeaf` already produces the correct emission, and
-    // appending a real child would knock that path out by flipping
-    // `hasElementChild` to true.
+    // Two-phase decision: first read both pseudos, then decide per pseudo. Every pseudo on the
+    // host shares one fallback — appending a stand-in marks the host with
+    // `data-snapshot-pseudo-host`, which turns `renderPseudoTextLeaf` off for the *whole* host.
+    // A stand-in therefore has to carry every text-bearing pseudo of that host, or the ones left
+    // behind silently lose their glyphs; a host whose text pseudos do not all materialise keeps
+    // the text-leaf path untouched.
     const pseudoData = [];
     let hasTextPseudo = false;
     for (const pseudo of PSEUDO_TYPES) {
@@ -5917,12 +5947,24 @@ async function materializeDecorativePseudoElements() {
       if (pseudoText !== '') hasTextPseudo = true;
       pseudoData.push({ cs, pseudoText, pseudo });
     }
-    if (hasTextPseudo) continue;
+    const decisions = pseudoData.map((slot) => {
+      if (!slot) return null;
+      return shouldMaterialise(slot.cs, slot.pseudoText);
+    });
+    if (hasTextPseudo) {
+      let textLeftBehind = false;
+      for (let i = 0; i < pseudoData.length; i++) {
+        const slot = pseudoData[i];
+        if (slot && slot.pseudoText !== '' && !decisions[i].ok) textLeftBehind = true;
+      }
+      if (textLeftBehind) continue;
+    }
 
     let materialisedAny = false;
-    for (const slot of pseudoData) {
+    for (let i = 0; i < pseudoData.length; i++) {
+      const slot = pseudoData[i];
       if (!slot) continue;
-      const decision = shouldMaterialise(slot.cs, slot.pseudoText);
+      const decision = decisions[i];
       if (!decision.ok) {
         if (decision.reason !== 'text-content') {
           el.setAttribute('data-snapshot-pseudo-skipped', decision.reason);
@@ -5938,6 +5980,18 @@ async function materializeDecorativePseudoElements() {
       const restingCs = restingPseudoStyle(el, slot.pseudo, slot.cs);
       const style = emitInlineStyle(restingCs);
       if (style) div.setAttribute('style', style);
+      // A text-bearing pseudo (see shouldMaterialise) rides the stand-in as its text content, so
+      // the glyphs inherit the pseudo's own box and text styles instead of the host's flow.
+      // `white-space` is not part of COPY_PROPS, so it is appended only when the pseudo states
+      // something other than the default — a box sized by the page for one line must not rewrap.
+      if (slot.pseudoText) {
+        div.textContent = applyPseudoTextTransform(slot.pseudoText, restingCs);
+        const whiteSpace = (restingCs.getPropertyValue('white-space') || '').trim();
+        if (whiteSpace && whiteSpace !== 'normal') {
+          const base = div.getAttribute('style') || '';
+          div.setAttribute('style', base ? base + '; white-space: ' + whiteSpace : 'white-space: ' + whiteSpace);
+        }
+      }
       // `::before` is painted before the host's children, `::after` after.
       // Mirror that order in the DOM so the natural document order matches.
       if (slot.pseudo === '::before') {
