@@ -51,6 +51,21 @@ static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& 
   return SystemFonts::ResolveTypeface(fontFamily, fontStyle);
 }
 
+// Memoised `ResolveLayoutTypeface`: the platform lookup walks the installed font list, and a
+// document repeats the same (family, style) pair for every text node that uses it. The two halves
+// are joined with a separator byte that no family name contains, so distinct pairs cannot collide.
+// A failed lookup is cached too — the platform answer does not change within one document.
+static std::shared_ptr<tgfx::Typeface> ResolveCachedLayoutTypeface(
+    std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>>& cache,
+    const std::string& fontFamily, const std::string& fontStyle) {
+  auto cacheKey = fontFamily + "\x1f" + fontStyle;
+  auto it = cache.find(cacheKey);
+  if (it == cache.end()) {
+    it = cache.emplace(cacheKey, ResolveLayoutTypeface(fontFamily, fontStyle)).first;
+  }
+  return it->second;
+}
+
 LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
 }
 
@@ -58,7 +73,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
                                                             const std::string& fontStyle) {
   if (fontConfig == nullptr) {
     if (!fontFamily.empty()) {
-      return ResolveLayoutTypeface(fontFamily, fontStyle);
+      return ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle);
     }
     return nullptr;
   }
@@ -114,14 +129,9 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
   // Stage 5: System font lookup, including another available style when the requested one is
   // absent from the family.
   if (!fontFamily.empty()) {
-    auto cacheKey = fontFamily + "\x1f" + fontStyle;
-    auto it = systemTypefaceCache.find(cacheKey);
-    if (it == systemTypefaceCache.end()) {
-      auto typeface = ResolveLayoutTypeface(fontFamily, fontStyle);
-      it = systemTypefaceCache.emplace(cacheKey, std::move(typeface)).first;
-    }
-    if (it->second != nullptr) {
-      return it->second;
+    auto typeface = ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle);
+    if (typeface != nullptr) {
+      return typeface;
     }
   }
 
