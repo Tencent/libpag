@@ -111,19 +111,51 @@ bool ResolvePinnedSvgTransformOrigin(const std::unordered_map<std::string, std::
   return true;
 }
 
-// Resolves one axis of a per-axis `mask-size` token into an on-element pixel length. A length
-// (`120px`) is taken verbatim; a percentage resolves against the element's box axis; `auto` (and
-// any unparseable token) returns NaN so the caller can tie the axis to the other for aspect-ratio
-// preservation. `intrinsicAxis` is unused for px/% but kept in the signature for symmetry with the
-// CSS model where `auto` would otherwise fall back to the intrinsic size.
-float ResolveMaskSizeAxis(const std::string& token, float boxAxis, float /*intrinsicAxis*/,
-                          HTMLValueParser& parser) {
+// Resolves one axis of a per-axis sizing token (`background-size` / `mask-size`) into an
+// on-element pixel length. A length (`120px`) is taken verbatim; a percentage resolves against the
+// element's box axis; `auto` (and any unparseable token) returns NaN so the caller can tie the axis
+// to the other one for aspect-ratio preservation.
+float ResolveCssSizeAxis(const std::string& token, float boxAxis, HTMLValueParser& parser) {
   if (token.empty() || token == "auto") return NAN;
   float fraction = 0;
   if (ParseCssPercentage(token, fraction)) {
     return fraction * boxAxis;
   }
   return parser.parseAbsoluteLengthPx(token);
+}
+
+// Resolves the CSS sizing model shared by `background-size` and `mask-size` into the on-screen tile
+// box for an element of `boxW` x `boxH` whose image has the intrinsic size `nativeW` x `nativeH`.
+// `contain` / `cover` fit the intrinsic box into the element box keeping the aspect ratio; a
+// per-axis length or percentage states that axis directly, and `auto` ties the axis to the other
+// one through the intrinsic ratio (both `auto` means the intrinsic size, which is also what a
+// single-value or unparseable declaration degrades to). An axis whose length cannot be recovered —
+// an unknown intrinsic size on an `auto` axis, an unknown image payload — comes back as NaN so the
+// caller can leave the corresponding scale untouched.
+std::pair<float, float> ResolveCssTileSize(const std::string& sizeValue, float boxW, float boxH,
+                                           float nativeW, float nativeH, HTMLValueParser& parser) {
+  auto sizeTokens = SplitTopLevelWhitespace(sizeValue);
+  std::string sizeW = sizeTokens.size() > 0 ? sizeTokens[0] : "";
+  std::string sizeH = sizeTokens.size() > 1 ? sizeTokens[1] : "";
+  bool hasIntrinsic = nativeW > 0 && nativeH > 0;
+  if (sizeW == "contain" || sizeW == "cover") {
+    if (!hasIntrinsic || !(boxW > 0) || !(boxH > 0)) return {NAN, NAN};
+    float fitX = boxW / nativeW;
+    float fitY = boxH / nativeH;
+    float fit = (sizeW == "contain") ? std::min(fitX, fitY) : std::max(fitX, fitY);
+    return {nativeW * fit, nativeH * fit};
+  }
+  float targetW = ResolveCssSizeAxis(sizeW, boxW, parser);
+  float targetH = ResolveCssSizeAxis(sizeH, boxH, parser);
+  if (std::isnan(targetW) && std::isnan(targetH)) {
+    return {hasIntrinsic ? nativeW : NAN, hasIntrinsic ? nativeH : NAN};
+  }
+  if (std::isnan(targetW)) {
+    targetW = hasIntrinsic ? targetH * nativeW / nativeH : NAN;
+  } else if (std::isnan(targetH)) {
+    targetH = hasIntrinsic ? targetW * nativeH / nativeW : NAN;
+  }
+  return {targetW, targetH};
 }
 
 // Maximum depth of layout-only `<div>` wrappers `foldRoundedImageWrapper` will skip
@@ -1144,47 +1176,17 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
   float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
 
   // Resolve `mask-size` into the on-element pixel box, then divide by the intrinsic box to recover
-  // the per-axis scale. The single-value, `auto`, `contain` and `cover` forms follow the CSS
-  // background/mask sizing model; the exporter's own output is the two-length form.
-  float scaleX = 1.0f;
-  float scaleY = 1.0f;
-  auto sizeTokens = SplitTopLevelWhitespace(box.maskSize);
-  std::string sizeW = sizeTokens.size() > 0 ? sizeTokens[0] : "";
-  std::string sizeH = sizeTokens.size() > 1 ? sizeTokens[1] : "";
-  if (sizeW == "contain" || sizeW == "cover") {
-    float fitX = boxW / intrinsicW;
-    float fitY = boxH / intrinsicH;
-    float fit = (sizeW == "contain") ? std::min(fitX, fitY) : std::max(fitX, fitY);
-    scaleX = fit;
-    scaleY = fit;
-  } else if (!sizeW.empty()) {
-    // Per-axis target length: `auto` (NaN here) keeps the axis tied to the other so the aspect
-    // ratio is preserved, matching CSS when only one dimension is given.
-    float targetW = ResolveMaskSizeAxis(sizeW, boxW, intrinsicW, *_valueParser);
-    float targetH = ResolveMaskSizeAxis(sizeH, boxH, intrinsicH, *_valueParser);
-    if (std::isnan(targetW) && std::isnan(targetH)) {
-      // both auto -> intrinsic size, scale 1
-    } else if (std::isnan(targetW)) {
-      scaleY = targetH / intrinsicH;
-      scaleX = scaleY;
-    } else if (std::isnan(targetH)) {
-      scaleX = targetW / intrinsicW;
-      scaleY = scaleX;
-    } else {
-      scaleX = targetW / intrinsicW;
-      scaleY = targetH / intrinsicH;
-    }
-  }
-
-  // The scaled mask box used to resolve percentage / keyword `mask-position` against the element.
-  float scaledW = intrinsicW * scaleX;
-  float scaledH = intrinsicH * scaleY;
+  // the per-axis scale. A known intrinsic size resolves every form the sizing model accepts, so the
+  // tile box is always usable here.
+  auto tile = ResolveCssTileSize(box.maskSize, boxW, boxH, intrinsicW, intrinsicH, *_valueParser);
+  float scaleX = tile.first / intrinsicW;
+  float scaleY = tile.second / intrinsicH;
   // Two empty tokens keep the `0 0` top-left default below.
   std::string posX;
   std::string posY;
   SplitPositionTokens(box.maskPosition, posX, posY);
-  float tx = resolveMaskPositionAxis(posX, boxW, scaledW);
-  float ty = resolveMaskPositionAxis(posY, boxH, scaledH);
+  float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+  float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
 
   // Geometry sits in the intrinsic box anchored at the origin; scale about (0,0) then translate so
   // the mask lands where CSS positions it. Compose ahead of any transform the SVG import produced.
@@ -1237,19 +1239,22 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
     pattern->scaleMode = ScaleMode::None;
     ResolveBackgroundRepeat(box.backgroundRepeat, pattern->tileModeX, pattern->tileModeY);
 
-    // Per-axis scale: the on-screen tile size (`background-size: <w>px <h>px`) divided by the
-    // image's native pixel size mirrors the exporter's `tileW = sx * imgW` emission. Without an
-    // explicit size the tile is the image's native size, i.e. scale 1.
-    auto sizeTokens = SplitTopLevelWhitespace(size);
-    float tileW = sizeTokens.size() > 0 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[0]) : NAN;
-    float tileH =
-        sizeTokens.size() > 1 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[1]) : tileW;
+    float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+    float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+    // Per-axis scale: the on-screen tile size (`background-size`) divided by the image's native
+    // pixel size mirrors the exporter's `tileW = sx * imgW` emission. Percentages resolve against
+    // this element's own box and an `auto` axis keeps the image's aspect ratio — the hero band of a
+    // real page is `auto 100%`, where a px-only parse silently left the pattern at native scale and
+    // magnified the artwork. Without an explicit size the tile is the image's native size, i.e.
+    // scale 1.
     auto nativeSize = decodeImageNativeSize(imageNode);
-    if (!std::isnan(tileW) && tileW > 0 && nativeSize.first > 0) {
-      pattern->matrix.a = tileW / static_cast<float>(nativeSize.first);
+    auto tile = ResolveCssTileSize(size, boxW, boxH, static_cast<float>(nativeSize.first),
+                                   static_cast<float>(nativeSize.second), *_valueParser);
+    if (!std::isnan(tile.first) && tile.first > 0 && nativeSize.first > 0) {
+      pattern->matrix.a = tile.first / static_cast<float>(nativeSize.first);
     }
-    if (!std::isnan(tileH) && tileH > 0 && nativeSize.second > 0) {
-      pattern->matrix.d = tileH / static_cast<float>(nativeSize.second);
+    if (!std::isnan(tile.second) && tile.second > 0 && nativeSize.second > 0) {
+      pattern->matrix.d = tile.second / static_cast<float>(nativeSize.second);
     }
 
     // `background-position` is the tile origin relative to this element's own box. Each
@@ -1260,22 +1265,12 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
     // on-screen tile, exactly like `mask-position` above. Chromium's computed value for
     // `background-position: center` is `50% 50%`, so a px-only parse would silently drop the
     // offset — a 30px icon in a 90px circle lands in the top-left corner instead of being centred.
-    float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
-    float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
-    // Without an explicit `background-size` the matrix stays at scale 1 and the tile is the image's
-    // native pixel box; an unknown native size leaves the percentage/keyword forms unresolvable.
-    float tileOnScreenW = (!std::isnan(tileW) && tileW > 0)
-                              ? tileW
-                              : (nativeSize.first > 0 ? static_cast<float>(nativeSize.first) : NAN);
-    float tileOnScreenH =
-        (!std::isnan(tileH) && tileH > 0)
-            ? tileH
-            : (nativeSize.second > 0 ? static_cast<float>(nativeSize.second) : NAN);
+    // An unknown native size leaves the percentage/keyword forms unresolvable.
     std::string posX;
     std::string posY;
     SplitPositionTokens(box.backgroundPosition, posX, posY);
-    float tx = resolveMaskPositionAxis(posX, boxW, tileOnScreenW);
-    float ty = resolveMaskPositionAxis(posY, boxH, tileOnScreenH);
+    float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+    float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
     if (!std::isnan(tx)) pattern->matrix.tx = tx;
     if (!std::isnan(ty)) pattern->matrix.ty = ty;
   }
@@ -1336,12 +1331,10 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
   float paintH = boxH;
   float scaleX = 1.0f;
   float scaleY = 1.0f;
-  // An explicit `<length>{1,2}` pair states the on-screen box directly, so it is resolved up front
-  // and also serves as the fallback anchor when the intrinsic size is unknown.
-  auto sizeTokens = SplitTopLevelWhitespace(size);
-  float tileW = sizeTokens.size() > 0 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[0]) : NAN;
-  float tileH = sizeTokens.size() > 1 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[1]) : tileW;
-  bool hasTileSize = !std::isnan(tileW) && tileW > 0;
+  // The on-screen tile box follows the same CSS sizing model the raster path applies, so it is
+  // resolved up front; it is also the fallback anchor when the intrinsic size is unknown.
+  auto tile = ResolveCssTileSize(size, boxW, boxH, nativeW, nativeH, *_valueParser);
+  bool hasTileSize = !std::isnan(tile.first) && tile.first > 0;
 
   if (!sized) {
     // Nothing states how large the icon is because the source is unavailable or does not parse, so
@@ -1350,8 +1343,8 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
     // background beats dropping it, which is what registering an SVG as a raster `Image` amounts
     // to.
     if (hasTileSize) {
-      paintW = tileW;
-      paintH = (!std::isnan(tileH) && tileH > 0) ? tileH : tileW;
+      paintW = tile.first;
+      paintH = (!std::isnan(tile.second) && tile.second > 0) ? tile.second : tile.first;
     }
   } else if (size == "contain") {
     float fit = std::min(boxW / nativeW, boxH / nativeH);
@@ -1367,13 +1360,16 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
     scaleX = boxW / nativeW;
     scaleY = boxH / nativeH;
   } else {
-    // `auto` (the CSS default) or an explicit pixel pair: the intrinsic box is the tile, rescaled
-    // per axis when the pair states a different on-screen size.
+    // `auto` (the CSS default) or an explicit length / percentage pair: the intrinsic box is the
+    // tile, rescaled per axis when the declaration states a different on-screen size. An unknown
+    // payload half leaves the intrinsic box untouched.
     paintW = nativeW;
     paintH = nativeH;
-    if (hasTileSize) {
-      scaleX = tileW / nativeW;
-      scaleY = ((!std::isnan(tileH) && tileH > 0) ? tileH : tileW) / nativeH;
+    if (!std::isnan(tile.first) && tile.first > 0) {
+      scaleX = tile.first / nativeW;
+    }
+    if (!std::isnan(tile.second) && tile.second > 0) {
+      scaleY = tile.second / nativeH;
     }
   }
 

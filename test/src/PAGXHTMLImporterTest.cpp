@@ -5185,6 +5185,72 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImagePercentPositionResolvesAgainstTile
   EXPECT_FLOAT_EQ(pattern->matrix.ty, 30.0f);
 }
 
+// `background-size: auto 100%` states the height only, so the width follows the image's aspect
+// ratio. A real page's hero band uses this form with a 5120x1000 artwork; a px-only parse left the
+// pattern at its native scale and magnified the fill until it covered the whole band.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeAutoHeightKeepsAspectRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:90px">
+      <div style="width:160px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==);
+                  background-size:auto 100%;background-repeat:repeat;
+                  background-position:50% 50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
+  // The 4x2 image fills the 90px height and keeps its 2:1 ratio, so the tile is 180x90.
+  EXPECT_FLOAT_EQ(pattern->matrix.a, 45.0f);
+  EXPECT_FLOAT_EQ(pattern->matrix.d, 45.0f);
+  // A 180px tile in a 160px box leaves -20px of slack, centred by the 50% position.
+  EXPECT_FLOAT_EQ(pattern->matrix.tx, -10.0f);
+  EXPECT_FLOAT_EQ(pattern->matrix.ty, 0.0f);
+}
+
+// A single-value `background-size` sets the width only; the height follows the aspect ratio
+// instead of reusing the same number.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeSingleLengthKeepsAspectRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:90px">
+      <div style="width:160px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==);
+                  background-size:60px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  // A 60px tile over a 4x2 image is 60x30, i.e. 15x on both axes.
+  EXPECT_FLOAT_EQ(pattern->matrix.a, 15.0f);
+  EXPECT_FLOAT_EQ(pattern->matrix.d, 15.0f);
+}
+
+// A percentage `background-size` resolves against the element's own box, on the width axis here
+// with the height tied to the aspect ratio.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizePercentWidthKeepsAspectRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:90px">
+      <div style="width:160px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==);
+                  background-size:50% auto;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  // 50% of the 160px box is an 80px tile, whose height is 40px by the 2:1 ratio.
+  EXPECT_FLOAT_EQ(pattern->matrix.a, 20.0f);
+  EXPECT_FLOAT_EQ(pattern->matrix.d, 20.0f);
+}
+
 // A single `background-position` value sets the horizontal axis and the vertical axis defaults to
 // `center` rather than to the leading edge.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSingleValuePositionDefaultsYToCenter) {
@@ -8794,6 +8860,30 @@ PAG_TEST(PAGXHTMLImporterTest, LocalSvgBackgroundUsesIntrinsicSizeByDefault) {
   ASSERT_NE(host, nullptr);
   EXPECT_FLOAT_EQ(host->width, 24.0f);
   EXPECT_FLOAT_EQ(host->height, 12.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, LocalSvgBackgroundSizeAutoHeightKeepsAspectRatio) {
+  SaveFile(R"SVG(<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"
+                          viewBox="0 0 40 20"><rect width="40" height="20"/></svg>)SVG",
+           "PAGXHTMLImporterTest/svg-background/stretched.svg");
+  auto htmlPath = SaveFile(
+      R"HTML(<html><body style="width:100px;height:50px">
+        <div style="width:100px;height:50px;background-image:url(stretched.svg);
+                    background-size:auto 100%;background-repeat:no-repeat"></div>
+      </body></html>)HTML",
+      "PAGXHTMLImporterTest/svg-background/stretched.html");
+
+  auto doc = pagx::HTMLImporter::Parse(htmlPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* host = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(host, nullptr);
+  // The host carries the intrinsic box and the per-axis scale, so a 100% height over a 40x20 icon
+  // is a 100x50 tile, i.e. 2.5x on both axes.
+  EXPECT_FLOAT_EQ(host->width, 40.0f);
+  EXPECT_FLOAT_EQ(host->height, 20.0f);
+  EXPECT_FLOAT_EQ(host->matrix.a, 2.5f);
+  EXPECT_FLOAT_EQ(host->matrix.d, 2.5f);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, BackgroundClipInsetsClampToEmptyBox) {
