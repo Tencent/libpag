@@ -1477,14 +1477,18 @@ Image* HTMLParserContext::registerImageResource(const std::string& imageSource) 
 }
 
 void HTMLParserContext::warnIfUnsupportedImageSource(const std::string& imageSource) {
+  bool isDataUri = imageSource.compare(0, 5, "data:") == 0;
   std::string format = DeclaredDataUriMime(imageSource);
-  if (format.empty()) {
+  if (format.empty() && !isDataUri) {
+    // A file path / remote URL is read and decoded by the renderer itself, so there is no declared
+    // media type to check here.
     return;
   }
   if (format.rfind("image/", 0) != 0) {
-    // A missing or generic media type (`application/octet-stream`) leaves the payload's own magic
-    // bytes as the only authority. Every pipeline that produces a data URI labels it, so this is
-    // not a hot path and the payload can be decoded to name the format precisely.
+    // A missing or generic media type (`data:;base64,…` / `application/octet-stream`) leaves the
+    // payload's own magic bytes as the only authority. Every pipeline that produces a data URI
+    // labels it, so this is not a hot path and the payload can be decoded to name the format
+    // precisely.
     auto data = DecodeBase64DataURI(imageSource);
     const char* sniffed = (data != nullptr && data->size() > 0)
                               ? DetectImageMime(data->bytes(), data->size())

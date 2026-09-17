@@ -209,9 +209,11 @@ class HTMLParserContext {
 
   // Warns when a `data:` image source carries a format outside the `<Image>` supported set
   // (PNG/JPEG/WebP/GIF), which the exported PAGX preserves verbatim and no renderer is required to
-  // decode. Reporting it at import time — with the element context the diagnostics carry — is the
-  // earliest point the author can act on it; a renderer that cannot decode the payload simply
-  // paints nothing. Non-`data:` sources are left alone: a file path is read by the renderer.
+  // decode. A `data:` source that declares no media type, or only a generic one, is named by the
+  // format sniffed from its magic bytes instead. Reporting it at import time — with the element
+  // context the diagnostics carry — is the earliest point the author can act on it; a renderer that
+  // cannot decode the payload simply paints nothing. Non-`data:` sources are left alone: a file
+  // path is read by the renderer.
   void warnIfUnsupportedImageSource(const std::string& imageSource);
 
   // Decodes an `Image` node's native pixel size (from inline data, a `data:` URI, or a file
