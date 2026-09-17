@@ -1898,18 +1898,20 @@ static bool RectsOverlap(const SpatialRect& a, const SpatialRect& b) {
 // whereas authored and content-measured sizes keep their exact values. Two related nodes can
 // therefore disagree by just under one pixel — an adjacent pair overlaps, or a child pokes past its
 // parent — without any visual defect, so cross-node comparisons need to tolerate a full pixel.
-static constexpr float kLayoutSnapTolerance = 1.0f;
+static constexpr float LAYOUT_SNAP_TOLERANCE = 1.0f;
 
 static bool SiblingsOverlap(const SpatialRect& a, const SpatialRect& b) {
-  return a.x + kLayoutSnapTolerance < b.x + b.width && a.x + a.width > b.x + kLayoutSnapTolerance &&
-         a.y + kLayoutSnapTolerance < b.y + b.height && a.y + a.height > b.y + kLayoutSnapTolerance;
+  return a.x + LAYOUT_SNAP_TOLERANCE < b.x + b.width &&
+         a.x + a.width > b.x + LAYOUT_SNAP_TOLERANCE &&
+         a.y + LAYOUT_SNAP_TOLERANCE < b.y + b.height &&
+         a.y + a.height > b.y + LAYOUT_SNAP_TOLERANCE;
 }
 
 static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
-  return (child.x + kLayoutSnapTolerance) >= parent.x &&
-         (child.y + kLayoutSnapTolerance) >= parent.y &&
-         (child.x + child.width) <= (parent.x + parent.width + kLayoutSnapTolerance) &&
-         (child.y + child.height) <= (parent.y + parent.height + kLayoutSnapTolerance);
+  return (child.x + LAYOUT_SNAP_TOLERANCE) >= parent.x &&
+         (child.y + LAYOUT_SNAP_TOLERANCE) >= parent.y &&
+         (child.x + child.width) <= (parent.x + parent.width + LAYOUT_SNAP_TOLERANCE) &&
+         (child.y + child.height) <= (parent.y + parent.height + LAYOUT_SNAP_TOLERANCE);
 }
 
 static bool ElementsHaveLeafContent(const std::vector<Element*>& elements);
