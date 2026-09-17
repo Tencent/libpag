@@ -104,7 +104,11 @@ bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
     }
     auto* font = static_cast<Font*>(node.get());
     if (font->data != nullptr) {
-      // Inline font source: register the embedded bytes directly.
+      // Inline font source: register the embedded bytes directly. The bytes may come from a TTC
+      // (`FontConfig::registerFont(..., ttcIndex, ...)` accepts a face index), but the PAGX `Font`
+      // node has no face-index field and the format carries none, so face 0 is the only face this
+      // path can load. The index is lost one layer up, when `FontEmbedder` writes the source
+      // declaration; preserving it needs a format-level field and is tracked separately.
       auto typeface = tgfx::Typeface::MakeFromBytes(font->data->bytes(), font->data->size());
       if (typeface == nullptr) {
         std::cerr << command << ": failed to load embedded font data\n";
