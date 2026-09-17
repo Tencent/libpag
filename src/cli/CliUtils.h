@@ -224,8 +224,11 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
  * fonts. Registers the document's own <Font> resources plus the given fallback specifiers for
  * shaping, runs layout, and writes the resulting glyph outlines back into the document.
  * `outputBaseDir` is the directory that external font sources are written relative to;
- * `embedFontData` inlines the font bytes as base64 data URIs instead. Prints errors to stderr
- * using the given command name as prefix. Returns false on failure.
+ * `embedFontData` inlines the font bytes as base64 data URIs instead.
+ *
+ * Prints messages to stderr using the given command name as prefix. Returns false when a font
+ * source cannot be loaded and the document still requires a font; a source that cannot be loaded
+ * while the document requires no font at all is reported and skipped, and the call continues.
  */
 bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
                 const std::vector<std::string>& fallbacks, bool embedFontData,
