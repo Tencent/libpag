@@ -1105,12 +1105,13 @@ class TextLayoutContext {
             }
           }
         }
-        // Recalculate xPosition after visual reordering.
+        // Recalculate xPosition after visual reordering. Uses the squashed advance so the
+        // reordered positions stay in step with the line width and with perTextBounds.
         float xPos = 0;
         for (auto& g : visualGlyphs) {
           g.xPosition = xPos;
           float letterSpacing = g.letterSpacing;
-          xPos += g.advance + letterSpacing;
+          xPos += g.squashedAdvance + letterSpacing;
         }
       }
       // Compute justify gap count on visual-order glyphs so that counting and application use
