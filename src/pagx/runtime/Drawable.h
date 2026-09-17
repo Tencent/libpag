@@ -54,6 +54,17 @@ class Drawable {
   }
 
   virtual std::shared_ptr<tgfx::Device> getDevice() {
+    // The wrapped surface was created from a specific device; walk back to it so this default
+    // implementation also works on backends without a thread-local "current context" (Metal /
+    // D3D12 / Vulkan / WebGPU), where AdoptCurrent() returns nothing. Fall back to AdoptCurrent()
+    // when no surface is held yet (GL semantics).
+    if (surface != nullptr) {
+      auto* context = surface->getContext();
+      if (context == nullptr) {
+        return nullptr;
+      }
+      return context->device()->lockSelf();
+    }
     return pag::Devices::AdoptCurrent().device;
   }
 
