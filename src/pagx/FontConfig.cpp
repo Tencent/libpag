@@ -241,6 +241,25 @@ std::vector<std::string> FontConfig::fallbackFamilyNames() const {
   return names;
 }
 
+// Appends the source description of `holder` to `sources` when its typeface is `typeface`.
+// Entries backed by a pre-built typeface (neither path nor bytes) are skipped.
+static void CollectFontSource(TypefaceHolder& holder, const tgfx::Typeface* typeface,
+                              std::vector<FontSourceInfo>& sources) {
+  if (holder.getTypeface().get() != typeface) {
+    return;
+  }
+  FontSourceInfo info = {};
+  info.path = holder.getPath();
+  info.ttcIndex = holder.getTtcIndex();
+  const auto& bytes = holder.getBytes();
+  if (bytes && !bytes->empty()) {
+    info.data = pagx::Data::MakeWithCopy(bytes->data(), bytes->size());
+  } else if (info.path.empty()) {
+    return;
+  }
+  sources.push_back(std::move(info));
+}
+
 std::vector<FontSourceInfo> FontConfig::fontSources(const tgfx::Typeface* typeface) {
   std::vector<FontSourceInfo> sources = {};
   if (typeface == nullptr) {
@@ -249,27 +268,11 @@ std::vector<FontSourceInfo> FontConfig::fontSources(const tgfx::Typeface* typefa
   // The same source can be registered both as a primary font and on the fallback chain (the CLI
   // registers every --fallback file both ways), so one typeface may yield duplicate entries; the
   // caller de-duplicates.
-  auto collect = [&](TypefaceHolder& holder) {
-    if (holder.getTypeface().get() != typeface) {
-      return;
-    }
-    FontSourceInfo info = {};
-    info.path = holder.getPath();
-    info.ttcIndex = holder.getTtcIndex();
-    const auto& bytes = holder.getBytes();
-    if (bytes && !bytes->empty()) {
-      // Fully qualified: FontConfig::Data (the registry struct) shadows pagx::Data inside members.
-      info.data = pagx::Data::MakeWithCopy(bytes->data(), bytes->size());
-    } else if (info.path.empty()) {
-      return;
-    }
-    sources.push_back(std::move(info));
-  };
   for (auto& pair : data->registeredTypefaces) {
-    collect(pair.second);
+    CollectFontSource(pair.second, typeface, sources);
   }
   for (auto& holder : data->fallbackTypefaces) {
-    collect(holder);
+    CollectFontSource(holder, typeface, sources);
   }
   return sources;
 }
