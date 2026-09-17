@@ -1293,8 +1293,10 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
   return true;
 }
 
-std::pair<float, float> HTMLParserContext::resolveSvgIntrinsicSize(const std::string& svgContent) {
-  auto cached = _svgIntrinsicSizeCache.find(svgContent);
+std::pair<float, float> HTMLParserContext::resolveSvgIntrinsicSize(const std::string& svgSource,
+                                                                   bool sourceIsFile) {
+  auto cacheKey = std::string(sourceIsFile ? "file:" : "data:") + svgSource;
+  auto cached = _svgIntrinsicSizeCache.find(cacheKey);
   if (cached != _svgIntrinsicSizeCache.end()) {
     return cached->second;
   }
@@ -1302,11 +1304,11 @@ std::pair<float, float> HTMLParserContext::resolveSvgIntrinsicSize(const std::st
   // `viewBox` map onto a pixel box — the same mapping `pagx resolve` applies when the directive is
   // expanded, so a size resolved here and there cannot disagree.
   std::pair<float, float> size = {NAN, NAN};
-  auto svgDoc = SVGImporter::ParseString(svgContent);
+  auto svgDoc = sourceIsFile ? SVGImporter::Parse(svgSource) : SVGImporter::ParseString(svgSource);
   if (svgDoc != nullptr && svgDoc->width > 0 && svgDoc->height > 0) {
     size = {svgDoc->width, svgDoc->height};
   }
-  _svgIntrinsicSizeCache.emplace(svgContent, size);
+  _svgIntrinsicSizeCache.emplace(std::move(cacheKey), size);
   return size;
 }
 
@@ -1318,8 +1320,9 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
   float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
   if (!(boxW > 0) || !(boxH > 0)) return false;
 
-  auto intrinsic =
-      svgContent.empty() ? std::make_pair(NAN, NAN) : resolveSvgIntrinsicSize(svgContent);
+  bool sourceIsFile = svgContent.empty();
+  auto intrinsic = resolveSvgIntrinsicSize(
+      sourceIsFile ? resolveImageSource(svgSource) : svgContent, sourceIsFile);
   float nativeW = intrinsic.first;
   float nativeH = intrinsic.second;
   bool sized = nativeW > 0 && nativeH > 0;
@@ -1341,11 +1344,11 @@ bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& 
   bool hasTileSize = !std::isnan(tileW) && tileW > 0;
 
   if (!sized) {
-    // Nothing states how large the icon is — an external file whose bytes are only read at resolve
-    // time, or a payload that does not parse — so the authored pixel size, when there is one, is
-    // the anchor; otherwise the element box is, and `pagx resolve` then fits the payload into
-    // whichever box the host carries. Filling the background beats dropping it, which is what
-    // registering an SVG as a raster `Image` amounts to.
+    // Nothing states how large the icon is because the source is unavailable or does not parse, so
+    // the authored pixel size, when there is one, is the anchor; otherwise the element box is, and
+    // `pagx resolve` then fits the payload into whichever box the host carries. Filling the
+    // background beats dropping it, which is what registering an SVG as a raster `Image` amounts
+    // to.
     if (hasTileSize) {
       paintW = tileW;
       paintH = (!std::isnan(tileH) && tileH > 0) ? tileH : tileW;

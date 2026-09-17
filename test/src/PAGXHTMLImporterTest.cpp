@@ -256,6 +256,27 @@ inline pagx::Layer* FindSvgImportLayer(pagx::Layer* layer) {
   return nullptr;
 }
 
+inline bool HasLayerSize(pagx::Layer* layer, float width, float height) {
+  if (!layer) return false;
+  if (layer->width == width && layer->height == height) return true;
+  for (auto* child : layer->children) {
+    if (HasLayerSize(child, width, height)) return true;
+  }
+  return false;
+}
+
+inline bool HasNegativeLayerSize(pagx::Layer* layer) {
+  if (!layer) return false;
+  if ((!std::isnan(layer->width) && layer->width < 0) ||
+      (!std::isnan(layer->height) && layer->height < 0)) {
+    return true;
+  }
+  for (auto* child : layer->children) {
+    if (HasNegativeLayerSize(child)) return true;
+  }
+  return false;
+}
+
 // True when any Fill in `layer`'s subtree paints an ImagePattern — the raster path an SVG
 // import source must not take. ImagePattern is a ColorSource, not an Element, so the check goes
 // through each Fill's `color` pointer instead of the contents list.
@@ -8753,6 +8774,41 @@ PAG_TEST(PAGXHTMLImporterTest, LocalSvgFileBackgroundRidesImportDirective) {
   ASSERT_NE(host, nullptr);
   EXPECT_FALSE(HasImagePatternFill(layer));
   EXPECT_NE(host->importDirective.source.find("icon.svg"), std::string::npos);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, LocalSvgBackgroundUsesIntrinsicSizeByDefault) {
+  SaveFile(R"SVG(<svg xmlns="http://www.w3.org/2000/svg" width="24" height="12"
+                          viewBox="0 0 24 12"><rect width="24" height="12"/></svg>)SVG",
+           "PAGXHTMLImporterTest/svg-background/icon.svg");
+  auto htmlPath = SaveFile(
+      R"HTML(<html><body style="width:100px;height:100px">
+        <div style="width:100px;height:100px;background-image:url(icon.svg);
+                    background-repeat:no-repeat"></div>
+      </body></html>)HTML",
+      "PAGXHTMLImporterTest/svg-background/index.html");
+
+  auto doc = pagx::HTMLImporter::Parse(htmlPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* host = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(host, nullptr);
+  EXPECT_FLOAT_EQ(host->width, 24.0f);
+  EXPECT_FLOAT_EQ(host->height, 12.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipInsetsClampToEmptyBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:20px;height:20px">
+      <div style="width:10px;height:10px;border:8px solid black;padding:5px;
+                  background-image:linear-gradient(red,blue);
+                  background-clip:content-box"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_FALSE(HasNegativeLayerSize(layer));
+  EXPECT_TRUE(HasLayerSize(layer, 0.0f, 0.0f));
 }
 
 //==================================================================================================

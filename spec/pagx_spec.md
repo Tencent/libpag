@@ -516,6 +516,7 @@ Font defines embedded font resources containing subsetted glyph data (vector out
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `unitsPerEm` | int | 1000 | Font design space units. Rendering scale = `fontSize / unitsPerEm` |
+| `ttcIndex` | int | 0 | Face index within a TrueType Collection referenced by `file`. |
 | `file` | string | — | External font file path. When set, the Font node references an external TTF/OTF file. Relative paths resolve against the PAGX file's directory. `pagx embed` discovers Font nodes with `file`, loads the fonts, and registers them for text shaping. After embed, `file` is preserved for source traceability while embedded glyph data lives in separate Font nodes. |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
@@ -3172,4 +3173,3 @@ Group and TextBox share the following transform channels for applying animated t
 | `blurX`, `blurY` | float | Shadow blur (DropShadowFilter, InnerShadowFilter) |
 | `color` | color | Shadow / blend color (DropShadowFilter, InnerShadowFilter, BlendFilter) |
 | `shadowOnly` | boolean | Show shadow only (DropShadowFilter, InnerShadowFilter) |
-

@@ -2155,6 +2155,11 @@ static Font* ParseFont(const DOMNode* node, PAGXDocument* doc) {
     return nullptr;
   }
   font->unitsPerEm = GetIntAttribute(node, "unitsPerEm", Default<Font>().unitsPerEm, doc);
+  font->ttcIndex = GetIntAttribute(node, "ttcIndex", Default<Font>().ttcIndex, doc);
+  if (font->ttcIndex < 0) {
+    ReportError(doc, node, "Invalid 'ttcIndex' value: expected a non-negative integer.");
+    font->ttcIndex = Default<Font>().ttcIndex;
+  }
   // The `file` attribute carries either an external path or a `data:font/...;base64,...` URI with
   // inline bytes (mirroring Image's `source`); the two split into different fields so that
   // FromFile's relative-path resolution never touches data URIs.

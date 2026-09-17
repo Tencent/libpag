@@ -5429,6 +5429,60 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
 }
 
+CLI_TEST(PAGXFontEmbedderTest, PreservesBitmapFauxItalicPerRun) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  const auto primaryPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto primary = Typeface::MakeFromPath(primaryPath);
+  ASSERT_NE(primary, nullptr);
+
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "A😀";
+  text->fontFamily = primary->fontFamily();
+  text->fontStyle = primary->fontStyle();
+  text->fontSize = 24;
+  text->fauxItalic = true;
+  layer->contents = {text, doc->makeNode<pagx::Fill>()};
+
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(primaryPath, 0, primary->fontFamily(), primary->fontStyle());
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"), 0);
+  doc->applyLayout(&fontConfig);
+  ASSERT_TRUE(pagx::FontEmbedder().embed(doc.get()));
+
+  EXPECT_FALSE(text->fauxItalic);
+  bool foundVectorRun = false;
+  bool foundBitmapRun = false;
+  for (auto* run : text->glyphRuns) {
+    ASSERT_NE(run->font, nullptr);
+    bool bitmapRun = false;
+    for (auto* glyph : run->font->glyphs) {
+      if (glyph->image != nullptr) {
+        bitmapRun = true;
+        break;
+      }
+    }
+    if (bitmapRun) {
+      foundBitmapRun = true;
+      EXPECT_EQ(run->skews.size(), run->glyphs.size());
+      EXPECT_EQ(run->anchors.size(), run->glyphs.size());
+      for (auto skew : run->skews) {
+        EXPECT_NEAR(skew, 11.309932f, 0.0001f);
+      }
+    } else {
+      foundVectorRun = true;
+      EXPECT_TRUE(run->skews.empty());
+    }
+  }
+  EXPECT_TRUE(foundVectorRun);
+  EXPECT_TRUE(foundBitmapRun);
+}
+
 // Collects the document's source-declaration Font nodes (external file reference or inline data).
 static std::vector<pagx::Font*> CollectFontSourceNodes(const pagx::PAGXDocument* doc) {
   std::vector<pagx::Font*> sources = {};
@@ -5777,6 +5831,25 @@ PAGX_TEST(PAGXTest, FontEmbedderFontSourceDataRoundTrip) {
     }
   }
   EXPECT_EQ(sourceCount, 1u);
+}
+
+CLI_TEST(PAGXFontEmbedderTest, FontSourceTtcIndexRoundTrip) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  ASSERT_NE(doc, nullptr);
+  auto* font = doc->makeNode<pagx::Font>("collection");
+  font->file = "fonts/family.ttc";
+  font->fileOriginal = font->file;
+  font->ttcIndex = 3;
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("ttcIndex=\"3\""), std::string::npos);
+
+  auto imported = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(imported, nullptr);
+  auto* importedFont = imported->findNode<pagx::Font>("collection");
+  ASSERT_NE(importedFont, nullptr);
+  EXPECT_EQ(importedFont->ttcIndex, 3);
+  EXPECT_EQ(importedFont->file, "fonts/family.ttc");
 }
 
 /**

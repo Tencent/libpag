@@ -119,12 +119,10 @@ class HTMLParserContext {
   bool applyVectorBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer,
                                       const std::string& svgSource, const std::string& svgContent);
 
-  // Intrinsic size in CSS pixels of the SVG payload `svgContent`, or {NaN, NaN} when the payload
-  // does not parse or carries no resolvable size. This is the coordinate frame the CSS
-  // `background-size` / `background-position` model resolves against, and parsing the payload is
-  // the only way to establish it (an SVG's size lives in its own attributes / viewBox, not in a
-  // format header), so the result is memoised per payload.
-  std::pair<float, float> resolveSvgIntrinsicSize(const std::string& svgContent);
+  // Intrinsic size in CSS pixels of an SVG payload or local file, or {NaN, NaN} when the source
+  // does not parse or carries no resolvable size. `sourceIsFile` selects SVGImporter::Parse()
+  // instead of ParseString(); results are memoised by source kind and value.
+  std::pair<float, float> resolveSvgIntrinsicSize(const std::string& svgSource, bool sourceIsFile);
 
   // Folds the standard CSS rounded-image wrapper pattern (a container whose only role is
   // to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into a
@@ -337,8 +335,8 @@ class HTMLParserContext {
   // authored pair pays for the platform font lookup at most once.
   std::unordered_map<std::string, std::pair<std::string, std::string>> _fontFaceNameCache = {};
 
-  // Memoises `resolveSvgIntrinsicSize` (SVG payload -> intrinsic size in CSS pixels) so a payload
-  // shared by many background layers is parsed once.
+  // Memoises `resolveSvgIntrinsicSize` so a payload or local file shared by many background layers
+  // is parsed once.
   std::unordered_map<std::string, std::pair<float, float>> _svgIntrinsicSizeCache = {};
 
   float _canvasWidth = 0;

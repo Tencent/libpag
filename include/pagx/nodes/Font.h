@@ -82,6 +82,11 @@ class Font : public Node {
   int unitsPerEm = 1000;
 
   /**
+   * Face index within a TrueType Collection referenced by file or data. The default value is 0.
+   */
+  int ttcIndex = 0;
+
+  /**
    * Path to an external font file. When set, this Font node serves as a font source declaration:
    * `pagx embed` loads and registers the referenced font for text shaping. Extracted glyph data
    * is stored in separate Font nodes (the source node's `glyphs` is preserved as empty across

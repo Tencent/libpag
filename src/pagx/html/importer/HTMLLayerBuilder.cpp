@@ -589,8 +589,8 @@ void HTMLLayerBuilder::emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttri
   // way.
   inner->left = inset.left;
   inner->top = inset.top;
-  inner->width = box.widthPx - inset.left - inset.right;
-  inner->height = box.heightPx - inset.top - inset.bottom;
+  inner->width = std::max(0.0f, box.widthPx - inset.left - inset.right);
+  inner->height = std::max(0.0f, box.heightPx - inset.top - inset.bottom);
   auto* rect = _document->makeNode<Rectangle>();
   rect->percentWidth = 100.0f;
   rect->percentHeight = 100.0f;
