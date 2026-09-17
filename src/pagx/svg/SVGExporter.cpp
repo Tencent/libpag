@@ -773,8 +773,9 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   }
   if (!mimeRecognized) {
     addWarning(
-        "ImagePattern: encoded bytes are outside the PNG/JPEG/WebP/GIF set; declared as "
-        "application/octet-stream — viewers may fail to decode.");
+        "ImagePattern: encoded bytes are outside the PNG/JPEG/WebP/GIF set; declared with the "
+        "MIME type sniffed from the payload (application/octet-stream when unrecognised) — "
+        "viewers may fail to decode.");
   }
 
   std::string defId = generateId("pattern");
@@ -2219,8 +2220,9 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
     }
     if (!mimeRecognized) {
       addWarning(
-          "Glyph bitmap: encoded bytes are outside the PNG/JPEG/WebP/GIF set; declared as "
-          "application/octet-stream — viewers may fail to decode.");
+          "Glyph bitmap: encoded bytes are outside the PNG/JPEG/WebP/GIF set; declared with the "
+          "MIME type sniffed from the payload (application/octet-stream when unrecognised) — "
+          "viewers may fail to decode.");
     }
     int imgW = 0;
     int imgH = 0;
