@@ -6111,8 +6111,9 @@ function expandStickyScrollytelling() {
     if (trackRect.height < 2 * elRect.height) continue;
     // The sticky panel must be the track's only in-flow visible child:
     // switching it to absolute releases its layout slot, and any in-flow
-    // sibling would shift up and corrupt the geometry of everything the
-    // walker measures afterwards. Scrollytelling tracks are dedicated
+    // sibling — including another sticky one, which keeps its own flow slot —
+    // would shift up and corrupt the geometry of everything the walker
+    // measures afterwards. Scrollytelling tracks are dedicated
     // height-creating wrappers, so this holds for the intended targets and
     // rejects sticky headers living inside a normal content flow.
     let hasFlowSibling = false;
@@ -6120,7 +6121,7 @@ function expandStickyScrollytelling() {
       if (sibling === el) continue;
       const sc = getComputedStyle(sibling);
       if (sc.display === 'none') continue;
-      if (sc.position === 'absolute' || sc.position === 'fixed' || sc.position === 'sticky') {
+      if (sc.position === 'absolute' || sc.position === 'fixed') {
         continue;
       }
       if (sibling.getBoundingClientRect().height > 0) {
