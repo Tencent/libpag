@@ -579,21 +579,6 @@ bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
   for (auto* text : textOrder) {
     auto& layoutRuns = text->glyphData->layoutRuns;
     if (!layoutRuns.empty()) {
-      // Layout drops fauxItalic when the resolved typeface is a real italic face, so the
-      // embedded glyph paths already carry the slant. Clear the Text-level flag in that case,
-      // otherwise rendering the embedded paths shears them a second time.
-      if (text->fauxItalic) {
-        bool anyRunSynthesised = false;
-        for (auto& tlRun : layoutRuns) {
-          if (tlRun.font.isFauxItalic()) {
-            anyRunSynthesised = true;
-            break;
-          }
-        }
-        if (!anyRunSynthesised) {
-          text->fauxItalic = false;
-        }
-      }
       for (auto& tlRun : layoutRuns) {
         auto* typeface = tlRun.font.getTypeface().get();
         if (typeface == nullptr) {
@@ -619,6 +604,35 @@ bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
             default:
               break;
           }
+        }
+      }
+      // The renderer shears every run of this Text with the Text-level flag (GlyphRunRenderer), so
+      // the flag may only be dropped when no run still needs it. Layout drops the run-level
+      // fauxItalic when the resolved typeface is a real italic face, and a synthesised italic is
+      // already baked into the embedded vector outlines because Font::getPath() applies
+      // ITALIC_SKEW. Bitmap glyphs keep no shear in their PNG, so a run that was synthesised and
+      // is embedded as bitmaps still depends on the renderer applying the slant.
+      if (text->fauxItalic) {
+        bool needsRenderShear = false;
+        for (auto& tlRun : layoutRuns) {
+          if (!tlRun.font.isFauxItalic()) {
+            continue;
+          }
+          auto* typeface = tlRun.font.getTypeface().get();
+          for (auto glyphID : tlRun.glyphs) {
+            GlyphKey key = {typeface, glyphID};
+            auto typeIt = glyphTypes.find(key);
+            if (typeIt != glyphTypes.end() && typeIt->second == GlyphType::Bitmap) {
+              needsRenderShear = true;
+              break;
+            }
+          }
+          if (needsRenderShear) {
+            break;
+          }
+        }
+        if (!needsRenderShear) {
+          text->fauxItalic = false;
         }
       }
     }
