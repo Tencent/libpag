@@ -396,8 +396,8 @@ Options:
   --font-manifest <file>     Write the font files this page uses (one absolute
                              path per line) to <file>. Requires
                              --download-fonts. Lets callers pass only the fonts
-                             this page needs to 'pagx render' / 'pagx font
-                             embed' when --font-dir is shared.
+                             this page needs to 'pagx render' / 'pagx embed'
+                             when --font-dir is shared.
   --browser-engine <name>    Headless browser driver: one of
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);
