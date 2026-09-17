@@ -5359,15 +5359,21 @@ async function inlineExternalImages(cachedMap) {
   // browser's own WebP encoder produce the replacement bytes.
   async function transcodeToWebpDataUri(blob) {
     const bitmap = await createImageBitmap(blob);
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    canvas.getContext('2d').drawImage(bitmap, 0, 0);
-    const encoded = await canvas.convertToBlob({ type: 'image/webp', quality: WEBP_QUALITY });
-    // A browser without a WebP encoder hands back a PNG blob; labelling that as WebP would lie
-    // about the payload, so treat it as a failure and keep the original bytes.
-    if (encoded.type !== 'image/webp') {
-      throw new Error('no webp encoder');
+    try {
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+      const encoded = await canvas.convertToBlob({ type: 'image/webp', quality: WEBP_QUALITY });
+      // A browser without a WebP encoder hands back a PNG blob; labelling that as WebP would lie
+      // about the payload, so treat it as a failure and keep the original bytes.
+      if (encoded.type !== 'image/webp') {
+        throw new Error('no webp encoder');
+      }
+      return await blobToDataUri(encoded);
+    } finally {
+      // The bitmap owns a decoded copy of the image; release it explicitly instead of leaving a
+      // page full of large images to the garbage collector.
+      bitmap.close();
     }
-    return await blobToDataUri(encoded);
   }
 
   // Normalises the bytes of one fetched blob for the snapshot. A format PAGX can carry is inlined
