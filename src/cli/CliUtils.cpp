@@ -104,18 +104,22 @@ bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
     }
     auto* font = static_cast<Font*>(node.get());
     if (font->data != nullptr) {
-      auto typeface =
-          tgfx::Typeface::MakeFromBytes(font->data->bytes(), font->data->size(), font->ttcIndex);
+      // Inline font source: register the embedded bytes directly. The bytes may come from a TTC
+      // (`FontConfig::registerFont(..., ttcIndex, ...)` accepts a face index), but the PAGX `Font`
+      // node has no face-index field and the format carries none, so face 0 is the only face this
+      // path can load. The index is lost one layer up, when `FontEmbedder` writes the source
+      // declaration; preserving it needs a format-level field and is tracked separately.
+      auto typeface = tgfx::Typeface::MakeFromBytes(font->data->bytes(), font->data->size());
       if (typeface == nullptr) {
         std::cerr << command << ": failed to load embedded font data\n";
         return false;
       }
-      fontConfig.registerFont(font->data->bytes(), font->data->size(), font->ttcIndex,
-                              typeface->fontFamily(), typeface->fontStyle());
-      fontConfig.addFallbackFont(font->data->bytes(), font->data->size(), font->ttcIndex,
-                                 typeface->fontFamily(), typeface->fontStyle());
+      fontConfig.registerFont(font->data->bytes(), font->data->size(), 0, typeface->fontFamily(),
+                              typeface->fontStyle());
+      fontConfig.addFallbackFont(font->data->bytes(), font->data->size(), 0, typeface->fontFamily(),
+                                 typeface->fontStyle());
     } else if (!font->file.empty()) {
-      auto typeface = tgfx::Typeface::MakeFromPath(font->file, font->ttcIndex);
+      auto typeface = tgfx::Typeface::MakeFromPath(font->file);
       if (typeface == nullptr) {
         if (requiresFonts) {
           std::cerr << command << ": failed to load font '" << font->file << "'\n";
@@ -125,12 +129,11 @@ bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
                   << "' not found, skipped because the document needs no font\n";
         continue;
       }
-      fontConfig.registerFont(font->file, font->ttcIndex, typeface->fontFamily(),
-                              typeface->fontStyle());
+      fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
       // Also reach this file through the fallback chain: a (family, style) key holds one primary
       // registration, so unicode-range subset files sharing that key would otherwise overwrite
       // each other and drop every glyph that lives in an earlier subset.
-      fontConfig.addFallbackFont(font->file, font->ttcIndex);
+      fontConfig.addFallbackFont(font->file, 0);
     }
   }
   FontEmbedder::ClearEmbeddedGlyphRuns(document);

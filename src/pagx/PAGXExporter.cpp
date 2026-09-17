@@ -1578,7 +1578,6 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       xml.openElement("Font");
       xml.addAttribute("id", font->id);
       xml.addAttribute("unitsPerEm", font->unitsPerEm, Default<Font>().unitsPerEm);
-      xml.addAttribute("ttcIndex", font->ttcIndex, Default<Font>().ttcIndex);
       if (!font->file.empty()) {
         const std::string& fileAttr = !font->fileOriginal.empty() ? font->fileOriginal : font->file;
         xml.addAttribute("file", fileAttr);

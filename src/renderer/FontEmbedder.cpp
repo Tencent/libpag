@@ -44,8 +44,6 @@ namespace pagx {
 
 static constexpr int VectorFontUnitsPerEm = 1000;
 static constexpr float MinFontSize = 0.001f;
-// GlyphRunRenderer negates tan(skewDegrees), so this reproduces TGFX's -0.2 faux-italic shear.
-static constexpr float FAUX_ITALIC_SKEW_DEGREES = 11.309932f;
 
 static void PathToPathData(const tgfx::Path& path, PathData* pathData) {
   for (const auto& segment : path) {
@@ -304,8 +302,7 @@ static std::vector<Text*> CollectAllText(PAGXDocument* document) {
 static GlyphRun* CreateGlyphRunFromLayoutRun(
     PAGXDocument* document, const TextLayoutGlyphRun& tlRun, const tgfx::Typeface* typeface,
     const std::vector<size_t>& indices, Font* embeddedFont, float fontSize,
-    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping,
-    bool preserveFauxItalic = false) {
+    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& glyphMapping) {
   auto glyphRun = document->makeNode<GlyphRun>();
   glyphRun->font = embeddedFont;
   glyphRun->fontSize = fontSize;
@@ -350,14 +347,6 @@ static GlyphRun* CreateGlyphRunFromLayoutRun(
     }
     if (!hasNonDefaultRotation) {
       glyphRun->rotations.clear();
-    }
-  }
-  if (preserveFauxItalic) {
-    glyphRun->anchors.reserve(indices.size());
-    glyphRun->skews.assign(indices.size(), FAUX_ITALIC_SKEW_DEGREES);
-    for (auto idx : indices) {
-      float advance = tlRun.font.getAdvance(tlRun.glyphs[idx]);
-      glyphRun->anchors.push_back({-advance * 0.5f, 0.0f});
     }
   }
   return glyphRun;
@@ -482,15 +471,15 @@ static std::shared_ptr<Data> ReadFileBytes(const std::string& path) {
 void FontEmbedder::WriteFontSourceDeclarations(PAGXDocument* document,
                                                const std::set<const tgfx::Typeface*>& usedTypefaces,
                                                const EmbedOptions& options, int& fontIndex) {
-  std::set<std::pair<std::string, int>> knownPaths = {};
-  std::set<std::pair<uint64_t, int>> knownDataHashes = {};
+  std::set<std::string> knownPaths = {};
+  std::set<uint64_t> knownDataHashes = {};
   for (auto& node : document->nodes) {
     if (node->nodeType() == NodeType::Font) {
       auto* font = static_cast<Font*>(node.get());
       if (!font->file.empty()) {
-        knownPaths.insert({font->file, font->ttcIndex});
+        knownPaths.insert(font->file);
       } else if (font->data != nullptr) {
-        knownDataHashes.insert({HashData(font->data.get()), font->ttcIndex});
+        knownDataHashes.insert(HashData(font->data.get()));
       }
     }
   }
@@ -504,12 +493,11 @@ void FontEmbedder::WriteFontSourceDeclarations(PAGXDocument* document,
         if (bytes == nullptr) {
           continue;
         }
-        if (!knownDataHashes.insert({HashData(bytes.get()), source.ttcIndex}).second) {
+        if (!knownDataHashes.insert(HashData(bytes.get())).second) {
           continue;
         }
         auto* font = document->makeNode<Font>();
         font->data = std::move(bytes);
-        font->ttcIndex = source.ttcIndex;
         document->setNodeId(font, NextEmbedFontId(document, fontIndex));
         continue;
       }
@@ -519,16 +507,14 @@ void FontEmbedder::WriteFontSourceDeclarations(PAGXDocument* document,
       auto fileValue = options.outputBaseDir.empty()
                            ? source.path
                            : FontFileRelativeTo(source.path, options.outputBaseDir);
-      if (knownPaths.count({source.path, source.ttcIndex}) > 0 ||
-          knownPaths.count({fileValue, source.ttcIndex}) > 0) {
+      if (knownPaths.count(source.path) > 0 || knownPaths.count(fileValue) > 0) {
         continue;
       }
-      knownPaths.insert({source.path, source.ttcIndex});
-      knownPaths.insert({fileValue, source.ttcIndex});
+      knownPaths.insert(source.path);
+      knownPaths.insert(fileValue);
       auto* font = document->makeNode<Font>();
       font->file = fileValue;
       font->fileOriginal = fileValue;
-      font->ttcIndex = source.ttcIndex;
       document->setNodeId(font, NextEmbedFontId(document, fontIndex));
     }
   }
@@ -620,10 +606,35 @@ bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
           }
         }
       }
-      // Vector outlines already include synthetic italic from Font::getPath(). Bitmap runs retain
-      // the same slant through per-glyph skew below, so the Text-level flag must be cleared to keep
-      // GlyphRunRenderer from shearing every embedded run a second time.
-      text->fauxItalic = false;
+      // The renderer shears every run of this Text with the Text-level flag (GlyphRunRenderer), so
+      // the flag may only be dropped when no run still needs it. Layout drops the run-level
+      // fauxItalic when the resolved typeface is a real italic face, and a synthesised italic is
+      // already baked into the embedded vector outlines because Font::getPath() applies
+      // ITALIC_SKEW. Bitmap glyphs keep no shear in their PNG, so a run that was synthesised and
+      // is embedded as bitmaps still depends on the renderer applying the slant.
+      if (text->fauxItalic) {
+        bool needsRenderShear = false;
+        for (auto& tlRun : layoutRuns) {
+          if (!tlRun.font.isFauxItalic()) {
+            continue;
+          }
+          auto* typeface = tlRun.font.getTypeface().get();
+          for (auto glyphID : tlRun.glyphs) {
+            GlyphKey key = {typeface, glyphID};
+            auto typeIt = glyphTypes.find(key);
+            if (typeIt != glyphTypes.end() && typeIt->second == GlyphType::Bitmap) {
+              needsRenderShear = true;
+              break;
+            }
+          }
+          if (needsRenderShear) {
+            break;
+          }
+        }
+        if (!needsRenderShear) {
+          text->fauxItalic = false;
+        }
+      }
     }
   }
 
@@ -687,9 +698,9 @@ bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
         if (!bitmapIndices.empty()) {
           auto builderIt = bitmapBuilders.find(typeface);
           if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
-            auto glyphRun = CreateGlyphRunFromLayoutRun(
-                document, tlRun, typeface, bitmapIndices, builderIt->second.font, fontSize,
-                builderIt->second.glyphMapping, tlRun.font.isFauxItalic());
+            auto glyphRun = CreateGlyphRunFromLayoutRun(document, tlRun, typeface, bitmapIndices,
+                                                        builderIt->second.font, fontSize,
+                                                        builderIt->second.glyphMapping);
             text->glyphRuns.push_back(glyphRun);
           }
         }

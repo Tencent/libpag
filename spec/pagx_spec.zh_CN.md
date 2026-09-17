@@ -516,7 +516,6 @@ Font 定义嵌入字体资源，包含子集化的字形数据（矢量轮廓或
 | 属性 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `unitsPerEm` | int | 1000 | 字体设计空间单位。渲染时按 `fontSize / unitsPerEm` 缩放 |
-| `ttcIndex` | int | 0 | `file` 引用 TrueType Collection 时使用的字体面索引。 |
 | `file` | string | — | 外部字体文件路径。设置后，Font 节点引用外部 TTF/OTF 文件。相对路径基于 PAGX 文件所在目录解析。`pagx embed` 会扫描带 `file` 的 Font 节点，加载字体并注册用于文本排版。嵌入后，`file` 仍被保留以便溯源，嵌入的字形数据则存放在独立的 Font 节点中。 |
 
 **一致性约束**：同一 Font 内的所有 Glyph 必须使用相同类型（全部 `path` 或全部 `image`），不允许混用。
@@ -3165,3 +3164,4 @@ Group 和 TextBox 共享以下变换通道，可对内部元素整体施加动�
 | `blurX`, `blurY` | float | 阴影模糊（DropShadowFilter, InnerShadowFilter） |
 | `color` | color | 阴影/混合颜色（DropShadowFilter, InnerShadowFilter, BlendFilter） |
 | `shadowOnly` | boolean | 仅显示阴影（DropShadowFilter, InnerShadowFilter） |
+
