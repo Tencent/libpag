@@ -23,6 +23,9 @@
 #include "rendering/PAGAnimator.h"
 
 namespace pag {
+class PAGViewEventDispatcher;
+class JPAGViewRenderSession;
+
 class JPAGView : public PAGAnimator::Listener, public XComponentListener {
  public:
   static bool Init(napi_env env, napi_value exports);
@@ -30,8 +33,7 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
     return "JPAGView";
   }
 
-  explicit JPAGView(const std::string& id) : id(std::move(id)), player(new PAGPlayer()) {
-  }
+  JPAGView(const std::string& id, napi_env env);
 
   virtual ~JPAGView();
 
@@ -51,7 +53,7 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
 
   void onSurfaceSizeChanged() override;
 
-  void release();
+  void release(napi_env env = nullptr);
 
   std::shared_ptr<PAGPlayer> getPlayer();
 
@@ -61,19 +63,19 @@ class JPAGView : public PAGAnimator::Listener, public XComponentListener {
 
   void setVisible(bool visible);
 
-  void setProgressCallback(napi_threadsafe_function callback);
+  void setProgressCallback(napi_env env, napi_value callback);
 
-  void setPlayingStateCallback(napi_threadsafe_function callback);
+  void setPlayingStateCallback(napi_env env, napi_value callback);
 
   std::string id;
 
  private:
   static napi_value Constructor(napi_env env, napi_callback_info info);
-  std::shared_ptr<PAGPlayer> player;
+  std::shared_ptr<JPAGViewRenderSession> renderSession = nullptr;
   std::shared_ptr<PAGAnimator> animator = nullptr;
-  napi_threadsafe_function progressCallback = nullptr;
-  napi_threadsafe_function playingStateCallback = nullptr;
+  std::shared_ptr<PAGViewEventDispatcher> eventDispatcher = nullptr;
   bool isVisible = false;
+  bool released = false;
   std::mutex locker;
 };
 }  // namespace pag

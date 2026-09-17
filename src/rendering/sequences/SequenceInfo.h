@@ -34,10 +34,12 @@ class SequenceInfo {
                                                      PAGFile* pagFile = nullptr,
                                                      bool useDiskCache = false);
 
-  virtual std::shared_ptr<tgfx::Image> makeStaticImage(std::shared_ptr<File> file,
-                                                       bool useDiskCache);
+  virtual std::shared_ptr<tgfx::Image> makeStaticImage(
+      std::shared_ptr<File> file, bool useDiskCache,
+      std::shared_ptr<SequenceReadResult> result = nullptr);
   virtual std::shared_ptr<tgfx::Image> makeFrameImage(std::shared_ptr<SequenceReader> reader,
-                                                      Frame targetFrame, bool useDiskCache);
+                                                      Frame targetFrame, bool useDiskCache,
+                                                      std::shared_ptr<SequenceReadResult> result);
 
   virtual bool staticContent() const;
   virtual ID uniqueID() const;
@@ -60,9 +62,9 @@ class SequenceInfo {
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
  public:
   StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info, int width,
-                          int height, bool useDiskCache)
+                          int height, bool useDiskCache, std::shared_ptr<SequenceReadResult> result)
       : tgfx::ImageGenerator(width, height), file(std::move(file)), info(info),
-        useDiskCache(useDiskCache) {
+        useDiskCache(useDiskCache), result(std::move(result)) {
   }
 
   bool isAlphaOnly() const override {
@@ -78,20 +80,28 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
     auto reader = info->makeReader(file, nullptr, useDiskCache);
-    return reader->readBuffer(0);
+    if (reader == nullptr) {
+      if (result != nullptr) {
+        result->status.store(SequenceReadStatus::Failed, std::memory_order_release);
+      }
+      return nullptr;
+    }
+    return reader->readBuffer(0, result);
   }
 
  private:
   std::shared_ptr<File> file = nullptr;
   std::shared_ptr<SequenceInfo> info = nullptr;
   bool useDiskCache = false;
+  std::shared_ptr<SequenceReadResult> result = nullptr;
 };
 
 class SequenceFrameGenerator : public tgfx::ImageGenerator {
  public:
-  SequenceFrameGenerator(std::shared_ptr<SequenceReader> reader, Frame targetFrame)
+  SequenceFrameGenerator(std::shared_ptr<SequenceReader> reader, Frame targetFrame,
+                         std::shared_ptr<SequenceReadResult> result)
       : tgfx::ImageGenerator(reader->width(), reader->height()), reader(std::move(reader)),
-        targetFrame(targetFrame) {
+        targetFrame(targetFrame), result(std::move(result)) {
   }
 
   bool isAlphaOnly() const override {
@@ -106,11 +116,12 @@ class SequenceFrameGenerator : public tgfx::ImageGenerator {
 
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
-    return reader->readBuffer(targetFrame);
+    return reader->readBuffer(targetFrame, result);
   }
 
  private:
   std::shared_ptr<SequenceReader> reader = nullptr;
   Frame targetFrame = 0;
+  std::shared_ptr<SequenceReadResult> result = nullptr;
 };
 }  // namespace pag

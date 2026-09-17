@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CompositionReader.h"
+#include "rendering/caches/RenderCache.h"
 
 namespace pag {
 std::shared_ptr<CompositionReader> CompositionReader::Make(
@@ -39,7 +40,14 @@ CompositionReader::CompositionReader(std::shared_ptr<BitmapDrawable> bitmapDrawa
 }
 
 CompositionReader::~CompositionReader() {
+  // Hold the locker so that the deletion of pagPlayer waits out any in-flight readFrame() call.
+  // readFrame() dereferences pagPlayer and its render cache from a background flush task; without
+  // this, a teardown path releasing the owning PAGDecoder could delete the player while the flush
+  // task was still using it (issue #3684).
+  std::lock_guard<std::mutex> autoLock(locker);
   delete pagPlayer;
+  pagPlayer = nullptr;
+  drawable = nullptr;
 }
 
 std::shared_ptr<PAGComposition> CompositionReader::getComposition() {
@@ -60,7 +68,8 @@ bool CompositionReader::readFrame(double progress, std::shared_ptr<BitmapBuffer>
 
 bool CompositionReader::renderFrame(double progress) {
   pagPlayer->setProgress(progress);
-  pagPlayer->flush();
-  return drawable->isPixelCopied();
+  auto success = pagPlayer->flush();
+  return success && drawable->isPixelCopied() &&
+         !pagPlayer->renderCache->hasSequenceDecodeFailure();
 }
 }  // namespace pag

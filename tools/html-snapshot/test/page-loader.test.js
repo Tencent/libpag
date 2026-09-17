@@ -45,4 +45,39 @@ describe('openAndSettlePage — reduced motion', () => {
       .toHaveBeenCalledWith(page, 'puppeteer', true);
     expect(order).toEqual(['reduced-motion:true', 'goto']);
   });
+
+  test('pins the root scroller to zero before and after lazy-content walking', async () => {
+    const expressions = [];
+    const page = {
+      goto: jest.fn().mockResolvedValue(undefined),
+      on: jest.fn(),
+      waitForFunction: jest.fn().mockResolvedValue(undefined),
+      evaluate: jest.fn(async (expression) => {
+        expressions.push(expression);
+        // The sweep returns the stable document height. Three identical rounds
+        // satisfy settleLazyContent's two-stable-round exit condition.
+        if (typeof expression === 'string' && expression.includes('return docHeight();')) {
+          return 1200;
+        }
+        return undefined;
+      }),
+    };
+    browserEngine.newPage.mockResolvedValue(page);
+
+    await openAndSettlePage(
+      { browser: {}, engine: 'puppeteer' },
+      'https://example.com/page',
+      { waitMs: 0, autoScroll: true },
+    );
+
+    const resetExpressions = expressions.filter(
+      (expression) => typeof expression === 'string' &&
+        expression.includes('function pagxResetRootScroll'),
+    );
+    expect(resetExpressions.length).toBeGreaterThanOrEqual(2);
+    for (const expression of resetExpressions) {
+      expect(expression).toContain('scrollLeft = 0');
+      expect(expression).toContain('scrollTop = 0');
+    }
+  });
 });

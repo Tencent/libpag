@@ -976,10 +976,10 @@ SDK 沿"五条独立失效路径"中最高风险路径打分（0-100，越高越
 
 | 路径 | 计算 |
 |------|------|
-| A. BgBlur × 下方不可缓存元素 | `bg_count × (inner + blur + grad/10)` |
+| A. 背景采样样式 × 下方不可缓存元素 | `backdrop_style_count × (inner + blur + grad/10)` |
 | B. Path 几何量 | `path_data_bytes (MB)` |
 | C. 大画布 × 元素密度 | `(pix_M/100) × (imgPat + layer/30 + grad/20)` |
-| D. BgBlur 数量 | `bg_count` |
+| D. 背景采样样式数量 | `backdrop_style_count`（BackgroundBlurStyle + GlassStyle） |
 | E. Layer XML 数量 | 源 XML 中 `<Layer>` 数量 |
 
 ### 设备档位（按 `wx.getDeviceBenchmarkInfo`）
