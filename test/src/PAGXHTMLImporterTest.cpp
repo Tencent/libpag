@@ -10008,14 +10008,18 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageInvalidDropped) {
   EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipPaddingBoxDroppedSilently) {
+// A `padding-box` layer is how CSS paints a gradient border (a border-box layer showing through
+// a padding-box layer inset by the border width), so the importer keeps the box clip and rebuilds
+// each layer with its own inset geometry. Only a list that is entirely the default `border-box`
+// collapses away.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipPaddingBoxIsKept) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="background-clip: padding-box"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-clip"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "background-clip: padding-box"));
   EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
