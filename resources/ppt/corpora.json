@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "corpora": {
+    "features": {
+      "description": "Feature-oriented PAGX documents used by the HTML exporter tests.",
+      "roots": [
+        {
+          "path": "resources/pagx_to_html",
+          "recursive": false
+        }
+      ]
+    },
+    "layout": {
+      "description": "PAGX layout and constraint coverage.",
+      "roots": [
+        {
+          "path": "resources/layout",
+          "recursive": false
+        }
+      ]
+    },
+    "text": {
+      "description": "Text shaping, bidi, line breaking and writing-mode coverage.",
+      "roots": [
+        {
+          "path": "resources/text",
+          "recursive": false
+        }
+      ]
+    },
+    "cli": {
+      "description": "CLI regression fixtures that are valid visual documents. Negative and import-conflict fixtures are excluded.",
+      "roots": [
+        {
+          "path": "resources/cli",
+          "recursive": false,
+          "exclude": [
+            "resolve_conflict_children.pagx",
+            "resolve_conflict_contents.pagx",
+            "verify_not_xml.pagx"
+          ]
+        }
+      ],
+      "resources": [
+        "resources/cli/import_external.svg"
+      ]
+    },
+    "spec": {
+      "description": "Normative PAGX samples. Animation and view-model-only samples are excluded from static PPT fidelity.",
+      "roots": [
+        {
+          "path": "spec/samples",
+          "recursive": false,
+          "exclude": [
+            "animation.pagx",
+            "viewmodel.pagx"
+          ]
+        }
+      ],
+      "resources": [
+        "spec/samples/pag_logo.png"
+      ]
+    },
+    "smoke": {
+      "description": "Small representative corpus for local and presubmit validation.",
+      "roots": [
+        {
+          "path": "resources/ppt/cases/smoke",
+          "recursive": false
+        }
+      ]
+    },
+    "decks": {
+      "description": "Multi-slide PPTX coverage. Requires Poppler; the LibreOffice PNG fallback cannot enumerate pages.",
+      "roots": [],
+      "decks": [
+        {
+          "name": "ppt/multi-slide-basic",
+          "inputs": [
+            "resources/ppt/cases/smoke/solid-fill.pagx",
+            "resources/ppt/cases/smoke/native-text.pagx"
+          ]
+        }
+      ]
+    }
+  }
+}
