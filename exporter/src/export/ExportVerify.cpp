@@ -542,12 +542,23 @@ static bool CompareVideoComposition(std::shared_ptr<PAGExportSession> session,
     return false;
   }
 
-  for (pag::Frame frame = 0; frame < composition1->duration && !session->stopExport; frame++) {
-    auto itemIter1 = session->itemHandleMap.find(composition1->id);
-    auto itemIter2 = session->itemHandleMap.find(composition2->id);
-    if (itemIter1 == session->itemHandleMap.end() || itemIter2 == session->itemHandleMap.end()) {
-      return false;
-    }
+  auto itemIter1 = session->itemHandleMap.find(composition1->id);
+  auto itemIter2 = session->itemHandleMap.find(composition2->id);
+  if (itemIter1 == session->itemHandleMap.end() || itemIter2 == session->itemHandleMap.end()) {
+    return false;
+  }
+
+  // The duration/frameRate compared above are already in the session frame-rate unit, so two
+  // items with different native frame rates but the same rescaled duration can slip through.
+  // Guard on the native duration and frame rate here, otherwise the per-frame comparison below
+  // samples the two items at mismatched time points and dedup silently returns false.
+  if (GetItemDuration(itemIter1->second) != GetItemDuration(itemIter2->second) ||
+      GetItemFrameRate(itemIter1->second) != GetItemFrameRate(itemIter2->second)) {
+    return false;
+  }
+
+  auto totalFrames = GetItemDuration(itemIter1->second);
+  for (pag::Frame frame = 0; frame < totalFrames && !session->stopExport; frame++) {
     auto image1 = GetCompositionFrameImage(itemIter1->second, frame);
     auto image2 = GetCompositionFrameImage(itemIter2->second, frame);
     if (image1 != image2) {
