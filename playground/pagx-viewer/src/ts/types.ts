@@ -58,7 +58,8 @@ export interface NodeBounds {
  * has no measurable on-screen rect.
  */
 export interface HitTestResult {
-  /** Index of the source node in the document's node list. */
+  /** Index of the source node in the main document's node list. A hit resolving inside an
+   *  embedded external document reports -1 (its index would number the external node list). */
   index: number;
   /** 1-based source line of the node's start tag; -1 when unavailable. */
   startLine: number;

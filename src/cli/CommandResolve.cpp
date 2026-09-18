@@ -279,10 +279,7 @@ static bool ResolveOneLayer(Layer* layer, const std::string& baseDir,
   }
 
   // Transfer ownership of all nodes from imported document to target document.
-  for (auto& node : svgDoc->nodes) {
-    doc->nodes.push_back(std::move(node));
-  }
-  svgDoc->nodes.clear();
+  doc->adoptNodes(svgDoc->nodes);
   svgDoc->layers.clear();
 
   // Clear import fields and set resolved marker.

@@ -412,12 +412,18 @@ const CSS = `
     left: 16px;
     width: fit-content;
     min-width: 220px;
-    max-width: calc(100% - 32px);
+    /* Hard cap in addition to the canvas-relative one: a wide graph must not let the panel eat
+       the whole canvas, so past this width the graph overflows and the mouse wheel pans it
+       (shift + wheel horizontally). */
+    max-width: min(calc(100% - 32px), 560px);
     max-height: calc(100% - 120px);
     z-index: 150;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
+    /* Clips overflowing content at the rounded card: without it a flex column's items keep
+       min-height:auto and grow past max-height, painting over the canvas. */
+    overflow: hidden;
     background: rgba(32, 32, 42, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 10px;
@@ -478,6 +484,32 @@ const CSS = `
    separated by a subtle top border so they read as distinct panels. */
 .sm-section {
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    /* Keeps the section's own height fixed at content height: only the graph section
+       (.sm-section-graph) absorbs the panel's max-height compression, so the animation list
+       is never squeezed when the panel runs out of room. */
+    flex: 0 0 auto;
+    /* Lets the section shrink below its content inside the panel's flex column, so the panel's
+       max-height actually constrains the graph section instead of being overridden by the
+       flex items' default min-height:auto. */
+    min-height: 0;
+}
+
+/* The graph section absorbs the panel's remaining height so its viewport gets a bounded
+   height; other sections (animation list) keep their content height. */
+.sm-section-graph {
+    flex: 1 1 auto;
+}
+
+.sm-section-graph .sm-section-body {
+    flex: 1 1 auto;
+    /* Critical: without min-height: 0 the flex item's automatic minimum size keeps the body at
+       the content height, so the flex chain (blueprint max-height -> section -> body) never
+       actually compresses the body, the viewport's max-height: 100% resolves against the full
+       content height, and both pan axes end up with zero range. */
+    min-height: 0;
+    overflow: hidden;
 }
 
 .sm-section-header {
@@ -565,10 +597,13 @@ const CSS = `
 .sm-viewport {
     position: relative;
     overflow: hidden;
-    /* Content-driven: the region canvas inside dictates width and height. Panel-level
-       max-height clamps it and hands off to wheel panning when content overflows. */
+    /* Content-driven: the region canvas inside dictates width and height; the panel's own
+       max-width / max-height do the clamping and the mouse wheel pans what overflows. */
     width: fit-content;
-    max-width: 100%;
+    /* NOTE: deliberately no max-width / max-height here. Percentages do not resolve against the
+       auto-sized flex body, so they would silently be none. The pan range is instead measured
+       against the compressed section body in applyContentOffset (sm-blueprint.ts), and the
+       body's overflow: hidden clips the overflow visually. */
 }
 
 .sm-content {
@@ -664,6 +699,21 @@ const CSS = `
     background: rgba(77, 159, 255, 0.1);
 }
 
+/* The "any" pseudo-node anchoring from="any" transitions: visually distinct from real states
+   (dashed border, italic name, muted) because it is an edge anchor sitting on its own band above
+   the state grid, not a state you can preview. */
+.sm-state-any {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.02);
+    opacity: 0.8;
+    cursor: default;
+}
+
+.sm-state-any .sm-state-name {
+    font-style: italic;
+}
+
 .sm-state-name {
     font-size: 13px;
     font-weight: 600;
@@ -697,19 +747,12 @@ const CSS = `
     opacity: 0.4;
 }
 
-.sm-entry-dot {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    box-sizing: border-box;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.6);
-    transform: translate(-50%, -50%);
-}
-
 .sm-tooltip {
     position: absolute;
-    z-index: 20;
+    /* Above the blueprint panel (z-index 150): the tooltip is mounted as the panel's sibling so
+       the panel's overflow: hidden cannot clip it, which also means it needs its own stacking
+       order to stay on top. */
+    z-index: 160;
     padding: 6px 10px;
     border-radius: 6px;
     background: rgba(10, 10, 14, 0.95);

@@ -165,9 +165,22 @@ class PAGXDocument : public Node {
   }
 
   /**
-   * All nodes in the document (owned by the document).
+   * All nodes in the document (owned by the document). Do not push into this vector directly:
+   * use makeNode() for new nodes and adoptNodes() to take over nodes from another document — a
+   * direct push leaves the node's index stale and invisible to ownsNode().
    */
   std::vector<std::unique_ptr<Node>> nodes = {};
+
+  /**
+   * Takes over ownership of nodes created by another document (e.g. an SVG importer run for an
+   * inline import or a mask): appends them to this document's node list, reassigns each node's
+   * index to its new position, and registers them in the ownership set so ownsNode() recognizes
+   * them and notifyChange broadcasts their edits. Callers must not push into `nodes` directly —
+   * a bypassed node keeps its old index (colliding with existing nodes) and is invisible to
+   * ownsNode(), breaking getNodeSourceMap()/hitTest() index-based lookups.
+   * @param other the vector to drain; emptied on return.
+   */
+  void adoptNodes(std::vector<std::unique_ptr<Node>>& other);
 
   /**
    * Errors collected during parsing. Non-empty errors indicate structural issues in the source
@@ -315,6 +328,12 @@ class PAGXDocument : public Node {
    * edit. Any other Layer that auto layout repositions as a side effect is refreshed automatically,
    * so callers do not need to list such siblings. For external compositions, notify the document
    * that owns the nodes; foreign nodes are skipped (see ownsNode()).
+   *
+   * Structural child-list edits and the incremental layout path: when moving a child Layer between
+   * containers, list BOTH the source and the destination container Layer — the incremental layout's
+   * consistency check only sees containers listed in dirtyNodes, so a move reported with the source
+   * alone would escape the check and leave the moved subtree with stale geometry. When a container
+   * cannot be named, use removeNodes() or reload the document instead.
    *
    * @param dirtyNodes nodes whose fields or child lists changed. Must be owned by this document;
    * null and foreign entries are skipped; an empty list is a no-op.

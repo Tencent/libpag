@@ -78,6 +78,10 @@ export class PAGXPlayer extends EventTarget {
     // the SM runs and the playback bar is dimmed, but the chip stays visually active so the
     // user can un-park with one click. Cleared by selectTimelineUnit (chip click / dbl-click).
     private parkedPreviewId: string | null = null;
+    // Frozen poster spec captured at park time. playbackBar.setVisible(false) (e.g. hide())
+    // clears the dim/frozen state, so updatePlaybackBarMode's parked branch re-applies it from
+    // this cache to survive hide() -> show() round trips.
+    private parkedFrozenSpec: { durationUs: number; frameRate: number } | null = null;
     // Monotonically increasing id for each showStatus call; the caller can hold this token
     // and pass it to hideStatus() to only clear the pill when their own message is still on
     // screen. See showStatus / hideStatus for the full story.
@@ -443,6 +447,7 @@ export class PAGXPlayer extends EventTarget {
         this.chipBar.stopPolling();
         this.chipBar.clear();
         this.parkedPreviewId = null;
+        this.parkedFrozenSpec = null;
         this.playbackBar.setDimmed(false);
         this.playbackBar.setFrozen(null);
         // Snapshots taken while it's still safe to read pre-existing view state; used after
@@ -602,6 +607,12 @@ export class PAGXPlayer extends EventTarget {
             this.canvas.classList.add('hidden');
             setToolbarVisible(this.toolbarRoot, false);
             this.playbackBar.setVisible(false);
+            // The SM panels hold data from the failed document (blueprint graph, preview chips)
+            // and their polling was already stopped at load() entry, so leaving them visible
+            // would strand a zombie panel that ignores every interaction. Hide them like the
+            // other surfaces; a successful load re-shows them via refresh()/setVisible.
+            this.blueprint.setVisible(false);
+            this.chipBar.setVisible(false);
             this.editor?.setDocumentXml(null);
             this.destroyView();
             const error = err instanceof Error ? err : new Error(String(err));
@@ -908,11 +919,35 @@ export class PAGXPlayer extends EventTarget {
         for (const edit of edits) {
             const ok = this.view.setNodeChannel(edit.index, edit.channel, edit.value);
             if (!ok) {
+                // Roll back the writes that already landed: the full-reparse fallback below can
+                // itself fail on the same invalid value (an importer rejects it too), which
+                // would leave the runtime showing a partial edit the editor text no longer
+                // matches. Re-parse the pre-edit baseline so canvas and editor stay in sync;
+                // the user sees the error toast and can retry or Discard.
+                this.rollbackRuntimeToBaseline(oldXml);
                 return false;
             }
         }
         this.view.draw();
         return true;
+    }
+
+    /** Best-effort restore of the runtime to the pre-edit baseline after a failed incremental
+     *  apply. Synchronous and heavy (full reparse); only used on the error path, where keeping
+     *  a half-applied document is worse than re-parsing a known-good one. */
+    private rollbackRuntimeToBaseline(oldXml: string): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        try {
+            view.parsePAGX(new TextEncoder().encode(oldXml));
+            view.buildLayers();
+            view.draw();
+        } catch {
+            // Best-effort: on failure the partial writes stay visible (pre-fix behavior); the
+            // editor still reports the apply error so the user can retry or Discard.
+        }
     }
 
     /** The transient hover target: editor-hover wins over canvas-hover (mouse can only be in one). */
@@ -1250,6 +1285,7 @@ export class PAGXPlayer extends EventTarget {
         // poster and dim overlay: the bar is now driven by the freshly reset preview
         // instance again, or hidden if the SM took the render loop back.
         this.parkedPreviewId = null;
+        this.parkedFrozenSpec = null;
         this.playbackBar.setDimmed(false);
         this.playbackBar.setFrozen(null);
         this.updatePlaybackBarMode();
@@ -1278,6 +1314,7 @@ export class PAGXPlayer extends EventTarget {
             frameRate: view.frameRate(),
         };
         this.parkedPreviewId = selection.id;
+        this.parkedFrozenSpec = frozenSpec;
         // Rewind the preview lazy instance so re-selecting it (via chip / dbl-click) starts
         // from the top rather than resuming wherever the park happened.
         view.pause();
@@ -1288,10 +1325,9 @@ export class PAGXPlayer extends EventTarget {
         this.dispatchEvent(new CustomEvent('play'));
         // Keep the playback bar visible with the preview's static "0/duration" poster and
         // dim it so the user cannot interact. updatePlaybackBarMode sees parkedPreviewId and
-        // routes to setVisible(true) instead of hiding the bar for SM default.
+        // re-applies the frozen/dim state from the cached spec (the same path that restores it
+        // after a hide() -> show() round trip).
         this.updatePlaybackBarMode();
-        this.playbackBar.setFrozen(frozenSpec);
-        this.playbackBar.setDimmed(true);
     }
 
     /** The preview id that is "parked" (SM playing while a preview stays on the chip bar as
@@ -1314,8 +1350,12 @@ export class PAGXPlayer extends EventTarget {
         if (view.durationMicros() > 0) {
             this.playbackBar.setVisible(true);
         } else if (this.parkedPreviewId != null) {
-            // Parked: keep the bar visible, dim state is applied separately by parkPreview.
+            // Parked: keep the bar visible. setVisible(false) — e.g. the hide() -> show() round
+            // trip — clears the dim/frozen poster state, so re-apply it from the cached spec
+            // instead of leaving an undimmed, live bar for a parked preview.
             this.playbackBar.setVisible(true);
+            this.playbackBar.setFrozen(this.parkedFrozenSpec);
+            this.playbackBar.setDimmed(true);
         } else if (this.root.classList.contains('sm-default')) {
             this.playbackBar.setVisible(false);
         } else if (view.hasTimeline()) {
@@ -1618,6 +1658,15 @@ export class PAGXPlayer extends EventTarget {
         // is null for elements whose computed display is none anywhere on the ancestor chain
         // (except the body, which the player is not).
         if (this.canvas.offsetParent === null) return;
+        if (isPlayPause && this.parkedPreviewId != null) {
+            // Parked: the bar is visible but dimmed to a static poster for the parked preview,
+            // so its own toggle and stepping are no-ops. Route Space to the same raw toggle the
+            // blueprint panel's play button uses, so keyboard users get the mouse equivalent
+            // (un-park and resume). Arrow stepping has no parked equivalent and stays disabled.
+            event.preventDefault();
+            this.toggleRawPlayback();
+            return;
+        }
         if (!this.playbackBar.isVisible()) {
             // sm-default mode: the bar yielded its spot to the blueprint panel, but playback
             // shortcuts must stay functional. Route Space to the same raw toggle the panel's

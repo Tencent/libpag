@@ -174,7 +174,8 @@ static MergePath* ParseMergePath(const DOMNode* node, PAGXDocument* doc);
 static TextModifier* ParseTextModifier(const DOMNode* node, PAGXDocument* doc);
 static TextPath* ParseTextPath(const DOMNode* node, PAGXDocument* doc);
 static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc);
-static void ConvertSiblingTextLayoutToTextBox(const DOMNode* node, Layer* layer, PAGXDocument* doc);
+static void ConvertSiblingTextLayoutToTextBox(const DOMNode* node, std::vector<Element*>& contents,
+                                              const std::string& containerName, PAGXDocument* doc);
 static Repeater* ParseRepeater(const DOMNode* node, PAGXDocument* doc);
 static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc);
 static RangeSelector* ParseRangeSelector(const DOMNode* node, PAGXDocument* doc);
@@ -602,7 +603,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
     // <TextLayout/> right after the <Text> it belongs to. Convert it before the generic element
     // lookup rejects it.
     if (current->name == "TextLayout") {
-      ConvertSiblingTextLayoutToTextBox(current.get(), layer, doc);
+      ConvertSiblingTextLayoutToTextBox(current.get(), layer->contents, "Layer", doc);
       continue;
     }
     // Try to parse as VectorElement.
@@ -649,7 +650,7 @@ static void ParseContents(const DOMNode* node, Layer* layer, PAGXDocument* doc) 
     }
     // Legacy text-box descriptor, same conversion as in ParseLayer.
     if (current->name == "TextLayout") {
-      ConvertSiblingTextLayoutToTextBox(current.get(), layer, doc);
+      ConvertSiblingTextLayoutToTextBox(current.get(), layer->contents, "Layer", doc);
       continue;
     }
     auto element = ParseElement(current.get(), doc);
@@ -1292,25 +1293,27 @@ static TextBox* ParseTextBox(const DOMNode* node, PAGXDocument* doc) {
   return textBox;
 }
 
-static void ConvertSiblingTextLayoutToTextBox(const DOMNode* node, Layer* layer,
-                                              PAGXDocument* doc) {
+static void ConvertSiblingTextLayoutToTextBox(const DOMNode* node, std::vector<Element*>& contents,
+                                              const std::string& containerName, PAGXDocument* doc) {
   // <TextLayout/> is not part of the schema: some external exporters emit it as a sibling right
   // after the <Text> it describes, carrying the box properties (width, textAlign, lineHeight...)
   // the schema expects on a <TextBox>. Re-parse the descriptor as a TextBox (self-closing, so no
   // child elements) and wrap the preceding Text in it, which preserves the exported layout
-  // instead of dropping it with an error.
-  if (layer->contents.empty() || layer->contents.back()->nodeType() != NodeType::Text) {
+  // instead of dropping it with an error. Works for both Layer contents and Group elements —
+  // external exporters group Texts just as often as they layer them.
+  if (contents.empty() || contents.back()->nodeType() != NodeType::Text) {
     ReportError(doc, node,
-                "Element 'TextLayout' is not allowed in 'Layer'. It is a legacy text-box"
-                " descriptor and must directly follow a 'Text' element.");
+                "Element 'TextLayout' is not allowed in '" + containerName +
+                    "'. It is a legacy text-box descriptor and must directly follow a 'Text'"
+                    " element.");
     return;
   }
   auto* textBox = ParseTextBox(node, doc);
   if (textBox == nullptr) {
     return;
   }
-  textBox->elements.push_back(static_cast<Text*>(layer->contents.back()));
-  layer->contents.back() = textBox;
+  textBox->elements.push_back(static_cast<Text*>(contents.back()));
+  contents.back() = textBox;
 }
 
 static Repeater* ParseRepeater(const DOMNode* node, PAGXDocument* doc) {
@@ -1355,6 +1358,14 @@ static Group* ParseGroup(const DOMNode* node, PAGXDocument* doc) {
   auto child = node->firstChild;
   while (child) {
     if (child->type == DOMNodeType::Element) {
+      // Legacy text-box descriptor, same conversion as in ParseLayer/ParseContents: a
+      // <TextLayout/> sibling right after a <Text> inside the Group becomes the TextBox
+      // wrapping that Text.
+      if (child->name == "TextLayout") {
+        ConvertSiblingTextLayoutToTextBox(child.get(), group->elements, "Group", doc);
+        child = child->nextSibling;
+        continue;
+      }
       auto element = ParseElement(child.get(), doc);
       if (element) {
         group->elements.push_back(element);

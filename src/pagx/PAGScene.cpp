@@ -770,21 +770,27 @@ HitTestResult PAGScene::hitTest(float surfaceX, float surfaceY) {
   }
   // getLayersUnderPoint returns the most specific runtime layer under the pointer (e.g. a
   // <Rectangle> inside a <Composition>), not the <Layer composition="@X"> reference. Walk the
-  // parent chain up to the first Composition that has a source node (a real reference layer, not
-  // the root composition whose node is null) so the caller highlights the reference, not the
-  // internal definition. If no such ancestor exists (a plain <Layer> at the document root), fall
-  // back to the hit itself.
+  // parent chain up to the first Composition that has a source node owned by this scene's
+  // document (a real reference layer, not the root composition whose node is null) so the
+  // caller highlights the reference, not the internal definition. Compositions built from an
+  // embedded external document (a nested <Layer composition="@X"> inside an external pagx) are
+  // skipped: their node indexes number the external document's node list, which consumers would
+  // silently mis-map onto this document's getNodeSourceMap(). If no in-document ancestor
+  // exists, fall back to the hit itself.
   auto target = layers.front();
   auto walker = target;
   while (walker != nullptr) {
-    if (walker->layerType() == LayerType::Composition && walker->getNode() != nullptr) {
+    if (walker->layerType() == LayerType::Composition && walker->getNode() != nullptr &&
+        (document == nullptr || document->ownsNode(walker->getNode()))) {
       target = walker;
       break;
     }
     walker = walker->getParent();
   }
+  // The fallback hit itself can be a foreign layer (the whole click landed inside an embedded
+  // external document); report no hit rather than an index from a different numbering.
   const auto* node = target->getNode();
-  if (node == nullptr) {
+  if (node == nullptr || (document != nullptr && !document->ownsNode(node))) {
     return result;
   }
   result.index = node->index;

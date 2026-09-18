@@ -250,7 +250,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
    * instance resolves to the reference node rather than the internal definition node. The returned
    * bounds are the on-screen rect of the clicked runtime layer (the instance itself, not the whole
    * reference span), with the same tight, scrollRect-clipped semantics as getGlobalBoundsForNode.
-   * Does not require a prior draw().
+   * The returned index refers to the main document's node numbering: hits whose resolution lands
+   * inside an embedded external document report index -1 rather than an index into the external
+   * document's node list. Does not require a prior draw().
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    * @return a HitTestResult with index -1 when nothing is hit or the hit layer has no source node.

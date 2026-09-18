@@ -14920,7 +14920,13 @@ PAGX_TEST(PAGXTest, IncrementalLayoutMatchesFullLayoutForNestedGroupContents) {
   incrementalDoc->notifyChange({incrementalHost}, /*layoutChanged=*/true);
   fullDoc->applyLayout();
 
-  EXPECT_EQ(incrementalHost->layoutBounds(), fullHost->layoutBounds());
+  // Compare the nested element's own geometry, not the host layer's: the host has authored
+  // width/height, so Layer::onMeasure skips content measurement and its layoutBounds stays
+  // (10,10,180,180) no matter whether the Group recursion ran — that comparison cannot catch a
+  // missing CollectContentResetNodes recursion. r2's memo does: without the recursive reset the
+  // incremental path keeps the stale preferred height (30) while the full re-layout measures 90.
+  EXPECT_EQ(incrementalR2->layoutBounds(), fullR2->layoutBounds());
+  EXPECT_FLOAT_EQ(incrementalR2->layoutBounds().height, 90.0f);
 }
 
 /**

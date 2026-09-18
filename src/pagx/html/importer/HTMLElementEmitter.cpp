@@ -916,10 +916,7 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   if (maskLayer->id.empty()) {
     maskLayer->id = _idAllocator->generateUnique("mask");
   }
-  for (auto& node : svgDoc->nodes) {
-    _document->nodes.push_back(std::move(node));
-  }
-  svgDoc->nodes.clear();
+  _document->adoptNodes(svgDoc->nodes);
   svgDoc->layers.clear();
 
   layer->mask = maskLayer;

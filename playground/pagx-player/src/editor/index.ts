@@ -226,8 +226,16 @@ export class EditorPanel {
     public setDocumentXml(xmlText: string | null): void {
         const isApplyLoopback =
             xmlText !== null && this.pendingApplyXml !== null && xmlText === this.pendingApplyXml;
+        // Byte-identical no-op: a reload pushing exactly the text the editor is already showing
+        // (e.g. a host file watcher re-delivering the same content after an incremental Apply,
+        // which — unlike a full Apply — sets no pendingApplyXml) must not bump the generation
+        // or replace the model: model replacement destroys undo history and resets the
+        // viewport even though nothing changed. pendingApplyXml covers the full-Apply loopback;
+        // this content check covers every other same-text path.
+        const contentUnchanged = xmlText !== null && this.editor !== null &&
+            this.currentXmlText === xmlText && this.editor.getContent() === xmlText;
         this.currentXmlText = xmlText;
-        if (!isApplyLoopback) {
+        if (!isApplyLoopback && !contentUnchanged) {
             this.documentGeneration++;
         }
         if (xmlText === null) {
@@ -247,11 +255,11 @@ export class EditorPanel {
             // An Apply loopback carries exactly the text already in the current Monaco model. Do
             // not replace that model: replacement preserves the viewport but destroys undo/redo
             // history. A genuine document load still creates a fresh model and starts a new history.
-            if (!isApplyLoopback) {
+            if (!isApplyLoopback && !contentUnchanged) {
                 this.editor.setContent(xmlText);
             }
             this.pendingEditorSync = false;
-        } else if (!isApplyLoopback) {
+        } else if (!isApplyLoopback && !contentUnchanged) {
             // Panel is closed (or not built yet): close() keeps the editor instance alive, so it
             // still holds the previous document's text. Defer the push to open() instead of dropping
             // it, otherwise reopening the panel would show — and Apply would write back — stale XML.
@@ -639,7 +647,17 @@ export class EditorPanel {
             this.report('No changes to apply', 'info');
             return;
         }
+        // Snapshot the document version and content BEFORE any await: the validation provider
+        // may be a host-injected async SourceDiagnosticProvider, and a document swap or panel
+        // destroy landing inside that await window must abort this Apply instead of promoting
+        // stale content back into the runtime.
+        const applyDocGen = this.documentGeneration;
+        const contentAtApply = xmlText;
         const validationError = await this.editor.getValidationError();
+        if (this.editor === null || this.editor.getContent() !== contentAtApply ||
+            this.documentGeneration !== applyDocGen) {
+            return;
+        }
         if (validationError !== '') {
             this.report(validationError, 'error');
             return;
@@ -676,11 +694,9 @@ export class EditorPanel {
         // disturbing whatever newer message the swapping producer put up in the same slot.
         this.setBusy(true);
         const applyingToken = this.report('Applying...', 'info', { sticky: true });
-        // Snapshot the document version at Apply time so a setDocumentXml() call arriving
-        // while the host's onApply is still awaited (e.g. an SSE reload racing a slow Apply)
-        // can be detected on resume - we drop this Apply's baseline write and success toast
-        // in that case because the pre-Apply XML is no longer the truth we should promote.
-        const applyDocGen = this.documentGeneration;
+        // applyDocGen was snapshotted before the validation await (see above). A panel destroy
+        // also invalidates the pipeline (markApplied on a destroyed editor would dereference
+        // null and surface as a misleading error toast), so it counts as a swap here.
         // Advertise the XML the host is about to receive so setDocumentXml can recognize its
         // loopback (host.load -> player.load -> editor.setDocumentXml with this same content)
         // and skip the generation bump. See pendingApplyXml field comment for the full story.
@@ -694,7 +710,8 @@ export class EditorPanel {
         await yieldToBrowser();
         try {
             const error = await this.callbacks.onApply(xmlText);
-            const documentSwapped = this.documentGeneration !== applyDocGen;
+            const documentSwapped =
+                this.documentGeneration !== applyDocGen || this.editor === null;
             if (documentSwapped) {
                 // A fresher document already took over: leave currentXmlText / status alone
                 // so the newer content stays authoritative. The sticky "Applying..." pill is
@@ -735,7 +752,13 @@ export class EditorPanel {
             return;
         }
         const xmlText = this.editor.getContent();
+        // Same await-window protection as handleApply: an async validation provider lets a
+        // destroy or document swap land between getContent and the await's resolution.
+        const saveDocGen = this.documentGeneration;
         const validationError = await this.editor.getValidationError();
+        if (this.editor === null || this.documentGeneration !== saveDocGen) {
+            return;
+        }
         if (validationError !== '') {
             this.report(validationError, 'error');
             return;

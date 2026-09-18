@@ -461,6 +461,16 @@ Node* PAGXDocument::findNode(const std::string& id) const {
   return it != nodeMap.end() ? it->second : nullptr;
 }
 
+void PAGXDocument::adoptNodes(std::vector<std::unique_ptr<Node>>& other) {
+  nodes.reserve(nodes.size() + other.size());
+  for (auto& node : other) {
+    node->index = static_cast<int>(nodes.size());
+    nodeSet.insert(node.get());
+    nodes.push_back(std::move(node));
+  }
+  other.clear();
+}
+
 void PAGXDocument::registerNode(Node* node, const std::string& id) {
   if (id.empty()) {
     return;

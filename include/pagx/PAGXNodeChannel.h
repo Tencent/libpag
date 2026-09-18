@@ -65,14 +65,17 @@ bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& valu
 
 /**
  * Writes a raw string value into the node field identified by channel, parsing it into the
- * KeyValue alternative the channel expects. The string uses the exact PAGX XML attribute syntax
- * and is parsed with the same rules as document import, so an incremental edit produces the value
- * a full reparse would (float via strtof, int via strtol, bool as "true"/"1"/"false"/"0", width and
- * height as a dimension "100" or "50%" where the percent form writes the percent member and
- * clears the absolute one and vice versa, color as "#RGB"/"#RRGGBB"/"#RRGGBBAA"/"srgb(...)"/
- * "p3(...)", enums and strings verbatim). This is the convenience entry point for editors that
- * hold the value as text (e.g. a source-editor attribute edit); prefer SetNodeChannel when the
- * value is already typed. Edits are applied to the document; refresh any associated scene
+ * KeyValue alternative the channel expects. The string uses the exact PAGX XML attribute syntax.
+ * Dimension channels ("100" / "50%", where the percent form writes the percent member and clears
+ * the absolute one and vice versa), bool, color ("#RGB"/"#RRGGBB"/"#RRGGBBAA"/"srgb(...)"/"p3(...)"),
+ * enum, and string channels are parsed with the same rules as document import, so an incremental
+ * edit produces the value a full reparse would. Float and int channels are intentionally stricter
+ * than the importer's attribute parsing: they require the whole string to be consumed and reject
+ * non-finite values (the importer's strtof-based reader accepts trailing junk like "10px" and
+ * "inf"). A false return for such inputs is not a document error — treat it as "cannot go
+ * incremental" and fall back to a full reparse. This is the convenience entry point for editors
+ * that hold the value as text (e.g. a source-editor attribute edit); prefer SetNodeChannel when
+ * the value is already typed. Edits are applied to the document; refresh any associated scene
  * separately via PAGXDocument::notifyChange (use RequiresLayout to decide the layoutChanged flag).
  * @param node  the node to write to; must not be null.
  * @param channel  the channel name (see the encoding notes above).
