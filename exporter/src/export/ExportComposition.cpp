@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExportComposition.h"
+#include <cmath>
 #include "ExportLayer.h"
 #include "sequence/BitmapSequence.h"
 #include "sequence/VideoSequence.h"
@@ -58,13 +59,21 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
                               const AEGP_CompH& compositionHandle, pag::Composition* composition) {
   AEGP_ItemH itemHandle = GetCompItemH(compositionHandle);
   composition->id = GetItemID(itemHandle);
+  auto itemFrameRate = GetItemFrameRate(itemHandle);
   composition->duration = GetItemDuration(itemHandle);
   composition->backgroundColor = GetCompBackgroundColor(compositionHandle);
   if (session->frameRate == -1) {
-    composition->frameRate = GetItemFrameRate(itemHandle);
-    session->frameRate = composition->frameRate;
+    session->frameRate = itemFrameRate;
+    composition->frameRate = itemFrameRate;
   } else {
     composition->frameRate = session->frameRate;
+    // The item is authored at its own native frame rate but exported on the session frame rate,
+    // so rescale the duration from native frames to session-rate frames to keep this composition's
+    // timeline length consistent with the rest of the export.
+    if (itemFrameRate > 0 && itemFrameRate != session->frameRate) {
+      composition->duration = static_cast<pag::Frame>(
+          std::round(composition->duration * session->frameRate / itemFrameRate));
+    }
   }
   auto size = GetItemDimensions(itemHandle);
   composition->width = size.width();
@@ -72,9 +81,15 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
   session->itemHandleMap[composition->id] = itemHandle;
 
   if (composition->type() != pag::CompositionType::Vector) {
-    auto frames =
-        static_cast<uint64_t>(composition->duration * session->frameRate / composition->frameRate);
-    session->progressModel.addTotalSteps(frames);
+    // Sequence encoding walks frames at the sequence frame rate (the smaller of the configured and
+    // the native item rate), not the session rate, so count progress steps in that same unit.
+    // Using the session-rate duration here would overshoot and finish the progress bar early.
+    auto sequenceFrameRate = std::min(session->configParam.frameRate, itemFrameRate);
+    auto sequenceFrames = session->frameRate > 0
+                              ? static_cast<uint64_t>(std::ceil(
+                                    composition->duration * sequenceFrameRate / session->frameRate))
+                              : static_cast<uint64_t>(composition->duration);
+    session->progressModel.addTotalSteps(sequenceFrames);
   }
 }
 
