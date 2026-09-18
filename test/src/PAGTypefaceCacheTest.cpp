@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cctype>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -26,6 +27,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/TypefaceHolder.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
@@ -43,6 +45,42 @@
 
 namespace pag {
 using namespace tgfx;
+
+static bool FontNamesMatch(const std::string& first, const std::string& second) {
+  if (first.size() != second.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < first.size(); index++) {
+    if (std::tolower(static_cast<unsigned char>(first[index])) !=
+        std::tolower(static_cast<unsigned char>(second[index]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static pagx::PAGFont FindSystemFamilyWithUnavailableStyle() {
+  static const std::string unavailableStyle = "Definitely Missing Font Style";
+  for (const auto& entry : pagx::SystemFonts::AllFontFamilies()) {
+    if (entry.family.empty()) {
+      continue;
+    }
+    auto exactTypeface = Typeface::MakeFromName(entry.family, unavailableStyle);
+    if (exactTypeface != nullptr && FontNamesMatch(entry.family, exactTypeface->fontFamily()) &&
+        FontNamesMatch(unavailableStyle, exactTypeface->fontStyle())) {
+      continue;
+    }
+    auto location = pagx::SystemFonts::FindFont(entry.family, "");
+    if (location.path.empty()) {
+      continue;
+    }
+    auto defaultTypeface = Typeface::MakeFromPath(location.path, location.ttcIndex);
+    if (defaultTypeface != nullptr && FontNamesMatch(entry.family, defaultTypeface->fontFamily())) {
+      return {entry.family, unavailableStyle};
+    }
+  }
+  return {};
+}
 
 // Returns the cached tgfx typeface on a Font node, or nullptr if no cache has been built yet.
 static std::shared_ptr<Typeface> CachedTypeface(const pagx::Font* fontNode) {
@@ -310,6 +348,31 @@ CLI_TEST(PAGTypefaceCacheTest, FontConfigCoversRegistrationFallbackAndValueSeman
     EXPECT_TRUE(moveAssigned.containsFamily(installed.fontFamily));
     EXPECT_EQ(moveAssigned.fallbackFamilyNames().back(), installed.fontFamily);
   }
+}
+
+CLI_TEST(PAGTypefaceCacheTest, SystemTypefaceFallsBackWithinRequestedFamily) {
+  auto request = FindSystemFamilyWithUnavailableStyle();
+  if (request.fontFamily.empty()) {
+    GTEST_SKIP() << "No loadable system font family is available";
+  }
+
+  auto typeface = pagx::SystemFonts::ResolveTypeface(request.fontFamily, request.fontStyle);
+  ASSERT_NE(typeface, nullptr);
+  EXPECT_TRUE(FontNamesMatch(request.fontFamily, typeface->fontFamily()));
+  EXPECT_FALSE(FontNamesMatch(request.fontStyle, typeface->fontStyle()));
+
+  pagx::FontConfig emptyConfig;
+  pagx::LayoutContext systemContext(&emptyConfig);
+  auto systemTypeface = systemContext.findTypeface(request.fontFamily, request.fontStyle);
+  ASSERT_NE(systemTypeface, nullptr);
+  EXPECT_TRUE(FontNamesMatch(request.fontFamily, systemTypeface->fontFamily()));
+
+  pagx::FontConfig registeredConfig;
+  EXPECT_TRUE(registeredConfig.registerSystemFont(request));
+  pagx::LayoutContext registeredContext(&registeredConfig);
+  auto registeredTypeface = registeredContext.findTypeface(request.fontFamily, request.fontStyle);
+  ASSERT_NE(registeredTypeface, nullptr);
+  EXPECT_TRUE(FontNamesMatch(request.fontFamily, registeredTypeface->fontFamily()));
 }
 
 }  // namespace pag

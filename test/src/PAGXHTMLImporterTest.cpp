@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -34,6 +35,7 @@
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXOptimizer.h"
 #include "pagx/SVGImporter.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -239,6 +241,74 @@ inline size_t CountBackgroundBlurStyles(pagx::Layer* layer) {
   }
   for (auto* c : layer->children) count += CountBackgroundBlurStyles(c);
   return count;
+}
+
+// Returns the first Layer in `layer`'s subtree whose import directive targets SVG, or nullptr.
+// Used to assert that SVG sources ride the import-directive path regardless of wrapper nesting.
+inline pagx::Layer* FindSvgImportLayer(pagx::Layer* layer) {
+  if (!layer) return nullptr;
+  if (layer->importDirective.format == "svg") return layer;
+  for (auto* c : layer->children) {
+    if (auto* match = FindSvgImportLayer(c)) {
+      return match;
+    }
+  }
+  return nullptr;
+}
+
+inline bool HasLayerSize(pagx::Layer* layer, float width, float height) {
+  if (!layer) return false;
+  if (layer->width == width && layer->height == height) return true;
+  for (auto* child : layer->children) {
+    if (HasLayerSize(child, width, height)) return true;
+  }
+  return false;
+}
+
+inline bool HasNegativeLayerSize(pagx::Layer* layer) {
+  if (!layer) return false;
+  if ((!std::isnan(layer->width) && layer->width < 0) ||
+      (!std::isnan(layer->height) && layer->height < 0)) {
+    return true;
+  }
+  for (auto* child : layer->children) {
+    if (HasNegativeLayerSize(child)) return true;
+  }
+  return false;
+}
+
+// True when any Fill in `layer`'s subtree paints an ImagePattern — the raster path an SVG
+// import source must not take. ImagePattern is a ColorSource, not an Element, so the check goes
+// through each Fill's `color` pointer instead of the contents list.
+inline bool HasImagePatternFill(pagx::Layer* layer) {
+  if (!layer) return false;
+  for (auto* e : layer->contents) {
+    auto* fill = As<pagx::Fill>(e);
+    if (fill && As<pagx::ImagePattern>(fill->color)) return true;
+  }
+  for (auto* c : layer->children) {
+    if (HasImagePatternFill(c)) return true;
+  }
+  return false;
+}
+
+// The tile Layer a single (non-tiled) background image rides: a tile-sized child inserted at the
+// front of the element, wrapped in a box-sized clip layer when the tile overflows the element box.
+inline pagx::Layer* FindBackgroundTileLayer(pagx::Layer* layer) {
+  if (!layer || layer->children.empty() || !layer->children.front()) return nullptr;
+  auto* child = layer->children.front();
+  if (child->contents.empty() && child->clipToBounds && !child->children.empty()) {
+    return child->children.front();
+  }
+  return child;
+}
+
+// The image Fill of the tile Layer the raster background path emits, or nullptr when the element
+// carries no single-tile background.
+inline pagx::Fill* FindBackgroundTileFill(pagx::Layer* layer) {
+  auto* tile = FindBackgroundTileLayer(layer);
+  if (!tile) return nullptr;
+  return FindElementOfType<pagx::Fill>(tile);
 }
 
 // Returns the first Channel named `name` across all AnimationObjects of `anim`, or nullptr.
@@ -1533,6 +1603,73 @@ PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenMapsToClipToBounds) {
   ASSERT_NE(doc, nullptr);
   auto* div = doc->layers.front()->children.front();
   EXPECT_TRUE(div->clipToBounds);
+  EXPECT_TRUE(div->visible);
+}
+
+// A zero-area clip box (width or height 0 with a clipping overflow) renders nothing in a browser.
+// PAGX carries the clip through clipToBounds, which layout expands into a scrollRect sized from the
+// layer bounds, and the renderer treats an empty scrollRect as "no clipping" — so the importer has
+// to mark such layers invisible to preserve the hidden state.
+PAG_TEST(PAGXHTMLImporterTest, ZeroAreaOverflowClipHidesLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:80px;height:80px">
+      <div style="width:80px;height:0;overflow:hidden">
+        <div style="width:80px;height:20px;background-color:#000"></div>
+      </div>
+      <div style="width:0;height:80px;overflow:hidden"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_TRUE(doc->layers.front()->children.size() >= 2);
+  auto* zeroHeight = doc->layers.front()->children[0];
+  auto* zeroWidth = doc->layers.front()->children[1];
+  EXPECT_FALSE(zeroHeight->visible);
+  EXPECT_TRUE(zeroHeight->clipToBounds);
+  EXPECT_FALSE(zeroWidth->visible);
+  EXPECT_TRUE(zeroWidth->clipToBounds);
+}
+
+// Chromium emits the two-value `overflow` shorthand for per-axis CSS (`overflow-x: auto;
+// overflow-y: hidden` → `overflow: auto hidden`). CSS makes the box a clipping container as soon
+// as one axis is not `visible`, so the shorthand has to fold into `clipToBounds` as well —
+// otherwise the clip is silently dropped and off-screen content parked at a negative offset (the
+// clone layers of an infinite carousel) bleeds into the layout.
+PAG_TEST(PAGXHTMLImporterTest, OverflowTwoValueShorthandClipsBothAxes) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;overflow:auto hidden;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(div->clipToBounds);
+  // `auto` implies a scroll affordance PAGX cannot model, so the shorthand still warns.
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "overflow: auto hidden not fully supported"));
+}
+
+// A two-value shorthand built only from silent keywords clips without a diagnostic.
+PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenTwoValueClipsSilently) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;overflow:hidden visible;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_TRUE(div->clipToBounds);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "overflow"));
+}
+
+// Both axes `visible` leaves the box unclipped, matching CSS.
+PAG_TEST(PAGXHTMLImporterTest, OverflowVisibleTwoValueDoesNotClip) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;overflow:visible visible;background-color:#000"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* div = doc->layers.front()->children.front();
+  EXPECT_FALSE(div->clipToBounds);
 }
 
 // `border-radius` + `overflow: hidden` on a container that is NOT a single-image fold (here a
@@ -3656,16 +3793,26 @@ PAG_TEST(PAGXHTMLImporterTest, MissingBoldFaceFallsBackWithoutFauxBold) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, FontWeight500MapsToMedium) {
-  auto doc = ParseFromString(R"HTML(
+  // Registered families are resolved by LayoutContext through an exact (family, style) key, so the
+  // importer must report their names verbatim — including an authored style label the platform has
+  // no face for. Registering keeps this assertion independent of the fonts installed on the host.
+  pagx::FontConfig fontConfig;
+  fontConfig.registerFont(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"), 0,
+                          "HTML Medium Test", "Regular");
+  pagx::HTMLImporter::Options opts;
+  opts.fontConfig = &fontConfig;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
     <html><body style="width:200px;height:40px">
-      <span style="font-weight:500">Medium</span>
+      <span style="font-family:'HTML Medium Test';font-weight:500">Medium</span>
     </body></html>
-  )HTML");
+  )HTML",
+                                             opts);
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
   // Medium stays a real-face style label so font lookup can select it precisely. The importer does
   // not bake a faux flag when that face is unavailable.
+  EXPECT_EQ(text->fontFamily, "HTML Medium Test");
   EXPECT_EQ(text->fontStyle, "Medium");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_FALSE(text->fauxItalic);
@@ -3680,9 +3827,9 @@ PAG_TEST(PAGXHTMLImporterTest, BoldItalicCombined) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  // The weight axis becomes a real-face "Bold" style label; only the italic axis is synthesised via
-  // faux italic so the slant survives a missing styled italic face.
-  EXPECT_EQ(text->fontStyle, "Bold");
+  // Both axes become real-face style labels ("Bold Italic") so font lookup can select the authored
+  // face; fauxItalic stays true as a synthesis fallback for when that face is unavailable.
+  EXPECT_EQ(text->fontStyle, "Bold Italic");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_TRUE(text->fauxItalic);
 }
@@ -3923,6 +4070,202 @@ PAG_TEST(PAGXHTMLImporterTest, FontFamilyStackDedupesAcrossElements) {
   EXPECT_EQ(interCount, 1u);
   EXPECT_NE(std::find(names.begin(), names.end(), "Roboto"), names.end());
   EXPECT_NE(std::find(names.begin(), names.end(), "Noto Sans"), names.end());
+}
+
+// Case-insensitive comparison of two font names, mirroring how the importer decides whether the
+// face the platform resolved still belongs to the requested family.
+static bool FontNamesMatchIgnoreCase(const std::string& first, const std::string& second) {
+  if (first.size() != second.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < first.size(); index++) {
+    if (std::tolower(static_cast<unsigned char>(first[index])) !=
+        std::tolower(static_cast<unsigned char>(second[index]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static std::string LowercaseAscii(const std::string& text) {
+  std::string out = text;
+  for (auto& character : out) {
+    character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+  }
+  return out;
+}
+
+// Returns a system family the platform resolves both under its own spelling and under the
+// lower-cased one, so feeding the lower-cased form to the importer proves the exported name is the
+// platform's spelling rather than what the CSS said. Empty when the host offers no such family.
+static std::string FindSystemFamilyWithCaseVariantSpelling() {
+  for (const auto& entry : pagx::SystemFonts::AllFontFamilies()) {
+    if (entry.family.empty()) {
+      continue;
+    }
+    auto lowercase = LowercaseAscii(entry.family);
+    if (lowercase == entry.family) {
+      continue;
+    }
+    auto typeface = pagx::SystemFonts::ResolveTypeface(lowercase, "");
+    if (typeface == nullptr || !FontNamesMatchIgnoreCase(entry.family, typeface->fontFamily())) {
+      continue;
+    }
+    if (typeface->fontFamily() == entry.family) {
+      return entry.family;
+    }
+  }
+  return {};
+}
+
+// Returns a system family that ships no Regular face, so the face the platform picks for an
+// unstyled request carries a different style name. Empty when every family has a Regular face.
+static std::string FindSystemFamilyWithoutRegularFace() {
+  for (const auto& entry : pagx::SystemFonts::AllFontFamilies()) {
+    if (entry.family.empty()) {
+      continue;
+    }
+    auto regular = pagx::SystemFonts::FindFont(entry.family, "Regular");
+    if (!regular.path.empty() && FontNamesMatchIgnoreCase(regular.fontStyle, "Regular")) {
+      continue;
+    }
+    auto typeface = pagx::SystemFonts::ResolveTypeface(entry.family, "");
+    if (typeface == nullptr || typeface->fontFamily() != entry.family) {
+      continue;
+    }
+    if (!typeface->fontStyle().empty()) {
+      return entry.family;
+    }
+  }
+  return {};
+}
+
+// Returns a system family without a Medium face, so `font-weight:500` names a face the family does
+// not ship. Empty when every installed family has a Medium face.
+static std::string FindSystemFamilyWithoutMediumFace() {
+  for (const auto& entry : pagx::SystemFonts::AllFontFamilies()) {
+    if (entry.family.empty()) {
+      continue;
+    }
+    auto medium = pagx::SystemFonts::FindFont(entry.family, "Medium");
+    if (!medium.path.empty() && FontNamesMatchIgnoreCase(medium.fontStyle, "Medium")) {
+      continue;
+    }
+    auto typeface = pagx::SystemFonts::ResolveTypeface(entry.family, "Medium");
+    if (typeface == nullptr || typeface->fontFamily() != entry.family) {
+      continue;
+    }
+    if (typeface->fontStyle().empty() || typeface->fontStyle() == "Medium") {
+      continue;
+    }
+    return entry.family;
+  }
+  return {};
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFamilyNameIsWrittenInPlatformSpelling) {
+  auto family = FindSystemFamilyWithCaseVariantSpelling();
+  if (family.empty()) {
+    GTEST_SKIP() << "No system font family resolves under a case-variant spelling";
+  }
+  auto typeface = pagx::SystemFonts::ResolveTypeface(LowercaseAscii(family), "");
+  ASSERT_NE(typeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<span style=\"font-family:'" +
+      LowercaseAscii(family) + "'\">Hi</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  // A host process that looks fonts up with an exact family match cannot resolve the authored
+  // spelling, so the exported name is the spelling the platform itself reports.
+  EXPECT_EQ(text->fontFamily, typeface->fontFamily());
+  EXPECT_EQ(text->fontFamily, family);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, MissingStyleIsWrittenAsResolvedFaceStyle) {
+  auto family = FindSystemFamilyWithoutMediumFace();
+  if (family.empty()) {
+    GTEST_SKIP() << "Every installed system font family ships a Medium face";
+  }
+  auto typeface = pagx::SystemFonts::ResolveTypeface(family, "Medium");
+  ASSERT_NE(typeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<span style=\"font-family:'" +
+      family + "';font-weight:500\">Hi</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  // "Medium" names no face in this family, so the exported pair reports the face the platform
+  // actually resolves instead of a label no font lookup can hit.
+  EXPECT_EQ(text->fontFamily, typeface->fontFamily());
+  EXPECT_EQ(text->fontStyle, typeface->fontStyle());
+  EXPECT_NE(text->fontStyle, "Medium");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FamilyWithoutRegularFaceUsesDefaultFaceStyle) {
+  auto family = FindSystemFamilyWithoutRegularFace();
+  if (family.empty()) {
+    GTEST_SKIP() << "Every installed system font family ships a Regular face";
+  }
+  auto typeface = pagx::SystemFonts::ResolveTypeface(family, "");
+  ASSERT_NE(typeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:40px\">"
+      "<span style=\"font-family:'" +
+      family + "'\">Hi</span></body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  // An unstyled request would otherwise be exported with the substituted "Regular" style label,
+  // which resolves nowhere for a family that has no Regular face.
+  EXPECT_EQ(text->fontFamily, typeface->fontFamily());
+  EXPECT_EQ(text->fontStyle, typeface->fontStyle());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, SubstitutedFamilyKeepsAuthoredName) {
+  // The platform substitutes a default face for an unknown family on some backends; the authored
+  // name must survive so the substitution is not baked into the exported document.
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:40px">
+      <span style="font-family:'No Such Font 24680';font-weight:500">Hi</span>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "No Such Font 24680");
+  EXPECT_EQ(text->fontStyle, "Medium");
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InheritedFontFaceNamesStayConsistent) {
+  auto family = FindSystemFamilyWithCaseVariantSpelling();
+  if (family.empty()) {
+    GTEST_SKIP() << "No system font family resolves under a case-variant spelling";
+  }
+  auto boldTypeface = pagx::SystemFonts::ResolveTypeface(family, "Bold");
+  ASSERT_NE(boldTypeface, nullptr);
+  auto doc = ParseFromString(
+      "<html><body style=\"width:200px;height:60px\">"
+      "<div style=\"font-family:'" +
+      LowercaseAscii(family) +
+      "'\"><span>One</span>"
+      "<span style=\"font-weight:700\">Two</span></div>"
+      "</body></html>");
+  ASSERT_NE(doc, nullptr);
+  auto* divLayer = doc->layers.front()->children.front();
+  ASSERT_FALSE(divLayer->children.empty());
+  ASSERT_GE(divLayer->children.size(), 2u);
+  auto* plain = FindElementOfType<pagx::Text>(divLayer->children.front());
+  auto* heavy = FindElementOfType<pagx::Text>(divLayer->children[1]);
+  ASSERT_NE(plain, nullptr);
+  ASSERT_NE(heavy, nullptr);
+  // The child that only changes the weight inherits the already-normalised family, and each child's
+  // style is the face the platform resolves for its own request.
+  EXPECT_EQ(plain->fontFamily, family);
+  EXPECT_EQ(heavy->fontFamily, family);
+  EXPECT_EQ(heavy->fontStyle, boldTypeface->fontStyle());
 }
 
 PAG_TEST(PAGXHTMLImporterTest, TextAlignAndLineHeightOnParagraph) {
@@ -4284,6 +4627,95 @@ PAG_TEST(PAGXHTMLImporterTest, GradientBackgroundWithoutClipKeepsRectangle) {
   auto* fill = FindElementOfType<pagx::Fill>(outer);
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::LinearGradient>(fill->color), nullptr);
+}
+
+// Verifies the solid-colour half of the `background-clip: text` technique: with no gradient
+// layer the element's `background-color` is what paints the glyphs, so it must become the text
+// fill while the rectangle behind the text is suppressed. Sites drive their tab / link
+// hover-and-active colour changes this way, pairing an inherited transparent text-fill with a
+// background that swaps between a solid colour and a gradient.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextRoutesSolidColorToTextFill) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-color:rgba(0,0,0,0.9);background-clip:text">
+        <span style="font-size:32px;font-weight:700">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  // No Rectangle on the clip-to-text wrapper: the colour is consumed by the text fill instead
+  // of painting a block behind the glyphs.
+  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 0u);
+  EXPECT_EQ(FindElementOfType<pagx::Fill>(outer), nullptr);
+  // The text leaf carries the background colour as its glyph fill, outranking the default
+  // text colour that the snapshot omits (CSS inherits a transparent text-fill-color).
+  auto* textLeaf = outer->children.front();
+  ASSERT_NE(textLeaf, nullptr);
+  auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
+  pagx::Fill* textFill = nullptr;
+  if (textBox) {
+    textFill = FindElement<pagx::Fill>(textBox->elements);
+  } else {
+    textFill = FindElementOfType<pagx::Fill>(textLeaf);
+  }
+  ASSERT_NE(textFill, nullptr);
+  auto* solid = As<pagx::SolidColor>(textFill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x000000, 0.9f)));
+}
+
+// Negative control: without `background-clip: text` a solid `background-color` must still paint
+// the rectangle behind the text (the existing behaviour must not regress).
+PAG_TEST(PAGXHTMLImporterTest, SolidBackgroundWithoutClipKeepsRectangle) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-color:rgba(0,0,0,0.9)">
+        <span style="font-size:32px;font-weight:700">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  EXPECT_EQ(CountElements<pagx::Rectangle>(outer->contents), 1u);
+  auto* fill = FindElementOfType<pagx::Fill>(outer);
+  ASSERT_NE(fill, nullptr);
+  auto* solid = As<pagx::SolidColor>(fill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x000000, 0.9f)));
+}
+
+// A fully transparent `background-color` carries no paint, so `background-clip: text` must stay
+// a no-op for that element and leave the text on its own resolved `color`.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipTextTransparentColorKeepsTextColor) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:240px;height:80px">
+      <div style="position:absolute;left:0;top:0;width:240px;height:80px;
+                  background-color:rgba(0,0,0,0);background-clip:text">
+        <span style="font-size:32px;font-weight:700;color:#123456">Hello</span>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* outer = doc->layers.front()->children.front();
+  ASSERT_NE(outer, nullptr);
+  auto* textLeaf = outer->children.front();
+  ASSERT_NE(textLeaf, nullptr);
+  pagx::Fill* textFill = nullptr;
+  auto* textBox = FindElementOfType<pagx::TextBox>(textLeaf);
+  if (textBox) {
+    textFill = FindElement<pagx::Fill>(textBox->elements);
+  } else {
+    textFill = FindElementOfType<pagx::Fill>(textLeaf);
+  }
+  ASSERT_NE(textFill, nullptr);
+  auto* solid = As<pagx::SolidColor>(textFill->color);
+  ASSERT_NE(solid, nullptr);
+  EXPECT_TRUE(ColorNear(solid->color, HexColor(0x123456)));
 }
 
 PAG_TEST(PAGXHTMLImporterTest, AnchorHrefStoredAsCustomData) {
@@ -4749,6 +5181,131 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatMapsToNoneTiled) {
   EXPECT_FLOAT_EQ(pattern->matrix.ty, -30.0f);
 }
 
+// Chromium's computed value for `background-position: center` is `50% 50%`, and a percentage
+// resolves against the slack between the element box and the on-screen tile. A px-only parse
+// dropped that offset, so a small icon in a large box landed in the top-left corner.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImagePercentPositionResolvesAgainstTileSlack) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:90px;height:90px">
+      <div style="width:90px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=);
+                  background-size:30px 30px;background-repeat:no-repeat;
+                  background-position:50% 50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_FLOAT_EQ(tile->width, 30.0f);
+  EXPECT_FLOAT_EQ(tile->height, 30.0f);
+  // (90 - 30) * 50% = 30 on both axes.
+  EXPECT_FLOAT_EQ(tile->left, 30.0f);
+  EXPECT_FLOAT_EQ(tile->top, 30.0f);
+  auto* fill = FindBackgroundTileFill(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+// `background-size: auto 100%` states the height only, so the width follows the image's aspect
+// ratio. A real page's hero band uses this form with a 5120x1000 artwork; a px-only parse left the
+// pattern at its native scale and magnified the fill until it covered the whole band.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeAutoHeightKeepsAspectRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:90px">
+      <div style="width:160px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==);
+                  background-size:auto 100%;background-repeat:repeat;
+                  background-position:50% 50%"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  // The 4x2 image fills the 90px height and keeps its 2:1 ratio, so the tile is 180x90.
+  EXPECT_FLOAT_EQ(tile->width, 180.0f);
+  EXPECT_FLOAT_EQ(tile->height, 90.0f);
+  // A 180px tile in a 160px box leaves -20px of slack, centred by the 50% position.
+  EXPECT_FLOAT_EQ(tile->left, -10.0f);
+  // The tile overflows the element box, so it rides a box-sized clip slot — CSS clips a background
+  // to the border box.
+  auto* clip = layer->children.front();
+  ASSERT_NE(clip, nullptr);
+  EXPECT_TRUE(clip->clipToBounds);
+  EXPECT_FLOAT_EQ(clip->width, 160.0f);
+  EXPECT_FLOAT_EQ(clip->height, 90.0f);
+  auto* fill = FindBackgroundTileFill(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+// A single-value `background-size` sets the width only; the height follows the aspect ratio
+// instead of reusing the same number.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizeSingleLengthKeepsAspectRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:90px">
+      <div style="width:160px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==);
+                  background-size:60px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  // A 60px tile over a 4x2 image is 60x30, painted at exactly that size.
+  EXPECT_FLOAT_EQ(tile->width, 60.0f);
+  EXPECT_FLOAT_EQ(tile->height, 30.0f);
+  auto* fill = FindBackgroundTileFill(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+// A percentage `background-size` resolves against the element's own box, on the width axis here
+// with the height tied to the aspect ratio.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSizePercentWidthKeepsAspectRatio) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:160px;height:90px">
+      <div style="width:160px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAE0lEQVR42mP8z8DwnwEJMDGgAQA/JwICXm3wVAAAAABJRU5ErkJggg==);
+                  background-size:50% auto;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  // 50% of the 160px box is an 80px tile, whose height is 40px by the 2:1 ratio.
+  EXPECT_FLOAT_EQ(tile->width, 80.0f);
+  EXPECT_FLOAT_EQ(tile->height, 40.0f);
+  auto* fill = FindBackgroundTileFill(layer);
+  ASSERT_NE(fill, nullptr);
+  auto* pattern = As<pagx::ImagePattern>(fill->color);
+  ASSERT_NE(pattern, nullptr);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
+}
+
+// A single `background-position` value sets the horizontal axis and the vertical axis defaults to
+// `center` rather than to the leading edge.
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSingleValuePositionDefaultsYToCenter) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:90px;height:90px">
+      <div style="width:90px;height:90px;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=);
+                  background-size:30px 30px;background-repeat:no-repeat;
+                  background-position:center"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* layer = doc->layers.front()->children.front();
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_FLOAT_EQ(tile->left, 30.0f);
+  EXPECT_FLOAT_EQ(tile->top, 30.0f);
+}
+
 // `background-repeat: repeat-x` is a single-axis shorthand — X tiles, Y clamps to Decal.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatXTilesHorizontalOnly) {
   auto doc = ParseFromString(R"HTML(
@@ -4785,7 +5342,8 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageRepeatYTilesVerticalOnly) {
   EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Repeat);
 }
 
-// `background-repeat: no-repeat` clamps both axes to Decal so the image paints once.
+// `background-repeat: no-repeat` paints the image once, so the tile rides its own layer with a
+// fitted fill rather than a repeated pattern.
 PAG_TEST(PAGXHTMLImporterTest, BackgroundImageNoRepeatClampsBothAxes) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:160px;height:120px">
@@ -4795,12 +5353,15 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundImageNoRepeatClampsBothAxes) {
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_FLOAT_EQ(tile->width, 40.0f);
+  EXPECT_FLOAT_EQ(tile->height, 40.0f);
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  EXPECT_EQ(pattern->tileModeX, pagx::TileMode::Decal);
-  EXPECT_EQ(pattern->tileModeY, pagx::TileMode::Decal);
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // Folding rule also handles asymmetric `border-radius`: the image-pattern fill rides on top
@@ -5577,7 +6138,8 @@ PAG_TEST(PAGXHTMLImporterTest, RawBorderDottedProducesRoundDots) {
 }
 
 PAG_TEST(PAGXHTMLImporterTest, RawOverflowAutoWarns) {
-  // Only `hidden` and `visible` are silent; everything else emits a warning.
+  // `hidden` / `clip` map cleanly and stay silent; `auto` / `scroll` / `overlay` clip too but
+  // lose a scroll affordance PAGX cannot model, so they emit a warning.
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
   auto doc = pagx::HTMLImporter::ParseString(R"HTML(
@@ -6056,9 +6618,9 @@ PAG_TEST(PAGXHTMLImporterTest, GradientThreeStopsImplicitMiddleInterpolated) {
   EXPECT_TRUE(NearlyEqual(lg->colorStops[1]->offset, 0.5f, 0.01f));
 }
 
-PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesFauxItalic) {
-  // Pure italic without bold is synthesised via faux italic; the base-face label surfaces as the
-  // canonical "Regular".
+PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesRealFaceWithFauxFallback) {
+  // Pure italic becomes the real-face "Italic" style label so font lookup can select the authored
+  // face; fauxItalic stays true as a synthesis fallback for when that face is unavailable.
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <span style="font-size:14px;color:#000;font-style:italic">Hi</span>
@@ -6067,7 +6629,7 @@ PAG_TEST(PAGXHTMLImporterTest, FontStyleItalicOnlyProducesFauxItalic) {
   ASSERT_NE(doc, nullptr);
   auto* text = FindElementOfType<pagx::Text>(doc->layers.front()->children.front());
   ASSERT_NE(text, nullptr);
-  EXPECT_EQ(text->fontStyle, "Regular");
+  EXPECT_EQ(text->fontStyle, "Italic");
   EXPECT_FALSE(text->fauxBold);
   EXPECT_TRUE(text->fauxItalic);
 }
@@ -8151,6 +8713,233 @@ PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgChild) {
   ASSERT_NE(doc, nullptr);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, ImgSvgDataUriRoutesAsImportDirective) {
+  // An inline `data:image/svg+xml;base64` <img> (the check-mark icon getflect.app embeds) decodes
+  // to SVG text and rides the same import-directive path as an external `.svg` file, instead of a
+  // raster ImagePattern that the renderer cannot decode.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=="
+           style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_EQ(layer->importDirective.format, "svg");
+  EXPECT_TRUE(layer->importDirective.source.empty());
+  EXPECT_NE(layer->importDirective.content.find("<path"), std::string::npos);
+  EXPECT_FALSE(HasImagePatternFill(layer));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, SvgDataUriPrologStrippedFromImportDirective) {
+  // Hand-exported SVG files (Sketch / Figma / Illustrator) open with an `<?xml ... ?>` prolog, and
+  // html-snapshot inlines them verbatim as data URIs. A prolog is only legal at the very start of a
+  // document, so keeping one inside the import directive made the exported PAGX unparseable —
+  // every command that loads the file failed, including `pagx resolve`, which is the command that
+  // expands the directive. The content must therefore start at `<svg`.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBmaWxsPSJub25lIi8+PC9zdmc+Cg=="
+           style="width:50px;height:50px"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  ASSERT_EQ(layer->importDirective.format, "svg");
+  EXPECT_EQ(layer->importDirective.content.compare(0, 4, "<svg"), 0);
+  EXPECT_EQ(layer->importDirective.content.find("<?xml"), std::string::npos);
+
+  // The document's own prolog stays the only one, so the exported text loads again.
+  std::string xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_EQ(xml.find("<?xml"), 0u);
+  EXPECT_EQ(xml.find("<?xml", 1), std::string::npos);
+  auto reloaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(reloaded, nullptr);
+  EXPECT_TRUE(reloaded->errors.empty());
+}
+
+PAG_TEST(PAGXHTMLImporterTest, RoundedImageWrapperRejectsSvgDataUriChild) {
+  // An SVG data-URI <img> inside a rounded wrapper must not fold into a raster ImagePattern; it
+  // keeps riding the import-directive path like an external `.svg` child.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;border-radius:25px;overflow:hidden">
+        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=="
+             style="width:50px;height:50px"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* wrapper = doc->layers.front()->children.front();
+  EXPECT_NE(FindSvgImportLayer(wrapper), nullptr);
+  EXPECT_FALSE(HasImagePatternFill(wrapper));
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BackgroundImageSvgDataUriRoutesAsImportDirective) {
+  // A `background-image` whose source is an SVG rides the inline-<svg> import directive exactly
+  // like an `<img>` SVG does, instead of being registered as a raster `Image`: `<Image>` only
+  // carries the formats every renderer is required to decode (PNG/JPEG/WebP/GIF), so an SVG
+  // payload registered there never paints on any platform.
+  auto doc = ParseRaw(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==');
+                  background-size:cover;background-repeat:no-repeat;background-position:50% 50%">
+        <div style="width:10px;height:10px;background-color:#f00"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  auto* host = FindSvgImportLayer(layer);
+  ASSERT_NE(host, nullptr);
+  EXPECT_FALSE(HasImagePatternFill(layer));
+  EXPECT_NE(host->importDirective.content.find("<path"), std::string::npos);
+  // The 24x24 icon covers the 50x50 box at 50/24 on both axes, so the fitted box is the element
+  // box and no clip wrapper is needed.
+  EXPECT_FLOAT_EQ(host->width, 50.0f);
+  EXPECT_FLOAT_EQ(host->height, 50.0f);
+  // A zero offset stays unset: an out-of-flow layer without left/top already sits at its parent's
+  // origin, and an explicit `left="0"` would only add an attribute for `pagx verify` to flag.
+  EXPECT_TRUE(std::isnan(host->left));
+  EXPECT_TRUE(std::isnan(host->top));
+  // Paint order: the background host comes before the element's own content, mirroring CSS (a
+  // Layer's contents paint behind its children, so the host cannot simply be appended).
+  ASSERT_GE(layer->children.size(), 2u);
+  EXPECT_EQ(layer->children.front(), host);
+}
+
+// A repeating SVG background whose tile is smaller than the element box would need the tile drawn
+// several times, which a single import directive cannot express, so it stays on the raster path.
+PAG_TEST(PAGXHTMLImporterTest, TiledSvgBackgroundFallsBackToRasterImage) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px">
+      <div style="width:100px;height:100px;background-image:url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMjAgNkw5IDE3TDQgMTIiIHN0cm9rZT0iIzJFMTkxOSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg==');
+                  background-size:24px 24px;background-repeat:repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_TRUE(HasImagePatternFill(layer));
+  EXPECT_EQ(FindSvgImportLayer(layer), nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "tiled SVG background"));
+}
+
+// An image whose format sits outside the `<Image>` supported set is persisted into the exported
+// PAGX verbatim, so the failure would only surface at render time on whichever platform lacks a
+// decoder for it. The importer names the format instead.
+PAG_TEST(PAGXHTMLImporterTest, UnsupportedImageFormatWarnsAtImport) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:url('data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWY=');
+                  background-size:50px 50px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "image/avif"));
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "outside the <Image> supported set"));
+}
+
+// A remote `.svg` background that the snapshot failed to inline cannot ride the import-directive
+// path: `pagx resolve` reads a directive's `source` from disk, so expanding an http(s) reference
+// fails and the layer is dropped. Such a reference stays on the raster path, exactly as it did
+// before the vector path existed, so the document remains resolvable.
+PAG_TEST(PAGXHTMLImporterTest, RemoteSvgBackgroundStaysOnRasterPath) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;
+                  background-image:url('https://cdn.example.com/icon.svg');
+                  background-size:50px 50px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_EQ(FindSvgImportLayer(layer), nullptr);
+  EXPECT_TRUE(HasImagePatternFill(layer));
+}
+
+// An external `.svg` file reference is read from disk at resolve time, so it rides the directive
+// path like an inline payload does.
+PAG_TEST(PAGXHTMLImporterTest, LocalSvgFileBackgroundRidesImportDirective) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:50px;height:50px">
+      <div style="width:50px;height:50px;background-image:url(icon.svg);
+                  background-size:50px 50px;background-repeat:no-repeat"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  auto* host = FindSvgImportLayer(layer);
+  ASSERT_NE(host, nullptr);
+  EXPECT_FALSE(HasImagePatternFill(layer));
+  EXPECT_NE(host->importDirective.source.find("icon.svg"), std::string::npos);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, LocalSvgBackgroundUsesIntrinsicSizeByDefault) {
+  SaveFile(R"SVG(<svg xmlns="http://www.w3.org/2000/svg" width="24" height="12"
+                          viewBox="0 0 24 12"><rect width="24" height="12"/></svg>)SVG",
+           "PAGXHTMLImporterTest/svg-background/icon.svg");
+  auto htmlPath = SaveFile(
+      R"HTML(<html><body style="width:100px;height:100px">
+        <div style="width:100px;height:100px;background-image:url(icon.svg);
+                    background-repeat:no-repeat"></div>
+      </body></html>)HTML",
+      "PAGXHTMLImporterTest/svg-background/index.html");
+
+  auto doc = pagx::HTMLImporter::Parse(htmlPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* host = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(host, nullptr);
+  EXPECT_FLOAT_EQ(host->width, 24.0f);
+  EXPECT_FLOAT_EQ(host->height, 12.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, LocalSvgBackgroundSizeAutoHeightKeepsAspectRatio) {
+  SaveFile(R"SVG(<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"
+                          viewBox="0 0 40 20"><rect width="40" height="20"/></svg>)SVG",
+           "PAGXHTMLImporterTest/svg-background/stretched.svg");
+  auto htmlPath = SaveFile(
+      R"HTML(<html><body style="width:100px;height:50px">
+        <div style="width:100px;height:50px;background-image:url(stretched.svg);
+                    background-size:auto 100%;background-repeat:no-repeat"></div>
+      </body></html>)HTML",
+      "PAGXHTMLImporterTest/svg-background/stretched.html");
+
+  auto doc = pagx::HTMLImporter::Parse(htmlPath);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* host = FindSvgImportLayer(doc->layers.front()->children.front());
+  ASSERT_NE(host, nullptr);
+  // The host carries the intrinsic box and the per-axis scale, so a 100% height over a 40x20 icon
+  // is a 100x50 tile, i.e. 2.5x on both axes.
+  EXPECT_FLOAT_EQ(host->width, 40.0f);
+  EXPECT_FLOAT_EQ(host->height, 20.0f);
+  EXPECT_FLOAT_EQ(host->matrix.a, 2.5f);
+  EXPECT_FLOAT_EQ(host->matrix.d, 2.5f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, BackgroundClipInsetsClampToEmptyBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:20px;height:20px">
+      <div style="width:10px;height:10px;border:8px solid black;padding:5px;
+                  background-image:linear-gradient(red,blue);
+                  background-clip:content-box"></div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.front()->children.empty());
+  auto* layer = doc->layers.front()->children.front();
+  EXPECT_FALSE(HasNegativeLayerSize(layer));
+  EXPECT_TRUE(HasLayerSize(layer, 0.0f, 0.0f));
+}
+
 //==================================================================================================
 // HTMLSubsetTransformer::Builder — public custom-pipeline API
 //==================================================================================================
@@ -9404,14 +10193,18 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundImageInvalidDropped) {
   EXPECT_TRUE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
-PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipPaddingBoxDroppedSilently) {
+// A `padding-box` layer is how CSS paints a gradient border (a border-box layer showing through
+// a padding-box layer inset by the border width), so the importer keeps the box clip and rebuilds
+// each layer with its own inset geometry. Only a list that is entirely the default `border-box`
+// collapses away.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, BackgroundClipPaddingBoxIsKept) {
   std::shared_ptr<pagx::DOMNode> root;
   auto result = RunTransform(
       R"HTML(<html><body style="width:1px;height:1px">
                <div style="background-clip: padding-box"></div></body></html>)HTML",
       &root);
   ASSERT_TRUE(result.ok);
-  EXPECT_FALSE(StyleContains(FirstBodyChild(root, "div"), "background-clip"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "background-clip: padding-box"));
   EXPECT_FALSE(HasDiagnostic(result, "subset:unsupported-property"));
 }
 
@@ -9959,13 +10752,15 @@ PAG_TEST(PAGXHTMLImporterTest, BackgroundDataImageExplicitSizeUsesNativeDimensio
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* layer = doc->layers.front()->children.front();
-  auto* fill = FindElementOfType<pagx::Fill>(layer);
+  auto* tile = FindBackgroundTileLayer(layer);
+  ASSERT_NE(tile, nullptr);
+  EXPECT_TRUE(NearlyEqual(tile->width, 20.0f));
+  EXPECT_TRUE(NearlyEqual(tile->height, 30.0f));
+  auto* fill = FindBackgroundTileFill(layer);
   ASSERT_NE(fill, nullptr);
   auto* pattern = As<pagx::ImagePattern>(fill->color);
   ASSERT_NE(pattern, nullptr);
-  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::None);
-  EXPECT_TRUE(NearlyEqual(pattern->matrix.a, 20.0f));
-  EXPECT_TRUE(NearlyEqual(pattern->matrix.d, 30.0f));
+  EXPECT_EQ(pattern->scaleMode, pagx::ScaleMode::Stretch);
 }
 
 // CSS `mask-image: url(data:image/svg+xml,...)` with `mask-mode: alpha` rebuilds an alpha mask
@@ -9989,6 +10784,69 @@ PAG_TEST(PAGXHTMLImporterTest, MaskImageAlphaRebuildsMaskLayer) {
   ASSERT_NE(ellipse, nullptr);
   EXPECT_TRUE(NearlyEqual(ellipse->size.width, 110.0f, 0.01f));
   EXPECT_TRUE(NearlyEqual(ellipse->size.height, 110.0f, 0.01f));
+}
+
+// A `mask-image` that is a CSS gradient function carries no `url()` payload — the browser hands over
+// the computed gradient itself — so it is rebuilt as a gradient-filled mask layer instead of being
+// dropped. An alpha mask reads the alpha channel, which is exactly the per-stop alpha authored.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageLinearGradientRebuildsGradientMaskLayer) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="width:200px;height:100px;
+                  mask-image:linear-gradient(90deg, rgba(0,0,0,0), rgb(0,0,0) 12%, rgb(0,0,0) 88%, rgba(0,0,0,0))">
+        <div style="width:200px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  EXPECT_EQ(masked->maskType, pagx::MaskType::Alpha);
+  EXPECT_FALSE(masked->mask->includeInLayout);
+  // With no `mask-size`, the gradient paints into the masked element's own box.
+  auto* rect = FindElementOfType<pagx::Rectangle>(masked->mask);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_TRUE(NearlyEqual(rect->size.width, 200.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(rect->size.height, 100.0f, 0.01f));
+  auto* fill = FindElementOfType<pagx::Fill>(masked->mask);
+  ASSERT_NE(fill, nullptr);
+  auto* gradient = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(gradient, nullptr);
+  // A horizontal gradient line across the 200x100 box, in absolute pixels.
+  EXPECT_FALSE(gradient->fitsToGeometry);
+  EXPECT_TRUE(NearlyEqual(gradient->startPoint.x, 0.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(gradient->startPoint.y, 50.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(gradient->endPoint.x, 200.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(gradient->endPoint.y, 50.0f, 0.01f));
+  ASSERT_EQ(gradient->colorStops.size(), 4u);
+  EXPECT_TRUE(NearlyEqual(gradient->colorStops.front()->color.alpha, 0.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(gradient->colorStops[1]->color.alpha, 1.0f, 0.001f));
+  EXPECT_TRUE(NearlyEqual(gradient->colorStops.back()->color.alpha, 0.0f, 0.001f));
+}
+
+// `mask-position` offsets the gradient tile inside the element, the same slack-resolution the image
+// mask paths apply; here a 100px tile in a 200px box centred by `50%` lands at x = 50.
+PAG_TEST(PAGXHTMLImporterTest, MaskImageLinearGradientAppliesMaskPosition) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <div style="width:200px;height:100px;
+                  mask-image:linear-gradient(90deg, rgba(0,0,0,0), rgb(0,0,0));
+                  mask-size:100px 100px;mask-position:50% 50%">
+        <div style="width:200px;height:100px;background-color:#10B981"></div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* masked = doc->layers.front()->children.front();
+  ASSERT_NE(masked->mask, nullptr);
+  // The gradient's own geometry is computed for the 100x100 tile rather than the whole element.
+  auto* fill = FindElementOfType<pagx::Fill>(masked->mask);
+  ASSERT_NE(fill, nullptr);
+  auto* gradient = As<pagx::LinearGradient>(fill->color);
+  ASSERT_NE(gradient, nullptr);
+  EXPECT_TRUE(NearlyEqual(gradient->endPoint.x, 100.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.tx, 50.0f, 0.01f));
+  EXPECT_TRUE(NearlyEqual(masked->mask->matrix.ty, 0.0f, 0.01f));
 }
 
 // A raster `mask-image: url(...)` (a PNG here, referenced via a `data:image/png` URI) is rebuilt
@@ -11586,6 +12444,67 @@ PAG_TEST(PAGXHTMLStyleCascadeTest, EmptyStylePropertyFallbackAndShorthandGradien
             "linear-gradient(90deg, red, blue)");
 }
 
+// Verifies that `background-clip: text` supplies the glyph paint in both of its forms: a solid
+// `background-color` becomes `textFillSolid` (outranking `color`, exactly as the gradient form
+// does), a gradient `background-image` wins over the solid colour and clears the solid channel,
+// and a fully transparent colour leaves the glyphs on their own `color`. The fill also
+// propagates to descendants, which is what lets one wrapper paint the glyphs of its inner spans.
+PAG_TEST(PAGXHTMLStyleCascadeTest, BackgroundClipTextSuppliesGlyphFill) {
+  auto root = ParseHtml(R"HTML(
+    <html>
+      <body style="width:100px;height:50px">
+        <solid style="background-color:rgba(0,0,0,0.9);background-clip:text;color:#123456">
+          <inner/>
+        </solid>
+        <grad style="background-image:linear-gradient(90deg, red, blue);
+                     background-color:rgba(0,0,0,0.9);background-clip:text;color:#123456"/>
+        <clear style="background-color:transparent;background-clip:text;color:#123456"/>
+      </body>
+    </html>
+  )HTML");
+  ASSERT_NE(root, nullptr);
+  auto body = root->getFirstChild("body");
+  ASSERT_NE(body, nullptr);
+  auto solid = body->getFirstChild("solid");
+  auto grad = body->getFirstChild("grad");
+  auto clear = body->getFirstChild("clear");
+  ASSERT_NE(solid, nullptr);
+  ASSERT_NE(grad, nullptr);
+  ASSERT_NE(clear, nullptr);
+
+  float canvasWidth = 100.0f;
+  float canvasHeight = 50.0f;
+  pagx::HTMLDiagnosticSink diagnostics(false);
+  pagx::HTMLValueParser valueParser(diagnostics, canvasWidth, canvasHeight);
+  pagx::HTMLStyleCascade cascade(diagnostics, valueParser);
+
+  // The solid colour is the glyph paint; `color` still resolves normally but no longer decides
+  // how the text is filled.
+  auto solidStyle = cascade.resolveInheritedStyle(solid, pagx::HTMLInheritedStyle{});
+  EXPECT_TRUE(solidStyle.textFillSolidSet);
+  EXPECT_TRUE(ColorNear(solidStyle.textFillSolid, HexColor(0x000000, 0.9f)));
+  EXPECT_TRUE(solidStyle.textFillImage.empty());
+  EXPECT_TRUE(ColorNear(solidStyle.resolvedTextColor, HexColor(0x123456)));
+
+  // The fill propagates: the clip-to-text wrapper paints the glyphs of the spans inside it.
+  auto inner = solid->getFirstChild("inner");
+  ASSERT_NE(inner, nullptr);
+  auto innerStyle = cascade.resolveInheritedStyle(inner, solidStyle);
+  EXPECT_TRUE(innerStyle.textFillSolidSet);
+  EXPECT_TRUE(ColorNear(innerStyle.textFillSolid, HexColor(0x000000, 0.9f)));
+
+  // A gradient layer wins over the solid colour, matching CSS layer order, and clears the solid
+  // channel so the text does not keep two competing paints.
+  auto gradStyle = cascade.resolveInheritedStyle(grad, pagx::HTMLInheritedStyle{});
+  EXPECT_FALSE(gradStyle.textFillSolidSet);
+  EXPECT_EQ(gradStyle.textFillImage, "linear-gradient(90deg, red, blue)");
+
+  // A fully transparent colour carries no paint and leaves the glyphs on `color`.
+  auto clearStyle = cascade.resolveInheritedStyle(clear, pagx::HTMLInheritedStyle{});
+  EXPECT_FALSE(clearStyle.textFillSolidSet);
+  EXPECT_TRUE(clearStyle.textFillImage.empty());
+}
+
 PAG_TEST(PAGXHTMLValueParserTest, FilterDefaultsAndRepeatingGradientBoundaries) {
   auto document = pagx::PAGXDocument::Make(100.0f, 100.0f);
   float canvasWidth = 100.0f;
@@ -12032,6 +12951,140 @@ PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceJustifyUsesPercentageChildrenAndGap
   ASSERT_TRUE(result.ok);
   EXPECT_TRUE(HasDiagnostic(result, "subset:space-justify-collapsed-on-overflow"));
   EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: flex-start"));
+}
+
+// HTMLSubsetTransformer — SpaceEvenlyPaddingCompensation
+//
+// `space-evenly` puts `g = free / (n + 1)` before, between and after the children. Consumers that
+// fold it onto the `space-between` formula render both ends flush with the padding box, so the
+// pass rewrites the container to `space-between` with `g` added to the main-axis padding. The
+// rewritten form is what every consumer renders identically, including PAGX itself.
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyRewrittenToBetweenWithPadding) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:300px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // free = 300 - 150 = 150, step = 150 / (2 + 1) = 50.
+  EXPECT_TRUE(StyleContains(container, "padding: 0px 50px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationAddsToExistingPadding) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:320px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;padding:10px;"
+      "width:320px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // free = 320 - 20 - 150 = 150, step = 50; vertical padding stays 10.
+  EXPECT_TRUE(StyleContains(container, "padding: 10px 60px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationUsesBlockAxisForColumn) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:100px;height:300px\">"
+      "<div style=\"display:flex;flex-direction:column;justify-content:space-evenly;"
+      "width:100px;height:300px\">"
+      "<div style=\"height:100px\"></div><div style=\"height:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // Column flex pads the block axis: 150 / 3 = 50 on top and bottom.
+  EXPECT_TRUE(StyleContains(container, "padding: 50px 0px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationHandlesSingleChild) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:100px;height:20px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:100px;height:20px\">"
+      "<div style=\"width:20px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  // A lone child is centred: free = 80, step = 80 / 2 = 40.
+  EXPECT_TRUE(StyleContains(container, "padding: 0px 40px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsOverflowingLine) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:100px;height:20px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:100px;height:20px\">"
+      "<div style=\"width:60px\"></div><div style=\"width:60px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // The overflow pass owns this container and pins it to flex-start.
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-justify-collapsed-on-overflow"));
+  EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+}
+
+// PAGX lays flex containers out as a single line — `flex-wrap` is dropped by the subset filter and
+// the runtime has no multi-line model — so the single-line equivalence still holds for containers
+// that declared `flex-wrap` in the source.
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationTreatsWrapContainerAsSingleLine) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;flex-wrap:wrap;justify-content:space-evenly;"
+      "width:300px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_TRUE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  auto container = FirstBodyChild(root, "div");
+  EXPECT_TRUE(StyleContains(container, "justify-content: space-between"));
+  EXPECT_TRUE(StyleContains(container, "padding: 0px 50px"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsPercentageChildren) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:300px;height:100px\">"
+      "<div style=\"width:30%\"></div><div style=\"width:20px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  // A percentage child re-resolves against the compensated content box, so the rewrite would
+  // change its size instead of preserving the layout.
+  EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: space-evenly"));
+}
+
+PAG_TEST(PAGXHTMLSubsetTransformerTest, SpaceEvenlyCompensationSkipsFlexGrowChild) {
+  std::shared_ptr<pagx::DOMNode> root;
+  auto result = RunTransform(
+      "<html><body style=\"width:300px;height:100px\">"
+      "<div style=\"display:flex;justify-content:space-evenly;width:300px;height:100px\">"
+      "<div style=\"width:100px\"></div><div style=\"flex:1;width:50px\"></div>"
+      "</div></body></html>",
+      &root);
+  ASSERT_TRUE(result.ok);
+  EXPECT_FALSE(HasDiagnostic(result, "subset:space-evenly-padding-compensated"));
+  EXPECT_TRUE(StyleContains(FirstBodyChild(root, "div"), "justify-content: space-evenly"));
 }
 
 }  // namespace pag

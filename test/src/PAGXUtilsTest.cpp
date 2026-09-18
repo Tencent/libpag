@@ -39,6 +39,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StrokeGeometryUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "utils/TestUtils.h"
@@ -2442,6 +2443,61 @@ PAGX_TEST(PAGXUtilsTest, SVGPathParser_ToSVGStringRoundTripPreservesGeometry) {
     EXPECT_FLOAT_EQ(original.points()[i].x, restored.points()[i].x);
     EXPECT_FLOAT_EQ(original.points()[i].y, restored.points()[i].y);
   }
+}
+
+// `<Image>` may only carry PNG/JPEG/WebP/GIF, so the detector has to name the formats that reach a
+// document from the outside (AVIF/HEIC via a CDN, SVG via an inlined icon) rather than reporting
+// them as unknown — a serializer that cannot name a format has to either mislabel it or drop it,
+// and both hide the problem from `pagx verify`.
+PAGX_TEST(PAGXUtilsTest, DetectImageMimeNamesFormatsOutsideTheSupportedSet) {
+  const uint8_t png[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+  EXPECT_STREQ(pagx::DetectImageMime(png, sizeof(png)), "image/png");
+  const uint8_t jpeg[] = {0xFF, 0xD8, 0xFF, 0xE0};
+  EXPECT_STREQ(pagx::DetectImageMime(jpeg, sizeof(jpeg)), "image/jpeg");
+  const uint8_t webp[] = {'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P'};
+  EXPECT_STREQ(pagx::DetectImageMime(webp, sizeof(webp)), "image/webp");
+  const uint8_t gif[] = {'G', 'I', 'F', '8', '9', 'a'};
+  EXPECT_STREQ(pagx::DetectImageMime(gif, sizeof(gif)), "image/gif");
+
+  // ISO-BMFF containers are told apart by their brand: the major brand, or — for files that
+  // declare the generic `mif1` major brand — a compatible brand listed later in the `ftyp` box.
+  // AVIF has to be tested before HEIC because a `mif1` major brand matches the HEIC brand set
+  // too, so only the compatible-brand list tells the two apart.
+  const uint8_t avif[] = {0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'a', 'v', 'i', 'f',
+                          0, 0, 0, 0,    'a', 'v', 'i', 'f', 'm', 'i', 'f', '1'};
+  EXPECT_STREQ(pagx::DetectImageMime(avif, sizeof(avif)), "image/avif");
+  const uint8_t heic[] = {0,   0,   0, 0x14, 'f', 't', 'y', 'p', 'h', 'e',
+                          'i', 'c', 0, 0,    0,   0,   'm', 'i', 'f', '1'};
+  EXPECT_STREQ(pagx::DetectImageMime(heic, sizeof(heic)), "image/heic");
+  // The generic major brand with the real codec named only in the compatible-brand list.
+  const uint8_t avifGenericBrand[] = {0,   0,   0, 0x14, 'f', 't', 'y', 'p', 'm', 'i',
+                                      'f', '1', 0, 0,    0,   0,   'a', 'v', 'i', 'f'};
+  EXPECT_STREQ(pagx::DetectImageMime(avifGenericBrand, sizeof(avifGenericBrand)), "image/avif");
+
+  const std::string svg = "<svg width=\"14\" height=\"5\"></svg>";
+  EXPECT_STREQ(pagx::DetectImageMime(reinterpret_cast<const uint8_t*>(svg.data()), svg.size()),
+               "image/svg+xml");
+  const std::string xml = "<?xml version=\"1.0\"?>\n<svg viewBox=\"0 0 4 4\"/>";
+  EXPECT_STREQ(pagx::DetectImageMime(reinterpret_cast<const uint8_t*>(xml.data()), xml.size()),
+               "image/svg+xml");
+
+  const uint8_t unknown[] = {0x01, 0x02, 0x03, 0x04};
+  EXPECT_EQ(pagx::DetectImageMime(unknown, sizeof(unknown)), nullptr);
+  EXPECT_EQ(pagx::DetectImageMime(nullptr, 0), nullptr);
+}
+
+// The supported set is the contract every renderer is bound by, so it is asserted here rather than
+// left to each caller to re-derive from the spec.
+PAGX_TEST(PAGXUtilsTest, IsSupportedImageMimePinsTheSpecSet) {
+  EXPECT_TRUE(pagx::IsSupportedImageMime("image/png"));
+  EXPECT_TRUE(pagx::IsSupportedImageMime("image/jpeg"));
+  EXPECT_TRUE(pagx::IsSupportedImageMime("image/webp"));
+  EXPECT_TRUE(pagx::IsSupportedImageMime("image/gif"));
+  EXPECT_FALSE(pagx::IsSupportedImageMime("image/avif"));
+  EXPECT_FALSE(pagx::IsSupportedImageMime("image/heic"));
+  EXPECT_FALSE(pagx::IsSupportedImageMime("image/svg+xml"));
+  EXPECT_FALSE(pagx::IsSupportedImageMime("application/octet-stream"));
+  EXPECT_FALSE(pagx::IsSupportedImageMime(nullptr));
 }
 
 }  // namespace pag

@@ -38,6 +38,33 @@ namespace pagx {
 // Coordinate rounding
 //==============================================================================
 
+// Copies one `url(...)` token verbatim and advances `i` past it, returning false when `i` is not at
+// a url token. A url wraps an opaque payload — an embedded base64 data URI in particular — that the
+// coordinate rounding below must never rewrite: a base64 run that happens to spell `<digits>px` (or
+// a zero-prefixed length) would otherwise lose its unit or digits, leaving the browser an image it
+// cannot decode.
+static bool CopyUrlToken(const std::string& style, size_t& i, std::string& result) {
+  constexpr size_t URL_PREFIX_LENGTH = 4;
+  if (style.compare(i, URL_PREFIX_LENGTH, "url(") != 0) {
+    return false;
+  }
+  size_t end = i + URL_PREFIX_LENGTH;
+  if (end < style.size() && (style[end] == '\'' || style[end] == '"')) {
+    auto closingQuote = style.find(style[end], end + 1);
+    if (closingQuote == std::string::npos) {
+      return false;
+    }
+    end = closingQuote + 1;
+  }
+  auto closingParen = style.find(')', end);
+  if (closingParen == std::string::npos) {
+    return false;
+  }
+  result.append(style, i, closingParen + 1 - i);
+  i = closingParen + 1;
+  return true;
+}
+
 // Rounds every <number>px in a CSS style fragment to at most two decimal places. Matching on
 // the `px` suffix keeps transform matrix components, color channels, rotation angles (deg),
 // scale factors, and SVG path data untouched.
@@ -46,6 +73,9 @@ static std::string RoundPxInStyle(const std::string& style) {
   result.reserve(style.size());
   size_t i = 0;
   while (i < style.size()) {
+    if (CopyUrlToken(style, i, result)) {
+      continue;
+    }
     char c = style[i];
     bool isDigitStart = (c >= '0' && c <= '9') || c == '.';
     bool isSignedDigit = (c == '-' || c == '+') && i + 1 < style.size() &&

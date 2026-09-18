@@ -61,6 +61,22 @@ const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 // See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
 const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
 
+// Whitespace-collapse pattern that spares NBSP (U+00A0). Source pages run English-typography
+// pre-passes that glue short function words to their neighbours with NBSP (e.g. getflect.app's
+// `applyEnglishTypography` rewrites "to perform" / "But nowhere" into "to\u00a0perform" /
+// "But\u00a0nowhere"), which is exactly the line-break-unit semantics the author designed.
+// JS `\s` matches U+00A0, so a plain `/\s+/g` collapse would silently demote every NBSP to a
+// breakable ASCII space — nowrap protects the first paint, but any PAGX-side re-typeset
+// (text edit, box resize) would then break inside those glued pairs. `[^\S\u00a0]` matches
+// whitespace except NBSP (\S is the negated whitespace class, so its complement minus NBSP is
+// exactly the collapsible set). The PAGX importer already treats NBSP as a real glyph
+// (see BOUNDARY_SPACE) and LineBreaker maps it to the GL (glue) class, so a preserved NBSP
+// keeps its no-break meaning downstream. Note that every call site pairs the collapse with a
+// `.trim()`, which strips a leading/trailing NBSP as well, so only NBSPs inside the text are
+// preserved. Re-declared in PAYLOAD_CONSTANTS_SRC for the
+// browser payload (same pattern as BOUNDARY_SPACE).
+const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
+
 /* eslint-disable no-undef, no-inner-declarations */
 
 // ===== Style-value normalisers =====
@@ -156,16 +172,26 @@ function normalizeBackgroundImage(value) {
   return '';
 }
 
-// PAGX only models `background-clip: text` — combined with a gradient
-// `background-image`, the importer routes the gradient to descendant text
-// fills (so the text glyphs are filled with the gradient instead of the
-// element painting a rectangular gradient). Every other clip value is
-// dropped: PAGX has no `padding-box` / `content-box` distinction. Chromium
-// computed style already coalesces `-webkit-background-clip` into the
-// unprefixed `background-clip`, so a single schema entry suffices.
+// `background-clip: text` routes a gradient `background-image` to descendant
+// text fills in the importer (the text glyphs are filled with the gradient
+// instead of the element painting a rectangular gradient). Layered box clips
+// (`padding-box` / `content-box` / `border-box`, comma-separated per
+// background layer) are kept verbatim: a layer clipped tighter than the
+// border box is how CSS paints gradient borders (transparent border + a
+// border-box layer showing through a padding-box layer's inset), and the
+// importer rebuilds each layer with its own inset geometry. A list where
+// every layer is the default `border-box` still collapses to '' so the
+// STYLE_SCHEMA defaults filter drops the property. Chromium computed style
+// already coalesces `-webkit-background-clip` into the unprefixed
+// `background-clip`, so a single schema entry suffices.
 function normalizeBackgroundClip(value) {
   if (!value) return '';
-  return value.trim().toLowerCase() === 'text' ? 'text' : '';
+  const v = value.trim().toLowerCase();
+  if (v === 'text') return 'text';
+  const layers = v.split(',').map((s) => s.trim()).filter(Boolean);
+  if (layers.length === 0) return '';
+  if (layers.every((l) => l === 'border-box')) return '';
+  return layers.join(', ');
 }
 
 // PAGX's mask-image supports the same value forms as background-image: a
@@ -880,7 +906,7 @@ function gatherDirectText(el) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.TEXT_NODE) s += n.nodeValue;
   }
-  return s.replace(/\s+/g, ' ').trim();
+  return s.replace(COLLAPSIBLE_WS, ' ').trim();
 }
 
 function elementHasChildren(el) {
@@ -908,7 +934,7 @@ function scanChildNodes(el) {
       directText += n.nodeValue;
     }
   }
-  return { hasElementChild, directText: directText.replace(/\s+/g, ' ').trim() };
+  return { hasElementChild, directText: directText.replace(COLLAPSIBLE_WS, ' ').trim() };
 }
 
 function firstTextNodeChild(el) {
@@ -2335,10 +2361,13 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   // (nowrap) span carries no stray hard break; leading/internal spaces — i.e.
   // indentation — stay intact. The line's vertical offset is already encoded in
   // its rect, so dropping the break characters never loses positioning.
-  // Collapsing modes fold + trim all whitespace as before.
+  // Collapsing modes fold whitespace as before, except NBSP which carries the
+  // source page's no-break glue semantics (see COLLAPSIBLE_WS). The `.trim()`
+  // below still drops a leading/trailing NBSP, so only NBSPs inside the text
+  // survive.
   const cleanLine = (s) => {
     const stripped = s.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
-    return preserve ? stripped : stripped.replace(/\s+/g, ' ').trim();
+    return preserve ? stripped : stripped.replace(COLLAPSIBLE_WS, ' ').trim();
   };
   const range = document.createRange();
   range.selectNodeContents(textNode);
@@ -3993,8 +4022,21 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   // the fixed host box. Preserve both facts explicitly: the importer drops the measured
   // Chromium width and replaces the baked `left` offset with a PAGX centerX constraint. Merely
   // dropping width would make an edited line grow only to the right and cease to be centered.
+  //
+  // The `text-align: center` -> `intrinsic-width=center` promotion applies to text leaves whose
+  // own box is a fixed-width host: every block-level display (`block`, `flex`, `grid`,
+  // `table-cell`, `list-item`, …) plus `inline-block`, whose parent is a real fixed-width box. An
+  // inline-level leaf that shares its line box with adjacent content (`display: inline`, e.g.
+  // `<em>` inside a centered paragraph) inherits its `text-align: center` for inline-flow
+  // character placement, NOT for the line fragment as a whole — Chromium measures each inline
+  // fragment at its inline-flow position, and marking those fragments `intrinsic-width=center`
+  // would re-center them inside the inline parent (e.g. putting "feel" at the em-container's
+  // horizontal centre instead of the line-end Chromium reported), breaking inline layout.
+  // `inline-flex` / `inline-grid` / `inline-table` are inline-level the same way and stay out.
   const textAlign = String(computed.getPropertyValue('text-align') || '').trim().toLowerCase();
-  const intrinsicWidth = textAlign === 'center' ? 'center' : false;
+  const display = String(computed.display || '').trim().toLowerCase();
+  const inlineLevelDisplay = display.startsWith('inline') && display !== 'inline-block';
+  const intrinsicWidth = (textAlign === 'center' && !inlineLevelDisplay) ? 'center' : false;
   const lineSpans = textNode
     ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed, { intrinsicWidth })
     : [];
@@ -4090,7 +4132,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
 // for the same expansion applied along the absolute-positioning path.
 function renderFlexTextItem(child, parentComputed) {
   const r = child.rect;
-  const text = (child.node.nodeValue || '').replace(/\s+/g, ' ').trim();
+  const text = (child.node.nodeValue || '').replace(COLLAPSIBLE_WS, ' ').trim();
   const lineHeightPx = readNum(parentComputed, 'line-height');
   const height = lineHeightPx > r.height + 0.1 ? lineHeightPx : r.height;
   const baseStyle = buildStyle(0, 0, 0, 0, parentComputed, {
@@ -4946,6 +4988,12 @@ const NAME_ANCHOR_ATTR = '${NAME_ANCHOR_ATTR}';
 
 const INTRINSIC_WIDTH_ATTR = '${INTRINSIC_WIDTH_ATTR}';
 
+// Browser-scope twin of the module-level COLLAPSIBLE_WS (whitespace collapse
+// that spares NBSP; see the module-level declaration for the rationale). The
+// raw-JS helpers below run inside this IIFE, so they resolve this payload-side
+// const rather than the TS module one.
+const COLLAPSIBLE_WS = /[^\\S\\u00a0]+/g;
+
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
 const INLINE_BY_DEFAULT_TAGS = new Set([
@@ -5282,6 +5330,93 @@ async function inlineExternalImages(cachedMap) {
     return `data:${mime};base64,${btoa(binary)}`;
   }
 
+  // Formats `<Image>` is allowed to carry, plus SVG (which the HTML importer routes to native
+  // vector nodes instead of a raster). Everything else has to be re-encoded: PAGX consumers are
+  // only required to decode PNG/JPEG/WebP/GIF, so an AVIF or HEIC that a CDN served would render
+  // on the machine that happens to have the codec and silently vanish everywhere else — Windows
+  // ships no AV1 decoder by default, and a design tool that reads the file with a narrow codec
+  // set drops it outright.
+  const PASSTHROUGH_MIMES = [
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/webp',
+    'image/gif',
+    'image/svg+xml',
+  ];
+
+  // WebP keeps alpha and is in the PAGX supported set with a software decoder in the engine, so it
+  // is the one target that every consumer can read. Quality is high enough that a lossy re-encode
+  // of an already-lossy source is not visible at the sizes these images are composited at.
+  const WEBP_QUALITY = 0.92;
+
+  // Media type declared by a `data:` URI, lower-cased and without parameters. Empty when the URI
+  // declares none (`data:;base64,…`), which is treated as "not known to be supported".
+  function dataUriMime(src) {
+    const match = /^data:([^;,]+)/i.exec(src);
+    return match ? match[1].toLowerCase() : '';
+  }
+
+  // Chromium is the only image codec available on this side of the pipeline (the Node side carries
+  // no AVIF/HEIC decoder), so the re-encode happens here: decode the blob, draw it 1:1 and let the
+  // browser's own WebP encoder produce the replacement bytes.
+  async function transcodeToWebpDataUri(blob) {
+    const bitmap = await createImageBitmap(blob);
+    try {
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+      const encoded = await canvas.convertToBlob({ type: 'image/webp', quality: WEBP_QUALITY });
+      // A browser without a WebP encoder hands back a PNG blob; labelling that as WebP would lie
+      // about the payload, so treat it as a failure and keep the original bytes.
+      if (encoded.type !== 'image/webp') {
+        throw new Error('no webp encoder');
+      }
+      return await blobToDataUri(encoded);
+    } finally {
+      // The bitmap owns a decoded copy of the image; release it explicitly instead of leaving a
+      // page full of large images to the garbage collector.
+      bitmap.close();
+    }
+  }
+
+  // Normalises the bytes of one fetched blob for the snapshot. A format PAGX can carry is inlined
+  // as-is; anything else is replaced by its WebP re-encode. Re-encoding failures keep the original
+  // bytes and warn — a kept AVIF still renders wherever the codec exists, whereas dropping the
+  // image would lose it everywhere.
+  async function blobToNormalizedDataUri(blob) {
+    const mime = (blob.type || '').split(';')[0].trim().toLowerCase();
+    if (PASSTHROUGH_MIMES.indexOf(mime) >= 0) {
+      return await blobToDataUri(blob);
+    }
+    try {
+      return await transcodeToWebpDataUri(blob);
+    } catch (err) {
+      console.warn(
+        `html-snapshot: keeping ${mime || 'unlabelled'} image as-is (${err && err.message})`,
+      );
+      return await blobToDataUri(blob);
+    }
+  }
+
+  // Normalises an already-resolved source string: a data URI whose format PAGX cannot carry is
+  // re-encoded, while a supported format is returned unchanged. Two forms are left alone by
+  // design: a remote URL (the callers fetch those separately) and a filesystem path — the shape
+  // `--download-images` passes, whose bytes never reach the browser, so the on-disk file keeps
+  // whatever format the server sent. That mode is a capture artifact rather than the input the
+  // PAGX pipeline consumes, so it is not re-encoded.
+  async function normalizeSource(src) {
+    if (!src.startsWith('data:')) return src;
+    if (PASSTHROUGH_MIMES.indexOf(dataUriMime(src)) >= 0) return src;
+    try {
+      const res = await fetch(src);
+      return await blobToNormalizedDataUri(await res.blob());
+    } catch (err) {
+      const mime = dataUriMime(src) || 'unlabelled';
+      console.warn(`html-snapshot: keeping ${mime} image as-is (${err && err.message})`);
+      return src;
+    }
+  }
+
   // Convert a `file://` URL (the absolute form the browser resolves a local /
   // relative <img src> into) back to a plain filesystem path. PAGX's importer
   // treats a leading `/` (POSIX) or `C:/` (Windows) as absolute and reads the
@@ -5304,7 +5439,10 @@ async function inlineExternalImages(cachedMap) {
 
   const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
+  // `pending` needs a fetch; `inlinePending` already holds its bytes (a response-cache hit, or a
+  // data URI the page authored) and only needs normalising.
   const pending = [];
+  const inlinePending = [];
   for (const img of imgs) {
     // A placeholder <img> whose `src`/`srcset` attributes are empty or missing
     // is not a real image, but the IDL getters below (`currentSrc` / `img.src`)
@@ -5326,7 +5464,13 @@ async function inlineExternalImages(cachedMap) {
     if ((img.getAttribute('data-snapshot-src') || '').trim()) continue;
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
     if (!src) continue;
-    if (src.startsWith('data:')) continue;
+    if (src.startsWith('data:')) {
+      // A page that inlines its own images still has to be normalised: the data URI may carry a
+      // format PAGX cannot (an AVIF the author embedded, for instance), and no later stage would
+      // re-encode it. A supported format is returned unchanged, so this costs a string compare.
+      inlinePending.push({ img, src });
+      continue;
+    }
     // Local image referenced by a relative (or absolute-but-relative-to-the-
     // source) path: the browser has already resolved it to an absolute
     // `file://` URL. Emit that as a plain absolute filesystem path so the
@@ -5343,7 +5487,9 @@ async function inlineExternalImages(cachedMap) {
     if (!/^https?:/i.test(src)) continue;
     const cached = cache[src];
     if (cached) {
-      img.setAttribute('data-snapshot-src', cached);
+      // Re-encoding an unsupported format needs the browser's codec, so it runs in the same
+      // chunked pass as the fetches below instead of one await per element here.
+      inlinePending.push({ img, src: cached });
       continue;
     }
     pending.push({ img, src });
@@ -5356,7 +5502,7 @@ async function inlineExternalImages(cachedMap) {
         console.warn(`html-snapshot: image fetch ${res.status} for ${entry.src}`);
         return;
       }
-      const dataUri = await blobToDataUri(await res.blob());
+      const dataUri = await blobToNormalizedDataUri(await res.blob());
       entry.img.setAttribute('data-snapshot-src', dataUri);
     } catch (err) {
       console.warn(`html-snapshot: failed to inline ${entry.src}: ${err && err.message}`);
@@ -5367,6 +5513,13 @@ async function inlineExternalImages(cachedMap) {
   // throttle aggressively past that. Keeping the in-flight window at 8
   // lets us saturate the bottleneck without queueing surprises.
   const FETCH_CHUNK_SIZE = 8;
+  async function applyInlineSource(entry) {
+    entry.img.setAttribute('data-snapshot-src', await normalizeSource(entry.src));
+  }
+  for (let i = 0; i < inlinePending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = inlinePending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(applyInlineSource));
+  }
   for (let i = 0; i < pending.length; i += FETCH_CHUNK_SIZE) {
     const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOne));
@@ -5385,16 +5538,24 @@ async function inlineExternalImages(cachedMap) {
   }
 
   const bgPending = [];
+  const bgInlinePending = [];
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
     const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
     if (!bg || !/^url\(/i.test(bg)) continue;
     const url = firstCssUrl(bg);
-    if (!url || url.startsWith('data:') || /^file:/i.test(url)) continue;
+    if (!url || /^file:/i.test(url)) continue;
+    if (url.startsWith('data:')) {
+      bgInlinePending.push({ el, src: url, current: url });
+      continue;
+    }
     if (!/^https?:/i.test(url)) continue;
     const cached = cache[url];
     if (cached) {
-      el.style.backgroundImage = `url("${cached.replace(/"/g, '\\"')}")`;
+      // `current` records what the element still declares: a cache hit has to be written back even
+      // when the cached bytes already are in a portable format, because the element is carrying
+      // the remote URL that entry replaces.
+      bgInlinePending.push({ el, src: cached, current: url });
       continue;
     }
     bgPending.push({ el, url });
@@ -5407,13 +5568,27 @@ async function inlineExternalImages(cachedMap) {
         console.warn(`html-snapshot: bg-image fetch ${res.status} for ${entry.url}`);
         return;
       }
-      const dataUri = await blobToDataUri(await res.blob());
+      const dataUri = await blobToNormalizedDataUri(await res.blob());
       entry.el.style.backgroundImage = `url("${dataUri.replace(/"/g, '\\"')}")`;
     } catch (err) {
       console.warn(`html-snapshot: failed to inline bg ${entry.url}: ${err && err.message}`);
     }
   }
 
+  async function applyInlineBgSource(entry) {
+    const normalized = await normalizeSource(entry.src);
+    // Skip the write only when the element already declares the value it would receive: an
+    // authored data URI that needed no re-encode stays untouched, so a page full of icon data
+    // URIs does not pay for a pointless style invalidation per element. Everything else — a cache
+    // hit above all — has to replace whatever the element declares now.
+    if (normalized !== entry.current) {
+      entry.el.style.backgroundImage = `url("${normalized.replace(/"/g, '\\"')}")`;
+    }
+  }
+  for (let i = 0; i < bgInlinePending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = bgInlinePending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(applyInlineBgSource));
+  }
   for (let i = 0; i < bgPending.length; i += FETCH_CHUNK_SIZE) {
     const slice = bgPending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOneBg));
@@ -5514,6 +5689,12 @@ async function materializeDecorativePseudoElements() {
   const COPY_PROPS = [
     'position', 'left', 'right', 'top', 'bottom',
     'width', 'height',
+    // Layout identity for in-flow stand-ins: without the exact display / flex
+    // participation the synthetic div would occupy a different slot in the
+    // host's flow (flex item vs block) and shift the measured children.
+    'display',
+    'flex-grow', 'flex-shrink', 'flex-basis', 'align-self', 'order',
+    'min-width', 'min-height', 'max-width', 'max-height',
     'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
     'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
     'background-color', 'background-image', 'background-clip',
@@ -5553,6 +5734,13 @@ async function materializeDecorativePseudoElements() {
   const DEFAULTS = new Map([
     ['position', 'static'],
     ['left', 'auto'], ['right', 'auto'], ['top', 'auto'], ['bottom', 'auto'],
+    // `display` is intentionally NOT default-suppressed: a `div` stand-in
+    // defaults to block, and an in-flow pseudo with `inline` / `inline-block`
+    // participation must keep it or the flow slot changes.
+    ['flex-grow', '0'], ['flex-shrink', '1'], ['flex-basis', 'auto'],
+    ['align-self', 'auto'], ['order', '0'],
+    ['min-width', 'auto'], ['min-height', 'auto'],
+    ['max-width', 'none'], ['max-height', 'none'],
     ['margin-top', '0px'], ['margin-right', '0px'],
     ['margin-bottom', '0px'], ['margin-left', '0px'],
     ['padding-top', '0px'], ['padding-right', '0px'],
@@ -5601,25 +5789,57 @@ async function materializeDecorativePseudoElements() {
     return out;
   }
 
-  // Decide whether a pseudo with the given resolved style should be
-  // materialised. Out-of-flow position is required so the synthetic sibling
-  // doesn't push the host's real children around. A pseudo with no visible
-  // box (no width / height / background / border / shadow / transform) is
-  // skipped — there's nothing to render anyway.
-  function shouldMaterialise(cs, pseudoText) {
-    if (pseudoText !== '') {
-      return { ok: false, reason: 'text-content' };
+  // Local copy of the Node-side `applyTextTransform` (see the file's top section). A materialised
+  // pseudo carries its glyphs on the stand-in, so `text-transform` has to be baked into that text
+  // node the same way `renderPseudoTextLeaf` bakes it into its <span>.
+  function applyPseudoTextTransform(text, computed) {
+    if (!text) return text;
+    const tt = String(computed.getPropertyValue('text-transform') || '').trim().toLowerCase();
+    if (!tt || tt === 'none') return text;
+    if (tt === 'uppercase') return text.toUpperCase();
+    if (tt === 'lowercase') return text.toLowerCase();
+    if (tt === 'capitalize') {
+      return text.replace(/(^|\s)(\S)/g, (_, prefix, ch) => prefix + ch.toUpperCase());
     }
+    return text;
+  }
+
+  // Decide whether a pseudo with the given resolved style should be
+  // materialised. A pseudo with no visible box (no width / height) is
+  // skipped — there's nothing to render anyway. Out-of-flow pseudos
+  // (absolute/fixed) become detached synthetic siblings exactly as before.
+  // In-flow pseudos (static/relative) are materialised as layout-equivalent
+  // stand-ins: the synthetic div joins the same flow (flex item, inline
+  // block, …) with the pseudo's copied layout styles and the original pseudo
+  // is switched off via an injected `content: none` rule, so the host's
+  // measured layout is unchanged while the decorative box survives the
+  // snapshot. `sticky` keeps its old rejection: the stand-in would freeze it
+  // at the current scroll position and lose the sticky semantics.
+  //
+  // A *text*-bearing pseudo normally stays on `renderPseudoTextLeaf`, which re-emits the glyphs
+  // inside the host's own flow — the right approximation while the glyphs really do ride that
+  // flow. An out-of-flow pseudo carries a box of its own instead (`position` / `inset` /
+  // `width` / `height` / `background` / `transform`), and the text-only path drops every one of
+  // those: baidu-pan's "current device" badge is `position:absolute;bottom:-3px;width:90px;
+  // height:22px;background:rgba(73,83,102,.1);content:"本机"`, which would land flush with the
+  // host's leading edge — no band, wrong axis — instead of sitting on the circle's bottom edge.
+  // Such a pseudo materialises like any other box, with its text carried on the stand-in.
+  function shouldMaterialise(cs, pseudoText) {
     const position = (cs.getPropertyValue('position') || '').trim();
-    if (position !== 'absolute' && position !== 'fixed') {
-      return { ok: false, reason: 'in-flow' };
+    if (position !== 'absolute' && position !== 'fixed' &&
+        position !== 'static' && position !== 'relative') {
+      return { ok: false, reason: 'position-' + (position || 'unknown') };
+    }
+    const outOfFlow = position === 'absolute' || position === 'fixed';
+    if (pseudoText !== '' && !outOfFlow) {
+      return { ok: false, reason: 'text-content' };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
     if (widthPx <= 0 && heightPx <= 0) {
       return { ok: false, reason: 'zero-size' };
     }
-    return { ok: true };
+    return { ok: true, inFlow: !outOfFlow };
   }
 
   function emitInlineStyle(cs) {
@@ -5682,6 +5902,7 @@ async function materializeDecorativePseudoElements() {
   // `<svg>` subtrees are an opaque resolver target downstream — leaving
   // pseudo-elements declared on inline SVG markup alone matches how the
   // snapshot already passes the SVG through verbatim.
+  const pseudoOffRules = [];
   const all = document.querySelectorAll('*');
   for (let i = 0; i < all.length; i++) {
     const el = all[i];
@@ -5696,14 +5917,22 @@ async function materializeDecorativePseudoElements() {
     if (el.closest('svg') && tag !== 'svg') continue;
     // Skip our own synthetic nodes from a previous pass (defensive — the
     // pipeline today calls this exactly once per page, but the in-page
-    // helpers can also be invoked manually).
+    // helpers can also be invoked manually). A host that already went
+    // through materialisation is skipped entirely so a second pass cannot
+    // stack a second stand-in next to the first.
     if (el.hasAttribute('data-snapshot-pseudo')) continue;
+    if (el.hasAttribute('data-snapshot-pseudo-host')) continue;
+    // A host whose icon-font pseudo was already converted to an inline `<svg>` (the icon-font pass
+    // runs before this one) is rendered by `renderInlineIconSvg`; materialising its pseudo box too
+    // would draw the raw glyph next to the converted icon.
+    if (el.hasAttribute('data-snapshot-icon-svg-id')) continue;
 
-    // Two-phase decision: first read both pseudos so we know whether the
-    // host carries a text-bearing pseudo. If it does, leave the host alone
-    // — `renderPseudoTextLeaf` already produces the correct emission, and
-    // appending a real child would knock that path out by flipping
-    // `hasElementChild` to true.
+    // Two-phase decision: first read both pseudos, then decide per pseudo. Every pseudo on the
+    // host shares one fallback — appending a stand-in marks the host with
+    // `data-snapshot-pseudo-host`, which turns `renderPseudoTextLeaf` off for the *whole* host.
+    // A stand-in therefore has to carry every text-bearing pseudo of that host, or the ones left
+    // behind silently lose their glyphs; a host whose text pseudos do not all materialise keeps
+    // the text-leaf path untouched.
     const pseudoData = [];
     let hasTextPseudo = false;
     for (const pseudo of PSEUDO_TYPES) {
@@ -5718,12 +5947,24 @@ async function materializeDecorativePseudoElements() {
       if (pseudoText !== '') hasTextPseudo = true;
       pseudoData.push({ cs, pseudoText, pseudo });
     }
-    if (hasTextPseudo) continue;
+    const decisions = pseudoData.map((slot) => {
+      if (!slot) return null;
+      return shouldMaterialise(slot.cs, slot.pseudoText);
+    });
+    if (hasTextPseudo) {
+      let textLeftBehind = false;
+      for (let i = 0; i < pseudoData.length; i++) {
+        const slot = pseudoData[i];
+        if (slot && slot.pseudoText !== '' && !decisions[i].ok) textLeftBehind = true;
+      }
+      if (textLeftBehind) continue;
+    }
 
     let materialisedAny = false;
-    for (const slot of pseudoData) {
+    for (let i = 0; i < pseudoData.length; i++) {
+      const slot = pseudoData[i];
       if (!slot) continue;
-      const decision = shouldMaterialise(slot.cs, slot.pseudoText);
+      const decision = decisions[i];
       if (!decision.ok) {
         if (decision.reason !== 'text-content') {
           el.setAttribute('data-snapshot-pseudo-skipped', decision.reason);
@@ -5739,6 +5980,18 @@ async function materializeDecorativePseudoElements() {
       const restingCs = restingPseudoStyle(el, slot.pseudo, slot.cs);
       const style = emitInlineStyle(restingCs);
       if (style) div.setAttribute('style', style);
+      // A text-bearing pseudo (see shouldMaterialise) rides the stand-in as its text content, so
+      // the glyphs inherit the pseudo's own box and text styles instead of the host's flow.
+      // `white-space` is not part of COPY_PROPS, so it is appended only when the pseudo states
+      // something other than the default — a box sized by the page for one line must not rewrap.
+      if (slot.pseudoText) {
+        div.textContent = applyPseudoTextTransform(slot.pseudoText, restingCs);
+        const whiteSpace = (restingCs.getPropertyValue('white-space') || '').trim();
+        if (whiteSpace && whiteSpace !== 'normal') {
+          const base = div.getAttribute('style') || '';
+          div.setAttribute('style', base ? base + '; white-space: ' + whiteSpace : 'white-space: ' + whiteSpace);
+        }
+      }
       // `::before` is painted before the host's children, `::after` after.
       // Mirror that order in the DOM so the natural document order matches.
       if (slot.pseudo === '::before') {
@@ -5750,12 +6003,264 @@ async function materializeDecorativePseudoElements() {
       } else {
         el.appendChild(div);
       }
+      // An out-of-flow pseudo never affected the host's layout, so the
+      // original can keep rendering until the stylesheet is stripped. An
+      // in-flow stand-in DOES take a layout slot: without switching the
+      // original off, pseudo + stand-in would double-occupy the flow and
+      // shift every measured sibling. Record a `content: none` override and
+      // inject all rules after the walk — injecting mid-walk would be safe
+      // too (already-read styles are unaffected), but batching keeps the
+      // DOM mutation profile flat and the markers deterministic.
+      if (decision.inFlow) {
+        const marker = 'data-snapshot-pseudo-off-' + pseudoOffRules.length;
+        el.setAttribute(marker, '');
+        pseudoOffRules.push('[' + marker + ']' + slot.pseudo + ' { content: none !important; }');
+      }
       materialisedAny = true;
     }
     if (materialisedAny) {
       el.setAttribute('data-snapshot-pseudo-host', '');
     }
   }
+
+  // Switch off every in-flow pseudo that now has a layout stand-in. The rule
+  // lives in the snapshot's <head> style block, so it keeps guarding the
+  // stand-in against a double paint if the snapshot is re-rendered with the
+  // original stylesheet still attached.
+  if (pseudoOffRules.length > 0) {
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-snapshot-pseudo-off', '');
+    styleEl.textContent = pseudoOffRules.join('\n');
+    document.head.appendChild(styleEl);
+  }
+}
+
+/* eslint-enable no-undef, no-inner-declarations */
+
+/* eslint-disable no-undef, no-inner-declarations */
+
+// ===== Pre-snapshot pass: expand sticky scrollytelling blocks =====
+
+// "Scrollytelling" pages pin a viewport-sized `position: sticky` panel inside
+// a much taller scroll track and cross-fade between N stacked step layers as
+// `scrollY` advances (Flect's `.method-scroll` / `.method-sticky` is the
+// canonical case). A static snapshot freezes the page at scroll 0, so:
+//
+//   - the track keeps its full height (4545px) but only the top panel
+//     (766px) has content — the rest renders as blank space, and
+//   - the step layers the page's JS left at `opacity: 0` are dropped by
+//     `isVisible` (or worse, half-captured by the animation sampler whose
+//     state depends on the lazy-load warm-up sweep timing), losing steps 2..N
+//     entirely or leaving them as invisible alpha-0 layers.
+//
+// This pass rewrites the live DOM before the walker runs: the sticky panel is
+// cloned N times and the clones are tiled vertically down the track, one per
+// step, each showing exactly one layer of every stacked group. The exported
+// PAGX then reads top-to-bottom as "page 1, page 2, page 3" instead of "page
+// 1, blank, blank".
+//
+// Detection is heuristic and deliberately conservative — no class names, no
+// site-specific selectors:
+//
+//   1. a sticky element S whose parent track P is at least 2x S's height
+//      (the scroll-into interval must exist for scrollytelling to make
+//      sense), and
+//   2. inside S, a group of >= 2 sibling `position: absolute` layers that
+//      stack on top of each other (pairwise vertical overlap, similar size)
+//      with mutually exclusive opacities (one >= 0.9, one <= 0.1) — the
+//      cross-faded steps. Sticky headers, tab panels without a scroll track,
+//      carousels and parallax decorations all fail one of these checks.
+//
+// Layer handling per segment keeps the page's own geometry: the surviving
+// layer's computed `transform` is frozen inline (removing it could snap the
+// layer back to an entrance-state CSS rule such as `scale(.965)`), while
+// `opacity`/`filter`/`visibility` are forced visible. The track's height is
+// pinned inline in case it was content-driven and would collapse once the
+// sticky panel leaves the flow.
+//
+// Idempotent: expanded tracks carry `data-snapshot-sticky-expanded` and both
+// the detection loop and this guard skip anything inside such a track (which
+// also shields nested stickies inside the cloned panels).
+function expandStickyScrollytelling() {
+  // Self-contained on purpose: this function is shipped through
+  // `page.evaluate`, so only its own body crosses the boundary (same rule as
+  // materializeDecorativePseudoElements above).
+  function overlapRatio(a, b) {
+    const top = Math.max(a.top, b.top);
+    const bottom = Math.min(a.bottom, b.bottom);
+    if (bottom <= top) return 0;
+    const shared = bottom - top;
+    return Math.min(shared / Math.max(1, a.height), shared / Math.max(1, b.height));
+  }
+
+  function sizeSimilar(a, b) {
+    const w = Math.abs(a.width - b.width) / Math.max(1, Math.max(a.width, b.width));
+    const h = Math.abs(a.height - b.height) / Math.max(1, Math.max(a.height, b.height));
+    return w <= 0.25 && h <= 0.25;
+  }
+
+  // Group absolutely-positioned candidates by parent, then keep the buckets
+  // that look like a cross-fade step stack: >= 2 layers, pairwise stacked,
+  // similar size, mutually exclusive opacities.
+  function findLayerGroups(root) {
+    const buckets = new Map();
+    const all = root.querySelectorAll('*');
+    for (const el of all) {
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'absolute') continue;
+      if (cs.display === 'none') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const parent = el.parentElement;
+      if (!parent) continue;
+      if (!buckets.has(parent)) buckets.set(parent, []);
+      buckets.get(parent).push({ el, cs, rect });
+    }
+    const groups = [];
+    for (const layers of buckets.values()) {
+      if (layers.length < 2) continue;
+      let stacked = true;
+      for (let i = 0; i < layers.length && stacked; i++) {
+        for (let j = i + 1; j < layers.length; j++) {
+          if (overlapRatio(layers[i].rect, layers[j].rect) < 0.6 ||
+              !sizeSimilar(layers[i].rect, layers[j].rect)) {
+            stacked = false;
+            break;
+          }
+        }
+      }
+      if (!stacked) continue;
+      const ops = layers.map((l) => parseFloat(l.cs.opacity) || 0);
+      if (Math.max.apply(null, ops) < 0.9) continue;
+      if (Math.min.apply(null, ops) > 0.1) continue;
+      groups.push(layers.map((l) => l.el));
+    }
+    return groups;
+  }
+
+  // Freeze one surviving layer into its visible resting state. `transform`
+  // keeps the *computed* value: the layer's CSS base rule may hold an
+  // entrance transform (e.g. `translateY(-50%)` centering or `scale(.965)`)
+  // that inline JS overrode at runtime, and removing the inline value would
+  // snap the geometry back. opacity/filter/visibility are forced so the
+  // walker's `isVisible` check never prunes the layer.
+  function keepLayer(el) {
+    const cs = getComputedStyle(el);
+    el.style.opacity = '1';
+    el.style.filter = 'none';
+    el.style.visibility = 'visible';
+    el.style.transform = cs.transform;
+    el.style.removeProperty('transition');
+    el.style.removeProperty('animation');
+  }
+
+  const results = [];
+  const candidates = Array.from(document.body ? document.body.querySelectorAll('*') : []);
+  for (const el of candidates) {
+    if (!el.parentElement) continue;
+    if (el.closest('[data-snapshot-sticky-expanded]')) continue;
+    let cs;
+    try {
+      cs = getComputedStyle(el);
+    } catch (_) {
+      continue;
+    }
+    if (cs.position !== 'sticky') continue;
+    if (cs.display === 'none') continue;
+    const track = el.parentElement;
+    const elRect = el.getBoundingClientRect();
+    const trackRect = track.getBoundingClientRect();
+    if (elRect.width <= 0 || elRect.height <= 0) continue;
+    if (trackRect.height < 2 * elRect.height) continue;
+    // The sticky panel must be the track's only in-flow visible child:
+    // switching it to absolute releases its layout slot, and any in-flow
+    // sibling — including another sticky one, which keeps its own flow slot —
+    // would shift up and corrupt the geometry of everything the walker
+    // measures afterwards. Scrollytelling tracks are dedicated
+    // height-creating wrappers, so this holds for the intended targets and
+    // rejects sticky headers living inside a normal content flow.
+    let hasFlowSibling = false;
+    for (const sibling of Array.from(track.children)) {
+      if (sibling === el) continue;
+      const sc = getComputedStyle(sibling);
+      if (sc.display === 'none') continue;
+      if (sc.position === 'absolute' || sc.position === 'fixed') {
+        continue;
+      }
+      if (sibling.getBoundingClientRect().height > 0) {
+        hasFlowSibling = true;
+        break;
+      }
+    }
+    if (hasFlowSibling) continue;
+    const groups = findLayerGroups(el);
+    if (groups.length === 0) continue;
+
+    const segments = Math.max.apply(null, groups.map((g) => g.length));
+    const segmentHeight = trackRect.height / segments;
+    const panelLeft = elRect.left - trackRect.left;
+    const panelWidth = elRect.width;
+
+    // Tag every layer with its group + index so the clones (fresh nodes the
+    // original references don't reach) can be re-queried per segment.
+    groups.forEach((layers, groupIndex) => {
+      layers.forEach((layer, layerIndex) => {
+        layer.setAttribute('data-snapshot-layer-group', String(groupIndex));
+        layer.setAttribute('data-snapshot-layer-index', String(layerIndex));
+      });
+    });
+
+    // The track must become the containing block for the absolutely
+    // positioned panels.
+    if (getComputedStyle(track).position === 'static') {
+      track.style.position = 'relative';
+    }
+
+    const panels = [el];
+    for (let i = 1; i < segments; i++) {
+      panels.push(el.cloneNode(true));
+    }
+    panels.forEach((panel, i) => {
+      if (i > 0) track.appendChild(panel);
+      panel.style.position = 'absolute';
+      panel.style.top = (i * segmentHeight + (segmentHeight - elRect.height) / 2) + 'px';
+      panel.style.left = panelLeft + 'px';
+      // `panelWidth` is a measured border-box width, so pin the sizing model before writing it:
+      // a content-box panel would otherwise grow by its own padding and border, shifting every
+      // measured child (the same hazard the track-height pin below handles).
+      panel.style.boxSizing = 'border-box';
+      panel.style.width = panelWidth + 'px';
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+      panel.style.removeProperty('margin-top');
+      panel.style.removeProperty('margin-bottom');
+      panel.style.removeProperty('margin-left');
+      panel.style.removeProperty('margin-right');
+      groups.forEach((layers, groupIndex) => {
+        const inPanel = panel.querySelectorAll(
+          '[data-snapshot-layer-group="' + groupIndex + '"]');
+        if (inPanel.length === 0) return;
+        const keepIndex = Math.min(i, inPanel.length - 1);
+        for (let li = 0; li < inPanel.length; li++) {
+          if (li === keepIndex) keepLayer(inPanel[li]);
+          else inPanel[li].remove();
+        }
+      });
+    });
+
+    // Only pin the height when the panel leaving the flow actually collapsed
+    // the track (a content-driven height). Writing getBoundingClientRect's
+    // border-box height into `style.height` unconditionally would inflate a
+    // `box-sizing: content-box` track by its padding and border.
+    if (Math.abs(track.getBoundingClientRect().height - trackRect.height) > 1) {
+      track.style.boxSizing = 'border-box';
+      track.style.height = trackRect.height + 'px';
+    }
+
+    track.setAttribute('data-snapshot-sticky-expanded', String(segments));
+    results.push({ segments });
+  }
+  return { blocks: results.length, expanded: results };
 }
 
 /* eslint-enable no-undef, no-inner-declarations */
@@ -5776,6 +6281,7 @@ export {
   imgAlt,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  expandStickyScrollytelling,
   mergeRectsOnSameLine,
   bandInsetRect,
   inlineBoxLineRects,

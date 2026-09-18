@@ -164,7 +164,7 @@
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | `<Fill>` 内嵌 `<LinearGradient>`（`startPoint`/`endPoint` 由角度推得） |
 | `background-image: radial-gradient(…)` | 内嵌 `<RadialGradient>` |
 | `background-image: conic-gradient(from angle, …)` | 内嵌 `<ConicGradient>`（CSS 0° = 顶，PAGX 0° = 右，自动 −90°） |
-| `background-clip: text`（别名 `-webkit-background-clip: text`） | 与 gradient `background-image` 同时设置时，渐变下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变），本元素的矩形背景被抑制。无 gradient `background-image` 时该属性为无操作。 |
+| `background-clip: text`（别名 `-webkit-background-clip: text`） | 元素背景下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变；无渐变层时为纯色），本元素的矩形背景被抑制。这与 CSS 一致：继承下来的 `text-fill-color` 为透明，被裁剪的背景是字形唯一的着色来源，因此背景优先于 `color`。存在渐变 `background-image` 时渐变优先于纯色 `background-color`（CSS 中纯色层在图片层之下）。背景色完全透明时不产生任何着色，该属性对该元素为无操作。 |
 | `background-image: url(...)` | 还原为背景矩形上的 `<ImagePattern>` 填充；`background-size` / `background-repeat` / `background-position` 决定该 pattern 的 `scaleMode` / 平铺模式 / 矩阵 |
 | `background-blend-mode: <mode>` | 在渐变 / 图像填充上设置 `Fill.blendMode`，使其与 `background-color` 混合；此时会保留底部的纯色 `<Fill>` 作为混合所需的背景。`normal`（默认）为空操作，不透明的渐变 / 图像仍会覆盖底色 |
 | `mask-image: url(data:image/svg+xml,...)`（+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`） | 引用的 SVG 变成一层 PAGX mask；`mask-mode` 选择 Alpha 还是 Luminance，`mask-size` / `mask-position` 决定其缩放/偏移 |
@@ -180,8 +180,9 @@
 | `transform-origin` | 透传；当其等于盒子中心（`50% 50%`、`center`、`center center`，或等于盒心的 px 值）时被尊重，其它原点告警 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
 
-`background-clip: border-box` / `padding-box` / `content-box` 均为静默无操作（仅 `text` 关键字
-在 PAGX 有效,见上）。
+`background-clip: text` 用于字形填充（见上表）。`border-box`（默认）静默折叠。`padding-box` /
+`content-box` 会保留：携带该关键字的每个渐变层重建为内缩子层，即 CSS 绘制渐变边框的方式（纯色
+`background-color` 仍按 border box 绘制）。其它未知值告警丢弃。
 
 禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、`perspective`、
 几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非

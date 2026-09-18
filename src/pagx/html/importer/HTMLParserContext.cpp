@@ -22,6 +22,7 @@
 #include <cmath>
 #include <utility>
 #include "pagx/FontConfig.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
 #include "pagx/nodes/Animation.h"
@@ -149,6 +150,11 @@ bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::st
   return static_cast<HTMLParserContext*>(userData)->isFontFamilyAvailable(family);
 }
 
+void HTMLParserContext::ResolveFontFaceNamesThunk(void* userData, std::string& family,
+                                                  std::string& style) {
+  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style);
+}
+
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
   _diagnostics = std::make_unique<HTMLDiagnosticSink>(_options.strict);
   _idAllocator = std::make_unique<HTMLIdAllocator>();
@@ -167,6 +173,9 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   // family the renderer can't resolve (e.g. the hidden "SF Mono" system font) doesn't get written
   // to `Text::fontFamily` and silently substituted with a mismatched proportional default.
   _styleCascade->setFontAvailabilitySink(&HTMLParserContext::IsFontFamilyAvailableThunk, this);
+  // Rewrite the resolved family/style pair to the spelling the platform resolves it to, so the
+  // exported PAGX can be looked up by name outside this process.
+  _styleCascade->setFontFaceNameSink(&HTMLParserContext::ResolveFontFaceNamesThunk, this);
   // The byte/string entry points have no implicit anchor for relative `<img src>` paths;
   // honour the caller-supplied base path here. The file entry point overrides this with
   // the input file's parent directory.
@@ -209,6 +218,46 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   bool available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
+}
+
+void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style) {
+  if (family.empty()) {
+    return;
+  }
+  // Registered/embedded families are resolved by `LayoutContext` through an exact (family, style)
+  // key, so their names must stay verbatim — renaming them would miss the registration and fall
+  // through to a system face instead.
+  if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
+    return;
+  }
+  // The cache is keyed on the exact pair rather than a case-insensitive normalisation: the style
+  // half of the platform lookup is case-sensitive on some backends, so spelling variants of one
+  // family can genuinely resolve to different faces.
+  std::string cacheKey = family + "\n" + style;
+  auto cached = _fontFaceNameCache.find(cacheKey);
+  if (cached != _fontFaceNameCache.end()) {
+    family = cached->second.first;
+    style = cached->second.second;
+    return;
+  }
+  std::string resolvedFamily = family;
+  std::string resolvedStyle = style;
+  auto typeface = SystemFonts::ResolveTypeface(family, style);
+  // A family mismatch means the platform substituted a different face, so the authored name is
+  // kept instead of baking the substitution into the exported document.
+  if (typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily())) {
+    resolvedFamily = typeface->fontFamily();
+    // Report the face style the platform actually picked, including when the request carried no
+    // style at all. The text-leaf exits substitute "Regular" for an empty style, but a family need
+    // not ship a Regular face (macOS "DIN Alternate" only has Bold), and the substituted name would
+    // then resolve nowhere. An empty style from the platform keeps the authored value.
+    if (!typeface->fontStyle().empty()) {
+      resolvedStyle = typeface->fontStyle();
+    }
+  }
+  _fontFaceNameCache.emplace(std::move(cacheKey), std::make_pair(resolvedFamily, resolvedStyle));
+  family = std::move(resolvedFamily);
+  style = std::move(resolvedStyle);
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {

@@ -480,6 +480,35 @@ bool FontEmbedder::embed(PAGXDocument* document) {
           }
         }
       }
+      // The renderer shears every run of this Text with the Text-level flag (GlyphRunRenderer), so
+      // the flag may only be dropped when no run still needs it. Layout drops the run-level
+      // fauxItalic when the resolved typeface is a real italic face, and a synthesised italic is
+      // already baked into the embedded vector outlines because Font::getPath() applies
+      // ITALIC_SKEW. Bitmap glyphs keep no shear in their PNG, so a run that was synthesised and
+      // is embedded as bitmaps still depends on the renderer applying the slant.
+      if (text->fauxItalic) {
+        bool needsRenderShear = false;
+        for (auto& tlRun : layoutRuns) {
+          if (!tlRun.font.isFauxItalic()) {
+            continue;
+          }
+          auto* typeface = tlRun.font.getTypeface().get();
+          for (auto glyphID : tlRun.glyphs) {
+            GlyphKey key = {typeface, glyphID};
+            auto typeIt = glyphTypes.find(key);
+            if (typeIt != glyphTypes.end() && typeIt->second == GlyphType::Bitmap) {
+              needsRenderShear = true;
+              break;
+            }
+          }
+          if (needsRenderShear) {
+            break;
+          }
+        }
+        if (!needsRenderShear) {
+          text->fauxItalic = false;
+        }
+      }
     }
   }
 

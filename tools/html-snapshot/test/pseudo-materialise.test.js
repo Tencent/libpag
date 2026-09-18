@@ -166,3 +166,194 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
     expect(state.cancelled).toBe(false);
   });
 });
+
+describe('materializeDecorativePseudoElements — in-flow decorative pseudo', () => {
+  // Mirrors the getflect.app `.free-tag` chip: an inline-flex host whose
+  // ::before is a static, 6x6 flex-item status dot with rounded corners.
+  function makeHostWithInFlowBefore() {
+    const host = new FakeElement('span');
+    host.appendChild(new FakeElement('span'));
+    host.__cs = {
+      '::before': makeCs({
+        content: '""',
+        position: 'static',
+        display: 'block',
+        width: '6px',
+        height: '6px',
+        'border-top-left-radius': '50%',
+        'background-color': 'rgba(116, 138, 42, 0.18)',
+        'flex-grow': '0',
+        'flex-shrink': '0',
+        'flex-basis': 'auto',
+      }),
+      '::after': makeCs({ content: 'none' }),
+    };
+    return host;
+  }
+
+  function runOnCapturingStyles(host) {
+    const styleEls = [];
+    global.document = {
+      querySelectorAll: () => [host],
+      createElement: (tag) => new FakeElement(tag),
+      head: { appendChild: (el) => styleEls.push(el) },
+    };
+    return materializeDecorativePseudoElements().then(() => styleEls);
+  }
+
+  test('materialises a static in-flow pseudo as a layout stand-in and switches the original off', async () => {
+    const host = makeHostWithInFlowBefore();
+    const styleEls = await runOnCapturingStyles(host);
+
+    // Exactly one stand-in div, inserted in front of the host's real child
+    // (the ::before slot), so the document order mirrors paint order.
+    expect(host.children).toHaveLength(2);
+    const div = host.children[0];
+    expect(div.getAttribute('data-snapshot-pseudo')).toBe('::before');
+    expect(host.getAttribute('data-snapshot-pseudo-host')).toBe('');
+
+    const style = div.getAttribute('style');
+    // Layout identity is copied so the stand-in occupies the same flow slot.
+    expect(style).toContain('display: block');
+    expect(style).toContain('width: 6px');
+    expect(style).toContain('height: 6px');
+    expect(style).toContain('background-color: rgba(116, 138, 42, 0.18)');
+    expect(style).toContain('border-top-left-radius: 50%');
+    expect(style).toContain('flex-shrink: 0');
+
+    // The original pseudo is switched off via an injected content:none rule
+    // so pseudo + stand-in cannot double-occupy the flow slot.
+    expect(host.getAttribute('data-snapshot-pseudo-off-0')).toBe('');
+    expect(styleEls).toHaveLength(1);
+    expect(styleEls[0].getAttribute('data-snapshot-pseudo-off')).toBe('');
+    expect(styleEls[0].textContent)
+      .toContain('[data-snapshot-pseudo-off-0]::before { content: none !important; }');
+  });
+
+  test('an out-of-flow pseudo does not inject a content:none rule', async () => {
+    const { host } = makeHostWithAfter({ animated: false });
+    const styleEls = await runOnCapturingStyles(host);
+
+    expect(host.children).toHaveLength(1);
+    expect(styleEls).toHaveLength(0);
+    expect(host.hasAttribute('data-snapshot-pseudo-off-0')).toBe(false);
+  });
+
+  test('a sticky pseudo is still rejected', async () => {
+    const host = new FakeElement('div');
+    host.__cs = {
+      '::before': makeCs({
+        content: '""',
+        position: 'sticky',
+        width: '6px',
+        height: '6px',
+        'background-color': 'rgb(255, 0, 0)',
+      }),
+      '::after': makeCs({ content: 'none' }),
+    };
+    const styleEls = await runOnCapturingStyles(host);
+
+    expect(host.children).toHaveLength(0);
+    expect(styleEls).toHaveLength(0);
+    expect(host.getAttribute('data-snapshot-pseudo-skipped')).toBe('position-sticky');
+  });
+});
+
+describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () => {
+  // Mirrors baidu-pan's "current device" badge: the circle host paints its icon as a background
+  // image and hangs a `本机` band off its bottom edge through `::before`. The pseudo's own box —
+  // absolute bottom anchor, fixed size, translucent background — is exactly what the text-leaf
+  // path drops, leaving the glyphs flush with the host's leading edge.
+  function makeHostWithBadgeBefore() {
+    const host = new FakeElement('div');
+    host.__cs = {
+      '::before': makeCs({
+        content: '"本机"',
+        position: 'absolute',
+        bottom: '-3px',
+        width: '90px',
+        height: '22px',
+        'background-color': 'rgba(73, 83, 102, 0.1)',
+        color: 'rgb(129, 137, 153)',
+        'font-size': '12px',
+        'line-height': '24px',
+        'text-align': 'center',
+        'white-space': 'nowrap',
+      }),
+      '::after': makeCs({ content: 'none' }),
+    };
+    return host;
+  }
+
+  test('carries the glyphs on a stand-in that keeps the pseudo box', async () => {
+    const host = makeHostWithBadgeBefore();
+    await runOn(host);
+
+    expect(host.children).toHaveLength(1);
+    const div = host.children[0];
+    expect(div.getAttribute('data-snapshot-pseudo')).toBe('::before');
+    expect(host.getAttribute('data-snapshot-pseudo-host')).toBe('');
+
+    const style = div.getAttribute('style');
+    expect(style).toContain('position: absolute');
+    expect(style).toContain('bottom: -3px');
+    expect(style).toContain('width: 90px');
+    expect(style).toContain('height: 22px');
+    expect(style).toContain('background-color: rgba(73, 83, 102, 0.1)');
+    // The box was sized for one line, so the glyphs must not rewrap.
+    expect(style).toContain('white-space: nowrap');
+    // The glyphs ride the stand-in instead of the host's flow.
+    expect(div.textContent).toBe('本机');
+  });
+
+  test('an in-flow text pseudo keeps the text-leaf path', async () => {
+    const host = new FakeElement('div');
+    host.__cs = {
+      '::before': makeCs({ content: '"→"', position: 'static', width: 'auto', height: 'auto' }),
+      '::after': makeCs({ content: 'none' }),
+    };
+    await runOn(host);
+
+    expect(host.children).toHaveLength(0);
+    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+  });
+
+  test('a host mixing a box pseudo with in-flow text is left to the text-leaf path', async () => {
+    const host = new FakeElement('div');
+    host.__cs = {
+      '::before': makeCs({ content: '"→"', position: 'static', width: 'auto', height: 'auto' }),
+      '::after': makeCs({
+        content: '""',
+        position: 'absolute',
+        width: '10px',
+        height: '10px',
+      }),
+    };
+    await runOn(host);
+
+    // Appending a stand-in suppresses `renderPseudoTextLeaf` for the whole host, so materialising
+    // the box pseudo would silently drop the in-flow glyphs — the host keeps the text path.
+    expect(host.children).toHaveLength(0);
+    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+  });
+
+  test('a host with an already inlined icon-font glyph is not materialised again', async () => {
+    const host = new FakeElement('div');
+    host.setAttribute('data-snapshot-icon-svg-id', 'icon-1');
+    host.__cs = {
+      '::before': makeCs({
+        content: '"\\e901"',
+        position: 'absolute',
+        width: '32px',
+        height: '32px',
+      }),
+      '::after': makeCs({ content: 'none' }),
+    };
+    await runOn(host);
+
+    // The icon-font pass already replaced the glyph with an inline `<svg>`; materialising the
+    // pseudo box would paint the raw glyph next to it.
+    expect(host.children).toHaveLength(0);
+    expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+  });
+});
