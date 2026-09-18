@@ -172,16 +172,21 @@ static void AdjustmentPreComposeLayerForVideoComposition(std::shared_ptr<PAGExpo
       preComposeLayer->composition->uniqueID != videoComposition->uniqueID) {
     return;
   }
+  // The wrapper layer produced by the clip rebuild (its containingComposition is set) already had
+  // this trim offset applied in RebuildVideoComposition. It is reachable again here because the
+  // traversal recurses into the redirected wrapper composition, so applying the offset a second
+  // time would double it. Skip it and only adjust the external references.
+  if (preComposeLayer->containingComposition != nullptr) {
+    return;
+  }
   // The video sequence is encoded starting from its first visible frame
-  // (videoCompositionStartTime), so sequence frame 0 corresponds to that composition frame.
+  // (videoCompositionStartFrame), so sequence frame 0 corresponds to that composition frame.
   // Accumulate this trim offset onto the layer's own composition start time instead of
   // overwriting it, otherwise multiple references to the same composition would all collapse
   // to the same start time and every reference except the first would freeze (discussion #3548).
-  auto frameRate = preComposeLayer->containingComposition != nullptr
-                       ? preComposeLayer->containingComposition->frameRate
-                       : videoComposition->frameRate;
+  // External references live on the session frame rate timeline, so convert the offset to it.
   preComposeLayer->compositionStartTime +=
-      GetVideoCompositionStartOffset(session, videoComposition, frameRate);
+      GetVideoCompositionStartOffset(session, videoComposition, session->frameRate);
 }
 
 static void AdjustTrackMatteLayer(std::shared_ptr<PAGExportSession> session) {
@@ -518,9 +523,9 @@ void PAGExport::exportRescaleVideoCompositions(std::vector<pag::Composition*>& c
 
       ExportVideoComposition(session, compositions,
                              static_cast<pag::VideoComposition*>(composition), factor);
-      AdjustCompositionFrameRate<pag::VideoComposition*>(composition);
       TraversalLayers(session, mainComposition, pag::LayerType::PreCompose,
                       AdjustmentPreComposeLayerForVideoComposition, composition);
+      AdjustCompositionFrameRate<pag::VideoComposition*>(composition);
     }
   }
 }

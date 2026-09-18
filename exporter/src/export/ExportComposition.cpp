@@ -67,6 +67,9 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
     composition->frameRate = itemFrameRate;
   } else {
     composition->frameRate = session->frameRate;
+    // The item is authored at its own native frame rate but exported on the session frame rate,
+    // so rescale the duration from native frames to session-rate frames to keep this composition's
+    // timeline length consistent with the rest of the export.
     if (itemFrameRate > 0 && itemFrameRate != session->frameRate) {
       composition->duration = static_cast<pag::Frame>(
           std::round(composition->duration * session->frameRate / itemFrameRate));
@@ -78,7 +81,15 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
   session->itemHandleMap[composition->id] = itemHandle;
 
   if (composition->type() != pag::CompositionType::Vector) {
-    session->progressModel.addTotalSteps(static_cast<uint64_t>(composition->duration));
+    // Sequence encoding walks frames at the sequence frame rate (the smaller of the configured and
+    // the native item rate), not the session rate, so count progress steps in that same unit.
+    // Using the session-rate duration here would overshoot and finish the progress bar early.
+    auto sequenceFrameRate = std::min(session->configParam.frameRate, itemFrameRate);
+    auto sequenceFrames = session->frameRate > 0
+                              ? static_cast<uint64_t>(std::ceil(
+                                    composition->duration * sequenceFrameRate / session->frameRate))
+                              : static_cast<uint64_t>(composition->duration);
+    session->progressModel.addTotalSteps(sequenceFrames);
   }
 }
 

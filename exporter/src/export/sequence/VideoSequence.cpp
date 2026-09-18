@@ -296,7 +296,7 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
       }
       if (firstExportFrame == -1) {
         firstExportFrame = frame;
-        session->videoCompositionStartTime[composition->uniqueID] = frame;
+        session->videoCompositionStartFrame[composition->uniqueID] = frame;
       }
       uint8_t* renderRgbaBytes = sizeChanged ? rgbaData->data() : curData->data();
       SetRenderTime(renderOptions, frameRate, frame);
@@ -410,8 +410,8 @@ static void ProcessLayerReference(std::shared_ptr<PAGExportSession>, pag::Layer*
 
 pag::Frame GetVideoCompositionStartOffset(std::shared_ptr<PAGExportSession> session,
                                           pag::VideoComposition* composition, float frameRate) {
-  auto iter = session->videoCompositionStartTime.find(composition->uniqueID);
-  if (iter == session->videoCompositionStartTime.end() || composition->sequences.empty()) {
+  auto iter = session->videoCompositionStartFrame.find(composition->uniqueID);
+  if (iter == session->videoCompositionStartFrame.end() || composition->sequences.empty()) {
     return 0;
   }
   auto sequenceFrameRate = composition->sequences[0]->frameRate;
