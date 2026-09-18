@@ -1477,27 +1477,6 @@ static std::string EscapeEnumOption(const std::string& option) {
   return escaped;
 }
 
-// Sniffs the SFNT container flavour for a font data-URI mime tag. Purely informational —
-// consumers register the raw bytes regardless — but keeps the URI self-describing.
-static const char* DetectFontMime(const uint8_t* bytes, size_t size) {
-  if (bytes == nullptr || size < 4) {
-    return "otf";
-  }
-  if (bytes[0] == 0x00 && bytes[1] == 0x01 && bytes[2] == 0x00 && bytes[3] == 0x00) {
-    return "ttf";
-  }
-  if (bytes[0] == 't' && bytes[1] == 't' && bytes[2] == 'c' && bytes[3] == 'f') {
-    return "ttc";
-  }
-  if (bytes[0] == 'w' && bytes[1] == 'O' && bytes[2] == 'F' && bytes[3] == '2') {
-    return "woff2";
-  }
-  if (bytes[0] == 'w' && bytes[1] == 'O' && bytes[2] == 'F' && bytes[3] == 'F') {
-    return "woff";
-  }
-  return "otf";
-}
-
 static void WriteResource(XMLBuilder& xml, const Node* node, const Options& options) {
   switch (node->nodeType()) {
     case NodeType::Image: {
@@ -1581,13 +1560,6 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       if (!font->file.empty()) {
         const std::string& fileAttr = !font->fileOriginal.empty() ? font->fileOriginal : font->file;
         xml.addAttribute("file", fileAttr);
-      } else if (font->data) {
-        // Inline font bytes as a data URI in the same `file` attribute (mirroring Image's
-        // `source`), so a single PAGX file carries the exact typefaces its text was shaped with.
-        xml.addAttribute("file", std::string("data:font/") +
-                                     DetectFontMime(font->data->bytes(), font->data->size()) +
-                                     ";base64," +
-                                     Base64Encode(font->data->bytes(), font->data->size()));
       }
       WriteCustomData(xml, node);
       if (font->glyphs.empty()) {

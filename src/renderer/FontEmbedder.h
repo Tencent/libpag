@@ -18,13 +18,7 @@
 
 #pragma once
 
-#include <set>
-#include <string>
 #include "pagx/PAGXDocument.h"
-
-namespace tgfx {
-class Typeface;
-}
 
 namespace pagx {
 
@@ -42,40 +36,11 @@ class FontEmbedder {
   FontEmbedder() = default;
 
   /**
-   * Optional inputs for embed(). Every on-disk typeface that actually contributed glyphs to
-   * this embed additionally gets a source-declaration Font node (file="..." with a path
-   * relative to `outputBaseDir`, glyphs left empty), so downstream consumers can re-shape with
-   * the exact same font files. The typefaces are matched against the document's own fontConfig
-   * — the copy applyLayout() kept — because that registry holds the very typeface instances the
-   * shaper used (tgfx::Typeface::MakeFromPath returns a fresh instance per call, so matching
-   * against a caller-side registry would never hit). Registrations backed by in-memory bytes or
-   * system typefaces have no file path and produce no source nodes. Re-embedding a document
-   * that already carries matching source nodes is idempotent: existing nodes are reused, not
-   * duplicated.
-   */
-  struct EmbedOptions {
-    /**
-     * Directory the exported PAGX file will live in; source-declaration `file` attributes are
-     * written relative to it. Empty keeps the registered path verbatim.
-     */
-    std::string outputBaseDir = {};
-
-    /**
-     * When true, source-declaration Font nodes carry the font bytes inline (a
-     * `data:font/...;base64,...` URI in the `file` attribute) instead of an external path,
-     * making the PAGX self-contained: a consumer that re-shapes needs nothing but the file
-     * itself. When false (default), only the relative path is written.
-     */
-    bool embedFontData = false;
-  };
-
-  /**
    * Resets previously-embedded font data in the document so it can be re-embedded from scratch.
    * Clears the embedded GlyphRuns vector on every Text node and removes previously-installed
    * Font nodes (along with their Glyph, PathData, and Image children) plus any orphan GlyphRun
-   * nodes from document->nodes. Font nodes that declare a font source — a non-empty `file`
-   * attribute or inline `data` bytes — are preserved (only their Glyph children are cleared);
-   * Font nodes with neither are removed entirely.
+   * nodes from document->nodes. Font nodes with a non-empty `file` attribute are preserved
+   * (only their Glyph children are cleared); Font nodes without `file` are removed entirely.
    * Call this before applyLayout() when re-embedding a file that
    * already has embedded fonts, so that layout performs runtime shaping instead of using stale
    * embedded data.
@@ -90,21 +55,7 @@ class FontEmbedder {
    * The document must have had applyLayout() called first so that Text nodes contain valid
    * layout run data.
    */
-  bool embed(PAGXDocument* document, const EmbedOptions& options);
-
-  /**
-   * Overload equivalent to embed(document, EmbedOptions{}): embeds without writing
-   * source-declaration nodes. (A default argument cannot be used on the overload above because
-   * the EmbedOptions default member initializers are not yet usable within the class definition.)
-   */
-  bool embed(PAGXDocument* document) {
-    return embed(document, EmbedOptions{});
-  }
-
- private:
-  static void WriteFontSourceDeclarations(PAGXDocument* document,
-                                          const std::set<const tgfx::Typeface*>& usedTypefaces,
-                                          const EmbedOptions& options, int& fontIndex);
+  bool embed(PAGXDocument* document);
 };
 
 }  // namespace pagx

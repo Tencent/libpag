@@ -20,7 +20,6 @@
 #include <memory>
 #include "FontConfigData.h"
 #include "SystemFonts.h"
-#include "pagx/types/Data.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -66,18 +65,6 @@ const std::string& TypefaceHolder::getFontFamily() const {
 
 const std::string& TypefaceHolder::getFontStyle() const {
   return fontStyle;
-}
-
-const std::string& TypefaceHolder::getPath() const {
-  return path;
-}
-
-int TypefaceHolder::getTtcIndex() const {
-  return ttcIndex;
-}
-
-const std::shared_ptr<const std::vector<uint8_t>>& TypefaceHolder::getBytes() const {
-  return bytes;
 }
 
 FontConfig::FontConfig() : data(std::make_unique<Data>()) {
@@ -239,42 +226,6 @@ std::vector<std::string> FontConfig::fallbackFamilyNames() const {
     names.push_back(holder.getFontFamily());
   }
   return names;
-}
-
-// Appends the source description of `holder` to `sources` when its typeface is `typeface`.
-// Entries backed by a pre-built typeface (neither path nor bytes) are skipped.
-static void CollectFontSource(TypefaceHolder& holder, const tgfx::Typeface* typeface,
-                              std::vector<FontSourceInfo>& sources) {
-  if (holder.getTypeface().get() != typeface) {
-    return;
-  }
-  FontSourceInfo info = {};
-  info.path = holder.getPath();
-  info.ttcIndex = holder.getTtcIndex();
-  const auto& bytes = holder.getBytes();
-  if (bytes && !bytes->empty()) {
-    info.data = pagx::Data::MakeWithCopy(bytes->data(), bytes->size());
-  } else if (info.path.empty()) {
-    return;
-  }
-  sources.push_back(std::move(info));
-}
-
-std::vector<FontSourceInfo> FontConfig::fontSources(const tgfx::Typeface* typeface) {
-  std::vector<FontSourceInfo> sources = {};
-  if (typeface == nullptr) {
-    return sources;
-  }
-  // The same source can be registered both as a primary font and on the fallback chain (the CLI
-  // registers every --fallback file both ways), so one typeface may yield duplicate entries; the
-  // caller de-duplicates.
-  for (auto& pair : data->registeredTypefaces) {
-    CollectFontSource(pair.second, typeface, sources);
-  }
-  for (auto& holder : data->fallbackTypefaces) {
-    CollectFontSource(holder, typeface, sources);
-  }
-  return sources;
 }
 
 bool FontConfig::containsFamily(const std::string& fontFamily) const {

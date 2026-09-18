@@ -84,8 +84,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
   return true;
 }
 
-bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
-                const std::vector<std::string>& fallbacks, bool embedFontData,
+bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
                 const std::string& command) {
   // Start from the document's own fallback chain: the HTML importer records the CSS font-family
   // stacks there, and applyLayout below replaces the whole config with the one passed in.
@@ -103,22 +102,7 @@ bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
       continue;
     }
     auto* font = static_cast<Font*>(node.get());
-    if (font->data != nullptr) {
-      // Inline font source: register the embedded bytes directly. The bytes may come from a TTC
-      // (`FontConfig::registerFont(..., ttcIndex, ...)` accepts a face index), but the PAGX `Font`
-      // node has no face-index field and the format carries none, so face 0 is the only face this
-      // path can load. The index is lost one layer up, when `FontEmbedder` writes the source
-      // declaration; preserving it needs a format-level field and is tracked separately.
-      auto typeface = tgfx::Typeface::MakeFromBytes(font->data->bytes(), font->data->size());
-      if (typeface == nullptr) {
-        std::cerr << command << ": failed to load embedded font data\n";
-        return false;
-      }
-      fontConfig.registerFont(font->data->bytes(), font->data->size(), 0, typeface->fontFamily(),
-                              typeface->fontStyle());
-      fontConfig.addFallbackFont(font->data->bytes(), font->data->size(), 0, typeface->fontFamily(),
-                                 typeface->fontStyle());
-    } else if (!font->file.empty()) {
+    if (!font->file.empty()) {
       auto typeface = tgfx::Typeface::MakeFromPath(font->file);
       if (typeface == nullptr) {
         if (requiresFonts) {
@@ -139,10 +123,7 @@ bool EmbedFonts(PAGXDocument* document, const std::string& outputBaseDir,
   FontEmbedder::ClearEmbeddedGlyphRuns(document);
   document->applyLayout(&fontConfig);
   FontEmbedder embedder = {};
-  FontEmbedder::EmbedOptions embedOptions = {};
-  embedOptions.outputBaseDir = outputBaseDir;
-  embedOptions.embedFontData = embedFontData;
-  if (!embedder.embed(document, embedOptions)) {
+  if (!embedder.embed(document)) {
     std::cerr << command << ": font embedding failed\n";
     return false;
   }

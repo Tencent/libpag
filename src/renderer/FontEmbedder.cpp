@@ -19,14 +19,10 @@
 #include "FontEmbedder.h"
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include "base/utils/Log.h"
 #include "base/utils/MathUtil.h"
-#include "pagx/FontConfig.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Font.h"
@@ -400,126 +396,6 @@ static std::string NextEmbedFontId(PAGXDocument* document, int& fontIndex) {
   return id;
 }
 
-// Resolves the `file` attribute value for a source-declaration Font node: the font path made
-// relative to the directory the exported PAGX will live in, so the reference survives moving the
-// PAGX together with its font files. Falls back to the absolute path when no relative form exists
-// (different volumes, filesystem errors, or a base that does not resolve).
-static std::string FontFileRelativeTo(const std::string& fontPath, const std::string& baseDir) {
-  namespace fs = std::filesystem;
-  std::error_code ec = {};
-  auto base = fs::absolute(fs::path(baseDir), ec);
-  if (ec) {
-    return fontPath;
-  }
-  auto font = fs::absolute(fs::path(fontPath), ec);
-  if (ec) {
-    return fontPath;
-  }
-  auto relative = fs::relative(font, base, ec);
-  if (ec || relative.empty() || relative.is_absolute()) {
-    return font.string();
-  }
-  return relative.string();
-}
-
-// 64-bit FNV-1a over a byte buffer, used as the idempotency key for inline font sources: two
-// embed passes over the same typeface produce equal byte content, and a round-trip through the
-// XML data URI preserves it exactly.
-static uint64_t HashBytes(const uint8_t* data, size_t length) {
-  uint64_t hash = 1469598103934665603ULL;
-  for (size_t i = 0; i < length; i++) {
-    hash ^= data[i];
-    hash *= 1099511628211ULL;
-  }
-  return hash;
-}
-
-static uint64_t HashData(const Data* data) {
-  return HashBytes(data->bytes(), data->size());
-}
-
-// Loads a font file's bytes for inline embedding. Returns null when the file cannot be read.
-static std::shared_ptr<Data> ReadFileBytes(const std::string& path) {
-  std::ifstream file(path, std::ios::binary | std::ios::ate);
-  if (!file) {
-    return nullptr;
-  }
-  auto size = file.tellg();
-  if (size <= 0) {
-    return nullptr;
-  }
-  file.seekg(0, std::ios::beg);
-  auto bytes = new uint8_t[static_cast<size_t>(size)];
-  file.read(reinterpret_cast<char*>(bytes), size);
-  if (!file) {
-    delete[] bytes;
-    return nullptr;
-  }
-  return Data::MakeAdopt(bytes, static_cast<size_t>(size));
-}
-
-// Writes one source-declaration Font node for every on-disk typeface that contributed glyphs to
-// this embed: either an external `file` reference (path relative to the output directory) or the
-// font bytes inline (EmbedOptions::embedFontData), mirroring Image's source/data split. The
-// lookup runs against the document's own fontConfig — the copy applyLayout() kept — because that
-// registry holds the exact typeface instances the shaper used (tgfx::Typeface::MakeFromPath
-// returns a fresh instance per call, so pointer identity only holds within one registry). Each
-// node gets a generated id: the exporter only serialises resources with non-empty ids. Idempotent
-// across re-embeds: an existing source node is matched by path string (external form), by the
-// importer-resolved absolute path (round-trip form), or by byte-content hash (inline form).
-// FontEmbedder member so it can reach the private PAGXDocument::setNodeId.
-void FontEmbedder::WriteFontSourceDeclarations(PAGXDocument* document,
-                                               const std::set<const tgfx::Typeface*>& usedTypefaces,
-                                               const EmbedOptions& options, int& fontIndex) {
-  std::set<std::string> knownPaths = {};
-  std::set<uint64_t> knownDataHashes = {};
-  for (auto& node : document->nodes) {
-    if (node->nodeType() == NodeType::Font) {
-      auto* font = static_cast<Font*>(node.get());
-      if (!font->file.empty()) {
-        knownPaths.insert(font->file);
-      } else if (font->data != nullptr) {
-        knownDataHashes.insert(HashData(font->data.get()));
-      }
-    }
-  }
-  auto& fontConfig = document->fontConfig();
-  for (auto* typeface : usedTypefaces) {
-    for (const auto& source : fontConfig.fontSources(typeface)) {
-      if (options.embedFontData) {
-        // Prefer the registered bytes; a path-backed registration reads the file now.
-        std::shared_ptr<Data> bytes =
-            source.data != nullptr ? source.data : ReadFileBytes(source.path);
-        if (bytes == nullptr) {
-          continue;
-        }
-        if (!knownDataHashes.insert(HashData(bytes.get())).second) {
-          continue;
-        }
-        auto* font = document->makeNode<Font>();
-        font->data = std::move(bytes);
-        document->setNodeId(font, NextEmbedFontId(document, fontIndex));
-        continue;
-      }
-      if (source.path.empty()) {
-        continue;
-      }
-      auto fileValue = options.outputBaseDir.empty()
-                           ? source.path
-                           : FontFileRelativeTo(source.path, options.outputBaseDir);
-      if (knownPaths.count(source.path) > 0 || knownPaths.count(fileValue) > 0) {
-        continue;
-      }
-      knownPaths.insert(source.path);
-      knownPaths.insert(fileValue);
-      auto* font = document->makeNode<Font>();
-      font->file = fileValue;
-      font->fileOriginal = fileValue;
-      document->setNodeId(font, NextEmbedFontId(document, fontIndex));
-    }
-  }
-}
-
 void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   if (document == nullptr) {
     return;
@@ -543,7 +419,7 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
           toRemove.insert(glyph->image);
         }
       }
-      if (!font->file.empty() || font->data != nullptr) {
+      if (!font->file.empty()) {
         font->glyphs.clear();
       } else {
         toRemove.insert(node.get());
@@ -556,7 +432,7 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   document->resetLayoutState();
 }
 
-bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
+bool FontEmbedder::embed(PAGXDocument* document) {
   if (document == nullptr) {
     return false;
   }
@@ -572,7 +448,6 @@ bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
   VectorFontBuilder vectorBuilder = {};
   std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
   std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
-  std::set<const tgfx::Typeface*> usedTypefaces = {};
 
   // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data.
   // Uses TextLayoutGlyphRun populated by applyLayout(). Text nodes without layoutRuns are skipped.
@@ -584,7 +459,6 @@ bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
         if (typeface == nullptr) {
           continue;
         }
-        usedTypefaces.insert(typeface);
         for (auto glyphID : tlRun.glyphs) {
           GlyphKey key = {typeface, glyphID};
           auto& type = glyphTypes[key];
@@ -711,8 +585,6 @@ bool FontEmbedder::embed(PAGXDocument* document, const EmbedOptions& options) {
       text->glyphRuns.front()->bounds = textBounds;
     }
   }
-
-  WriteFontSourceDeclarations(document, usedTypefaces, options, fontIndex);
 
   return true;
 }

@@ -465,9 +465,8 @@ bool PAGXDocument::embed() {
 
 void PAGXDocument::clearEmbed() {
   FontEmbedder::ClearEmbeddedGlyphRuns(this);
-  // Embedded Font nodes without a font source (no `file`, no inline `data`) are removed above.
-  // Drop cached typefaces from the surviving source-backed Font nodes so their memory is
-  // reclaimed before the next embed/render cycle.
+  // Embedded Font nodes without a file are removed above. Drop cached typefaces from the surviving
+  // file-backed Font nodes so their memory is reclaimed before the next embed/render cycle.
   for (auto& node : nodes) {
     if (node->nodeType() == NodeType::Font) {
       static_cast<Font*>(node.get())->resetRenderCache();

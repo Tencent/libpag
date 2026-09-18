@@ -24,24 +24,7 @@
 #include <vector>
 #include "pagx/PAGFont.h"
 
-namespace tgfx {
-class Typeface;
-}
-
 namespace pagx {
-
-class Data;
-
-/**
- * Source of a registered typeface: an on-disk file (`path`, with `ttcIndex` selecting the face
- * within a TTC) or an in-memory buffer (`data`). Exactly one of the two is set, mirroring how the
- * typeface was registered.
- */
-struct FontSourceInfo {
-  std::string path = {};
-  std::shared_ptr<Data> data = nullptr;
-  int ttcIndex = 0;
-};
 
 /**
  * FontConfig manages registered and fallback fonts for font lookup during text layout and
@@ -174,17 +157,6 @@ class FontConfig {
    * (use `applyLayout` and let `LayoutContext` resolve typefaces internally).
    */
   std::vector<std::string> fallbackFamilyNames() const;
-
-  /**
-   * Returns the sources of every registered/fallback typeface matching `typeface` by pointer
-   * identity. A typeface may match multiple entries when unicode-range subset files are
-   * registered under the same (fontFamily, fontStyle) — one entry per file. Each entry carries
-   * either a file path or the in-memory bytes it was registered from; entries backed by
-   * pre-built typefaces (neither) are omitted, as are entries whose lazy typeface fails to load.
-   * Not const because matching lazily builds the held typeface.
-   * @param typeface The typeface to look up, compared by pointer against every registration.
-   */
-  std::vector<FontSourceInfo> fontSources(const tgfx::Typeface* typeface);
 
   /**
    * Returns true when a typeface with the given family (in any style) is registered as either a
