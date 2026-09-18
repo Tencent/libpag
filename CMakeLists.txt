@@ -224,6 +224,8 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_HTML)
         list(APPEND PAG_FILES
+            src/pagx/html/importer/HTMLAnimationBuilder.cpp
+            src/pagx/html/importer/HTMLAnimationBuilder.h
             src/pagx/html/importer/HTMLBoxAttributes.h
             src/pagx/html/importer/HTMLCssCascade.cpp
             src/pagx/html/importer/HTMLCssCascade.h
@@ -466,6 +468,10 @@ elseif (IOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
@@ -505,6 +511,10 @@ elseif (MACOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
@@ -934,6 +944,14 @@ if (PAG_BUILD_TESTS)
     # Build minizip's reader into test binaries only, so archive-producing tests
     # validate the central directory, entry data, and CRCs by actually extracting.
     list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES} ${MINIZIP_DIR}/unzip.c)
+    # woff2 decoder + brotli dec, test-only: lets font-export tests decompress the generated
+    # WOFF2 data and validate the embedded CFF structure (the pag library only embeds the encoder).
+    if (PAG_BUILD_PAGX)
+        file(GLOB BROTLI_DEC_SOURCES ${BROTLI_DIR}/c/dec/*.c)
+        list(APPEND PAG_TEST_FILES ${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES})
+        set_source_files_properties(${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES}
+                PROPERTIES COMPILE_OPTIONS "-w")
+    endif ()
     list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src

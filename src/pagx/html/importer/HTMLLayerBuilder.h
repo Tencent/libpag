@@ -69,8 +69,11 @@ class HTMLLayerBuilder {
   Element* buildBackgroundGeometry(const HTMLBoxAttributes& box);
 
   /** Emits the standard background visual chain (geometry + fill + stroke + shadows +
-   *  backdrop filter). Returns true when any visual was emitted. */
-  bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box);
+   *  backdrop filter). When `foregroundFill` is supplied, it is painted after the CSS background
+   *  and before the border; this is used for replaced elements such as `<img>`. Returns true when
+   *  any visual was emitted. */
+  bool applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
+                              Fill* foregroundFill = nullptr);
 
   /** Applies the resolved CSS `transform` (incl. `transform-origin`) onto `layer->matrix`. */
   void applyBoxTransform(Layer* layer, const HTMLBoxAttributes& box,

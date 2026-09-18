@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
 
 namespace pagx {
 
@@ -81,13 +82,23 @@ class HTMLStyleCascade {
 
   /** Computes the inherited style for `element` based on `parent`. Mirrors the CSS cascade for
    *  text-related properties and pre-resolves the numeric forms (font-size, letter-spacing,
-   *  resolved text colour) so text-leaf conversion can read them without re-parsing. */
+   *  resolved text colour) so text-leaf conversion can read them without re-parsing.
+   *  When `recordFontFallbacks` is false, font-family chains discovered at this element are
+   *  not forwarded to the fallback sink — used for data-pagx-text hosts whose CSS font-family
+   *  is a synthetic pagx-font-* name that must not enter FontConfig fallbacks. */
   HTMLInheritedStyle resolveInheritedStyle(const std::shared_ptr<DOMNode>& element,
-                                           const HTMLInheritedStyle& parent);
+                                           const HTMLInheritedStyle& parent,
+                                           bool recordFontFallbacks = true);
 
   /** Resolves the box-model attributes from the element's resolved style (sizing, positioning,
    *  layout, visuals, transform). */
   HTMLBoxAttributes computeBoxAttributes(const std::shared_ptr<DOMNode>& element);
+
+  /** Returns the `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name.
+   *  Populated by `collectStyles`; consumed by the animation builder (see §13). */
+  const std::unordered_map<std::string, html::CssKeyframesRule>& keyframes() const {
+    return _keyframes;
+  }
 
  private:
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
@@ -136,6 +147,10 @@ class HTMLStyleCascade {
   // cleared first; switching to `weak_ptr<DOMNode>` would express the constraint at the cost of
   // a hash-table indirection.
   std::unordered_map<const DOMNode*, PropertyMap> _resolvedCache = {};
+
+  // `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name. The last
+  // definition of a given name wins, matching CSS cascade order.
+  std::unordered_map<std::string, html::CssKeyframesRule> _keyframes = {};
 };
 
 }  // namespace pagx

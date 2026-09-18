@@ -23,6 +23,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "PAGXOptimizerOptions.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
@@ -74,7 +76,8 @@ Group* WrapShellLayerAsGroup(PAGXDocument* doc, Layer* layer);
 
 bool TryReadAxisAlignedRect(const PathData* data, float& cx, float& cy, float& w, float& h);
 bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float& h);
-Element* TryCanonicalizePath(PAGXDocument* doc, Path* path);
+Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
+                             const std::unordered_set<std::string>& animatedTargets);
 
 bool TryConvertRectMaskToScrollRect(Layer* layer);
 bool RectMaskToScrollRectInLayer(Layer* layer);
@@ -92,8 +95,10 @@ bool PruneEmptyInLayer(Layer* layer, const std::unordered_set<const Layer*>& mas
 bool PruneEmptyTopLevel(std::vector<Layer*>& layers, bool parentHasLayout,
                         const std::unordered_set<const Layer*>& maskRefs);
 
-bool CanonicalizePathsInElements(PAGXDocument* doc, std::vector<Element*>& elements);
-bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer);
+bool CanonicalizePathsInElements(PAGXDocument* doc, std::vector<Element*>& elements,
+                                 const std::unordered_set<std::string>& animatedTargets);
+bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer,
+                              const std::unordered_set<std::string>& animatedTargets);
 
 bool DowngradeShellChildrenInLayer(PAGXDocument* doc, Layer* layer,
                                    const std::unordered_set<const Layer*>& maskRefs);
@@ -146,6 +151,7 @@ bool PruneUnreferencedResources(PAGXDocument* doc);
 
 int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
                       std::unordered_set<const Layer*>& maskRefs,
+                      const std::unordered_set<std::string>& animatedTargets,
                       const PAGXOptimizerOptions& options, bool* converged);
 
 // ----------------------------------------------------------------------------
@@ -410,7 +416,8 @@ bool TryReadEllipse(const PathData* data, float& cx, float& cy, float& w, float&
 
 // Replace `path` in-place with a Rectangle/Ellipse if eligible. Returns the new element to
 // substitute (which may be the same path if no rewrite happened).
-Element* TryCanonicalizePath(PAGXDocument* doc, Path* path) {
+Element* TryCanonicalizePath(PAGXDocument* doc, Path* path,
+                             const std::unordered_set<std::string>& animatedTargets) {
   if (path->data == nullptr || path->data->isEmpty()) {
     return path;
   }
@@ -421,6 +428,13 @@ Element* TryCanonicalizePath(PAGXDocument* doc, Path* path) {
     return path;
   }
   if (!path->customData.empty()) {
+    return path;
+  }
+  // An animated contour-mask Path is driven per-frame by `point{i}.x/.y` runtime channels that
+  // target this node's id (see HTMLAnimationBuilder::BuildContourMaskPath). Rewriting it to a
+  // Rectangle/Ellipse would drop the id and the point structure the runtime rebuilds each frame,
+  // orphaning the animation and freezing the mask at its base geometry. Keep such paths verbatim.
+  if (!path->id.empty() && animatedTargets.find(path->id) != animatedTargets.end()) {
     return path;
   }
 
@@ -847,35 +861,37 @@ bool PruneEmptyTopLevel(std::vector<Layer*>& layers, bool parentHasLayout,
 // Canonicalize Path nodes inside Layers/Groups.
 // ----------------------------------------------------------------------------
 
-bool CanonicalizePathsInElements(PAGXDocument* doc, std::vector<Element*>& elements) {
+bool CanonicalizePathsInElements(PAGXDocument* doc, std::vector<Element*>& elements,
+                                 const std::unordered_set<std::string>& animatedTargets) {
   bool changed = false;
   for (auto& el : elements) {
     if (el->nodeType() == NodeType::Path) {
       auto* path = static_cast<Path*>(el);
-      auto* replacement = TryCanonicalizePath(doc, path);
+      auto* replacement = TryCanonicalizePath(doc, path, animatedTargets);
       if (replacement != el) {
         el = replacement;
         changed = true;
       }
     } else if (el->nodeType() == NodeType::Group) {
       auto* group = static_cast<Group*>(el);
-      changed |= CanonicalizePathsInElements(doc, group->elements);
+      changed |= CanonicalizePathsInElements(doc, group->elements, animatedTargets);
     }
   }
   return changed;
 }
 
-bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer) {
+bool CanonicalizePathsInLayer(PAGXDocument* doc, Layer* layer,
+                              const std::unordered_set<std::string>& animatedTargets) {
   bool changed = false;
-  changed |= CanonicalizePathsInElements(doc, layer->contents);
+  changed |= CanonicalizePathsInElements(doc, layer->contents, animatedTargets);
   // Mask subtrees carry their own Path children (e.g. SVG <clipPath> typically imports each
   // <rect> as Path data). Rewriting those Paths to Rectangle primitives is the prerequisite
   // for TryConvertRectMaskToScrollRect to recognize the mask as an axis-aligned alpha rect.
   if (layer->mask != nullptr) {
-    changed |= CanonicalizePathsInLayer(doc, layer->mask);
+    changed |= CanonicalizePathsInLayer(doc, layer->mask, animatedTargets);
   }
   for (auto* child : layer->children) {
-    changed |= CanonicalizePathsInLayer(doc, child);
+    changed |= CanonicalizePathsInLayer(doc, child, animatedTargets);
   }
   return changed;
 }
@@ -1701,6 +1717,7 @@ bool PruneUnreferencedResources(PAGXDocument* doc) {
 // matches the cap while the last pass still reported changes).
 int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
                       std::unordered_set<const Layer*>& maskRefs,
+                      const std::unordered_set<std::string>& animatedTargets,
                       const PAGXOptimizerOptions& options, bool* converged) {
   int iter = 0;
   for (; iter < options.maxIterations; iter++) {
@@ -1708,7 +1725,7 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
 
     if (options.canonicalizePaths) {
       for (auto* layer : layers) {
-        changed |= CanonicalizePathsInLayer(doc, layer);
+        changed |= CanonicalizePathsInLayer(doc, layer, animatedTargets);
       }
     }
     if (options.rectMaskToScrollRect) {
@@ -1751,6 +1768,30 @@ int OptimizeLayerList(PAGXDocument* doc, std::vector<Layer*>& layers,
   return iter;
 }
 
+// Collects every id referenced as an animation target (top-level animations plus any declared on
+// compositions). Path canonicalization consults this so an animated contour-mask Path keeps its id
+// and Path node type instead of being rewritten to a Rectangle/Ellipse (which would orphan the
+// per-point runtime channels that drive the mask).
+void CollectAnimatedTargets(PAGXDocument* doc, std::unordered_set<std::string>& targets) {
+  auto collectFrom = [&targets](const std::vector<Node*>& animations) {
+    for (const auto* node : animations) {
+      if (node == nullptr || node->nodeType() != NodeType::Animation) continue;
+      const auto* animation = static_cast<const Animation*>(node);
+      for (const auto* object : animation->objects) {
+        if (object != nullptr && !object->target.empty()) {
+          targets.insert(object->target);
+        }
+      }
+    }
+  };
+  collectFrom(doc->animations);
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      collectFrom(static_cast<Composition*>(node.get())->animations);
+    }
+  }
+}
+
 }  // namespace
 
 PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizerOptions& options) {
@@ -1762,13 +1803,16 @@ PAGXOptimizer::Result OptimizeWithOptions(PAGXDocument* doc, const PAGXOptimizer
   std::unordered_set<const Layer*> maskRefs;
   RecomputeMaskRefs(doc, maskRefs);
 
+  std::unordered_set<std::string> animatedTargets;
+  CollectAnimatedTargets(doc, animatedTargets);
+
   result.iterationsUsed +=
-      OptimizeLayerList(doc, doc->layers, maskRefs, options, &result.converged);
+      OptimizeLayerList(doc, doc->layers, maskRefs, animatedTargets, options, &result.converged);
   for (auto& node : doc->nodes) {
     if (node->nodeType() == NodeType::Composition) {
       auto* comp = static_cast<Composition*>(node.get());
-      result.iterationsUsed +=
-          OptimizeLayerList(doc, comp->layers, maskRefs, options, &result.converged);
+      result.iterationsUsed += OptimizeLayerList(doc, comp->layers, maskRefs, animatedTargets,
+                                                 options, &result.converged);
     }
   }
 

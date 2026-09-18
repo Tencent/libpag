@@ -48,6 +48,16 @@ class HTMLBuilder {
     _buf += '"';
   }
 
+  // Same as addAttr but also emits the attribute when the value is empty (name=""), so callers
+  // can distinguish "present but empty" from "absent" in round-trip protocols.
+  void addAttrAllowEmpty(const char* name, const std::string& value) {
+    _buf += ' ';
+    _buf += name;
+    _buf += "=\"";
+    _buf += EscapeAttr(value);
+    _buf += '"';
+  }
+
   void closeTagStart() {
     _buf += '>';
     newline();
@@ -245,8 +255,31 @@ class HTMLBuilder {
         case '>':
           r += "&gt;";
           break;
+        // Raw newlines / tabs inside attribute values are normalised to spaces by XML 1.0
+        // attribute-value normalisation (Expat applies it), which would corrupt multi-line
+        // text carried through data-* attributes. Emit them as numeric character references,
+        // which survive normalisation; literal "&#10;" in the source stays distinct because
+        // its '&' is already escaped to "&amp;" above. Mirrors XMLBuilder::escapeAttrTo.
+        case '\n':
+          r += "&#10;";
+          break;
+        case '\r':
+          r += "&#13;";
+          break;
+        case '\t':
+          r += "&#9;";
+          break;
         default:
-          r += c;
+          // XML 1.0 forbids the remaining C0 control characters even as numeric character
+          // references, and a strict parser (Expat, which the HTML importer uses) rejects the
+          // whole document on encountering one. User text travels through data-pagx-*
+          // attributes, so replace such a character with U+FFFD instead of emitting a document
+          // that cannot be parsed back.
+          if (static_cast<unsigned char>(c) < 0x20) {
+            r += "\xEF\xBF\xBD";
+          } else {
+            r += c;
+          }
       }
     }
     return r;
