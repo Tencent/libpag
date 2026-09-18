@@ -239,7 +239,7 @@ export function buildResourceHandlers({ staticDir, generatedDir, getServerBaseUr
       if (fs.existsSync(widgetPath)) {
         html = fs.readFileSync(widgetPath, 'utf8');
       } else {
-        html = '<html><body>pagx-preview widget not found. Run npm run prebuild.</body></html>';
+        html = '<html><body>pagx-preview widget not found. Run npm run build.</body></html>';
       }
       // Inline the pre-built widget bundle (app-with-deps + pagx-player + mcp-widget merged
       // by esbuild into one minified file). This avoids external <script src="..."> which
@@ -255,7 +255,7 @@ export function buildResourceHandlers({ staticDir, generatedDir, getServerBaseUr
       try {
         bundleJs = fs.readFileSync(bundlePath, 'utf8');
       } catch (_) {
-        html = '<html><body>pagx-preview widget bundle not found. Run npm run prebuild.</body></html>';
+        html = '<html><body>pagx-preview widget bundle not found. Run npm run build.</body></html>';
         return {
           contents: [
             {
