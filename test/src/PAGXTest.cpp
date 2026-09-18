@@ -7986,6 +7986,251 @@ PAGX_TEST(PAGXTest, Int64AttributeRejectsMalformedAndOutOfRange) {
   EXPECT_TRUE(hasRangeError);
 }
 
+/**
+ * Test case: a sibling <TextLayout/> (legacy exporter descriptor) is converted into a TextBox
+ * wrapping the preceding <Text>, instead of being rejected as an unknown element.
+ */
+PAGX_TEST(PAGXTest, LegacyTextLayoutSiblingConvertsToTextBox) {
+  std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Layer>
+    <Text text="Hello"><GlyphRun fontSize="15" glyphs="1" positions="0,0"/></Text>
+    <TextLayout width="267" textAlign="center" lineHeight="1.2"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  ASSERT_EQ(doc->layers.size(), 1u);
+  ASSERT_EQ(doc->layers[0]->contents.size(), 1u);
+  auto* textBox = static_cast<pagx::TextBox*>(doc->layers[0]->contents[0]);
+  EXPECT_EQ(textBox->nodeType(), pagx::NodeType::TextBox);
+  ASSERT_EQ(textBox->elements.size(), 1u);
+  EXPECT_EQ(textBox->elements[0]->nodeType(), pagx::NodeType::Text);
+  EXPECT_FLOAT_EQ(textBox->width, 267.0f);
+  EXPECT_EQ(textBox->textAlign, pagx::TextAlign::Center);
+  EXPECT_FLOAT_EQ(textBox->lineHeight, 1.2f);
+}
+
+/**
+ * Test case: a <TextLayout/> without a preceding <Text> sibling is reported as an error and
+ * produces no content element.
+ */
+PAGX_TEST(PAGXTest, LegacyTextLayoutWithoutTextReportsError) {
+  std::string xml = R"(<pagx version="1.0" width="100" height="100">
+  <Layer>
+    <TextLayout width="267"/>
+  </Layer>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_FALSE(doc->errors.empty());
+  bool hasTextLayoutError = false;
+  for (const auto& error : doc->errors) {
+    if (error.find("TextLayout") != std::string::npos) {
+      hasTextLayoutError = true;
+    }
+  }
+  EXPECT_TRUE(hasTextLayoutError);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_TRUE(doc->layers[0]->contents.empty());
+}
+
+/**
+ * Test case: an internal Composition reference whose host Layer carries a <Timelines> driver
+ * builds and advances without crashing, and the nested layer is animated by its own binding.
+ */
+PAGX_TEST(PAGXTest, NestedCompositionTimelinesDriveAnimations) {
+  // Same XML as the driving case below but parsed-and-destroyed immediately, to cover the
+  // doc-teardown path that differs between native and wexception wasm builds.
+  {
+    auto xml = R"(<pagx width="640" height="500">
+  <Resources>
+    <Composition id="orbit" width="640" height="400">
+      <Layer id="ball" x="80" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Layer id="loopB" x="240" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill id="fillLoopB" color="#3B82F6"/>
+      </Layer>
+      <Layer id="ppB" x="40" y="340" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="8"/>
+        <Fill id="fillPpB" color="#10B981"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="boxA" x="40" y="25" width="60" height="60">
+    <Rectangle width="60" height="60" roundness="10"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <Layer x="0" y="90" composition="@orbit">
+    <Timelines>
+      <Animation ref="@bobAnim" playing="true"/>
+      <Animation ref="@gradAnim" playing="true"/>
+      <Animation ref="@ppAnim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="slideAnim" duration="180" frameRate="60" loop="once">
+      <Object target="boxA">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="180" value="352"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="bobAnim" duration="120" frameRate="60" loop="loop">
+      <Object target="ball">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+          <Key time="120" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="gradAnim" duration="300" frameRate="60" loop="loop">
+      <Object target="loopB">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="150" value="100" interpolation="linear"/>
+          <Key time="300" value="20"/>
+        </Channel>
+      </Object>
+      <Object target="fillLoopB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#3B82F6" interpolation="linear"/>
+          <Key time="150" value="#EC4899" interpolation="linear"/>
+          <Key time="300" value="#3B82F6"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="ppAnim" duration="360" frameRate="60" loop="pingPong">
+      <Object target="ppB">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="360" value="560"/>
+        </Channel>
+      </Object>
+      <Object target="fillPpB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#10B981" interpolation="linear"/>
+          <Key time="360" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+    auto doc = pagx::PAGXImporter::FromXML(xml);
+    ASSERT_TRUE(doc != nullptr);
+    EXPECT_TRUE(doc->errors.empty());
+  }  // doc destroyed here while still holding nested-composition timelines.
+
+  auto xml = R"(<pagx width="640" height="500">
+  <Resources>
+    <Composition id="orbit" width="640" height="400">
+      <Layer id="ball" x="80" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill color="#F59E0B"/>
+      </Layer>
+      <Layer id="loopB" x="240" y="20" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="20"/>
+        <Fill id="fillLoopB" color="#3B82F6"/>
+      </Layer>
+      <Layer id="ppB" x="40" y="340" width="40" height="40">
+        <Rectangle width="40" height="40" roundness="8"/>
+        <Fill id="fillPpB" color="#10B981"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="boxA" x="40" y="25" width="60" height="60">
+    <Rectangle width="60" height="60" roundness="10"/>
+    <Fill color="#3B82F6"/>
+  </Layer>
+  <Layer x="0" y="90" composition="@orbit">
+    <Timelines>
+      <Animation ref="@bobAnim" playing="true"/>
+      <Animation ref="@gradAnim" playing="true"/>
+      <Animation ref="@ppAnim" playing="true"/>
+    </Timelines>
+  </Layer>
+  <Animations>
+    <Animation id="slideAnim" duration="180" frameRate="60" loop="once">
+      <Object target="boxA">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="180" value="352"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="bobAnim" duration="120" frameRate="60" loop="loop">
+      <Object target="ball">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="60" value="100" interpolation="linear"/>
+          <Key time="120" value="20"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="gradAnim" duration="300" frameRate="60" loop="loop">
+      <Object target="loopB">
+        <Channel name="y" type="float">
+          <Key time="0" value="20" interpolation="linear"/>
+          <Key time="150" value="100" interpolation="linear"/>
+          <Key time="300" value="20"/>
+        </Channel>
+      </Object>
+      <Object target="fillLoopB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#3B82F6" interpolation="linear"/>
+          <Key time="150" value="#EC4899" interpolation="linear"/>
+          <Key time="300" value="#3B82F6"/>
+        </Channel>
+      </Object>
+    </Animation>
+    <Animation id="ppAnim" duration="360" frameRate="60" loop="pingPong">
+      <Object target="ppB">
+        <Channel name="x" type="float">
+          <Key time="0" value="40" interpolation="linear"/>
+          <Key time="360" value="560"/>
+        </Channel>
+      </Object>
+      <Object target="fillPpB">
+        <Channel name="color" type="color">
+          <Key time="0" value="#10B981" interpolation="linear"/>
+          <Key time="360" value="#F59E0B"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_TRUE(doc != nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  doc->applyLayout();  // Mirror the viewer's load order: layout before scene construction.
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  // Mirror PAGXView::buildLayers: the default timeline comes from the scene and is driven by the
+  // view itself, while the scene tree advances the nested composition timelines.
+  auto defaultTimeline = scene->getDefaultTimeline();
+  ASSERT_TRUE(defaultTimeline != nullptr);
+  ASSERT_EQ(defaultTimeline->type(), pagx::TimelineType::Animation);
+  defaultTimeline->advanceAndApply(0);
+  scene->advanceAndApply(0);
+  defaultTimeline->advanceAndApply(500000);
+  scene->advanceAndApply(500000);  // 0.5s: ball should sit mid-bob at y=56.
+  auto& rootChildren = scene->rootComposition()->children;
+  ASSERT_EQ(rootChildren.size(), 2u);
+  ASSERT_EQ(rootChildren[1]->layerType(), pagx::LayerType::Composition);
+  ASSERT_EQ(rootChildren[1]->children.size(), 3u);
+  auto* ballRuntime = rootChildren[1]->children[0]->runtimeLayer.get();
+  ASSERT_TRUE(ballRuntime != nullptr);
+  EXPECT_FLOAT_EQ(ballRuntime->matrix().getTranslateY(), 60.0f);
+  auto surface = pagx::PAGSurface::MakeOffscreen(480, 160);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(scene->draw(surface));
+}
+
 PAGX_TEST(PAGXTest, HitTestSingleLayer) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   ASSERT_TRUE(doc != nullptr);
@@ -14478,6 +14723,378 @@ PAGX_TEST(PAGXTest, SMDataBindTypeMismatch) {
   vmBool->value(true);
   smTimeline->advance(0);
   EXPECT_EQ(smTimeline->getCurrentState("main"), "low");
+}
+
+/**
+ * Test case: reset() returns every region to its initialState, restores input values to their
+ * declared defaults, makes a finished once-region playable again, and notifies state-change
+ * listeners for regions whose state actually changed (reset() does not go through changeState(),
+ * so the notification must be dispatched explicitly).
+ */
+PAGX_TEST(PAGXTest, SMResetRestoresStateInputsAndNotifies) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>("mainLayer");
+  layer->width = 50;
+  layer->height = 50;
+  doc->layers.push_back(layer);
+
+  auto anim = doc->makeNode<pagx::Animation>("anim");
+  anim->duration = 60;
+  anim->frameRate = 60;
+  anim->loop = pagx::LoopMode::Once;
+  doc->animations.push_back(anim);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "mainLayer";
+  anim->objects.push_back(object);
+  auto* alphaProp = doc->makeNode<pagx::TypedChannel<float>>();
+  alphaProp->name = "alpha";
+  alphaProp->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  alphaProp->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(alphaProp);
+
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  input->defaultBool = false;
+  sm->inputs.push_back(input);
+  auto level = doc->makeNode<pagx::StateMachineInput>();
+  level->name = "level";
+  level->type = pagx::StateMachineInputType::Number;
+  level->defaultNumber = 7.0f;
+  sm->inputs.push_back(level);
+
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto stateIdle = doc->makeNode<pagx::AnimationState>();
+  stateIdle->name = "idle";
+  region->states.push_back(stateIdle);
+  auto stateActive = doc->makeNode<pagx::AnimationState>();
+  stateActive->name = "active";
+  stateActive->animationId = "anim";
+  region->states.push_back(stateActive);
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "idle";
+  transition->to = "active";
+  transition->duration = 0;
+  auto condition = doc->makeNode<pagx::TransitionCondition>();
+  condition->inputName = "go";
+  condition->op = pagx::TransitionConditionOp::Equal;
+  condition->valueBool = true;
+  transition->conditions.push_back(condition);
+  region->transitions.push_back(transition);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc)->shared_from_this();
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+
+  std::vector<std::pair<std::string, std::string>> notified;
+  auto listenerHandle = timeline->addStateChangeListener(
+      [&](const std::string& regionName, const std::string& stateName) {
+        notified.emplace_back(regionName, stateName);
+      });
+
+  // Transition away from the initial state. The zero-duration transition lands mid-advance, and
+  // the newly created timeline sits at frame 0 for that frame's apply, so the first apply writes
+  // the animation's first-frame value.
+  ASSERT_TRUE(timeline->setBool("go", true));
+  ASSERT_TRUE(timeline->setNumber("level", 42.0f));
+  timeline->advanceAndApply(2'000'000);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_TRUE(tgfxLayer != nullptr);
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.0f, 1.0e-3f);
+  // The once animation runs 60 frames at 60fps (1s); advancing past its end holds the last frame.
+  timeline->advanceAndApply(1'000'000);
+  EXPECT_NEAR(tgfxLayer->alpha(), 1.0f, 1.0e-3f);
+
+  notified.clear();
+  timeline->reset();
+  timeline->apply();
+
+  // The region is back at initialState and the listener was told about the change.
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  ASSERT_EQ(notified.size(), 1u);
+  EXPECT_EQ(notified[0].first, "main");
+  EXPECT_EQ(notified[0].second, "idle");
+
+  // Inputs are back at their defaults: with go == false the idle -> active transition no longer
+  // fires on advance.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // The reset did not corrupt the input table: setters keep working.
+  ASSERT_TRUE(timeline->setNumber("level", 8.0f));
+
+  // The once animation is replayable: transition again. The transition frame itself shows the
+  // restarted animation's first frame (alpha = 0), and the next 500ms advance reaches 30 frames,
+  // i.e. the halfway point of the 0 -> 1 alpha ramp.
+  ASSERT_TRUE(timeline->setBool("go", true));
+  timeline->advanceAndApply(500'000);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.0f, 1.0e-3f);
+  timeline->advanceAndApply(500'000);
+  EXPECT_NEAR(tgfxLayer->alpha(), 0.5f, 1.0e-3f);
+}
+
+/**
+ * Test case: hitTest() inside a <Layer composition="@X"> instance resolves to the referencing
+ * host layer rather than the internal definition layer, and reports the instance's on-screen
+ * bounds. A click in the empty area returns index -1.
+ */
+PAGX_TEST(PAGXTest, HitTestResolvesCompositionReference) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
+  <Resources>
+    <Composition id="inner" width="40" height="40">
+      <Layer id="innerLayer" x="0" y="0" width="40" height="40">
+        <Rectangle width="40" height="40"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="host" x="50" y="50" width="40" height="40" composition="@inner"/>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  auto* host = doc->findNode<pagx::Layer>("host");
+  auto* innerLayer = doc->findNode<pagx::Layer>("innerLayer");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(innerLayer, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+
+  // A click inside the composition instance resolves to the referencing host layer, not the
+  // internal definition layer.
+  auto hit = scene->hitTest(70, 70);
+  EXPECT_EQ(hit.index, host->index);
+  EXPECT_NE(hit.index, innerLayer->index);
+  EXPECT_FALSE(hit.bounds.isEmpty());
+
+  // A click in the empty area hits nothing.
+  EXPECT_EQ(scene->hitTest(10, 10).index, -1);
+}
+
+/**
+ * Test case: an incremental layout triggered by notifyChange({owningLayer}, layoutChanged=true)
+ * after editing an element nested inside a Group produces the same geometry as a full re-layout.
+ * The nested element is deeper than layer->contents' top level, so the reset collection must
+ * recurse through Group::elements to reach it.
+ */
+PAGX_TEST(PAGXTest, IncrementalLayoutMatchesFullLayoutForNestedGroupContents) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="200">
+  <Layer id="host" x="10" y="10" width="180" height="180">
+    <Group>
+      <Rectangle id="r1" width="40" height="40"/>
+      <Fill color="#3B82F6"/>
+      <Group>
+        <Rectangle id="r2" width="30" height="30"/>
+        <Fill color="#10B981"/>
+      </Group>
+    </Group>
+  </Layer>
+</pagx>)";
+  auto incrementalDoc = pagx::PAGXImporter::FromXML(xml);
+  auto fullDoc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(incrementalDoc, nullptr);
+  ASSERT_NE(fullDoc, nullptr);
+  incrementalDoc->applyLayout();
+  fullDoc->applyLayout();
+
+  auto* incrementalHost = incrementalDoc->findNode<pagx::Layer>("host");
+  auto* fullHost = fullDoc->findNode<pagx::Layer>("host");
+  auto* incrementalR2 = incrementalDoc->findNode<pagx::Rectangle>("r2");
+  auto* fullR2 = fullDoc->findNode<pagx::Rectangle>("r2");
+  ASSERT_NE(incrementalHost, nullptr);
+  ASSERT_NE(fullHost, nullptr);
+  ASSERT_NE(incrementalR2, nullptr);
+  ASSERT_NE(fullR2, nullptr);
+
+  // Edit an element nested inside the inner Group and report the owning Layer: notifyChange's
+  // documented "prefer passing the owning Layer" route, which takes the incremental path.
+  incrementalR2->height = 90;
+  fullR2->height = 90;
+  incrementalDoc->notifyChange({incrementalHost}, /*layoutChanged=*/true);
+  fullDoc->applyLayout();
+
+  // Compare the nested element's own geometry, not the host layer's: the host has authored
+  // width/height, so Layer::onMeasure skips content measurement and its layoutBounds stays
+  // (10,10,180,180) no matter whether the Group recursion ran — that comparison cannot catch a
+  // missing CollectContentResetNodes recursion. r2's memo does: without the recursive reset the
+  // incremental path keeps the stale preferred height (30) while the full re-layout measures 90.
+  EXPECT_EQ(incrementalR2->layoutBounds(), fullR2->layoutBounds());
+  EXPECT_FLOAT_EQ(incrementalR2->layoutBounds().height, 90.0f);
+}
+
+/**
+ * Test case: SetNodeChannelFromString's dimension parsing produces the same width/percentWidth
+ * pair as a full reparse of the same attribute value, including the strtof-accepted scientific
+ * notation ("1e2" parses on both paths even though the XSD DimensionType pattern does not list
+ * it). Malformed values are rejected by both paths: the incremental write returns false and
+ * leaves the node untouched, the reparse reports an error and leaves both members NaN. A percent
+ * write clears the absolute member and vice versa, and ResetNodeChannel clears both.
+ */
+PAGX_TEST(PAGXTest, SetNodeChannelFromStringMatchesFullReparse) {
+  const std::string validValues[] = {"100", "50%", "1e2", "0.5", "12.5%"};
+  for (const auto& raw : validValues) {
+    auto incrementalDoc = pagx::PAGXDocument::Make(100, 100);
+    auto* layer = incrementalDoc->makeNode<pagx::Layer>();
+    ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", raw));
+
+    auto fullDoc = pagx::PAGXImporter::FromXML(
+        "<pagx version=\"1.0\" width=\"100\" height=\"100\">\n  <Layer width=\"" + raw +
+        "\"/>\n</pagx>");
+    ASSERT_NE(fullDoc, nullptr);
+    EXPECT_TRUE(fullDoc->errors.empty()) << "raw: " << raw;
+    ASSERT_EQ(fullDoc->layers.size(), 1u);
+    auto* parsed = fullDoc->layers[0];
+
+    EXPECT_EQ(std::isnan(layer->width), std::isnan(parsed->width)) << "raw: " << raw;
+    EXPECT_EQ(std::isnan(layer->percentWidth), std::isnan(parsed->percentWidth)) << "raw: " << raw;
+    if (!std::isnan(layer->width) && !std::isnan(parsed->width)) {
+      EXPECT_FLOAT_EQ(layer->width, parsed->width) << "raw: " << raw;
+    }
+    if (!std::isnan(layer->percentWidth) && !std::isnan(parsed->percentWidth)) {
+      EXPECT_FLOAT_EQ(layer->percentWidth, parsed->percentWidth) << "raw: " << raw;
+    }
+  }
+
+  const std::string invalidValues[] = {"+5", "-3", "0x10", "50 %", " 10", "abc", "50%%"};
+  for (const auto& raw : invalidValues) {
+    // Incremental: rejected, and the previously written value survives untouched.
+    auto incrementalDoc = pagx::PAGXDocument::Make(100, 100);
+    auto* layer = incrementalDoc->makeNode<pagx::Layer>();
+    ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", "100"));
+    EXPECT_FALSE(pagx::SetNodeChannelFromString(layer, "width", raw)) << "raw: " << raw;
+    EXPECT_FLOAT_EQ(layer->width, 100.0f) << "raw: " << raw;
+    EXPECT_TRUE(std::isnan(layer->percentWidth)) << "raw: " << raw;
+
+    // Full reparse of the same raw value: error reported, both members stay NaN.
+    auto fullDoc = pagx::PAGXImporter::FromXML(
+        "<pagx version=\"1.0\" width=\"100\" height=\"100\">\n  <Layer width=\"" + raw +
+        "\"/>\n</pagx>");
+    ASSERT_NE(fullDoc, nullptr);
+    EXPECT_FALSE(fullDoc->errors.empty()) << "raw: " << raw;
+    ASSERT_EQ(fullDoc->layers.size(), 1u);
+    EXPECT_TRUE(std::isnan(fullDoc->layers[0]->width)) << "raw: " << raw;
+    EXPECT_TRUE(std::isnan(fullDoc->layers[0]->percentWidth)) << "raw: " << raw;
+  }
+
+  // The empty string is the one asymmetry: the reparse treats an empty attribute as absent
+  // (no error, both members NaN) while the incremental write rejects it — an editor pushing an
+  // empty field must not silently clear the node.
+  auto emptyDoc = pagx::PAGXImporter::FromXML(
+      "<pagx version=\"1.0\" width=\"100\" height=\"100\">\n  <Layer width=\"\"/>\n</pagx>");
+  ASSERT_NE(emptyDoc, nullptr);
+  EXPECT_TRUE(emptyDoc->errors.empty());
+  ASSERT_EQ(emptyDoc->layers.size(), 1u);
+  EXPECT_TRUE(std::isnan(emptyDoc->layers[0]->width));
+  EXPECT_TRUE(std::isnan(emptyDoc->layers[0]->percentWidth));
+
+  // Dimension writes clear the sibling member, matching ReadDimension's exactly-one-member rule.
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", "100"));
+  EXPECT_FLOAT_EQ(layer->width, 100.0f);
+  EXPECT_TRUE(std::isnan(layer->percentWidth));
+  ASSERT_TRUE(pagx::SetNodeChannelFromString(layer, "width", "50%"));
+  EXPECT_TRUE(std::isnan(layer->width));
+  EXPECT_FLOAT_EQ(layer->percentWidth, 50.0f);
+
+  // ResetNodeChannel on a dimension channel clears both members to the "unspecified" default.
+  ASSERT_TRUE(pagx::ResetNodeChannel(layer, "width"));
+  EXPECT_TRUE(std::isnan(layer->width));
+  EXPECT_TRUE(std::isnan(layer->percentWidth));
+}
+
+/**
+ * Test case: getNodeSourceMap() describes every node in document order — index, type, and
+ * channel list align with the node vector, parsed nodes carry a 1-based source span, and the
+ * line -> index lookup an editor selection needs resolves to the owning node. A composition
+ * referenced by multiple host layers appears once in the map (one source definition), while the
+ * hosts are distinct entries. Programmatically created nodes have a valid index but no span.
+ */
+PAGX_TEST(PAGXTest, GetNodeSourceMapMultiInstanceComposition) {
+  const std::string xml = R"(<pagx version="1.0" width="200" height="100">
+  <Resources>
+    <Composition id="inner" width="40" height="40">
+      <Layer id="innerLayer" x="0" y="0" width="40" height="40">
+        <Rectangle width="40" height="40"/>
+        <Fill color="#3B82F6"/>
+      </Layer>
+    </Composition>
+  </Resources>
+  <Layer id="hostA" x="0" y="30" width="40" height="40" composition="@inner"/>
+  <Layer id="hostB" x="60" y="30" width="40" height="40" composition="@inner"/>
+</pagx>)";
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  auto* hostA = doc->findNode<pagx::Layer>("hostA");
+  auto* hostB = doc->findNode<pagx::Layer>("hostB");
+  auto* innerComp = doc->findNode<pagx::Composition>("inner");
+  auto* innerLayer = doc->findNode<pagx::Layer>("innerLayer");
+  ASSERT_NE(hostA, nullptr);
+  ASSERT_NE(hostB, nullptr);
+  ASSERT_NE(innerComp, nullptr);
+  ASSERT_NE(innerLayer, nullptr);
+
+  auto map = doc->getNodeSourceMap();
+  ASSERT_EQ(map.size(), doc->nodes.size());
+
+  // Entries follow document order: entry i describes nodes[i] with a matching index, type, and
+  // channel list. Nodes with an XML element of their own carry a 1-based source span; nodes the
+  // importer derives implicitly from an attribute (e.g. the SolidColor behind a Fill's
+  // color="#..." shorthand) have no element, so their span stays -1 while their index is valid.
+  for (size_t i = 0; i < map.size(); i++) {
+    EXPECT_EQ(map[i].index, static_cast<int>(i));
+    EXPECT_EQ(map[i].nodeType, doc->nodes[i]->nodeType());
+    EXPECT_EQ(map[i].channels, pagx::ListChannels(doc->nodes[i]->nodeType()));
+    EXPECT_TRUE(map[i].startLine == -1 || map[i].startLine >= 1);
+    if (map[i].startLine != -1) {
+      EXPECT_GE(map[i].endLine, map[i].startLine);
+    }
+  }
+
+  // The two hosts are distinct entries with distinct indices and source lines; the referenced
+  // definition subtree appears exactly once no matter how many instances reference it.
+  EXPECT_NE(hostA->index, hostB->index);
+  EXPECT_NE(map[hostA->index].startLine, map[hostB->index].startLine);
+  EXPECT_EQ(map[hostA->index].nodeType, pagx::NodeType::Layer);
+  EXPECT_EQ(map[hostB->index].nodeType, pagx::NodeType::Layer);
+  EXPECT_EQ(map[innerComp->index].nodeType, pagx::NodeType::Composition);
+  EXPECT_EQ(map[innerLayer->index].startLine, innerLayer->sourceLine);
+
+  // The line -> index lookup an editor selection performs. Spans nest (the Composition's span
+  // contains its inner layers' spans), so a line inside innerLayer matches both the composition
+  // and the layer; the innermost matching span is the node the editor selected.
+  int line = innerLayer->sourceLine;
+  int lookupIndex = -1;
+  int lookupSpan = -1;
+  for (const auto& entry : map) {
+    if (entry.startLine == -1) {
+      continue;
+    }
+    if (entry.startLine <= line && line <= entry.endLine &&
+        (lookupSpan == -1 || entry.endLine - entry.startLine < lookupSpan)) {
+      lookupIndex = entry.index;
+      lookupSpan = entry.endLine - entry.startLine;
+    }
+  }
+  EXPECT_EQ(lookupIndex, innerLayer->index);
+  EXPECT_NE(lookupIndex, innerComp->index);
+
+  // A programmatically created node joins the map with a valid trailing index but no span.
+  auto* added = doc->makeNode<pagx::Layer>();
+  map = doc->getNodeSourceMap();
+  ASSERT_EQ(map.size(), doc->nodes.size());
+  ASSERT_EQ(map.back().index, added->index);
+  EXPECT_EQ(map.back().startLine, -1);
+  EXPECT_EQ(map.back().endLine, -1);
 }
 
 // Verifies the demo pagx's animation and viewmodel both reshape text through the runtime holder:

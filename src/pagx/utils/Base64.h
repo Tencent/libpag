@@ -20,13 +20,14 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include "pagx/types/Data.h"
 
 namespace pagx {
 
-std::shared_ptr<Data> Base64Decode(const std::string& encodedString);
+std::shared_ptr<Data> Base64Decode(std::string_view encodedString);
 
-std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI);
+std::shared_ptr<Data> DecodeBase64DataURI(std::string_view dataURI);
 
 std::string Base64Encode(const uint8_t* data, size_t length);
 

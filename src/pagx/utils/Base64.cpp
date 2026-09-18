@@ -22,7 +22,7 @@
 
 namespace pagx {
 
-std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
+std::shared_ptr<Data> Base64Decode(std::string_view encodedString) {
   static const std::array<unsigned char, 128> decodingTable = {
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 62,
@@ -85,16 +85,16 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   return Data::MakeAdopt(output.release(), outputLength);
 }
 
-std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI) {
+std::shared_ptr<Data> DecodeBase64DataURI(std::string_view dataURI) {
   if (dataURI.find("data:") != 0) {
     return nullptr;
   }
   auto commaPos = dataURI.find(',');
-  if (commaPos == std::string::npos) {
+  if (commaPos == std::string_view::npos) {
     return nullptr;
   }
   auto base64Pos = dataURI.find(";base64");
-  if (base64Pos == std::string::npos || base64Pos > commaPos) {
+  if (base64Pos == std::string_view::npos || base64Pos > commaPos) {
     return nullptr;
   }
   return Base64Decode(dataURI.substr(commaPos + 1));
