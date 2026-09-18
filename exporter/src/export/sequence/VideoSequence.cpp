@@ -19,6 +19,7 @@
 #include "VideoSequence.h"
 #include <QApplication>
 #include <atomic>
+#include <cmath>
 #include "codec/mp4/MP4BoxHelper.h"
 #include "export/encode/PAGEncodeThread.h"
 #include "export/encode/VideoEncoder.h"
@@ -183,11 +184,18 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
   const auto& Suites = GetSuites();
   const auto& PluginID = GetPluginID();
 
+  auto itemIter = session->itemHandleMap.find(composition->id);
+  if (itemIter == session->itemHandleMap.end()) {
+    session->pushWarning(AlertInfoType::CompositionHandleNotFound, std::to_string(composition->id));
+    return;
+  }
+  AEGP_ItemH itemH = itemIter->second;
+
   composition->sequences.clear();
 
   auto needToScale = true;
   auto factor = compositionFactor;
-  auto frameRate = std::min(session->configParam.frameRate, composition->frameRate);
+  auto frameRate = std::min(session->configParam.frameRate, GetItemFrameRate(itemH));
   auto duration =
       static_cast<pag::Frame>(ceil(composition->duration * frameRate / composition->frameRate));
 
@@ -233,12 +241,6 @@ static void GetVideoSequence(std::shared_ptr<PAGExportSession> session,
     }
   }
 
-  auto itemIter = session->itemHandleMap.find(composition->id);
-  if (itemIter == session->itemHandleMap.end()) {
-    session->pushWarning(AlertInfoType::CompositionHandleNotFound, std::to_string(composition->id));
-    return;
-  }
-  AEGP_ItemH itemH = itemIter->second;
   AEGP_RenderOptionsH renderOptions = nullptr;
   Suites->RenderOptionsSuite3()->AEGP_NewFromItem(PluginID, itemH, &renderOptions);
   if (renderOptions == nullptr) {
@@ -406,6 +408,19 @@ static void ProcessLayerReference(std::shared_ptr<PAGExportSession>, pag::Layer*
   }
 }
 
+pag::Frame GetVideoCompositionStartOffset(std::shared_ptr<PAGExportSession> session,
+                                          pag::VideoComposition* composition, float frameRate) {
+  auto iter = session->videoCompositionStartTime.find(composition->uniqueID);
+  if (iter == session->videoCompositionStartTime.end() || composition->sequences.empty()) {
+    return 0;
+  }
+  auto sequenceFrameRate = composition->sequences[0]->frameRate;
+  if (sequenceFrameRate <= 0) {
+    return 0;
+  }
+  return static_cast<pag::Frame>(std::round(iter->second * frameRate / sequenceFrameRate));
+}
+
 static void AdjustMainCompositionParam(pag::VectorComposition* newComposition,
                                        pag::VideoComposition* composition,
                                        std::vector<pag::Composition*>& compositions) {
@@ -515,6 +530,8 @@ static void RebuildVideoComposition(std::shared_ptr<PAGExportSession> session,
   composition->width = right - left;
   composition->height = bottom - top;
   AdjustMainCompositionParam(newComposition, composition, compositions);
+  newLayer->compositionStartTime =
+      GetVideoCompositionStartOffset(session, composition, newComposition->frameRate);
 }
 
 void GetVideoSequence(std::shared_ptr<PAGExportSession> session,

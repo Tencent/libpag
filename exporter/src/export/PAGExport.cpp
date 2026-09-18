@@ -24,6 +24,7 @@
 #include "Marker.h"
 #include "data/ImageBytes.h"
 #include "sequence/AudioSequence.h"
+#include "sequence/VideoSequence.h"
 #include "src/base/utils/Log.h"
 #include "utils/AEDataTypeConverter.h"
 #include "utils/AEHelper.h"
@@ -167,19 +168,20 @@ static void AdjustmentPreComposeLayerForVideoComposition(std::shared_ptr<PAGExpo
                                                          pag::Layer* layer, void* ctx) {
   auto videoComposition = static_cast<pag::VideoComposition*>(ctx);
   auto preComposeLayer = static_cast<pag::PreComposeLayer*>(layer);
-  if (preComposeLayer->composition != nullptr &&
-      preComposeLayer->composition->uniqueID == videoComposition->uniqueID) {
-    if (session->videoCompositionStartTime.find(videoComposition->uniqueID) !=
-        session->videoCompositionStartTime.end()) {
-      // The video sequence is encoded starting from its first visible frame
-      // (videoCompositionStartTime), so sequence frame 0 corresponds to that composition frame.
-      // Accumulate this trim offset onto the layer's own composition start time instead of
-      // overwriting it, otherwise multiple references to the same composition would all collapse
-      // to the same start time and every reference except the first would freeze (discussion #3548).
-      preComposeLayer->compositionStartTime +=
-          session->videoCompositionStartTime[videoComposition->uniqueID];
-    }
+  if (preComposeLayer->composition == nullptr ||
+      preComposeLayer->composition->uniqueID != videoComposition->uniqueID) {
+    return;
   }
+  // The video sequence is encoded starting from its first visible frame
+  // (videoCompositionStartTime), so sequence frame 0 corresponds to that composition frame.
+  // Accumulate this trim offset onto the layer's own composition start time instead of
+  // overwriting it, otherwise multiple references to the same composition would all collapse
+  // to the same start time and every reference except the first would freeze (discussion #3548).
+  auto frameRate = preComposeLayer->containingComposition != nullptr
+                       ? preComposeLayer->containingComposition->frameRate
+                       : videoComposition->frameRate;
+  preComposeLayer->compositionStartTime +=
+      GetVideoCompositionStartOffset(session, videoComposition, frameRate);
 }
 
 static void AdjustTrackMatteLayer(std::shared_ptr<PAGExportSession> session) {
@@ -516,9 +518,9 @@ void PAGExport::exportRescaleVideoCompositions(std::vector<pag::Composition*>& c
 
       ExportVideoComposition(session, compositions,
                              static_cast<pag::VideoComposition*>(composition), factor);
+      AdjustCompositionFrameRate<pag::VideoComposition*>(composition);
       TraversalLayers(session, mainComposition, pag::LayerType::PreCompose,
                       AdjustmentPreComposeLayerForVideoComposition, composition);
-      AdjustCompositionFrameRate<pag::VideoComposition*>(composition);
     }
   }
 }

@@ -293,8 +293,8 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
 
     auto marker = new pag::Marker();
     marker->comment = comment;
-    marker->startTime = session->configParam.frameRate * keyTime.value / keyTime.scale;
-    marker->duration = session->configParam.frameRate * duration.value / duration.scale;
+    marker->startTime = AEDurationToFrame(keyTime, session->frameRate);
+    marker->duration = AEDurationToFrame(duration, session->frameRate);
 
     markers.push_back(marker);
     suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);

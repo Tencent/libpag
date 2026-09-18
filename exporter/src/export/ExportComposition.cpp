@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExportComposition.h"
+#include <cmath>
 #include "ExportLayer.h"
 #include "sequence/BitmapSequence.h"
 #include "sequence/VideoSequence.h"
@@ -58,13 +59,18 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
                               const AEGP_CompH& compositionHandle, pag::Composition* composition) {
   AEGP_ItemH itemHandle = GetCompItemH(compositionHandle);
   composition->id = GetItemID(itemHandle);
+  auto itemFrameRate = GetItemFrameRate(itemHandle);
   composition->duration = GetItemDuration(itemHandle);
   composition->backgroundColor = GetCompBackgroundColor(compositionHandle);
   if (session->frameRate == -1) {
-    composition->frameRate = GetItemFrameRate(itemHandle);
-    session->frameRate = composition->frameRate;
+    session->frameRate = itemFrameRate;
+    composition->frameRate = itemFrameRate;
   } else {
     composition->frameRate = session->frameRate;
+    if (itemFrameRate > 0 && itemFrameRate != session->frameRate) {
+      composition->duration = static_cast<pag::Frame>(
+          std::round(composition->duration * session->frameRate / itemFrameRate));
+    }
   }
   auto size = GetItemDimensions(itemHandle);
   composition->width = size.width();
@@ -72,9 +78,7 @@ void GetCompositionAttributes(std::shared_ptr<PAGExportSession> session,
   session->itemHandleMap[composition->id] = itemHandle;
 
   if (composition->type() != pag::CompositionType::Vector) {
-    auto frames =
-        static_cast<uint64_t>(composition->duration * session->frameRate / composition->frameRate);
-    session->progressModel.addTotalSteps(frames);
+    session->progressModel.addTotalSteps(static_cast<uint64_t>(composition->duration));
   }
 }
 
