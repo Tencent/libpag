@@ -156,13 +156,12 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
     elseif (MACOS)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-        endif ()
+        # Recent Apple toolchains reject the old 10.15 default: libc++ warns below 11.0
+        # (-Werror makes it fatal) and the SDK refuses below 12.0 with the Xcode generator.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
     elseif (IOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+        # libc++ and the SDK both reject a deployment target below 15.0.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
     endif ()
 endif ()
 
