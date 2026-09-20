@@ -55,10 +55,10 @@ PAG 方案目前已经接入了腾讯系几乎所有主流应用以及外部几�
 
 ## 系统要求
 
-- iOS 9.0 版本及以上
+- iOS 15.0 版本及以上
 - Android 5.0 版本及以上
 - HarmonyOS Next 5.0.0(12) 版本及以上
-- macOS 10.15 版本及以上
+- macOS 12.0 版本及以上
 - Windows 7.0 版本及以上
 - Chrome 69.0 版本及以上
 - Safari 15.0 版本及以上
@@ -199,7 +199,7 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sd
 
 ### 编译环境
 
-- Xcode 11.0+
+- Xcode 13.0+
 - GCC 9.0+
 - Visual Studio 2019+
 - NodeJS 14.14.0+

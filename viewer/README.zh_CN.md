@@ -17,7 +17,7 @@ PAGViewer 是一款基于 Qt 6 和 libpag 渲染引擎的跨平台桌面应用�
 
 - **Qt 6.2.0+**（推荐 Qt 6.8.1）
 - **CLion** IDE
-- **macOS 10.15+** 或 **Windows 10+**（64 位）
+- **macOS 12.0+** 或 **Windows 10+**（64 位）
 - 已成功编译 libpag 库（参见[主 README](../README.zh_CN.md)）
 
 ## 编译指南
