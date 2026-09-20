@@ -29,7 +29,7 @@ PAGExporter 是一款 Adobe After Effects 插件，能够一键将设计师在 A
 - **Adobe After Effects 2020+**（推荐 CC 2023）
 - **Qt 6.2.0+**（推荐 Qt 6.6.1）
 - **CLion** IDE
-- **macOS 12.0+** 或 **Windows 10+**（64 位）
+- **macOS 10.15+** 或 **Windows 10+**（64 位）
 - **After Effects SDK**（推荐 2023 Windows 版本）
 - 已成功编译 libpag 库（参见[主 README](../README.zh_CN.md)）
 
