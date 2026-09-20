@@ -1,4 +1,13 @@
 cmake_minimum_required(VERSION 3.13)
+
+# vendor_tools derives the compiler triple (-target ...-macosx${DEPLOYMENT_TARGET}) from this
+# variable while project() loads the toolchain, so it has to be set here rather than later.
+# Setting CMAKE_OSX_DEPLOYMENT_TARGET alone would desync it from the triple and trip
+# -Woverriding-option, which is fatal under -Werror.
+if (APPLE AND NOT DEFINED DEPLOYMENT_TARGET)
+    set(DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum deployment target" FORCE)
+endif ()
+
 project(PAGViewer)
 
 include(../third_party/vendor_tools/vendor.cmake)
@@ -201,7 +210,7 @@ if (APPLE)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sparkle/mac/Sparkle.framework)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/sonic/mac/${ARCH}/libsonic.a)
     list(APPEND VIEWER_VENDOR_LIBRARIES ${CMAKE_SOURCE_DIR}/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum OS X deployment version" FORCE)
 elseif (WIN32)
     set(RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/PAGViewer.rc"
             "${CMAKE_CURRENT_SOURCE_DIR}/package/templates/appIcon.ico"

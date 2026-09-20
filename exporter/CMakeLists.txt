@@ -1,4 +1,13 @@
 cmake_minimum_required(VERSION 3.13)
+
+# vendor_tools derives the compiler triple (-target ...-macosx${DEPLOYMENT_TARGET}) from this
+# variable while project() loads the toolchain, so it has to be set here rather than later.
+# Setting CMAKE_OSX_DEPLOYMENT_TARGET alone would desync it from the triple and trip
+# -Woverriding-option, which is fatal under -Werror.
+if (APPLE AND NOT DEFINED DEPLOYMENT_TARGET)
+    set(DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum deployment target" FORCE)
+endif ()
+
 project(PAGExporter)
 
 include(../third_party/vendor_tools/vendor.cmake)
@@ -167,7 +176,7 @@ if (APPLE)
     find_library(ICONV_LIBRARIES NAMES iconv libiconv libiconv-2 c)
     list(APPEND libs ${ICONV_LIBRARIES})
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/../viewer/vendor/ffmovie/mac/${ARCH}/libffmovie.dylib)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum OS X deployment version" FORCE)
 elseif (WIN32)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/../viewer/vendor/ffmovie/win/x64/ffmovie.lib)
 endif ()
