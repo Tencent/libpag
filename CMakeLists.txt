@@ -165,6 +165,12 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     endif ()
 endif ()
 
+# iOS 15.0 is the lowest target both Xcode 26 (iOS 15-26) and Xcode 27 (iOS 15-27) accept. The
+# Ninja path never loads the toolchain, so this is the only thing guarding it there.
+if (IOS AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "15.0")
+    message(FATAL_ERROR "Building for iOS requires CMAKE_OSX_DEPLOYMENT_TARGET >= 15.0.")
+endif ()
+
 file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)
 set(PAG_VERSION "")
 foreach (LINE IN LISTS VERSION_FILE)

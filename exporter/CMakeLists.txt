@@ -1,13 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
 
-# vendor_tools derives the compiler triple (-target ...-macosx${DEPLOYMENT_TARGET}) from this
-# variable while project() loads the toolchain, so it has to be set here rather than later.
-# Setting CMAKE_OSX_DEPLOYMENT_TARGET alone would desync it from the triple and trip
-# -Woverriding-option, which is fatal under -Werror.
-if (APPLE AND NOT DEFINED DEPLOYMENT_TARGET)
-    set(DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum deployment target" FORCE)
-endif ()
-
 project(PAGExporter)
 
 include(../third_party/vendor_tools/vendor.cmake)

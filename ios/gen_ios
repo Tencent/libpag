@@ -6,8 +6,6 @@ childProcess.execSync("depsync");
 
 process.argv.push("../");
 process.argv.push("-w");
-// Inserted ahead of the caller's arguments so a -DDEPLOYMENT_TARGET they pass still wins.
-process.argv.splice(2, 0, "-DDEPLOYMENT_TARGET=15.0");
 let args = process.argv.slice(2);
 if (args.indexOf("-p") === -1 && args.indexOf("--platform") === -1) {
     process.argv.push("-p");
