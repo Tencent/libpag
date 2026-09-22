@@ -138,10 +138,39 @@
   }
 }
 
+- (void)setFrameSize:(NSSize)newSize {
+  NSSize oldSize = self.bounds.size;
+  [super setFrameSize:newSize];
+  // Autoresizing-driven layout resizes through setFrameSize:, which does not pass through
+  // setFrame:, so mirror the size-change handling of setFrame: here.
+  if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
+#if defined(TGFX_USE_METAL)
+    [self updateLayerDrawableSize];
+#endif
+    [pagSurface updateSize];
+    if (oldSize.width == 0 || oldSize.height == 0) {
+      [animator update];
+    }
+  }
+}
+
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
   [self checkVisible];
 }
+
+#if defined(TGFX_USE_METAL)
+- (void)viewDidChangeBackingProperties {
+  [super viewDidChangeBackingProperties];
+  // Moving the window between displays with different backing scales does not change bounds, so
+  // setBounds:/setFrame: never fire and contentsScale would stay stuck on the old display's
+  // scale (blurry or clipped content).
+  if (pagSurface != nil) {
+    [self updateLayerDrawableSize];
+    [pagSurface updateSize];
+  }
+}
+#endif
 
 - (void)setAlphaValue:(CGFloat)alphaValue {
   [super setAlphaValue:alphaValue];
