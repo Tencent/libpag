@@ -28,7 +28,16 @@ std::shared_ptr<MetalGPUDrawable> MetalGPUDrawable::FromLayer(CAMetalLayer* laye
   if (layer == nil) {
     return nullptr;
   }
-  return std::shared_ptr<MetalGPUDrawable>(new MetalGPUDrawable(layer));
+  // Fail fast when Metal is unavailable (no usable MTLDevice): create the window eagerly so
+  // FromMetalLayer returns nil instead of a surface that silently never renders. The window is
+  // kept and reused by getDevice(), so this costs nothing on the happy path.
+  auto window = tgfx::MetalWindow::MakeFrom(layer);
+  if (window == nullptr) {
+    return nullptr;
+  }
+  auto drawable = std::shared_ptr<MetalGPUDrawable>(new MetalGPUDrawable(layer));
+  drawable->window = std::move(window);
+  return drawable;
 }
 
 MetalGPUDrawable::MetalGPUDrawable(CAMetalLayer* layer) : layer(layer) {
