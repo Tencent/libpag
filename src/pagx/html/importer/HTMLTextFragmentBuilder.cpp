@@ -649,7 +649,19 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
   if (hasNoWrap) {
     textBox->wordWrap = false;
   }
-  if (box.clipOverflow) {
+  // CSS `overflow: hidden` clips pixels, and the host layer already carries that clip
+  // (`clipToBounds`, or the rounded-corner mask that replaces it). PAGX's `overflow="hidden"`
+  // adds a second rule on top of it: lines that do not fit the box are dropped outright. That
+  // second rule also rejects the *first* line when the box is a single line tall, because the
+  // half-leading model puts the glyph descent below the box bottom whenever `lineHeight` is under
+  // the font's natural line height, and an auto-height box resolves to exactly `lineHeight`. The
+  // text then disappears entirely instead of being clipped. Keep the flag only where a line can
+  // actually be dropped: a box with an automatic height grows to its content, and one shorter
+  // than two line heights holds at most one line, so neither has anything to drop.
+  bool heightIsAutomatic = std::isnan(box.heightPx) && std::isnan(box.heightPct);
+  bool boxHoldsAtMostOneLine = !std::isnan(box.heightPx) && textBox->lineHeight > 0 &&
+                               box.heightPx < textBox->lineHeight * 2.0f;
+  if (box.clipOverflow && !heightIsAutomatic && !boxHoldsAtMostOneLine) {
     textBox->overflow = Overflow::Hidden;
   }
   if (isVertical) {
