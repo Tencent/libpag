@@ -44,13 +44,15 @@ std::shared_ptr<MetalGPUDrawable> MetalGPUDrawable::FromView(MTKView* view) {
 }
 
 MetalGPUDrawable::MetalGPUDrawable(CAMetalLayer* layer) : layer(layer) {
-  // Do not retain layer here — the ObjC facade already owns the layer for the drawable's
-  // lifetime, and retaining it here would risk a strong reference cycle in typical UIKit /
-  // AppKit setups where the layer is bound to a view.
+  // Do not retain the layer — retaining it would risk a strong reference cycle in typical UIKit /
+  // AppKit setups where the layer is bound to a view. The caller keeps the layer alive for the
+  // drawable's lifetime; the contract is documented on the public FromMetalLayer API.
   updateSize();
 }
 
 MetalGPUDrawable::MetalGPUDrawable(MTKView* view, CAMetalLayer* layer) : layer(layer), view(view) {
+  // Same non-owning contract as the CAMetalLayer constructor: neither the view nor its layer is
+  // retained, and the caller must keep them alive for the drawable's lifetime.
   updateSize();
 }
 
