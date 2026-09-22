@@ -37,8 +37,8 @@ PAG_EXPORT void* pag_backend_semaphore_get_gl_sync(pag_backend_semaphore* semaph
  * Initialize the semaphore with a Metal id<MTLEvent> and a timeline signal value. Passing a
  * null event leaves the semaphore uninitialized.
  */
-PAG_EXPORT void pag_backend_semaphore_init_mtl(pag_backend_semaphore* semaphore, void* mtlEvent,
-                                               unsigned long long value);
+PAG_EXPORT void pag_backend_semaphore_init_metal(pag_backend_semaphore* semaphore,
+                                                 void* mtlEvent, unsigned long long value);
 
 /**
  * Copies the underlying id<MTLEvent> handle and timeline value into eventInfo. Returns false and

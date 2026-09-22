@@ -44,8 +44,8 @@ void* pag_backend_semaphore_get_gl_sync(pag_backend_semaphore* semaphore) {
   return semaphore->p.glSync();
 }
 
-void pag_backend_semaphore_init_mtl(pag_backend_semaphore* semaphore, void* mtlEvent,
-                                    unsigned long long value) {
+void pag_backend_semaphore_init_metal(pag_backend_semaphore* semaphore, void* mtlEvent,
+                                      unsigned long long value) {
   if (semaphore == nullptr) {
     return;
   }
