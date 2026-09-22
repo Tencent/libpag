@@ -236,15 +236,33 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   } else {
     tgfx::BackendSemaphore semaphore = {};
     recording = context->flush(&semaphore);
-    // The context may hand back a semaphore for whichever backend it was built on. Peek at each
-    // supported variant; the first one that unpacks successfully wins and gets forwarded to the
-    // caller's pag::BackendSemaphore. Non-matching variants silently no-op.
-    tgfx::GLSyncInfo glInfo = {};
-    tgfx::MetalSyncInfo mtlInfo = {};
-    if (semaphore.getGLSync(&glInfo)) {
-      signalSemaphore->initGL(glInfo.sync);
-    } else if (semaphore.getMetalSync(&mtlInfo)) {
-      signalSemaphore->initMetal(const_cast<void*>(mtlInfo.event), mtlInfo.value);
+    // The context hands back a semaphore for whichever backend it was built on. Every tgfx
+    // backend enum is listed explicitly (no default), so adding a new tgfx backend without
+    // handling it here fails -Wswitch at compile time instead of silently dropping the semaphore.
+    switch (semaphore.backend()) {
+      case tgfx::Backend::OpenGL: {
+        tgfx::GLSyncInfo glInfo = {};
+        if (semaphore.getGLSync(&glInfo)) {
+          signalSemaphore->initGL(glInfo.sync);
+        }
+        break;
+      }
+      case tgfx::Backend::Metal: {
+        tgfx::MetalSyncInfo mtlInfo = {};
+        if (semaphore.getMetalSync(&mtlInfo)) {
+          // tgfx::MetalSyncInfo::event is const void*; pag::BackendSemaphore takes void*. The
+          // handle is treated as opaque by libpag — the const_cast is safe because no writer
+          // path exists downstream.
+          signalSemaphore->initMetal(const_cast<void*>(mtlInfo.event), mtlInfo.value);
+        }
+        break;
+      }
+      case tgfx::Backend::Unknown:
+      case tgfx::Backend::Vulkan:
+      case tgfx::Backend::WebGPU:
+      case tgfx::Backend::D3D12:
+        LOGE("PAGSurface::flushInternal() cannot forward a semaphore of this backend yet.");
+        break;
     }
   }
   cache->detachFromContext();
