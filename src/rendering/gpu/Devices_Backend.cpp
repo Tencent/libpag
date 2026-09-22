@@ -28,8 +28,10 @@
 // Exactly one backend must be defined. Without this count check, the #if chain below would
 // silently pass when multiple backends are defined at once (e.g. the first matching branch
 // wins), which is precisely the link-failure shape this sentinel is meant to catch early.
+// clang-format off
 #if defined(TGFX_USE_OPENGL) + defined(TGFX_USE_METAL) + defined(TGFX_USE_VULKAN) + \
     defined(TGFX_USE_D3D12) + defined(TGFX_USE_WEBGPU) != 1
+// clang-format on
 #error \
     "Exactly one GPU backend must be enabled for libpag " \
     "(TGFX_USE_OPENGL / TGFX_USE_METAL / TGFX_USE_VULKAN / TGFX_USE_D3D12 / TGFX_USE_WEBGPU)."

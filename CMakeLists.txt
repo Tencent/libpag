@@ -136,6 +136,18 @@ if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
+# The Metal backend requires iOS 13+ (see the tgfx deployment-target check) and supports the iOS
+# simulator on arm64 only. Raise the deployment target automatically when Metal is selected so
+# `gen_ios -DPAG_USE_METAL=ON` needs no extra flags (as documented in ios/README.md). Without this
+# the toolchain's iOS default (9.0) flows into tgfx and trips its >= 13.0 check. Must run before
+# tgfx is added via add_subdirectory().
+if (PAG_USE_METAL AND IOS)
+    if (NOT CMAKE_OSX_DEPLOYMENT_TARGET OR CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "13.0")
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
+    endif ()
+    set(CMAKE_XCODE_ATTRIBUTE_EXCLUDED_ARCHS[sdk=iphonesimulator*] "x86_64")
+endif ()
+
 if (NOT PAG_USE_OPENGL AND NOT PAG_USE_METAL AND NOT PAG_USE_VULKAN
         AND NOT PAG_USE_D3D12 AND NOT PAG_USE_WEBGPU)
     message(FATAL_ERROR

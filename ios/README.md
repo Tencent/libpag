@@ -50,8 +50,10 @@ pass `-DPAG_USE_METAL=ON`:
 ./gen_simulator -DPAG_USE_METAL=ON
 ```
 
-The Metal backend requires iOS 13 or later and is arm64-only. The deployment target is raised to
-13.0 automatically when Metal is selected, so no extra flags are needed. The simulator build
-therefore only works on Apple Silicon Macs.
+The Metal backend requires iOS 13 or later and is arm64-only. The deployment target of the
+generated libpag project is raised to 13.0 automatically when Metal is selected, so no extra
+flags are needed. The simulator build therefore only works on Apple Silicon Macs. Note that the
+PAGViewer demo target keeps its default deployment target — bump it to 13.0 in Xcode if you plan
+to run the demo with Metal on devices older than iOS 13.
 
 At last, launch XCode and open the ios/PAGViewer.xcworkspace. You'll be ready to go!
