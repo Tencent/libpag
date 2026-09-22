@@ -2017,8 +2017,8 @@ function isSvgSource(src) {
 // cloned element so the snapshot renders identically without the page's
 // original stylesheet:
 //
-//   1. `currentColor` / `context-fill` / `context-stroke` literal attribute
-//      values get rewritten to the node's resolved color.
+//   1. Literal `currentColor` attributes use their CSS-resolved paint value.
+//      `context-fill` / `context-stroke` are left as-is (no colour to freeze).
 //   2. Every presentation attribute in `SVG_PRESENTATION_ATTRS` (defined
 //      below as a function-local constant so it ships into the browser
 //      payload via `fn.toString()`) whose resolved value differs from what
@@ -2158,11 +2158,18 @@ function freezeSvg(svgEl, rect) {
     if (dst && dst.nodeType === 1 && dst.getAttribute) {
       const stroke = dst.getAttribute('stroke');
       const fill = dst.getAttribute('fill');
-      if (stroke === 'currentColor' || stroke === 'context-stroke') {
-        dst.setAttribute('stroke', here);
+      // A stylesheet rule such as `.spark svg path { fill: #ffd76a }` outranks
+      // the element's own `fill="currentColor"` attribute, so use the resolved
+      // paint value and fall back to the resolved `color` only when it is empty.
+      // `context-fill` / `context-stroke` are deliberately left untouched: their
+      // resolved value stays the literal keyword (there is no colour to read),
+      // and the browser paints nothing without a context element, so freezing
+      // the element's `color` here would invent a paint the page never had.
+      if (stroke === 'currentColor') {
+        dst.setAttribute('stroke', resolvedAttrs['stroke'] || here);
       }
-      if (fill === 'currentColor' || fill === 'context-fill') {
-        dst.setAttribute('fill', here);
+      if (fill === 'currentColor') {
+        dst.setAttribute('fill', resolvedAttrs['fill'] || here);
       }
       // Inline `style="stroke: currentColor"` is uncommon but legal.
       if (dst.style) {
