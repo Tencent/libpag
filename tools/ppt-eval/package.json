@@ -1,0 +1,12 @@
+{
+  "name": "pagx-ppt-eval",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Visual regression harness for the PAGX PPTX exporter",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "dependencies": {
+    "pixelmatch": "7.2.0",
+    "pngjs": "7.0.0"
+  }
+}
