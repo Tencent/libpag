@@ -38,6 +38,10 @@ PAG_API @interface PAGSurface : NSObject
  * backend. The caller must keep the CAMetalLayer alive for the lifetime of the PAGSurface —
  * libpag does not retain it (retaining would risk a reference cycle in typical view-layer
  * setups), so releasing the layer while the PAGSurface is still in use is undefined behavior.
+ * The caller must also maintain layer.drawableSize (in pixels) — CAMetalLayer does not derive it
+ * from bounds automatically, and if it stays at zero the surface reports a fallback size but
+ * never actually renders. When the size changes, update layer.drawableSize and call updateSize
+ * on the PAGSurface.
  */
 + (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
 
