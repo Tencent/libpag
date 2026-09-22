@@ -52,16 +52,6 @@
   return pagSurface;
 }
 
-+ (PAGSurface*)FromMTKView:(MTKView*)view {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMTKView:view];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
-}
-
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer];
   if (surface == nil) {

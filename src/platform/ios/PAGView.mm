@@ -32,7 +32,6 @@
 
 #if defined(TGFX_USE_METAL)
 #import <Metal/Metal.h>
-#import <MetalKit/MetalKit.h>
 #endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGAnimatorListener>

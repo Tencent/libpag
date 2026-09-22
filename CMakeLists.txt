@@ -561,10 +561,9 @@ elseif (IOS)
             list(APPEND PAG_SHARED_LIBS ${OpenGLES_LIBS})
             list(APPEND PAG_DEFINES GLES_SILENCE_DEPRECATION)
         else ()
-            # Uses Metal instead. MetalKit is needed for MTKView bindings in MetalGPUDrawable.
+            # Uses Metal instead.
             find_library(Metal_LIBS Metal REQUIRED)
-            find_library(MetalKit_LIBS MetalKit REQUIRED)
-            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS} ${MetalKit_LIBS})
+            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
@@ -601,10 +600,9 @@ elseif (MACOS)
             list(APPEND PAG_SHARED_LIBS ${OpenGL_LIBS})
             list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
         else ()
-            # Uses Metal instead. MetalKit is needed for MTKView bindings in MetalGPUDrawable.
+            # Uses Metal instead.
             find_library(Metal_LIBS Metal REQUIRED)
-            find_library(MetalKit_LIBS MetalKit REQUIRED)
-            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS} ${MetalKit_LIBS})
+            list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)

@@ -26,15 +26,11 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
-@class MTKView;
-
 @interface PAGSurfaceImpl : NSObject
 
 + (PAGSurfaceImpl*)FromView:(NSView*)view;
 
 + (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromMTKView:(MTKView*)view;
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 

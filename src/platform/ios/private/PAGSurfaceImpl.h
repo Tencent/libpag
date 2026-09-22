@@ -23,7 +23,6 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
-@class MTKView;
 @protocol MTLDevice;
 
 @interface PAGSurfaceImpl : NSObject
@@ -31,8 +30,6 @@
 + (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
 
 + (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromMTKView:(MTKView*)view;
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
                              context:(EAGLContext*)eaglContext;

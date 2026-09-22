@@ -20,7 +20,6 @@
 
 #import "MetalGPUDrawable.h"
 
-#import <MetalKit/MetalKit.h>
 #include "tgfx/core/Surface.h"
 
 namespace pag {
@@ -32,27 +31,10 @@ std::shared_ptr<MetalGPUDrawable> MetalGPUDrawable::FromLayer(CAMetalLayer* laye
   return std::shared_ptr<MetalGPUDrawable>(new MetalGPUDrawable(layer));
 }
 
-std::shared_ptr<MetalGPUDrawable> MetalGPUDrawable::FromView(MTKView* view) {
-  if (view == nil) {
-    return nullptr;
-  }
-  auto layer = static_cast<CAMetalLayer*>(view.layer);
-  if (layer == nil) {
-    return nullptr;
-  }
-  return std::shared_ptr<MetalGPUDrawable>(new MetalGPUDrawable(view, layer));
-}
-
 MetalGPUDrawable::MetalGPUDrawable(CAMetalLayer* layer) : layer(layer) {
   // Do not retain the layer — retaining it would risk a strong reference cycle in typical UIKit /
   // AppKit setups where the layer is bound to a view. The caller keeps the layer alive for the
   // drawable's lifetime; the contract is documented on the public FromMetalLayer API.
-  updateSize();
-}
-
-MetalGPUDrawable::MetalGPUDrawable(MTKView* view, CAMetalLayer* layer) : layer(layer), view(view) {
-  // Same non-owning contract as the CAMetalLayer constructor: neither the view nor its layer is
-  // retained, and the caller must keep them alive for the drawable's lifetime.
   updateSize();
 }
 
@@ -75,11 +57,7 @@ std::shared_ptr<tgfx::Device> MetalGPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
-    if (view != nil) {
-      window = tgfx::MetalWindow::MakeFrom(view);
-    } else {
-      window = tgfx::MetalWindow::MakeFrom(layer);
-    }
+    window = tgfx::MetalWindow::MakeFrom(layer);
   }
   return window ? window->getDevice() : nullptr;
 }

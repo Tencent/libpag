@@ -32,7 +32,6 @@
 
 #if defined(TGFX_USE_METAL)
 #import <Metal/Metal.h>
-#import <MetalKit/MetalKit.h>
 #include "platform/cocoa/private/MetalGPUDrawable.h"
 #include "tgfx/gpu/metal/MetalDevice.h"
 #endif
@@ -75,20 +74,6 @@
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
 #else
   LOGE("The current libpag build does not support [PAGSurface FromMetalLayer:].");
-  return nil;
-#endif
-}
-
-+ (PAGSurfaceImpl*)FromMTKView:(MTKView*)view {
-#if defined(TGFX_USE_METAL)
-  auto drawable = pag::MetalGPUDrawable::FromView(view);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-#else
-  LOGE("The current libpag build does not support [PAGSurface FromMTKView:].");
   return nil;
 #endif
 }

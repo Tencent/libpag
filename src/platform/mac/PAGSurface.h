@@ -23,8 +23,6 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-@class MTKView;
-
 PAG_API @interface PAGSurface : NSObject
 
 /**
@@ -41,20 +39,6 @@ PAG_API @interface PAGSurface : NSObject
  * behavior.
  */
 + (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
-
-/**
- * Creates a new PAGSurface from an MTKView. The view's layer must be a CAMetalLayer. Returns nil
- * if the current libpag build does not use the Metal backend.
- * Note: the first render into this surface (which creates the backing CAMetalDrawable) must
- * happen on the main thread — MTKView is an NSView subclass annotated with @MainActor, so
- * touching its properties off the main thread is undefined. After the first frame, rendering
- * may continue on any thread. Also, when the view is resized, call updateSize on the PAGSurface
- * so its width()/height() and the underlying drawable follow the new size. The caller must keep
- * the MTKView alive for the lifetime of the PAGSurface — libpag does not retain it (retaining
- * would risk a reference cycle), so releasing the view while the PAGSurface is still in use is
- * undefined behavior.
- */
-+ (PAGSurface*)FromMTKView:(MTKView*)view;
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead.)

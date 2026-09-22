@@ -21,24 +21,19 @@
 #if defined(TGFX_USE_METAL)
 
 #import <QuartzCore/QuartzCore.h>
-@class MTKView;
-
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/gpu/metal/MetalWindow.h"
 
 namespace pag {
 
 /**
- * Drawable that renders into an externally owned CAMetalLayer / MTKView. Shared between iOS and
- * macOS since Metal's CAMetalLayer/MTKView API is identical across the two platforms — only the
- * host layer/view type name differs at the OC-facade level, and both funnel into a CAMetalLayer
- * for the low-level tgfx wiring.
+ * Drawable that renders into an externally owned CAMetalLayer. Shared between iOS and macOS
+ * since Metal's CAMetalLayer API is identical across the two platforms — only the host layer
+ * type name differs at the OC-facade level.
  */
 class MetalGPUDrawable : public Drawable {
  public:
   static std::shared_ptr<MetalGPUDrawable> FromLayer(CAMetalLayer* layer);
-
-  static std::shared_ptr<MetalGPUDrawable> FromView(MTKView* view);
 
   int width() const override {
     return _width;
@@ -63,11 +58,9 @@ class MetalGPUDrawable : public Drawable {
   int _width = 0;
   int _height = 0;
   CAMetalLayer* layer = nil;
-  MTKView* view = nil;
   std::shared_ptr<tgfx::MetalWindow> window = nullptr;
 
   explicit MetalGPUDrawable(CAMetalLayer* layer);
-  MetalGPUDrawable(MTKView* view, CAMetalLayer* layer);
 };
 
 }  // namespace pag

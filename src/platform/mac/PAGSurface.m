@@ -48,16 +48,6 @@
   return pagSurface;
 }
 
-+ (PAGSurface*)FromMTKView:(MTKView*)view {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMTKView:view];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
-}
-
 + (PAGSurface*)MakeFromGPU:(CGSize)size {
   return [PAGSurface MakeOffscreen:size];
 }
