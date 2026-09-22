@@ -403,7 +403,13 @@ void ResolveBackgroundRepeat(const std::string& repeat, TileMode& outX, TileMode
 void SplitPositionTokens(const std::string& position, std::string& outX, std::string& outY) {
   auto tokens = SplitTopLevelWhitespace(position);
   outX = tokens.size() > 0 ? tokens[0] : std::string();
-  outY = tokens.size() > 1 ? tokens[1] : tokens.size() == 1 ? "center" : std::string();
+  if (tokens.size() > 1) {
+    outY = tokens[1];
+  } else if (tokens.size() == 1) {
+    outY = "center";
+  } else {
+    outY.clear();
+  }
 }
 
 // Reads a DOM element attribute by (case-insensitive) name, or empty when absent. `name` must be
@@ -1236,6 +1242,12 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
   // the per-axis scale. A known intrinsic size resolves every form the sizing model accepts, so the
   // tile box is always usable here.
   auto tile = ResolveCssTileSize(box.maskSize, boxW, boxH, intrinsicW, intrinsicH, *_valueParser);
+  // `contain` / `cover` cannot be resolved against a degenerate element box and come back as NaN;
+  // writing that into the matrix would poison the whole mask, so keep the mask at its intrinsic
+  // size instead (a zero-area element paints nothing either way).
+  if (std::isnan(tile.first) || std::isnan(tile.second)) {
+    return;
+  }
   float scaleX = tile.first / intrinsicW;
   float scaleY = tile.second / intrinsicH;
   // Two empty tokens keep the `0 0` top-left default below.
@@ -1368,6 +1380,15 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
       // A `background-blend-mode` blends this image against the background-color the element
       // paints underneath it (the fill emitted by applyBackgroundVisuals) — for a tile layer the
       // blend therefore belongs on the layer, which composites against what is already drawn.
+      // The neighbouring pattern / gradient paths put the same blend on their `Fill`; a layer
+      // blend is the more robust of the two here: a non-Normal blend renders the subtree into an
+      // offscreen buffer and applies the mode when that buffer is composited (tgfx
+      // `Layer::drawLayer` → `drawOffscreen`), so the blend survives an isolating ancestor,
+      // whereas a `Fill` blend inside such a buffer would blend against the buffer's own
+      // transparent content and degrade to a no-op. The oversized-tile clip wrapper is a plain
+      // scrollRect clip (`Layer.clipToBounds`), not an isolating pass, so it does not interfere.
+      // As with the `Fill` form, the blend sees whatever the enclosing canvas already holds —
+      // CSS's isolation of the element's own background layers is not expressible in PAGX.
       if (box.backgroundColorSet) {
         host->blendMode = HTMLLayerBuilder::resolveBackgroundBlendMode(box.backgroundBlendMode);
       }

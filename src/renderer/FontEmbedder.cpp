@@ -449,66 +449,98 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   std::unordered_map<const tgfx::Typeface*, BitmapFontBuilder> bitmapBuilders = {};
   std::vector<const tgfx::Typeface*> bitmapTypefaces = {};
 
-  // First pass: classify all glyphs and collect vector/bitmap/spacing glyph data.
+  // Classify every glyph up front: the classification decides how the outlines below are baked, and
+  // the collection loop then reads it instead of re-probing the font (ClassifyGlyph() asks for both
+  // the outline and the image of a glyph, and a document repeats the same glyphs across its texts).
+  for (auto* text : textOrder) {
+    for (auto& tlRun : text->glyphData->layoutRuns) {
+      auto* typeface = tlRun.font.getTypeface().get();
+      if (typeface == nullptr) {
+        continue;
+      }
+      for (auto glyphID : tlRun.glyphs) {
+        auto& type = glyphTypes[GlyphKey{typeface, glyphID}];
+        if (type == GlyphType::Unknown) {
+          type = ClassifyGlyph(tlRun.font, glyphID);
+        }
+      }
+    }
+  }
+
+  // A synthesized italic must reach the glyphs exactly once, and its two carriers are mutually
+  // exclusive: `Font::getPath()` bakes ITALIC_SKEW into an embedded vector outline, while a bitmap
+  // glyph keeps an upright PNG — tgfx rasterizes it without the skew and only slants the placement
+  // matrix — and leans on GlyphRunRenderer applying the Text-level flag. That shear covers *every*
+  // run of the Text, so an outline the bake already covered would be slanted a second time. Layout
+  // clears the run-level flag when the resolved typeface is a real italic face, so only a
+  // synthesized run is examined here. The choice is document-wide because an outline is embedded
+  // once and shared by every Text that uses the glyph.
+  bool needsRenderShear = false;
+  for (auto* text : textOrder) {
+    if (!text->fauxItalic) {
+      continue;
+    }
+    for (auto& tlRun : text->glyphData->layoutRuns) {
+      if (!tlRun.font.isFauxItalic()) {
+        continue;
+      }
+      auto* typeface = tlRun.font.getTypeface().get();
+      for (auto glyphID : tlRun.glyphs) {
+        auto typeIt = glyphTypes.find(GlyphKey{typeface, glyphID});
+        if (typeIt != glyphTypes.end() && typeIt->second == GlyphType::Bitmap) {
+          needsRenderShear = true;
+          break;
+        }
+      }
+      if (needsRenderShear) {
+        break;
+      }
+    }
+    if (needsRenderShear) {
+      break;
+    }
+  }
+
+  // First pass: collect vector/bitmap/spacing glyph data.
   // Uses TextLayoutGlyphRun populated by applyLayout(). Text nodes without layoutRuns are skipped.
   for (auto* text : textOrder) {
     auto& layoutRuns = text->glyphData->layoutRuns;
-    if (!layoutRuns.empty()) {
-      for (auto& tlRun : layoutRuns) {
-        auto* typeface = tlRun.font.getTypeface().get();
-        if (typeface == nullptr) {
-          continue;
-        }
-        for (auto glyphID : tlRun.glyphs) {
-          GlyphKey key = {typeface, glyphID};
-          auto& type = glyphTypes[key];
-          if (type == GlyphType::Unknown) {
-            type = ClassifyGlyph(tlRun.font, glyphID);
-          }
-          switch (type) {
-            case GlyphType::Vector:
-              CollectVectorGlyph(document, tlRun.font, glyphID, maxFontSizes, vectorBuilder);
-              break;
-            case GlyphType::Bitmap:
-              CollectBitmapGlyph(document, tlRun.font, glyphID, bitmapBuilders, &bitmapTypefaces);
-              break;
-            case GlyphType::Spacing:
-              CollectSpacingGlyph(document, tlRun.font, glyphID, bitmapBuilders, vectorBuilder);
-              break;
-            default:
-              break;
-          }
-        }
+    if (layoutRuns.empty()) {
+      continue;
+    }
+    for (auto& tlRun : layoutRuns) {
+      auto* typeface = tlRun.font.getTypeface().get();
+      if (typeface == nullptr) {
+        continue;
       }
-      // The renderer shears every run of this Text with the Text-level flag (GlyphRunRenderer), so
-      // the flag may only be dropped when no run still needs it. Layout drops the run-level
-      // fauxItalic when the resolved typeface is a real italic face, and a synthesised italic is
-      // already baked into the embedded vector outlines because Font::getPath() applies
-      // ITALIC_SKEW. Bitmap glyphs keep no shear in their PNG, so a run that was synthesised and
-      // is embedded as bitmaps still depends on the renderer applying the slant.
-      if (text->fauxItalic) {
-        bool needsRenderShear = false;
-        for (auto& tlRun : layoutRuns) {
-          if (!tlRun.font.isFauxItalic()) {
-            continue;
-          }
-          auto* typeface = tlRun.font.getTypeface().get();
-          for (auto glyphID : tlRun.glyphs) {
-            GlyphKey key = {typeface, glyphID};
-            auto typeIt = glyphTypes.find(key);
-            if (typeIt != glyphTypes.end() && typeIt->second == GlyphType::Bitmap) {
-              needsRenderShear = true;
-              break;
-            }
-          }
-          if (needsRenderShear) {
+      // When the renderer will apply the slant to the whole Text anyway, the glyph geometry is
+      // collected from an unskewed font so that the outline carries no slant of its own. Advances
+      // and bitmap glyph data are identical either way: the skew only transforms outlines and
+      // placement matrices, never advances.
+      tgfx::Font collectFont = tlRun.font;
+      if (needsRenderShear) {
+        collectFont.setFauxItalic(false);
+      }
+      for (auto glyphID : tlRun.glyphs) {
+        switch (glyphTypes[GlyphKey{typeface, glyphID}]) {
+          case GlyphType::Vector:
+            CollectVectorGlyph(document, collectFont, glyphID, maxFontSizes, vectorBuilder);
             break;
-          }
-        }
-        if (!needsRenderShear) {
-          text->fauxItalic = false;
+          case GlyphType::Bitmap:
+            CollectBitmapGlyph(document, collectFont, glyphID, bitmapBuilders, &bitmapTypefaces);
+            break;
+          case GlyphType::Spacing:
+            CollectSpacingGlyph(document, collectFont, glyphID, bitmapBuilders, vectorBuilder);
+            break;
+          default:
+            break;
         }
       }
+    }
+    // Keep the flag for a document whose runs still rely on the render-time shear; drop it when
+    // the outlines above were baked instead.
+    if (!needsRenderShear) {
+      text->fauxItalic = false;
     }
   }
 

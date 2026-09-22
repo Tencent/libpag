@@ -34,14 +34,6 @@
 
 namespace pagx::cli {
 
-/**
- * Resolves a system font by family and style through the shared PAGX font resolver.
- */
-static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::string& family,
-                                                                    const std::string& style) {
-  return pagx::SystemFonts::ResolveTypeface(family, style);
-}
-
 inline size_t FindLastPathSeparator(const std::string& path) {
   auto slash = path.rfind('/');
   auto backslash = path.rfind('\\');
@@ -74,7 +66,7 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   auto commaPos = specifier.find(',');
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
   auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
-  return ResolveSystemTypeface(family, style);
+  return SystemFonts::ResolveTypeface(family, style);
 }
 
 /**

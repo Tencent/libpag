@@ -38,6 +38,27 @@ using namespace pagx::html;
 
 namespace {
 
+// The element's effective `background-image`: the longhand, or the `background` shorthand when
+// that carries a gradient (the only shorthand form PAGX can paint). `none` declares no image but
+// is a non-empty computed value, so it folds to empty here — every downstream "does this element
+// have a background image?" decision, including the `background-clip: text` redirect, treats the
+// two alike, and a literal "none" would otherwise be painted as an image or block the
+// solid-colour channel.
+std::string LookupEffectiveBackgroundImage(
+    const std::unordered_map<std::string, std::string>& props) {
+  std::string bgImage = LookupProperty(props, "background-image");
+  if (ToLower(Trim(bgImage)) == "none") {
+    return {};
+  }
+  if (bgImage.empty()) {
+    const std::string& shorthand = LookupProperty(props, "background");
+    if (!shorthand.empty() && ToLower(shorthand).find("gradient") != std::string::npos) {
+      return shorthand;
+    }
+  }
+  return bgImage;
+}
+
 // Splits a CSS function argument list (the slice between `(` and `)`) on top-level commas,
 // trimming each token. Used by `ParseTransformFunction` so multi-arg forms like
 // `scale(1.5, 0.75)` and `translate(10px, 20px)` round-trip without a heavier parser.
@@ -562,15 +583,9 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   // paints its glyphs, so it replaces the inherited fill of the other channel and outranks
   // `color` — CSS inherits a transparent text-fill-color through the subtree, leaving the
   // clipped background as the only glyph paint.
-  std::string ownBgImage = LookupProperty(props, "background-image");
-  if (ownBgImage.empty()) {
-    const std::string& sh = LookupProperty(props, "background");
-    if (!sh.empty() && sh.find("gradient") != std::string::npos) {
-      ownBgImage = sh;
-    }
-  }
+  std::string ownBgImage = LookupEffectiveBackgroundImage(props);
   if (LookupLowerTrimmed(props, "background-clip") == "text") {
-    if (!ownBgImage.empty() && ownBgImage.find("gradient") != std::string::npos) {
+    if (!ownBgImage.empty() && ToLower(ownBgImage).find("gradient") != std::string::npos) {
       out.textFillImage = ownBgImage;
       out.textFillSolidSet = false;
     } else if (ownBgImage.empty()) {
@@ -870,13 +885,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
-  std::string bgImage = LookupProperty(props, "background-image");
-  if (bgImage.empty()) {
-    const std::string& sh = LookupProperty(props, "background");
-    if (!sh.empty() && sh.find("gradient") != std::string::npos) {
-      bgImage = sh;
-    }
-  }
+  std::string bgImage = LookupEffectiveBackgroundImage(props);
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
   }

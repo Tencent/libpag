@@ -22,7 +22,7 @@
 
 namespace pagx {
 
-static std::string NormalizeFontName(const std::string& name) {
+std::string SystemFonts::NormalizeFontName(const std::string& name) {
   std::string result = {};
   result.reserve(name.size());
   bool pendingSpace = false;
@@ -40,17 +40,18 @@ static std::string NormalizeFontName(const std::string& name) {
   return result;
 }
 
-static bool FontNamesMatch(const std::string& requested, const std::string& resolved) {
+bool SystemFonts::FontNamesMatch(const std::string& requested, const std::string& resolved) {
   return !resolved.empty() && NormalizeFontName(requested) == NormalizeFontName(resolved);
 }
 
 static bool TypefaceMatches(const std::shared_ptr<tgfx::Typeface>& typeface,
                             const std::string& family, const std::string& style,
                             bool requireStyle) {
-  if (typeface == nullptr || !FontNamesMatch(family, typeface->fontFamily())) {
+  if (typeface == nullptr || !SystemFonts::FontNamesMatch(family, typeface->fontFamily())) {
     return false;
   }
-  return !requireStyle || style.empty() || FontNamesMatch(style, typeface->fontStyle());
+  return !requireStyle || style.empty() ||
+         SystemFonts::FontNamesMatch(style, typeface->fontStyle());
 }
 
 static std::shared_ptr<tgfx::Typeface> LoadTypeface(const FontLocation& location) {

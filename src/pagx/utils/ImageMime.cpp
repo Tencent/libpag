@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/utils/ImageMime.h"
+#include <cstring>
 
 namespace pagx {
 
@@ -100,14 +101,18 @@ const char* DetectImageMime(const uint8_t* bytes, size_t size) {
   if (size >= 4 && MatchesTag(bytes, "GIF8")) {
     return "image/gif";
   }
-  // AVIF / HEIC: both are ISO-BMFF containers distinguished only by their brand.
+  // AVIF / HEIC: both are ISO-BMFF containers distinguished only by their brand. `mif1` / `msf1`
+  // are the generic HEIF brands and are deliberately not accepted here: they are carried by any
+  // HEIF still — a static image whose codec is neither AV1 nor HEVC included — so matching them
+  // alone would label such a payload `image/heic` and send a reader after the wrong format.
+  // Reporting no format at all is the safer answer; the HEVC family brands are what vouches for
+  // the codec, and they appear in the compatible list whenever the payload really is HEVC-coded.
   if (HasIsoBmffBrand(bytes, size, "avif") || HasIsoBmffBrand(bytes, size, "avis")) {
     return "image/avif";
   }
   if (HasIsoBmffBrand(bytes, size, "heic") || HasIsoBmffBrand(bytes, size, "heix") ||
       HasIsoBmffBrand(bytes, size, "hevc") || HasIsoBmffBrand(bytes, size, "hevx") ||
-      HasIsoBmffBrand(bytes, size, "heim") || HasIsoBmffBrand(bytes, size, "heis") ||
-      HasIsoBmffBrand(bytes, size, "mif1") || HasIsoBmffBrand(bytes, size, "msf1")) {
+      HasIsoBmffBrand(bytes, size, "heim") || HasIsoBmffBrand(bytes, size, "heis")) {
     return "image/heic";
   }
   if (LooksLikeSvg(bytes, size)) {
@@ -122,13 +127,7 @@ bool IsSupportedImageMime(const char* mime) {
   }
   const char* supported[] = {"image/png", "image/jpeg", "image/webp", "image/gif"};
   for (const char* candidate : supported) {
-    size_t i = 0;
-    for (; mime[i] != '\0' && candidate[i] != '\0'; i++) {
-      if (mime[i] != candidate[i]) {
-        break;
-      }
-    }
-    if (mime[i] == '\0' && candidate[i] == '\0') {
+    if (strcmp(mime, candidate) == 0) {
       return true;
     }
   }

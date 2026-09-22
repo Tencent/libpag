@@ -98,43 +98,6 @@ size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::st
   return removed;
 }
 
-// Normalises a font-family name for case- and spacing-insensitive comparison the way CSS
-// treats family identifiers: lower-cased, leading/trailing whitespace trimmed, and internal
-// runs of whitespace collapsed to a single space. Whitespace is *significant* in CSS family
-// names (only its amount is not), so this deliberately preserves single spaces rather than
-// deleting all whitespace — a "delete every space" rule would fold "SF Mono" into "sfmono" and
-// wrongly match a platform's spaceless variant "SFMono", defeating the substitution guard this
-// availability check exists to enforce. Written as a free function to honour the no-lambda rule.
-std::string NormalizeFamilyName(const std::string& name) {
-  std::string out;
-  out.reserve(name.size());
-  bool pendingSpace = false;
-  for (unsigned char c : name) {
-    if (std::isspace(c)) {
-      // Defer emitting a separator until a non-space follows, so leading/trailing runs are
-      // dropped and interior runs collapse to exactly one space.
-      pendingSpace = !out.empty();
-      continue;
-    }
-    if (pendingSpace) {
-      out.push_back(' ');
-      pendingSpace = false;
-    }
-    out.push_back(static_cast<char>(std::tolower(c)));
-  }
-  return out;
-}
-
-// True when the family the renderer resolved matches the family we requested. A mismatch means
-// the platform substituted a different face (e.g. a hidden or missing font), so the requested
-// family should be treated as unavailable.
-bool FontFamilyNamesMatch(const std::string& requested, const std::string& resolved) {
-  if (resolved.empty()) {
-    return false;
-  }
-  return NormalizeFamilyName(requested) == NormalizeFamilyName(resolved);
-}
-
 }  // namespace
 
 //==================================================================================================
@@ -194,8 +157,8 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // fonts, in contrast, are resolved by the platform font manager, which silently substitutes a
   // default face for an unknown name (on some platforms `MakeFromName` never returns null) and
   // may report the same family under a differently-spaced spelling; there we compare with the
-  // spacing/case-insensitive `FontFamilyNamesMatch` and treat the family as available only when
-  // the resolved typeface's family matches the request — i.e. no substitution happened.
+  // spacing/case-insensitive `SystemFonts::FontNamesMatch` and treat the family as available only
+  // when the resolved typeface's family matches the request — i.e. no substitution happened.
   //
   // The registered branch is checked *before* the cache and against the exact `family` string.
   // `containsFamily` is a cheap in-memory scan, and its result depends on the exact spelling, so
@@ -209,13 +172,14 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // variants of the same CSS family ("SF Mono" / "sf  mono") share one entry and touch the
   // platform font manager at most once. This is safe because the probe itself compares with the
   // same spacing/case-insensitive rule, so all variants of a key genuinely share one verdict.
-  std::string cacheKey = NormalizeFamilyName(family);
+  std::string cacheKey = SystemFonts::NormalizeFontName(family);
   auto cached = _fontAvailabilityCache.find(cacheKey);
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
   auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
-  bool available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
+  bool available =
+      typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
 }
@@ -245,7 +209,7 @@ void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& s
   auto typeface = SystemFonts::ResolveTypeface(family, style);
   // A family mismatch means the platform substituted a different face, so the authored name is
   // kept instead of baking the substitution into the exported document.
-  if (typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily())) {
+  if (typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily())) {
     resolvedFamily = typeface->fontFamily();
     // Report the face style the platform actually picked, including when the request carried no
     // style at all. The text-leaf exits substitute "Regular" for an empty style, but a family need

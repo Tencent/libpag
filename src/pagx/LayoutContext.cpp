@@ -40,8 +40,11 @@ static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& 
                                                              const std::string& fontStyle) {
   auto namedTypeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   auto exactLocation = SystemFonts::FindFont(fontFamily, fontStyle);
-  bool exactStyleExists = namedTypeface != nullptr && !exactLocation.path.empty() &&
-                          (fontStyle.empty() || exactLocation.fontStyle == fontStyle);
+  // The platform reports the style under its own spelling, which may differ from the requested one
+  // in case or spacing only, so compare the two the way every other font-name decision here does.
+  bool exactStyleExists =
+      namedTypeface != nullptr && !exactLocation.path.empty() &&
+      (fontStyle.empty() || SystemFonts::FontNamesMatch(fontStyle, exactLocation.fontStyle));
   if (exactStyleExists) {
     // Preserve the platform's existing exact-style behavior. Some FreeType configurations cannot
     // load an installed exact face by name, and changing that behavior affects established layout

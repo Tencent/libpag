@@ -5429,6 +5429,82 @@ PAGX_TEST(PAGXTest, FontEmbedderReEmbed) {
   EXPECT_EQ(text->glyphRuns[0]->glyphs, firstGlyphs);
 }
 
+// What an embedded single-Text document kept of a synthesized italic: the Text-level flag, whether
+// any glyph was embedded as a bitmap, and the outline of the first vector glyph collected.
+struct EmbeddedItalicProbe {
+  bool textFauxItalic = false;
+  bool hasBitmapGlyph = false;
+  std::vector<pagx::Point> vectorGlyphPoints = {};
+};
+
+static EmbeddedItalicProbe EmbedSingleTextDocument(const std::string& content, bool fauxItalic) {
+  EmbeddedItalicProbe probe = {};
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  doc->layers.push_back(layer);
+  layer->width = 200;
+  layer->height = 100;
+
+  const auto primaryPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  auto primary = Typeface::MakeFromPath(primaryPath);
+  if (primary == nullptr) {
+    return probe;
+  }
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = content;
+  text->fontFamily = primary->fontFamily();
+  text->fontStyle = primary->fontStyle();
+  text->fontSize = 24;
+  text->fauxItalic = fauxItalic;
+  auto* fill = doc->makeNode<pagx::Fill>();
+  layer->contents = {text, fill};
+
+  pagx::FontConfig fontConfig = {};
+  fontConfig.registerFont(primaryPath, 0, primary->fontFamily(), primary->fontStyle());
+  fontConfig.addFallbackFont(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"), 0);
+  doc->applyLayout(&fontConfig);
+  if (!pagx::FontEmbedder().embed(doc.get())) {
+    return probe;
+  }
+  probe.textFauxItalic = text->fauxItalic;
+  for (auto* run : text->glyphRuns) {
+    for (auto* glyph : run->font->glyphs) {
+      if (glyph->image != nullptr) {
+        probe.hasBitmapGlyph = true;
+      } else if (glyph->path != nullptr && probe.vectorGlyphPoints.empty()) {
+        probe.vectorGlyphPoints = glyph->path->points();
+      }
+    }
+  }
+  return probe;
+}
+
+/**
+ * Test case: a synthesized italic reaches the glyphs exactly once.
+ * The Text-level `fauxItalic` flag and a baked outline are two carriers of the same slant, and
+ * GlyphRunRenderer shears every run of a Text whose flag is set. A bitmap glyph (NotoColorEmoji
+ * keeps no slant in its PNG) can only be slanted by that shear, so such a document keeps the flag
+ * and must leave the shared outlines unskewed; a document whose runs all carry outlines bakes the
+ * slant instead and drops the flag.
+ */
+PAGX_TEST(PAGXTest, FontEmbedderAppliesSynthesizedItalicExactlyOnce) {
+  auto mixed = EmbedSingleTextDocument("A\U0001F600", true);
+  EXPECT_TRUE(mixed.textFauxItalic);
+  EXPECT_TRUE(mixed.hasBitmapGlyph);
+  ASSERT_FALSE(mixed.vectorGlyphPoints.empty());
+
+  // The same document without the italic request: the outline is what a bake would have rewritten.
+  auto upright = EmbedSingleTextDocument("A\U0001F600", false);
+  ASSERT_FALSE(upright.vectorGlyphPoints.empty());
+  EXPECT_EQ(mixed.vectorGlyphPoints, upright.vectorGlyphPoints);
+
+  // No run depends on the render-time shear here, so the outline carries the slant itself.
+  auto vectorOnly = EmbedSingleTextDocument("A", true);
+  EXPECT_FALSE(vectorOnly.textFauxItalic);
+  ASSERT_FALSE(vectorOnly.vectorGlyphPoints.empty());
+  EXPECT_NE(vectorOnly.vectorGlyphPoints, upright.vectorGlyphPoints);
+}
+
 /**
  * Test case: Vertical text layout produces TextLayoutGlyphRun with rotations.
  */

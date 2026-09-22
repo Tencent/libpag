@@ -4354,7 +4354,25 @@ PAG_TEST(PAGXHTMLImporterTest, WhiteSpaceNowrapDisablesWrap) {
   }
 }
 
+// CSS `overflow: hidden` clips pixels, which the host layer's `clipToBounds` already does; the
+// TextBox's own `overflow` additionally *drops* lines that do not fit, so the importer keeps it
+// only on a box that can actually drop one.
 PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenOnTextContainerHidesText) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:100px">
+      <p style="overflow:hidden;height:80px">Hi <span>World</span></p>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
+  ASSERT_NE(tb, nullptr);
+  EXPECT_EQ(tb->overflow, pagx::Overflow::Hidden);
+}
+
+// An auto-height box grows to its content, so it has no line to drop: carrying the flag there
+// would discard the first line instead of clipping it, because the half-leading model puts the
+// glyph descent below an exactly line-height-tall box.
+PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenAutoHeightTextContainerKeepsLines) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:200px;height:40px">
       <p style="overflow:hidden">Hi <span>World</span></p>
@@ -4363,7 +4381,7 @@ PAG_TEST(PAGXHTMLImporterTest, OverflowHiddenOnTextContainerHidesText) {
   ASSERT_NE(doc, nullptr);
   auto* tb = FindElementOfType<pagx::TextBox>(doc->layers.front()->children.front());
   ASSERT_NE(tb, nullptr);
-  EXPECT_EQ(tb->overflow, pagx::Overflow::Hidden);
+  EXPECT_EQ(tb->overflow, pagx::Overflow::Visible);
 }
 
 PAG_TEST(PAGXHTMLImporterTest, TextDecorationLineThroughOverlay) {

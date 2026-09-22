@@ -416,7 +416,7 @@ class TextLayoutContext {
     primaryFont.setFauxItalic(glyph.fauxItalic && !typefaceIsItalic);
     tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
     metricsFont.setFauxBold(glyph.fauxBold);
-    metricsFont.setFauxItalic(glyph.fauxItalic);
+    metricsFont.setFauxItalic(glyph.fauxItalic && !typefaceIsItalic);
     float currentX = 0;
     const std::string& content = glyph.text;
     float effectiveLetterSpacing = glyph.letterSpacing * textScale;

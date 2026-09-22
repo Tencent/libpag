@@ -109,8 +109,8 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
           std::cerr << command << ": failed to load font '" << font->file << "'\n";
           return false;
         }
-        std::cerr << command << ": font source '" << font->file
-                  << "' not found, skipped because the document needs no font\n";
+        std::cerr << command << ": failed to load font '" << font->file
+                  << "', skipped because the document needs no font\n";
         continue;
       }
       fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());

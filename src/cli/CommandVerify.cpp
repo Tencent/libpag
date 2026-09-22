@@ -1810,6 +1810,11 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
 // (it warns about them at import time), so failing the document here would turn a legitimate import
 // into a verify failure.
 static void WarnUnsupportedImageFormats(const PAGXDocument* doc) {
+  // Every sniffer in DetectImageMime() reads a header: 8 magic bytes for the raster formats, the
+  // `ftyp` box for the ISO-BMFF pair, and a 256-byte window for the SVG probe. Decoding that much
+  // of a data URI is enough to name the format, so an inlined multi-megabyte image is not
+  // materialized just to be looked at.
+  static constexpr size_t MIME_SNIFF_BYTES = 512;
   for (const auto& nodePtr : doc->nodes) {
     auto* node = nodePtr.get();
     if (node->nodeType() != NodeType::Image) {
@@ -1817,8 +1822,8 @@ static void WarnUnsupportedImageFormats(const PAGXDocument* doc) {
     }
     auto* image = static_cast<const Image*>(node);
     std::shared_ptr<Data> inlineData = image->data;
-    if (inlineData == nullptr && image->filePath.compare(0, 5, "data:") == 0) {
-      inlineData = DecodeBase64DataURI(image->filePath);
+    if (inlineData == nullptr) {
+      inlineData = DecodeBase64DataURIPrefix(image->filePath, MIME_SNIFF_BYTES);
     }
     if (inlineData == nullptr || inlineData->size() == 0) {
       continue;

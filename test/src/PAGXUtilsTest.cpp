@@ -2461,8 +2461,8 @@ PAGX_TEST(PAGXUtilsTest, DetectImageMimeNamesFormatsOutsideTheSupportedSet) {
 
   // ISO-BMFF containers are told apart by their brand: the major brand, or — for files that
   // declare the generic `mif1` major brand — a compatible brand listed later in the `ftyp` box.
-  // AVIF has to be tested before HEIC because a `mif1` major brand matches the HEIC brand set
-  // too, so only the compatible-brand list tells the two apart.
+  // The AVIF family is tested first so a payload that names both families (an AVIF written by a
+  // tool that kept the source HEVC brand) is reported as AVIF.
   const uint8_t avif[] = {0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'a', 'v', 'i', 'f',
                           0, 0, 0, 0,    'a', 'v', 'i', 'f', 'm', 'i', 'f', '1'};
   EXPECT_STREQ(pagx::DetectImageMime(avif, sizeof(avif)), "image/avif");
@@ -2473,6 +2473,12 @@ PAGX_TEST(PAGXUtilsTest, DetectImageMimeNamesFormatsOutsideTheSupportedSet) {
   const uint8_t avifGenericBrand[] = {0,   0,   0, 0x14, 'f', 't', 'y', 'p', 'm', 'i',
                                       'f', '1', 0, 0,    0,   0,   'a', 'v', 'i', 'f'};
   EXPECT_STREQ(pagx::DetectImageMime(avifGenericBrand, sizeof(avifGenericBrand)), "image/avif");
+  // A generic `mif1` container whose compatible list names no codec family (`miaf` is the generic
+  // HEIF image brand) declares neither AV1 nor HEVC, so it stays unknown instead of being reported
+  // as HEIC.
+  const uint8_t heifGenericBrand[] = {0,   0,   0, 0x14, 'f', 't', 'y', 'p', 'm', 'i',
+                                      'f', '1', 0, 0,    0,   0,   'm', 'i', 'a', 'f'};
+  EXPECT_EQ(pagx::DetectImageMime(heifGenericBrand, sizeof(heifGenericBrand)), nullptr);
 
   const std::string svg = "<svg width=\"14\" height=\"5\"></svg>";
   EXPECT_STREQ(pagx::DetectImageMime(reinterpret_cast<const uint8_t*>(svg.data()), svg.size()),

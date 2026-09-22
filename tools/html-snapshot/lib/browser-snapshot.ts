@@ -184,6 +184,13 @@ function normalizeBackgroundImage(value) {
 // STYLE_SCHEMA defaults filter drops the property. Chromium computed style
 // already coalesces `-webkit-background-clip` into the unprefixed
 // `background-clip`, so a single schema entry suffices.
+//
+// Keyword validation is deliberately left to the importer's
+// `TransformBackgroundClip`, which drops a value the subset cannot express
+// (an unknown keyword, or `text` mixed into a per-layer list) with a
+// diagnostic naming the offending value. Snapshot-side validation could only
+// drop silently, and would have to duplicate that table: this function's job
+// is to normalize the forms PAGX *can* express, not to re-check them.
 function normalizeBackgroundClip(value) {
   if (!value) return '';
   const v = value.trim().toLowerCase();
