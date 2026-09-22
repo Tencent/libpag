@@ -152,8 +152,10 @@ bool HardwareDecoder::resetVideoToolBox() {
   uint32_t pixelFormatType = kCVPixelFormatType_32BGRA;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
-  // The OpenGL compatibility key requires a CFBoolean. A CFNumber would make
-  // CVPixelBufferCreateResolvedAttributesDictionary fail and drop the 32BGRA/IOSurface request.
+  // The OpenGL compatibility key expects a CFBoolean, not a CFNumber. Passing a CFNumber makes
+  // CVPixelBufferCreateResolvedAttributesDictionary reject the whole attribute set and drop the
+  // 32BGRA/IOSurface request. The key itself is still supported on newer macOS, so kCFBooleanTrue
+  // is the fix (correcting the earlier assumption in #3631 that the key was no longer recognized).
   CFDictionaryRef ioSurfaceParam =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
 
