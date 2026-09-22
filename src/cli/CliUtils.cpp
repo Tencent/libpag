@@ -40,35 +40,53 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
   return document;
 }
 
+// Registers every face of a font file and returns how many could be opened, 0 meaning the file
+// itself cannot be read. `MakeFromPath` and `registerFont` both default to face 0, which is the
+// whole of a single-face file but merely the first of a collection: PingFang.ttc holds 24 faces,
+// and a request for "PingFang SC Medium" resolves to face 7 — unreachable unless every face is
+// registered under its own (family, style) key. Probing stops at the first index that fails to
+// open, so a single-face file costs one extra call.
+static int RegisterFontFaces(FontConfig* fontConfig, const std::string& path,
+                             bool addToFallbackChain) {
+  static constexpr int MaxFontFaces = 64;
+  int faceCount = 0;
+  for (int index = 0; index < MaxFontFaces; index++) {
+    auto typeface = tgfx::Typeface::MakeFromPath(path, index);
+    if (typeface == nullptr) {
+      break;
+    }
+    fontConfig->registerFont(path, index, typeface->fontFamily(), typeface->fontStyle());
+    if (addToFallbackChain) {
+      fontConfig->addFallbackFont(path, index);
+    }
+    faceCount++;
+  }
+  return faceCount;
+}
+
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
                     const std::vector<std::string>& fallbacks, const std::string& command) {
   for (const auto& fontFile : fontFiles) {
-    auto typeface = tgfx::Typeface::MakeFromPath(fontFile);
-    if (typeface == nullptr) {
+    if (RegisterFontFaces(fontConfig, fontFile, false) == 0) {
       std::cerr << command << ": failed to load font '" << fontFile << "'\n";
       return false;
     }
-    fontConfig->registerFont(fontFile, 0, typeface->fontFamily(), typeface->fontStyle());
   }
   for (const auto& fallbackStr : fallbacks) {
-    bool isFilePath = fallbackStr.find('/') != std::string::npos;
+    bool isFilePath =
+        fallbackStr.find('/') != std::string::npos || fallbackStr.find('\\') != std::string::npos;
     if (!isFilePath) {
-      auto dot = fallbackStr.rfind('.');
-      if (dot != std::string::npos) {
-        auto ext = fallbackStr.substr(dot);
-        isFilePath = ext == ".ttf" || ext == ".otf" || ext == ".ttc" || ext == ".woff" ||
-                     ext == ".woff2" || ext == ".TTF" || ext == ".OTF" || ext == ".TTC";
-      }
+      auto ext = GetFileExtension(fallbackStr);
+      isFilePath = ext == "ttf" || ext == "otf" || ext == "ttc" || ext == "woff" || ext == "woff2";
     }
     if (isFilePath) {
       // Register as both a main font (precise family match) and a fallback font, matching the
       // pre-refactor behavior where fallback fonts were also reachable via exact family lookup.
-      auto typeface = tgfx::Typeface::MakeFromPath(fallbackStr);
-      if (typeface == nullptr) {
+      // A file that cannot be read is fatal: the caller asked for this exact source, and silently
+      // dropping it would shape the text with a substituted face instead.
+      if (RegisterFontFaces(fontConfig, fallbackStr, true) == 0) {
         std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      } else {
-        fontConfig->registerFont(fallbackStr, 0, typeface->fontFamily(), typeface->fontStyle());
-        fontConfig->addFallbackFont(fallbackStr, 0);
+        return false;
       }
     } else {
       auto commaPos = fallbackStr.find(',');
@@ -76,9 +94,9 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       auto style = commaPos != std::string::npos ? fallbackStr.substr(commaPos + 1) : std::string();
       if (!fontConfig->registerSystemFont(family, style)) {
         std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
-      } else {
-        fontConfig->addFallbackSystemFont(family, style);
+        return false;
       }
+      fontConfig->addFallbackSystemFont(family, style);
     }
   }
   return true;
@@ -102,22 +120,19 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
       continue;
     }
     auto* font = static_cast<Font*>(node.get());
-    if (!font->file.empty()) {
-      auto typeface = tgfx::Typeface::MakeFromPath(font->file);
-      if (typeface == nullptr) {
-        if (requiresFonts) {
-          std::cerr << command << ": failed to load font '" << font->file << "'\n";
-          return false;
-        }
-        std::cerr << command << ": failed to load font '" << font->file
-                  << "', skipped because the document needs no font\n";
-        continue;
+    if (font->file.empty()) {
+      continue;
+    }
+    // Also reach this file through the fallback chain: a (family, style) key holds one primary
+    // registration, so unicode-range subset files sharing that key would otherwise overwrite each
+    // other and drop every glyph that lives in an earlier subset.
+    if (RegisterFontFaces(&fontConfig, font->file, true) == 0) {
+      if (requiresFonts) {
+        std::cerr << command << ": failed to load font '" << font->file << "'\n";
+        return false;
       }
-      fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
-      // Also reach this file through the fallback chain: a (family, style) key holds one primary
-      // registration, so unicode-range subset files sharing that key would otherwise overwrite
-      // each other and drop every glyph that lives in an earlier subset.
-      fontConfig.addFallbackFont(font->file, 0);
+      std::cerr << command << ": failed to load font '" << font->file
+                << "', skipped because the document needs no font\n";
     }
   }
   FontEmbedder::ClearEmbeddedGlyphRuns(document);
@@ -125,6 +140,17 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   FontEmbedder embedder = {};
   if (!embedder.embed(document)) {
     std::cerr << command << ": font embedding failed\n";
+    return false;
+  }
+  // A text that shaped to nothing means no font available here covered its characters. Writing the
+  // document anyway would silently produce a file whose text is blank on every host lacking the
+  // authored font, so fail loudly and name the texts instead.
+  if (!embedder.unembeddedTexts().empty()) {
+    std::cerr << command << ": " << embedder.unembeddedTexts().size()
+              << " text(s) produced no glyph run, no available font covers them:\n";
+    for (const auto& description : embedder.unembeddedTexts()) {
+      std::cerr << command << ":   " << description << "\n";
+    }
     return false;
   }
   return true;

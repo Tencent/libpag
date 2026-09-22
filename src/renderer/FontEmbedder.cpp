@@ -18,6 +18,7 @@
 
 #include "FontEmbedder.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
@@ -295,6 +296,38 @@ static std::vector<Text*> CollectAllText(PAGXDocument* document) {
   return allText;
 }
 
+// True when a text carries at least one character that must be drawn. A text of only spaces or
+// newlines shapes to no glyphs by design, so it must not be reported as a missing-font failure.
+static bool HasVisibleCharacters(const std::string& text) {
+  for (auto ch : text) {
+    if (std::isspace(static_cast<unsigned char>(ch)) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static std::string DescribeUnembeddedText(const Text* text) {
+  std::string preview = text->text;
+  if (preview.size() > 32) {
+    preview.resize(32);
+    // Never cut a UTF-8 sequence in half: a preview that ends mid-character would print as
+    // replacement glyphs in the error message.
+    while (!preview.empty() && (static_cast<unsigned char>(preview.back()) & 0xC0) == 0x80) {
+      preview.pop_back();
+    }
+    preview += "...";
+  }
+  std::string label = text->fontFamily.empty() ? "(default family)" : text->fontFamily;
+  if (!text->fontStyle.empty()) {
+    label += "/" + text->fontStyle;
+  }
+  if (!text->id.empty()) {
+    label += " id=" + text->id;
+  }
+  return label + ": " + preview;
+}
+
 static GlyphRun* CreateGlyphRunFromLayoutRun(
     PAGXDocument* document, const TextLayoutGlyphRun& tlRun, const tgfx::Typeface* typeface,
     const std::vector<size_t>& indices, Font* embeddedFont, float fontSize,
@@ -433,6 +466,7 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
 }
 
 bool FontEmbedder::embed(PAGXDocument* document) {
+  unembedded.clear();
   if (document == nullptr) {
     return false;
   }
@@ -615,6 +649,16 @@ bool FontEmbedder::embed(PAGXDocument* document) {
 
     if (!text->glyphRuns.empty() && (textBounds.width > 0 || textBounds.height > 0)) {
       text->glyphRuns.front()->bounds = textBounds;
+    }
+  }
+
+  // A text with visible characters but no glyph run means no typeface on this machine covered
+  // them: the run's font was never resolved, so nothing was baked. Recording these lets a caller
+  // fail instead of silently shipping a document whose text renders as blank (or as a substituted
+  // face) on every host that also lacks the authored font.
+  for (auto* text : textOrder) {
+    if (text->glyphRuns.empty() && HasVisibleCharacters(text->text)) {
+      unembedded.push_back(DescribeUnembeddedText(text));
     }
   }
 
