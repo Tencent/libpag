@@ -317,6 +317,13 @@ class PAG_API BackendSemaphore {
    */
   bool isInitialized() const;
 
+  /**
+   * Returns the backend API of this semaphore.
+   */
+  Backend backend() const {
+    return _backend;
+  }
+
   void initGL(void* sync);
 
   void* glSync() const;

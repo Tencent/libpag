@@ -28,9 +28,11 @@ namespace pag {
 PAG_TEST(BackendSemaphoreTest, CrossBackendGuards) {
   BackendSemaphore semaphore = {};
   EXPECT_FALSE(semaphore.isInitialized());
+  EXPECT_EQ(semaphore.backend(), Backend::MOCK);
 
   semaphore.initGL(reinterpret_cast<void*>(1));
   EXPECT_TRUE(semaphore.isInitialized());
+  EXPECT_EQ(semaphore.backend(), Backend::OPENGL);
   EXPECT_EQ(semaphore.glSync(), reinterpret_cast<void*>(1));
   // Reading Metal accessors on a GL semaphore must not leak the union.
   EXPECT_EQ(semaphore.mtlEvent(), nullptr);
@@ -39,6 +41,7 @@ PAG_TEST(BackendSemaphoreTest, CrossBackendGuards) {
   semaphore = {};
   semaphore.initMetal(reinterpret_cast<void*>(2), 5);
   EXPECT_TRUE(semaphore.isInitialized());
+  EXPECT_EQ(semaphore.backend(), Backend::METAL);
   EXPECT_EQ(semaphore.mtlEvent(), reinterpret_cast<void*>(2));
   EXPECT_EQ(semaphore.mtlValue(), 5u);
   // Reading the GL accessor on a Metal semaphore must not leak the union.
