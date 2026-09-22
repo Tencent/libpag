@@ -138,6 +138,8 @@ class HTMLLayerBuilder {
  private:
   void applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
                            bool& emitted);
+  void emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttributes& box, ColorSource* color,
+                                const Padding& inset, BlendMode blendMode);
   void applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
                          bool& emitted);
   void applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);

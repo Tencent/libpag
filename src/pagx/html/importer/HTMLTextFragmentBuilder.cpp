@@ -87,7 +87,10 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
 
 Fill* HTMLTextFragmentBuilder::buildTextFill(const TextFragment& fragment) {
   if (fragment.fillImage.empty()) {
-    return _layerBuilder.buildSolidFill(fragment.color);
+    // A clip-to-text ancestor painting the glyphs with a solid `background-color` outranks the
+    // element's own `color`, exactly as the gradient branch above does for gradients.
+    return _layerBuilder.buildSolidFill(fragment.fillSolidSet ? fragment.fillSolid
+                                                              : fragment.color);
   }
   auto fill = _document->makeNode<Fill>();
   fill->color = _layerBuilder.parseGradientByValue(fragment.fillImage);
@@ -244,6 +247,8 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.strokeWidth = inherited.textStrokeWidthPx;
   frag.strokeColor = inherited.textStrokeColor;
   frag.fillImage = inherited.textFillImage;
+  frag.fillSolid = inherited.textFillSolid;
+  frag.fillSolidSet = inherited.textFillSolidSet;
   // Resolve once per fragment so convertTextLeaf can derive TextBox.lineHeight without
   // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
   // explicit contribution" — the line-box then collapses to the parent's font metrics.
@@ -274,6 +279,7 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
          std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
          a.textDecoration == b.textDecoration && a.fillImage == b.fillImage &&
+         a.fillSolidSet == b.fillSolidSet && a.fillSolid == b.fillSolid &&
          StrokesMatch(a.strokeWidth, a.strokeColor, b.strokeWidth, b.strokeColor);
 }
 
@@ -295,7 +301,8 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
-         a.fillImage == inherited.textFillImage && a.collapseWhitespace == incomingCollapse &&
+         a.fillImage == inherited.textFillImage && a.fillSolidSet == inherited.textFillSolidSet &&
+         a.fillSolid == inherited.textFillSolid && a.collapseWhitespace == incomingCollapse &&
          a.preserveNewlines == incomingPreserveNewlines &&
          StrokesMatch(a.strokeWidth, a.strokeColor, inherited.textStrokeWidthPx,
                       inherited.textStrokeColor);
@@ -642,7 +649,19 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
   if (hasNoWrap) {
     textBox->wordWrap = false;
   }
-  if (box.clipOverflow) {
+  // CSS `overflow: hidden` clips pixels, and the host layer already carries that clip
+  // (`clipToBounds`, or the rounded-corner mask that replaces it). PAGX's `overflow="hidden"`
+  // adds a second rule on top of it: lines that do not fit the box are dropped outright. That
+  // second rule also rejects the *first* line when the box is a single line tall, because the
+  // half-leading model puts the glyph descent below the box bottom whenever `lineHeight` is under
+  // the font's natural line height, and an auto-height box resolves to exactly `lineHeight`. The
+  // text then disappears entirely instead of being clipped. Keep the flag only where a line can
+  // actually be dropped: a box with an automatic height grows to its content, and one shorter
+  // than two line heights holds at most one line, so neither has anything to drop.
+  bool heightIsAutomatic = std::isnan(box.heightPx) && std::isnan(box.heightPct);
+  bool boxHoldsAtMostOneLine = !std::isnan(box.heightPx) && textBox->lineHeight > 0 &&
+                               box.heightPx < textBox->lineHeight * 2.0f;
+  if (box.clipOverflow && !heightIsAutomatic && !boxHoldsAtMostOneLine) {
     textBox->overflow = Overflow::Hidden;
   }
   if (isVertical) {

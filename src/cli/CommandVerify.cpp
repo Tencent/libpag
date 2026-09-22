@@ -78,6 +78,8 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
+#include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -1798,11 +1800,52 @@ static void RunStaticDetectionOnLayer(const Layer* layer, float canvasWidth, flo
   }
 }
 
+// `<Image>` may only carry PNG/JPEG/WebP/GIF (spec "支持格式"): every renderer is required to
+// decode those and nothing guarantees any other format. A `data:` payload outside that set — an
+// AVIF or SVG inlined by an upstream tool, or bytes whose format cannot be identified at all — is
+// reported here so the offending resource is visible before it silently fails to paint on a
+// platform whose decoder does not happen to cover it. Only inline payloads are inspected: an
+// external `filePath` is not read, so a referenced file's format stays the author's concern.
+// Reported as a warning rather than a diagnostic: the HTML importer keeps such payloads on purpose
+// (it warns about them at import time), so failing the document here would turn a legitimate import
+// into a verify failure.
+static void WarnUnsupportedImageFormats(const PAGXDocument* doc) {
+  // Every sniffer in DetectImageMime() reads a header: 8 magic bytes for the raster formats, the
+  // `ftyp` box for the ISO-BMFF pair, and a 256-byte window for the SVG probe. Decoding that much
+  // of a data URI is enough to name the format, so an inlined multi-megabyte image is not
+  // materialized just to be looked at.
+  static constexpr size_t MIME_SNIFF_BYTES = 512;
+  for (const auto& nodePtr : doc->nodes) {
+    auto* node = nodePtr.get();
+    if (node->nodeType() != NodeType::Image) {
+      continue;
+    }
+    auto* image = static_cast<const Image*>(node);
+    std::shared_ptr<Data> inlineData = image->data;
+    if (inlineData == nullptr) {
+      inlineData = DecodeBase64DataURIPrefix(image->filePath, MIME_SNIFF_BYTES);
+    }
+    if (inlineData == nullptr || inlineData->size() == 0) {
+      continue;
+    }
+    const char* mime = DetectImageMime(inlineData->bytes(), inlineData->size());
+    if (IsSupportedImageMime(mime)) {
+      continue;
+    }
+    std::string format = mime != nullptr ? std::string("data:") + mime : std::string("an unknown");
+    std::cerr << "pagx verify: warning: resource <Image> id=\"" << image->id << "\" (line "
+              << node->sourceLine << ") carries " << format
+              << " payload, outside the supported set (PNG/JPEG/WebP/GIF); transcode it before "
+                 "inlining or reference a supported format\n";
+  }
+}
+
 static void RunStaticDetection(const PAGXDocument* doc, const LineNodeMap& lineNodeMap,
                                std::vector<VerifyDiagnostic>& diagnostics,
                                const Layer* targetLayer = nullptr) {
   if (targetLayer == nullptr) {
     DetectUnreferencedResources(doc, diagnostics);
+    WarnUnsupportedImageFormats(doc);
     DetectDuplicatePathData(doc, lineNodeMap, diagnostics);
     DetectDuplicateGradients(doc, lineNodeMap, diagnostics);
     DetectStructurallyIdenticalLayers(doc, lineNodeMap, diagnostics);
@@ -1857,20 +1900,25 @@ static bool RectsOverlap(const SpatialRect& a, const SpatialRect& b) {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
-// Sibling overlap needs a small tolerance because auto-layout rounds child positions to integers
-// while child sizes can carry fractional text-measurement remainders. Adjacent siblings may then
-// appear to overlap by a fraction of a pixel even though the layout is visually correct.
+// Auto-layout snaps geometry to whole pixels while sizes stay fractional: LayoutNode::layoutChildren
+// rounds every child position with std::round and ceils sizes derived from constraints or percent,
+// whereas authored and content-measured sizes keep their exact values. Two related nodes can
+// therefore disagree by just under one pixel — an adjacent pair overlaps, or a child pokes past its
+// parent — without any visual defect, so cross-node comparisons need to tolerate a full pixel.
+static constexpr float LAYOUT_SNAP_TOLERANCE = 1.0f;
+
 static bool SiblingsOverlap(const SpatialRect& a, const SpatialRect& b) {
-  constexpr float TOLERANCE = 0.5f;
-  return a.x + TOLERANCE < b.x + b.width && a.x + a.width > b.x + TOLERANCE &&
-         a.y + TOLERANCE < b.y + b.height && a.y + a.height > b.y + TOLERANCE;
+  return a.x + LAYOUT_SNAP_TOLERANCE < b.x + b.width &&
+         a.x + a.width > b.x + LAYOUT_SNAP_TOLERANCE &&
+         a.y + LAYOUT_SNAP_TOLERANCE < b.y + b.height &&
+         a.y + a.height > b.y + LAYOUT_SNAP_TOLERANCE;
 }
 
 static bool IsFullyContained(const SpatialRect& parent, const SpatialRect& child) {
-  static constexpr float TOLERANCE = 0.5f;
-  return (child.x + TOLERANCE) >= parent.x && (child.y + TOLERANCE) >= parent.y &&
-         (child.x + child.width) <= (parent.x + parent.width + TOLERANCE) &&
-         (child.y + child.height) <= (parent.y + parent.height + TOLERANCE);
+  return (child.x + LAYOUT_SNAP_TOLERANCE) >= parent.x &&
+         (child.y + LAYOUT_SNAP_TOLERANCE) >= parent.y &&
+         (child.x + child.width) <= (parent.x + parent.width + LAYOUT_SNAP_TOLERANCE) &&
+         (child.y + child.height) <= (parent.y + parent.height + LAYOUT_SNAP_TOLERANCE);
 }
 
 static bool ElementsHaveLeafContent(const std::vector<Element*>& elements);

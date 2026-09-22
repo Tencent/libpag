@@ -194,17 +194,38 @@ std::string TransformBackgroundImage(const std::string& value, const PropertyCon
   return DropProperty("background-image", value, "is not a supported value", diags);
 }
 
-// `background-clip` only models the `text` keyword in PAGX. Combined with a gradient
-// `background-image` it tells the importer to route the gradient onto descendant text fills
-// instead of painting a rectangle. Other keywords (`border-box`, `padding-box`, …) are
-// silent no-ops; only unknown values produce a diagnostic.
+// `background-clip: text` routes a gradient `background-image` onto descendant text fills
+// instead of painting a rectangle. Layered box clips are kept verbatim (comma-separated in
+// CSS layer order): a `padding-box` layer inset by the border width is how CSS paints
+// gradient borders, and the layer builder rebuilds it with its own inset geometry. A list
+// where every layer is the default `border-box` is dropped, matching the snapshot's
+// `normalizeBackgroundClip` filter.
 std::string TransformBackgroundClip(const std::string& value, const PropertyContext&,
                                     HTMLTransformContext& diags) {
   std::string lc = ToLower(Trim(value));
-  if (lc.empty() || lc == "border-box") return std::string();
+  if (lc.empty()) return std::string();
   if (lc == "text") return "text";
-  if (lc == "padding-box" || lc == "content-box") return std::string();
-  return DropProperty("background-clip", value, "is not a supported value", diags);
+  auto layers = SplitTopLevelCommas(lc);
+  if (layers.empty()) return std::string();
+  bool anyPaddingBox = false;
+  for (auto& layer : layers) {
+    std::string clip = ToLower(Trim(layer));
+    if (clip.empty() || clip == "border-box") {
+      clip = "border-box";
+    } else if (clip == "padding-box" || clip == "content-box") {
+      anyPaddingBox = true;
+    } else {
+      return DropProperty("background-clip", value, "is not a supported value", diags);
+    }
+    layer = clip;
+  }
+  if (!anyPaddingBox) return std::string();
+  std::string joined;
+  for (size_t i = 0; i < layers.size(); i++) {
+    if (i > 0) joined += ", ";
+    joined += layers[i];
+  }
+  return joined;
 }
 
 // `clip-path` is rebuilt by the importer into a contour mask layer, either from a `url(#id)`

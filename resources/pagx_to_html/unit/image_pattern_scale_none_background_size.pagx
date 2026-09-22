@@ -1,0 +1,11 @@
+<pagx width="100" height="100">
+  <Resources>
+    <Image id="checker" source="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAPklEQVR4nGO8o6b2nwEJKN+8icxluKuuzoBPnomBQsA04AYw/v///z8pfkaXZ6LUBUwDbgDjaDpgGE0HDAwAbjceY/dvRuYAAAAASUVORK5CYII="/>
+  </Resources>
+  <Layer id="1:1" width="40" height="40" matrix="1,0,0,1,10,20" data-node-type="10">
+    <Rectangle position="20,20" size="40,40"/>
+    <Fill>
+      <ImagePattern image="@checker" scaleMode="none" matrix="0.5,0,0,0.5,0,0"/>
+    </Fill>
+  </Layer>
+</pagx>

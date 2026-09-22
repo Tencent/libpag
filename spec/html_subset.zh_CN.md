@@ -164,7 +164,7 @@
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | `<Fill>` 内嵌 `<LinearGradient>`（`startPoint`/`endPoint` 由角度推得） |
 | `background-image: radial-gradient(…)` | 内嵌 `<RadialGradient>` |
 | `background-image: conic-gradient(from angle, …)` | 内嵌 `<ConicGradient>`（CSS 0° = 顶，PAGX 0° = 右，自动 −90°） |
-| `background-clip: text`（别名 `-webkit-background-clip: text`） | 与 gradient `background-image` 同时设置时，渐变下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变），本元素的矩形背景被抑制。无 gradient `background-image` 时该属性为无操作。 |
+| `background-clip: text`（别名 `-webkit-background-clip: text`） | 元素背景下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变；无渐变层时为纯色），本元素的矩形背景被抑制。这与 CSS 一致：继承下来的 `text-fill-color` 为透明，被裁剪的背景是字形唯一的着色来源，因此背景优先于 `color`。存在渐变 `background-image` 时渐变优先于纯色 `background-color`（CSS 中纯色层在图片层之下）。背景色完全透明时不产生任何着色，该属性对该元素为无操作。 |
 | `background-image: url(...)` | 还原为背景矩形上的 `<ImagePattern>` 填充；`background-size` / `background-repeat` / `background-position` 决定该 pattern 的 `scaleMode` / 平铺模式 / 矩阵 |
 | `background-blend-mode: <mode>` | 在渐变 / 图像填充上设置 `Fill.blendMode`，使其与 `background-color` 混合；此时会保留底部的纯色 `<Fill>` 作为混合所需的背景。`normal`（默认）为空操作，不透明的渐变 / 图像仍会覆盖底色 |
 | `mask-image: url(data:image/svg+xml,...)`（+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`） | 引用的 SVG 变成一层 PAGX mask；`mask-mode` 选择 Alpha 还是 Luminance，`mask-size` / `mask-position` 决定其缩放/偏移 |
@@ -179,9 +179,11 @@
 | `transform: <fn>` | 映射到 `Layer.matrix`。支持单函数形式（`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`）以及 `matrix3d(...)`（投影为其 2D 仿射分量）；复合链与其它 3D 变体（`rotate3d`/`perspective`）告警丢弃 |
 | `transform-origin` | 透传；当其等于盒子中心（`50% 50%`、`center`、`center center`，或等于盒心的 px 值）时被尊重，其它原点告警 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
+| Layer 上的 `overflow: <x> <y>`（两值简写） | 任一轴不是 `visible`（`hidden` / `clip` / `scroll` / `auto` / `overlay`）时 `Layer.clipToBounds = true`，与 CSS「任一轴非 `visible` 即成为裁剪容器」的规则一致；`visible visible` 则不裁剪。`scroll` / `auto` / `overlay` 另外告警，因为 PAGX 无法表达它们隐含的滚动能力 |
 
-`background-clip: border-box` / `padding-box` / `content-box` 均为静默无操作（仅 `text` 关键字
-在 PAGX 有效,见上）。
+`background-clip: text` 用于字形填充（见上表）。`border-box`（默认）静默折叠。`padding-box` /
+`content-box` 会保留：携带该关键字的每个渐变层重建为内缩子层，即 CSS 绘制渐变边框的方式（纯色
+`background-color` 仍按 border box 绘制）。其它未知值告警丢弃。
 
 禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、`perspective`、
 几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非
@@ -204,7 +206,7 @@
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` 叠加（`bottom="0"` / `centerY="0"`），见 §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
 | `writing-mode: vertical-rl | vertical-lr` | `TextBox.writingMode = "Vertical"`（水平模式为默认） |
-| 文本容器上的 `overflow: hidden` | `TextBox.overflow = "hidden"` |
+| 文本容器上的 `overflow: hidden`（或任一非 `visible` 轴） | `TextBox.overflow = "hidden"` |
 | `text-overflow: ellipsis` | 告警（PAGX 暂未实现） |
 
 禁用（告警并跳过）：`text-transform`、`text-indent`、`word-spacing`、`direction`、
@@ -343,7 +345,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 `HTMLImporter::Options::autoNormalize = false` 可以关闭（仅 API 层——`pagx import` 未暴露
 对应的 `--html-*` 命令行选项）。
 
-转换器按固定顺序执行八个核心 Pass，外加一个可选 Pass（可选的 `HTMLFlexInference`
+转换器按固定顺序执行九个核心 Pass，外加一个可选 Pass（可选的 `HTMLFlexInference`
 运行在 PropertyFilter 与 MarginToGapPromotion 之间），行为如下：
 
 | Pass | 静默改写 | 警告并丢弃 |
@@ -355,6 +357,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | HTMLFlexInference *（默认开启：`Options::inferFlexFromAbsolute`；`autoNormalize` 为 false 时无效）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`；当容器有显式主轴尺寸且内容两端留白（近似）相等时，用 `justify-content: center` 取代对称的主轴 padding；同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |
 | MarginToGapPromotion | 当 `display: flex` 容器的在流子元素带有统一的逐子主轴 margin（leading 或 trailing 模式）时，把该 margin 提升到容器的 `gap` 并清除逐子 margin（`subset:margin-promoted-to-gap`） | 容器换行、已有正 `gap`、参与子元素少于两个、子元素带 `flex` grow、或 margin 非 px 时跳过（margin 留给 `wrapForMargin` 折叠） |
 | SpaceJustifyOverflowCollapse | 当使用 `space-between` / `space-around` / `space-evenly` 的 `display: flex` 容器子元素在主轴溢出时，把 `justify-content` 改写为 `flex-start`，避免 PAGX flex 引擎重叠（`subset:space-justify-collapsed-on-overflow`） | 尺寸数据不全（无显式 px 主轴尺寸、padding/gap 非 px、子元素尺寸无法解析、或子元素带 `flex` grow）时保持原样 |
+| SpaceEvenlyPaddingCompensation | 当 `display: flex` 容器使用 `space-evenly` 时，把 `justify-content` 改写为 `space-between`，并把空出的步长 `g = R / (n + 1)`（`R` 为扣除子元素与 `n - 1` 个 gap 后的剩余空间）加到容器两端的主轴 padding 上，使每个子元素落在与 `space-evenly` 完全相同的位置（`subset:space-evenly-padding-compensated`） | 容器没有显式 px 主轴尺寸、gap 非 px、该行无剩余空间、padding 无法解析为 px 时保持原样；在流子元素的主轴尺寸无法解析为 px、声明了 `flex` grow、或带非零主轴 margin 时同样跳过 |
 | StructureNormalization | 把容器中的散落文本包进 `<p>`（`subset:text-wrapped`）；丢掉元素之间纯空白的文本节点；保持 `<svg>` 子树原样以供 SVG 解析器使用 | 未知标签（`<table>`、`<form>`、`<input>`、`<button>`、自定义元素等）被移除（`subset:unsupported-tag`）；启用 `HTMLImporter::Options::preserveUnknownElements` 时会被保留为 `<div data-html-unknown="<tag>">` |
 | InlineStyleEmitter | 把每个元素解析后的属性集合按字母顺序重新写回 `style="…"`（保证可重复输出）；同时丢掉已经被级联吸收的 `class` 属性（`Options::preserveClassAttribute` 为真时保留） | — |
 

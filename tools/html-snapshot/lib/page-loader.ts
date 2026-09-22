@@ -389,6 +389,25 @@ export async function openAndSettlePage(
   // `networkidle`-gated `goto` would.
   await waitForNetworkIdle(page, engine, 5000);
 
+  // A quiet network does not guarantee Chromium has re-laid-out text with the
+  // real webfaces yet: when the idle window opens mid-download, every subsequent
+  // rect measurement runs on fallback metrics, whose narrower glyphs shift wrap
+  // points (getflect.app's clamp()-scaled, NBSP-glued hero copy wraps "But
+  // nowhere" onto line 1 under fallback metrics but onto line 2 once the
+  // webfont lands — both fill the same ~708px line, so the divergence is
+  // invisible until the snapshot's own fonts re-typeset the text).
+  // `document.fonts.ready` resolves once all pending font loads finish — or
+  // fail, which settles too — matching what a visitor's browser shows after
+  // first paint. Bounded by a real-clock timeout (the virtual-clock init script
+  // may have frozen the page's own setTimeout) so a stalled font request
+  // degrades to the pre-fix behaviour instead of hanging the snapshot.
+  try {
+    await page.evaluate(
+      `Promise.race([document.fonts.ready, ` +
+        `new Promise((r) => (window.__pagxRealSetTimeout || setTimeout)(r, 10000))])`,
+    );
+  } catch (_) { /* best-effort: proceed with whatever fonts are loaded */ }
+
   if (selector) {
     await page.waitForSelector(selector, { timeout: 15000 });
   } else {

@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
@@ -58,6 +59,10 @@ class LayoutContext {
   FontConfig* fontConfig = nullptr;
   std::vector<TypefaceHolder> systemFallbacks = {};
   bool systemFallbacksLoaded = false;
+  // System lookups are cached so that every text that asks for the same family and style shares
+  // one typeface instance. Glyph collection keys glyphs by typeface identity, so a fresh instance
+  // per text node would store the same outline once per text.
+  std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> systemTypefaceCache = {};
 };
 
 }  // namespace pagx

@@ -12,7 +12,7 @@
 //
 // This module bridges that gap by saving the actual font *files* the browser
 // already downloaded while rendering the page. The caller can then hand those
-// files to `pagx render --font/--fallback` or `pagx font embed --fallback` so
+// files to `pagx render --font/--fallback` or `pagx embed --fallback` so
 // the document renders (or embeds) with the correct typeface.
 //
 // Why capture the browser's downloads instead of parsing @font-face URLs:

@@ -1963,11 +1963,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
   std::string style;
   style.reserve(300);
 
-  // Origin of this layer's div in the parent's coordinate space, tracking the Repeater and child
-  // layer shifts applied below. A mask image is positioned against that origin, so it must follow
-  // the div rather than the layer's un-shifted render position.
-  Point layerDivOrigin = layer->renderPosition();
-
   if (isFlexItem) {
     // Flex item: positioned by parent's flexbox, no absolute positioning needed.
     //
@@ -2061,7 +2056,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
       _ctx->childLayerOffsetX = 0;
       _ctx->childLayerOffsetY = 0;
     }
-    layerDivOrigin = renderPos;
     std::string transform = LayerTransformCSS(layer);
     // `positionSet` becomes true after we emit `left/top`. The Repeater branch below may need
     // to shift `renderPos` by the union-bounds offset (uL, uT) so the layer div extends into
@@ -2157,8 +2151,6 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
           repeaterOffsetX = uL;
           repeaterOffsetY = uT;
         }
-        layerDivOrigin.x = renderPos.x + repeaterOffsetX;
-        layerDivOrigin.y = renderPos.y + repeaterOffsetY;
         EmitLeftTopCss(style, positionSet, renderPos.x + repeaterOffsetX,
                        renderPos.y + repeaterOffsetY);
         if (uw > 0) {
@@ -2500,7 +2492,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
         }
       }
     } else {
-      style += writeMaskCSS(layer->mask, layer->maskType, layerDivOrigin);
+      style += writeMaskCSS(layer->mask, layer->maskType);
     }
   }
 

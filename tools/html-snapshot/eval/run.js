@@ -59,7 +59,7 @@ function parseArgs(argv) {
     // CJK corpora whose text would otherwise fall back to a host typeface.
     downloadFonts: false,
     // When true, additionally embed each case's downloaded faces into its .pagx
-    // (`pagx font embed`) so the document is self-contained and its glyph
+    // (`pagx embed`) so the document is self-contained and its glyph
     // metrics match the snapshot regardless of host fonts. Implies
     // downloadFonts.
     embedFonts: false,
@@ -134,7 +134,7 @@ const USAGE = `Usage: node run.js [options]
                       faces stored once); each case records the subset it uses
                       in out/<label>/<case>/fonts.txt.
   --embed-fonts       On top of --download-fonts, embed each case's downloaded
-                      faces into its .pagx (pagx font embed) so glyph metrics
+                      faces into its .pagx (pagx embed) so glyph metrics
                       match the snapshot. Implies --download-fonts.
   --download-images   Download the page's external images (snapshot.js) and
                       reference them by local file path instead of inlining them
@@ -371,7 +371,7 @@ async function processCase(entry, outDir, opts, browser) {
   row.flexSkipped = w.flexSkipped;
 
   // The fonts this case uses (from its manifest) become `--fallback` args for
-  // `pagx render` (and `pagx font embed` when --embed-fonts is set), so text
+  // `pagx render` (and `pagx embed` when --embed-fonts is set), so text
   // in an uninstalled web font resolves against the real typeface instead of
   // a host system fallback. Only this case's fonts are passed — the shared
   // cache also holds other cases' fonts, which this render must not see.

@@ -38,6 +38,7 @@
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 #include "renderer/ToTGFX.h"
@@ -57,6 +58,21 @@ bool IsExternalSvgSrc(const std::string& src) {
   if (src.size() <= 4) return false;
   if (src.compare(0, 5, "data:") == 0) return false;
   return ToLower(src.substr(src.size() - 4)) == ".svg";
+}
+
+// True for an `http(s):` reference. An import directive's `source` is read from disk by
+// `pagx resolve`, so a remote `.svg` can never be expanded — its bytes only reach the document
+// once the snapshot has inlined them, which turns the reference into a `data:` URI.
+bool IsRemoteUrl(const std::string& src) {
+  return src.compare(0, 7, "http://") == 0 || src.compare(0, 8, "https://") == 0;
+}
+
+// True when an SVG background source can actually be expanded by `pagx resolve`: an inline
+// `data:` payload (`decoded` non-empty) or a file reference. A remote URL cannot, and it only
+// survives to this point when the snapshot could not inline its bytes.
+bool IsResolvableSvgSource(const std::string& src, const std::string& decoded) {
+  if (!decoded.empty()) return true;
+  return !IsRemoteUrl(src);
 }
 
 void SetDOMAttribute(const std::shared_ptr<DOMNode>& node, const std::string& name,
@@ -95,19 +111,51 @@ bool ResolvePinnedSvgTransformOrigin(const std::unordered_map<std::string, std::
   return true;
 }
 
-// Resolves one axis of a per-axis `mask-size` token into an on-element pixel length. A length
-// (`120px`) is taken verbatim; a percentage resolves against the element's box axis; `auto` (and
-// any unparseable token) returns NaN so the caller can tie the axis to the other for aspect-ratio
-// preservation. `intrinsicAxis` is unused for px/% but kept in the signature for symmetry with the
-// CSS model where `auto` would otherwise fall back to the intrinsic size.
-float ResolveMaskSizeAxis(const std::string& token, float boxAxis, float /*intrinsicAxis*/,
-                          HTMLValueParser& parser) {
+// Resolves one axis of a per-axis sizing token (`background-size` / `mask-size`) into an
+// on-element pixel length. A length (`120px`) is taken verbatim; a percentage resolves against the
+// element's box axis; `auto` (and any unparseable token) returns NaN so the caller can tie the axis
+// to the other one for aspect-ratio preservation.
+float ResolveCssSizeAxis(const std::string& token, float boxAxis, HTMLValueParser& parser) {
   if (token.empty() || token == "auto") return NAN;
   float fraction = 0;
   if (ParseCssPercentage(token, fraction)) {
     return fraction * boxAxis;
   }
   return parser.parseAbsoluteLengthPx(token);
+}
+
+// Resolves the CSS sizing model shared by `background-size` and `mask-size` into the on-screen tile
+// box for an element of `boxW` x `boxH` whose image has the intrinsic size `nativeW` x `nativeH`.
+// `contain` / `cover` fit the intrinsic box into the element box keeping the aspect ratio; a
+// per-axis length or percentage states that axis directly, and `auto` ties the axis to the other
+// one through the intrinsic ratio (both `auto` means the intrinsic size, which is also what a
+// single-value or unparseable declaration degrades to). An axis whose length cannot be recovered —
+// an unknown intrinsic size on an `auto` axis, an unknown image payload — comes back as NaN so the
+// caller can leave the corresponding scale untouched.
+std::pair<float, float> ResolveCssTileSize(const std::string& sizeValue, float boxW, float boxH,
+                                           float nativeW, float nativeH, HTMLValueParser& parser) {
+  auto sizeTokens = SplitTopLevelWhitespace(sizeValue);
+  std::string sizeW = sizeTokens.size() > 0 ? sizeTokens[0] : "";
+  std::string sizeH = sizeTokens.size() > 1 ? sizeTokens[1] : "";
+  bool hasIntrinsic = nativeW > 0 && nativeH > 0;
+  if (sizeW == "contain" || sizeW == "cover") {
+    if (!hasIntrinsic || !(boxW > 0) || !(boxH > 0)) return {NAN, NAN};
+    float fitX = boxW / nativeW;
+    float fitY = boxH / nativeH;
+    float fit = (sizeW == "contain") ? std::min(fitX, fitY) : std::max(fitX, fitY);
+    return {nativeW * fit, nativeH * fit};
+  }
+  float targetW = ResolveCssSizeAxis(sizeW, boxW, parser);
+  float targetH = ResolveCssSizeAxis(sizeH, boxH, parser);
+  if (std::isnan(targetW) && std::isnan(targetH)) {
+    return {hasIntrinsic ? nativeW : NAN, hasIntrinsic ? nativeH : NAN};
+  }
+  if (std::isnan(targetW)) {
+    targetW = hasIntrinsic ? targetH * nativeW / nativeH : NAN;
+  } else if (std::isnan(targetH)) {
+    targetH = hasIntrinsic ? targetW * nativeH / nativeW : NAN;
+  }
+  return {targetW, targetH};
 }
 
 // Maximum depth of layout-only `<div>` wrappers `foldRoundedImageWrapper` will skip
@@ -229,18 +277,52 @@ int HexDigitValue(char h) {
   return -1;
 }
 
-// Decodes a percent-encoded `data:image/svg+xml,...` URI payload into raw SVG text. The HTML
-// exporter emits the mask SVG as `url('data:image/svg+xml,<percent-encoded>')` (NOT base64), so
-// only the `%XX` escapes the exporter produced (`<`, `>`, `#`, `"`, `'`) plus any stray ones need
-// undoing. Returns empty when `dataUri` is not an `image/svg+xml` data URI. A `base64,` payload is
-// rejected (the exporter never emits one) rather than mis-decoded.
+// Returns the offset of the first non-whitespace byte at or after `offset`.
+size_t SkipSvgWhitespace(const std::string& text, size_t offset) {
+  while (offset < text.size() && (text[offset] == ' ' || text[offset] == '\t' ||
+                                  text[offset] == '\r' || text[offset] == '\n')) {
+    offset++;
+  }
+  return offset;
+}
+
+// Removes a leading `<?xml ... ?>` prolog — together with any UTF-8 BOM and whitespace in front of
+// it — from SVG text. Payloads without a prolog are returned untouched.
+// A prolog is only legal at the very start of a document, so SVG bytes that keep one cannot be
+// embedded as an inline `<svg>` import directive: the stray declaration makes the entire PAGX
+// unparseable, and `pagx resolve` could never load the document to expand the directive it came
+// from. Hand-exported files (Sketch / Figma / Illustrator) inlined verbatim as data URIs by
+// html-snapshot are the usual source of one.
+std::string StripXmlProlog(std::string svg) {
+  size_t probe = svg.compare(0, 3, "\xEF\xBB\xBF") == 0 ? 3 : 0;
+  probe = SkipSvgWhitespace(svg, probe);
+  if (svg.compare(probe, 5, "<?xml") != 0) {
+    return svg;
+  }
+  auto close = svg.find("?>", probe);
+  if (close == std::string::npos) {
+    return svg;
+  }
+  return svg.substr(SkipSvgWhitespace(svg, close + 2));
+}
+
+// Decodes a `data:image/svg+xml,...` URI payload into raw SVG text. Two encodings are accepted:
+// base64 (what html-snapshot pages embed in `<img src>` for inline SVG icons) and percent-encoded
+// (what the HTML exporter emits for mask SVGs, where only the `%XX` escapes it produced — `<`,
+// `>`, `#`, `"`, `'` — plus any stray ones need undoing). Returns empty when `dataUri` is not an
+// `image/svg+xml` data URI or the payload fails to decode. A leading XML prolog is dropped, since
+// the result is embedded as a document fragment rather than parsed as a document of its own.
 std::string DecodeSvgDataUri(const std::string& dataUri) {
   static const char* Prefix = "data:image/svg+xml";
   if (dataUri.compare(0, std::strlen(Prefix), Prefix) != 0) return {};
   auto comma = dataUri.find(',');
   if (comma == std::string::npos) return {};
   std::string meta = dataUri.substr(std::strlen(Prefix), comma - std::strlen(Prefix));
-  if (ToLower(meta).find("base64") != std::string::npos) return {};
+  if (ToLower(meta).find("base64") != std::string::npos) {
+    auto data = DecodeBase64DataURI(dataUri);
+    if (data == nullptr || data->size() == 0) return {};
+    return StripXmlProlog(std::string(reinterpret_cast<const char*>(data->bytes()), data->size()));
+  }
   std::string out;
   out.reserve(dataUri.size() - comma);
   for (size_t i = comma + 1; i < dataUri.size(); ++i) {
@@ -256,7 +338,35 @@ std::string DecodeSvgDataUri(const std::string& dataUri) {
     }
     out.push_back(c);
   }
-  return out;
+  return StripXmlProlog(std::move(out));
+}
+
+// True when `src` should ride the SVG import-directive path instead of a raster image fill:
+// an external `.svg` file, or an inline `data:image/svg+xml,...` URI (base64 or
+// percent-encoded). `decoded` receives the decoded SVG text for the data-URI form; it stays
+// empty for the external-file form, whose bytes are read at resolve time via `source`.
+bool IsSvgImportSource(const std::string& src, std::string* decoded = nullptr) {
+  if (IsExternalSvgSrc(src)) return true;
+  std::string svg = DecodeSvgDataUri(src);
+  if (svg.empty()) return false;
+  if (decoded != nullptr) {
+    *decoded = std::move(svg);
+  }
+  return true;
+}
+
+// Returns the media type declared by a `data:` URI, lower-cased and stripped of any parameters
+// (`;base64`, `;charset=…`). Empty when `uri` is not a data URI or carries no media type at all.
+std::string DeclaredDataUriMime(const std::string& uri) {
+  if (uri.compare(0, 5, "data:") != 0) return {};
+  auto comma = uri.find(',');
+  if (comma == std::string::npos) return {};
+  std::string meta = uri.substr(5, comma - 5);
+  auto semicolon = meta.find(';');
+  if (semicolon != std::string::npos) {
+    meta = meta.substr(0, semicolon);
+  }
+  return ToLower(Trim(meta));
 }
 
 // Maps a `background-repeat` keyword onto a per-axis tile mode. CSS `repeat` / `repeat-x` /
@@ -283,6 +393,22 @@ void ResolveBackgroundRepeat(const std::string& repeat, TileMode& outX, TileMode
   } else if (x == "repeat-y") {
     outX = TileMode::Decal;
     outY = TileMode::Repeat;
+  }
+}
+
+// Splits a CSS `<position>` value into its horizontal / vertical axis tokens. CSS resolves a
+// single-value form as the horizontal axis with the vertical defaulting to `center` (not to the
+// leading edge), so the two-token case must be distinguished from the one-token case. An empty
+// value leaves both tokens empty for the `0 0` top-left default at the call site.
+void SplitPositionTokens(const std::string& position, std::string& outX, std::string& outY) {
+  auto tokens = SplitTopLevelWhitespace(position);
+  outX = tokens.size() > 0 ? tokens[0] : std::string();
+  if (tokens.size() > 1) {
+    outY = tokens[1];
+  } else if (tokens.size() == 1) {
+    outY = "center";
+  } else {
+    outY.clear();
   }
 }
 
@@ -537,7 +663,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
   auto* srcAttr = img->findAttribute("src");
   if (!srcAttr || srcAttr->empty()) return false;
   const std::string& src = *srcAttr;
-  if (IsExternalSvgSrc(src)) return false;
+  if (IsSvgImportSource(src)) return false;
 
   // The image must exactly cover the outer wrapper's content box, anchored at
   // top-left — otherwise the rounded clip would shape only part of the visible
@@ -575,7 +701,8 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
                                        const HTMLBoxAttributes& box) {
   auto* srcAttr = element->findAttribute("src");
   const std::string src = (srcAttr != nullptr) ? *srcAttr : std::string();
-  if (IsExternalSvgSrc(src)) {
+  std::string svgContent;
+  if (IsSvgImportSource(src, &svgContent)) {
     auto* layer = _document->makeNode<Layer>();
     _layerBuilder->applySizeAndPosition(layer, box);
     _layerBuilder->applyLayerAttributes(layer, element, box);
@@ -609,7 +736,11 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
         layer->children.push_back(borderOverlay);
       }
     }
-    importHost->importDirective.source = resolveImageSource(src);
+    if (svgContent.empty()) {
+      importHost->importDirective.source = resolveImageSource(src);
+    } else {
+      importHost->importDirective.content = std::move(svgContent);
+    }
     importHost->importDirective.format = "svg";
     auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
     assignElementId(wrapper, element);
@@ -818,6 +949,12 @@ void HTMLParserContext::applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& b
   std::string svgContent;
   MaskType maskType = MaskType::Alpha;
   if (hasMaskImage) {
+    // Chromium's computed value for a gradient mask is the gradient function itself — the
+    // `url(data:image/svg+xml,...)` wrapper only appears on a PAGX→HTML round-trip — so it has no
+    // `url()` for the branches below to unpack and is rebuilt straight into a gradient fill.
+    if (applyGradientImageMask(layer, box)) {
+      return;
+    }
     std::string url = ExtractCssUrl(box.maskImage);
     svgContent = DecodeSvgDataUri(url);
     if (svgContent.empty()) {
@@ -975,6 +1112,57 @@ bool HTMLParserContext::applyRasterImageMask(Layer* layer, const HTMLBoxAttribut
   return true;
 }
 
+bool HTMLParserContext::applyGradientImageMask(Layer* layer, const HTMLBoxAttributes& box) {
+  float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+  float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+  if (!(boxW > 0) || !(boxH > 0)) return false;
+  // A gradient carries no intrinsic size: CSS paints it into the mask positioning area, which is
+  // the masked element's own box unless `mask-size` states another tile. Resolving the tile first
+  // keeps `mask-size` faithful — the gradient's own geometry is then computed for that box rather
+  // than the rendered gradient being stretched.
+  auto tile = ResolveCssTileSize(box.maskSize, boxW, boxH, boxW, boxH, *_valueParser);
+  if (std::isnan(tile.first) || std::isnan(tile.second) || !(tile.first > 0) ||
+      !(tile.second > 0)) {
+    return false;
+  }
+  auto* gradient = _layerBuilder->parseGradientByValue(box.maskImage, tile.first, tile.second);
+  if (gradient == nullptr) return false;
+
+  // The gradient is the mask's own paint, so the mask layer holds a Rectangle covering that tile
+  // and a Fill carrying the gradient. An alpha mask reads the alpha channel, which is exactly the
+  // per-stop alpha the CSS gradient authored.
+  auto* maskLayer = _document->makeNode<Layer>();
+  maskLayer->width = tile.first;
+  maskLayer->height = tile.second;
+  maskLayer->includeInLayout = false;
+  auto* rect = _document->makeNode<Rectangle>();
+  rect->size = {tile.first, tile.second};
+  maskLayer->contents.push_back(rect);
+  auto* fill = _document->makeNode<Fill>();
+  fill->color = gradient;
+  maskLayer->contents.push_back(fill);
+
+  // `mask-position` places the tile inside the element, resolved against the same box/tile slack the
+  // image paths use. The mask layer shares the masked layer's local origin, so the offset rides on
+  // its own matrix.
+  std::string posX;
+  std::string posY;
+  SplitPositionTokens(box.maskPosition, posX, posY);
+  float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+  float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
+  if (!std::isnan(tx) && !std::isnan(ty) && (tx != 0.0f || ty != 0.0f)) {
+    maskLayer->matrix = Matrix::Translate(tx, ty);
+  }
+  maskLayer->id = _idAllocator->generateUnique("mask");
+
+  layer->mask = maskLayer;
+  // `mask-mode: match-source` resolves to the alpha channel for a gradient, which is also the
+  // form the HTML exporter rebuilds from an alpha mask layer.
+  layer->maskType = (box.maskMode == "luminance") ? MaskType::Luminance : MaskType::Alpha;
+  layer->children.push_back(maskLayer);
+  return true;
+}
+
 void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttributes& box) {
   if (layer == nullptr) return;
   // Only a container that both rounds its corners and clips overflow needs a shaped clip; a plain
@@ -1051,48 +1239,23 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
   float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
 
   // Resolve `mask-size` into the on-element pixel box, then divide by the intrinsic box to recover
-  // the per-axis scale. The single-value, `auto`, `contain` and `cover` forms follow the CSS
-  // background/mask sizing model; the exporter's own output is the two-length form.
-  float scaleX = 1.0f;
-  float scaleY = 1.0f;
-  auto sizeTokens = SplitTopLevelWhitespace(box.maskSize);
-  std::string sizeW = sizeTokens.size() > 0 ? sizeTokens[0] : "";
-  std::string sizeH = sizeTokens.size() > 1 ? sizeTokens[1] : "";
-  if (sizeW == "contain" || sizeW == "cover") {
-    float fitX = boxW / intrinsicW;
-    float fitY = boxH / intrinsicH;
-    float fit = (sizeW == "contain") ? std::min(fitX, fitY) : std::max(fitX, fitY);
-    scaleX = fit;
-    scaleY = fit;
-  } else if (!sizeW.empty()) {
-    // Per-axis target length: `auto` (NaN here) keeps the axis tied to the other so the aspect
-    // ratio is preserved, matching CSS when only one dimension is given.
-    float targetW = ResolveMaskSizeAxis(sizeW, boxW, intrinsicW, *_valueParser);
-    float targetH = ResolveMaskSizeAxis(sizeH, boxH, intrinsicH, *_valueParser);
-    if (std::isnan(targetW) && std::isnan(targetH)) {
-      // both auto -> intrinsic size, scale 1
-    } else if (std::isnan(targetW)) {
-      scaleY = targetH / intrinsicH;
-      scaleX = scaleY;
-    } else if (std::isnan(targetH)) {
-      scaleX = targetW / intrinsicW;
-      scaleY = scaleX;
-    } else {
-      scaleX = targetW / intrinsicW;
-      scaleY = targetH / intrinsicH;
-    }
+  // the per-axis scale. A known intrinsic size resolves every form the sizing model accepts, so the
+  // tile box is always usable here.
+  auto tile = ResolveCssTileSize(box.maskSize, boxW, boxH, intrinsicW, intrinsicH, *_valueParser);
+  // `contain` / `cover` cannot be resolved against a degenerate element box and come back as NaN;
+  // writing that into the matrix would poison the whole mask, so keep the mask at its intrinsic
+  // size instead (a zero-area element paints nothing either way).
+  if (std::isnan(tile.first) || std::isnan(tile.second)) {
+    return;
   }
-
-  // The scaled mask box used to resolve percentage / keyword `mask-position` against the element.
-  float scaledW = intrinsicW * scaleX;
-  float scaledH = intrinsicH * scaleY;
-  auto posTokens = SplitTopLevelWhitespace(box.maskPosition);
-  std::string posX = posTokens.size() > 0 ? posTokens[0] : "";
-  // CSS resolves a single `mask-position` value as the horizontal axis with the vertical defaulting
-  // to `center`, not to the leading edge. Two empty tokens keep the `0 0` top-left default below.
-  std::string posY = posTokens.size() > 1 ? posTokens[1] : posTokens.size() == 1 ? "center" : "";
-  float tx = resolveMaskPositionAxis(posX, boxW, scaledW);
-  float ty = resolveMaskPositionAxis(posY, boxH, scaledH);
+  float scaleX = tile.first / intrinsicW;
+  float scaleY = tile.second / intrinsicH;
+  // Two empty tokens keep the `0 0` top-left default below.
+  std::string posX;
+  std::string posY;
+  SplitPositionTokens(box.maskPosition, posX, posY);
+  float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+  float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
 
   // Geometry sits in the intrinsic box anchored at the origin; scale about (0,0) then translate so
   // the mask lands where CSS positions it. Compose ahead of any transform the SVG import produced.
@@ -1103,6 +1266,21 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
 bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer) {
   std::string src = ExtractCssUrl(box.backgroundImage);
   if (src.empty()) return false;
+
+  // An SVG background rides the inline-`<svg>` import directive rather than a raster image:
+  // registering it as an `Image` would hand every consumer a payload no decoder is required to
+  // read (the supported set is PNG/JPEG/WebP/GIF), so the icon would silently never paint.
+  // A remote `.svg` URL is the one exception: `pagx resolve` reads a directive's `source` from
+  // disk, so expanding such a reference fails and drops the layer. It only reaches this point when
+  // the snapshot could not inline the bytes, and the raster path at least keeps the document
+  // resolvable, so that case stays where it was.
+  std::string svgContent;
+  if (IsSvgImportSource(src, &svgContent) && IsResolvableSvgSource(src, svgContent)) {
+    if (applyVectorBackgroundImageFill(box, layer, src, svgContent)) {
+      return true;
+    }
+  }
+
   auto* imageNode = registerImageResource(resolveImageSource(src));
   if (!imageNode) return false;
 
@@ -1127,37 +1305,130 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
   }
 
   if (!fitted) {
-    pattern->scaleMode = ScaleMode::None;
-    ResolveBackgroundRepeat(box.backgroundRepeat, pattern->tileModeX, pattern->tileModeY);
-
-    // Per-axis scale: the on-screen tile size (`background-size: <w>px <h>px`) divided by the
-    // image's native pixel size mirrors the exporter's `tileW = sx * imgW` emission. Without an
-    // explicit size the tile is the image's native size, i.e. scale 1.
-    auto sizeTokens = SplitTopLevelWhitespace(size);
-    float tileW = sizeTokens.size() > 0 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[0]) : NAN;
-    float tileH =
-        sizeTokens.size() > 1 ? _valueParser->parseAbsoluteLengthPx(sizeTokens[1]) : tileW;
+    float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+    float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+    // Per-axis scale: the on-screen tile size (`background-size`) divided by the image's native
+    // pixel size mirrors the exporter's `tileW = sx * imgW` emission. Percentages resolve against
+    // this element's own box and an `auto` axis keeps the image's aspect ratio — the hero band of a
+    // real page is `auto 100%`, where a px-only parse silently left the pattern at native scale and
+    // magnified the artwork. Without an explicit size the tile is the image's native size, i.e.
+    // scale 1.
     auto nativeSize = decodeImageNativeSize(imageNode);
-    if (!std::isnan(tileW) && tileW > 0 && nativeSize.first > 0) {
-      pattern->matrix.a = tileW / static_cast<float>(nativeSize.first);
-    }
-    if (!std::isnan(tileH) && tileH > 0 && nativeSize.second > 0) {
-      pattern->matrix.d = tileH / static_cast<float>(nativeSize.second);
+    auto tile = ResolveCssTileSize(size, boxW, boxH, static_cast<float>(nativeSize.first),
+                                   static_cast<float>(nativeSize.second), *_valueParser);
+    TileMode tileX = TileMode::Decal;
+    TileMode tileY = TileMode::Decal;
+    ResolveBackgroundRepeat(box.backgroundRepeat, tileX, tileY);
+
+    // A single, fully resolved tile rides a child Layer sized to the tile instead of a
+    // ScaleMode::None pattern whose matrix states the placement in the image's own pixel space.
+    // Both express the same picture, but the two forms are not equally portable: a consumer that
+    // models an image fill as a *normalized* transform (the Ardot editor importer stores
+    // paint.transform in 0..1 space, so the renderer can rebuild the sampling matrix as
+    // `S(image) · transform · S(1/node)`) reads the pixel-space numbers as a normalized crop
+    // window and samples thousands of pixels outside the image — a 30px icon in a 90px circle
+    // silently disappears. An exactly tile-sized layer carries no placement at all: the fitted
+    // fill below fits the box by construction.
+    constexpr float TILE_SLACK = 0.5f;
+    bool tileResolved =
+        !std::isnan(tile.first) && tile.first > 0 && !std::isnan(tile.second) && tile.second > 0;
+    // A repeat whose tile already covers the box needs no tiling either — the declared repeat is
+    // a no-op there, so the single-tile form stays exact. The epsilon absorbs the sub-pixel slack
+    // of a size rounded against the box.
+    bool needsTiling = (tileX == TileMode::Repeat && tile.first + TILE_SLACK < boxW) ||
+                       (tileY == TileMode::Repeat && tile.second + TILE_SLACK < boxH);
+
+    if (tileResolved && !needsTiling) {
+      pattern->scaleMode = ScaleMode::Stretch;
+
+      // `background-position` places the tile origin inside this element's own box. Both are
+      // expressed in the element's coordinate space and the child's slot is relative to its
+      // parent's, so the resolved offset maps straight onto the child's left/top. Percentages and
+      // the `center` / `right` / `bottom` keywords resolve against the slack between the box and
+      // the on-screen tile, exactly like `mask-position`. Chromium's computed value for
+      // `background-position: center` is `50% 50%`, so a px-only parse would silently drop the
+      // offset — a 30px icon in a 90px circle lands in the top-left corner instead of being
+      // centred.
+      auto* host = _document->makeNode<Layer>();
+      host->width = tile.first;
+      host->height = tile.second;
+      std::string posX;
+      std::string posY;
+      SplitPositionTokens(box.backgroundPosition, posX, posY);
+      float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+      float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
+      // An unset offset and a zero offset both place an out-of-flow layer at its parent's origin,
+      // so only a real offset is written (an explicit `left="0"` is redundant, and `pagx verify`
+      // says so).
+      if (!std::isnan(tx) && tx != 0.0f) {
+        host->left = tx;
+      }
+      if (!std::isnan(ty) && ty != 0.0f) {
+        host->top = ty;
+      }
+      host->includeInLayout = false;
+
+      auto* rect = _document->makeNode<Rectangle>();
+      rect->percentWidth = 100.0f;
+      rect->percentHeight = 100.0f;
+      host->contents.push_back(rect);
+
+      auto* tileFill = _document->makeNode<Fill>();
+      tileFill->color = pattern;
+      host->contents.push_back(tileFill);
+
+      // A `background-blend-mode` blends this image against the background-color the element
+      // paints underneath it (the fill emitted by applyBackgroundVisuals) — for a tile layer the
+      // blend therefore belongs on the layer, which composites against what is already drawn.
+      // The neighbouring pattern / gradient paths put the same blend on their `Fill`; a layer
+      // blend is the more robust of the two here: a non-Normal blend renders the subtree into an
+      // offscreen buffer and applies the mode when that buffer is composited (tgfx
+      // `Layer::drawLayer` → `drawOffscreen`), so the blend survives an isolating ancestor,
+      // whereas a `Fill` blend inside such a buffer would blend against the buffer's own
+      // transparent content and degrade to a no-op. The oversized-tile clip wrapper is a plain
+      // scrollRect clip (`Layer.clipToBounds`), not an isolating pass, so it does not interfere.
+      // As with the `Fill` form, the blend sees whatever the enclosing canvas already holds —
+      // CSS's isolation of the element's own background layers is not expressible in PAGX.
+      if (box.backgroundColorSet) {
+        host->blendMode = HTMLLayerBuilder::resolveBackgroundBlendMode(box.backgroundBlendMode);
+      }
+
+      // CSS clips a background to the element's border box, which the pattern-matrix form gets for
+      // free from its host geometry. An oversized tile (`background-size` larger than the box)
+      // paints past the element instead, so it needs an explicit clip slot — sized to the box and
+      // sharing the tile's coordinate origin, exactly like the vector background path.
+      Layer* tileHost = host;
+      if (tile.first > boxW + TILE_SLACK || tile.second > boxH + TILE_SLACK) {
+        auto* clip = _document->makeNode<Layer>();
+        clip->width = boxW;
+        clip->height = boxH;
+        clip->includeInLayout = false;
+        clip->clipToBounds = true;
+        clip->children.push_back(host);
+        tileHost = clip;
+      }
+      // A Layer's own contents render behind its children, and a CSS background paints behind the
+      // element's content, so the tile takes the leading child slot.
+      layer->children.insert(layer->children.begin(), tileHost);
+      return true;
     }
 
-    // `background-position: <x>px <y>px` is the tile origin relative to this element's own box.
-    // Each re-imported card is a standalone Layer whose contents share the box origin, so the
-    // position maps straight onto the pattern matrix translation (the exporter writes the same
-    // value back, offset by the layer's own left/top which is zero in the standalone case).
-    auto posTokens = SplitTopLevelWhitespace(box.backgroundPosition);
-    if (posTokens.size() > 0) {
-      float posX = _valueParser->parseAbsoluteLengthPx(posTokens[0]);
-      if (!std::isnan(posX)) pattern->matrix.tx = posX;
+    pattern->scaleMode = ScaleMode::None;
+    pattern->tileModeX = tileX;
+    pattern->tileModeY = tileY;
+    if (!std::isnan(tile.first) && tile.first > 0 && nativeSize.first > 0) {
+      pattern->matrix.a = tile.first / static_cast<float>(nativeSize.first);
     }
-    if (posTokens.size() > 1) {
-      float posY = _valueParser->parseAbsoluteLengthPx(posTokens[1]);
-      if (!std::isnan(posY)) pattern->matrix.ty = posY;
+    if (!std::isnan(tile.second) && tile.second > 0 && nativeSize.second > 0) {
+      pattern->matrix.d = tile.second / static_cast<float>(nativeSize.second);
     }
+    std::string posX;
+    std::string posY;
+    SplitPositionTokens(box.backgroundPosition, posX, posY);
+    float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
+    float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
+    if (!std::isnan(tx)) pattern->matrix.tx = tx;
+    if (!std::isnan(ty)) pattern->matrix.ty = ty;
   }
 
   auto fill = _document->makeNode<Fill>();
@@ -1170,6 +1441,167 @@ bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, L
     fill->blendMode = HTMLLayerBuilder::resolveBackgroundBlendMode(box.backgroundBlendMode);
   }
   layer->contents.push_back(fill);
+  return true;
+}
+
+std::pair<float, float> HTMLParserContext::resolveSvgIntrinsicSize(const std::string& svgSource,
+                                                                   bool sourceIsFile) {
+  auto cacheKey = std::string(sourceIsFile ? "file:" : "data:") + svgSource;
+  auto cached = _svgIntrinsicSizeCache.find(cacheKey);
+  if (cached != _svgIntrinsicSizeCache.end()) {
+    return cached->second;
+  }
+  // The SVG importer is the single source of truth for how an SVG's own `width`/`height` /
+  // `viewBox` map onto a pixel box — the same mapping `pagx resolve` applies when the directive is
+  // expanded, so a size resolved here and there cannot disagree.
+  std::pair<float, float> size = {NAN, NAN};
+  auto svgDoc = sourceIsFile ? SVGImporter::Parse(svgSource) : SVGImporter::ParseString(svgSource);
+  if (svgDoc != nullptr && svgDoc->width > 0 && svgDoc->height > 0) {
+    size = {svgDoc->width, svgDoc->height};
+  }
+  _svgIntrinsicSizeCache.emplace(std::move(cacheKey), size);
+  return size;
+}
+
+bool HTMLParserContext::applyVectorBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer,
+                                                       const std::string& svgSource,
+                                                       const std::string& svgContent) {
+  if (layer == nullptr) return false;
+  float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
+  float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
+  if (!(boxW > 0) || !(boxH > 0)) return false;
+
+  bool sourceIsFile = svgContent.empty();
+  auto intrinsic = resolveSvgIntrinsicSize(
+      sourceIsFile ? resolveImageSource(svgSource) : svgContent, sourceIsFile);
+  float nativeW = intrinsic.first;
+  float nativeH = intrinsic.second;
+  bool sized = nativeW > 0 && nativeH > 0;
+
+  // Replay the CSS sizing model into an on-screen paint box plus an optional per-axis scale,
+  // mirroring what the raster path expresses with `scaleMode` / the pattern matrix. A fitted
+  // keyword yields a box that already shares the SVG's aspect, so the host needs only its size;
+  // an explicit pixel pair keeps the intrinsic size and puts the scale on the host matrix.
+  const std::string& size = box.backgroundSize;
+  float paintW = boxW;
+  float paintH = boxH;
+  float scaleX = 1.0f;
+  float scaleY = 1.0f;
+  // The on-screen tile box follows the same CSS sizing model the raster path applies, so it is
+  // resolved up front; it is also the fallback anchor when the intrinsic size is unknown.
+  auto tile = ResolveCssTileSize(size, boxW, boxH, nativeW, nativeH, *_valueParser);
+  bool hasTileSize = !std::isnan(tile.first) && tile.first > 0;
+
+  if (!sized) {
+    // Nothing states how large the icon is because the source is unavailable or does not parse, so
+    // the authored pixel size, when there is one, is the anchor; otherwise the element box is, and
+    // `pagx resolve` then fits the payload into whichever box the host carries. Filling the
+    // background beats dropping it, which is what registering an SVG as a raster `Image` amounts
+    // to.
+    if (hasTileSize) {
+      paintW = tile.first;
+      paintH = (!std::isnan(tile.second) && tile.second > 0) ? tile.second : tile.first;
+    }
+  } else if (size == "contain") {
+    float fit = std::min(boxW / nativeW, boxH / nativeH);
+    paintW = nativeW * fit;
+    paintH = nativeH * fit;
+  } else if (size == "cover") {
+    float fit = std::max(boxW / nativeW, boxH / nativeH);
+    paintW = nativeW * fit;
+    paintH = nativeH * fit;
+  } else if (size == "100% 100%") {
+    paintW = nativeW;
+    paintH = nativeH;
+    scaleX = boxW / nativeW;
+    scaleY = boxH / nativeH;
+  } else {
+    // `auto` (the CSS default) or an explicit length / percentage pair: the intrinsic box is the
+    // tile, rescaled per axis when the declaration states a different on-screen size. An unknown
+    // payload half leaves the intrinsic box untouched.
+    paintW = nativeW;
+    paintH = nativeH;
+    if (!std::isnan(tile.first) && tile.first > 0) {
+      scaleX = tile.first / nativeW;
+    }
+    if (!std::isnan(tile.second) && tile.second > 0) {
+      scaleY = tile.second / nativeH;
+    }
+  }
+
+  // The on-screen paint box. A fitted keyword states it directly in `paintW` / `paintH` (scale 1),
+  // while `100% 100%` / an explicit pixel pair keeps the intrinsic size on the host and carries the
+  // rescale on its matrix — so the CSS tile size is always `paint * scale`.
+  const float onScreenW = paintW * scaleX;
+  const float onScreenH = paintH * scaleY;
+
+  // A repeat whose on-screen tile is smaller than the element box needs the tile drawn several
+  // times, which a single import directive cannot express, so the caller falls back to the raster
+  // path. A repeat along an axis the tile already covers is a no-op, so only a genuinely tiled axis
+  // disqualifies. The epsilon absorbs the sub-pixel slack of an authored size that was rounded
+  // against the box (e.g. a native 80px icon in a 78px slot).
+  constexpr float TILE_SLACK = 0.5f;
+  TileMode tileX = TileMode::Decal;
+  TileMode tileY = TileMode::Decal;
+  ResolveBackgroundRepeat(box.backgroundRepeat, tileX, tileY);
+  if ((tileX == TileMode::Repeat && onScreenW + TILE_SLACK < boxW) ||
+      (tileY == TileMode::Repeat && onScreenH + TILE_SLACK < boxH)) {
+    warn("html: tiled SVG background needs repeated tiles; kept as a raster image");
+    return false;
+  }
+
+  // `background-position` places the paint box inside the element box. Both are expressed in the
+  // element's own coordinate space and the host's slot is relative to its parent, so the resolved
+  // offset maps straight onto the host's left/top. Percentages and the centring keywords resolve
+  // against the slack between the box and the *on-screen* tile, exactly like `mask-position`.
+  std::string posX;
+  std::string posY;
+  SplitPositionTokens(box.backgroundPosition, posX, posY);
+  float tx = resolveMaskPositionAxis(posX, boxW, onScreenW);
+  float ty = resolveMaskPositionAxis(posY, boxH, onScreenH);
+
+  // The directive host must hold nothing but the directive: `pagx resolve` refuses to expand one
+  // on a layer that also carries contents or children. It therefore lives in a child layer of the
+  // element, which is also where paint order requires it — a Layer's own contents render behind
+  // its children, and a CSS background paints behind the element's content.
+  auto* host = _document->makeNode<Layer>();
+  host->width = paintW;
+  host->height = paintH;
+  // An unset offset and a zero offset both place an out-of-flow layer at its parent's origin, so
+  // only a real offset is written (an explicit `left="0"` is redundant, and `pagx verify` says so).
+  if (tx != 0.0f) {
+    host->left = tx;
+  }
+  if (ty != 0.0f) {
+    host->top = ty;
+  }
+  host->includeInLayout = false;
+  if (scaleX != 1.0f || scaleY != 1.0f) {
+    host->matrix = Matrix::Scale(scaleX, scaleY);
+  }
+  if (svgContent.empty()) {
+    host->importDirective.source = resolveImageSource(svgSource);
+  } else {
+    host->importDirective.content = svgContent;
+  }
+  host->importDirective.format = "svg";
+
+  Layer* backgroundHost = host;
+  if (onScreenW > boxW + TILE_SLACK || onScreenH > boxH + TILE_SLACK) {
+    // `cover`, and an authored size larger than the box, paint past the element box while CSS
+    // clips a background to it. The clip sits on a dedicated wrapper so it cannot clip the
+    // element's own content. Known difference: the wrapper clips to a rectangle, so an element's
+    // `border-radius` does not round a vector background the way the raster path's rounded
+    // Rectangle geometry does.
+    auto* clip = _document->makeNode<Layer>();
+    clip->width = boxW;
+    clip->height = boxH;
+    clip->includeInLayout = false;
+    clip->clipToBounds = true;
+    clip->children.push_back(host);
+    backgroundHost = clip;
+  }
+  layer->children.insert(layer->children.begin(), backgroundHost);
   return true;
 }
 
@@ -1195,7 +1627,35 @@ std::pair<int, int> HTMLParserContext::decodeImageNativeSize(const Image* image)
 }
 
 Image* HTMLParserContext::registerImageResource(const std::string& imageSource) {
+  warnIfUnsupportedImageSource(imageSource);
   return _imageResources->registerResource(imageSource);
+}
+
+void HTMLParserContext::warnIfUnsupportedImageSource(const std::string& imageSource) {
+  bool isDataUri = imageSource.compare(0, 5, "data:") == 0;
+  std::string format = DeclaredDataUriMime(imageSource);
+  if (format.empty() && !isDataUri) {
+    // A file path / remote URL is read and decoded by the renderer itself, so there is no declared
+    // media type to check here.
+    return;
+  }
+  if (format.rfind("image/", 0) != 0) {
+    // A missing or generic media type (`data:;base64,…` / `application/octet-stream`) leaves the
+    // payload's own magic bytes as the only authority. Every pipeline that produces a data URI
+    // labels it, so this is not a hot path and the payload can be decoded to name the format
+    // precisely.
+    auto data = DecodeBase64DataURI(imageSource);
+    const char* sniffed = (data != nullptr && data->size() > 0)
+                              ? DetectImageMime(data->bytes(), data->size())
+                              : nullptr;
+    format = sniffed != nullptr ? sniffed : "an unrecognised format";
+  }
+  if (IsSupportedImageMime(format.c_str())) {
+    return;
+  }
+  warn("html: image source is " + format +
+       ", outside the <Image> supported set (PNG/JPEG/WebP/GIF); it may not render on every "
+       "platform");
 }
 
 std::string HTMLParserContext::resolveImageSource(const std::string& src) const {

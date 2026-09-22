@@ -133,17 +133,12 @@ std::string ResolveFontStyleName(const std::string& cssFontWeight,
 FontStyleSynthesis ResolveFontStyleSynthesis(const std::string& cssFontWeight,
                                              const std::string& cssFontStyle) {
   FontStyleSynthesis out;
-  int numericWeight = CssFontWeightToNumeric(cssFontWeight);
-  // The weight axis is always carried as a real-face style label (Bold / SemiBold / Black / etc.)
-  // and is never pre-synthesised. This preserves precise face selection when the requested face is
-  // available. If it is unavailable, normal font lookup fallback applies without faux emboldening.
+  // Both the weight and slant axes are carried as real-face style labels (Bold / SemiBold /
+  // Italic / Medium Italic ...) so the renderer resolves the authored face when it is installed
+  // or embedded. fauxItalic stays true as a synthesis fallback for when the styled italic face
+  // is unavailable: layout detects the resolved typeface and drops the flag in that case.
+  out.fontStyleName = ResolveFontStyleName(cssFontWeight, cssFontStyle);
   out.fauxBold = false;
-  const char* weightKeyword = WeightKeywordForRoundedHundreds(numericWeight);
-  if (weightKeyword) {
-    out.fontStyleName = weightKeyword;
-  }
-  // Italic is kept as a faux axis: an oblique slant can be synthesised on top of any upright face,
-  // so it survives even when the styled italic face is unavailable.
   out.fauxItalic = IsItalicCssStyle(cssFontStyle);
   return out;
 }

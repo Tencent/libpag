@@ -42,7 +42,7 @@ Both modes also accept `--download-fonts` (or `DOWNLOAD_FONTS=1`),
 which forwards `--download-fonts` to each `snapshot.js` invocation so
 the page's web fonts are captured to a per-case `<name>.fonts/`
 directory under the output dir. This measures the **cost of font
-capture** inside the snapshot step; the downstream `pagx font embed` /
+capture** inside the snapshot step; the downstream `pagx embed` /
 `pagx render --fallback` work that `html2pagx` (and `eval/`) perform is
 out of scope here — the bench only samples `snapshot.js` itself.
 

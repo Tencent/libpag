@@ -15,6 +15,7 @@ import {
   normalizeEmptyImagePlaceholders,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  expandStickyScrollytelling,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
 import {
@@ -530,17 +531,13 @@ export async function runSnapshot(
     };
     await inlineCapturedImages();
 
-    // Chromium renders an empty/missing-src <img> with non-empty alt text as
-    // fallback glyphs and ignores even explicit CSS width/height in that
-    // state. Neutralise the alt text for source-less placeholders that have a
-    // real authored two-axis box before canvas/element measurement. The
-    // snapshot entry restores the live DOM after preserving the original alt
-    // in its emitted markup.
-    await page.evaluate(normalizeEmptyImagePlaceholders);
-
     // Capture each <canvas>'s live bitmap as a data URI so the snapshot
     // walker can emit it as an <img>. Without this, every chart / scripted
     // graphic on the page (ECharts, Chart.js, etc.) becomes an empty box.
+    //
+    // Runs before the sticky-scrollytelling expansion below: `cloneNode`
+    // clears a <canvas>'s bitmap, so a panel cloned first would carry an empty
+    // chart in every tiled segment.
     //
     // Non-capture path only: the real clock has already let each chart's
     // entrance animation finish during settle, so a plain t=0 read gets the
@@ -551,6 +548,39 @@ export async function runSnapshot(
     if (!captureAnimations) {
       await page.evaluate(inlineCanvases);
     }
+
+    // Expand scrollytelling blocks (a sticky panel inside a tall scroll track
+    // whose steps cross-fade as the page scrolls — Flect's "How Flect works"
+    // is the canonical case) into N vertically tiled panels so the exported
+    // PAGX shows every step instead of the frozen top frame plus blank track.
+    // Runs after image and canvas inlining — the clones copy the attributes
+    // those passes stamp on the source nodes — and before every remaining pass
+    // (placeholder normalisation, icon-font, pseudo materialisation, animation
+    // capture and the snapshot walker all see the expanded DOM). In
+    // animation-capture mode the canvas settle pass runs after the sampler, so
+    // a canvas inside an expanded panel is inlined on the original only and
+    // its tiled copies stay empty. Opt out with
+    // HTML_SNAPSHOT_NO_STICKY_EXPAND=1. Best-effort: a failure falls back to
+    // the unexpanded snapshot rather than aborting.
+    if (process.env.HTML_SNAPSHOT_NO_STICKY_EXPAND !== '1') {
+      try {
+        const stickyStats = await page.evaluate(expandStickyScrollytelling);
+        if (log && stickyStats && stickyStats.blocks > 0) {
+          const segList = stickyStats.expanded.map((b: { segments: number }) => b.segments).join(', ');
+          log(`sticky-scrollytelling: expanded ${stickyStats.blocks} block(s) into ${segList} segment(s) each`);
+        }
+      } catch (err) {
+        if (log) log(`sticky-scrollytelling expansion skipped: ${errMessage(err)}`);
+      }
+    }
+
+    // Chromium renders an empty/missing-src <img> with non-empty alt text as
+    // fallback glyphs and ignores even explicit CSS width/height in that
+    // state. Neutralise the alt text for source-less placeholders that have a
+    // real authored two-axis box before element measurement. The snapshot
+    // entry restores the live DOM after preserving the original alt in its
+    // emitted markup.
+    await page.evaluate(normalizeEmptyImagePlaceholders);
 
     if (inlineIconFonts) {
       try {
