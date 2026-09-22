@@ -107,7 +107,29 @@ endif ()
 # third_party/tgfx/CMakeLists.txt, and must run BEFORE the existing QT / SwiftShader mutual-
 # exclusion block so the "if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE) set(PAG_USE_OPENGL ON)"
 # fixup further down does not accidentally re-enable GL.
+#
+# The non-GL backends must not be combined: libpag passes each PAG_USE_* to tgfx unchanged, but
+# tgfx resolves them with its own priority chain (Vulkan > D3D12 > Metal > WebGPU) and silently
+# disables the losers. A combination would leave libpag compiling backend glue (Devices_*.cpp)
+# for a backend tgfx never built, failing at link time with undefined symbols.
+set(PAG_NON_GL_BACKENDS_COUNT 0)
+foreach (backend PAG_USE_METAL PAG_USE_VULKAN PAG_USE_D3D12 PAG_USE_WEBGPU)
+    if (${backend})
+        math(EXPR PAG_NON_GL_BACKENDS_COUNT "${PAG_NON_GL_BACKENDS_COUNT} + 1")
+    endif ()
+endforeach ()
+if (PAG_NON_GL_BACKENDS_COUNT GREATER 1)
+    message(FATAL_ERROR
+            "Only one non-OpenGL backend may be enabled at a time "
+            "(PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
+endif ()
+
 if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
+    foreach (gl_variant PAG_USE_OPENGL PAG_USE_QT PAG_USE_SWIFTSHADER PAG_USE_ANGLE)
+        if (${gl_variant})
+            message(WARNING "${gl_variant} is ignored because a non-OpenGL backend is enabled.")
+        endif ()
+    endforeach ()
     set(PAG_USE_OPENGL OFF)
     set(PAG_USE_QT OFF)
     set(PAG_USE_SWIFTSHADER OFF)
