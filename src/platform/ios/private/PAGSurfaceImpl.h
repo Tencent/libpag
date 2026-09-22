@@ -23,7 +23,6 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
-@class CAMetalLayer;
 @class MTKView;
 @protocol MTLDevice;
 

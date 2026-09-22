@@ -23,7 +23,6 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-@class CAMetalLayer;
 @class MTKView;
 
 PAG_API @interface PAGSurface : NSObject
