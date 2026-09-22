@@ -4888,17 +4888,31 @@ function snapshotMainImpl(opts) {
   const bodyBgImage = normalizeBackgroundImage(
     bodyComputed.getPropertyValue('background-image').trim(),
   );
+  // The canvas backdrop does not always live on <body>: CSS propagates the root element's
+  // background to the canvas whenever the body's own is transparent — the shape of the common
+  // `html { background: #fff }` reset — while a page that declares the backdrop on <body>
+  // (or on both) keeps its own. The subset's <body> *is* the canvas for PAGX, so without the
+  // fallback such a page snapshots with no background at all and every layer paints onto
+  // nothing, which `pagx render` composites as black.
+  const rootComputed = getComputedStyle(document.documentElement);
+  const bodyPaintsNothing = colorAlpha(bodyBg) === 0 && !bodyBgImage;
+  const effectiveBg = !bodyPaintsNothing
+    ? bodyBg
+    : rootComputed.getPropertyValue('background-color').trim();
+  const effectiveBgImage = !bodyPaintsNothing
+    ? bodyBgImage
+    : normalizeBackgroundImage(rootComputed.getPropertyValue('background-image').trim());
   const bodyStyle = [
     `width: ${canvasWidth}px`,
     `height: ${canvasHeight}px`,
   ];
-  if (bodyBg && !['rgba(0, 0, 0, 0)', 'transparent'].includes(bodyBg)) {
-    bodyStyle.push(`background-color: ${bodyBg}`);
+  if (effectiveBg && colorAlpha(effectiveBg) > 0) {
+    bodyStyle.push(`background-color: ${effectiveBg}`);
   }
-  // Body-level gradient (e.g. a full-page hero backdrop) would otherwise be
+  // A page-level gradient (e.g. a full-page hero backdrop) would otherwise be
   // lost because the snapshot's <body> only emits sizing + background-color.
-  if (bodyBgImage) {
-    bodyStyle.push(`background-image: ${bodyBgImage}`);
+  if (effectiveBgImage) {
+    bodyStyle.push(`background-image: ${effectiveBgImage}`);
   }
 
   // The <style> block centralises four rendering invariants that the
@@ -5820,6 +5834,11 @@ async function materializeDecorativePseudoElements() {
     'background-color', 'background-image', 'background-clip',
     'background-blend-mode',
     'background-size', 'background-repeat', 'background-position',
+    // A decorative pseudo usually draws its shape with a mask rather than a background image: the
+    // stand-in paints `background-color: currentColor` clipped by `mask-image`. Copying the colour
+    // but not the mask leaves the stand-in painting the raw fill — a chevron icon, an
+    // external-link glyph or a gradient fade over clamped text all collapse to a solid rectangle.
+    'mask-image', 'mask-mode', 'mask-size', 'mask-position', 'mask-repeat',
     'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
     'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
     'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
@@ -5872,6 +5891,8 @@ async function materializeDecorativePseudoElements() {
     ['background-size', 'auto'],
     ['background-repeat', 'repeat'],
     ['background-position', '0% 0%'],
+    ['mask-image', 'none'], ['mask-mode', 'match-source'],
+    ['mask-size', 'auto'], ['mask-position', '0% 0%'], ['mask-repeat', 'repeat'],
     ['border-top-width', '0px'], ['border-right-width', '0px'],
     ['border-bottom-width', '0px'], ['border-left-width', '0px'],
     ['border-top-style', 'none'], ['border-right-style', 'none'],
@@ -6159,6 +6180,87 @@ async function materializeDecorativePseudoElements() {
 
 /* eslint-disable no-undef, no-inner-declarations */
 
+// ===== Pre-snapshot pass: inline remote mask-image urls =====
+
+// Unlike `background-image`, whose remote layers `inlineExternalImages` has already replaced with
+// `data:` URIs, a `mask-image: url(https://…)` reaches the walker verbatim. A browser resolves
+// such a url over the network, so the subset still renders correctly when opened directly, but the
+// importer hands the url to `ImageCodec::MakeFrom`, which cannot fetch: the mask layer is dropped
+// and the masked element paints its unmasked fill instead. Fetch every remote mask url and rewrite
+// it to a `data:` URI so both consumers see the same self-contained value.
+//
+// Must run after `materializeDecorativePseudoElements`: a decorative `::before` / `::after` icon
+// lives on a synthetic stand-in div that pass creates, and the mask it copies from the pseudo's
+// computed style is what this pass has to resolve.
+//
+// Gradients (the importer rebuilds them into a contour mask), `data:` urls (already
+// self-contained) and `file:` urls (`normalizeMaskImage` strips those to a plain path the importer
+// loads directly) are left untouched.
+async function inlineMaskImages() {
+  // Standalone on purpose: `page.evaluate` serialises this function into the page, so it cannot
+  // share a closure with `inlineExternalImages`' own helpers.
+  function blobToDataUri(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // One entry per element: a decorative pseudo that materialised onto its host, a plain element
+  // masked by an icon, and a clamped-text fade overlay all take the same path.
+  const pending = [];
+  for (const el of Array.from(document.querySelectorAll('*'))) {
+    const value = (getComputedStyle(el).getPropertyValue('mask-image') || '').trim();
+    if (!value || value === 'none') continue;
+    const match = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value);
+    if (!match) continue;
+    const url = match[2];
+    if (!/^https?:/i.test(url)) continue;
+    pending.push({ el, url, value });
+  }
+  if (pending.length === 0) return;
+
+  // Icons repeat across a page (one chevron asset on every nav item), so the same url is fetched
+  // and encoded once.
+  const cache = new Map();
+  async function resolveUrl(url) {
+    if (cache.has(url)) return cache.get(url);
+    const promise = (async () => {
+      const res = await fetch(url, { credentials: 'omit' });
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      return await blobToDataUri(await res.blob());
+    })();
+    cache.set(url, promise);
+    return promise;
+  }
+
+  // The data URI is emitted single-quoted: the value lands inside the double-quoted `style="…"`
+  // attribute the walker writes, where a double-quoted url() would close the attribute early.
+  async function inlineOne(entry) {
+    try {
+      const dataUri = await resolveUrl(entry.url);
+      entry.el.style.maskImage = entry.value.replace(
+        /url\(\s*(['"]?)([^'")]+)\1\s*\)/i,
+        () => `url('${dataUri}')`,
+      );
+    } catch (err) {
+      console.warn(`html-snapshot: failed to inline mask ${entry.url}: ${err && err.message}`);
+    }
+  }
+
+  const FETCH_CHUNK_SIZE = 8;
+  for (let i = 0; i < pending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(inlineOne));
+  }
+}
+
+/* eslint-enable no-undef, no-inner-declarations */
+
+/* eslint-disable no-undef, no-inner-declarations */
+
 // ===== Pre-snapshot pass: expand sticky scrollytelling blocks =====
 
 // "Scrollytelling" pages pin a viewport-sized `position: sticky` panel inside
@@ -6401,6 +6503,7 @@ export {
   imgAlt,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  inlineMaskImages,
   expandStickyScrollytelling,
   mergeRectsOnSameLine,
   bandInsetRect,
