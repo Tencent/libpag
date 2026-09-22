@@ -36,7 +36,9 @@ PAG_API @interface PAGSurface : NSObject
 /**
  * Creates a new PAGSurface from a CAMetalLayer. The MTLDevice on the layer (or the system
  * default) is adopted internally. Returns nil if the current libpag build does not use the Metal
- * backend.
+ * backend. The caller must keep the CAMetalLayer alive for the lifetime of the PAGSurface —
+ * libpag does not retain it (retaining would risk a reference cycle in typical view-layer
+ * setups), so releasing the layer while the PAGSurface is still in use is undefined behavior.
  */
 + (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
 
@@ -47,7 +49,10 @@ PAG_API @interface PAGSurface : NSObject
  * happen on the main thread — MTKView is a UIView subclass annotated with @MainActor, so
  * touching its properties off the main thread is undefined. After the first frame, rendering
  * may continue on any thread. Also, when the view is resized, call updateSize on the PAGSurface
- * so its width()/height() and the underlying drawable follow the new size.
+ * so its width()/height() and the underlying drawable follow the new size. The caller must keep
+ * the MTKView alive for the lifetime of the PAGSurface — libpag does not retain it (retaining
+ * would risk a reference cycle), so releasing the view while the PAGSurface is still in use is
+ * undefined behavior.
  */
 + (PAGSurface*)FromMTKView:(MTKView*)view;
 
