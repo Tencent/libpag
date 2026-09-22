@@ -250,10 +250,13 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
       case tgfx::Backend::Metal: {
         tgfx::MetalSyncInfo mtlInfo = {};
         if (semaphore.getMetalSync(&mtlInfo)) {
-          // tgfx::MetalSyncInfo::event is const void*; pag::BackendSemaphore takes void*. The
-          // handle is treated as opaque by libpag — the const_cast is safe because no writer
-          // path exists downstream.
-          signalSemaphore->initMetal(const_cast<void*>(mtlInfo.event), mtlInfo.value);
+          // tgfx::MetalSyncInfo::event is const void*; pag::MtlEventInfo uses void*. The handle
+          // is treated as opaque by libpag — the const_cast is safe because no writer path
+          // exists downstream.
+          MtlEventInfo eventInfo = {};
+          eventInfo.event = const_cast<void*>(mtlInfo.event);
+          eventInfo.value = mtlInfo.value;
+          signalSemaphore->initMetal(eventInfo);
         }
         break;
       }

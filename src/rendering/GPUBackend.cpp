@@ -162,24 +162,17 @@ void* BackendSemaphore::glSync() const {
   return _glSync;
 }
 
-void BackendSemaphore::initMetal(void* event, uint64_t value) {
+void BackendSemaphore::initMetal(const MtlEventInfo& info) {
   _backend = Backend::METAL;
-  _mtlInfo.event = event;
-  _mtlInfo.value = value;
+  _mtlInfo = info;
 }
 
-void* BackendSemaphore::mtlEvent() const {
+bool BackendSemaphore::getMtlEventInfo(MtlEventInfo* info) const {
   if (_backend != Backend::METAL || _mtlInfo.event == nullptr) {
-    return nullptr;
+    return false;
   }
-  return _mtlInfo.event;
-}
-
-uint64_t BackendSemaphore::mtlValue() const {
-  if (_backend != Backend::METAL || _mtlInfo.event == nullptr) {
-    return 0;
-  }
-  return _mtlInfo.value;
+  *info = _mtlInfo;
+  return true;
 }
 
 bool BackendSemaphore::isInitialized() const {

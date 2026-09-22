@@ -49,7 +49,10 @@ void pag_backend_semaphore_init_mtl(pag_backend_semaphore* semaphore, void* mtlE
   if (semaphore == nullptr) {
     return;
   }
-  semaphore->p.initMetal(mtlEvent, static_cast<uint64_t>(value));
+  pag::MtlEventInfo info = {};
+  info.event = mtlEvent;
+  info.value = static_cast<uint64_t>(value);
+  semaphore->p.initMetal(info);
 }
 
 bool pag_backend_semaphore_get_mtl_event(pag_backend_semaphore* semaphore,
@@ -57,11 +60,11 @@ bool pag_backend_semaphore_get_mtl_event(pag_backend_semaphore* semaphore,
   if (semaphore == nullptr || eventInfo == nullptr) {
     return false;
   }
-  auto event = semaphore->p.mtlEvent();
-  if (event == nullptr) {
-    return false;
+  pag::MtlEventInfo info = {};
+  if (semaphore->p.getMtlEventInfo(&info)) {
+    eventInfo->event = info.event;
+    eventInfo->value = static_cast<unsigned long long>(info.value);
+    return true;
   }
-  eventInfo->event = event;
-  eventInfo->value = static_cast<unsigned long long>(semaphore->p.mtlValue());
-  return true;
+  return false;
 }

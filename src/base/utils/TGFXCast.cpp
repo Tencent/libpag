@@ -268,8 +268,9 @@ tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
     tgfx::GLSyncInfo syncInfo = {glSync};
     return tgfx::BackendSemaphore(syncInfo);
   }
-  if (auto mtlEvent = semaphore.mtlEvent()) {
-    tgfx::MetalSyncInfo syncInfo = {mtlEvent, semaphore.mtlValue()};
+  MtlEventInfo mtlInfo = {};
+  if (semaphore.getMtlEventInfo(&mtlInfo)) {
+    tgfx::MetalSyncInfo syncInfo = {mtlInfo.event, mtlInfo.value};
     return tgfx::BackendSemaphore(syncInfo);
   }
   return {};

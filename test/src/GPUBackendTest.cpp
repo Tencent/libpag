@@ -35,15 +35,23 @@ PAG_TEST(BackendSemaphoreTest, CrossBackendGuards) {
   EXPECT_EQ(semaphore.backend(), Backend::OPENGL);
   EXPECT_EQ(semaphore.glSync(), reinterpret_cast<void*>(1));
   // Reading Metal accessors on a GL semaphore must not leak the union.
-  EXPECT_EQ(semaphore.mtlEvent(), nullptr);
-  EXPECT_EQ(semaphore.mtlValue(), 0u);
+  MtlEventInfo crossInfo = {};
+  crossInfo.event = reinterpret_cast<void*>(9);
+  crossInfo.value = 9;
+  EXPECT_FALSE(semaphore.getMtlEventInfo(&crossInfo));
+  EXPECT_EQ(crossInfo.event, reinterpret_cast<void*>(9));
 
   semaphore = {};
-  semaphore.initMetal(reinterpret_cast<void*>(2), 5);
+  MtlEventInfo info = {};
+  info.event = reinterpret_cast<void*>(2);
+  info.value = 5;
+  semaphore.initMetal(info);
   EXPECT_TRUE(semaphore.isInitialized());
   EXPECT_EQ(semaphore.backend(), Backend::METAL);
-  EXPECT_EQ(semaphore.mtlEvent(), reinterpret_cast<void*>(2));
-  EXPECT_EQ(semaphore.mtlValue(), 5u);
+  MtlEventInfo readBack = {};
+  EXPECT_TRUE(semaphore.getMtlEventInfo(&readBack));
+  EXPECT_EQ(readBack.event, reinterpret_cast<void*>(2));
+  EXPECT_EQ(readBack.value, 5u);
   // Reading the GL accessor on a Metal semaphore must not leak the union.
   EXPECT_EQ(semaphore.glSync(), nullptr);
 
@@ -51,12 +59,13 @@ PAG_TEST(BackendSemaphoreTest, CrossBackendGuards) {
   semaphore = {};
   semaphore.initGL(nullptr);
   EXPECT_FALSE(semaphore.isInitialized());
-  semaphore.initMetal(nullptr, 3);
+  MtlEventInfo nullInfo = {};
+  semaphore.initMetal(nullInfo);
   EXPECT_FALSE(semaphore.isInitialized());
 
   // initMetal with a null event resets the semaphore instead of keeping the previous GL state.
   semaphore.initGL(reinterpret_cast<void*>(1));
-  semaphore.initMetal(nullptr, 5);
+  semaphore.initMetal(nullInfo);
   EXPECT_FALSE(semaphore.isInitialized());
   EXPECT_EQ(semaphore.glSync(), nullptr);
 }
