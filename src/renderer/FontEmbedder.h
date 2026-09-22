@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 
 namespace pagx {
@@ -56,6 +58,20 @@ class FontEmbedder {
    * layout run data.
    */
   bool embed(PAGXDocument* document);
+
+  /**
+   * Texts from the last embed() call that carry visible characters but produced no glyph run,
+   * because no typeface available on this machine covered them. Such a document renders those
+   * characters as blank (or as a substituted face) on any host that also lacks the authored font,
+   * so a caller that needs a self-contained result should treat a non-empty list as a failure.
+   * Each entry describes one text as "<family>/<style> id=<id>: <preview>".
+   */
+  const std::vector<std::string>& unembeddedTexts() const {
+    return unembedded;
+  }
+
+ private:
+  std::vector<std::string> unembedded = {};
 };
 
 }  // namespace pagx
