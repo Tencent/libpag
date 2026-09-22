@@ -205,8 +205,11 @@ inline std::string EscapeJson(const std::string& input) {
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const std::string& command);
 
 /**
- * Loads font files and fallback typefaces into a FontConfig. Prints errors to stderr using the
- * given command name as prefix. Returns false on failure.
+ * Loads font files and fallback typefaces into a FontConfig. Every face of a font file is
+ * registered, so a collection such as PingFang.ttc contributes each of its (family, style) pairs.
+ * Prints errors to stderr using the given command name as prefix. Returns false when a requested
+ * source cannot be loaded — the caller named that exact source, so dropping it would shape text
+ * with a substituted face.
  */
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
                     const std::vector<std::string>& fallbacks, const std::string& command);
@@ -219,6 +222,8 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
  * Prints messages to stderr using the given command name as prefix. Returns false when a font
  * source cannot be loaded and the document still requires a font; a source that cannot be loaded
  * while the document requires no font at all is reported and skipped, and the call continues.
+ * Also returns false when any text with visible characters produced no glyph run, since such a
+ * document would render that text as blank on hosts lacking the authored font.
  */
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
                 const std::string& command);
