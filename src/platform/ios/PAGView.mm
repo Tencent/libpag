@@ -74,6 +74,10 @@
                                                name:UIApplicationDidReceiveMemoryWarningNotification
                                              object:nil];
 #if defined(TGFX_USE_OPENGL)
+  // The async-surface-prepared dance is a GL-only workaround for issue #1870: creating a
+  // CAEAGLLayer surface off the main thread crashes, so GPUDrawable defers creation to the main
+  // queue and notifies us to redraw. Metal does not need this — CAMetalLayer / nextDrawable
+  // support creating surfaces on the render thread, so MetalGPUDrawable creates them inline.
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(AsyncSurfacePrepared:)
                                                name:pag::AsyncSurfacePreparedNotification
@@ -119,6 +123,9 @@
   [super setBounds:bounds];
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
+    // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize can
+    // never overlap with the render thread reading it inside flush (tgfx MetalWindow).
+    std::lock_guard<std::mutex> autoLock(lock);
     [self updateLayerDrawableSize];
     [pagSurface updateSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
@@ -132,6 +139,8 @@
   [super setFrame:frame];
   if (pagSurface != nil &&
       (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
+    // Same locking rationale as setBounds:.
+    std::lock_guard<std::mutex> autoLock(lock);
     [self updateLayerDrawableSize];
     [pagSurface updateSize];
     if (oldRect.size.width == 0 || oldRect.size.height == 0) {
@@ -144,6 +153,8 @@
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
   if (pagSurface != nil && oldScaleFactor != scaleFactor) {
+    // Same locking rationale as setBounds:.
+    std::lock_guard<std::mutex> autoLock(lock);
     [self updateLayerDrawableSize];
     [pagSurface updateSize];
   }
