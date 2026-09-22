@@ -150,26 +150,23 @@ bool HardwareDecoder::resetVideoToolBox() {
                         kCVPixelBufferIOSurfacePropertiesKey};
 
   uint32_t pixelFormatType = kCVPixelFormatType_32BGRA;
-  uint32_t openGLCompatibility = true;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
-  CFNumberRef openGLCompatibilityValue =
-      CFNumberCreate(NULL, kCFNumberSInt32Type, &openGLCompatibility);
+  // The OpenGL compatibility key requires a CFBoolean. A CFNumber would make
+  // CVPixelBufferCreateResolvedAttributesDictionary fail and drop the 32BGRA/IOSurface request.
   CFDictionaryRef ioSurfaceParam =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
 
-  const void* values[] = {pixelFormatTypeValue, openGLCompatibilityValue, ioSurfaceParam};
+  const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, ioSurfaceParam};
   inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 3, NULL, NULL);
   const void* combineDics[] = {inAttrs};
   CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
   CFDictionaryRef outAttrs = NULL;
-  // CVPixelBufferCreateResolvedAttributesDictionary may fail when attributes
-  // contain keys unsupported by the current environment (e.g., the OpenGL
-  // compatibility key is no longer recognized on newer macOS), and will set
-  // outAttrs to NULL in that case.
   CVReturn resolvedResult =
       CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
   if (resolvedResult != kCVReturnSuccess) {
+    LOGE("HardwareDecoder: pixel buffer attributes were rejected (%d), using decoder defaults.",
+         static_cast<int>(resolvedResult));
     outAttrs = NULL;
   }
   VTDecompressionOutputCallbackRecord callBackRecord;
@@ -185,7 +182,7 @@ bool HardwareDecoder::resetVideoToolBox() {
   CFRelease(combines);
   CFRelease(inAttrs);
   CFRelease(pixelFormatTypeValue);
-  CFRelease(openGLCompatibilityValue);
+  // kCFBooleanTrue is a shared constant and must not be released.
   CFRelease(ioSurfaceParam);
 
   if (colorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
