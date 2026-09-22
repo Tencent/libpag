@@ -28,6 +28,7 @@ const {
   inlineCanvases,
   dropCollapsedDetailsContent,
   materializeDecorativePseudoElements,
+  inlineMaskImages,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 } = require('./dist/lib/browser-snapshot');
@@ -52,6 +53,7 @@ const BROWSER_EXPORTS = [
   { name: 'inlineCanvases',         fn: inlineCanvases },
   { name: 'dropCollapsedDetailsContent', fn: dropCollapsedDetailsContent },
   { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },
+  { name: 'inlineMaskImages',       fn: inlineMaskImages },
   { name: 'collectFontFaceMap',     fn: browserCollectFontFaceMap },
   { name: 'collectIconFontTargets', fn: browserCollectIconFontTargets },
   { name: 'applyIconFontSvgs',      fn: browserApplyIconFontSvgs },
@@ -72,6 +74,7 @@ const banner = `/*!
  *   inlineCanvases()                        -> Promise<void>
  *   dropCollapsedDetailsContent()           -> { details, nodes }
  *   materializeDecorativePseudoElements()   -> Promise<void>
+ *   inlineMaskImages()                      -> Promise<void>
  *   collectIconFontTargets()                -> Promise<target[]>
  *   applyIconFontSvgs(target_svg_pairs)     -> void
  *   collectFontFaceMap()                    -> Promise<{family:[{url,format,weight,style}, ...]}>
@@ -271,6 +274,10 @@ const exampleHtml = `<!DOCTYPE html>
         // (toggle thumbs, custom radio dots, dividers …) into real <div>
         // children so their boxes survive the snapshot.
         await HtmlSnapshot.materializeDecorativePseudoElements();
+        // Optional: inline remote mask-image: url(https://…) values (icon and
+        // fade masks) as data: URIs. No-op when every mask is a gradient, a
+        // data: URI or a local path.
+        await HtmlSnapshot.inlineMaskImages();
         const { html, width, height } = HtmlSnapshot.takeSnapshot();
         const head = '// ' + width + 'x' + height + ', ' + html.length + ' bytes\\n';
         const preview = html.length > 4000 ? html.slice(0, 4000) + '\\n// …truncated' : html;

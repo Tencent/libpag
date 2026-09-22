@@ -167,6 +167,55 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
   });
 });
 
+describe('materializeDecorativePseudoElements — masked decorative pseudo', () => {
+  // Mirrors MDN's `.menu__tab-button::after` chevron: an icon pseudo paints
+  // `background-color: currentColor` clipped by `mask-image`. Copying the colour
+  // without the mask would leave the stand-in painting its raw fill — a solid
+  // white rectangle where the page shows a chevron.
+  function makeHostWithMaskedAfter() {
+    const host = new FakeElement('button');
+    host.__cs = {
+      '::before': makeCs({ content: 'none' }),
+      '::after': makeCs({
+        content: '""',
+        position: 'absolute',
+        width: '20px',
+        height: '20px',
+        'background-color': 'rgb(255, 255, 255)',
+        'mask-image': 'url("https://developer.mozilla.org/static/client/chevron-down.svg")',
+        'mask-size': '100% 100%',
+        'mask-repeat': 'no-repeat',
+      }),
+    };
+    return host;
+  }
+
+  test('forwards the mask so the stand-in does not paint a solid rectangle', async () => {
+    const host = makeHostWithMaskedAfter();
+    await runOn(host);
+
+    expect(host.children).toHaveLength(1);
+    const style = host.children[0].getAttribute('style');
+    expect(style).toContain('background-color: rgb(255, 255, 255)');
+    // `emitInlineStyle` rewrites embedded double quotes to single quotes so the
+    // value survives the double-quoted style="…" attribute.
+    expect(style).toContain(
+      "mask-image: url('https://developer.mozilla.org/static/client/chevron-down.svg')",
+    );
+    expect(style).toContain('mask-size: 100% 100%');
+    expect(style).toContain('mask-repeat: no-repeat');
+  });
+
+  test('does not emit mask descriptors on an unmasked pseudo', async () => {
+    const { host } = makeHostWithAfter({ animated: false });
+    await runOn(host);
+
+    const style = host.children[0].getAttribute('style');
+    expect(style).not.toContain('mask-image');
+    expect(style).not.toContain('mask-size');
+  });
+});
+
 describe('materializeDecorativePseudoElements — in-flow decorative pseudo', () => {
   // Mirrors the getflect.app `.free-tag` chip: an inline-flex host whose
   // ::before is a static, 6x6 flex-item status dot with rounded corners.

@@ -16,6 +16,7 @@ import {
   inlineCanvases,
   dropCollapsedDetailsContent,
   materializeDecorativePseudoElements,
+  inlineMaskImages,
   expandStickyScrollytelling,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
@@ -639,6 +640,19 @@ export async function runSnapshot(
     } catch (err) {
       if (log) {
         log(`WARNING: pseudo-element materialisation skipped — decorative ::before/::after boxes will be missing from the snapshot: ${errMessage(err)}`);
+      }
+    }
+
+    // Inline remote `mask-image: url(https://…)` values into `data:` URIs.
+    // Runs after the pseudo-element pass so the masks that pass copies onto the
+    // synthetic stand-in divs are resolved too. Best-effort: a failure leaves
+    // the mask url remote, which a browser still renders but the importer
+    // cannot fetch (the mask is silently dropped there).
+    try {
+      await page.evaluate(inlineMaskImages);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: mask-image inlining skipped — remote mask urls stay remote and the importer will drop those masks: ${errMessage(err)}`);
       }
     }
 
