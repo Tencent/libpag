@@ -882,19 +882,29 @@ function resolveZIndex(computed) {
   return isFinite(v) ? v : 0;
 }
 
-// Replay CSS paint order: non-stackable (flow) children first, then
-// stackable children sorted by z-index ascending, with DOM order as
-// tie-break. A child is "stackable" when its z-index participates in
-// stacking — that is, when it is `position` != static (CSS2 rule) OR
-// when it is a flex / grid item (CSS Flexbox & Grid both honour
-// `z-index` on items regardless of `position`). Without the
-// flex/grid carve-out a `position: static` flex item authored with a
-// high z-index (e.g. the slide-13 `.center-node { z-index: 20 }`
-// sitting above its `.satellite-card` siblings at `z-index: 10`)
-// would always sort to the back, painting underneath siblings the
-// browser draws on top.
+// Replay CSS paint order (CSS 2.1 Appendix E): negative-z stackable
+// children paint behind the in-flow content, the flow content itself
+// next, and zero/positive-z stackable children on top — each band in
+// z-index order, with DOM order as tie-break. A child is "stackable"
+// when its z-index participates in stacking — that is, when it is
+// `position` != static (CSS2 rule) OR when it is a flex / grid item
+// (CSS Flexbox & Grid both honour `z-index` on items regardless of
+// `position`). Without the flex/grid carve-out a `position: static`
+// flex item authored with a high z-index (e.g. the slide-13
+// `.center-node { z-index: 20 }` sitting above its `.satellite-card`
+// siblings at `z-index: 10`) would always sort to the back, painting
+// underneath siblings the browser draws on top. The negative band is
+// what keeps a `z-index: -1` backdrop — the usual "photo behind the
+// card's text" pattern — underneath its siblings instead of covering
+// them.
+function paintBand(entry) {
+  if (!entry.stackable) return 1;
+  return entry.zIndex < 0 ? 0 : 2;
+}
+
 function paintOrder(a, b) {
-  if (a.stackable !== b.stackable) return a.stackable ? 1 : -1;
+  const bandDelta = paintBand(a) - paintBand(b);
+  if (bandDelta !== 0) return bandDelta;
   if (a.stackable && a.zIndex !== b.zIndex) return a.zIndex - b.zIndex;
   return a.domIndex - b.domIndex;
 }
@@ -5134,6 +5144,7 @@ const HELPER_FNS = [
   isUniformBorder,
   hasAnyBorder,
   resolveZIndex,
+  paintBand,
   paintOrder,
   gatherDirectText,
   elementHasChildren,
@@ -5529,12 +5540,29 @@ async function inlineExternalImages(cachedMap) {
   // to an absolute form. Local `file://` urls are handled at emit time by
   // `normalizeBackgroundImage` (stripped to a plain path the importer loads directly), so only
   // remote `http(s)` bytes need inlining here — fetch them and overwrite the element's inline
-  // `background-image` with a `data:` URI so the walker emits a self-contained reference. Only
-  // the first layer of a comma-separated stack is handled: that is the single-image case the
-  // exporter produces and the only one the importer recovers.
+  // `background-image` with a `data:` URI so the walker emits a self-contained reference.
   function firstCssUrl(value) {
     const m = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value || '');
     return m ? m[2] : '';
+  }
+
+  // A stack that mixes a colour wash with a photo — `linear-gradient(...), url(photo.jpg)`, the
+  // usual "tinted card" pattern — is inlined layer by layer. Replacing the whole declaration
+  // would throw the gradient away, and leaving the photo remote makes the importer emit an
+  // `<Image source="https://…">` the renderer cannot fetch, so the card renders as bare text.
+  // Only a single-url stack is handled: `url(...), url(...)` has no gradient to preserve and
+  // keeps the previous whole-declaration replacement.
+  function hasGradientLayer(value) {
+    return /(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value || '');
+  }
+
+  // Replaces just the `url(...)` token, leaving every other background layer in place. The data
+  // URI is emitted single-quoted because `normalizeBackgroundImage` passes a gradient-bearing
+  // value through verbatim: the value lands inside the double-quoted `style="…"` attribute the
+  // walker writes, where a double-quoted url() would close the attribute early.
+  function replaceFirstCssUrl(value, replacement) {
+    const token = `url('${replacement.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+    return value.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/i, () => token);
   }
 
   const bgPending = [];
@@ -5542,11 +5570,12 @@ async function inlineExternalImages(cachedMap) {
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
     const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
-    if (!bg || !/^url\(/i.test(bg)) continue;
+    const layered = hasGradientLayer(bg) && (bg.match(/url\(/gi) || []).length === 1;
+    if (!bg || (!/^url\(/i.test(bg) && !layered)) continue;
     const url = firstCssUrl(bg);
     if (!url || /^file:/i.test(url)) continue;
     if (url.startsWith('data:')) {
-      bgInlinePending.push({ el, src: url, current: url });
+      bgInlinePending.push({ el, src: url, current: url, bg, layered });
       continue;
     }
     if (!/^https?:/i.test(url)) continue;
@@ -5555,10 +5584,18 @@ async function inlineExternalImages(cachedMap) {
       // `current` records what the element still declares: a cache hit has to be written back even
       // when the cached bytes already are in a portable format, because the element is carrying
       // the remote URL that entry replaces.
-      bgInlinePending.push({ el, src: cached, current: url });
+      bgInlinePending.push({ el, src: cached, current: url, bg, layered });
       continue;
     }
-    bgPending.push({ el, url });
+    bgPending.push({ el, url, bg, layered });
+  }
+
+  // The inline declaration a fetched/cached url layer is written back into: a layered stack gets
+  // only its url token swapped, anything else keeps the whole-declaration replacement.
+  function writeInlinedBackground(entry, value) {
+    entry.el.style.backgroundImage = entry.layered
+      ? replaceFirstCssUrl(entry.bg, value)
+      : `url("${value.replace(/"/g, '\\"')}")`;
   }
 
   async function processOneBg(entry) {
@@ -5568,8 +5605,7 @@ async function inlineExternalImages(cachedMap) {
         console.warn(`html-snapshot: bg-image fetch ${res.status} for ${entry.url}`);
         return;
       }
-      const dataUri = await blobToNormalizedDataUri(await res.blob());
-      entry.el.style.backgroundImage = `url("${dataUri.replace(/"/g, '\\"')}")`;
+      writeInlinedBackground(entry, await blobToNormalizedDataUri(await res.blob()));
     } catch (err) {
       console.warn(`html-snapshot: failed to inline bg ${entry.url}: ${err && err.message}`);
     }
@@ -5582,7 +5618,7 @@ async function inlineExternalImages(cachedMap) {
     // URIs does not pay for a pointless style invalidation per element. Everything else — a cache
     // hit above all — has to replace whatever the element declares now.
     if (normalized !== entry.current) {
-      entry.el.style.backgroundImage = `url("${normalized.replace(/"/g, '\\"')}")`;
+      writeInlinedBackground(entry, normalized);
     }
   }
   for (let i = 0; i < bgInlinePending.length; i += FETCH_CHUNK_SIZE) {
@@ -5593,6 +5629,76 @@ async function inlineExternalImages(cachedMap) {
     const slice = bgPending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOneBg));
   }
+
+  // Top-level comma split of a CSS value list. Commas nested inside `rgb(...)`,
+  // `linear-gradient(...)` or a quoted `url('…')` argument — a `data:` URI in particular — must
+  // not split the list. Mirrors the importer's `SplitTopLevelCommas`.
+  function splitTopLevelCommas(value) {
+    const out = [];
+    let depth = 0;
+    let cur = '';
+    for (const ch of String(value || '')) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth = Math.max(0, depth - 1);
+      if (ch === ',' && depth === 0) {
+        if (cur.trim() !== '') out.push(cur.trim());
+        cur = '';
+        continue;
+      }
+      cur += ch;
+    }
+    if (cur.trim() !== '') out.push(cur.trim());
+    return out;
+  }
+
+  // A stack that layers a colour wash over a photo cannot be expressed as one PAGX background:
+  // the importer paints either the gradient layers or the image, never both. Split it into two
+  // boxes that the existing paths already handle — the element keeps the photo as a lone url()
+  // background (so its `background-size` / `-position` / `-repeat` apply as usual), and a
+  // synthesized full-bleed child carries the wash on top of it. Only backdrop boxes are split:
+  // an element with content of its own would need the wash slotted between its background and
+  // that content, which the flattened subset has no way to express.
+  function splitTintedBackgrounds() {
+    for (const el of Array.from(document.querySelectorAll('*'))) {
+      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
+      const computed = getComputedStyle(el);
+      // The wash child is positioned against the element, so the element has to be its own
+      // containing block; on a static box the inset would resolve against some distant ancestor.
+      if (computed.position === 'static') continue;
+      const bg = (computed.getPropertyValue('background-image') || '').trim();
+      if (!hasGradientLayer(bg)) continue;
+      const layers = splitTopLevelCommas(bg);
+      const urlIndex = layers.findIndex((layer) => /^url\(/i.test(layer));
+      if (urlIndex < 0 || (bg.match(/url\(/gi) || []).length !== 1) continue;
+      const wash = layers.filter((layer, index) => index !== urlIndex);
+      if (wash.length === 0) continue;
+      // Each fitting property is a per-layer list; the element now carries a single layer, so it
+      // needs that layer's own entry rather than the list. A one-entry value is already shared by
+      // every layer and passes through unchanged.
+      const entryFor = (value, fallback) => {
+        const entries = splitTopLevelCommas(value);
+        const picked = entries.length > 1 ? entries[urlIndex] : entries[0];
+        return picked || fallback;
+      };
+      const size = entryFor(computed.getPropertyValue('background-size'), 'auto');
+      const position = entryFor(computed.getPropertyValue('background-position'), '0% 0%');
+      const repeat = entryFor(computed.getPropertyValue('background-repeat'), 'repeat');
+      el.style.backgroundImage = layers[urlIndex];
+      el.style.backgroundSize = size;
+      el.style.backgroundPosition = position;
+      el.style.backgroundRepeat = repeat;
+      const tint = document.createElement('div');
+      tint.setAttribute('data-pagx-tint', '');
+      tint.setAttribute(
+        'style',
+        'position:absolute;left:0;top:0;width:100%;height:100%;background-image:' +
+          wash.join(', ') +
+          ';'
+      );
+      el.appendChild(tint);
+    }
+  }
+  splitTintedBackgrounds();
 }
 
 // ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====
