@@ -238,6 +238,11 @@ PAG_API @interface PAGView : NSView
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGView. Subsequent rendering of
  * the PAGView will not be captured. Returns nil if the PAGView hasn't been presented yet.
+ * Limitation: on the Metal backend this method is unreliable — the underlying tgfx window
+ * releases its CAMetalDrawable right after presentation, so a later readback receives whichever
+ * drawable comes off the layer's rotation queue (often blank or stale). This is not fixable on
+ * the libpag side alone; use an offscreen PAGSurface if you need reliable snapshots with Metal.
+ * The OpenGL backend is not affected.
  */
 - (CVPixelBufferRef)makeSnapshot;
 
