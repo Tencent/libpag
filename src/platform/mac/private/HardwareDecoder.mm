@@ -147,30 +147,34 @@ bool HardwareDecoder::resetVideoToolBox() {
   // create decompression session
   CFDictionaryRef inAttrs = NULL;
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLCompatibilityKey,
-                        kCVPixelBufferIOSurfacePropertiesKey};
+                        kCVPixelBufferMetalCompatibilityKey, kCVPixelBufferIOSurfacePropertiesKey};
 
   uint32_t pixelFormatType = kCVPixelFormatType_32BGRA;
-  uint32_t openGLCompatibility = true;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
-  CFNumberRef openGLCompatibilityValue =
-      CFNumberCreate(NULL, kCFNumberSInt32Type, &openGLCompatibility);
+  // The compatibility keys expect a CFBoolean, not a CFNumber. Passing a CFNumber makes
+  // CVPixelBufferCreateResolvedAttributesDictionary reject the whole attribute set and drop the
+  // 32BGRA/IOSurface request. The keys themselves are still supported on newer macOS, so
+  // kCFBooleanTrue is the fix (correcting the earlier assumption in PR #3631 that the OpenGL key
+  // was no longer recognized). The Metal compatibility key is added because tgfx renders through
+  // Metal (CVMetalTextureCache) on macOS.
   CFDictionaryRef ioSurfaceParam =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
 
-  const void* values[] = {pixelFormatTypeValue, openGLCompatibilityValue, ioSurfaceParam};
-  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 3, NULL, NULL);
+  const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, kCFBooleanTrue, ioSurfaceParam};
+  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 4, NULL, NULL);
   const void* combineDics[] = {inAttrs};
   CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
   CFDictionaryRef outAttrs = NULL;
-  // CVPixelBufferCreateResolvedAttributesDictionary may fail when attributes
-  // contain keys unsupported by the current environment (e.g., the OpenGL
-  // compatibility key is no longer recognized on newer macOS), and will set
-  // outAttrs to NULL in that case.
   CVReturn resolvedResult =
       CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
   if (resolvedResult != kCVReturnSuccess) {
-    outAttrs = NULL;
+    // Falling back to decoder defaults drops the 32BGRA/IOSurface request, which can later surface
+    // as a texture upload failure in tgfx's IOSurface-backed HardwareBufferCheck rather than an
+    // obvious decode error.
+    LOGE("HardwareDecoder:pixel buffer attributes rejected, falling back to decoder defaults which "
+         "may break IOSurface texture upload status = %d",
+         static_cast<int>(resolvedResult));
   }
   VTDecompressionOutputCallbackRecord callBackRecord;
   callBackRecord.decompressionOutputCallback = DidDecompress;
@@ -185,7 +189,7 @@ bool HardwareDecoder::resetVideoToolBox() {
   CFRelease(combines);
   CFRelease(inAttrs);
   CFRelease(pixelFormatTypeValue);
-  CFRelease(openGLCompatibilityValue);
+  // kCFBooleanTrue is a shared constant and must not be released.
   CFRelease(ioSurfaceParam);
 
   if (colorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
