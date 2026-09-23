@@ -147,29 +147,34 @@ bool HardwareDecoder::resetVideoToolBox() {
   // create decompression session
   CFDictionaryRef inAttrs = NULL;
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLCompatibilityKey,
-                        kCVPixelBufferIOSurfacePropertiesKey};
+                        kCVPixelBufferMetalCompatibilityKey, kCVPixelBufferIOSurfacePropertiesKey};
 
   uint32_t pixelFormatType = kCVPixelFormatType_32BGRA;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
-  // The OpenGL compatibility key expects a CFBoolean, not a CFNumber. Passing a CFNumber makes
+  // The compatibility keys expect a CFBoolean, not a CFNumber. Passing a CFNumber makes
   // CVPixelBufferCreateResolvedAttributesDictionary reject the whole attribute set and drop the
-  // 32BGRA/IOSurface request. The key itself is still supported on newer macOS, so kCFBooleanTrue
-  // is the fix (correcting the earlier assumption in #3631 that the key was no longer recognized).
+  // 32BGRA/IOSurface request. The keys themselves are still supported on newer macOS, so
+  // kCFBooleanTrue is the fix (correcting the earlier assumption in PR #3631 that the OpenGL key
+  // was no longer recognized). The Metal compatibility key is added because tgfx renders through
+  // Metal (CVMetalTextureCache) on macOS.
   CFDictionaryRef ioSurfaceParam =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
 
-  const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, ioSurfaceParam};
-  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 3, NULL, NULL);
+  const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, kCFBooleanTrue, ioSurfaceParam};
+  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 4, NULL, NULL);
   const void* combineDics[] = {inAttrs};
   CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
   CFDictionaryRef outAttrs = NULL;
   CVReturn resolvedResult =
       CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
   if (resolvedResult != kCVReturnSuccess) {
-    LOGE("HardwareDecoder: pixel buffer attributes were rejected (%d), using decoder defaults.",
+    // Falling back to decoder defaults drops the 32BGRA/IOSurface request, which can later surface
+    // as a texture upload failure in tgfx's IOSurface-backed HardwareBufferCheck rather than an
+    // obvious decode error.
+    LOGE("HardwareDecoder:pixel buffer attributes rejected, falling back to decoder defaults which "
+         "may break IOSurface texture upload status = %d",
          static_cast<int>(resolvedResult));
-    outAttrs = NULL;
   }
   VTDecompressionOutputCallbackRecord callBackRecord;
   callBackRecord.decompressionOutputCallback = DidDecompress;
