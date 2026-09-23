@@ -28,12 +28,10 @@ void PAGWindowHelper::setWindowStyle(QQuickWindow* quickWindow, double red, doub
   if (quickWindow != nullptr) {
     NSView* view = (NSView*)quickWindow->winId();
     NSWindow* window = [view window];
-    if (@available(macOS 10.10, *)) {
-      window.titleVisibility = NSWindowTitleHidden;
-      window.styleMask |= NSWindowStyleMaskFullSizeContentView;
-      window.titlebarAppearsTransparent = true;
-      window.contentView.wantsLayer = true;
-    }
+    window.titleVisibility = NSWindowTitleHidden;
+    window.styleMask |= NSWindowStyleMaskFullSizeContentView;
+    window.titlebarAppearsTransparent = true;
+    window.contentView.wantsLayer = true;
     window.colorSpace = [NSColorSpace extendedSRGBColorSpace];
     window.backgroundColor = [NSColor colorWithRed:red green:green blue:blue alpha:1.];
   }

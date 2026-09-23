@@ -156,14 +156,19 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
     elseif (MACOS)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-        endif ()
+        # Recent Apple toolchains reject the old 10.15 default: libc++ warns below 11.0
+        # (-Werror makes it fatal) and the SDK refuses below 12.0 with the Xcode generator.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
     elseif (IOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+        # libc++ and the SDK both reject a deployment target below 15.0.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
     endif ()
+endif ()
+
+# iOS 15.0 is the lowest target both Xcode 26 (iOS 15-26) and Xcode 27 (iOS 15-27) accept. The
+# Ninja path never loads the toolchain, so this is the only thing guarding it there.
+if (IOS AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "15.0")
+    message(FATAL_ERROR "Building for iOS requires CMAKE_OSX_DEPLOYMENT_TARGET >= 15.0.")
 endif ()
 
 file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)

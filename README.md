@@ -66,10 +66,10 @@ required for features like video templates.
 
 ## System Requirements
 
-- iOS 9.0+
+- iOS 15.0+
 - Android 5.0+
 - HarmonyOS Next 5.0.0(12)+
-- macOS 10.15+
+- macOS 12.0+
 - Windows 7.0+
 - Chrome 69.0+ (Web)
 - Safari 15.0+ (Web)
@@ -213,7 +213,7 @@ you can download the precompiled libraries from [here](https://github.com/Tencen
 
 ### Build Prerequisites
 
-- Xcode 11.0+
+- Xcode 13.0+
 - GCC 9.0+
 - Visual Studio 2019+
 - NodeJS 14.14.0+

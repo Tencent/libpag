@@ -231,13 +231,9 @@ pag::DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int
 
   // create sample buffer
   const size_t sampleSizeArray[] = {length};
-  if (@available(macOS 10.10, *)) {
-    status = CMSampleBufferCreateReady(kCFAllocatorDefault, blockBuffer, videoFormatDescription, 1,
-                                       0, NULL, 1, sampleSizeArray, &sampleBuffer);
-  } else {
-    LOGE("HardwareDecoder: Error on sending bytes for decoding.\n");
-    return DecodingResult::Error;
-  }
+  // CMSampleBufferCreateReady needs macOS 10.10, well below the 12.0 floor.
+  status = CMSampleBufferCreateReady(kCFAllocatorDefault, blockBuffer, videoFormatDescription, 1, 0,
+                                     NULL, 1, sampleSizeArray, &sampleBuffer);
 
   if (status != noErr) {
     LOGE("HardwareDecoder:CMSampleBufferRef failed status=%d", (int)status);
