@@ -53,6 +53,14 @@ static PreComposeLayer* MakePreComposeLayer(ID compositionID) {
   return layer;
 }
 
+static Layer* MakeLayer(ID id) {
+  auto layer = new Layer();
+  layer->id = id;
+  layer->duration = 60;
+  layer->transform = Transform2D::MakeDefault().release();
+  return layer;
+}
+
 /**
  * 用例描述: 校验加载混淆过的错误 PAG 文件是否会崩溃。
  */
@@ -129,10 +137,7 @@ PAG_TEST(PAGFuzzTest, PreComposeNestingDepth) {
  */
 PAG_TEST(PAGFuzzTest, LayerParentCycle) {
   auto mainComposition = MakeVectorComposition(1);
-  auto layer = new Layer();
-  layer->id = 2;
-  layer->duration = 60;
-  layer->transform = Transform2D::MakeDefault().release();
+  auto layer = MakeLayer(2);
   mainComposition->layers.push_back(layer);
 
   std::vector<Composition*> compositions = {mainComposition};
@@ -140,9 +145,41 @@ PAG_TEST(PAGFuzzTest, LayerParentCycle) {
   auto file = Codec::VerifyAndMake(compositions, {});
   ASSERT_NE(file, nullptr);
 
+  auto validBytes = Codec::Encode(file);
+  ASSERT_NE(validBytes, nullptr);
+  ASSERT_NE(File::Load(validBytes->data(), validBytes->length()), nullptr);
+
   layer->parent = layer;
   auto bytes = Codec::Encode(file);
   ASSERT_NE(bytes, nullptr);
   ASSERT_EQ(File::Load(bytes->data(), bytes->length()), nullptr);
+}
+
+/**
+ * 用例描述: 校验合法的图层父级链可以通过，成环的父级链会被拒绝。
+ */
+PAG_TEST(PAGFuzzTest, LayerParentChain) {
+  auto mainComposition = MakeVectorComposition(1);
+  auto firstLayer = MakeLayer(2);
+  auto secondLayer = MakeLayer(3);
+  auto thirdLayer = MakeLayer(4);
+  mainComposition->layers = {firstLayer, secondLayer, thirdLayer};
+
+  std::vector<Composition*> compositions = {mainComposition};
+  Codec::InstallReferences(compositions);
+  secondLayer->parent = firstLayer;
+  thirdLayer->parent = secondLayer;
+  auto file = Codec::VerifyAndMake(compositions, {});
+  ASSERT_NE(file, nullptr);
+
+  auto validBytes = Codec::Encode(file);
+  ASSERT_NE(validBytes, nullptr);
+  ASSERT_NE(File::Load(validBytes->data(), validBytes->length()), nullptr);
+
+  firstLayer->parent = secondLayer;
+  secondLayer->parent = firstLayer;
+  auto cycleBytes = Codec::Encode(file);
+  ASSERT_NE(cycleBytes, nullptr);
+  ASSERT_EQ(File::Load(cycleBytes->data(), cycleBytes->length()), nullptr);
 }
 }  // namespace pag
