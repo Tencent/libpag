@@ -226,7 +226,7 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     } guard{target, target->visible};
     target->visible = false;
 
-    std::string fileName = "pd_" + std::to_string(idx) + ".png";
+    std::string fileName = ctx->idPrefix + "pd_" + std::to_string(idx) + ".png";
     std::shared_ptr<tgfx::Data> encoded;
     if (!RenderCroppedBackdrop(doc, gpuCtx, bx, by, bw, bh, ctx->rasterScale, &encoded)) {
       continue;
@@ -244,7 +244,7 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     }
 
     PlusDarkerBackdrop entry;
-    entry.filterId = "pagx_pd_" + std::to_string(idx);
+    entry.filterId = ctx->idPrefix + "pagx_pd_" + std::to_string(idx);
     entry.backdropDataURL =
         "data:image/png;base64," + Base64Encode(encoded->bytes(), encoded->size());
     entry.cropLeft = bx;

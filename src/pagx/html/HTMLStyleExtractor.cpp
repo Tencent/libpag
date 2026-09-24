@@ -658,7 +658,7 @@ static bool IsPosInsideRange(size_t pos, const std::vector<std::pair<size_t, siz
 // Extract
 //==============================================================================
 
-std::string HTMLStyleExtractor::Extract(const std::string& html) {
+std::string HTMLStyleExtractor::Extract(const std::string& html, const std::string& namePrefix) {
   if (html.empty()) return html;
   auto tags = Tokenize(html);
 
@@ -793,7 +793,7 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
       auto prefix = InferSemanticPrefix(firstTag.tagName, classification.sharedProps,
                                         members[0]->properties, classification.varyingPropNames);
       // Emit base class.
-      auto baseName = prefix + std::to_string(prefixCounters[prefix]++);
+      auto baseName = namePrefix + prefix + std::to_string(prefixCounters[prefix]++);
       classRules.push_back(
           {baseName, BuildDeclarationsString(classification.sharedProps), true, false});
 
@@ -827,7 +827,7 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
               }
             }
           }
-          modName = prefix + std::to_string(prefixCounters[prefix]++);
+          modName = namePrefix + prefix + std::to_string(prefixCounters[prefix]++);
           classRules.push_back({modName, BuildDeclarationsString(varyingProps), true, false});
           varyingKeyToModifierName[varyingKey] = modName;
         }
@@ -850,7 +850,7 @@ std::string HTMLStyleExtractor::Extract(const std::string& html) {
           } else {
             prefix = InferStandalonePrefix(tag.tagName, entry.properties);
           }
-          auto className = prefix + std::to_string(prefixCounters[prefix]++);
+          auto className = namePrefix + prefix + std::to_string(prefixCounters[prefix]++);
           // Normalize declaration order for professional front-end readability.
           // dedup key (styleToClassName) continues to use decodedStyle: two tags with the
           // same source style trivially map to the same sorted output, so the cache works.
