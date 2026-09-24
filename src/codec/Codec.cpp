@@ -154,6 +154,12 @@ enum class VisitState {
   Visited,
 };
 
+struct CompositionVisitInfo {
+  VisitState state;
+  // The maximum number of the compositions on a reference chain starting from this composition.
+  size_t depth;
+};
+
 // The parent of a layer is resolved by id inside its own composition without any validation, so a
 // corrupted file can make a parent chain point back to one of its own layers. Such a chain forms
 // an endless loop in the traversals of the layer tree.
@@ -184,23 +190,28 @@ static bool VerifyLayerParentChains(const std::vector<Layer*>& layers) {
 }
 
 // The composition references are resolved by id without any validation, so a corrupted file can
-// make the references form a cycle. The nesting depth is limited as well, otherwise a deeply
-// nested file would overflow the stack in the recursive traversals of the layer tree.
-static bool VerifyCompositionReferences(Composition* composition, size_t depth,
-                                        std::unordered_map<Composition*, VisitState>& states) {
-  if (composition == nullptr || depth > MaxCompositionNestingDepth) {
+// make the references form a cycle. The depth of the reference chains is limited as well,
+// otherwise a deeply nested file would overflow the stack in the recursive traversals of the
+// layer tree. The depth is measured for every composition instead of the recursion itself,
+// because the order of the compositions in a file is arbitrary.
+static bool MeasureCompositionDepth(Composition* composition, size_t recursionDepth,
+                                    std::unordered_map<Composition*, CompositionVisitInfo>& states,
+                                    size_t* depth) {
+  if (composition == nullptr || recursionDepth > MaxCompositionNestingDepth) {
     VerifyFailed();
     return false;
   }
   auto result = states.find(composition);
   if (result != states.end()) {
-    if (result->second == VisitState::Visiting) {
+    if (result->second.state == VisitState::Visiting) {
       VerifyFailed();
       return false;
     }
+    *depth = result->second.depth;
     return true;
   }
-  states[composition] = VisitState::Visiting;
+  states[composition] = {VisitState::Visiting, 0};
+  size_t maxChildDepth = 0;
   if (composition->type() == CompositionType::Vector) {
     auto vectorComposition = static_cast<VectorComposition*>(composition);
     if (!VerifyLayerParentChains(vectorComposition->layers)) {
@@ -210,20 +221,31 @@ static bool VerifyCompositionReferences(Composition* composition, size_t depth,
       if (layer->type() != LayerType::PreCompose) {
         continue;
       }
+      size_t childDepth = 0;
       auto child = static_cast<PreComposeLayer*>(layer)->composition;
-      if (!VerifyCompositionReferences(child, depth + 1, states)) {
+      if (!MeasureCompositionDepth(child, recursionDepth + 1, states, &childDepth)) {
         return false;
+      }
+      if (childDepth > maxChildDepth) {
+        maxChildDepth = childDepth;
       }
     }
   }
-  states[composition] = VisitState::Visited;
+  auto compositionDepth = maxChildDepth + 1;
+  if (compositionDepth > MaxCompositionNestingDepth) {
+    VerifyFailed();
+    return false;
+  }
+  states[composition] = {VisitState::Visited, compositionDepth};
+  *depth = compositionDepth;
   return true;
 }
 
 static bool VerifyCompositionGraph(const std::vector<Composition*>& compositions) {
-  std::unordered_map<Composition*, VisitState> states = {};
+  std::unordered_map<Composition*, CompositionVisitInfo> states = {};
   for (auto composition : compositions) {
-    if (!VerifyCompositionReferences(composition, 0, states)) {
+    size_t depth = 0;
+    if (!MeasureCompositionDepth(composition, 0, states, &depth)) {
       return false;
     }
   }

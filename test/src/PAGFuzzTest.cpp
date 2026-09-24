@@ -88,19 +88,29 @@ PAG_TEST(PAGFuzzTest, PreComposeReferenceCycle) {
   ASSERT_EQ(File::Load(cycleBytes->data(), cycleBytes->length()), nullptr);
 }
 
+// Builds a chain of compositions, each one references the next by a pre-compose layer.
+static std::vector<Composition*> MakePreComposeChain(int count, bool reversed) {
+  std::vector<Composition*> compositions(count);
+  for (int i = 0; i < count; i++) {
+    auto composition = MakeVectorComposition(static_cast<ID>(i + 1));
+    if (i + 1 < count) {
+      composition->layers.push_back(MakePreComposeLayer(static_cast<ID>(i + 2)));
+    }
+    compositions[reversed ? count - 1 - i : i] = composition;
+  }
+  return compositions;
+}
+
 /**
  * 用例描述: 校验预合成嵌套过深的文件不会导致栈溢出。
  */
 PAG_TEST(PAGFuzzTest, PreComposeNestingDepth) {
   const int compositionCount = 200;
-  std::vector<Composition*> compositions = {};
-  for (int i = 0; i < compositionCount; i++) {
-    auto composition = MakeVectorComposition(static_cast<ID>(i + 1));
-    if (i + 1 < compositionCount) {
-      composition->layers.push_back(MakePreComposeLayer(static_cast<ID>(i + 2)));
-    }
-    compositions.push_back(composition);
-  }
+  auto compositions = MakePreComposeChain(compositionCount, false);
+  Codec::InstallReferences(compositions);
+  ASSERT_EQ(Codec::VerifyAndMake(compositions, {}), nullptr);
+
+  compositions = MakePreComposeChain(compositionCount, true);
   Codec::InstallReferences(compositions);
   ASSERT_EQ(Codec::VerifyAndMake(compositions, {}), nullptr);
 }
