@@ -45,8 +45,10 @@ void VectorComposition::updateStaticTimeRanges() {
     if (layer->type() == LayerType::PreCompose) {
       auto composition = static_cast<PreComposeLayer*>(layer)->composition;
       if (!composition->staticTimeRangeUpdated) {
-        composition->updateStaticTimeRanges();
+        // The flag must be set before the recursion, otherwise a referenced cycle would make the
+        // recursion never end.
         composition->staticTimeRangeUpdated = true;
+        composition->updateStaticTimeRanges();
       }
     }
     layer->excludeVaryingRanges(&staticTimeRanges);
