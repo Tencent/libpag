@@ -105,12 +105,21 @@ static std::vector<Composition*> MakePreComposeChain(int count, bool reversed) {
  * 用例描述: 校验预合成嵌套过深的文件不会导致栈溢出。
  */
 PAG_TEST(PAGFuzzTest, PreComposeNestingDepth) {
-  const int compositionCount = 200;
-  auto compositions = MakePreComposeChain(compositionCount, false);
+  // Should be the same as MaxCompositionNestingDepth in Codec.cpp.
+  const int maxDepth = 128;
+  auto compositions = MakePreComposeChain(maxDepth, false);
+  Codec::InstallReferences(compositions);
+  ASSERT_NE(Codec::VerifyAndMake(compositions, {}), nullptr);
+
+  compositions = MakePreComposeChain(maxDepth + 1, false);
   Codec::InstallReferences(compositions);
   ASSERT_EQ(Codec::VerifyAndMake(compositions, {}), nullptr);
 
-  compositions = MakePreComposeChain(compositionCount, true);
+  compositions = MakePreComposeChain(maxDepth + 1, true);
+  Codec::InstallReferences(compositions);
+  ASSERT_EQ(Codec::VerifyAndMake(compositions, {}), nullptr);
+
+  compositions = MakePreComposeChain(maxDepth * 2, false);
   Codec::InstallReferences(compositions);
   ASSERT_EQ(Codec::VerifyAndMake(compositions, {}), nullptr);
 }
