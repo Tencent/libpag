@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "pagx/PAGXDocument.h"
 #include "pagx/types/Data.h"
 
@@ -181,6 +182,46 @@ class HTMLExporter {
    * @return The complete HTML ZIP archive as Data, or nullptr on failure.
    */
   static std::shared_ptr<Data> ToData(PAGXDocument& document, const Options& options = {},
+                                      std::string* errorMsg = nullptr);
+
+  /**
+   * Exports a sequence of PAGXDocuments as a single self-contained HTML presentation (a "deck")
+   * packed into a ZIP archive. The archive contains a full HTML document at index.html and all
+   * auxiliary resources under assets/. Each document becomes one page, in the order supplied; a
+   * single-element list yields a one-page deck.
+   *
+   * Unlike PPTExporter — which adopts the first document's slide size for the whole deck — every
+   * page keeps its own logical size and is scaled to fit the viewer's window while staying
+   * centered, so pages of different sizes are all presented at their largest legible scale.
+   *
+   * The generated presentation supports keyboard paging (arrow keys, PageUp/PageDown, Space,
+   * Home/End), click and touch-swipe paging, URL hash deep links (#pN), a page indicator, and
+   * manual zoom (Ctrl+wheel, double-click, pinch, +/-/0) with drag-to-pan while zoomed. Paging
+   * resets the zoom so every page starts fit to the window.
+   *
+   * Precondition: the exporter reads layout-resolved geometry from every document, applying
+   * layout automatically if needed. Element ids, class names, and resource filenames are
+   * namespaced with a per-page prefix so pages cannot collide with each other; author-assigned
+   * node ids are prefixed the same way.
+   *
+   * Resource handling matches the single-document ToData: Image::data takes precedence
+   * (populated via PAGXDocument::loadFileDataMap()), base64 data URIs in filePath are decoded
+   * into the archive, and references that resolve to neither degrade gracefully by omission.
+   *
+   * Failure semantics: this method is all-or-nothing — it returns nullptr if the list is empty,
+   * contains a nullptr entry or a document with unresolved imports, if any document fails to
+   * apply its layout, or if any page cannot be serialized or written into the archive. If
+   * errorMsg is not null, a human-readable description is written to *errorMsg.
+   *
+   * @param documents the PAGXDocuments to export, one page per entry, in display order. Pointers
+   *        are non-const because internal layout computation may cache intermediate results. Must
+   *        not be empty or contain nullptr entries or unresolved imports.
+   * @param options export options controlling output formatting.
+   * @param errorMsg optional pointer to receive a human-readable error description on failure.
+   * @return the complete HTML presentation ZIP archive as Data, or nullptr on failure.
+   */
+  static std::shared_ptr<Data> ToData(const std::vector<PAGXDocument*>& documents,
+                                      const Options& options = {},
                                       std::string* errorMsg = nullptr);
 };
 

@@ -24,6 +24,7 @@
 #include <iostream>
 #include <string>
 #include "pagx/html/HTMLBuilder.h"
+#include "pagx/html/HTMLDeckWriter.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
@@ -293,7 +294,7 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   std::string nativeHTML = RoundCoordinatesInHTML(html.release());
 
   if (options.extractStyleSheet) {
-    nativeHTML = HTMLStyleExtractor::Extract(nativeHTML);
+    nativeHTML = HTMLStyleExtractor::Extract(nativeHTML, ctx.idPrefix);
   }
 
   std::string result = nativeHTML;
@@ -438,6 +439,88 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
   return zipWriter.finish(errorMsg);
 #else
   (void)document;
+  (void)options;
+  if (errorMsg) {
+    *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
+  }
+  return nullptr;
+#endif
+}
+
+std::shared_ptr<Data> HTMLExporter::ToData(const std::vector<PAGXDocument*>& documents,
+                                           const Options& options, std::string* errorMsg) {
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
+  if (documents.empty()) {
+    if (errorMsg) {
+      *errorMsg = "documents must not be empty.";
+    }
+    return nullptr;
+  }
+  HTMLZipWriter zipWriter;
+  std::vector<std::string> fragments = {};
+  std::vector<std::pair<float, float>> pageSizes = {};
+  fragments.reserve(documents.size());
+  pageSizes.reserve(documents.size());
+  for (size_t i = 0; i < documents.size(); i++) {
+    auto page = std::to_string(i + 1);
+    auto* document = documents[i];
+    if (document == nullptr) {
+      if (errorMsg) {
+        *errorMsg = "documents[" + std::to_string(i) + "] is null.";
+      }
+      return nullptr;
+    }
+    if (document->hasUnresolvedImports()) {
+      if (errorMsg) {
+        *errorMsg = "page " + page + " has unresolved imports.";
+      }
+      return nullptr;
+    }
+    // applyLayout reports structural failures (for example, a cyclic external composition)
+    // through the document's error list. Fail the whole deck instead of silently turning the
+    // page into a blank one, matching PPTExporter's all-or-nothing deck semantics.
+    auto errorCount = document->errors.size();
+    if (!document->isLayoutApplied()) {
+      document->applyLayout();
+    }
+    if (!document->isLayoutApplied() || document->errors.size() != errorCount) {
+      if (errorMsg) {
+        *errorMsg = "page " + page + " failed to apply layout.";
+      }
+      return nullptr;
+    }
+    HTMLWriterContext ctx;
+    ctx.docWidth = document->width;
+    ctx.docHeight = document->height;
+    ctx.zipWriter = &zipWriter;
+    ctx.staticImgUrlPrefix = "assets/";
+    ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
+    // Namespace every generated id, class name, and resource filename per page so the page
+    // fragments can share one HTML document and one assets/ directory without colliding.
+    ctx.idPrefix = "s" + std::to_string(i) + "-";
+    auto fragment = BuildHTML(*document, HTMLOutputMode::Fragment, options, ctx);
+    if (fragment.empty()) {
+      if (errorMsg) {
+        *errorMsg = "page " + page + " produced no HTML output.";
+      }
+      return nullptr;
+    }
+    if (!ctx.zipWriteError.empty()) {
+      if (errorMsg) {
+        *errorMsg = "failed to write resource into archive: " + ctx.zipWriteError;
+      }
+      return nullptr;
+    }
+    fragments.push_back(std::move(fragment));
+    pageSizes.emplace_back(document->width, document->height);
+  }
+  auto deck = BuildDeckHTML(fragments, pageSizes);
+  if (!zipWriter.write("index.html", deck.data(), deck.size(), errorMsg)) {
+    return nullptr;
+  }
+  return zipWriter.finish(errorMsg);
+#else
+  (void)documents;
   (void)options;
   if (errorMsg) {
     *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
