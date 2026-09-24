@@ -147,11 +147,94 @@ void Codec::InstallReferences(const std::vector<Composition*>& compositions) {
   }
 }
 
+static const size_t MaxCompositionNestingDepth = 128;
+
+enum class VisitState {
+  Visiting,
+  Visited,
+};
+
+// The parent of a layer is resolved by id inside its own composition without any validation, so a
+// corrupted file can make a parent chain point back to one of its own layers. Such a chain forms
+// an endless loop in the traversals of the layer tree.
+static bool VerifyLayerParentChains(const std::vector<Layer*>& layers) {
+  std::unordered_set<Layer*> verifiedLayers = {};
+  std::vector<Layer*> chain = {};
+  for (auto layer : layers) {
+    if (layer == nullptr) {
+      VerifyFailed();
+      return false;
+    }
+    chain.clear();
+    auto current = layer;
+    while (current != nullptr && verifiedLayers.find(current) == verifiedLayers.end() &&
+           chain.size() <= layers.size()) {
+      chain.push_back(current);
+      current = current->parent;
+    }
+    if (chain.size() > layers.size()) {
+      VerifyFailed();
+      return false;
+    }
+    for (auto item : chain) {
+      verifiedLayers.insert(item);
+    }
+  }
+  return true;
+}
+
+// The composition references are resolved by id without any validation, so a corrupted file can
+// make the references form a cycle. The nesting depth is limited as well, otherwise a deeply
+// nested file would overflow the stack in the recursive traversals of the layer tree.
+static bool VerifyCompositionReferences(Composition* composition, size_t depth,
+                                        std::unordered_map<Composition*, VisitState>& states) {
+  if (composition == nullptr || depth > MaxCompositionNestingDepth) {
+    VerifyFailed();
+    return false;
+  }
+  auto result = states.find(composition);
+  if (result != states.end()) {
+    if (result->second == VisitState::Visiting) {
+      VerifyFailed();
+      return false;
+    }
+    return true;
+  }
+  states[composition] = VisitState::Visiting;
+  if (composition->type() == CompositionType::Vector) {
+    auto vectorComposition = static_cast<VectorComposition*>(composition);
+    if (!VerifyLayerParentChains(vectorComposition->layers)) {
+      return false;
+    }
+    for (auto layer : vectorComposition->layers) {
+      if (layer->type() != LayerType::PreCompose) {
+        continue;
+      }
+      auto child = static_cast<PreComposeLayer*>(layer)->composition;
+      if (!VerifyCompositionReferences(child, depth + 1, states)) {
+        return false;
+      }
+    }
+  }
+  states[composition] = VisitState::Visited;
+  return true;
+}
+
+static bool VerifyCompositionGraph(const std::vector<Composition*>& compositions) {
+  std::unordered_map<Composition*, VisitState> states = {};
+  for (auto composition : compositions) {
+    if (!VerifyCompositionReferences(composition, 0, states)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::shared_ptr<File> Codec::VerifyAndMake(const std::vector<pag::Composition*>& compositions,
                                            const std::vector<pag::ImageBytes*>& images) {
-  bool success = !compositions.empty();
+  bool success = !compositions.empty() && VerifyCompositionGraph(compositions);
   for (auto composition : compositions) {
-    if (composition == nullptr || !composition->verify()) {
+    if (!success || composition == nullptr || !composition->verify()) {
       success = false;
       break;
     }
