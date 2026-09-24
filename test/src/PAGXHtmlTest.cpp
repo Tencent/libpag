@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include "base/PAGTest.h"
@@ -43,6 +44,7 @@
 #include "tgfx/core/Path.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
+#include "utils/ZipTestUtils.h"
 #include "woff2/decode.h"
 
 namespace pag {
@@ -2979,6 +2981,174 @@ CLI_TEST(PAGXHtmlTest, Woff2HostWinsWhenBothMarkersPresent) {
   ASSERT_EQ(texts.size(), 1u);
   EXPECT_EQ(texts[0]->text, "Both");
   EXPECT_EQ(texts[0]->fontFamily, "CustomFont");
+}
+
+// =============================================================================
+// Multi-document deck export (HTMLExporter::ToData with a document list)
+// =============================================================================
+
+static std::shared_ptr<pagx::PAGXDocument> LoadDeckPage(const char* xml) {
+  return pagx::PAGXImporter::FromXML(xml);
+}
+
+static std::string DeckHTMLFrom(const std::shared_ptr<pagx::Data>& data,
+                                std::unordered_map<std::string, std::string>* entries) {
+  if (!ExtractZipEntries(data.get(), entries)) {
+    return "";
+  }
+  auto it = entries->find("index.html");
+  return it == entries->end() ? std::string() : it->second;
+}
+
+CLI_TEST(PAGXHtmlTest, DeckExport_TwoPagesStructure) {
+  auto page1 = LoadDeckPage(R"(
+<pagx width="400" height="300">
+  <Layer id="background" width="400" height="300">
+    <Rectangle position="200,150" size="200,100"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>)");
+  auto page2 = LoadDeckPage(R"(
+<pagx width="320" height="220">
+  <Layer id="background" width="320" height="220">
+    <Rectangle position="160,110" size="120,80"/>
+    <Fill color="#EC4899"/>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(page1, nullptr);
+  ASSERT_NE(page2, nullptr);
+
+  std::vector<pagx::PAGXDocument*> documents = {page1.get(), page2.get()};
+  std::string errorMsg;
+  auto data = pagx::HTMLExporter::ToData(documents, {}, &errorMsg);
+  ASSERT_NE(data, nullptr) << errorMsg;
+
+  std::unordered_map<std::string, std::string> entries = {};
+  auto html = DeckHTMLFrom(data, &entries);
+  ASSERT_FALSE(html.empty());
+
+  // Deck shell: one <section> per document carrying its own logical size, plus the
+  // navigation/zoom scaffolding.
+  EXPECT_NE(html.find("<!DOCTYPE html>"), std::string::npos);
+  EXPECT_NE(html.find("id=\"deck\""), std::string::npos);
+  EXPECT_NE(html.find("id=\"deck-page\""), std::string::npos);
+  EXPECT_NE(html.find("id=\"deck-zoom\""), std::string::npos);
+  EXPECT_NE(html.find("<section data-w=\"400\" data-h=\"300\">"), std::string::npos);
+  EXPECT_NE(html.find("<section data-w=\"320\" data-h=\"220\">"), std::string::npos);
+  EXPECT_EQ(CountOccurrences(html, "data-pagx-version"), static_cast<size_t>(2));
+
+  // Both pages use the author id "background": each page fragment must be namespaced with its
+  // own "s{n}-" prefix so the combined document has no duplicate ids.
+  EXPECT_NE(html.find("id=\"s0-background\""), std::string::npos);
+  EXPECT_NE(html.find("id=\"s1-background\""), std::string::npos);
+  EXPECT_EQ(html.find("id=\"background\""), std::string::npos);
+
+  // Stylesheet extraction namespaces the generated class names the same way.
+  EXPECT_NE(html.find("s0-root0"), std::string::npos);
+  EXPECT_NE(html.find("s1-root0"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, DeckExport_SingleElementYieldsOnePage) {
+  auto page = LoadDeckPage(R"(
+<pagx width="360" height="240">
+  <Layer id="background" width="360" height="240">
+    <Rectangle position="180,120" size="160,100"/>
+    <Fill color="#22C55E"/>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(page, nullptr);
+
+  std::vector<pagx::PAGXDocument*> documents = {page.get()};
+  auto data = pagx::HTMLExporter::ToData(documents);
+  ASSERT_NE(data, nullptr);
+
+  std::unordered_map<std::string, std::string> entries = {};
+  auto html = DeckHTMLFrom(data, &entries);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("id=\"deck\""), std::string::npos);
+  EXPECT_EQ(CountOccurrences(html, "<section "), static_cast<size_t>(1));
+  EXPECT_NE(html.find("<section data-w=\"360\" data-h=\"240\">"), std::string::npos);
+}
+
+// Each page's generated assets must land under distinct names inside the shared assets/
+// directory. ExtractZipEntries rejects duplicate entries, so a successful extraction already
+// proves no page overwrote another page's files; the namespaced names are pinned explicitly.
+CLI_TEST(PAGXHtmlTest, DeckExport_PageAssetsAreNamespaced) {
+  auto resourcePath = ProjectPath::Absolute("resources/pagx_to_html/color_conic_gradient.pagx");
+  auto page1 = pagx::PAGXImporter::FromFile(resourcePath);
+  auto page2 = pagx::PAGXImporter::FromFile(resourcePath);
+  ASSERT_NE(page1, nullptr);
+  ASSERT_NE(page2, nullptr);
+
+  std::vector<pagx::PAGXDocument*> documents = {page1.get(), page2.get()};
+  auto data = pagx::HTMLExporter::ToData(documents);
+  ASSERT_NE(data, nullptr);
+
+  std::unordered_map<std::string, std::string> entries = {};
+  auto html = DeckHTMLFrom(data, &entries);
+  ASSERT_FALSE(html.empty());
+
+  bool hasPage0Asset = false;
+  bool hasPage1Asset = false;
+  for (const auto& entry : entries) {
+    if (entry.first.rfind("assets/s0-", 0) == 0) {
+      hasPage0Asset = true;
+    }
+    if (entry.first.rfind("assets/s1-", 0) == 0) {
+      hasPage1Asset = true;
+    }
+  }
+  EXPECT_TRUE(hasPage0Asset);
+  EXPECT_TRUE(hasPage1Asset);
+}
+
+CLI_TEST(PAGXHtmlTest, DeckExport_EmptyListFails) {
+  std::vector<pagx::PAGXDocument*> documents = {};
+  std::string errorMsg;
+  auto data = pagx::HTMLExporter::ToData(documents, {}, &errorMsg);
+  EXPECT_EQ(data, nullptr);
+  EXPECT_FALSE(errorMsg.empty());
+}
+
+CLI_TEST(PAGXHtmlTest, DeckExport_NullEntryFails) {
+  auto page = LoadDeckPage(R"(
+<pagx width="100" height="100">
+  <Layer width="100" height="100">
+    <Rectangle position="50,50" size="40,40"/>
+    <Fill color="#3366FF"/>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(page, nullptr);
+
+  std::vector<pagx::PAGXDocument*> documents = {page.get(), nullptr};
+  std::string errorMsg;
+  auto data = pagx::HTMLExporter::ToData(documents, {}, &errorMsg);
+  EXPECT_EQ(data, nullptr);
+  EXPECT_FALSE(errorMsg.empty());
+}
+
+// The single-document ToData overload keeps its legacy output shape: a plain full HTML document
+// with no deck scaffolding, and no page prefix on author ids.
+CLI_TEST(PAGXHtmlTest, SingleDocumentToDataKeepsLegacyShape) {
+  auto page = LoadDeckPage(R"(
+<pagx width="200" height="140">
+  <Layer id="background" width="200" height="140">
+    <Rectangle position="100,70" size="80,60"/>
+    <Fill color="#F59E0B"/>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(page, nullptr);
+
+  auto data = pagx::HTMLExporter::ToData(*page);
+  ASSERT_NE(data, nullptr);
+
+  std::unordered_map<std::string, std::string> entries = {};
+  auto html = DeckHTMLFrom(data, &entries);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("data-pagx-version"), std::string::npos);
+  EXPECT_EQ(html.find("id=\"deck\""), std::string::npos);
+  EXPECT_NE(html.find("id=\"background\""), std::string::npos);
+  EXPECT_EQ(html.find("id=\"s0-background\""), std::string::npos);
 }
 
 }  // namespace pag
