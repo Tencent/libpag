@@ -179,9 +179,6 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
     }
     auto bound = std::upper_bound(clusterBounds.begin(), clusterBounds.end(), infos[i].cluster);
     auto clusterEnd = bound == clusterBounds.end() ? static_cast<uint32_t>(text.length()) : *bound;
-    if (clusterEnd <= infos[i].cluster) {
-      continue;
-    }
     result.emplace_back(infos[i].codepoint, infos[i].cluster, clusterEnd - infos[i].cluster);
   }
   return result;
