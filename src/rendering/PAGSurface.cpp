@@ -22,7 +22,6 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/drawables/Drawable.h"
 #include "rendering/gpu/Devices.h"
-#include "rendering/gpu/GLRestorer.h"
 #include "rendering/graphics/Recorder.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
@@ -36,14 +35,14 @@ PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
   if (externalContext) {
     // Devices::MakeExternalStateGuard() returns nullptr on backends / platforms that do not need
     // host GPU state preservation (all non-GL backends, plus Web and Windows on GL for historical
-    // reasons). The raw pointer is stored in the void* field declared in include/pag/pag.h to
-    // keep the public header's ABI unchanged.
-    glRestorer = Devices::MakeExternalStateGuard().release();
+    // reasons). The raw pointer is stored in a void* field so the public header does not have to
+    // include the internal ExternalStateGuard definition.
+    stateGuard = Devices::MakeExternalStateGuard().release();
   }
 }
 
 PAGSurface::~PAGSurface() {
-  delete static_cast<ExternalStateGuard*>(glRestorer);
+  delete static_cast<ExternalStateGuard*>(stateGuard);
 }
 
 int PAGSurface::width() {
@@ -327,15 +326,15 @@ tgfx::Context* PAGSurface::lockContext() {
     return nullptr;
   }
   auto context = device->lockContext();
-  if (context != nullptr && glRestorer != nullptr) {
-    static_cast<ExternalStateGuard*>(glRestorer)->save(context);
+  if (context != nullptr && stateGuard != nullptr) {
+    static_cast<ExternalStateGuard*>(stateGuard)->save(context);
   }
   return context;
 }
 
 void PAGSurface::unlockContext() {
-  if (glRestorer != nullptr) {
-    static_cast<ExternalStateGuard*>(glRestorer)->restore();
+  if (stateGuard != nullptr) {
+    static_cast<ExternalStateGuard*>(stateGuard)->restore();
   }
   auto device = drawable->getDevice();
   if (device != nullptr) {

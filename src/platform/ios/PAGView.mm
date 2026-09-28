@@ -32,6 +32,7 @@
 
 #if defined(TGFX_USE_METAL)
 #import <Metal/Metal.h>
+#include "platform/cocoa/private/PAGMetalLayerHelper.h"
 #endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGAnimatorListener>
@@ -110,10 +111,8 @@
 
 - (void)updateLayerDrawableSize {
 #if defined(TGFX_USE_METAL)
-  CAMetalLayer* layer = (CAMetalLayer*)[self layer];
-  CGSize size = self.bounds.size;
-  CGFloat scale = self.contentScaleFactor;
-  layer.drawableSize = CGSizeMake(size.width * scale, size.height * scale);
+  pag::cocoa::UpdateMetalLayerDrawableSize((CAMetalLayer*)[self layer], self.bounds.size,
+                                           self.contentScaleFactor);
 #endif
 }
 
@@ -193,8 +192,7 @@
 - (void)initPAGSurface {
 #if defined(TGFX_USE_METAL)
   CAMetalLayer* layer = (CAMetalLayer*)[self layer];
-  layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-  layer.framebufferOnly = YES;
+  pag::cocoa::SetUpPAGMetalLayer(layer);
   // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
   // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
   [self updateLayerDrawableSize];

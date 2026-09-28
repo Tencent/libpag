@@ -337,12 +337,12 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
 
   auto device = pag::Devices::MakeDefault();
   if (device == nullptr) {
-    std::cerr << "pagx render: failed to create GL device\n";
+    std::cerr << "pagx render: failed to create the GPU device\n";
     return {};
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    std::cerr << "pagx render: failed to lock GL context\n";
+    std::cerr << "pagx render: failed to lock the GPU context\n";
     return {};
   }
 

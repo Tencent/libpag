@@ -61,20 +61,18 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> im
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
-  // Verify the caller has a current host GPU context (only meaningful on GL); on GL this records
-  // the native handle and Picture::BackendTextureProxy uses it later to check the render
-  // surface's device is share-compatible. On backends without a "current context" concept
-  // (Metal / D3D12 / Vulkan / WebGPU), the capture legitimately returns nullptr and we must
-  // not treat that as an error — RequiresCapturedIdentity() distinguishes the two cases.
-  auto deviceRef = Devices::CaptureFromTexture(ToTGFX(texture));
-  if (deviceRef == nullptr && Devices::RequiresCapturedIdentity()) {
-    LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
-    return nullptr;
-  }
   auto pagImage = std::shared_ptr<StillImage>(new StillImage(texture.width(), texture.height()));
+  // Picture::MakeFrom() captures the owning device identity from the texture in one shot. On GL
+  // it requires a current GPU context on the calling thread (capturing the native handle for the
+  // later share-compatibility check); on other backends a null capture is normal and not an
+  // error. Distinguish the two cases so the GL user gets an actionable message.
   auto picture = Picture::MakeFrom(pagImage->uniqueID(), ToTGFX(texture), ToTGFX(origin));
   if (!picture) {
-    LOGE("PAGImage.MakeFrom() The texture is invalid.");
+    if (Devices::RequiresCapturedIdentity()) {
+      LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
+    } else {
+      LOGE("PAGImage.MakeFrom() The texture is invalid.");
+    }
     return nullptr;
   }
   pagImage->graphic = picture;
