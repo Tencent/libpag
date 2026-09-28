@@ -33,7 +33,8 @@ PAG_API @interface PAGSurface : NSObject
 
 /**
  * Creates a new PAGSurface from a CAMetalLayer. The MTLDevice on the layer (or the system
- * default) is adopted internally. Returns nil if the current libpag build does not use the Metal
+ * default) is adopted internally. Multiple PAGSurfaces whose layers share the same MTLDevice
+ * share the same GPU caches. Returns nil if the current libpag build does not use the Metal
  * backend. The caller must keep the CAMetalLayer alive for the lifetime of the PAGSurface —
  * libpag does not retain it (retaining would risk a reference cycle in typical view-layer
  * setups), so releasing the layer while the PAGSurface is still in use is undefined behavior.

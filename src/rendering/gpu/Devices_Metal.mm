@@ -92,7 +92,9 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(const tgfx::BackendTexture
   if (mtlDevice == nil) {
     return nullptr;
   }
-  return tgfx::MetalDevice::MakeFrom((__bridge void*)mtlDevice);
+  // MetalDevice::MakeFrom deduplicates by id<MTLDevice> inside tgfx, so surfaces built from
+  // textures on the same GPU share one Device (and its ResourceCache / shader cache).
+  return tgfx::MetalDevice::MakeFrom(mtlDevice);
 }
 
 std::shared_ptr<tgfx::Device> Devices::MakeForTexture(
@@ -108,7 +110,7 @@ std::shared_ptr<tgfx::Device> Devices::MakeForTexture(
   if (mtlDevice == nil) {
     return nullptr;
   }
-  return tgfx::MetalDevice::MakeFrom((__bridge void*)mtlDevice);
+  return tgfx::MetalDevice::MakeFrom(mtlDevice);
 }
 
 std::shared_ptr<ExternalDeviceRef> Devices::CaptureFromTexture(

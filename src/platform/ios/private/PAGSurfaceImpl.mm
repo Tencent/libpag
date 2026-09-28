@@ -126,7 +126,7 @@
 #if defined(TGFX_USE_METAL)
   std::shared_ptr<tgfx::MetalDevice> metalDevice = nullptr;
   if (device != nil) {
-    metalDevice = tgfx::MetalDevice::MakeFrom((__bridge void*)device);
+    metalDevice = tgfx::MetalDevice::MakeFrom(device);
   }
   auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, metalDevice);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
