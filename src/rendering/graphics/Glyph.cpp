@@ -48,7 +48,7 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgf
     auto bound =
         std::upper_bound(stringIndexes.begin(), stringIndexes.end(), shapedGlyph.stringIndex);
     auto end = bound == stringIndexes.end() ? text.length() : static_cast<size_t>(*bound);
-    auto length = end > shapedGlyph.stringIndex ? end - shapedGlyph.stringIndex : 0;
+    auto length = end - shapedGlyph.stringIndex;
     auto name = text.substr(shapedGlyph.stringIndex, length);
     if (glyphMap.find(name) != glyphMap.end()) {
       glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
