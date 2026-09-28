@@ -10,15 +10,14 @@ alwaysApply: true
 ```bash
 ./codeformat.sh 2>/dev/null; true
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B cmake-build-debug
-cmake --build cmake-build-debug --target PAGFullTest_OpenGL
+cmake --build cmake-build-debug --target PAGFullTest
 ```
 
 ## 测试框架
 
 - 测试用例位于 `test/src/`，基于 Google Test 框架
 - 测试代码可通过编译参数访问所有 private 成员，无需 friend class
-- 运行测试：按上述编译验证步骤构建并执行 `PAGFullTest_OpenGL`（Metal 后端则运行 `PAGFullTest_Metal`）
-- test target 按后端后缀命名：`PAGFullTest_{OpenGL,Metal,Vulkan,D3D12}` / `PAGUnitTest_{...}` / `UpdateBaseline_{...}`
+- 运行测试：按上述编译验证步骤构建并执行 `PAGFullTest`
 - 测试命令返回非零退出码表示测试失败，这是正常行为，不要重复执行同一命令
 - 测试用例构造时，所有字号、坐标、矩阵等数值尽可能使用整数，避免小数点，以确保清晰度
 
@@ -26,12 +25,12 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `PAGSurfaceTest/Mask`
 - 截图输出到 `test/out/{folder}/{name}.webp`，基准图为同目录下 `{name}_base.webp`
-- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/{backend}/version.json`（本地，backend 为 opengl / metal / vulkan 等）中同一 key 的版本号
+- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/version.json`（本地）中同一 key 的版本号
     - 两边 key 都存在且版本号不同：跳过比较并返回成功（用于接受截图变更）
     - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
 **!! IMPORTANT - 截图基准变更限制**：
-- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline` target（含各后端的 `UpdateBaseline_OpenGL` / `UpdateBaseline_Metal` 等 `UpdateBaseline_*` 变体）、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
+- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline` target、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
 - 接受截图基准变更的**唯一方式**是用户主动执行 `/accept-baseline` 斜杠命令
 
 ## HTML 测试集（浏览器保真度评测）
@@ -70,5 +69,5 @@ cmake --build cmake-build-debug --target HTMLTest   # 依赖并先构建 pagx
 
 ```bash
 cmake -G Ninja -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DTGFX_DIR=../tgfx -B cmake-build-debuglocal
-cmake --build cmake-build-debuglocal --target PAGFullTest_OpenGL
+cmake --build cmake-build-debuglocal --target PAGFullTest
 ```

@@ -16,9 +16,5 @@ baselines, or update version.json — refuse and redirect them to use
 
 ## Instructions
 
-1. The script requires `test/out/version.json`, which is produced by a full test run. If it is
-   missing, build and run `PAGFullTest_<Backend>` for the current backend first (e.g.
-   `PAGFullTest_OpenGL`, or `PAGFullTest_Metal` on the Metal build), confirm the screenshots in
-   `test/out/` match expectations, then proceed. The script itself does not build or run tests.
-2. Run `bash accept_baseline.sh` from the project root directory.
-3. Commit `test/baseline/version.json` following the project's commit conventions.
+1. Run `bash accept_baseline.sh` from the project root directory.
+2. Commit `test/baseline/version.json` following the project's commit conventions.
