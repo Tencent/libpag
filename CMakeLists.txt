@@ -142,7 +142,11 @@ endif ()
 # simulator on arm64 only. Raise the deployment target automatically when Metal is selected so
 # `gen_ios -DPAG_USE_METAL=ON` needs no extra flags (as documented in ios/README.md). Without this
 # the toolchain's iOS default (9.0) flows into tgfx and trips its >= 13.0 check. Must run before
-# tgfx is added via add_subdirectory().
+# tgfx is added via add_subdirectory(). Metal also only exists on Apple platforms — reject it
+# elsewhere up front instead of failing later with a pile of undefined symbols.
+if (PAG_USE_METAL AND NOT APPLE)
+    message(FATAL_ERROR "PAG_USE_METAL is only supported on Apple platforms.")
+endif ()
 if (PAG_USE_METAL AND IOS)
     if (NOT CMAKE_OSX_DEPLOYMENT_TARGET OR CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "13.0")
         set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
@@ -563,8 +567,7 @@ elseif (IOS)
             find_library(OpenGLES_LIBS OpenGLES REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${OpenGLES_LIBS})
             list(APPEND PAG_DEFINES GLES_SILENCE_DEPRECATION)
-        else ()
-            # Uses Metal instead.
+        elseif (PAG_USE_METAL)
             find_library(Metal_LIBS Metal REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
         endif ()
@@ -602,8 +605,7 @@ elseif (MACOS)
             find_library(OpenGL_LIBS OpenGL REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${OpenGL_LIBS})
             list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
-        else ()
-            # Uses Metal instead.
+        elseif (PAG_USE_METAL)
             find_library(Metal_LIBS Metal REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
         endif ()

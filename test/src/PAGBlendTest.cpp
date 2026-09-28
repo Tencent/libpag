@@ -19,6 +19,18 @@
 #include "base/utils/TGFXCast.h"
 #include "utils/TestUtils.h"
 
+#ifdef TGFX_USE_OPENGL
+#include "tgfx/gpu/opengl/GLDevice.h"
+#ifdef PAG_USE_SWIFTSHADER
+#include <GLES3/gl3.h>
+#else
+#ifndef GL_SILENCE_DEPRECATION
+#define GL_SILENCE_DEPRECATION
+#endif
+#include <OpenGL/gl3.h>
+#endif
+#endif  // TGFX_USE_OPENGL
+
 namespace pag {
 using namespace tgfx;
 
@@ -52,17 +64,6 @@ PAG_TEST(PAGBlendTest, Blend) {
 // consume GLTextureInfo, so the rest of the GL section is gated on TGFX_USE_OPENGL. Metal
 // equivalents live in the TGFX_USE_METAL section at the bottom of this file.
 #ifdef TGFX_USE_OPENGL
-
-#include "tgfx/gpu/opengl/GLDevice.h"
-
-#ifdef PAG_USE_SWIFTSHADER
-#include <GLES3/gl3.h>
-#else
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-#include <OpenGL/gl3.h>
-#endif
 
 namespace pag {
 using namespace tgfx;

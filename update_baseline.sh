@@ -82,6 +82,11 @@
   STASH_LIST_BEFORE=$(git stash list)
   git stash push --include-untracked --quiet
   STASH_LIST_AFTER=$(git stash list)
+  # If anything below fails before the restore block runs (e.g. cmake configure error), restore
+  # the caller's branch and stashed changes so the working tree is not left on main with the
+  # user's changes still stashed. The trap also runs on the normal success path, replacing the
+  # old inline restore block.
+  trap 'cd "${0%/*}"; if [[ $CURRENT_BRANCH == "HEAD" ]]; then git checkout ${CURRENT_COMMIT} --quiet; else git switch ${CURRENT_BRANCH} --quiet; fi; if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then git stash pop --index --quiet; fi' EXIT
   git switch main --quiet
 
   ./install_tools.sh
@@ -127,15 +132,8 @@
 
   cd ..
 
-  if [[ $CURRENT_BRANCH == "HEAD" ]]; then
-      git checkout $CURRENT_COMMIT --quiet
-  else
-      git switch $CURRENT_BRANCH --quiet
-  fi
-  if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
-    git stash pop --index --quiet
-  fi
-
+  # Branch/stash restoration is handled by the EXIT trap set before `git switch main`, which
+  # covers both this success path and any failure above (cmake errors, build failures, ...).
   depsync
 
   if [ "$COMPLIE_RESULT" == false ]; then

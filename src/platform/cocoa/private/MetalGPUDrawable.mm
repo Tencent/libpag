@@ -20,6 +20,7 @@
 
 #import "MetalGPUDrawable.h"
 
+#include <cmath>
 #include "tgfx/core/Surface.h"
 
 namespace pag {

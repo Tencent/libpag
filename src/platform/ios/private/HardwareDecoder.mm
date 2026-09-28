@@ -227,12 +227,11 @@ bool HardwareDecoder::resetVideoToolBox() {
 #if defined(TGFX_USE_METAL)
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferMetalCompatibilityKey,
                         kCVPixelBufferIOSurfacePropertiesKey};
-  uint32_t gpuCompatibility = true;
 #else
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLESCompatibilityKey,
                         kCVPixelBufferIOSurfacePropertiesKey};
-  uint32_t gpuCompatibility = true;
 #endif
+  uint32_t gpuCompatibility = true;
 
   uint32_t pixelFormatType = tgfx::IsLimitedYUVColorRange(sourceColorSpace)
                                  ? kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
