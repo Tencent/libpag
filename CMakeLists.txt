@@ -250,11 +250,11 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
     elseif (MACOS)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-        endif ()
+        # Xcode 27's libc++ hard-requires a macOS deployment target >= 11.0 (older targets trip
+        # "#warning The selected platform is no longer supported by libc++", which -Werror turns
+        # into a build failure on every translation unit). 11.0 is also the natural floor for
+        # arm64 Macs, so use it for both architectures.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
     elseif (IOS)
         # Default deployment target for the non-toolchain path (e.g. -DCMAKE_SYSTEM_NAME=iOS);
         # the toolchain path is handled before project() above. tgfx's Metal backend enforces
