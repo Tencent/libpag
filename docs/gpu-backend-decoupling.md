@@ -2,10 +2,15 @@
 
 ## 版本信息
 
-- 文档版本：v1.0
-- 日期：2026-08-25
+- 文档版本：v1.1
+- 日期：2026-08-25（v1.1 更新于 2026-09-28）
 - 分支：`feature/thunderllei_gpu_backend`
-- 状态：**待评审**
+- 状态：**已实施（含 Metal 后端接入，见 §8）**
+
+> **实施状态说明**：§1.3 原定的「只做架构准备」范围在实际实施中已扩大——本 PR 同时接入了
+> Metal 后端（`Devices_Metal.mm`、平台 API、PAGView）、扩展了 `BackendSemaphore` ABI（Metal
+> semaphore，后为二进制兼容重构为 `MtlEventInfo` 形态）、并解除了公开头的宏门禁（工厂方法
+> 无条件声明）。原文保留如下作为历史设计意图，与实现不一致处以代码为准。
 
 ---
 
@@ -29,24 +34,23 @@ tgfx 的后端是**编译期强互斥**的（参见 `third_party/tgfx/CMakeLists
 
 **只做架构准备，不引入新后端**。核心目标：
 
-1. 把 libpag 里约 26 处对 `tgfx::GLDevice` 的直接调用、以及所有 `#include "tgfx/gpu/opengl/*.h"` **收敛到 1 个新文件** `Devices.cpp`（平台特化白名单除外，见 §5.4）
+1. 把 libpag 里约 26 处对 `tgfx::GLDevice` 的直接调用、以及所有 `#include "tgfx/gpu/opengl/*.h"` **收敛到 `src/rendering/gpu/` 下的 `Devices_GL.cpp` / `Devices_Metal.mm` / `Devices_Backend.cpp`（编译期哨兵）**（平台特化白名单除外，见 §5.4；实施时由单文件拆分为按后端分文件）
 2. 通过编译期宏 `TGFX_USE_OPENGL/METAL/VULKAN/D3D12/WEBGPU` 分派
 3. 其他所有渲染代码只见 `tgfx::Device` 基类
-4. 引入 `PAG_USE_METAL/VULKAN/D3D12/WEBGPU` CMake 开关，透传到 tgfx，与 `PAG_USE_OPENGL` 互斥
-5. **对外 API 完全不变**（`include/pag/*.h`、平台层 Java/OC/JS API 全部保留签名和行为）
+4. 引入 `PAG_USE_METAL/VULKAN/D3D12/WEBGPU` CMake 开关，透传到 tgfx，非 GL 后端之间互斥（与 `PAG_USE_OPENGL` 亦互斥）
+5. 对外 API 保持兼容（存量 API 签名不变；新增 Metal 特化 API 见 §8）
 
-**本次不做**：
+**本次不做**（v1.0 原文；实际实施状态见文档头部说明与 §8）：
 
-- 不实际引入 Metal/Vulkan/D3D12/WebGPU 任何一个新后端
-- 不改 tgfx 头文件（`VulkanImageInfo` 无 `VkDevice` 字段等历史遗留延后）
-- 不扩展 `BackendSemaphore` ABI（`initMetal/Vulkan/...` 等延后到具体后端接入时）
-- 不动 iOS `+FromCVPixelBuffer:context:(EAGLContext*)` 等对外 GL 特化 API
+- 不实际引入 Metal/Vulkan/D3D12/WebGPU 任何一个新后端 → *实际已接入 Metal*
+- 不改 tgfx 头文件（`VulkanImageInfo` 无 `VkDevice` 字段等历史遗留延后）→ *仍未改（tgfx 由 depsync 锁定）*
+- 不扩展 `BackendSemaphore` ABI（`initMetal/Vulkan/...` 等延后到具体后端接入时）→ *实际已扩展 Metal semaphore*
+- 不动 iOS `+FromCVPixelBuffer:context:(EAGLContext*)` 等对外 GL 特化 API → *该 API 保留，并新增了 Metal 特化变体*
 
 ### 1.4 收益
 
-- 未来接入 Metal/Vulkan/D3D12/WebGPU 只需在 `Devices.cpp` 加 `#elif` 分支
+- 未来接入 Vulkan/D3D12/WebGPU 只需新增对应的 `Devices_<Backend>.{cpp,mm}` 分支文件
 - 核心渲染代码变得"后端无关"，可读性提升
-- 无破坏性变更，可以独立合入 main
 - 为公司内部潜在的 Metal 后端 PoC 铺路
 
 ---
@@ -726,8 +730,8 @@ src/platform/web/pagx/GPUDrawable.h                 # 平台窗口
 
 以下为改造时的遗留项，标注 Metal 后端接入后的实际状态（`[完成]` / `[待完成]` / `[不适用]`）：
 
-1. **[完成] BackendSemaphore ABI 扩展**：`initMetal` / `mtlEvent` / `mtlValue` 已加入 `include/pag/gpu.h`。
-2. **[完成] iOS `+FromCVPixelBuffer:context:(EAGLContext*)` 的非 GL 版本**：已新增 `+FromCVPixelBuffer:device:(id<MTLDevice>)`。
+1. **[完成] BackendSemaphore ABI 扩展**：已加入 `include/pag/gpu.h`（`initMetal(const MtlEventInfo&)` + `getMtlEventInfo()`，公开 struct 形态；早期扁平的 `mtlEvent()`/`mtlValue()` 已随之重构删除）。
+2. **[完成] iOS `+FromCVPixelBuffer:context:(EAGLContext*)` 的非 GL 版本**：已新增 `+FromCVPixelBuffer:mtlDevice:(id<MTLDevice>)`。
 3. **[不适用] Android/Web 外部纹理 API 的非 GL 版本**：Android/Web 无 Metal 后端。
 4. **[不适用] VulkanImageInfo 无 VkDevice 字段**：Vulkan 后端相关，非 Metal。
 5. **[不适用] WebGPUDevice::Make 阻塞异步 Promise**：WebGPU 后端相关，非 Metal。
@@ -743,18 +747,23 @@ src/platform/web/pagx/GPUDrawable.h                 # 平台窗口
 
 | 后端 | 工作量 | 关键改动 |
 |---|---|---|
-| Metal | 核心已完成，仅剩 device 注入（多 GPU，低优先级） | `Devices.cpp` Metal 分支 + `MetalGPUDrawable` + iOS/mac 平台 API 扩展 + PAGView Metal 版（均已完成）；device 注入 API 待做（见 §8.1 第 8/9 项） |
-| Vulkan | 大 | 引入 device 注入 API 并强制要求 + 各平台 Vulkan Drawable + `TGFXCast` VK 分支 |
-| D3D12 | 中 | `Devices.cpp` D3D12 分支 + Windows Drawable + `TGFXCast` D3D12 分支 |
-| WebGPU | 大 | 引入并强制 device 注入 API + Web 侧 API + 异步初始化处理 |
+| Metal | 核心已完成，仅剩 device 注入（多 GPU，低优先级） | `Devices_Metal.mm` + `MetalGPUDrawable` + iOS/mac 平台 API 扩展 + PAGView Metal 版（均已完成）；device 注入 API 待做（见 §8.1 第 8/9 项） |
+| Vulkan | 大 | 引入 device 注入 API 并强制要求 + 各平台 Vulkan Drawable + `TGFXCast` VK 分支 + 新增 `Devices_Vulkan.cpp` |
+| D3D12 | 中 | 新增 `Devices_D3D12.cpp` + Windows Drawable + `TGFXCast` D3D12 分支 |
+| WebGPU | 大 | 引入并强制 device 注入 API + Web 侧 API + 异步初始化处理 + 新增 `Devices_WebGPU.cpp` |
 
 ### 8.3 Metal 剩余待办优先级
 
 | 待办 | 工作量 | 设计复杂度 | 优先级 | 建议 |
 |---|---|---|---|---|
 | device 注入 API + 多 GPU（§8.1 第 8/9 项） | 中 | **高** | 低 | 延后：进程级全局状态 + 生命周期 + 线程安全语义需精确定稿，且仅多 GPU 边缘场景需要；建议随 Vulkan/WebGPU 一起定稿，避免单独为 Metal 定语义后再改 |
+| tgfx `MetalDevice` 去重（deviceMap） | 小（tgfx 侧） | 中 | 中 | 多 PAGSurface / 多 PAGView 各自新建 MetalDevice（独立 Caps/Compiler/ResourceCache），显存与 shader 编译成本成倍；对齐 GL 的 deviceMap 需走 tgfx 上游 PR |
+| tgfx 窗口 drawable 回读（PR #1586） | 中 | 中 | 中 | `Drawable` 显式生命周期 + present 后回读契约；libpag 侧需改造 `MetalGPUDrawable` 走 `nextDrawable` + 持久纹理快照，GL 同样受益（swap 后 back buffer 内容规范未定义，实测为上一帧） |
 
-Metal 的其余功能（含 PAGView Metal 版）均已完成，当前唯一剩余待办是 device 注入 API。
+Metal 的其余功能（含 PAGView Metal 版）均已完成。**实施期间已发现并修复的问题记录**（review 过程沉淀）：
+
+- 公开头宏门禁：`src/platform/{ios,mac}/PAGSurface.h` 曾用 `TGFX_USE_*` 包裹工厂方法，导致预编译 framework 用户 API 不可见/存量调用编译失败——已改为无条件声明 + 实现层分派
+- ABI 破坏：本 PR 曾引入两处数据布局变化（`BackendSemaphore` +`_isInitialized`、`MtlTextureInfo` +`format`），均已通过推导式初始化状态与从真实 `MTLTexture` 读 format 消除，四个相关类型 sizeof 与 main 完全一致
 
 ---
 

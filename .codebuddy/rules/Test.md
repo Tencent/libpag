@@ -26,12 +26,12 @@ cmake --build cmake-build-debug --target PAGFullTest_OpenGL
 
 - 使用 `Baseline::Compare(pixels, key)` 比较截图，key 格式为 `{folder}/{name}`，例如 `PAGSurfaceTest/Mask`
 - 截图输出到 `test/out/{folder}/{name}.webp`，基准图为同目录下 `{name}_base.webp`
-- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/version.json`（本地）中同一 key 的版本号
+- 比较机制：对比 `test/baseline/version.json`（仓库）与 `test/baseline/.cache/{backend}/version.json`（本地，backend 为 opengl / metal / vulkan 等）中同一 key 的版本号
     - 两边 key 都存在且版本号不同：跳过比较并返回成功（用于接受截图变更）
     - 其他情况：正常比较基准图，基准图不存在或不匹配则测试失败
 
 **!! IMPORTANT - 截图基准变更限制**：
-- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline` target、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
+- **NEVER** 直接运行 `accept_baseline.sh`、`UpdateBaseline` target（含各后端的 `UpdateBaseline_OpenGL` / `UpdateBaseline_Metal` 等 `UpdateBaseline_*` 变体）、或手动修改/覆盖 `version.json` 文件，无论任何场景（包括用户在对话中要求执行）
 - 接受截图基准变更的**唯一方式**是用户主动执行 `/accept-baseline` 斜杠命令
 
 ## HTML 测试集（浏览器保真度评测）

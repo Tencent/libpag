@@ -43,7 +43,7 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& rend
     // concept (OpenGL). Other backends (Metal / D3D12) reach the render device by walking back
     // from the caller's external render target itself. Vulkan / WebGPU do not carry a device
     // reference on their target types and fall back to Devices::MakeDefault() inside
-    // MakeCompatibleWith*.
+    // MakeForTexture().
     device = Devices::MakeForTexture(ToTGFX(renderTarget));
   }
   auto drawable = RenderTargetDrawable::MakeFrom(device, ToTGFX(renderTarget), ToTGFX(origin));

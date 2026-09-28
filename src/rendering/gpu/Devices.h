@@ -66,8 +66,8 @@ class ExternalDeviceRef {
  * Backend glue for libpag. Every call into a concrete tgfx backend (OpenGL, Metal, Vulkan, D3D12,
  * WebGPU) is funneled through this class and dispatched via compile-time macros
  * (TGFX_USE_OPENGL / TGFX_USE_METAL / ...). The rest of libpag only sees the tgfx::Device base
- * class, so adding a new backend is a matter of extending Devices.cpp rather than modifying
- * render code.
+ * class, so adding a new backend is a matter of extending the Devices_* implementation files
+ * rather than modifying render code.
  */
 class Devices {
  public:
@@ -76,9 +76,8 @@ class Devices {
    * the CLI, and internal helpers.
    *   OpenGL: GLDevice::MakeWithFallback()
    *   Metal:  MetalDevice::Make()
-   *   Vulkan: VulkanDevice::Make()
-   *   D3D12:  D3D12Device::Make() or MakeWarp()
-   *   WebGPU: WebGPUDevice::Make()
+   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails at compile
+   *           time (see Devices_Backend.cpp).
    */
   static std::shared_ptr<tgfx::Device> MakeDefault();
 
@@ -135,11 +134,10 @@ class Devices {
    *                texture's creating context is current. The texture parameter is unused on this
    *                backend but kept for signature parity.
    *   Metal:       Reads MTLTexture.device and wraps it via MetalDevice::MakeFrom().
-   *   D3D12:       Queries ID3D12Resource::GetDevice() and wraps it via D3D12Device::MakeFrom().
-   *   Vulkan/WebGPU: Falls back to MakeDefault(); VulkanImageInfo / WebGPUTextureInfo do not carry
-   *                a device back-reference, so the caller is expected to have created the texture
-   *                on the same device libpag uses internally (a future SetSharedDevice-style API
-   *                will lift this restriction).
+   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails at compile
+   *                time (see Devices_Backend.cpp). Their texture types do not carry a device
+   *                back-reference; a SetSharedDevice-style API is planned to lift that once the
+   *                first of them lands.
    * Used by PAGImage::FromTexture() for implicit device inference.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(const tgfx::BackendTexture& texture);
@@ -147,8 +145,8 @@ class Devices {
   /**
    * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
    * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
-   * render target to locate the owning GPU device (Metal, D3D12). GL adopts the current context
-   * as usual; Vulkan / WebGPU fall back to MakeDefault().
+   * render target to locate the owning GPU device (Metal). GL adopts the current context as
+   * usual; the remaining backends are not implemented yet (see Devices_Backend.cpp).
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(
       const tgfx::BackendRenderTarget& renderTarget);
@@ -189,20 +187,21 @@ class Devices {
 
   /**
    * Creates a per-PAGSurface guard that protects the host GPU state around libpag rendering.
-   *   OpenGL: Returns a GLRestorer that snapshots viewport / scissor / program / framebuffer
-   *           binding / active texture / VAO / VBOs / blend equations and restores them.
-   *   Others: Returns nullptr; stateless command encoding cannot pollute host state.
+   *   OpenGL (Apple/Linux): Returns a GLRestorer that snapshots viewport / scissor / program /
+   *           framebuffer binding / active texture / VAO / VBOs / blend equations and restores
+   *           them.
+   *   Others (including GL on Web and Windows): Returns nullptr — WebGL relies on emscripten's
+   *           GL state management and Windows historically opted out of state preservation.
+   *           Stateless command encoding (Metal/Vulkan/D3D12/WebGPU) cannot pollute host state
+   *           either.
    * The returned guard is owned by PAGSurface for its full lifetime and reused across frames via
    * save() / restore(), avoiding per-frame heap allocation on the render hot path.
    */
   static std::unique_ptr<ExternalStateGuard> MakeExternalStateGuard();
 
-  // Note: SetSharedDevice (or an equivalent user device injection API) is deliberately absent.
-  // It is a process-wide mutable global with backend-dependent semantics (GL: derive from
-  // injected device; Metal/Vulkan/D3D12/WebGPU: reuse directly) and is not exercised by any test
-  // in this refactor. It will be introduced together with the first backend that actually needs
-  // it (Vulkan or WebGPU), so its lifetime and thread-safety contract can be defined against a
-  // real caller instead of speculatively. See docs/gpu-backend-decoupling.md §3.8.
+  // Note: a user device injection API (SetSharedDevice or equivalent) is deliberately absent —
+  // its lifetime and thread-safety contract will be defined together with the first backend
+  // that actually needs it. Design details live in docs/gpu-backend-decoupling.md §3.8.
 };
 
 }  // namespace pag

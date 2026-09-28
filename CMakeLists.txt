@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.13)
 
 # The iOS toolchain (third_party/vendor_tools/ios.toolchain.cmake) reads DEPLOYMENT_TARGET while
 # configuring the project and derives both the deployment target and the compiler target triple
-# from it. tgfx's Metal backend requires iOS 13 or later (MTLSharedEvent / MTLBinaryArchive), so
+# from it. tgfx's Metal backend enforces iOS 13 or later via a hard FATAL_ERROR in its
+# CMakeLists (the APIs tgfx actually uses, e.g. MTLEvent via newEvent, are available on older
+# iOS; the 13.0 floor is tgfx's own policy choice), so Metal builds must
 # pre-set the minimum before configuration. This only applies to iOS builds; macOS keeps its own
 # default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
 if (PAG_USE_METAL AND NOT DEFINED DEPLOYMENT_TARGET AND PLATFORM MATCHES "^(OS|SIMULATOR)")
@@ -188,10 +190,10 @@ if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE)
     set(PAG_USE_OPENGL ON)
 endif ()
 
-# Expose the selected tgfx backend to libpag sources. Devices.cpp dispatches on this macro to
-# pick the right tgfx backend headers; kept in sync with the TGFX_USE_* variables passed to tgfx
-# further down. libpag defines its own copy instead of relying on tgfx's PRIVATE compile
-# definitions, so tgfx can change its visibility policy without breaking libpag.
+# Expose the selected tgfx backend to libpag sources. The Devices_* implementation files dispatch
+# on this macro to pick the right tgfx backend headers; kept in sync with the TGFX_USE_* variables
+# passed to tgfx further down. libpag defines its own copy instead of relying on tgfx's PRIVATE
+# compile definitions, so tgfx can change its visibility policy without breaking libpag.
 if (PAG_USE_OPENGL)
     list(APPEND PAG_DEFINES TGFX_USE_OPENGL)
 endif ()
@@ -251,8 +253,9 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
         endif ()
     elseif (IOS)
         # Default deployment target for the non-toolchain path (e.g. -DCMAKE_SYSTEM_NAME=iOS);
-        # the toolchain path is handled before project() above. tgfx's Metal backend needs iOS 13
-        # (MTLSharedEvent / MTLBinaryArchive), so raise the default for Metal and keep 9.0 for GL.
+        # the toolchain path is handled before project() above. tgfx's Metal backend enforces
+        # iOS 13+ via a hard FATAL_ERROR in its CMakeLists (see third_party/tgfx/CMakeLists.txt),
+        # so raise the default for Metal and keep 9.0 for GL.
         if (PAG_USE_METAL)
             set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
         else ()
