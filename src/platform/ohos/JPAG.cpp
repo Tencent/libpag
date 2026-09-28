@@ -79,12 +79,15 @@ static napi_value Init(napi_env env, napi_value exports) {
              pag::JPAGImage::Init(env, exports) && pag::JPAGPlayer::Init(env, exports) &&
              pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
              pag::JPAGText::Init(env, exports) && pag::JPAGView::Init(env, exports) &&
-             pag::JPAGImageView::Init(env, exports) && pag::JPAGDiskCache::Init(env, exports) &&
-             pag::XComponentHandler::Init(env, exports);
+             pag::JPAGImageView::Init(env, exports) && pag::JPAGDiskCache::Init(env, exports);
     result = pag::FinishConstructorContext(env, result);
   } else {
     result = pag::ExportConstructors(env, exports);
   }
+  // Every XComponent that loads the "pag" library triggers another module init with a new exports
+  // object, and the surface callbacks can only be registered on the XComponent carried by that
+  // init. Keep it outside the initialization branch so each init registers its own XComponent.
+  result = result && pag::XComponentHandler::Init(env, exports);
   if (!result) {
     LOGE("PAG InitFailed");
     return nullptr;
