@@ -201,7 +201,7 @@ class Devices {
 
   // Note: a user device injection API (SetSharedDevice or equivalent) is deliberately absent —
   // its lifetime and thread-safety contract will be defined together with the first backend
-  // that actually needs it. Design details live in docs/gpu-backend-decoupling.md §3.8.
+  // that actually needs it.
 };
 
 }  // namespace pag

@@ -115,7 +115,7 @@ std::unique_ptr<ExternalStateGuard> Devices::MakeExternalStateGuard() {
   return std::make_unique<GLRestorer>();
 #else
   // Web builds rely on emscripten's GL state management; Windows historically opted out of state
-  // preservation and this refactor keeps that behavior. See docs/gpu-backend-decoupling.md §8.1.
+  // preservation and this refactor keeps that behavior.
   return nullptr;
 #endif
 }

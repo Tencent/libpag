@@ -43,21 +43,15 @@
 
 #elif defined(TGFX_USE_VULKAN)
 
-#error \
-    "libpag Vulkan backend is not yet implemented. Add src/rendering/gpu/Devices_Vulkan.cpp " \
-    "(see docs/gpu-backend-decoupling.md §3.3 and §6 Step 5)."
+#error "libpag Vulkan backend is not yet implemented. Add src/rendering/gpu/Devices_Vulkan.cpp."
 
 #elif defined(TGFX_USE_D3D12)
 
-#error \
-    "libpag D3D12 backend is not yet implemented. Add src/rendering/gpu/Devices_D3D12.cpp " \
-    "(see docs/gpu-backend-decoupling.md §3.3 and §6 Step 5)."
+#error "libpag D3D12 backend is not yet implemented. Add src/rendering/gpu/Devices_D3D12.cpp."
 
 #elif defined(TGFX_USE_WEBGPU)
 
-#error \
-    "libpag WebGPU backend is not yet implemented. Add src/rendering/gpu/Devices_WebGPU.cpp " \
-    "(see docs/gpu-backend-decoupling.md §3.3 and §6 Step 5)."
+#error "libpag WebGPU backend is not yet implemented. Add src/rendering/gpu/Devices_WebGPU.cpp."
 
 #else
 

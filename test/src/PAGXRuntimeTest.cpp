@@ -282,9 +282,9 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
  * content and produce a correct screenshot.
  *
  * GL-specific: this exercises the GL-backed BackendTexture path (external GLTextureInfo + share-
- * context adoption). No equivalent public API exists yet on non-GL backends; see
- * docs/gpu-backend-decoupling.md §8.1 for the roadmap. The following two test cases are gated
- * on TGFX_USE_OPENGL until Metal-friendly BackendTexture APIs are introduced.
+ * context adoption). No equivalent public API exists yet on non-GL backends. The following two
+ * test cases are gated on TGFX_USE_OPENGL until Metal-friendly BackendTexture APIs are
+ * introduced.
  */
 #ifdef TGFX_USE_OPENGL
 PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
