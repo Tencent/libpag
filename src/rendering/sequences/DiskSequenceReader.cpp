@@ -38,6 +38,13 @@ DiskSequenceReader::DiskSequenceReader(std::shared_ptr<File> file, Sequence* seq
 }
 
 DiskSequenceReader::~DiskSequenceReader() {
+  // Hold the locker to wait out any in-flight onMakeBuffer() call, mirroring how decoding is
+  // serialized, so a concurrent teardown cannot release buffers or the internal decoder while
+  // they are in use.
+  std::lock_guard<std::mutex> autoLock(locker);
+  pagDecoder = nullptr;
+  imageBuffer = nullptr;
+  pixels = nullptr;
   if (frontHardWareBuffer) {
     tgfx::HardwareBufferRelease(frontHardWareBuffer);
   }

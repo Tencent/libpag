@@ -31,10 +31,12 @@ class MovieInfo : public SequenceInfo {
 
   std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file, PAGFile* pagFile = nullptr,
                                              bool useDiskCache = false) override;
-  std::shared_ptr<tgfx::Image> makeStaticImage(std::shared_ptr<File> file,
-                                               bool useDiskCache) override;
+  std::shared_ptr<tgfx::Image> makeStaticImage(
+      std::shared_ptr<File> file, bool useDiskCache,
+      std::shared_ptr<SequenceReadResult> result = nullptr) override;
   std::shared_ptr<tgfx::Image> makeFrameImage(std::shared_ptr<SequenceReader> reader,
-                                              Frame targetFrame, bool useDiskCache) override;
+                                              Frame targetFrame, bool useDiskCache,
+                                              std::shared_ptr<SequenceReadResult> result) override;
 
   ID uniqueID() const override;
   int width() const override;

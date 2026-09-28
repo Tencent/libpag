@@ -41,6 +41,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -674,6 +675,21 @@ static void CollectElementsByType(pagx::Layer* layer, pagx::NodeType type,
   }
 }
 
+static pagx::Layer* FindFirstMaskedLayer(pagx::Layer* layer) {
+  if (layer == nullptr) {
+    return nullptr;
+  }
+  if (layer->mask != nullptr) {
+    return layer;
+  }
+  for (auto child : layer->children) {
+    if (auto* found = FindFirstMaskedLayer(child)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
 /**
  * Test SVG import: a <text> element with a <textPath href="#..."> child resolves the referenced
  * path into a TextPath modifier alongside a Text node, so path-following text imports instead of
@@ -820,26 +836,21 @@ PAGX_TEST(PAGXSVGTest, SVGImport_StrokeDashPathLengthAcrossShapes) {
 
 /**
  * Test SVG import: a document whose canvas size differs from its viewBox needs a content transform.
- * With a single converted layer the importer folds the scale into an inner Group rather than adding
- * a wrapper layer.
+ * With a single converted layer the importer folds the scale into that layer's own matrix rather
+ * than adding a wrapper layer or an inner Group, so the mapping also reaches nested child layers.
  */
-PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoGroup) {
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoLayerMatrix) {
   std::string svg =
       "<svg width=\"200\" height=\"200\" viewBox=\"0 0 100 100\">"
       "<rect x=\"10\" y=\"10\" width=\"40\" height=\"40\" fill=\"#3B82F6\"/></svg>";
   auto doc = pagx::SVGImporter::ParseString(svg);
   ASSERT_NE(doc, nullptr);
   ASSERT_EQ(doc->layers.size(), 1u);
-
-  std::vector<pagx::Element*> groups;
-  for (auto layer : doc->layers) {
-    CollectElementsByType(layer, pagx::NodeType::Group, groups);
-  }
-  ASSERT_FALSE(groups.empty());
-  auto* group = static_cast<pagx::Group*>(groups[0]);
-  // viewBox 100 -> canvas 200 is a uniform 2x scale embedded in the group.
-  EXPECT_FLOAT_EQ(group->scale.x, 2.0f);
-  EXPECT_FLOAT_EQ(group->scale.y, 2.0f);
+  // viewBox 100 -> canvas 200 is a uniform 2x scale folded into the single converted layer's own
+  // matrix (rather than a wrapper Group) so the mapping also reaches any nested child layers.
+  auto* layer = doc->layers[0];
+  EXPECT_FLOAT_EQ(layer->matrix.a, 2.0f);
+  EXPECT_FLOAT_EQ(layer->matrix.d, 2.0f);
 }
 
 /**
@@ -870,6 +881,38 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MaskAndClipPathWrapsLayer) {
 }
 
 /**
+ * Test SVG import: a clipPath may instantiate geometry through <use>, and the referenced element
+ * may live in a nested <defs> rather than a root-level one. SVG href resolution is document-wide;
+ * limiting shape lookup to the root defs table produces an empty mask that clips everything out.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ClipPathUseResolvesNestedDefinition) {
+  std::string svg =
+      "<svg xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"100\" height=\"100\""
+      " viewBox=\"0 0 100 100\">"
+      "<g><defs><path id=\"clipShape\" d=\"M10 10H90V90H10Z\"/></defs>"
+      "<clipPath id=\"clip\"><use xlink:href=\"#clipShape\"/></clipPath>"
+      "<rect width=\"100\" height=\"100\" fill=\"#EF4444\" clip-path=\"url(#clip)\"/>"
+      "</g></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+
+  pagx::Layer* masked = nullptr;
+  for (auto* layer : doc->layers) {
+    masked = FindFirstMaskedLayer(layer);
+    if (masked != nullptr) break;
+  }
+  ASSERT_NE(masked, nullptr);
+  ASSERT_NE(masked->mask, nullptr);
+
+  std::vector<pagx::Element*> paths;
+  CollectElementsByType(masked->mask, pagx::NodeType::Path, paths);
+  ASSERT_EQ(paths.size(), 1u);
+  auto* path = static_cast<pagx::Path*>(paths.front());
+  ASSERT_NE(path->data, nullptr);
+  EXPECT_FALSE(path->data->isEmpty());
+}
+
+/**
  * Test SVG import: a gradient referenced by more than one shape is counted and, for the default
  * objectBoundingBox units, re-resolved per shape rather than shared. The document imports cleanly
  * with a fill on each shape.
@@ -891,6 +934,34 @@ PAGX_TEST(PAGXSVGTest, SVGImport_SharedGradientReferencedTwice) {
     CollectElementsByType(layer, pagx::NodeType::Fill, fills);
   }
   EXPECT_GE(fills.size(), 2u);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_QuotedGradientUrlReferences) {
+  std::string svg =
+      "<svg width=\"200\" height=\"100\" viewBox=\"0 0 200 100\">"
+      "<defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\">"
+      "<stop offset=\"0\" stop-color=\"#F00\"/><stop offset=\"1\" stop-color=\"#00F\"/>"
+      "</linearGradient></defs>"
+      "<rect x=\"0\" y=\"0\" width=\"80\" height=\"80\" fill=\"url('#g')\"/>"
+      "<rect x=\"100\" y=\"0\" width=\"80\" height=\"80\" fill=\"none\" "
+      "stroke=\"url(&quot;#g&quot;)\" stroke-width=\"4\"/></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+
+  std::vector<pagx::Element*> fills;
+  std::vector<pagx::Element*> strokes;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Fill, fills);
+    CollectElementsByType(layer, pagx::NodeType::Stroke, strokes);
+  }
+  ASSERT_FALSE(fills.empty());
+  ASSERT_FALSE(strokes.empty());
+  auto* fill = static_cast<pagx::Fill*>(fills.front());
+  auto* stroke = static_cast<pagx::Stroke*>(strokes.front());
+  ASSERT_NE(fill->color, nullptr);
+  ASSERT_NE(stroke->color, nullptr);
+  EXPECT_EQ(fill->color->nodeType(), pagx::NodeType::LinearGradient);
+  EXPECT_EQ(stroke->color->nodeType(), pagx::NodeType::LinearGradient);
 }
 
 /**
@@ -1236,6 +1307,31 @@ PAGX_TEST(PAGXSVGTest, SVGExport_DropShadowStyle) {
   EXPECT_NE(svg.find("<feOffset"), std::string::npos);
   EXPECT_NE(svg.find("<feMerge"), std::string::npos);
   SaveFile(svg, "PAGXSVGTest/svg_export_dropshadow_style.svg");
+}
+
+/**
+ * GlassStyle has no faithful SVG representation. The base vector content remains visible and no
+ * empty filter is emitted.
+ */
+PAGX_TEST(PAGXSVGTest, SVGExport_GlassStylePreservesBaseContent) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto layer = doc->makeNode<pagx::Layer>();
+  auto rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {100, 100};
+  rect->size = {120, 80};
+  auto fill = doc->makeNode<pagx::Fill>();
+  auto solid = doc->makeNode<pagx::SolidColor>();
+  solid->color = {0.2f, 0.4f, 0.8f, 1.0f};
+  fill->color = solid;
+  layer->contents.push_back(rect);
+  layer->contents.push_back(fill);
+  layer->styles.push_back(doc->makeNode<pagx::GlassStyle>());
+  doc->layers.push_back(layer);
+
+  auto svg = pagx::SVGExporter::ToSVG(*doc);
+  EXPECT_NE(svg.find("<rect"), std::string::npos);
+  EXPECT_EQ(svg.find("<filter"), std::string::npos);
+  EXPECT_EQ(svg.find("GlassStyle"), std::string::npos);
 }
 
 /**

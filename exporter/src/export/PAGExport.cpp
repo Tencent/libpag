@@ -24,6 +24,7 @@
 #include "Marker.h"
 #include "data/ImageBytes.h"
 #include "sequence/AudioSequence.h"
+#include "sequence/VideoSequence.h"
 #include "src/base/utils/Log.h"
 #include "utils/AEDataTypeConverter.h"
 #include "utils/AEHelper.h"
@@ -167,19 +168,25 @@ static void AdjustmentPreComposeLayerForVideoComposition(std::shared_ptr<PAGExpo
                                                          pag::Layer* layer, void* ctx) {
   auto videoComposition = static_cast<pag::VideoComposition*>(ctx);
   auto preComposeLayer = static_cast<pag::PreComposeLayer*>(layer);
-  if (preComposeLayer->composition != nullptr &&
-      preComposeLayer->composition->uniqueID == videoComposition->uniqueID) {
-    if (session->videoCompositionStartTime.find(videoComposition->uniqueID) !=
-        session->videoCompositionStartTime.end()) {
-      // The video sequence is encoded starting from its first visible frame
-      // (videoCompositionStartTime), so sequence frame 0 corresponds to that composition frame.
-      // Accumulate this trim offset onto the layer's own composition start time instead of
-      // overwriting it, otherwise multiple references to the same composition would all collapse
-      // to the same start time and every reference except the first would freeze (discussion #3548).
-      preComposeLayer->compositionStartTime +=
-          session->videoCompositionStartTime[videoComposition->uniqueID];
-    }
+  if (preComposeLayer->composition == nullptr ||
+      preComposeLayer->composition->uniqueID != videoComposition->uniqueID) {
+    return;
   }
+  // The wrapper layer produced by the clip rebuild (its containingComposition is set) already had
+  // this trim offset applied in RebuildVideoComposition. It is reachable again here because the
+  // traversal recurses into the redirected wrapper composition, so applying the offset a second
+  // time would double it. Skip it and only adjust the external references.
+  if (preComposeLayer->containingComposition != nullptr) {
+    return;
+  }
+  // The video sequence is encoded starting from its first visible frame
+  // (videoCompositionStartFrame), so sequence frame 0 corresponds to that composition frame.
+  // Accumulate this trim offset onto the layer's own composition start time instead of
+  // overwriting it, otherwise multiple references to the same composition would all collapse
+  // to the same start time and every reference except the first would freeze (discussion #3548).
+  // External references live on the session frame rate timeline, so convert the offset to it.
+  preComposeLayer->compositionStartTime +=
+      GetVideoCompositionStartOffset(session, videoComposition, session->frameRate);
 }
 
 static void AdjustTrackMatteLayer(std::shared_ptr<PAGExportSession> session) {

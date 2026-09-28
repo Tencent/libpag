@@ -17,7 +17,7 @@ PAGViewer is a cross-platform desktop application for previewing and editing PAG
 
 - **Qt 6.2.0+** (Qt 6.8.1 recommended)
 - **CLion** IDE
-- **macOS 10.15+** or **Windows 10+** (64-bit)
+- **macOS 12.0+** or **Windows 10+** (64-bit)
 - Successfully built libpag library (see [main README](../README.md))
 
 ## Build Instructions

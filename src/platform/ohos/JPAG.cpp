@@ -62,21 +62,31 @@ bool JPAG::Init(napi_env env, napi_value exports) {
 
 EXTERN_C_START
 
-// The napi module init can be triggered concurrently by multiple taskpool worker threads that
-// share the same napi_env. The napi_refs created during init are not safe to be released from a
-// different thread, so the whole init sequence is serialized to keep all napi_ref operations on
-// a single thread at a time.
+// The napi module init can be triggered concurrently by multiple taskpool worker threads. The
+// whole sequence is serialized because class definitions and constructor context updates are not
+// thread safe.
 static std::mutex PAGInitMutex;
 
 static napi_value Init(napi_env env, napi_value exports) {
   std::lock_guard<std::mutex> autoLock(PAGInitMutex);
-  bool result = pag::JPAG::Init(env, exports) && pag::JPAGLayerHandle::Init(env, exports) &&
-                pag::JPAGImage::Init(env, exports) && pag::JPAGPlayer::Init(env, exports) &&
-                pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
-                pag::JPAGText::Init(env, exports) && pag::JPAGView::Init(env, exports) &&
-                pag::JPAGImageView::Init(env, exports) && pag::JPAGDiskCache::Init(env, exports) &&
-                pag::XComponentHandler::Init(env, exports) &&
-                pag::NativeDisplayLink::InitThreadSafeFunction(env);
+  bool needsInitialization = false;
+  if (!pag::PrepareConstructorContext(env, &needsInitialization)) {
+    LOGE("PAG PrepareConstructorContext failed");
+    return nullptr;
+  }
+  bool result = false;
+  if (needsInitialization) {
+    result = pag::JPAG::Init(env, exports) && pag::JPAGLayerHandle::Init(env, exports) &&
+             pag::JPAGImage::Init(env, exports) && pag::JPAGPlayer::Init(env, exports) &&
+             pag::JPAGSurface::Init(env, exports) && pag::JPAGFont::Init(env, exports) &&
+             pag::JPAGText::Init(env, exports) && pag::JPAGView::Init(env, exports) &&
+             pag::JPAGImageView::Init(env, exports) && pag::JPAGDiskCache::Init(env, exports);
+    result = pag::FinishConstructorContext(env, result);
+  } else {
+    result = pag::ExportConstructors(env, exports);
+  }
+  result = result && pag::XComponentHandler::Init(env, exports) &&
+           pag::NativeDisplayLink::InitThreadSafeFunction(env);
   if (!result) {
     LOGE("PAG InitFailed");
     return nullptr;

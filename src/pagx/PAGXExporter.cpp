@@ -39,6 +39,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Gradient.h"
 #include "pagx/nodes/Group.h"
@@ -48,6 +49,8 @@
 #include "pagx/nodes/InnerShadowStyle.h"
 #include "pagx/nodes/LinearGradient.h"
 #include "pagx/nodes/MergePath.h"
+#include "pagx/nodes/NoiseFilter.h"
+#include "pagx/nodes/NoiseStyle.h"
 #include "pagx/nodes/Path.h"
 #include "pagx/nodes/Polystar.h"
 #include "pagx/nodes/RadialGradient.h"
@@ -82,6 +85,16 @@ namespace pagx {
 //==============================================================================
 // Helper functions for converting types to strings
 //==============================================================================
+
+// MIME label for the payload of a `data:` URI. The format is sniffed from the payload rather than
+// guessed: bytes whose format cannot be identified are labelled `application/octet-stream` instead
+// of being passed off as a PNG, so a serializer never invents a format that consumers would then
+// fail to decode silently. A payload that is identified but sits outside the `<Image>` supported
+// set (AVIF, HEIC, SVG, …) keeps its real label so `pagx verify` can report it by name.
+static std::string ImageDataMimeLabel(const uint8_t* bytes, size_t size) {
+  const char* mime = DetectImageMime(bytes, size);
+  return mime != nullptr ? mime : "application/octet-stream";
+}
 
 static std::string PointToString(const Point& p) {
   return FloatToString(p.x) + "," + FloatToString(p.y);
@@ -627,7 +640,7 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
         } else if (pattern->image->data) {
           const auto* bytes = pattern->image->data->bytes();
           auto size = pattern->image->data->size();
-          xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+          xml.addAttribute("image", std::string("data:") + ImageDataMimeLabel(bytes, size) +
                                         ";base64," + Base64Encode(bytes, size));
         }
       }
@@ -1219,6 +1232,38 @@ static void WriteShadowAttributes(XMLBuilder& xml, float offsetX, float offsetY,
   xml.addAttribute("color", ColorToHexString(color, color.alpha < 1.0f));
 }
 
+// NoiseStyle and NoiseFilter share the same noise parameters, so these two helpers serve both.
+// They are split because the two nodes place blendMode differently: NoiseStyle writes it up front
+// with the other LayerStyle attributes, while NoiseFilter writes it between the grain and color
+// parameters. Both orders mirror the importer and the XSD attribute declarations.
+template <typename T>
+static void WriteNoiseGrainAttributes(XMLBuilder& xml, const T* node) {
+  if (node->mode != Default<T>().mode) {
+    xml.addAttribute("mode", NoiseModeToString(node->mode));
+  }
+  xml.addAttribute("size", node->size, Default<T>().size);
+  xml.addAttribute("density", node->density, Default<T>().density);
+  xml.addAttribute("seed", node->seed, Default<T>().seed);
+}
+
+// Writes every non-default color and the opacity regardless of the active mode: the inactive
+// mode's fields must survive a round-trip so that changing mode later does not surface lost data.
+template <typename T>
+static void WriteNoiseColorAttributes(XMLBuilder& xml, const T* node) {
+  if (node->color != Default<T>().color) {
+    xml.addAttribute("color", ColorToHexString(node->color, node->color.alpha < 1.0f));
+  }
+  if (node->firstColor != Default<T>().firstColor) {
+    xml.addAttribute("firstColor",
+                     ColorToHexString(node->firstColor, node->firstColor.alpha < 1.0f));
+  }
+  if (node->secondColor != Default<T>().secondColor) {
+    xml.addAttribute("secondColor",
+                     ColorToHexString(node->secondColor, node->secondColor.alpha < 1.0f));
+  }
+  xml.addAttribute("opacity", node->opacity, Default<T>().opacity);
+}
+
 static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
   switch (node->nodeType()) {
     case NodeType::DropShadowStyle: {
@@ -1267,6 +1312,42 @@ static void WriteLayerStyle(XMLBuilder& xml, const LayerStyle* node) {
       if (style->tileMode != Default<BackgroundBlurStyle>().tileMode) {
         xml.addAttribute("tileMode", TileModeToString(style->tileMode));
       }
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::GlassStyle: {
+      auto style = static_cast<const GlassStyle*>(node);
+      xml.openElement("GlassStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<GlassStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<GlassStyle>().excludeChildEffects);
+      xml.addAttribute("refraction", style->refraction, Default<GlassStyle>().refraction);
+      xml.addAttribute("depth", style->depth, Default<GlassStyle>().depth);
+      xml.addAttribute("frost", style->frost, Default<GlassStyle>().frost);
+      xml.addAttribute("dispersion", style->dispersion, Default<GlassStyle>().dispersion);
+      xml.addAttribute("splay", style->splay, Default<GlassStyle>().splay);
+      xml.addAttribute("lightAngle", style->lightAngle, Default<GlassStyle>().lightAngle);
+      xml.addAttribute("lightIntensity", style->lightIntensity,
+                       Default<GlassStyle>().lightIntensity);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
+    case NodeType::NoiseStyle: {
+      auto style = static_cast<const NoiseStyle*>(node);
+      xml.openElement("NoiseStyle");
+      xml.addAttribute("id", style->id);
+      if (style->blendMode != Default<NoiseStyle>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(style->blendMode));
+      }
+      xml.addAttribute("excludeChildEffects", style->excludeChildEffects,
+                       Default<NoiseStyle>().excludeChildEffects);
+      WriteNoiseGrainAttributes(xml, style);
+      WriteNoiseColorAttributes(xml, style);
       WriteCustomData(xml, node);
       xml.closeElementSelfClosing();
       break;
@@ -1338,6 +1419,19 @@ static void WriteLayerFilter(XMLBuilder& xml, const LayerFilter* node) {
       xml.closeElementSelfClosing();
       break;
     }
+    case NodeType::NoiseFilter: {
+      auto filter = static_cast<const NoiseFilter*>(node);
+      xml.openElement("NoiseFilter");
+      xml.addAttribute("id", filter->id);
+      WriteNoiseGrainAttributes(xml, filter);
+      if (filter->blendMode != Default<NoiseFilter>().blendMode) {
+        xml.addAttribute("blendMode", BlendModeToString(filter->blendMode));
+      }
+      WriteNoiseColorAttributes(xml, filter);
+      WriteCustomData(xml, node);
+      xml.closeElementSelfClosing();
+      break;
+    }
     default:
       break;
   }
@@ -1394,7 +1488,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       } else if (image->data) {
         const auto* bytes = image->data->bytes();
         auto size = image->data->size();
-        xml.addAttribute("source", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+        xml.addAttribute("source", std::string("data:") + ImageDataMimeLabel(bytes, size) +
                                        ";base64," + Base64Encode(bytes, size));
       } else {
         // `source` is a required attribute (see pagx.xsd). An unresolved image — e.g. an `<img>`
@@ -1488,7 +1582,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             } else if (glyph->image->data) {
               const auto* bytes = glyph->image->data->bytes();
               auto size = glyph->image->data->size();
-              xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+              xml.addAttribute("image", std::string("data:") + ImageDataMimeLabel(bytes, size) +
                                             ";base64," + Base64Encode(bytes, size));
             }
           }
@@ -1800,12 +1894,22 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
       }
     }
   }
-  bool hasAnimOrSM = !doc.animations.empty();
+  auto isExportableTimelineNode = [](const Node* node) {
+    if (node == nullptr) return false;
+    if (node->nodeType() == NodeType::StateMachine) return true;
+    return node->nodeType() == NodeType::Animation &&
+           !static_cast<const Animation*>(node)->objects.empty();
+  };
+  bool hasAnimOrSM = false;
+  for (const auto* node : doc.animations) {
+    if (isExportableTimelineNode(node)) {
+      hasAnimOrSM = true;
+      break;
+    }
+  }
   if (!hasAnimOrSM) {
     for (const auto& node : doc.nodes) {
-      if (node != nullptr &&
-          (node->nodeType() == NodeType::Animation || node->nodeType() == NodeType::StateMachine) &&
-          written.find(node.get()) == written.end()) {
+      if (isExportableTimelineNode(node.get()) && written.find(node.get()) == written.end()) {
         hasAnimOrSM = true;
         break;
       }
@@ -1819,7 +1923,8 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
         continue;
       }
       if (node->nodeType() == NodeType::Animation) {
-        WriteAnimation(xml, static_cast<const Animation*>(node));
+        auto* animation = static_cast<const Animation*>(node);
+        if (!animation->objects.empty()) WriteAnimation(xml, animation);
       } else if (node->nodeType() == NodeType::StateMachine) {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node));
       }
@@ -1831,7 +1936,8 @@ std::string PAGXExporter::ToXML(const PAGXDocument& doc, const Options& options)
         continue;
       }
       if (node->nodeType() == NodeType::Animation) {
-        WriteAnimation(xml, static_cast<const Animation*>(node.get()));
+        auto* animation = static_cast<const Animation*>(node.get());
+        if (!animation->objects.empty()) WriteAnimation(xml, animation);
       } else {
         WriteStateMachine(xml, static_cast<const StateMachine*>(node.get()));
       }

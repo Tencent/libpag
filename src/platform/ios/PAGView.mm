@@ -25,6 +25,7 @@
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 #import "platform/cocoa/private/PAGAnimator.h"
+#import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
 
 #if defined(TGFX_USE_OPENGL)
 #import "platform/ios/private/GPUDrawable.h"
@@ -35,7 +36,7 @@
 #include "platform/cocoa/private/PAGMetalLayerHelper.h"
 #endif
 
-@interface PAGView () <PAGAnimatorUpdater, PAGAnimatorListener>
+@interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
 
 @implementation PAGView {
@@ -43,6 +44,7 @@
   PAGSurface* pagSurface;
   NSString* filePath;
   PAGAnimator* animator;
+  PAGAnimatorListenerProxy* animatorListenerProxy;
   BOOL _isVisible;
   std::mutex lock;
   NSHashTable* listeners;
@@ -64,7 +66,8 @@
   pagPlayer = [[PAGPlayer alloc] init];
   animator = [[PAGAnimator alloc] initWithUpdater:(id<PAGAnimatorUpdater>)self];
   listeners = [[NSHashTable weakObjectsHashTable] retain];
-  [animator addListener:self];
+  animatorListenerProxy = [[PAGAnimatorListenerProxy alloc] initWithForwarder:self];
+  [animator addListener:animatorListenerProxy];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)
                                                name:UIApplicationDidBecomeActiveNotification
@@ -95,6 +98,7 @@
     pagSurface = nil;
   }
   [animator release];
+  [animatorListenerProxy release];
   [filePath release];
   [listeners release];
   [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -221,27 +225,7 @@
   [listeners removeObject:listener];
 }
 
-#pragma mark - PAGAnimatorListener
-
-- (void)onAnimationStart:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationStart:)];
-}
-
-- (void)onAnimationEnd:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationEnd:)];
-}
-
-- (void)onAnimationCancel:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationCancel:)];
-}
-
-- (void)onAnimationRepeat:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationRepeat:)];
-}
-
-- (void)onAnimationUpdate:(id<PAGAnimatorUpdater>)updater {
-  [self dispatchListenerEvent:@selector(onAnimationUpdate:)];
-}
+#pragma mark - Listener dispatch
 
 - (void)dispatchListenerEvent:(SEL)selector {
   if ([NSThread isMainThread]) {

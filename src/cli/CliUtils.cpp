@@ -22,6 +22,8 @@
 #include <fstream>
 #include <iostream>
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Font.h"
+#include "renderer/FontEmbedder.h"
 
 namespace pagx::cli {
 
@@ -78,6 +80,52 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
         fontConfig->addFallbackSystemFont(family, style);
       }
     }
+  }
+  return true;
+}
+
+bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
+                const std::string& command) {
+  // Start from the document's own fallback chain: the HTML importer records the CSS font-family
+  // stacks there, and applyLayout below replaces the whole config with the one passed in.
+  FontConfig fontConfig = document->fontConfig();
+  if (!LoadFontConfig(&fontConfig, {}, fallbacks, command)) {
+    return false;
+  }
+  // A source file is the only record of the family/style it provides, so a missing one cannot be
+  // proven unused while any Text still asks for a font: shaping would silently fall back to a
+  // substituted font with different outlines. Only a document that needs no font at all can skip
+  // such a source.
+  bool requiresFonts = !document->getRequiredFonts().empty();
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<Font*>(node.get());
+    if (!font->file.empty()) {
+      auto typeface = tgfx::Typeface::MakeFromPath(font->file);
+      if (typeface == nullptr) {
+        if (requiresFonts) {
+          std::cerr << command << ": failed to load font '" << font->file << "'\n";
+          return false;
+        }
+        std::cerr << command << ": failed to load font '" << font->file
+                  << "', skipped because the document needs no font\n";
+        continue;
+      }
+      fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
+      // Also reach this file through the fallback chain: a (family, style) key holds one primary
+      // registration, so unicode-range subset files sharing that key would otherwise overwrite
+      // each other and drop every glyph that lives in an earlier subset.
+      fontConfig.addFallbackFont(font->file, 0);
+    }
+  }
+  FontEmbedder::ClearEmbeddedGlyphRuns(document);
+  document->applyLayout(&fontConfig);
+  FontEmbedder embedder = {};
+  if (!embedder.embed(document)) {
+    std::cerr << command << ": font embedding failed\n";
+    return false;
   }
   return true;
 }

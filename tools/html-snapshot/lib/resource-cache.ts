@@ -26,6 +26,11 @@ export class ResourceCache {
   // re-inserting on every get/set hit. The first key is therefore always the
   // least-recently-used entry, which `evict()` drops first.
   private readonly entries = new Map<string, CachedResource>();
+  // In-flight fetches keyed by URL. Concurrent listeners for the same URL
+  // wait on the existing promise instead of issuing a duplicate body read,
+  // which matters when multiple pages of an HTTP service request the same
+  // CDN bundle within the same render burst.
+  private readonly inflight = new Map<string, Promise<CachedResource | undefined>>();
   private totalBytes = 0;
 
   // `maxEntries`     — hard cap on the number of cached items.
@@ -98,5 +103,36 @@ export class ResourceCache {
   clear(): void {
     this.entries.clear();
     this.totalBytes = 0;
+    this.inflight.clear();
+  }
+
+  // Coalesce concurrent populate calls for the same URL. The first caller
+  // installs an in-flight entry; subsequent callers await the same promise
+  // and skip the body read. The producer signals completion via the returned
+  // settle/reject helpers so the listener can hold a stable reference even
+  // if the cache is cleared mid-flight. Returns null if another caller is
+  // already in-flight for `url` (the caller should skip its own body read).
+  beginInflight(url: string): {
+    promise: Promise<CachedResource | undefined>;
+    settle: (value: CachedResource | undefined) => void;
+  } | null {
+    if (this.inflight.has(url)) return null;
+    let settle: (value: CachedResource | undefined) => void = () => {};
+    const promise = new Promise<CachedResource | undefined>((resolve) => {
+      settle = resolve;
+    });
+    this.inflight.set(url, promise);
+    const wrappedSettle = (value: CachedResource | undefined): void => {
+      this.inflight.delete(url);
+      settle(value);
+    };
+    return { promise, settle: wrappedSettle };
+  }
+
+  // Look up a pending in-flight fetch for `url`, or undefined when no peer
+  // request has installed one. Allows a concurrent listener to wait on the
+  // first request's body read instead of duplicating it.
+  awaitInflight(url: string): Promise<CachedResource | undefined> | undefined {
+    return this.inflight.get(url);
   }
 }

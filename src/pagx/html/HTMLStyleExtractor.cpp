@@ -369,7 +369,22 @@ static std::vector<CSSProperty> ParseStyleProperties(const std::string& decodedS
       props.push_back(prop);
     }
   }
-  return props;
+  // CSS cascade: when a property name is declared twice the last value wins. Writers may emit a
+  // deliberate override (e.g. a mask-box width/height appended after the layer's own size), so
+  // collapse duplicates keeping the last occurrence; downstream grouping and signature logic
+  // assumes each name appears once.
+  std::unordered_map<std::string, size_t> lastIndex;
+  for (size_t i = 0; i < props.size(); i++) {
+    lastIndex[props[i].name] = i;
+  }
+  std::vector<CSSProperty> collapsed;
+  collapsed.reserve(props.size());
+  for (size_t i = 0; i < props.size(); i++) {
+    if (lastIndex[props[i].name] == i) {
+      collapsed.push_back(std::move(props[i]));
+    }
+  }
+  return collapsed;
 }
 
 static std::string BuildPropertySignature(const std::vector<CSSProperty>& props) {

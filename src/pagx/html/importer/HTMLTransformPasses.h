@@ -174,6 +174,39 @@ class SpaceJustifyOverflowCollapsePass : public HTMLTransformPass {
 };
 
 /**
+ * Pass — SpaceEvenlyPaddingCompensation.
+ *
+ * `space-evenly` distributes the main-axis free space into `n + 1` equal gaps, so the first and
+ * last children also sit `g` away from the content-box edges. PAGX's own layout engine implements
+ * that faithfully, but some PAGX consumers — Ardot's CoCraft layout kernel among them — fold
+ * `spaceEvenly` onto the `space-between` formula (`n - 1` gaps, both ends flush with the padding
+ * box), which visibly shifts the first child left and the last child right.
+ *
+ * This pass rewrites such containers into the mathematically equivalent form those consumers can
+ * render: with `S` the children's combined main-axis size, `G` the authored `gap` between adjacent
+ * children and `R` the free space left after both, the space-evenly step is `g = R / (n + 1)`.
+ * Writing `space-between` while increasing the container's main-axis padding by `g` on both ends
+ * places every child exactly where space-evenly would, because the reduced free space `R - 2g`
+ * then divides into `n - 1` steps of `g`. The rewritten container is also rendered identically by
+ * PAGX itself, so the substitution is lossless across engines.
+ *
+ * Conservative: bails out unless the container has a fixed px main-axis size, no in-flow child
+ * declares `flex` grow, every in-flow child's main-axis size resolves to px, the authored `gap`
+ * resolves to px, and the line has free space left (overflowing lines are handled by
+ * SpaceJustifyOverflowCollapsePass, which runs first). `flex-wrap` needs no gate: the subset
+ * filter drops the property and PAGX lays flex containers out as a single line regardless, so the
+ * single-line equivalence is the one the runtime applies. Emits
+ * `subset:space-evenly-padding-compensated` for each rewrite.
+ */
+class SpaceEvenlyPaddingCompensationPass : public HTMLTransformPass {
+ public:
+  const char* name() const override {
+    return "SpaceEvenlyPaddingCompensation";
+  }
+  void apply(const std::shared_ptr<DOMNode>& root, HTMLTransformContext& ctx) override;
+};
+
+/**
  * Pass 5 — StructureNormalization.
  *
  * Removes tags outside the subset (`<table>`, `<form>`, `<input>`, `<script>`, ...), wraps

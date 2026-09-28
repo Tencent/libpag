@@ -293,8 +293,8 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
 
     auto marker = new pag::Marker();
     marker->comment = comment;
-    marker->startTime = session->configParam.frameRate * keyTime.value / keyTime.scale;
-    marker->duration = session->configParam.frameRate * duration.value / duration.scale;
+    marker->startTime = AEDurationToFrame(keyTime, session->frameRate);
+    marker->duration = AEDurationToFrame(duration, session->frameRate);
 
     markers.push_back(marker);
     suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
@@ -619,7 +619,7 @@ void ExportTimeStretch(std::shared_ptr<pag::File> file, std::shared_ptr<PAGExpor
   suites->CompSuite6()->AEGP_GetCompWorkAreaDuration(compHandle, &durationTime);
   auto compositionDuration = AEDurationToFrame(durationTime, session->frameRate);
 
-  auto optInfo = GetTimeStretchInfo(itemHandle);
+  auto optInfo = GetTimeStretchInfo(itemHandle, session->frameRate);
   if (optInfo.has_value()) {
     const auto& info = *optInfo;
     pag::Frame timeStretchStart =
@@ -869,7 +869,7 @@ void AddMarkerToLayer(const AEGP_LayerH& layerHandle, const std::string& key,
   DeleteStream(markerStream);
 }
 
-std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemHandle) {
+std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemHandle, float frameRate) {
   const auto& suites = GetSuites();
   auto pluginID = GetPluginID();
 
@@ -919,8 +919,6 @@ std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemHandle) 
       A_Time duration;
       suites->MarkerSuite2()->AEGP_GetMarkerDuration(markerP, &duration);
       suites->StreamSuite3()->AEGP_DisposeStreamValue(&streamValue);
-
-      float frameRate = GetItemFrameRate(itemHandle);
 
       TimeStretchInfo result = {*foundMode, AEDurationToFrame(time, frameRate),
                                 AEDurationToFrame(duration, frameRate)};

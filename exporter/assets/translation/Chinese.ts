@@ -862,7 +862,7 @@
         <translation>建议去掉文本路径或去掉文本动画。</translation>
     </message>
     <message>
-        <location filename="../../src/utils/AlertInfo.cpp" line="413"/>
+        <location filename="../../src/utils/AlertInfo.cpp" line="412"/>
         <source>Some characters of the text layer use superscript or subscript, which is not supported by PAG.</source>
         <translation>文本图层中的部分字符使用了上标或下标，PAG 不支持该属性。</translation>
     </message>

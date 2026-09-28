@@ -36,6 +36,39 @@ static int StylePriority(const std::string& style) {
   return 3;
 }
 
+static std::shared_ptr<tgfx::Typeface> ResolveLayoutTypeface(const std::string& fontFamily,
+                                                             const std::string& fontStyle) {
+  auto namedTypeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+  auto exactLocation = SystemFonts::FindFont(fontFamily, fontStyle);
+  // The platform reports the style under its own spelling, which may differ from the requested one
+  // in case or spacing only, so compare the two the way every other font-name decision here does.
+  bool exactStyleExists =
+      namedTypeface != nullptr && !exactLocation.path.empty() &&
+      (fontStyle.empty() || SystemFonts::FontNamesMatch(fontStyle, exactLocation.fontStyle));
+  if (exactStyleExists) {
+    // Preserve the platform's existing exact-style behavior. Some FreeType configurations cannot
+    // load an installed exact face by name, and changing that behavior affects established layout
+    // metrics. The same-family fallback below is only needed when the requested style is absent.
+    return namedTypeface;
+  }
+  return SystemFonts::ResolveTypeface(fontFamily, fontStyle);
+}
+
+// Memoised `ResolveLayoutTypeface`: the platform lookup walks the installed font list, and a
+// document repeats the same (family, style) pair for every text node that uses it. The two halves
+// are joined with a separator byte that no family name contains, so distinct pairs cannot collide.
+// A failed lookup is cached too — the platform answer does not change within one document.
+static std::shared_ptr<tgfx::Typeface> ResolveCachedLayoutTypeface(
+    std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>>& cache,
+    const std::string& fontFamily, const std::string& fontStyle) {
+  auto cacheKey = fontFamily + "\x1f" + fontStyle;
+  auto it = cache.find(cacheKey);
+  if (it == cache.end()) {
+    it = cache.emplace(cacheKey, ResolveLayoutTypeface(fontFamily, fontStyle)).first;
+  }
+  return it->second;
+}
+
 LayoutContext::LayoutContext(FontConfig* fontConfig) : fontConfig(fontConfig) {
 }
 
@@ -43,7 +76,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
                                                             const std::string& fontStyle) {
   if (fontConfig == nullptr) {
     if (!fontFamily.empty()) {
-      return tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+      return ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle);
     }
     return nullptr;
   }
@@ -96,9 +129,10 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
   }
 #endif
 
-  // Stage 5: System font lookup via MakeFromName
+  // Stage 5: System font lookup, including another available style when the requested one is
+  // absent from the family.
   if (!fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
+    auto typeface = ResolveCachedLayoutTypeface(systemTypefaceCache, fontFamily, fontStyle);
     if (typeface != nullptr) {
       return typeface;
     }

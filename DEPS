@@ -7,12 +7,16 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "9e11e4fbd54903a807f2a3708f6b6637a0892252",
+        "commit": "fdcd3c28c02c9d39aeef5aefede96645b8bc593b",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/tgfx.git",
+<<<<<<< HEAD
         "commit": "5cf4fcce70e7c4aeadb94b588e7df5f656a0d52a",
+=======
+        "commit": "062b864b1425de23fe5a63fbb67137974a4af215",
+>>>>>>> main
         "dir": "third_party/tgfx"
       },
       {
@@ -37,7 +41,7 @@
       },
       {
         "url": "https://github.com/libexpat/libexpat.git",
-        "commit": "70a0d4b01f2b6af4ec3d851ad2b399752f531ff8",
+        "commit": "92810461043fce37e70079b37ab1f04490a8f039",
         "dir": "third_party/expat"
       },
       {

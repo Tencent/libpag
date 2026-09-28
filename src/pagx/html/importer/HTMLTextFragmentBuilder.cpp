@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLTextFragmentBuilder.h"
+#include <cerrno>
 #include <cmath>
+#include <cstdlib>
 #include <utility>
 #include "pagx/PAGXDocument.h"
 #include "pagx/html/importer/HTMLDetail.h"
@@ -72,7 +74,10 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
   auto t = _document->makeNode<Text>();
   t->text = fragment.text;
   t->fontFamily = fragment.fontFamily;
-  t->fontStyle = ResolveHTMLFontStyleName(fragment.fontStyleName);
+  // Round-trip fragments carry the exact PAGX fontStyle (empty means empty); only the ordinary
+  // HTML path substitutes the canonical "Regular" name for an empty label.
+  t->fontStyle = fragment.exactFontStyle ? fragment.fontStyleName
+                                         : ResolveHTMLFontStyleName(fragment.fontStyleName);
   t->fauxBold = fragment.fauxBold;
   t->fauxItalic = fragment.fauxItalic;
   t->fontSize = fragment.fontSize;
@@ -82,7 +87,10 @@ Text* HTMLTextFragmentBuilder::buildTextElement(const TextFragment& fragment) {
 
 Fill* HTMLTextFragmentBuilder::buildTextFill(const TextFragment& fragment) {
   if (fragment.fillImage.empty()) {
-    return _layerBuilder.buildSolidFill(fragment.color);
+    // A clip-to-text ancestor painting the glyphs with a solid `background-color` outranks the
+    // element's own `color`, exactly as the gradient branch above does for gradients.
+    return _layerBuilder.buildSolidFill(fragment.fillSolidSet ? fragment.fillSolid
+                                                              : fragment.color);
   }
   auto fill = _document->makeNode<Fill>();
   fill->color = _layerBuilder.parseGradientByValue(fragment.fillImage);
@@ -110,6 +118,120 @@ Stroke* HTMLTextFragmentBuilder::buildTextStroke(const TextFragment& fragment) {
   return stroke;
 }
 
+void HTMLTextFragmentBuilder::applyPagxTextMetadata(TextFragment& frag, const DOMNode* element) {
+  if (const std::string* value = element->findAttribute("data-pagx-text")) {
+    frag.text = *value;
+  }
+  if (const std::string* value = element->findAttribute("data-pagx-font-family")) {
+    frag.fontFamily = *value;
+  }
+  if (const std::string* value = element->findAttribute("data-pagx-font-style")) {
+    frag.fontStyleName = *value;
+    frag.exactFontStyle = true;
+  }
+  if (const std::string* value = element->findAttribute("data-pagx-letter-spacing")) {
+    // Strict parse: the exporter writes %.9g (possibly scientific notation); require the whole
+    // token to be consumed, reject ERANGE over/underflow and non-finite results.
+    errno = 0;
+    char* end = nullptr;
+    float parsed = std::strtof(value->c_str(), &end);
+    if (!value->empty() && end == value->c_str() + value->size() && errno != ERANGE &&
+        std::isfinite(parsed)) {
+      frag.letterSpacing = parsed;
+    } else {
+      _diagnostics.warn("html: invalid data-pagx-letter-spacing '" + *value +
+                        "'; CSS-resolved value kept");
+    }
+  }
+  static const char* fauxKeys[2] = {"data-pagx-faux-bold", "data-pagx-faux-italic"};
+  bool* fauxTargets[2] = {&frag.fauxBold, &frag.fauxItalic};
+  for (int i = 0; i < 2; i++) {
+    if (const std::string* value = element->findAttribute(fauxKeys[i])) {
+      if (*value == "1") {
+        *fauxTargets[i] = true;
+      } else if (*value == "0") {
+        *fauxTargets[i] = false;
+      } else {
+        _diagnostics.warn(std::string("html: invalid ") + fauxKeys[i] + " '" + *value +
+                          "'; CSS-resolved value kept");
+      }
+    }
+  }
+}
+
+Layer* HTMLTextFragmentBuilder::buildPAGXTextHost(const std::shared_ptr<DOMNode>& element,
+                                                  const std::vector<TextFragment>& fragments,
+                                                  const HTMLBoxAttributes& box,
+                                                  const HTMLInheritedStyle& inherited) {
+  if (fragments.empty() || fragments.front().text.empty()) {
+    return nullptr;
+  }
+  Layer* textHost = nullptr;
+  // hasBgVisuals / shrink are always false: WOFF2 spans and their containers carry only
+  // positioning and font CSS, never backgrounds or authored sizes.
+  Layer* wrapper = buildTextHostLayers(element, box, /*hasBgVisuals=*/false,
+                                       /*shrinkWidth=*/false, /*shrinkHeight=*/false, textHost);
+  // Force the bare <Text>+<Fill> path. The WOFF2 span's `line-height:1` is a visual-layer
+  // implementation detail of the glyph positioning; letting it drive needsTextBox would wrap
+  // every restored text in a TextBox the original PAGX never had.
+  populateTextHostContents(textHost, fragments, inherited, box,
+                           /*needsTextBox=*/false, /*isVertical=*/false, /*hasNoWrap=*/false);
+  _idAllocator.assign(wrapper, element);
+  return wrapper;
+}
+
+Layer* HTMLTextFragmentBuilder::convertPAGXTextHost(const std::shared_ptr<DOMNode>& element,
+                                                    const HTMLInheritedStyle& inherited) {
+  // The generator emits glyph <span>s as direct children of the host container; the first one
+  // carries the style (font size / colour) of the first rendered glyph.
+  std::shared_ptr<DOMNode> firstSpan;
+  for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
+    if (child->type == DOMNodeType::Element && child->name == "span") {
+      firstSpan = child;
+      break;
+    }
+  }
+  if (!firstSpan) {
+    // The exporter opens the host container before it knows whether any glyph is emitted, so a
+    // text whose glyph ids are all blank still produces an empty container carrying the
+    // semantics. Restore it from the container's own cascade rather than dropping the text.
+    _diagnostics.warn("html: data-pagx-text host has no glyph span; restored from container style");
+  }
+  // Resolve the style chain through the container so any styles it contributes still apply,
+  // then through the first span. Both resolves are local to this host: the synthetic
+  // pagx-font-* family must not be forwarded to the FontConfig fallback sink.
+  HTMLInheritedStyle containerStyle =
+      _styleCascade.resolveInheritedStyle(element, inherited, /*recordFontFallbacks=*/false);
+  HTMLInheritedStyle runStyle =
+      firstSpan ? _styleCascade.resolveInheritedStyle(firstSpan, containerStyle,
+                                                      /*recordFontFallbacks=*/false)
+                : containerStyle;
+  TextFragment frag = makeFragment(runStyle);
+  applyPagxTextMetadata(frag, element.get());
+  if (frag.text.empty()) {
+    return nullptr;
+  }
+
+  // Child span offsets are relative to the positioned container; recover the absolute position
+  // as container + first-child offset. Only left/top are honoured — per-glyph transforms
+  // (rotation / scale / skew) belong to individual glyphs and cannot apply to the whole run.
+  HTMLBoxAttributes containerBox = _styleCascade.computeBoxAttributes(element);
+  HTMLBoxAttributes box = containerBox;
+  if (firstSpan) {
+    HTMLBoxAttributes spanBox = _styleCascade.computeBoxAttributes(firstSpan);
+    float left = (std::isnan(containerBox.leftPx) ? 0.0f : containerBox.leftPx) +
+                 (std::isnan(spanBox.leftPx) ? 0.0f : spanBox.leftPx);
+    float top = (std::isnan(containerBox.topPx) ? 0.0f : containerBox.topPx) +
+                (std::isnan(spanBox.topPx) ? 0.0f : spanBox.topPx);
+    box.leftPx = left;
+    box.topPx = top;
+  }
+  box.rightPx = NAN;
+  box.bottomPx = NAN;
+
+  return buildPAGXTextHost(element, std::vector<TextFragment>{std::move(frag)}, box, runStyle);
+}
+
 HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
     const HTMLInheritedStyle& inherited) {
   TextFragment frag;
@@ -125,6 +247,8 @@ HTMLTextFragmentBuilder::TextFragment HTMLTextFragmentBuilder::makeFragment(
   frag.strokeWidth = inherited.textStrokeWidthPx;
   frag.strokeColor = inherited.textStrokeColor;
   frag.fillImage = inherited.textFillImage;
+  frag.fillSolid = inherited.textFillSolid;
+  frag.fillSolidSet = inherited.textFillSolidSet;
   // Resolve once per fragment so convertTextLeaf can derive TextBox.lineHeight without
   // re-parsing the cascade. Empty / `normal` cascades resolve to NaN, signalling "no
   // explicit contribution" — the line-box then collapses to the parent's font metrics.
@@ -155,6 +279,7 @@ bool HTMLTextFragmentBuilder::fragmentsShareStyle(const TextFragment& a, const T
          std::fabs(a.fontSize - b.fontSize) < epsilon &&
          std::fabs(a.letterSpacing - b.letterSpacing) < epsilon && a.color == b.color &&
          a.textDecoration == b.textDecoration && a.fillImage == b.fillImage &&
+         a.fillSolidSet == b.fillSolidSet && a.fillSolid == b.fillSolid &&
          StrokesMatch(a.strokeWidth, a.strokeColor, b.strokeWidth, b.strokeColor);
 }
 
@@ -176,7 +301,8 @@ bool HTMLTextFragmentBuilder::fragmentMatchesInherited(const TextFragment& a,
          std::fabs(a.fontSize - inherited.fontSizePx) < epsilon &&
          std::fabs(a.letterSpacing - inherited.letterSpacingPx) < epsilon &&
          a.color == inherited.resolvedTextColor && a.textDecoration == inherited.textDecoration &&
-         a.fillImage == inherited.textFillImage && a.collapseWhitespace == incomingCollapse &&
+         a.fillImage == inherited.textFillImage && a.fillSolidSet == inherited.textFillSolidSet &&
+         a.fillSolid == inherited.textFillSolid && a.collapseWhitespace == incomingCollapse &&
          a.preserveNewlines == incomingPreserveNewlines &&
          StrokesMatch(a.strokeWidth, a.strokeColor, inherited.textStrokeWidthPx,
                       inherited.textStrokeColor);
@@ -270,6 +396,16 @@ void HTMLTextFragmentBuilder::collectFragments(const std::shared_ptr<DOMNode>& e
 Layer* HTMLTextFragmentBuilder::convertTextLeaf(const std::shared_ptr<DOMNode>& element,
                                                 const HTMLBoxAttributes& box,
                                                 const HTMLInheritedStyle& inherited) {
+  if (element->findAttribute("data-pagx-text") != nullptr) {
+    // WOFF2 round-trip span host: the DOM text nodes hold PUA glyph characters; restore the
+    // original semantics from the data-pagx-* attributes instead of collecting them.
+    TextFragment frag = makeFragment(inherited);
+    applyPagxTextMetadata(frag, element.get());
+    if (frag.text.empty()) {
+      return nullptr;
+    }
+    return buildPAGXTextHost(element, std::vector<TextFragment>{std::move(frag)}, box, inherited);
+  }
   std::vector<TextFragment> fragments;
   collectFragments(element, inherited, fragments);
   collapseFragmentWhitespace(fragments);
@@ -513,7 +649,19 @@ void HTMLTextFragmentBuilder::populateTextHostContents(Layer* textHost,
   if (hasNoWrap) {
     textBox->wordWrap = false;
   }
-  if (box.clipOverflow) {
+  // CSS `overflow: hidden` clips pixels, and the host layer already carries that clip
+  // (`clipToBounds`, or the rounded-corner mask that replaces it). PAGX's `overflow="hidden"`
+  // adds a second rule on top of it: lines that do not fit the box are dropped outright. That
+  // second rule also rejects the *first* line when the box is a single line tall, because the
+  // half-leading model puts the glyph descent below the box bottom whenever `lineHeight` is under
+  // the font's natural line height, and an auto-height box resolves to exactly `lineHeight`. The
+  // text then disappears entirely instead of being clipped. Keep the flag only where a line can
+  // actually be dropped: a box with an automatic height grows to its content, and one shorter
+  // than two line heights holds at most one line, so neither has anything to drop.
+  bool heightIsAutomatic = std::isnan(box.heightPx) && std::isnan(box.heightPct);
+  bool boxHoldsAtMostOneLine = !std::isnan(box.heightPx) && textBox->lineHeight > 0 &&
+                               box.heightPx < textBox->lineHeight * 2.0f;
+  if (box.clipOverflow && !heightIsAutomatic && !boxHoldsAtMostOneLine) {
     textBox->overflow = Overflow::Hidden;
   }
   if (isVertical) {

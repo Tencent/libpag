@@ -74,8 +74,9 @@ struct SVGExportOptions {
    * baked to an embedded PNG and emitted as an &lt;image&gt; so the visual result is preserved.
    * When false, the exporter falls through to the vector path and those features degrade silently
    * (TextPath / TextModifier drop, diamond/conic gradient fall back to radial). BackgroundBlurStyle
-   * is always kept as vector output with the blur effect silently dropped, since SVG has no
-   * portable backdrop-blur primitive. Naming is aligned with PPTExportOptions::bakeUnsupported.
+   * and GlassStyle are always kept as vector output with the backdrop effect silently dropped,
+   * since SVG has no portable backdrop-blur / glass primitive. Naming is aligned with
+   * PPTExportOptions::bakeUnsupported.
    * The default value is true.
    */
   bool bakeUnsupported = true;
@@ -139,8 +140,7 @@ class SVGExporter {
    * @return true on success.
    */
   static bool ToFile(PAGXDocument& document, const std::string& filePath,
-                     const Options& options = {},
-                     std::vector<std::string>* warnings = nullptr);
+                     const Options& options = {}, std::vector<std::string>* warnings = nullptr);
 };
 
 }  // namespace pagx

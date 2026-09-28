@@ -24,6 +24,9 @@
 
 namespace pag {
 
+std::shared_ptr<tgfx::EGLWindow> MakeEGLWindow(NativeWindow* nativeWindow,
+                                               EGLContext sharedContext = EGL_NO_CONTEXT);
+
 class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromWindow(NativeWindow* nativeWindow,

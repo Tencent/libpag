@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SoftwareDecoderWrapper.h"
+#include <atomic>
+#include "base/utils/Log.h"
 #include "platform/Platform.h"
 #include "rendering/video/SoftwareData.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
-#include <atomic>
-#include "base/utils/Log.h"
 #include "libyuv/convert_argb.h"
 #include "tgfx/platform/HardwareBuffer.h"
 #endif
@@ -222,6 +222,23 @@ std::shared_ptr<tgfx::ImageBuffer> SoftwareDecoderWrapper::onRenderFrame() {
   auto frame = softwareDecoder->onRenderFrame();
   if (frame == nullptr) {
     return nullptr;
+  }
+  // The decoder is only told the format we want, and it may return a frame whose planes are too
+  // narrow for the size the VideoSequence declares. tgfx copies that declared size out of these
+  // pointers, so reject the frame rather than let the upload read past the returned buffers.
+  const int planeWidths[I420_PLANE_COUNT] = {videoFormat.width, videoFormat.width / 2,
+                                             videoFormat.width / 2};
+  for (int i = 0; i < I420_PLANE_COUNT; i++) {
+    if (frame->data[i] == nullptr || frame->lineSize[i] < planeWidths[i]) {
+      // Report the first unusable frame so a nonconforming decoder is visible in logs; later frames
+      // stay silent to avoid log spam.
+      static std::atomic_flag unusableFrameLogged = ATOMIC_FLAG_INIT;
+      if (!unusableFrameLogged.test_and_set(std::memory_order_relaxed)) {
+        LOGE("SoftwareDecoderWrapper: decoder returned an unusable plane %d for a %dx%d video.\n",
+             i, videoFormat.width, videoFormat.height);
+      }
+      return nullptr;
+    }
   }
 #if defined(__ANDROID__) || defined(ANDROID)
   // Route software-decoded frames through a RGBA HardwareBuffer bound via

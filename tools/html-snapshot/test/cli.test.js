@@ -56,6 +56,13 @@ describe('parseArgs — file inputs', () => {
     expect(opts.inlineIconFonts).toBe(false);
   });
 
+  test('captureAnimations is off by default and enabled by --capture-animations', () => {
+    expect(parseArgs(argv('/tmp/page.html')).captureAnimations).toBe(false);
+    const opts = parseArgs(argv('/tmp/page.html', '--capture-animations'));
+    expect(opts.captureAnimations).toBe(true);
+    expect(opts.reducedMotion).toBe(false);
+  });
+
   test('reduced motion defaults on and --no-reduced-motion disables it', () => {
     expect(parseArgs(argv('/tmp/page.html')).reducedMotion).toBe(true);
     const opts = parseArgs(argv('/tmp/page.html', '--no-reduced-motion'));

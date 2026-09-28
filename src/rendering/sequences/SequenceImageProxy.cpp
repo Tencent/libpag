@@ -28,8 +28,7 @@ SequenceImageProxy::SequenceImageProxy(std::shared_ptr<SequenceInfo> sequence, F
 
 void SequenceImageProxy::prepareImage(RenderCache* cache) const {
   if (sequence->staticContent()) {
-    // We treat sequences with static content as normal asset images.
-    cache->prepareAssetImage(sequence->uniqueID(), this);
+    cache->prepareStaticSequenceImage(sequence);
     return;
   }
   cache->prepareSequenceImage(sequence, targetFrame);
@@ -37,7 +36,7 @@ void SequenceImageProxy::prepareImage(RenderCache* cache) const {
 
 std::shared_ptr<tgfx::Image> SequenceImageProxy::getImage(RenderCache* cache) const {
   if (sequence->staticContent()) {
-    return cache->getAssetImage(sequence->uniqueID(), this);
+    return cache->getStaticSequenceImage(sequence);
   }
   return cache->getSequenceImage(sequence, targetFrame);
 }

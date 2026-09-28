@@ -22,10 +22,17 @@
 #include <cmath>
 #include <utility>
 #include "pagx/FontConfig.h"
+#include "pagx/SystemFonts.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLSubsetTransformer.h"
+#include "pagx/nodes/Animation.h"
+#include "pagx/nodes/AnimationObject.h"
+#include "pagx/nodes/Channel.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/nodes/State.h"
+#include "pagx/nodes/StateMachine.h"
+#include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
@@ -50,41 +57,45 @@ HTMLSubsetTransformer::Options DeriveTransformerOptions(const HTMLImporter::Opti
   return result;
 }
 
-// Normalises a font-family name for case- and spacing-insensitive comparison the way CSS
-// treats family identifiers: lower-cased, leading/trailing whitespace trimmed, and internal
-// runs of whitespace collapsed to a single space. Whitespace is *significant* in CSS family
-// names (only its amount is not), so this deliberately preserves single spaces rather than
-// deleting all whitespace — a "delete every space" rule would fold "SF Mono" into "sfmono" and
-// wrongly match a platform's spaceless variant "SFMono", defeating the substitution guard this
-// availability check exists to enforce. Written as a free function to honour the no-lambda rule.
-std::string NormalizeFamilyName(const std::string& name) {
-  std::string out;
-  out.reserve(name.size());
-  bool pendingSpace = false;
-  for (unsigned char c : name) {
-    if (std::isspace(c)) {
-      // Defer emitting a separator until a non-space follows, so leading/trailing runs are
-      // dropped and interior runs collapse to exactly one space.
-      pendingSpace = !out.empty();
-      continue;
-    }
-    if (pendingSpace) {
-      out.push_back(' ');
-      pendingSpace = false;
-    }
-    out.push_back(static_cast<char>(std::tolower(c)));
-  }
-  return out;
-}
-
-// True when the family the renderer resolved matches the family we requested. A mismatch means
-// the platform substituted a different face (e.g. a hidden or missing font), so the requested
-// family should be treated as unavailable.
-bool FontFamilyNamesMatch(const std::string& requested, const std::string& resolved) {
-  if (resolved.empty()) {
+// True when an `alpha` channel ever drops below 1 (a fade-in from 0 or a fade-out toward 0). Such
+// an animation drives the layer's group opacity below 1 at some point, isolating it into an
+// offscreen surface that breaks descendant backdrop-filter sampling.
+bool AlphaChannelDipsBelowOne(const Channel* channel) {
+  if (channel == nullptr || channel->name != "alpha" ||
+      channel->valueType() != ChannelValueType::Float) {
     return false;
   }
-  return NormalizeFamilyName(requested) == NormalizeFamilyName(resolved);
+  const auto* typed = static_cast<const TypedChannel<float>*>(channel);
+  for (const auto& kf : typed->keyframes) {
+    if (kf.value < 1.0f - 1e-3f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Recursively strips `BackgroundBlurStyle` from `layer` and its descendants once `ancestorFades`
+// (or the layer's own id) marks the subtree as living under an animated-opacity group. Returns the
+// number of styles removed.
+size_t StripBackdropBlurUnderFade(Layer* layer, const std::unordered_set<std::string>& fadingIds,
+                                  bool ancestorFades) {
+  if (layer == nullptr) {
+    return 0;
+  }
+  const bool fades = ancestorFades || (!layer->id.empty() && fadingIds.count(layer->id) > 0);
+  size_t removed = 0;
+  if (fades && !layer->styles.empty()) {
+    auto& styles = layer->styles;
+    auto it = std::remove_if(styles.begin(), styles.end(), [](const LayerStyle* ls) {
+      return ls != nullptr && ls->nodeType() == NodeType::BackgroundBlurStyle;
+    });
+    removed += static_cast<size_t>(std::distance(it, styles.end()));
+    styles.erase(it, styles.end());
+  }
+  for (auto* child : layer->children) {
+    removed += StripBackdropBlurUnderFade(child, fadingIds, fades);
+  }
+  return removed;
 }
 
 }  // namespace
@@ -102,6 +113,11 @@ bool HTMLParserContext::IsFontFamilyAvailableThunk(void* userData, const std::st
   return static_cast<HTMLParserContext*>(userData)->isFontFamilyAvailable(family);
 }
 
+void HTMLParserContext::ResolveFontFaceNamesThunk(void* userData, std::string& family,
+                                                  std::string& style) {
+  static_cast<HTMLParserContext*>(userData)->resolveFontFaceNames(family, style);
+}
+
 HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _options(options) {
   _diagnostics = std::make_unique<HTMLDiagnosticSink>(_options.strict);
   _idAllocator = std::make_unique<HTMLIdAllocator>();
@@ -109,6 +125,8 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _imageResources = std::make_unique<HTMLImageResources>(*_idAllocator);
   _svgEmitter = std::make_unique<HTMLInlineSvgEmitter>();
   _styleCascade = std::make_unique<HTMLStyleCascade>(*_diagnostics, *_valueParser);
+  _animationBuilder =
+      std::make_unique<HTMLAnimationBuilder>(*_diagnostics, *_valueParser, *_idAllocator);
   _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
@@ -118,6 +136,9 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   // family the renderer can't resolve (e.g. the hidden "SF Mono" system font) doesn't get written
   // to `Text::fontFamily` and silently substituted with a mismatched proportional default.
   _styleCascade->setFontAvailabilitySink(&HTMLParserContext::IsFontFamilyAvailableThunk, this);
+  // Rewrite the resolved family/style pair to the spelling the platform resolves it to, so the
+  // exported PAGX can be looked up by name outside this process.
+  _styleCascade->setFontFaceNameSink(&HTMLParserContext::ResolveFontFaceNamesThunk, this);
   // The byte/string entry points have no implicit anchor for relative `<img src>` paths;
   // honour the caller-supplied base path here. The file entry point overrides this with
   // the input file's parent directory.
@@ -136,8 +157,8 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // fonts, in contrast, are resolved by the platform font manager, which silently substitutes a
   // default face for an unknown name (on some platforms `MakeFromName` never returns null) and
   // may report the same family under a differently-spaced spelling; there we compare with the
-  // spacing/case-insensitive `FontFamilyNamesMatch` and treat the family as available only when
-  // the resolved typeface's family matches the request — i.e. no substitution happened.
+  // spacing/case-insensitive `SystemFonts::FontNamesMatch` and treat the family as available only
+  // when the resolved typeface's family matches the request — i.e. no substitution happened.
   //
   // The registered branch is checked *before* the cache and against the exact `family` string.
   // `containsFamily` is a cheap in-memory scan, and its result depends on the exact spelling, so
@@ -151,15 +172,56 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // variants of the same CSS family ("SF Mono" / "sf  mono") share one entry and touch the
   // platform font manager at most once. This is safe because the probe itself compares with the
   // same spacing/case-insensitive rule, so all variants of a key genuinely share one verdict.
-  std::string cacheKey = NormalizeFamilyName(family);
+  std::string cacheKey = SystemFonts::NormalizeFontName(family);
   auto cached = _fontAvailabilityCache.find(cacheKey);
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
   auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
-  bool available = typeface != nullptr && FontFamilyNamesMatch(family, typeface->fontFamily());
+  bool available =
+      typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
   return available;
+}
+
+void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& style) {
+  if (family.empty()) {
+    return;
+  }
+  // Registered/embedded families are resolved by `LayoutContext` through an exact (family, style)
+  // key, so their names must stay verbatim — renaming them would miss the registration and fall
+  // through to a system face instead.
+  if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
+    return;
+  }
+  // The cache is keyed on the exact pair rather than a case-insensitive normalisation: the style
+  // half of the platform lookup is case-sensitive on some backends, so spelling variants of one
+  // family can genuinely resolve to different faces.
+  std::string cacheKey = family + "\n" + style;
+  auto cached = _fontFaceNameCache.find(cacheKey);
+  if (cached != _fontFaceNameCache.end()) {
+    family = cached->second.first;
+    style = cached->second.second;
+    return;
+  }
+  std::string resolvedFamily = family;
+  std::string resolvedStyle = style;
+  auto typeface = SystemFonts::ResolveTypeface(family, style);
+  // A family mismatch means the platform substituted a different face, so the authored name is
+  // kept instead of baking the substitution into the exported document.
+  if (typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily())) {
+    resolvedFamily = typeface->fontFamily();
+    // Report the face style the platform actually picked, including when the request carried no
+    // style at all. The text-leaf exits substitute "Regular" for an empty style, but a family need
+    // not ship a Regular face (macOS "DIN Alternate" only has Bold), and the substituted name would
+    // then resolve nowhere. An empty style from the platform keeps the authored value.
+    if (!typeface->fontStyle().empty()) {
+      resolvedStyle = typeface->fontStyle();
+    }
+  }
+  _fontFaceNameCache.emplace(std::move(cacheKey), std::make_pair(resolvedFamily, resolvedStyle));
+  family = std::move(resolvedFamily);
+  style = std::move(resolvedStyle);
 }
 
 std::shared_ptr<PAGXDocument> HTMLParserContext::parseFile(const std::string& filePath) {
@@ -265,6 +327,8 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _imageResources->bindDocument(_document.get());
   _layerBuilder->bindDocument(_document.get());
   _textFragmentBuilder->bindDocument(_document.get());
+  _animationBuilder->bindDocument(_document.get());
+  _animationBuilder->setKeyframes(&_styleCascade->keyframes());
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -293,8 +357,149 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   if (bodyLayer) {
     _document->layers.push_back(bodyLayer);
   }
+  // Build PAGX animations for every recorded animated element now that the full layer tree
+  // (including background fills consumed by `color` channels) exists. See spec §13.
+  for (auto& entry : _pendingAnimations) {
+    const auto& style = _styleCascade->getResolvedStyle(entry.first);
+    _animationBuilder->buildForElement(style, entry.second);
+  }
+  // Inline-SVG shape animations (`fill` / `stroke` / `stroke-dashoffset` on `<path>` etc.). Their
+  // painter nodes are synthesised by the SVG importer during resolve, so the emitted objects target
+  // the derived painter ids by string; the nodes materialise (with those ids) before export.
+  for (auto& shape : _pendingSvgShapeAnimations) {
+    _animationBuilder->buildForInlineSvgShape(shape.style, shape.shapeTargetId,
+                                              shape.rotationTargetId, shape.fillTargetId,
+                                              shape.strokeTargetId, shape.dashScale);
+  }
+  coalesceAnimations();
+  buildAnimationStateMachine();
+  suppressBackdropBlurUnderOpacityFade();
   flushFontFallbacksToDocument();
   return _document;
+}
+
+void HTMLParserContext::coalesceAnimations() {
+  if (!_document || _document->animations.size() < 2) {
+    return;
+  }
+  // First animation of each (duration, frameRate, loop) group becomes the group leader and keeps
+  // its id; later animations in the same group have their objects appended to the leader and are
+  // dropped from the list. Leaders are scanned linearly because a page has only a handful of
+  // distinct timings even when it animates hundreds of elements. Order is preserved so the
+  // resulting `<Animations>` block still follows document order.
+  std::vector<Node*> coalesced;
+  coalesced.reserve(_document->animations.size());
+  // Parallel list of the Animation* leaders held in `coalesced`, used to match subsequent
+  // animations by timing. Non-animation timelines (e.g. state machines) are passed through
+  // untouched and never participate in coalescing.
+  std::vector<Animation*> leaders;
+  for (auto* node : _document->animations) {
+    if (node == nullptr) {
+      continue;
+    }
+    if (node->nodeType() != NodeType::Animation) {
+      coalesced.push_back(node);
+      continue;
+    }
+    auto* anim = static_cast<Animation*>(node);
+    Animation* group = nullptr;
+    for (auto* leader : leaders) {
+      if (leader->duration == anim->duration && leader->loop == anim->loop &&
+          std::fabs(leader->frameRate - anim->frameRate) < 1e-6f) {
+        group = leader;
+        break;
+      }
+    }
+    if (group == nullptr) {
+      coalesced.push_back(anim);
+      leaders.push_back(anim);
+      continue;
+    }
+    for (auto* obj : anim->objects) {
+      group->objects.push_back(obj);
+    }
+    anim->objects.clear();
+  }
+  _document->animations = std::move(coalesced);
+}
+
+void HTMLParserContext::buildAnimationStateMachine() {
+  if (!_document) {
+    return;
+  }
+  std::vector<Animation*> animations;
+  for (auto* node : _document->animations) {
+    if (node != nullptr && node->nodeType() == NodeType::Animation) {
+      auto* animation = static_cast<Animation*>(node);
+      // Empty animations are not exported, so they must not be referenced by the generated state
+      // machine either. The builder normally filters them earlier; keep this guard so the graph
+      // remains valid if a future optimization empties an animation before this pass.
+      if (!animation->objects.empty()) {
+        animations.push_back(animation);
+      }
+    }
+  }
+  if (animations.size() < 2) {
+    return;
+  }
+
+  // PAGStateMachine advances its StateRegions in parallel. Give each independent HTML animation
+  // one always-active region, then place the state machine first so PAGScene::getDefaultTimeline()
+  // returns it. This preserves each Animation's own duration, delay and loop mode while exposing a
+  // single playback driver to viewers and other hosts.
+  auto* stateMachine =
+      _document->makeNode<StateMachine>(_idAllocator->generateUnique("htmlAnimations"));
+  for (size_t index = 0; index < animations.size(); index++) {
+    auto* region = _document->makeNode<StateRegion>();
+    region->name = "animation" + std::to_string(index);
+    region->initialState = "playing";
+
+    auto* state = _document->makeNode<AnimationState>();
+    state->name = region->initialState;
+    state->animationId = animations[index]->id;
+    region->states.push_back(state);
+    stateMachine->regions.push_back(region);
+  }
+  _document->animations.insert(_document->animations.begin(), stateMachine);
+}
+
+void HTMLParserContext::suppressBackdropBlurUnderOpacityFade() {
+  if (!_document) {
+    return;
+  }
+  // Gather the ids of every layer whose opacity is animated below 1 at some point in the timeline.
+  std::unordered_set<std::string> fadingIds;
+  for (const auto* node : _document->animations) {
+    if (node == nullptr || node->nodeType() != NodeType::Animation) {
+      continue;
+    }
+    const auto* anim = static_cast<const Animation*>(node);
+    for (const auto* obj : anim->objects) {
+      if (obj == nullptr || obj->target.empty()) {
+        continue;
+      }
+      for (const auto* ch : obj->channels) {
+        if (AlphaChannelDipsBelowOne(ch)) {
+          fadingIds.insert(obj->target);
+          break;
+        }
+      }
+    }
+  }
+  if (fadingIds.empty()) {
+    return;
+  }
+  size_t removed = 0;
+  for (auto* root : _document->layers) {
+    removed += StripBackdropBlurUnderFade(root, fadingIds, /*ancestorFades=*/false);
+  }
+  if (removed > 0) {
+    warn("html: dropped " + std::to_string(removed) +
+         " backdrop-filter blur(s) under an animated-opacity group; PAGX isolates such groups into "
+         "an offscreen surface and cannot sample the page behind them, which would tint the box "
+         "with its own colour instead of blurring the backdrop "
+         "(subset:backdrop-blur-dropped-under-opacity-fade)");
+  }
 }
 
 void HTMLParserContext::recordFontFallbacks(const std::vector<std::string>& chain) {
@@ -359,6 +564,22 @@ bool HTMLParserContext::resolveCanvasSize(const std::shared_ptr<DOMNode>& body, 
 }
 
 //==================================================================================================
+// ID assignment with animation registration hook.
+//==================================================================================================
+
+void HTMLParserContext::assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element) {
+  _idAllocator->assign(layer, element);
+  // Record elements that declare an animation so PAGX animations can be emitted once the whole
+  // tree is built. Cheap lookup: the resolved style is cached by the cascade.
+  if (layer != nullptr && element != nullptr) {
+    const auto& style = _styleCascade->getResolvedStyle(element);
+    if (style.count("animation") > 0 || style.count("animation-name") > 0) {
+      _pendingAnimations.emplace_back(element, layer);
+    }
+  }
+}
+
+//==================================================================================================
 // Body / element conversion
 //==================================================================================================
 
@@ -418,7 +639,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
     }
     child = child->getNextSibling();
   }
-  _idAllocator->assign(wrapper, body);
+  assignElementId(wrapper, body);
   return wrapper;
 }
 
@@ -432,6 +653,23 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     return nullptr;
   }
   const std::string& tag = element->name;
+
+  // PAGX round-trip text groups (WOFF2/PUA export output). The host element carries the
+  // original Text semantics in data-pagx-* attributes; part elements only repeat the
+  // pre-shaped PUA characters and are skipped entirely so the glyphs never leak into the
+  // restored document. Host detection wins when both markers are present, so an edited
+  // element that still carries the semantics is never dropped.
+  bool isPagxTextHost = element->findAttribute("data-pagx-text") != nullptr;
+  if (!isPagxTextHost && element->findAttribute("data-pagx-text-part") != nullptr) {
+    return nullptr;
+  }
+  if (isPagxTextHost && IsContainerTag(tag)) {
+    // Per-glyph / TextModifier / TextPath container host: convert the whole container into a
+    // single semantic Text layer instead of recursing into its PUA glyph spans.
+    HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
+    return _layerBuilder->wrapForMargin(
+        _textFragmentBuilder->convertPAGXTextHost(element, inherited), box);
+  }
 
   if (tag == "br") {
     auto layer = _document->makeNode<Layer>();
@@ -455,7 +693,8 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     return _layerBuilder->wrapForMargin(convertImage(element, box), box);
   }
 
-  HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(element, inherited);
+  HTMLInheritedStyle childInherited = _styleCascade->resolveInheritedStyle(
+      element, inherited, /*recordFontFallbacks=*/!isPagxTextHost);
   HTMLBoxAttributes box = _styleCascade->computeBoxAttributes(element);
 
   if (IsContainerTag(tag)) {
@@ -466,6 +705,10 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
     // (<div>, <svg>, <img>, ...). Strict text-leaf handling would drop them. When we
     // detect any non-inline-run element child, fall back to container handling so
     // both the text fragments and the block children survive as sibling layers.
+    // A data-pagx-text host is exempt: its text semantics live in the attribute and its
+    // DOM content is PUA glyph characters, so converting it as a container would leak the
+    // glyphs as stray text. The host is restored by convertTextLeaf even when an editor
+    // added block children to it.
     bool hasBlockChild = false;
     for (auto c = element->getFirstChild(); c; c = c->getNextSibling()) {
       if (c->type != DOMNodeType::Element) continue;
@@ -473,9 +716,12 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
       hasBlockChild = true;
       break;
     }
-    if (hasBlockChild) {
+    if (hasBlockChild && !isPagxTextHost) {
       return _layerBuilder->wrapForMargin(convertContainer(element, box, childInherited, depth),
                                           box);
+    }
+    if (hasBlockChild) {
+      warn("html: block children inside a data-pagx-text host are ignored");
     }
     return _layerBuilder->wrapForMargin(convertTextLeaf(element, box, childInherited), box);
   }
@@ -570,7 +816,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
   // and is skipped for the folded single-image case (which returned early above).
   applyRoundedOverflowClip(layer, box);
-  _idAllocator->assign(wrapper, element);
+  assignElementId(wrapper, element);
   return wrapper;
 }
 
@@ -581,7 +827,14 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
 Layer* HTMLParserContext::convertTextLeaf(const std::shared_ptr<DOMNode>& element,
                                           const HTMLBoxAttributes& box,
                                           const HTMLInheritedStyle& inherited) {
-  return _textFragmentBuilder->convertTextLeaf(element, box, inherited);
+  auto* layer = _textFragmentBuilder->convertTextLeaf(element, box, inherited);
+  // Text leaves bypass convertContainer(), so they must pass through the same registration hook
+  // here. HTMLTextFragmentBuilder assigns authored ids/names to the layer, but a bare allocator
+  // assignment does not enqueue CSS animations for the post-tree animation pass. Without this,
+  // animations on <span>/<a>/<p>/<h1>... elements are silently dropped while identical styles on
+  // a <div> work, which is especially visible for per-character text animations.
+  assignElementId(layer, element);
+  return layer;
 }
 
 }  // namespace pagx

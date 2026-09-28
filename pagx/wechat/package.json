@@ -16,7 +16,8 @@
     "build:js": "rollup -c ./script/rollup.wx.js &&  node script/copy-files.js  &&  tsc -p ./tsconfig.type.json ",
     "build": "node script/cmake.wx.js -a wasm && brotli -f ./lib/pagx-viewer.wasm && npm run build:js",
     "build:release": "node script/cmake.wx.js -a wasm -DNO_LOG=ON && brotli -f ./lib/pagx-viewer.wasm && npm run build:js",
-    "copyFile": "node script/copy-files.js"
+    "copyFile": "node script/copy-files.js",
+    "test:pagx-check": "node test/pagx-check-glass-risk.test.mjs"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "~28.0.3",

@@ -39,6 +39,12 @@ struct ImportFormatOptions {
   bool svgExpandUse = true;
   bool svgFlattenTransforms = false;
   bool svgPreserveUnknown = false;
+  // HTML/URL inputs only: when true, the html-snapshot pre-pass is asked to
+  // capture the page's animations (CSS @keyframes, Web Animations, GSAP,
+  // anime.js) into the subset (forwarded as `--capture-animations` to
+  // snapshot.js) so the importer can replay the motion. Off by default: the
+  // snapshot emits a single static frame.
+  bool captureAnimations = false;
 };
 
 /**

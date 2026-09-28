@@ -118,6 +118,8 @@ export interface BuildSnapshotArgsOptions {
   output: string;
   browserEngine?: string;
   inlineIconFonts?: boolean;
+  captureAnimations?: boolean;
+  scrollReveal?: boolean;
   viewportWidth?: number;
   viewportHeight?: number;
   waitMs?: number;
@@ -140,6 +142,8 @@ function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   const args = [path.join(opts.scriptDir, 'snapshot.js'), opts.input, '-o', opts.output];
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
   if (opts.inlineIconFonts === false) args.push('--no-inline-icon-fonts');
+  if (opts.captureAnimations) args.push('--capture-animations', '--no-reduced-motion');
+  if (opts.scrollReveal) args.push('--scroll-reveal');
   if (typeof opts.viewportWidth === 'number') args.push('--viewport-width', String(opts.viewportWidth));
   if (typeof opts.viewportHeight === 'number') args.push('--viewport-height', String(opts.viewportHeight));
   if (typeof opts.waitMs === 'number') args.push('--wait-ms', String(opts.waitMs));
@@ -249,12 +253,13 @@ export interface RunPagxFontEmbedOptions extends SpawnCaptureOptions {
   fontFiles?: string[];
 }
 
-// Optional Step 3.5 — `pagx font embed <pagx> --fallback <font>...`.
+// Optional Step 3.5 — `pagx embed <pagx> --skip-images --fallback <font>...`. Images are left
+// alone here because their storage mode is owned by the resolve step's --images flag.
 export async function runPagxFontEmbed(opts: RunPagxFontEmbedOptions = {}): Promise<SpawnCaptureResult> {
   const { pagxBin, pagxFile, fontFiles = [], stderrPath, timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxFontEmbed: pagxBin is required');
   if (!pagxFile) throw new Error('runPagxFontEmbed: pagxFile is required');
-  const args = ['font', 'embed', pagxFile];
+  const args = ['embed', pagxFile, '--skip-images'];
   for (const f of fontFiles) args.push('--fallback', f);
   return spawnCapture(pagxBin, args, { stderrPath, timeoutMs });
 }
@@ -352,6 +357,8 @@ export interface RunHtmlToPagxOptions {
   pagxImageBaseDir?: string;
   browserEngine?: string;
   inlineIconFonts?: boolean;
+  captureAnimations?: boolean;
+  scrollReveal?: boolean;
   cookies?: string[];
   headers?: string[];
   viewportWidth?: number;
@@ -448,6 +455,8 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       scriptDir,
       browserEngine: opts.browserEngine,
       inlineIconFonts: opts.inlineIconFonts,
+      captureAnimations: opts.captureAnimations,
+      scrollReveal: opts.scrollReveal,
       cookies: opts.cookies,
       headers: opts.headers,
       viewportWidth: opts.viewportWidth,
@@ -504,10 +513,14 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     });
     assertStepOk('pagx resolve', resolveResult);
 
-    if (embedFonts && fonts.length > 0) {
-      log(`[font-embed] ${pagxFile} (${fonts.length} font file(s))`);
+    // Downloaded faces are only one source of glyphs: the importer also records system font names
+    // on every Text, and `pagx embed` resolves those through the host font manager. Running the
+    // step unconditionally keeps pages that rely on system fonts (most sites) self-contained too;
+    // `fontFiles` stays empty for them, which just means nothing extra is registered for shaping.
+    if (embedFonts) {
+      log(`[font-embed] ${pagxFile} (${fonts.length} downloaded font file(s))`);
       const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fontFiles: fonts });
-      assertStepOk('pagx font embed', embedResult);
+      assertStepOk('pagx embed', embedResult);
     }
 
     if (!doRender) {

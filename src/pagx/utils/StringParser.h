@@ -252,6 +252,19 @@ std::string FloatToString(float value);
 bool ParseCSSHSLColor(const std::string& value, Color& out);
 
 /**
+ * Parses a CSS Color Module Level 4 `color()` functional notation such as
+ * `color(srgb 0.15 0.88 0.81)` or `color(srgb 0.15 0.88 0.81 / 0.6)`. Chrome emits this form
+ * from `getComputedStyle` whenever the authored value mixes color spaces or uses CSS color
+ * functions even when the inputs are plain `rgb()`/`rgba()`. Channels are 0..1 floats; a `%`
+ * suffix is also accepted (mapped onto 0..1). Alpha follows the `/` separator and may be a
+ * unitless number in [0, 1] or a percentage. Only the `srgb` color space is honoured for now;
+ * other spaces (display-p3, rec2020, …) parse but are downgraded to sRGB by returning false so
+ * callers can emit a precise diagnostic. Returns false on malformed input or an unsupported
+ * color space and leaves `out` untouched. Function head matching is ASCII case-insensitive.
+ */
+bool ParseCSSColorFunction(const std::string& value, Color& out);
+
+/**
  * Formats a float as a pixel coordinate or size with at most two decimal places. Unlike
  * FloatToString (which uses %g and preserves full float precision), this trims sub-pixel
  * noise that only adds visual clutter to HTML/CSS output. Use this for left/top/width/height

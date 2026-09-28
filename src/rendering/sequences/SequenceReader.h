@@ -25,6 +25,18 @@
 #include "tgfx/core/ImageBuffer.h"
 
 namespace pag {
+enum class SequenceReadStatus {
+  Pending,
+  Succeeded,
+  Failed,
+};
+
+struct SequenceReadResult {
+  uint64_t requestID = 0;
+  Frame targetFrame = -1;
+  std::atomic<SequenceReadStatus> status = SequenceReadStatus::Pending;
+};
+
 class SequenceReader {
  public:
   virtual ~SequenceReader() = default;
@@ -42,7 +54,8 @@ class SequenceReader {
   /**
    * Decodes the specified target frame immediately and returns the decoded image buffer.
    */
-  std::shared_ptr<tgfx::ImageBuffer> readBuffer(Frame targetFrame);
+  std::shared_ptr<tgfx::ImageBuffer> readBuffer(
+      Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result = nullptr);
 
   void reportPerformance(Performance* performance);
 

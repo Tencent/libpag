@@ -74,7 +74,8 @@ class PAGExportSession {
   /* key: layer ID, value: layer handle */
   std::unordered_map<pag::ID, AEGP_LayerH> layerHandleMap = {};
 
-  std::unordered_map<pag::ID, pag::Frame> videoCompositionStartTime = {};
+  /* key: video composition uniqueID, value: first visible frame index in sequence frame rate */
+  std::unordered_map<pag::ID, pag::Frame> videoCompositionStartFrame = {};
 
   std::string outputPath = "";
 };

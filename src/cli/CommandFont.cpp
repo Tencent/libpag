@@ -182,7 +182,7 @@ int RunFont(int argc, char* argv[]) {
         commaPos != std::string::npos ? options.fontName.substr(0, commaPos) : options.fontName;
     auto style =
         commaPos != std::string::npos ? options.fontName.substr(commaPos + 1) : std::string();
-    typeface = ResolveSystemTypeface(family, style);
+    typeface = SystemFonts::ResolveTypeface(family, style);
     if (typeface == nullptr) {
       std::cerr << "pagx font: font '" << options.fontName << "' not found\n";
       return 1;

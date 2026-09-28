@@ -147,10 +147,8 @@ endif ()
 if (PAG_USE_METAL AND NOT APPLE)
     message(FATAL_ERROR "PAG_USE_METAL is only supported on Apple platforms.")
 endif ()
+# The Metal backend supports the iOS simulator on arm64 only.
 if (PAG_USE_METAL AND IOS)
-    if (NOT CMAKE_OSX_DEPLOYMENT_TARGET OR CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "13.0")
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
-    endif ()
     set(CMAKE_XCODE_ATTRIBUTE_EXCLUDED_ARCHS[sdk=iphonesimulator*] "x86_64")
 endif ()
 
@@ -250,22 +248,19 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
     elseif (MACOS)
-        # Xcode 27's libc++ hard-requires a macOS deployment target >= 11.0 (older targets trip
-        # "#warning The selected platform is no longer supported by libc++", which -Werror turns
-        # into a build failure on every translation unit). 11.0 is also the natural floor for
-        # arm64 Macs, so use it for both architectures.
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
+        # Recent Apple toolchains reject the old 10.15 default: libc++ warns below 11.0
+        # (-Werror makes it fatal) and the SDK refuses below 12.0 with the Xcode generator.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
     elseif (IOS)
-        # Default deployment target for the non-toolchain path (e.g. -DCMAKE_SYSTEM_NAME=iOS);
-        # the toolchain path is handled before project() above. tgfx's Metal backend enforces
-        # iOS 13+ via a hard FATAL_ERROR in its CMakeLists (see third_party/tgfx/CMakeLists.txt),
-        # so raise the default for Metal and keep 9.0 for GL.
-        if (PAG_USE_METAL)
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
-        endif ()
+        # libc++ and the SDK both reject a deployment target below 15.0.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
     endif ()
+endif ()
+
+# iOS 15.0 is the lowest target both Xcode 26 (iOS 15-26) and Xcode 27 (iOS 15-27) accept. The
+# Ninja path never loads the toolchain, so this is the only thing guarding it there.
+if (IOS AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "15.0")
+    message(FATAL_ERROR "Building for iOS requires CMAKE_OSX_DEPLOYMENT_TARGET >= 15.0.")
 endif ()
 
 file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)
@@ -333,6 +328,8 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_HTML)
         list(APPEND PAG_FILES
+            src/pagx/html/importer/HTMLAnimationBuilder.cpp
+            src/pagx/html/importer/HTMLAnimationBuilder.h
             src/pagx/html/importer/HTMLBoxAttributes.h
             src/pagx/html/importer/HTMLCssCascade.cpp
             src/pagx/html/importer/HTMLCssCascade.h
@@ -574,6 +571,10 @@ elseif (IOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
@@ -612,6 +613,10 @@ elseif (MACOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
@@ -1086,6 +1091,14 @@ if (PAG_BUILD_TESTS)
     # Build minizip's reader into test binaries only, so archive-producing tests
     # validate the central directory, entry data, and CRCs by actually extracting.
     list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES} ${MINIZIP_DIR}/unzip.c)
+    # woff2 decoder + brotli dec, test-only: lets font-export tests decompress the generated
+    # WOFF2 data and validate the embedded CFF structure (the pag library only embeds the encoder).
+    if (PAG_BUILD_PAGX)
+        file(GLOB BROTLI_DEC_SOURCES ${BROTLI_DIR}/c/dec/*.c)
+        list(APPEND PAG_TEST_FILES ${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES})
+        set_source_files_properties(${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES}
+                PROPERTIES COMPILE_OPTIONS "-w")
+    endif ()
     list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src

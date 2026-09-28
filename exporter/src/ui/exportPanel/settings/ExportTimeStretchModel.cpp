@@ -92,7 +92,8 @@ void ExportTimeStretchModel::setAEResource(std::shared_ptr<AEResource> newResour
   resource = std::move(newResource);
   duration = GetItemDuration(resource->itemHandle);
   frameRate = GetItemFrameRate(resource->itemHandle);
-  std::optional<TimeStretchInfo> timeStretchInfo = GetTimeStretchInfo(resource->itemHandle);
+  std::optional<TimeStretchInfo> timeStretchInfo =
+      GetTimeStretchInfo(resource->itemHandle, frameRate);
   if (timeStretchInfo.has_value()) {
     const auto& info = *timeStretchInfo;
     resource->stretchMode = info.mode;
