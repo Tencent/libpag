@@ -183,7 +183,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `mask-image: url(data:image/svg+xml,...)` (+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`) | the referenced SVG becomes a PAGX mask layer; `mask-mode` selects Alpha vs Luminance, `mask-size` / `mask-position` drive its scale / offset |
 | `clip-path: url(#id)` | resolves the referenced hidden `<clipPath>` into a contour mask layer. Static geometric forms (`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`) have no PAGX primitive and are dropped with a warning — but an *animated* geometric `clip-path` is supported as a contour-mask morph (see §13.2) |
 | `border-radius: N` (px), `N%` (resolved against `min(width, height)`; a fixed-size element with `border-radius: 50%` becomes an `Ellipse`), or the 1–4 value shorthand (`T`, `T R`, `T R B`, `T R B L`) | `Rectangle.roundness = N` (or an `Ellipse` for `50%`). Elliptical `W / H` two-radius forms are warned and ignored |
-| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning) |
+| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>` (`solid`/`dashed`/`dotted` first-class; other styles downgraded to `solid` with a warning). Like `padding`, the border insets the **content box** by W, so a box with content-box-dependent children gains an inner host (see §5) |
 | `box-shadow: X Y B C` (one or more, optional `inset`) | `<DropShadowStyle>` or `<InnerShadowStyle>` per shadow |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
@@ -262,6 +262,29 @@ PAGX "outer background + inner padded container" pattern (see `spec/pagx_spec.md
 
 Elements with neither background nor padding emit a single Layer with no wrapper.
 
+In the CSS box model `border` insets the content box just like `padding`: a flow child is laid out
+in the content box, percentage sizes resolve against it, and an absolutely positioned child's
+containing block is the padding box. To match that, a box with a border (`borderWidth > 0`) *and* a
+child that depends on the content box — a flow child, or one declaring a percentage width/height —
+inserts that inner host and adds `border-width` to its `padding`:
+
+```xml
+<Layer width="100" height="80">
+  <Rectangle roundness="10" width="100%" height="100%"/>
+  <Stroke color="#E6E9F0" width="4" align="inside"/>
+  <Layer width="100%" height="100%" padding="4">
+    <!-- children: `width/height: 100%` resolves to 92x72 -->
+  </Layer>
+</Layer>
+```
+
+A box whose children are all absolutely positioned with explicit px anchors skips the host instead
+and only offsets those anchors by `border-width` — one Layer less, identical geometry.
+
+The `border-radius` + `overflow: hidden` rounded clip is likewise shaped to the padding box (radius
+shrunk by `border-width`) and attached to that **inner host**: a contour mask also clips the masked
+Layer's own contents, so masking the outer Layer would erase the border stroke.
+
 ## 6. Text Decoration
 
 Underline and strike-through are rendered as overlay rectangles inside the same `Layer`:
@@ -324,9 +347,16 @@ When folded, the emitted PAGX is the canonical rounded-image pattern:
 </Layer>
 ```
 
-Any background colour / gradient / border / shadow declared on the wrapper is preserved
-underneath the folded image fill (i.e. it shows through the image's transparent pixels,
-matching CSS painting order). SVG image sources (`.svg`) are never folded — they go
+Any background colour / gradient / shadow declared on the wrapper is preserved underneath the
+folded image fill (i.e. it shows through the image's transparent pixels, matching CSS painting
+order).
+
+A wrapper carrying a `border` is never folded: the fold stretches the image across the whole border
+box, which both covers the border stroke and inflates the image by 2×`border-width` relative to the
+browser's content box. Those wrappers take the standard container path — the inner host of §5 pulls
+the image into the content box and the rounded mask attached to that host clips it.
+
+SVG image sources (`.svg`) are never folded — they go
 through their own external-import directive path.
 
 ## 8. Coordinate / Angle Conventions

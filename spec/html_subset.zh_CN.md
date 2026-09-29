@@ -170,7 +170,7 @@
 | `mask-image: url(data:image/svg+xml,...)`（+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`） | 引用的 SVG 变成一层 PAGX mask；`mask-mode` 选择 Alpha 还是 Luminance，`mask-size` / `mask-position` 决定其缩放/偏移 |
 | `clip-path: url(#id)` | 解析引用的隐藏 `<clipPath>` 为一层轮廓 mask。静态几何形式（`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`）在 PAGX 无对应原语，告警丢弃——但*动画*的几何 `clip-path` 作为轮廓 mask 变形受支持（见 §13.2） |
 | `border-radius: N`（px）、`N%`（按 `min(width, height)` 解析；固定 px 宽高且 `border-radius: 50%` 的元素会变成 `Ellipse`），或 1–4 值缩写（`T`、`T R`、`T R B`、`T R B L`） | `Rectangle.roundness = N`（`50%` 输出 `Ellipse`）。椭圆 `W / H` 双半径形式告警并忽略 |
-| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>`（`solid`/`dashed`/`dotted` 一等公民；其它样式告警并降级为 `solid`） |
+| `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>`（`solid`/`dashed`/`dotted` 一等公民；其它样式告警并降级为 `solid`）。与 `padding` 一样，边框会把**内容盒**向内收 W，因此有依赖内容盒的子节点时外层 Layer 会再套一层内层宿主（见 §5） |
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
@@ -243,6 +243,28 @@
 
 无背景也无 padding 的元素只产出单层 Layer。
 
+CSS 盒模型里 `border` 与 `padding` 一样内缩内容盒：流内子节点落在内容盒中，百分比尺寸也相对内容盒
+解析，而绝对定位子元素的包含块是 padding box。为对齐这一语义，当一个元素带 `border`
+（`borderWidth > 0`）**且**存在依赖内容盒的子节点（流内子节点，或声明了百分比宽高的子节点）时，
+会插入这层内层宿主，并把 `border-width` 加到它的 `padding` 上：
+
+```xml
+<Layer width="100" height="80">
+  <Rectangle roundness="10" width="100%" height="100%"/>
+  <Stroke color="#E6E9F0" width="4" align="inside"/>
+  <Layer width="100%" height="100%" padding="4">
+    <!-- 子内容：`width/height: 100%` 解析为 92x72 -->
+  </Layer>
+</Layer>
+```
+
+若子节点全部是带显式 px 锚点的绝对定位元素，则不插入宿主，只把这些锚点按 `border-width` 偏移
+（少一层 Layer，几何等价）。
+
+`border-radius` + `overflow: hidden` 的圆角裁剪 mask 同样按 padding box 构造（半径按
+`border-width` 收缩），并挂在**内层宿主**上：contour mask 会连同被遮罩 Layer 自身的 contents
+一起裁剪，挂在外层会把边框描边一并裁掉。
+
 ## 6. 文本装饰
 
 下划线与删除线在同一个 Layer 内输出为叠加矩形：
@@ -295,8 +317,12 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 </Layer>
 ```
 
-包装容器上声明的背景色 / 渐变 / 描边 / 阴影会保留在折叠后的图片填充之下（在图片透明像素处透出
-来，与 CSS 绘制顺序一致）。SVG 图片源（`.svg`）不会被折叠 —— 它们仍然走自己的外部导入指令通道。
+包装容器上声明的背景色 / 渐变 / 阴影会保留在折叠后的图片填充之下（在图片透明像素处透出来，与
+CSS 绘制顺序一致）。SVG 图片源（`.svg`）不会被折叠 —— 它们仍然走自己的外部导入指令通道。
+
+带 `border` 的包装容器**不折叠**：折叠会把图片铺满整个边框盒，既盖住边框描边，又让图片比浏览器
+的内容盒大 2×`border-width`。这类容器走标准容器路径 —— 由 §5 的内层宿主把图片收进内容盒、由
+挂在该宿主上的圆角 mask 完成裁剪。
 
 导入器最多会穿过三层仅用于布局的包装 `<div>`（自身无绘制、只透传布局的包装层）去寻找 `<img>`，
 因此常见的 `div > div > img` 头像结构仍能被折叠。

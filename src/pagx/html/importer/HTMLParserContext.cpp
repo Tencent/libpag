@@ -609,7 +609,8 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   Layer* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
 
   Layer* contentHost = layer;
-  bool needsInnerHost = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
+  bool needsInnerHost =
+      hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box, hasContentBoxDependentChild(body));
   if (needsInnerHost) {
     contentHost = _layerBuilder->createInnerHost(layer, box);
   } else {
@@ -735,11 +736,31 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   return nullptr;
 }
 
+bool HTMLParserContext::hasContentBoxDependentChild(const std::shared_ptr<DOMNode>& element) {
+  if (element == nullptr) {
+    return false;
+  }
+  for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
+    if (child->type != DOMNodeType::Element) {
+      continue;
+    }
+    HTMLBoxAttributes childBox = _styleCascade->computeBoxAttributes(child);
+    // A flow child is laid out in the content box; a percentage resolves its size against the
+    // containing block, which for an out-of-flow child is the padding box. Both are inset by the
+    // border, unlike an absolutely positioned child with explicit px anchors.
+    if (!childBox.absolute || !std::isnan(childBox.widthPct) || !std::isnan(childBox.heightPct)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& element,
                                            const HTMLBoxAttributes& box,
                                            const HTMLInheritedStyle& inherited, int depth) {
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
-  bool needsInner = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
+  bool needsInner = hasBgVisuals &&
+                    HTMLLayerBuilder::requiresInnerHost(box, hasContentBoxDependentChild(element));
 
   auto layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
@@ -782,11 +803,10 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, depth + 1);
       if (childLayer) {
-        // CSS border-box: position:absolute descendants are positioned relative to the
-        // parent's padding box, which sits inside the border. Shift their explicit
-        // left/right/top/bottom offsets by the border width so they don't overlap the
-        // border stroke.
-        if (box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
+        // CSS border-box: descendants are laid out against the parent's padding box, which sits
+        // inside the border. The inner host reproduces that inset for every child, so only the
+        // host-less path needs the per-child compensation below (applying both would inset twice).
+        if (!needsInner && box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
           if (!std::isnan(childLayer->left)) childLayer->left += box.borderWidthPx;
           if (!std::isnan(childLayer->right)) childLayer->right += box.borderWidthPx;
           if (!std::isnan(childLayer->top)) childLayer->top += box.borderWidthPx;
@@ -815,7 +835,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // Reshape the rectangular `overflow: hidden` clip into the border-radius outline so descendants
   // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
   // and is skipped for the folded single-image case (which returned early above).
-  applyRoundedOverflowClip(layer, box);
+  applyRoundedOverflowClip(layer, contentHost, box);
   assignElementId(wrapper, element);
   return wrapper;
 }
