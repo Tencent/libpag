@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#import <UIKit/UIKit.h>
 #import "AppDelegate.h"
 
 @interface AppDelegate ()
@@ -28,6 +29,22 @@
     // Override point for customization after application launch.
     return YES;
 }
+
+// Minimal UIScene adoption required by SDKs from Xcode 26/27: returning a default (nil-name)
+// configuration keeps UIKit on the default UIWindowScene that loads UIMainStoryboardFile, so the
+// AppDelegate lifecycle demo keeps working without a scene delegate.
+- (UISceneConfiguration *)application:(UIApplication *)application
+    configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession
+                                   options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0)) {
+    return [[UISceneConfiguration alloc] initWithName:nil
+                                          sessionRole:connectingSceneSession.role];
+}
+
+- (void)application:(UIApplication *)application
+    didDiscardSceneSessions:(NSSet<UISceneSession *> *)sceneSessions API_AVAILABLE(ios(13.0)) {
+}
+
+
 
 
 - (void)applicationWillResignActive:(UIApplication*)application {
