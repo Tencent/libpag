@@ -192,16 +192,28 @@ function renderHtml(summaries, overall, title, entries) {
 // per-case pixel comparison (baselines are Chromium-rendered at run time and
 // therefore not deterministic per case). A corpus regresses when its SSIM mean
 // drops, or its pixel-diff / RGB-delta mean rises, beyond the tolerance.
+// Corpora listed in REPORT_ONLY_CORPORA are skipped entirely: their means track
+// the host's fonts and browser rather than the code.
 
-// Default tolerances per corpus. websites/generated pull CDN CSS/fonts/images
-// at eval time, so they are inherently noisier and get looser bounds.
+// Corpora whose per-case pixels depend on the host environment, and whose
+// corpus means therefore are not comparable across machines. `websites` and
+// `generated` render real pages that lean on the host's system fonts
+// (`-apple-system`, `PingFang SC`, and Tailwind's default `system-ui` stack),
+// while `pagx render` has to resolve those through the host (the eval embeds no
+// fonts); the Chromium that draws the ground truth is also downloaded at run
+// time. Two machines legitimately differ by more than 0.10 SSIM on them, far
+// beyond any tolerance that would still catch a regression, so they keep
+// producing reports for hand inspection but never gate. The deterministic
+// corpora (`cases`/`cli`) barely use fonts at all — 0 and 1 of 187/276 files
+// declare a `font-family` — and reproduce to four decimals across machines.
+const REPORT_ONLY_CORPORA = new Set(['html-websites', 'html-generated']);
+
+// Tolerances for the gated corpora, an order of magnitude above the observed
+// machine-to-machine spread on those deterministic corpora.
 const DEFAULT_TOLERANCE = { ssim: 0.02, pd: 0.02, rgb: 2.0 };
-const LOOSE_TOLERANCE = { ssim: 0.05, pd: 0.05, rgb: 5.0 };
 const CORPUS_TOLERANCE = {
   'html-cases': DEFAULT_TOLERANCE,
   'html-cli': DEFAULT_TOLERANCE,
-  'html-websites': LOOSE_TOLERANCE,
-  'html-generated': LOOSE_TOLERANCE,
 };
 
 function loadBaseline(file) {
@@ -223,6 +235,9 @@ function toleranceFor(baseline, label) {
 // Returns { ok, checks: [...] } comparing a corpus summary against its baseline
 // entry. A missing baseline entry is report-only (ok=true, checks=[]).
 function gateCorpus(summary, baseline) {
+  if (REPORT_ONLY_CORPORA.has(summary.label)) {
+    return { ok: true, checks: [], skipped: true, reportOnly: true };
+  }
   const entry = baseline && baseline.corpora && baseline.corpora[summary.label];
   if (!entry) return { ok: true, checks: [], skipped: true };
   const tol = toleranceFor(baseline, summary.label);
@@ -243,6 +258,10 @@ function printGate(results) {
   console.log('=== HTML eval baseline gate (corpus-level means) ===');
   let anyGated = false;
   for (const { summary, gate } of results) {
+    if (gate.reportOnly) {
+      console.log(`  ${summary.label}: (report-only — host-font/browser dependent, not gated)`);
+      continue;
+    }
     if (gate.skipped) {
       console.log(`  ${summary.label}: (no baseline entry — report-only)`);
       continue;

@@ -10,8 +10,11 @@
 # Per case it is report-only: it never fails on a single low SSIM. Browser
 # fidelity is a corpus-level mean metric, so the only pass/fail gate is on the
 # per-corpus means (SSIM / pixel-diff / RGB-delta) compared against the
-# committed baseline resources/html/baseline.json. A corpus with no baseline
-# entry stays report-only. Inspect report.md / index.html by hand for detail.
+# committed baseline resources/html/baseline.json. Only the deterministic
+# corpora gate: the host-font/browser dependent ones (websites/generated) stay
+# report-only, as does any corpus with no baseline entry. See
+# REPORT_ONLY_CORPORA in tools/html-snapshot/eval/summary.js. Inspect
+# report.md / index.html by hand for detail.
 #
 # Prerequisites:
 #   - a built `pagx` binary (default: <repo>/cmake-build-debug/pagx, or $PAGX_BIN)
