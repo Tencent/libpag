@@ -189,14 +189,13 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     return;
   }
 
-  auto device = pag::Devices::MakeDefault();
-  if (!device) {
+  // Reentrancy-safe lock: HTMLExporter::ToData can be invoked while the caller already holds
+  // the default device; the scope then reuses that context instead of deadlocking.
+  pag::DeviceLockScope deviceLock;
+  if (!deviceLock) {
     return;
   }
-  auto gpuCtx = device->lockContext();
-  if (!gpuCtx) {
-    return;
-  }
+  auto gpuCtx = deviceLock.context();
 
   int idx = 0;
   for (Layer* target : candidates) {
@@ -254,8 +253,6 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     out[target] = std::move(entry);
     idx++;
   }
-
-  device->unlock();
 }
 
 }  // namespace pagx

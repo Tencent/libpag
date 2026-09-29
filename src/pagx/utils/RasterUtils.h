@@ -19,6 +19,8 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -35,6 +37,8 @@ class ImagePattern;
 /**
  * Manages a lazily-created GPU device and context for off-screen rendering.
  * Reuse a single instance across multiple render calls to avoid repeated GL context creation.
+ * lockContext()/unlock() pairs may nest: inner pairs reuse the already-locked context through
+ * pag::DeviceLockScope instead of re-entering tgfx's non-recursive device mutex.
  */
 class GPUContext {
  public:
@@ -48,7 +52,7 @@ class GPUContext {
   void unlock();
 
  private:
-  std::shared_ptr<tgfx::Device> _device = nullptr;
+  std::vector<std::unique_ptr<pag::DeviceLockScope>> _lockStack = {};
 };
 
 /**

@@ -291,16 +291,20 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
   const int width = 100;
   const int height = 100;
 
+  // Hold the device lock across texture + surface creation (GL needs a current context there),
+  // then release before PAGScene::draw() below, which acquires the device on its own.
   tgfx::GLTextureInfo textureInfo = {};
-  CreateGLTexture(context, width, height, &textureInfo);
-  auto backendTexture = ToBackendTexture(textureInfo, width, height);
-
-  auto surface = pagx::PAGSurface::MakeFrom(backendTexture, pag::ImageOrigin::TopLeft);
+  std::shared_ptr<pagx::PAGSurface> surface = nullptr;
+  {
+    pag::DeviceLockScope deviceLock;
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    CreateGLTexture(deviceLock.context(), width, height, &textureInfo);
+    auto backendTexture = ToBackendTexture(textureInfo, width, height);
+    surface = pagx::PAGSurface::MakeFrom(backendTexture, pag::ImageOrigin::TopLeft);
+  }
   ASSERT_TRUE(surface != nullptr);
   EXPECT_EQ(surface->width(), width);
   EXPECT_EQ(surface->height(), height);
-
-  device->unlock();
 
   auto doc = pagx::PAGXDocument::Make(width, height);
   auto layer = doc->makeNode<pagx::Layer>("L");
@@ -341,8 +345,11 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSurfaceFromBackendTexture"));
 
-  context = device->lockContext();
-  glDeleteTextures(1, &textureInfo.id);
+  {
+    pag::DeviceLockScope lock;
+    ASSERT_TRUE(static_cast<bool>(lock));
+    glDeleteTextures(1, &textureInfo.id);
+  }
 }
 
 /**
@@ -353,26 +360,29 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   const int width = 100;
   const int height = 100;
 
+  // Hold the device lock across GL object + surface creation (GL needs a current context there),
+  // then release before PAGScene::draw() below, which acquires the device on its own.
   tgfx::GLTextureInfo textureInfo = {};
-  CreateGLTexture(context, width, height, &textureInfo);
-
   GLuint fbo = 0;
-  glGenFramebuffers(1, &fbo);
-  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureInfo.id, 0);
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  std::shared_ptr<pagx::PAGSurface> surface = nullptr;
+  {
+    pag::DeviceLockScope deviceLock;
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    CreateGLTexture(deviceLock.context(), width, height, &textureInfo);
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureInfo.id, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  pag::GLFrameBufferInfo fbInfo = {};
-  fbInfo.id = fbo;
-  fbInfo.format = GL_RGBA8;
-  pag::BackendRenderTarget backendRT(fbInfo, width, height);
-
-  auto surface = pagx::PAGSurface::MakeFrom(backendRT, pag::ImageOrigin::TopLeft);
+    pag::GLFrameBufferInfo fbInfo = {};
+    fbInfo.id = fbo;
+    fbInfo.format = GL_RGBA8;
+    pag::BackendRenderTarget backendRT(fbInfo, width, height);
+    surface = pagx::PAGSurface::MakeFrom(backendRT, pag::ImageOrigin::TopLeft);
+  }
   ASSERT_TRUE(surface != nullptr);
   EXPECT_EQ(surface->width(), width);
   EXPECT_EQ(surface->height(), height);
-
-  device->unlock();
 
   auto doc = pagx::PAGXDocument::Make(width, height);
   auto layer = doc->makeNode<pagx::Layer>("L");
@@ -413,9 +423,12 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSurfaceFromBackendRenderTarget"));
 
-  context = device->lockContext();
-  glDeleteFramebuffers(1, &fbo);
-  glDeleteTextures(1, &textureInfo.id);
+  {
+    pag::DeviceLockScope lock;
+    ASSERT_TRUE(static_cast<bool>(lock));
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &textureInfo.id);
+  }
 }
 #endif  // TGFX_USE_OPENGL
 
@@ -433,15 +446,19 @@ PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendTexture) {
   const int height = 100;
 
   tgfx::MetalTextureInfo textureInfo = {};
-  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  {
+    // Lock only while creating the texture; PAGScene::draw() below acquires the device on its
+    // own, and holding the lock here would deadlock it on the deduplicated shared device.
+    pag::DeviceLockScope lock;
+    ASSERT_TRUE(static_cast<bool>(lock));
+    ASSERT_TRUE(CreateMetalTexture(lock.context(), width, height, &textureInfo));
+  }
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
 
   auto surface = pagx::PAGSurface::MakeFrom(backendTexture, pag::ImageOrigin::TopLeft);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_EQ(surface->width(), width);
   EXPECT_EQ(surface->height(), height);
-
-  device->unlock();
 
   auto doc = pagx::PAGXDocument::Make(width, height);
   auto layer = doc->makeNode<pagx::Layer>("L");
@@ -482,7 +499,6 @@ PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendTexture) {
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/MetalPAGSurfaceFromBackendTexture"));
 
-  context = device->lockContext();
   pag::ReleaseMetalTexture(&textureInfo);
 }
 
@@ -495,15 +511,19 @@ PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendRenderTarget) {
   const int height = 100;
 
   tgfx::MetalTextureInfo textureInfo = {};
-  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  {
+    // Lock only while creating the texture; PAGScene::draw() below acquires the device on its
+    // own, and holding the lock here would deadlock it on the deduplicated shared device.
+    pag::DeviceLockScope lock;
+    ASSERT_TRUE(static_cast<bool>(lock));
+    ASSERT_TRUE(CreateMetalTexture(lock.context(), width, height, &textureInfo));
+  }
   auto backendRT = ToBackendRenderTarget(textureInfo, width, height);
 
   auto surface = pagx::PAGSurface::MakeFrom(backendRT, pag::ImageOrigin::TopLeft);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_EQ(surface->width(), width);
   EXPECT_EQ(surface->height(), height);
-
-  device->unlock();
 
   auto doc = pagx::PAGXDocument::Make(width, height);
   auto layer = doc->makeNode<pagx::Layer>("L");
@@ -544,7 +564,6 @@ PAGX_TEST(PAGXRuntimeTest, MetalPAGSurfaceFromBackendRenderTarget) {
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/MetalPAGSurfaceFromBackendRenderTarget"));
 
-  context = device->lockContext();
   pag::ReleaseMetalTexture(&textureInfo);
 }
 #endif  // TGFX_USE_METAL

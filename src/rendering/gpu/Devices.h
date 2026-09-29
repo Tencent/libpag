@@ -204,4 +204,57 @@ class Devices {
   // that actually needs it.
 };
 
+/**
+ * Reentrancy-safe RAII lock over the default device.
+ *
+ * tgfx::Device::lockContext() uses a non-recursive mutex and only documents cross-thread
+ * blocking; locking the same device twice from one thread is undefined and, with the device
+ * deduplication introduced by tgfx #1581, deadlocks: MakeDefault() returns the same shared
+ * Device instance to every caller on a thread, so a caller that already holds the device lock
+ * and calls back into libpag code that fetches the default device (e.g. HTMLExporter::ToData
+ * rasterizing gradient fills) re-enters the same mutex.
+ *
+ * DeviceLockScope removes that hazard for libpag-internal usage: scopes created on a thread
+ * that already holds the lock (through an outer DeviceLockScope) reuse the live context and
+ * only the outermost scope's destruction unlocks the device. Callers that bypass this class
+ * and call tgfx::Device::lockContext() directly still own the reentrancy contract themselves.
+ */
+class DeviceLockScope {
+ public:
+  /**
+   * Locks Devices::MakeDefault(), or reuses the already-locked default device when the calling
+   * thread holds one through an outer DeviceLockScope. Use the bool conversion to check for
+   * failure (device creation or context lock failed); the scope is then empty and inert.
+   */
+  DeviceLockScope();
+
+  /**
+   * Releases the device lock, unless the calling thread still holds an outer DeviceLockScope
+   * (the lock is released when the outermost scope is destroyed).
+   */
+  ~DeviceLockScope();
+
+  DeviceLockScope(const DeviceLockScope&) = delete;
+  DeviceLockScope& operator=(const DeviceLockScope&) = delete;
+
+  /**
+   * Returns the locked context, or nullptr when the scope failed to acquire one.
+   */
+  tgfx::Context* context() const {
+    return _context;
+  }
+
+  /**
+   * Returns false when the device could not be created or the context lock failed.
+   */
+  explicit operator bool() const {
+    return _context != nullptr;
+  }
+
+ private:
+  bool _ownsLock = false;
+  tgfx::Context* _context = nullptr;
+  std::shared_ptr<tgfx::Device> _device = {};
+};
+
 }  // namespace pag
