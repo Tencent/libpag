@@ -23,6 +23,13 @@
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/gpu/opengl/eagl/EAGLWindow.h"
 
+// The CAEAGLLayer declarations below are deprecated since iOS 12 but remain part of the published
+// GL-backend API surface. Silence the deprecation warnings locally: this header is included from
+// platform files compiled without libpag's GLES_SILENCE_DEPRECATION build define, and defining
+// that macro here would leak into the whole including translation unit.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace pag {
 
 extern NSString* const AsyncSurfacePreparedNotification;
@@ -59,5 +66,7 @@ class GPUDrawable : public Drawable {
   void tryCreateSurface();
 };
 }  // namespace pag
+
+#pragma clang diagnostic pop
 
 #endif  // TGFX_USE_OPENGL

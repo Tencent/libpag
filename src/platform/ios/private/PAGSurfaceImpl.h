@@ -25,6 +25,14 @@
 
 @protocol MTLDevice;
 
+// The CAEAGLLayer / EAGLContext declarations below are deprecated since iOS 12 but remain part
+// of the published GL-backend API surface. Silence the deprecation warnings locally: this header
+// is included from platform files compiled without libpag's GLES_SILENCE_DEPRECATION build
+// define (e.g. the cocoa PAGPlayer bridge), and defining that macro here would leak into the
+// whole including translation unit.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 @interface PAGSurfaceImpl : NSObject
 
 + (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
@@ -57,3 +65,5 @@
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 
 @end
+
+#pragma clang diagnostic pop
