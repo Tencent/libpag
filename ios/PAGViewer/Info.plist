@@ -37,9 +37,8 @@
 	</array>
 	<key>UIRequiresFullScreen</key>
 	<false/>
-	<!-- SDKs since Xcode 27 refuse to launch apps without a scene manifest. The AppDelegate acts
-	     as the scene delegate too: its existing window property receives the storyboard-created
-	     window, so the legacy AppDelegate lifecycle demo keeps working unchanged. -->
+	<!-- SDKs since Xcode 27 refuse to launch apps without a scene manifest. The dedicated
+	     SceneDelegate owns the window, while the AppDelegate keeps the application lifecycle. -->
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -52,7 +51,7 @@
 					<key>UISceneConfigurationName</key>
 					<string>Default</string>
 					<key>UISceneDelegateClassName</key>
-					<string>AppDelegate</string>
+					<string>SceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
 				</dict>

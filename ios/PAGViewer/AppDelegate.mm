@@ -10,14 +10,15 @@
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <UIKit/UIKit.h>
 #import "AppDelegate.h"
+#import "SceneDelegate.h"
 
 @interface AppDelegate ()
 
@@ -30,17 +31,15 @@
     return YES;
 }
 
-// Minimal UIScene adoption required by SDKs from Xcode 26/27: the AppDelegate doubles as the
-// scene delegate (its window property receives the storyboard window), so the legacy AppDelegate
-// lifecycle demo keeps working unchanged. The same configuration is declared statically in
-// Info.plist; this callback mirrors it for sessions created programmatically.
+// Mirrors the scene configuration declared statically in Info.plist, so sessions created
+// programmatically also pick up the SceneDelegate and the Main storyboard.
 - (UISceneConfiguration *)application:(UIApplication *)application
     configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession
                                    options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0)) {
     UISceneConfiguration* configuration =
         [[UISceneConfiguration alloc] initWithName:@"Default"
                                        sessionRole:connectingSceneSession.role];
-    configuration.delegateClass = [AppDelegate class];
+    configuration.delegateClass = [SceneDelegate class];
     configuration.storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
     return configuration;
 }
@@ -53,8 +52,8 @@
 
 
 - (void)applicationWillResignActive:(UIApplication*)application {
-    // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-    // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
+    // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and begins the transition to the background state.
+    // Use this method to pause ongoing tasks, disable timers, or invalidate graphics rendering callbacks. Games should use this method to pause the game.
 }
 
 

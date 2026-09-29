@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 Tencent. All rights reserved.
+//  Copyright (C) 2026 Tencent. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,10 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <UIKit/UIKit.h>
+#import "SceneDelegate.h"
 
+@implementation SceneDelegate
 
-@interface AppDelegate : UIResponder <UIApplicationDelegate> {
+// The window is instantiated automatically from the UISceneStoryboardFile declared in the scene
+// configuration (Info.plist), so nothing needs to be done here on connect.
+- (void)scene:(UIScene*)scene willConnectToSession:(UISceneSession*)session
+      options:(UISceneConnectionOptions*)connectionOptions {
+}
+
+- (void)sceneDidDisconnect:(UIScene*)scene {
+}
+
+- (void)sceneDidBecomeActive:(UIScene*)scene {
+}
+
+- (void)sceneWillResignActive:(UIScene*)scene {
+}
+
+- (void)sceneWillEnterForeground:(UIScene*)scene {
+}
+
+- (void)sceneDidEnterBackground:(UIScene*)scene {
 }
 
 @end
