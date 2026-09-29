@@ -26,6 +26,7 @@ const path = require('path');
 const {
   inlineExternalImages,
   inlineCanvases,
+  dropCollapsedDetailsContent,
   materializeDecorativePseudoElements,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
@@ -49,6 +50,7 @@ const {
 const BROWSER_EXPORTS = [
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
+  { name: 'dropCollapsedDetailsContent', fn: dropCollapsedDetailsContent },
   { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },
   { name: 'collectFontFaceMap',     fn: browserCollectFontFaceMap },
   { name: 'collectIconFontTargets', fn: browserCollectIconFontTargets },
@@ -68,6 +70,7 @@ const banner = `/*!
  *   takeSnapshot()                          -> { html, width, height }
  *   inlineExternalImages(cachedMap?)        -> Promise<void>
  *   inlineCanvases()                        -> Promise<void>
+ *   dropCollapsedDetailsContent()           -> { details, nodes }
  *   materializeDecorativePseudoElements()   -> Promise<void>
  *   collectIconFontTargets()                -> Promise<target[]>
  *   applyIconFontSvgs(target_svg_pairs)     -> void
@@ -105,6 +108,7 @@ return {
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,
   inlineCanvases: inlineCanvases,
+  dropCollapsedDetailsContent: dropCollapsedDetailsContent,
   materializeDecorativePseudoElements: materializeDecorativePseudoElements,
   // Icon-font hooks: callers running outside of node (no opentype.js /
   // wawoff2 available) can still tag icon-font hosts via
@@ -258,6 +262,11 @@ const exampleHtml = `<!DOCTYPE html>
         // libraries (ECharts, Chart.js, …) survive the snapshot. No-op when
         // the page has no canvases.
         await HtmlSnapshot.inlineCanvases();
+        // Optional: drop the collapsed content of closed <details> elements.
+        // Chromium hides it through a UA pseudo-element the walker cannot
+        // observe, so an unclipped <details> would otherwise emit every
+        // collapsed panel as a box painted over the summary rows.
+        HtmlSnapshot.dropCollapsedDetailsContent();
         // Optional: turn decorative ::before/::after pseudo-elements
         // (toggle thumbs, custom radio dots, dividers …) into real <div>
         // children so their boxes survive the snapshot.
