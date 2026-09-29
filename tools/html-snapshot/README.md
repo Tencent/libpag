@@ -312,6 +312,9 @@ document and require no other globals:
   (async () => {
     await HtmlSnapshot.inlineExternalImages();           // optional
     await HtmlSnapshot.inlineCanvases();                 // optional
+    // Optional: prune the collapsed content of closed <details> so it does
+    // not leak into the walk as boxes painted over the summary rows.
+    HtmlSnapshot.dropCollapsedDetailsContent();
     // Optional: inline icon-font glyphs as <svg>. The browser bundle only
     // exposes the collect/apply hooks (font parsing requires opentype.js
     // + a WOFF2 decoder, which we don't bundle). A typical setup posts
@@ -338,6 +341,7 @@ import {
   takeSnapshot,
   inlineExternalImages,
   inlineCanvases,
+  dropCollapsedDetailsContent,
   collectIconFontTargets,
   applyIconFontSvgs,
 } from './html-snapshot.esm.js';
@@ -560,9 +564,15 @@ Babel-compiled at runtime.
   expansion is opt-out via `HTML_SNAPSHOT_NO_STICKY_EXPAND=1`.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
-- `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
+- `<video>`, `<audio>`, `<iframe>`, `<dialog>`,
   `<template>`, `<slot>`, `<map>`/`<area>`, `<source>`/`<track>`, etc. are
   dropped — they have no static visual representation.
+- `<details>` is kept: the summary row paints, so an accordion/FAQ list comes
+  through as its first item expanded plus the remaining titles. The collapsed
+  content of a closed `<details>` is pruned from the DOM before the walk,
+  because Chromium hides it through a UA pseudo-element the snapshot cannot
+  observe (the content reports normal visibility and a full-size rect, and
+  only the element's own `overflow: hidden` keeps it off screen).
 - `<canvas>` is captured via `toDataURL`, which fails silently in two
   cases: tainted 2D canvases (cross-origin `drawImage` source without CORS),
   and WebGL canvases created without `preserveDrawingBuffer: true` (the
