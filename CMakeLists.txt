@@ -2,13 +2,12 @@ cmake_minimum_required(VERSION 3.13)
 
 # The iOS toolchain (third_party/vendor_tools/ios.toolchain.cmake) reads DEPLOYMENT_TARGET while
 # configuring the project and derives both the deployment target and the compiler target triple
-# from it. tgfx's Metal backend enforces iOS 13 or later via a hard FATAL_ERROR in its
-# CMakeLists (the APIs tgfx actually uses, e.g. MTLEvent via newEvent, are available on older
-# iOS; the 13.0 floor is tgfx's own policy choice), so Metal builds must
+# from it. Apple toolchains reject iOS deployment targets below 15.0 (Xcode 26/27 SDKs), and
+# the tgfx Metal backend has its own >= 13.0 floor that 15.0 satisfies, so Metal builds must
 # pre-set the minimum before configuration. This only applies to iOS builds; macOS keeps its own
 # default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
 if (PAG_USE_METAL AND NOT DEFINED DEPLOYMENT_TARGET AND PLATFORM MATCHES "^(OS|SIMULATOR)")
-    set(DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum iOS deployment target" FORCE)
+    set(DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum iOS deployment target" FORCE)
 endif ()
 
 project(PAG)
