@@ -57,10 +57,23 @@ EMSCRIPTEN_BINDINGS(PAGXPlayground) {
       .function("_durationMicros", optional_override([](pagx::PAGXView& self) -> double {
                   return static_cast<double>(self.durationMicros());
                 }))
+      .function("_hasTimeline", &pagx::PAGXView::hasTimeline)
       .function("_frameRate", &pagx::PAGXView::frameRate)
       .function("_setCurrentTimeMicros", optional_override([](pagx::PAGXView& self, double micros) {
                   self.setCurrentTimeMicros(static_cast<int64_t>(micros));
                 }))
       .function("_setLoop", &pagx::PAGXView::setLoop)
-      .function("_isLoop", &pagx::PAGXView::isLoop);
+      .function("_isLoop", &pagx::PAGXView::isLoop)
+      .function("_hitTest", &pagx::PAGXView::hitTest)
+      .function("_getNodeSourceMap", &pagx::PAGXView::getNodeSourceMap)
+      .function("_getNodeBounds", &pagx::PAGXView::getNodeBounds)
+      .function("_validatePAGX", &pagx::PAGXView::validatePAGX)
+      .function("_setNodeChannel", &pagx::PAGXView::setNodeChannel)
+      .function("_setSMInputBool", &pagx::PAGXView::setSMInputBool)
+      .function("_setSMInputNumber", &pagx::PAGXView::setSMInputNumber)
+      .function("_fireSMInputTrigger", &pagx::PAGXView::fireSMInputTrigger)
+      .function("_getTimelineTree", &pagx::PAGXView::getTimelineTree)
+      .function("_selectTimelineUnit", &pagx::PAGXView::selectTimelineUnit)
+      .function("_getSelectedTimelineUnit", &pagx::PAGXView::getSelectedTimelineUnit)
+      .function("_getSMCurrentStates", &pagx::PAGXView::getSMCurrentStates);
 }

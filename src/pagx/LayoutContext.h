@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include "TypefaceHolder.h"
 #include "pagx/FontConfig.h"
@@ -30,6 +31,8 @@ class Typeface;
 }
 
 namespace pagx {
+
+class LayoutNode;
 
 /**
  * Internal layout context that provides font lookup capabilities during the layout phase.
@@ -52,6 +55,13 @@ class LayoutContext {
   FontConfig* getFontConfig() const {
     return fontConfig;
   }
+
+  // Per-pass memo for Layer::setLayoutSize: maps each Layer that already received a setLayoutSize
+  // call in this pass to the (targetWidth, targetHeight) it was given. Within one pass a
+  // subtree's measured sizes are fixed, so an unchanged target reproduces the same layout and the
+  // callee can skip re-laying the subtree. The context is constructed fresh by every applyLayout
+  // pass, so the memo dies with the pass and no cross-pass invalidation convention is needed.
+  std::unordered_map<const LayoutNode*, std::pair<float, float>> layoutTargets = {};
 
  private:
   void ensureSystemFallbacks();

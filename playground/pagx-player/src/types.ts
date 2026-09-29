@@ -25,7 +25,28 @@
 // PAGXView is structurally assignable to PlayerView so existing hosts keep working with no
 // adapter.
 
-import type { PlayerModule, PlayerView } from './pagx-view-types';
+import type { PlayerModule, PlayerView, TimelineTreeNode } from './pagx-view-types';
+
+/** A source-editor diagnostic expressed in 1-based Monaco source coordinates. `owner` identifies
+ *  the provider that produced it and keeps markers from independent validators isolated, so a
+ *  provider can refresh its diagnostics without clearing XML syntax or another provider's markers. */
+export interface SourceDiagnostic {
+    owner: string;
+    severity: 'error' | 'warning' | 'info';
+    message: string;
+    startLine: number;
+    startColumn: number;
+    endLine?: number;
+    endColumn?: number;
+}
+
+/** Extensible source-editor validation hook. Providers may validate synchronously or asynchronously
+ *  (for example in a Worker or against a project-specific schema service). The player discards
+ *  stale async results after the source changes, and only errors block Apply/Save. */
+export interface SourceDiagnosticProvider {
+    id: string;
+    validate(xmlText: string): SourceDiagnostic[] | Promise<SourceDiagnostic[]>;
+}
 
 /** Menu item slot for the toolbar. External hosts (playground homepage buttons, etc.) inject
  *  their own entries around the built-in Reset / Source Editor buttons. */
@@ -99,13 +120,18 @@ export interface PAGXPlayerOptions {
      *  '/static/icons/' when served by a dev server. */
     iconBaseUrl: string;
 
-    /** Enable the built-in Source Editor button and panel. CodeMirror is bundled inside the
+    /** Enable the built-in Source Editor button and panel. Monaco is loaded from CDN inside the
      *  component's shipped ESM, so hosts don't need to install any editor dependency
      *  themselves. Default false. */
     enableEditor?: boolean;
 
     /** Editor callbacks (required when enableEditor is true). */
     editorCallbacks?: EditorCallbacks;
+
+    /** Additional PAGX/XML diagnostic providers. They run after built-in XML well-formedness
+     *  validation; errors are rendered inline and block Apply/Save. Providers may be sync or
+     *  async, enabling future Worker- or service-backed project-specific schema rules. */
+    diagnosticProviders?: SourceDiagnosticProvider[];
 
     /** Extra items injected into the toolbar. `before` is prepended, `after` is appended; the
      *  built-in Reset View + Source Editor buttons sit between them. */
@@ -221,4 +247,4 @@ export type PAGXPlayerEventName = keyof PAGXPlayerEventMap;
  *  callbacks or reading `player.getView()` can annotate against these shapes without importing
  *  pagx-viewer. Any concrete PAGXView instance from pagx-viewer is structurally assignable to
  *  PlayerView. */
-export type { PlayerModule, PlayerView };
+export type { PlayerModule, PlayerView, TimelineTreeNode };

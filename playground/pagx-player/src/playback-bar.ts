@@ -48,7 +48,7 @@ export interface PlaybackBarOptions {
 }
 
 /** Resolves the icon URL against `iconBaseUrl`, tolerating both '/foo/' and '/foo' inputs. */
-function iconUrl(base: string, name: string): string {
+export function iconUrl(base: string, name: string): string {
     if (!base) return name;
     return base.endsWith('/') ? base + name : base + '/' + name;
 }
@@ -72,6 +72,24 @@ export class PlaybackBar {
     private isDraggingSlider = false;
     private wasPlayingBeforeDrag = false;
     private wasPlaying = false;
+    // Fallback mode: the loaded document has a default timeline but no queryable duration
+    // (e.g. a state machine). The bar stays visible greyed out; play/pause and frame stepping
+    // keep working while the slider and loop toggle are disabled.
+    private untimed = false;
+    // Dimmed overlay: the bar keeps rendering the underlying values but a semi-transparent
+    // mask covers everything and every interaction is disabled. Used by the SM blueprint to
+    // "park" the preview progress bar when the user presses the panel play button; the mask
+    // stays until the user re-selects a preview (via a chip click or a fresh state double
+    // click), which resets and un-dims the bar.
+    private dimmed = false;
+    // Frozen display: while parked, the bar keeps showing "0.00s / <preview duration>" for the
+    // preview animation whose selection has been cleared. Tick sampling from the view is
+    // paused; the frozen values below feed the counters and progress slider directly. When
+    // null, the bar reads live values from the view as usual.
+    private frozen: { durationUs: number; frameRate: number } | null = null;
+    // Frame rate used for stepping in fallback mode (the view reports a default one).
+    private fallbackRate = 60;
+    // Handle of the pending requestAnimationFrame callback; null when the tick loop is stopped.
     private tickHandle: number | null = null;
 
     constructor(opts: PlaybackBarOptions) {
@@ -89,19 +107,107 @@ export class PlaybackBar {
         return !this.root.classList.contains('hidden');
     }
 
-    /** Force the bar visible / hidden. Called by the player based on the loaded document's
-     *  duration (>0 = visible). */
+    /** Root DOM element of the bar; exposed so companion components (e.g. the SM chip strip)
+     *  can position themselves relative to the bar and mirror its live width. */
+    public getElement(): HTMLElement {
+        return this.root;
+    }
+
+    /** Normal mode shows a fully interactive bar; fallback mode (a default timeline without a
+     *  queryable duration) keeps the bar visible but greyed out, disabling scrubbing and the
+     *  loop toggle while play/pause and frame stepping keep working. */
+    /** Normal mode shows a fully interactive bar; fallback mode (untimed) keeps the bar visible
+     *  but greyed out. Private: hosts use setVisible / showUntimed. */
+    private setTimelineEnabled(enabled: boolean): void {
+        this.untimed = !enabled;
+        this.root.classList.remove('hidden');
+        this.root.classList.toggle('is-untimed', this.untimed);
+        this.progressSlider.disabled = this.untimed || this.dimmed;
+        this.loopBtn.disabled = this.untimed || this.dimmed;
+        // Entering normal mode always lifts a stale frozen poster: the bar starts reading live
+        // view state again unless the host explicitly re-freezes it (park path).
+        if (enabled) {
+            this.frozen = null;
+        }
+        this.updateAll();
+        this.updateLoopIcon();
+    }
+
+    /** Force the bar visible / hidden. Called by the player on load success/failure and on
+     *  host-driven show/hide. Hiding also leaves fallback mode. */
     public setVisible(visible: boolean): void {
         this.root.classList.toggle('hidden', !visible);
         if (visible) {
-            this.updateAll();
-            this.updateLoopIcon();
+            this.setTimelineEnabled(true);
+        } else {
+            this.untimed = false;
+            this.dimmed = false;
+            this.frozen = null;
+            this.root.classList.remove('is-untimed');
+            this.root.classList.remove('is-dimmed');
         }
+    }
+
+    /** Enters the greyed-out fallback mode: the document has a default timeline but no
+     *  queryable duration (e.g. a state machine). The bar stays visible; scrubbing and the
+     *  loop toggle are disabled while play/pause and frame stepping keep working. */
+    public showUntimed(): void {
+        const view = this.getView();
+        this.fallbackRate = view ? view.frameRate() : 60;
+        if (this.fallbackRate <= 0) {
+            this.fallbackRate = 60;
+        }
+        this.setTimelineEnabled(false);
+    }
+
+    /** Overlay a dim mask on the bar and disable every interaction (buttons + slider). Used
+     *  when a preview is "parked" by the SM panel play button: the bar stays in place so the
+     *  user can see it, but pressing anything on it does nothing until the parent lifts the
+     *  dim state by re-selecting a preview. Orthogonal to setVisible/showUntimed. */
+    public setDimmed(dimmed: boolean): void {
+        this.dimmed = dimmed;
+        this.root.classList.toggle('is-dimmed', dimmed);
+        this.progressSlider.disabled = dimmed || this.untimed;
+        this.loopBtn.disabled = dimmed || this.untimed;
+    }
+
+    /** Freeze the bar's displayed values to the given duration + frame rate, and reset the
+     *  playhead label to "0.00s / <duration>". Once frozen the bar ignores view state entirely
+     *  (no tick sampling, no updates from togglePlayback / stepFrame - it's a static poster
+     *  for the parked preview's identity). Pass null to un-freeze; the next updateAll() call
+     *  will read live values again. */
+    public setFrozen(spec: { durationUs: number; frameRate: number } | null): void {
+        this.frozen = spec;
+        if (spec != null) {
+            // Render once so the bar shows 0/<duration> immediately without waiting for the
+            // next rAF tick (which would be skipped for frozen anyway).
+            this.renderFrozen();
+        }
+    }
+
+    private renderFrozen(): void {
+        if (this.frozen == null) {
+            return;
+        }
+        const totalFrames = this.frozen.frameRate > 0
+            ? Math.ceil((this.frozen.durationUs * this.frozen.frameRate) / 1_000_000)
+            : 0;
+        this.timeText.textContent = '0.00s / ' + formatTime(this.frozen.durationUs);
+        this.frameText.textContent = '0 / ' + String(totalFrames);
+        this.progressSlider.value = '0';
+        this.updateSliderFill();
+        this.playPauseImg.src = iconUrl(this.iconBaseUrl, 'play.png');
     }
 
     /** Push all current PAGXView state onto the DOM. Called on visibility change and after
      *  user actions to keep the UI in sync. */
     public updateAll(): void {
+        if (this.frozen != null) {
+            // Frozen: keep the static "0 / duration" poster for the parked preview; nothing
+            // in the view state is relevant right now.
+            this.renderFrozen();
+            return;
+        }
         this.updatePlayPauseIcon();
         this.updateProgressSlider();
         this.updateTimeDisplay();
@@ -111,14 +217,16 @@ export class PlaybackBar {
      *  playthrough that ended at the tail becomes replay-able. */
     public togglePlayback(): void {
         const view = this.getView();
-        if (!view || view.durationMicros() <= 0) {
+        if (!view || this.dimmed || (!this.untimed && view.durationMicros() <= 0)) {
             return;
         }
         if (view.isPlaying()) {
             view.pause();
             this.callbacks.onPause?.();
         } else {
-            if (view.currentTimeMicros() >= view.durationMicros()) {
+            // Wrap-around replay only applies to timed timelines; an untimed one has no end to
+            // wrap from, and seeking to 0 would rewind its absolute position.
+            if (!this.untimed && view.currentTimeMicros() >= view.durationMicros()) {
                 view.setCurrentTimeMicros(0);
             }
             view.play();
@@ -128,10 +236,26 @@ export class PlaybackBar {
     }
 
     /** Step one frame in either direction (-1 previous, +1 next). Always pauses first so the
-     *  render loop can't advance the playhead past the destination frame. */
+     *  render loop can't advance the playhead past the destination frame. Steps on frame
+     *  boundaries (not raw float microseconds) so repeated stepping keeps the frame counter and
+     *  the time label perfectly in sync — the underlying playhead is snapped to `frame / rate`
+     *  rather than drifting by the non-integer `1e6 / rate` each click. */
     public stepFrame(direction: number): void {
         const view = this.getView();
-        if (!view) {
+        if (!view || this.dimmed) {
+            return;
+        }
+        if (this.untimed) {
+            // Fallback mode: no total frame count to clamp against; step relative to the
+            // fallback clock and let the view translate it into a signed delta.
+            view.pause();
+            this.callbacks.onPause?.();
+            const currentFrame = Math.round(
+                (Math.max(0, view.currentTimeMicros()) * this.fallbackRate) / 1_000_000);
+            const targetFrame = Math.max(0, currentFrame + direction);
+            view.setCurrentTimeMicros((targetFrame * 1_000_000) / this.fallbackRate);
+            this.callbacks.onSeek?.(view.currentTimeMicros());
+            this.updateAll();
             return;
         }
         const rate = view.frameRate();
@@ -141,10 +265,14 @@ export class PlaybackBar {
         }
         view.pause();
         this.callbacks.onPause?.();
-        const frameDurationUs = 1_000_000 / rate;
-        const target = view.currentTimeMicros() + direction * frameDurationUs;
-        const clamped = Math.max(0, Math.min(duration, target));
-        view.setCurrentTimeMicros(clamped);
+        const totalFrames = Math.ceil((duration * rate) / 1_000_000);
+        const currentFrame = Math.round((Math.max(0, view.currentTimeMicros()) * rate) / 1_000_000);
+        const targetFrame = Math.max(0, Math.min(totalFrames, currentFrame + direction));
+        // Clamp one microsecond short of duration: stepping onto the final frame seeks exactly
+        // `duration`, which Loop-mode WrapTime maps to `duration % duration == 0`, snapping the
+        // canvas and counters back to frame 0. duration - 1us still lands inside the final frame.
+        const clamped = Math.min(duration - 1, (targetFrame * 1_000_000) / rate);
+        view.setCurrentTimeMicros(Math.max(0, clamped));
         this.callbacks.onSeek?.(clamped);
         this.updateAll();
     }
@@ -152,7 +280,7 @@ export class PlaybackBar {
     /** Detach listeners and stop the tick. */
     public destroy(): void {
         if (this.tickHandle !== null) {
-            window.clearInterval(this.tickHandle);
+            window.cancelAnimationFrame(this.tickHandle);
             this.tickHandle = null;
         }
         this.root.remove();
@@ -315,25 +443,31 @@ export class PlaybackBar {
     }
 
     private startTick(): void {
-        // 100ms cadence matches the playground; smoother updates would just waste DOM work.
-        // Also fires once on the play -> stop transition so the slider/counters land on the
-        // final frame after a single (non-looping) playback ends, and hosts subscribing to
-        // 'framechange' see the terminal frame explicitly.
-        this.tickHandle = window.setInterval(() => {
-            const view = this.getView();
-            if (!view || !this.isVisible()) {
+        // Drive UI updates off requestAnimationFrame so the slider/counters advance in lockstep
+        // with the render loop (which also runs on rAF). A prior setInterval(100) cadence sampled
+        // the playhead at ~10Hz out of phase with the ~60Hz render loop, which made the slider
+        // visibly stutter. Also fires once on the play -> stop transition so the slider/counters
+        // land on the final frame after a single (non-looping) playback ends, and hosts
+        // subscribing to 'framechange' see the terminal frame explicitly.
+        const tick = () => {
+            if (this.tickHandle === null) {
                 return;
             }
-            const playing = view.isPlaying();
-            if (!this.isDraggingSlider && (playing || this.wasPlaying)) {
-                this.updateAll();
-                // Emit onFrameChange on both playing ticks and the play -> stop transition so
-                // hosts can react to the final frame settling; skipping the transition case
-                // would leave subscribers stuck on the last "playing" frame value.
-                this.callbacks.onFrameChange?.(view.currentTimeMicros());
+            const view = this.getView();
+            if (view && this.isVisible() && this.frozen == null) {
+                const playing = view.isPlaying();
+                if (!this.isDraggingSlider && (playing || this.wasPlaying)) {
+                    this.updateAll();
+                    // Emit onFrameChange on both playing frames and the play -> stop transition so
+                    // hosts can react to the final frame settling; skipping the transition case
+                    // would leave subscribers stuck on the last "playing" frame value.
+                    this.callbacks.onFrameChange?.(view.currentTimeMicros());
+                }
+                this.wasPlaying = playing;
             }
-            this.wasPlaying = playing;
-        }, 100);
+            this.tickHandle = window.requestAnimationFrame(tick);
+        };
+        this.tickHandle = window.requestAnimationFrame(tick);
     }
 
     // --- UI updaters (private) ---
@@ -362,18 +496,32 @@ export class PlaybackBar {
             return;
         }
         const current = Math.max(0, view.currentTimeMicros());
-        this.progressSlider.value = String(Math.round((current / duration) * 1000));
+        const v = Math.round((current / duration) * 1000);
+        this.progressSlider.value = String(v);
         this.updateSliderFill();
     }
 
     private updateTimeDisplay(): void {
         const view = this.getView();
         if (!view) return;
-        const current = view.currentTimeMicros();
+        if (this.untimed) {
+            // Fallback mode: no position is meaningful without a total duration — show
+            // placeholders only.
+            this.timeText.textContent = '--:--';
+            this.frameText.textContent = '--';
+            return;
+        }
+        const rate = view.frameRate();
         const duration = view.durationMicros();
-        this.timeText.textContent = formatTime(current) + ' / ' + formatTime(duration);
-        this.frameText.textContent =
-            String(getCurrentFrame(view)) + ' / ' + String(getTotalFrames(view));
+        const currentFrame = getCurrentFrame(view);
+        const totalFrames = getTotalFrames(view);
+        // Derive the displayed seconds from the (rounded) frame number rather than the raw
+        // playhead microseconds so the time label and the frame counter can never disagree —
+        // e.g. frame 30 always reads exactly 1.00s at 30fps instead of 0.99s / 1.01s depending
+        // on sub-frame drift.
+        this.timeText.textContent =
+            formatFrameTime(currentFrame, rate) + ' / ' + formatTime(duration);
+        this.frameText.textContent = String(currentFrame) + ' / ' + String(totalFrames);
     }
 
     private updateLoopIcon(): void {
@@ -386,6 +534,13 @@ export class PlaybackBar {
 function formatTime(microseconds: number): string {
     const seconds = Math.max(0, microseconds / 1_000_000);
     return seconds.toFixed(2) + 's';
+}
+
+// Formats the seconds label for a frame number so it stays consistent with the frame counter
+// (frame / rate) instead of the raw sub-frame playhead time.
+function formatFrameTime(frame: number, rate: number): string {
+    if (rate <= 0) return '0.00s';
+    return (Math.max(0, frame) / rate).toFixed(2) + 's';
 }
 
 function getCurrentFrame(view: PlayerView): number {

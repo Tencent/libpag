@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGScene.h"
+#include <algorithm>
 #include "base/utils/Log.h"
 #include "pagx/DataBindRuntime.h"
 #include "pagx/DataContext.h"
@@ -40,10 +41,12 @@
 #include "pagx/runtime/Drawable.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/RasterUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "renderer/TextHolder.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/VectorLayer.h"
 
 namespace pagx {
 
@@ -504,6 +507,13 @@ std::shared_ptr<PAGStateMachine> PAGScene::getStateMachineTimeline(const std::st
   instantiatedTimelines.emplace(matched, timeline);
   _rootComposition->binding->setTarget(
       matched, std::make_unique<StateMachineInputTarget>(timeline, matched));
+  // The fresh instance starts with inputs at their declared defaults, and the data-bind pass ran
+  // when the scene was built, so no dirty entry will re-push the bound ones. Re-apply the
+  // ViewModel's current values now; without this the state machine would evaluate conditions
+  // against the declared defaults until the next ViewModel change. A lazily created top-level
+  // instance has a null binding resolved to the root binding here, so the re-apply only touches
+  // the root runtime's entries.
+  reapplyDataBindsForTarget(matched, timeline->effectiveBinding());
   return timeline;
 }
 
@@ -615,6 +625,31 @@ void PAGScene::ClearCompositionTreeDirty(PAGComposition* comp) {
   }
 }
 
+void PAGScene::reapplyDataBindsForTarget(const Node* targetNode, RuntimeBinding* scopeBinding) {
+  if (targetNode == nullptr || scopeBinding == nullptr) {
+    return;
+  }
+  if (_rootComposition != nullptr) {
+    ReapplyCompositionTreeDataBinds(_rootComposition.get(), targetNode, scopeBinding);
+  }
+}
+
+void PAGScene::ReapplyCompositionTreeDataBinds(PAGComposition* comp, const Node* targetNode,
+                                               RuntimeBinding* scopeBinding) {
+  if (comp == nullptr) {
+    return;
+  }
+  if (comp->dataBindRuntime != nullptr &&
+      comp->dataBindRuntime->getBoundBinding() == scopeBinding) {
+    comp->dataBindRuntime->reapplyForTarget(targetNode);
+  }
+  std::vector<PAGComposition*> childComps = {};
+  PAGComposition::CollectChildCompositions(comp, childComps);
+  for (auto* childComp : childComps) {
+    ReapplyCompositionTreeDataBinds(childComp, targetNode, scopeBinding);
+  }
+}
+
 void PAGScene::RefreshViewModelImages(PAGComposition* comp,
                                       const std::unordered_set<const Image*>& changed) {
   if (comp == nullptr) {
@@ -655,6 +690,73 @@ void PAGScene::onImageResourcesChanged(const std::vector<Image*>& changedImages)
   RefreshViewModelImages(_rootComposition.get(), changed);
 }
 
+bool PAGScene::RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
+                                       float rootY) {
+  // Mirrors the per-child gating of tgfx::Layer::getLayersUnderPoint. A PAGComposition's runtime
+  // layer hangs under the referencing layer's slot, which carries that layer's visibility, clip and
+  // mask, so every tgfx layer between the child and its PAGLayer parent is checked.
+  auto rootPoint = tgfx::Point::Make(rootX, rootY);
+  for (auto* current = layer; current != nullptr && current != stop; current = current->parent()) {
+    if (!current->visible()) {
+      return false;
+    }
+    auto scrollRect = current->scrollRect();
+    if (!scrollRect.isEmpty()) {
+      auto localPoint = current->globalToLocal(rootPoint);
+      if (!scrollRect.contains(localPoint.x, localPoint.y)) {
+        return false;
+      }
+    }
+    auto mask = current->mask();
+    if (mask != nullptr && !mask->hitTestPoint(rootX, rootY)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool PAGScene::OwnContentContainsPoint(PAGLayer* layer, float surfaceX, float surfaceY) {
+  // Only a tgfx::VectorLayer carries contents (see LayerBuilder), so a plain container layer has no
+  // content of its own and cannot be hit by itself.
+  auto* runtimeLayer = layer->runtimeLayer.get();
+  if (runtimeLayer == nullptr || runtimeLayer->type() != tgfx::LayerType::Vector ||
+      static_cast<tgfx::VectorLayer*>(runtimeLayer)->contents().empty()) {
+    return false;
+  }
+  // Reached only when no child was hit, so the children this also walks cannot turn a miss into a
+  // hit: the result reflects this layer's own content shape.
+  return layer->hitTestPoint(surfaceX, surfaceY, true);
+}
+
+bool PAGScene::CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, float rootX,
+                                       float rootY, float surfaceX, float surfaceY,
+                                       std::vector<std::shared_ptr<PAGLayer>>* out) {
+  // Subtrees are gated only by visibility, clip and mask, never pruned by an ancestor's shape test:
+  // tgfx's shape test recurses into every descendant, so testing each ancestor before descending
+  // would re-run the descendants' shape tests once per level.
+  bool childHit = false;
+  const auto& children = layer->getChildren();
+  auto* parentRuntime = layer->runtimeLayer.get();
+  // Top-most child first, matching the document's paint order.
+  for (auto item = children.rbegin(); item != children.rend(); ++item) {
+    const auto& child = *item;
+    if (child == nullptr || child->runtimeLayer == nullptr ||
+        !RuntimePathAcceptsPoint(child->runtimeLayer.get(), parentRuntime, rootX, rootY)) {
+      continue;
+    }
+    if (CollectLayersUnderPoint(child, rootX, rootY, surfaceX, surfaceY, out)) {
+      childHit = true;
+    }
+  }
+  if (!childHit && !OwnContentContainsPoint(layer.get(), surfaceX, surfaceY)) {
+    return false;
+  }
+  // Descendants are pushed before their parent so the deepest top-most hit ends up at the front,
+  // which is the order callers (editor selection) already rely on.
+  out->push_back(layer);
+  return true;
+}
+
 std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfaceX,
                                                                      float surfaceY) {
   float rootX = 0;
@@ -666,13 +768,7 @@ std::vector<std::shared_ptr<PAGLayer>> PAGScene::getLayersUnderPoint(float surfa
     return {};
   }
   std::vector<std::shared_ptr<PAGLayer>> result = {};
-  auto hitLayers = _rootComposition->runtimeLayer->getLayersUnderPoint(rootX, rootY);
-  for (const auto& hitLayer : hitLayers) {
-    auto it = layerRegistry.find(hitLayer.get());
-    if (it != layerRegistry.end()) {
-      result.push_back(it->second->shared_from_this());
-    }
-  }
+  CollectLayersUnderPoint(_rootComposition, rootX, rootY, surfaceX, surfaceY, &result);
   return result;
 }
 
@@ -686,6 +782,29 @@ Rect PAGScene::getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const 
   }
   auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
   auto rootBounds = pagLayer->runtimeLayer->getBounds(rootLayer);
+  Matrix rootToSurface = {};
+  rootToSurfaceMatrix(&rootToSurface);
+  auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
+  return FromTGFX(surfaceBounds);
+}
+
+Rect PAGScene::getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const {
+  // getGlobalBounds' conservative envelope semantics are part of its published contract (existing
+  // callers such as the wechat view's LRU eviction scoring and getImageBounds binding rely on it),
+  // while editor-selection rects want tight bounds that hug the visible content. The two variants
+  // must stay separate so improving selection outlines never changes what existing hosts observe.
+  if (pagLayer == nullptr || pagLayer->runtimeLayer == nullptr) {
+    return {};
+  }
+  auto scene = pagLayer->rootScene.lock();
+  if (scene.get() != this) {
+    return {};
+  }
+  auto* rootLayer = _rootComposition != nullptr ? _rootComposition->runtimeLayer.get() : nullptr;
+  // Tight bounds clipped to the layer's own scrollRect window, so selection outlines hug the
+  // visible content (per-glyph extents for text) instead of the conservative content envelope
+  // that Layer::getBounds returns by default.
+  auto rootBounds = ComputeRasterizedLayerBoundsInSpace(pagLayer->runtimeLayer, rootLayer);
   Matrix rootToSurface = {};
   rootToSurfaceMatrix(&rootToSurface);
   auto surfaceBounds = ToTGFX(rootToSurface).mapRect(rootBounds);
@@ -798,6 +917,26 @@ void PAGScene::onNodesChanged(const std::vector<Node*>& dirtyNodes) {
       _rootComposition->resetTimelines();
     }
     instantiatedTimelines.clear();
+  } else if (_rootComposition != nullptr) {
+    // RefreshLayerInPlace reset the rebuilt layers' runtime channels to their node defaults. The
+    // per-frame updateDataBinds restores ViewModel-bound channels, but timeline-driven channels
+    // recover only on the next apply(). When playback is paused no advance/apply happens, so an
+    // animated property (e.g. a Channel-driven x) would snap back to its static layout value until
+    // playback resumes. Re-apply the timelines at their current position here (apply without
+    // advancing) so the rebuilt targets are re-resolved (targetsDirty was set above) and written
+    // back immediately. resetTimelines() above already covers the timelineDirty case.
+    _rootComposition->apply();
+    // Top-level PAGAnimation and PAGStateMachine instances live in instantiatedTimelines, not
+    // inside the root composition subtree, so _rootComposition->apply() above does not reach them.
+    // Re-apply them at their current position so an animated property on a top-level timeline
+    // (e.g. slidingBar's x, or a state machine's active-state channels) is written back
+    // immediately while paused; otherwise it would snap back to its static layout value until the
+    // next tick, which only fires while playing.
+    for (auto& entry : instantiatedTimelines) {
+      if (entry.second != nullptr) {
+        entry.second->apply();
+      }
+    }
   }
 }
 

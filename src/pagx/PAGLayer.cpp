@@ -29,17 +29,9 @@ namespace pagx {
 PAGLayer::PAGLayer(const Layer* node, std::shared_ptr<tgfx::Layer> runtimeLayer,
                    const std::shared_ptr<PAGScene>& scene)
     : node(node), runtimeLayer(std::move(runtimeLayer)), rootScene(scene) {
-  if (scene != nullptr && this->runtimeLayer != nullptr) {
-    scene->layerRegistry[this->runtimeLayer.get()] = this;
-  }
 }
 
-PAGLayer::~PAGLayer() {
-  auto scene = rootScene.lock();
-  if (scene != nullptr && runtimeLayer != nullptr) {
-    scene->layerRegistry.erase(runtimeLayer.get());
-  }
-}
+PAGLayer::~PAGLayer() = default;
 
 LayerType PAGLayer::layerType() const {
   return LayerType::Layer;

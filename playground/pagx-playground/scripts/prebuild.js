@@ -35,10 +35,16 @@
  *   node scripts/prebuild.js --arch st        # single-threaded, debug
  *   node scripts/prebuild.js --release        # multi-threaded, release
  *   node scripts/prebuild.js --arch st --release  single-threaded, release
+ *
+ * Pass --build to additionally compile the upstream pagx-viewer + pagx-player packages before
+ * copying, instead of only copying pre-built artifacts:
+ *   node scripts/prebuild.js --build          # build (mt debug) then copy
+ *   node scripts/prebuild.js --build --arch st --release  build (st release) then copy
  */
 
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -156,11 +162,45 @@ function copyPlayerFiles() {
   console.log('');
 }
 
+// Builds the upstream pagx-viewer + pagx-player packages in place before copying, so a single
+// command from pagx-playground produces every artifact. Only runs when --build is passed;
+// otherwise the script keeps its copy-only behavior (used by a clean checkout that already ships
+// the artifacts). The viewer variant follows the same arch/release selection as the copy step.
+function buildUpstreamDependencies() {
+  let viewerScript;
+  if (isSingleThreaded) {
+    viewerScript = isRelease ? 'build:release:st' : 'build:debug:st';
+  } else {
+    viewerScript = isRelease ? 'build:release' : 'build:debug';
+  }
+  const playerScript = isRelease ? 'build:release' : 'build';
+
+  if (!fs.existsSync(PAGX_VIEWER_DIR)) {
+    console.error(`\nERROR: pagx-viewer not found at ${PAGX_VIEWER_DIR}.`);
+    process.exit(1);
+  }
+  if (!fs.existsSync(PAGX_PLAYER_DIR)) {
+    console.error(`\nERROR: pagx-player not found at ${PAGX_PLAYER_DIR}.`);
+    process.exit(1);
+  }
+
+  console.log(`Building pagx-viewer (npm run ${viewerScript})...`);
+  execSync(`npm run ${viewerScript}`, { cwd: PAGX_VIEWER_DIR, stdio: 'inherit' });
+
+  console.log(`Building pagx-player (npm run ${playerScript})...`);
+  execSync(`npm run ${playerScript}`, { cwd: PAGX_PLAYER_DIR, stdio: 'inherit' });
+  console.log('');
+}
+
 function main() {
   const archLabel = isSingleThreaded ? 'single-threaded' : 'multi-threaded';
   console.log(
     `Prebuild: Preparing pagx-viewer (${archLabel}) wasm files and pagx-player bundle...\n`,
   );
+
+  if (CLI_ARGS.includes('--build')) {
+    buildUpstreamDependencies();
+  }
 
   copyWasmFiles();
   copyPlayerFiles();
