@@ -30,14 +30,19 @@
     return YES;
 }
 
-// Minimal UIScene adoption required by SDKs from Xcode 26/27: returning a default (nil-name)
-// configuration keeps UIKit on the default UIWindowScene that loads UIMainStoryboardFile, so the
-// AppDelegate lifecycle demo keeps working without a scene delegate.
+// Minimal UIScene adoption required by SDKs from Xcode 26/27: the AppDelegate doubles as the
+// scene delegate (its window property receives the storyboard window), so the legacy AppDelegate
+// lifecycle demo keeps working unchanged. The same configuration is declared statically in
+// Info.plist; this callback mirrors it for sessions created programmatically.
 - (UISceneConfiguration *)application:(UIApplication *)application
     configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession
                                    options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0)) {
-    return [[UISceneConfiguration alloc] initWithName:nil
-                                          sessionRole:connectingSceneSession.role];
+    UISceneConfiguration* configuration =
+        [[UISceneConfiguration alloc] initWithName:@"Default"
+                                       sessionRole:connectingSceneSession.role];
+    configuration.delegateClass = [AppDelegate class];
+    configuration.storyboard = [UIStoryboard storyboardWithName:@"Main" bundle:nil];
+    return configuration;
 }
 
 - (void)application:(UIApplication *)application
