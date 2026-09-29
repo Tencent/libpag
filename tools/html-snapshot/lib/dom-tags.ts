@@ -2,9 +2,17 @@
 // Lives here so the main DOM walk (lib/browser-snapshot.ts) and the icon
 // font pre-pass (lib/icon-font.ts) consult one list instead of maintaining
 // independent copies — the previous arrangement had already drifted
-// (`form`, `details`, `summary` were in one list but missing from the
-// other), causing icon detection to walk into subtrees that the snapshot
-// proper would have skipped.
+// (`form` was in one list but missing from the other), causing icon
+// detection to walk into subtrees that the snapshot proper would have
+// skipped.
+//
+// Reserved for tags whose contents never paint at all (metadata, replaced
+// media with no visual we can capture, `<dialog>`/`<template>`). A tag whose
+// box *does* paint must not be listed here: `<details>` / `<summary>` used to
+// sit in this list, which erased every accordion from the snapshot even
+// though the browser renders it. The collapsed content of a closed
+// `<details>` is pruned from the DOM by the `dropCollapsedDetailsContent`
+// pre-pass instead, where the closed/open state is actually visible.
 //
 // Lower-case canonical form. Both consumers serialise this constant into
 // the browser-side payload and rebuild a Set from it: the main pipeline
@@ -17,7 +25,7 @@ export const DROP_TAG_NAMES: readonly string[] = [
   'iframe', 'object', 'embed', 'video', 'audio',
   'br', 'hr', 'wbr',
   'head', 'title', 'base',
-  'template', 'slot', 'dialog', 'details', 'summary',
+  'template', 'slot', 'dialog',
   'map', 'area', 'source', 'track', 'param',
   'form',
 ];

@@ -5750,6 +5750,66 @@ async function inlineCanvases() {
   }
 }
 
+// ===== Pre-snapshot pass: prune the collapsed content of <details> =====
+
+// A closed `<details>` paints only its first `<summary>` child. Everything
+// else is hidden by the UA `::details-content` pseudo-element, and that
+// hiding is invisible to the snapshot: measured inside a closed `<details>`,
+// the content still reports `display: block`, `visibility: visible`,
+// `opacity: 1` and `content-visibility: visible`, and
+// `getBoundingClientRect()` hands back its full expanded-size rect (a
+// 742x67 answer box, in the accordion that motivated this pass).
+//
+// The content is unpainted only because the collapsed `::details-content`
+// box contributes zero height and the element's own `overflow: hidden`
+// clips whatever spills past it. Nothing in the walker can test for that,
+// and when the author leaves the `<details>` unclipped (`overflow: visible`,
+// so a box-shadow can escape) every collapsed answer leaked into the
+// snapshot as a full-size box painted across the summary rows below it.
+//
+// So don't test — remove. Detaching the non-summary children up front makes
+// every downstream traversal skip them for free: the block walker
+// (`renderChildrenInto`), the flex walker (`flexItemChildren`), the
+// inline-run emitters (`emitInlineRunMarkup` and its six `emitTextSpans`
+// call sites), bare text nodes, and any traversal added later. Guarding each
+// traversal separately was the alternative; there are five of them today and
+// a sixth would silently reintroduce the leak.
+//
+// Geometrically the removal is a no-op — the hidden content already
+// contributes zero height, so the `<details>` box, its siblings and the
+// document scroll size all measure identically before and after.
+//
+// Two spec details the loop encodes, both verified against Chromium:
+//   - Only the *first* `summary` child is the disclosure control; a second
+//     `summary` is content and is hidden along with everything else.
+//   - Content *before* the summary is hidden too, so "everything except the
+//     first summary" is the right cut, not "everything after it".
+// A `<details>` with no summary child therefore keeps nothing. Chromium
+// paints a UA-supplied "Details" label there; that string is not in the DOM
+// and is not reproduced.
+function dropCollapsedDetailsContent() {
+  const detailsList = Array.from(document.querySelectorAll('details'));
+  let detailsPruned = 0;
+  let nodesRemoved = 0;
+  for (const element of detailsList) {
+    if (element.open) continue;
+    let summary = null;
+    for (const child of element.children) {
+      if (child.tagName === 'SUMMARY') {
+        summary = child;
+        break;
+      }
+    }
+    for (const child of Array.from(element.childNodes)) {
+      if (child === summary) continue;
+      element.removeChild(child);
+      nodesRemoved++;
+    }
+    detailsPruned++;
+  }
+  return { details: detailsPruned, nodes: nodesRemoved };
+}
+
 // ===== Pre-snapshot pass: materialise decorative ::before / ::after pseudo-elements =====
 
 // CSS pseudo-elements have no DOM presence, so the snapshot walker (which
@@ -6400,6 +6460,7 @@ export {
   restoreEmptyImagePlaceholders,
   imgAlt,
   inlineCanvases,
+  dropCollapsedDetailsContent,
   materializeDecorativePseudoElements,
   expandStickyScrollytelling,
   mergeRectsOnSameLine,

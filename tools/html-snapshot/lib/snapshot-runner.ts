@@ -14,6 +14,7 @@ import {
   inlineExternalImages,
   normalizeEmptyImagePlaceholders,
   inlineCanvases,
+  dropCollapsedDetailsContent,
   materializeDecorativePseudoElements,
   expandStickyScrollytelling,
 } from './browser-snapshot';
@@ -572,6 +573,30 @@ export async function runSnapshot(
       } catch (err) {
         if (log) log(`sticky-scrollytelling expansion skipped: ${errMessage(err)}`);
       }
+    }
+
+    // Prune the collapsed content of every closed <details> (accordion items,
+    // FAQ lists, native disclosure widgets). Chromium hides that content via
+    // its UA `::details-content` pseudo-element, which the snapshot cannot
+    // observe: the content reports normal visibility and a full-size rect, so
+    // an unclipped <details> leaked every collapsed answer as a box drawn over
+    // the summary rows. Removing the nodes here makes all five downstream
+    // traversals skip them without any per-path guard.
+    //
+    // Runs after the DOM-cloning passes above (image/canvas inlining, sticky
+    // expansion) so clones of a <details> are pruned too — the query is
+    // document-wide — and before every remaining pass (placeholder
+    // normalisation, icon-font, pseudo materialisation, animation capture and
+    // the snapshot walk) so none of them spend work on content the browser
+    // never paints. Best-effort: a failure only reverts to the previous
+    // behaviour, so it must not abort the snapshot.
+    try {
+      const pruned = await page.evaluate(dropCollapsedDetailsContent);
+      if (log && pruned && pruned.details > 0) {
+        log(`collapsed details: pruned ${pruned.nodes} node(s) from ${pruned.details} closed <details>`);
+      }
+    } catch (err) {
+      if (log) log(`collapsed-details pruning skipped: ${errMessage(err)}`);
     }
 
     // Chromium renders an empty/missing-src <img> with non-empty alt text as
