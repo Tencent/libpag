@@ -833,6 +833,108 @@ PAG_TEST(PAGXHTMLImporterTest, BorderExpandsLayoutPadding) {
   EXPECT_FLOAT_EQ(host->padding.left, 9.0f);
 }
 
+// CSS insets the content box by the border width for every box, so a child sized `100%` resolves
+// against the content box rather than the border box. Resolving it against the border box (the
+// outer Layer's box) stretched the child across the border stroke and hid the ring — which is how
+// the html-snapshot pipeline's wrapper + inner `<img width:100%>` pair lost the border of every
+// bordered image and drew the image slightly oversized.
+PAG_TEST(PAGXHTMLImporterTest, BorderInsetsPercentageChildIntoContentBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:80px;border:4px solid #000000;border-radius:10px;
+                  overflow:hidden">
+        <img src="pic.png" style="width:100%;height:100%"/>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  // The outer Layer keeps the border-box geometry and owns the border stroke that must stay visible.
+  EXPECT_FLOAT_EQ(wrapper->width, 100.0f);
+  EXPECT_FLOAT_EQ(wrapper->height, 80.0f);
+  auto* stroke = FindElementOfType<pagx::Stroke>(wrapper);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 4.0f);
+  // The inner host reproduces the CSS content box as padding, so the 100% image resolves inside the
+  // border instead of on top of it.
+  ASSERT_FALSE(wrapper->children.empty());
+  auto* host = wrapper->children.front();
+  EXPECT_FLOAT_EQ(host->padding.left, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.top, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.right, 4.0f);
+  EXPECT_FLOAT_EQ(host->padding.bottom, 4.0f);
+  ASSERT_FALSE(host->children.empty());
+  auto* image = host->children.front();
+  EXPECT_FLOAT_EQ(image->percentWidth, 100.0f);
+  EXPECT_FLOAT_EQ(image->percentHeight, 100.0f);
+  // The rounded clip belongs to the clipped content, so it masks the host. A contour mask also
+  // clips the masked Layer's own contents, and masking the outer Layer would erase the border ring.
+  EXPECT_EQ(wrapper->mask, nullptr);
+  ASSERT_NE(host->mask, nullptr);
+  EXPECT_EQ(host->maskType, pagx::MaskType::Contour);
+  // The mask is the padding box — the CSS clip region — so its geometry is inset by the border
+  // width with the corner radius shrunk by the same amount.
+  auto* hostMask = host->mask;
+  EXPECT_FLOAT_EQ(hostMask->width, 92.0f);
+  EXPECT_FLOAT_EQ(hostMask->height, 72.0f);
+  auto* maskRect = FindElementOfType<pagx::Rectangle>(hostMask);
+  ASSERT_NE(maskRect, nullptr);
+  EXPECT_FLOAT_EQ(maskRect->roundness, 6.0f);
+}
+
+// Only children that resolve against the content box need the inset host. An absolutely positioned
+// child with explicit px anchors is already compensated through its anchors, so a bordered box
+// whose children are all absolutely positioned stays a single Layer.
+PAG_TEST(PAGXHTMLImporterTest, BorderKeepsSingleLayerForAbsolutelyPositionedChildren) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <div style="width:100px;height:80px;border:4px solid #000000">
+        <div style="position:absolute;left:0;top:0;width:20px;height:20px;background-color:#F00">
+        </div>
+      </div>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* wrapper = doc->layers.front()->children.front();
+  ASSERT_EQ(wrapper->children.size(), 1u);
+  // `left` / `top` are relative to the padding box, so the anchors carry the border inset.
+  auto* child = wrapper->children.front();
+  EXPECT_FLOAT_EQ(child->left, 4.0f);
+  EXPECT_FLOAT_EQ(child->top, 4.0f);
+}
+
+// A replaced element's content is inset by the border width as well: a bordered `<img>` fills its
+// content box rather than stretching the image across (and past) the border ring, and the inner
+// corner radius shrinks with the inset exactly like CSS's inner border curve.
+PAG_TEST(PAGXHTMLImporterTest, BorderedImageInsetsImageIntoContentBox) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:200px;height:200px">
+      <img src="pic.png" style="width:60px;height:40px;border:4px solid #000000;
+           border-radius:10px;object-fit:fill"/>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* imageLayer = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(imageLayer->width, 60.0f);
+  EXPECT_FLOAT_EQ(imageLayer->height, 40.0f);
+  auto* stroke = FindElementOfType<pagx::Stroke>(imageLayer);
+  ASSERT_NE(stroke, nullptr);
+  EXPECT_FLOAT_EQ(stroke->width, 4.0f);
+  // The image moves onto an inset child Layer covering the 52x32 content box.
+  ASSERT_FALSE(imageLayer->children.empty());
+  auto* host = imageLayer->children.front();
+  EXPECT_FLOAT_EQ(host->left, 4.0f);
+  EXPECT_FLOAT_EQ(host->top, 4.0f);
+  EXPECT_FLOAT_EQ(host->width, 52.0f);
+  EXPECT_FLOAT_EQ(host->height, 32.0f);
+  auto* fill = FindElementOfType<pagx::Fill>(host);
+  ASSERT_NE(fill, nullptr);
+  ASSERT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
+  auto* rect = FindElementOfType<pagx::Rectangle>(host);
+  ASSERT_NE(rect, nullptr);
+  EXPECT_FLOAT_EQ(rect->roundness, 6.0f);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, BoxShadowProducesDropShadowStyle) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:80px;height:80px">
@@ -5023,7 +5125,10 @@ PAG_TEST(PAGXHTMLImporterTest, ImagePreservesBorderEffectsAndTransform) {
   auto* stroke = FindElementOfType<pagx::Stroke>(image);
   ASSERT_NE(stroke, nullptr);
   EXPECT_FLOAT_EQ(stroke->width, 3.0f);
-  auto* fill = FindElementOfType<pagx::Fill>(image);
+  // The image is inset by the border width into the content box, so its fill sits on a child Layer
+  // rather than across the whole border box (see `BorderedImageInsetsImageIntoContentBox`).
+  ASSERT_FALSE(image->children.empty());
+  auto* fill = FindElementOfType<pagx::Fill>(image->children.front());
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
   EXPECT_EQ(CountBackgroundBlurStyles(image), 1u);
@@ -5047,8 +5152,11 @@ PAG_TEST(PAGXHTMLImporterTest, ImageBackgroundClipTextKeepsForegroundAndBoxEffec
   )HTML");
   ASSERT_NE(doc, nullptr);
   auto* image = doc->layers.front()->children.front();
-  ASSERT_EQ(CountElements<pagx::Fill>(image->contents), 1u);
-  auto* fill = FindElementOfType<pagx::Fill>(image);
+  // `background-clip: text` suppresses the box gradient, and the bordered image moved its fill
+  // into the content box, so no Fill of either kind stays on the outer Layer.
+  ASSERT_EQ(CountElements<pagx::Fill>(image->contents), 0u);
+  ASSERT_FALSE(image->children.empty());
+  auto* fill = FindElementOfType<pagx::Fill>(image->children.front());
   ASSERT_NE(fill, nullptr);
   EXPECT_NE(As<pagx::ImagePattern>(fill->color), nullptr);
   EXPECT_EQ(As<pagx::LinearGradient>(fill->color), nullptr);
