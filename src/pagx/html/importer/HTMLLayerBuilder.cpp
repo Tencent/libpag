@@ -171,12 +171,19 @@ bool HTMLLayerBuilder::hasLayoutHostAttributes(const HTMLBoxAttributes& box) {
   return box.paddingSet || box.displayFlex || box.gapSet;
 }
 
-bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box) {
+bool HTMLLayerBuilder::requiresInnerHost(const HTMLBoxAttributes& box,
+                                         bool hasContentBoxDependentChild) {
   if (!box.padding.isZero()) return true;
   // Flex-flow children sit inside the CSS border edge. The importer models that edge as extra
   // padding on the layout host, so a bordered flex box still needs paint/layout isolation even
   // when its authored padding is zero.
-  return box.displayFlex && box.borderSet && box.borderWidthPx > 0.0f;
+  if (box.displayFlex && box.borderSet && box.borderWidthPx > 0.0f) return true;
+  // CSS insets the content box by the border width for every box, not only flex containers: a flow
+  // child is laid out in the content box, and a percentage-sized child resolves against it. Both
+  // would otherwise land on the border box and cover the border stroke.
+  // An absolutely positioned child with explicit px anchors does not need the host — its anchors
+  // are compensated by the border width instead (see `HTMLParserContext::convertContainer`).
+  return box.borderSet && box.borderWidthPx > 0.0f && hasContentBoxDependentChild;
 }
 
 Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& box) {
@@ -184,7 +191,10 @@ Layer* HTMLLayerBuilder::createInnerHost(Layer* outer, const HTMLBoxAttributes& 
   inner->percentWidth = 100.0f;
   inner->percentHeight = 100.0f;
   applyLayoutAttributes(inner, box);
-  if (box.borderSet && box.borderWidthPx > 0.0f && inner->layout != LayoutMode::None) {
+  if (box.borderSet && box.borderWidthPx > 0.0f) {
+    // The border insets everything the host resolves against, so it applies regardless of
+    // `layout`: a non-flex host still insets the constraint frame for percentage-sized and
+    // absolutely positioned children (see `Padding` in `spec/pagx_spec.zh_CN.md` §5).
     inner->padding.top += box.borderWidthPx;
     inner->padding.right += box.borderWidthPx;
     inner->padding.bottom += box.borderWidthPx;
