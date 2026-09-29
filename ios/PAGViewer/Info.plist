@@ -37,6 +37,14 @@
 	</array>
 	<key>UIRequiresFullScreen</key>
 	<false/>
+	<!-- SDKs since Xcode 27 refuse to launch apps without a scene manifest. Single-scene with no
+	     custom configuration keeps UIKit on the default UIWindowScene, which still loads
+	     UIMainStoryboardFile below, so the AppDelegate lifecycle demo keeps working. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
