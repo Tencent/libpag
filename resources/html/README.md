@@ -10,9 +10,10 @@ snapshot.js (Chromium)  ->  pagx import  ->  pagx render  ->  与 Chromium 基�
 即复用 [`tools/html-snapshot/eval`](../../tools/html-snapshot/eval/README.md) 这条评测管线。
 每套语料跑完会生成 `report.md` / `report.csv` / `index.html`，供人工查看 SSIM、像素差、
 平均 RGB 偏差等指标。**逐例不设门禁**（浏览器保真度本质是“语料级均值”指标，逐例卡阈值
-意义不大），但**在语料级均值上设了回归门禁**：每套语料的平均 SSIM / 像素差 / RGB 偏差
-会与仓库内的 [`baseline.json`](baseline.json) 比对，均值退化超过容忍值时 `HTMLTest` 失败。
-详见下方 [基准门禁](#基准门禁语料级均值)。
+意义不大），且**语料级均值门禁只对确定性语料生效**：`cases` / `cli` 的均值会与仓库内的
+[`baseline.json`](baseline.json) 比对，退化超过容忍值时 `HTMLTest` 失败；`websites` /
+`generated` 依赖宿主系统字体与运行时下载的 Chromium，跨机器不可比，**只出报告、不参与
+门禁**。详见下方 [基准门禁](#基准门禁语料级均值)。
 
 ## 语料清单
 
@@ -97,18 +98,27 @@ CONCURRENCY=8 BROWSER_ENGINE=puppeteer test/run_html_eval.sh
 ## 基准门禁（语料级均值）
 
 `HTMLTest` 在跑完所有语料后，会把每套语料本次的**平均 SSIM / 平均像素差 / 平均 RGB
-偏差**与仓库内的 [`baseline.json`](baseline.json) 逐套比对：
+偏差**与仓库内的 [`baseline.json`](baseline.json) 比对，但**门禁只对确定性语料生效**：
 
-- 平均 SSIM 下降超过容忍值 → 该语料 **FAIL**（SSIM 越高越好）
-- 平均像素差 / 平均 RGB 偏差上升超过容忍值 → 该语料 **FAIL**（越低越好）
-- 均值持平或改善 → PASS
-- 任一语料 FAIL，脚本整体返回非零
+- **门禁语料 `cases` / `cli`**：平均 SSIM 下降超过容忍值 → 该语料 **FAIL**（SSIM 越高越好）；
+  平均像素差 / 平均 RGB 偏差上升超过容忍值 → 该语料 **FAIL**（越低越好）；均值持平或改善 →
+  PASS。任一门禁语料 FAIL，脚本整体返回非零。
+- **报告语料 `websites` / `generated`**：只打印指标、写报告，**不参与门禁**，永远不会因此
+  导致脚本失败。
+
+为什么分开？这两套真实网页的逐例像素取决于**宿主环境**：它们大量使用系统字体栈
+（`-apple-system` / `PingFang SC` / Tailwind 默认的 `system-ui`），而 `pagx render` 只能靠
+宿主解析这些字体（评测不嵌入字体）；画基准图的 Chromium 又是运行时按需下载的。两台机器在
+这两套语料上相差 0.10 以上 SSIM 属正常，远超任何"既能有意义、又不会误报"的容忍值。相比之下
+`cases` 187 个文件里只有 3 处 `font-family`、`cli` 276 个文件里只有 1 处，几乎不含文字，
+跨机器可复现到小数第 4 位，适合作为门禁。报告语料集合定义在 `tools/html-snapshot/eval/summary.js`
+的 `REPORT_ONLY_CORPORA`。
 
 `baseline.json` 结构为 `corpora.<label>`（`label` 即 `html-cases` / `html-cli` /
 `html-websites` / `html-generated`），每套记录 `ssimMean` / `pdMean` / `rgbMean` 三个均值
-和一个可选的 `tolerance`。`websites` / `generated` 联网拉取 CDN 资源、天然更抖，默认给了
-更宽松的容忍值（`ssim 0.05 / pd 0.05 / rgb 5.0`），`cases` / `cli` 为 `ssim 0.02 / pd 0.02
-/ rgb 2.0`。若某套语料的均值为 `null`（尚未 seed），则该套**只出报告、不参与门禁**。
+和一个可选的 `tolerance`；门禁语料默认容忍值为 `ssim 0.02 / pd 0.02 / rgb 2.0`。若某套门禁
+语料的均值为 `null`（尚未 seed），则该套**只出报告、不参与门禁**；报告语料的条目仅作历史
+参考，不参与判定。
 
 ### 更新基准
 
@@ -181,7 +191,8 @@ node tools/html-snapshot/eval/summary.js --out tools/html-snapshot/eval/out \
 
 指标含义（`ssim` / `pixelDiffRatio` / `meanRgbDelta` / `flex*` / `importerWarnings` 等）详见
 [`tools/html-snapshot/eval/README.md`](../../tools/html-snapshot/eval/README.md)。**逐例**不做
-回归门禁，验收以“语料级均值随迭代改善”为准，并由 `baseline.json` 守住均值不退化。
+回归门禁，验收以“语料级均值随迭代改善”为准，并由 `baseline.json` 守住确定性语料（`cases` /
+`cli`）的均值不退化。
 
 ## 补充：cases 的直接 importer 校验（可选，无需浏览器）
 
