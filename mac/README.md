@@ -42,7 +42,7 @@ pass `-DPAG_USE_METAL=ON`:
 ./gen_mac -DPAG_USE_METAL=ON
 ```
 
-The Metal backend works on both Apple Silicon and Intel Macs, and requires macOS 10.15 or later.
+The Metal backend works on both Apple Silicon and Intel Macs, and requires macOS 12.0 or later.
 No extra flags are needed.
 
 At last, launch XCode and open the mac/PAGViewer.xcworkspace. You'll be ready to go!
