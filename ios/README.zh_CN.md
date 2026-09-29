@@ -45,7 +45,7 @@
 ./gen_simulator -DPAG_USE_METAL=ON
 ```
 
-Metal 后端要求 iOS 13 及以上版本，且仅支持 arm64 架构。选择 Metal 时部署目标会自动提升到 13.0，
+Metal 后端要求 iOS 15 及以上版本，且仅支持 arm64 架构。选择 Metal 时部署目标会自动提升到 15.0，
 无需额外参数。因此模拟器构建仅支持 Apple Silicon 设备。
 
 最后，启动 XCode 并打开 ios/PAGViewer.xcworkspace 即可。
