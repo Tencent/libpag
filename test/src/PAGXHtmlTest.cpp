@@ -1551,6 +1551,80 @@ CLI_TEST(PAGXHtmlTest, MaskGeometryUsesResolvedChildLayerPosition) {
   EXPECT_EQ(html.find("mask-position:0px 0px"), std::string::npos);
 }
 
+// CSS measures `mask-position` from the masked element's own (0,0), which is exactly the space the
+// mask geometry bounds are resolved in — the mask layer shares the masked layer's origin. A masked
+// layer that sits away from the document origin must therefore not shift its mask off the element.
+CLI_TEST(PAGXHtmlTest, MaskPositionIgnoresMaskedLayerOrigin) {
+  std::string xml =
+      "<pagx width=\"400\" height=\"300\">"
+      "  <Layer width=\"400\" height=\"300\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Rectangle position=\"50,25\" size=\"100,50\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer left=\"100\" top=\"50\" width=\"100\" height=\"50\" mask=\"@m\" "
+      "maskType=\"alpha\">"
+      "      <Rectangle position=\"50,25\" size=\"100,50\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("mask-size:100px 50px"), std::string::npos);
+  // The mask is anchored at the masked layer's own origin, so no position is emitted at all.
+  EXPECT_EQ(html.find("mask-position"), std::string::npos);
+}
+
+// An offset mask geometry states its bounds origin as the position, still measured from the masked
+// layer's origin rather than from the document.
+CLI_TEST(PAGXHtmlTest, MaskPositionIsBoundsOriginWithinMaskedLayer) {
+  std::string xml =
+      "<pagx width=\"400\" height=\"300\">"
+      "  <Layer width=\"400\" height=\"300\">"
+      "    <Layer id=\"m\" visible=\"false\">"
+      "      <Rectangle position=\"150,80\" size=\"40,20\"/>"
+      "      <Fill color=\"#FFFFFF\"/>"
+      "    </Layer>"
+      "    <Layer left=\"100\" top=\"50\" width=\"400\" height=\"300\" mask=\"@m\" "
+      "maskType=\"alpha\">"
+      "      <Rectangle position=\"200,150\" size=\"400,300\"/>"
+      "      <Fill color=\"#10B981\"/>"
+      "    </Layer>"
+      "  </Layer>"
+      "</pagx>";
+  auto html = LoadXMLAndConvert(xml);
+  ASSERT_FALSE(html.empty());
+  // Bounds are x 130..170 / y 70..90 in the masked layer's space.
+  EXPECT_NE(html.find("mask-position:130px 70px"), std::string::npos);
+}
+
+// The coordinate rounding pass rewrites every `<number>px` in a style attribute, so it has to step
+// over `url(...)` payloads: a base64 data URI can contain runs that read as a zero length (`0px`)
+// or a zero-prefixed one (`07px`), and rewriting those leaves the browser bytes it cannot decode.
+CLI_TEST(PAGXHtmlTest, StyleRoundingSkipsUrlPayloads) {
+  // "iVBORw0KGgo" is the PNG signature's base64; the two groups after it spell `0px` and `07px`.
+  const std::string payload = "iVBORw0KGgo0pxA07pxAAAAAA==";
+  std::string xml =
+      "<pagx width=\"100\" height=\"100\">"
+      "  <Layer width=\"100\" height=\"100\">"
+      "    <Rectangle position=\"50,50\" size=\"100,100\"/>"
+      "    <Fill><ImagePattern image=\"@img\"/></Fill>"
+      "  </Layer>"
+      "  <Resources><Image id=\"img\" source=\"data:image/png;base64," +
+      payload +
+      "\"/></Resources>"
+      "</pagx>";
+  pagx::HTMLExportOptions options;
+  options.extractStyleSheet = false;
+  auto html = LoadXMLAndConvert(xml, options);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find(payload), std::string::npos)
+      << "the embedded payload must reach the browser verbatim";
+  EXPECT_EQ(html.find("0A7pxAAAAAA=="), std::string::npos)
+      << "rounding must not swallow a payload's `px` suffix or a leading zero";
+}
+
 // Descendants resolve their own mask painter. Their layer alpha, Fill alpha, and source alpha all
 // participate in the emitted SVG opacity instead of reusing the root mask's paint.
 CLI_TEST(PAGXHtmlTest, NestedLuminanceMaskPreservesLayerPaintAndAlpha) {

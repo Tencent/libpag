@@ -24,26 +24,26 @@
 namespace pagx {
 
 /**
- * Inspects the magic bytes of an in-memory image and returns the canonical MIME type
- * (`"image/png"`, `"image/jpeg"`, `"image/webp"`, `"image/gif"`). Returns `nullptr`
- * when the buffer is too short or the magic bytes do not match a recognised format.
+ * Inspects the magic bytes of an in-memory image and returns the canonical MIME type, or
+ * `nullptr` when the buffer is too short or the magic bytes match no known signature.
  *
- * The detector is intentionally narrow: it sniffs only the four formats that the
- * libpag image pipeline produces or consumes at the boundary (PNG/JPEG/WebP/GIF).
- * Anything else (TIFF, BMP, AVIF, HEIC, …) is reported as unknown so the caller can
- * decide how to handle it instead of being silently mislabelled.
+ * The four formats `<Image>` may carry per the PAGX spec — PNG, JPEG, WebP and GIF — are what
+ * the libpag image pipeline produces and consumes at the boundary. Recognised beyond that set
+ * are the formats that reach a document from the outside (AVIF and HEIC via `<img>` /
+ * `background-image`, SVG via an inlined icon data URI) so a caller can report the offending
+ * format by name instead of mislabelling the payload.
  */
 const char* DetectImageMime(const uint8_t* bytes, size_t size);
 
 /**
- * Like `DetectImageMime`, but falls back to `"image/png"` instead of `nullptr` when
- * the magic bytes do not match a recognised format. Use this from serialisers that
- * MUST emit a non-empty MIME label in their output (e.g. `data:<mime>;base64,...`
- * URIs in PAGX/SVG documents). Decoders downstream of those serialisers sniff the
- * payload bytes themselves, so an unknown buffer reaching this fallback still
- * round-trips correctly through PAGX and tgfx — the label is purely for the
- * benefit of HTML preview / `<img src="data:…">` consumers.
+ * Returns true when `mime` is one of the formats `<Image>` / `<Glyph image>` may carry.
+ *
+ * The supported set is pinned by the PAGX spec ("支持格式：PNG、JPEG、WebP、GIF"): it is
+ * exactly the set every renderer is required to decode, so bytes outside it — including a
+ * `nullptr`/unknown `mime` — cannot be assumed to render anywhere. Callers that are about to
+ * persist image bytes into a document must transcode first (or report the offending format);
+ * this is the single source of truth for that decision.
  */
-const char* DetectImageMimeOrPNG(const uint8_t* bytes, size_t size);
+bool IsSupportedImageMime(const char* mime);
 
 }  // namespace pagx

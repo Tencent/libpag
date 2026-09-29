@@ -86,6 +86,16 @@ namespace pagx {
 // Helper functions for converting types to strings
 //==============================================================================
 
+// MIME label for the payload of a `data:` URI. The format is sniffed from the payload rather than
+// guessed: bytes whose format cannot be identified are labelled `application/octet-stream` instead
+// of being passed off as a PNG, so a serializer never invents a format that consumers would then
+// fail to decode silently. A payload that is identified but sits outside the `<Image>` supported
+// set (AVIF, HEIC, SVG, …) keeps its real label so `pagx verify` can report it by name.
+static std::string ImageDataMimeLabel(const uint8_t* bytes, size_t size) {
+  const char* mime = DetectImageMime(bytes, size);
+  return mime != nullptr ? mime : "application/octet-stream";
+}
+
 static std::string PointToString(const Point& p) {
   return FloatToString(p.x) + "," + FloatToString(p.y);
 }
@@ -630,7 +640,7 @@ static void WriteColorSource(XMLBuilder& xml, const ColorSource* node) {
         } else if (pattern->image->data) {
           const auto* bytes = pattern->image->data->bytes();
           auto size = pattern->image->data->size();
-          xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+          xml.addAttribute("image", std::string("data:") + ImageDataMimeLabel(bytes, size) +
                                         ";base64," + Base64Encode(bytes, size));
         }
       }
@@ -1478,7 +1488,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
       } else if (image->data) {
         const auto* bytes = image->data->bytes();
         auto size = image->data->size();
-        xml.addAttribute("source", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+        xml.addAttribute("source", std::string("data:") + ImageDataMimeLabel(bytes, size) +
                                        ";base64," + Base64Encode(bytes, size));
       } else {
         // `source` is a required attribute (see pagx.xsd). An unresolved image — e.g. an `<img>`
@@ -1572,7 +1582,7 @@ static void WriteResource(XMLBuilder& xml, const Node* node, const Options& opti
             } else if (glyph->image->data) {
               const auto* bytes = glyph->image->data->bytes();
               auto size = glyph->image->data->size();
-              xml.addAttribute("image", std::string("data:") + DetectImageMimeOrPNG(bytes, size) +
+              xml.addAttribute("image", std::string("data:") + ImageDataMimeLabel(bytes, size) +
                                             ";base64," + Base64Encode(bytes, size));
             }
           }

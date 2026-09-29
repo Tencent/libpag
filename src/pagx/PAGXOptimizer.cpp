@@ -162,6 +162,17 @@ bool HasUnresolvedImport(const Layer* layer) {
   return !layer->importDirective.source.empty() || !layer->importDirective.content.empty();
 }
 
+// A painter paints every geometry that precedes it in the same element list; every non-painter
+// element acts as geometry for that purpose.
+bool ContainsGeometry(const std::vector<Element*>& contents) {
+  for (const auto* element : contents) {
+    if (!IsPainter(element->nodeType())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool LayerNeedsKeeping(const Layer* layer, const std::unordered_set<const Layer*>& maskRefs) {
   if (maskRefs.find(layer) != maskRefs.end()) {
     return true;
@@ -1359,6 +1370,15 @@ bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,
     return false;
   }
   if (childImport && !parent->contents.empty()) {
+    return false;
+  }
+  // A painter paints every geometry that precedes it in the same element list, so a child payload
+  // carrying painters must not merge into a parent that already owns geometry: the child's Fill
+  // would paint the parent's shapes too. That is how a resolved SVG icon's Fill used to swallow the
+  // host box's placeholder Rectangle and render the icon as a solid block. The parent's own
+  // painters stay safe — the merge appends the child's payload behind the parent's, and a painter
+  // only reaches geometry that precedes it.
+  if (HasPainter(child->contents) && ContainsGeometry(parent->contents)) {
     return false;
   }
   return true;

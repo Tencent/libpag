@@ -105,6 +105,25 @@ class HTMLParserContext {
   // background geometry must already be present (added by `applyBackgroundVisuals`).
   bool applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer);
 
+  // Recovers a CSS `url(...)` background whose source is an SVG — an inline `data:image/svg+xml`
+  // URI (`svgContent` carries the decoded payload) or an external `.svg` reference
+  // (`svgContent` empty, `svgSource` the path) — as an inline-`<svg>` import directive instead of
+  // a raster `ImagePattern`. `<Image>` only carries the formats every renderer is required to
+  // decode (PNG/JPEG/WebP/GIF), so an SVG registered as an image would never paint anywhere;
+  // routing it through the directive keeps the icon as editable vector nodes after `pagx resolve`.
+  // `background-size` / `background-position` replay onto the directive host with the same CSS
+  // model as the raster path. A tiling `background-repeat` whose tile is smaller than the element
+  // box needs repeated copies that a single directive cannot express, and returns false so the
+  // caller falls back to the raster path. Returns true when the directive was emitted. The layer's
+  // background geometry must already be present (added by `applyBackgroundVisuals`).
+  bool applyVectorBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer,
+                                      const std::string& svgSource, const std::string& svgContent);
+
+  // Intrinsic size in CSS pixels of an SVG payload or local file, or {NaN, NaN} when the source
+  // does not parse or carries no resolvable size. `sourceIsFile` selects SVGImporter::Parse()
+  // instead of ParseString(); results are memoised by source kind and value.
+  std::pair<float, float> resolveSvgIntrinsicSize(const std::string& svgSource, bool sourceIsFile);
+
   // Folds the standard CSS rounded-image wrapper pattern (a container whose only role is
   // to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into a
   // single Layer whose rounded Rectangle is filled directly by the image. PAGX's only
@@ -154,6 +173,17 @@ class HTMLParserContext {
   // mask. The complement of the SVG data-URI branch handled directly in `applyMaskOrClip`.
   bool applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box, const std::string& url);
 
+  // Rebuilds an alpha / luminance mask layer from a `mask-image` that is a CSS gradient function
+  // (`linear-gradient(...)` / `radial-gradient(...)` / `conic-gradient(...)`, incl. `repeating-*`).
+  // The browser hands those over as the computed gradient itself rather than as a `url(...)`, so
+  // there is no payload to unpack: the gradient is resolved into the mask positioning area
+  // (`mask-size` / `mask-position` applied) and carried by a mask layer's own Fill, which is the
+  // form `HTMLWriter::writeMaskGeometry` emits back as an SVG gradient. `mask-repeat` is not
+  // modelled — PAGX gradients cannot tile, so an explicit `mask-size` smaller than the element
+  // paints one tile rather than repeating it. Returns false when the box is unsized or the value
+  // does not parse as a gradient, so the caller can fall back to its other mask sources.
+  bool applyGradientImageMask(Layer* layer, const HTMLBoxAttributes& box);
+
   // Replaces the rectangular `overflow: hidden` clip (`clipToBounds`) with a mask shaped like the
   // element's `border-radius` geometry, so descendants are clipped to the rounded outline rather
   // than the layer rectangle. PAGX's only native clip primitive (`clipToBounds`) squares off the
@@ -182,8 +212,18 @@ class HTMLParserContext {
   // while a bare length is the offset from the box's leading edge.
   float resolveMaskPositionAxis(const std::string& token, float boxAxis, float maskAxis);
 
-  // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
+  // Image resource registration. Thin forwarder to `_imageResources->registerResource`, preceded
+  // by `warnIfUnsupportedImageSource`.
   Image* registerImageResource(const std::string& imageSource);
+
+  // Warns when a `data:` image source carries a format outside the `<Image>` supported set
+  // (PNG/JPEG/WebP/GIF), which the exported PAGX preserves verbatim and no renderer is required to
+  // decode. A `data:` source that declares no media type, or only a generic one, is named by the
+  // format sniffed from its magic bytes instead. Reporting it at import time — with the element
+  // context the diagnostics carry — is the earliest point the author can act on it; a renderer that
+  // cannot decode the payload simply paints nothing. Non-`data:` sources are left alone: a file
+  // path is read by the renderer.
+  void warnIfUnsupportedImageSource(const std::string& imageSource);
 
   // Decodes an `Image` node's native pixel size (from inline data, a `data:` URI, or a file
   // path). Returns {0, 0} when the bytes cannot be decoded. Used to recover the per-axis scale
@@ -302,6 +342,14 @@ class HTMLParserContext {
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
 
+  // Memoises `resolveFontFaceNames` (family + '\n' + style -> the resolved pair) so each distinct
+  // authored pair pays for the platform font lookup at most once.
+  std::unordered_map<std::string, std::pair<std::string, std::string>> _fontFaceNameCache = {};
+
+  // Memoises `resolveSvgIntrinsicSize` so a payload or local file shared by many background layers
+  // is parsed once.
+  std::unordered_map<std::string, std::pair<float, float>> _svgIntrinsicSizeCache = {};
+
   float _canvasWidth = 0;
   float _canvasHeight = 0;
   // Records concrete family names from a font-family stack into the document-wide
@@ -323,6 +371,17 @@ class HTMLParserContext {
 
   // Static trampoline adapting the cascade's `FontAvailabilityThunk` to `isFontFamilyAvailable`.
   static bool IsFontFamilyAvailableThunk(void* userData, const std::string& family);
+
+  // Rewrites `family` / `style` in place to the names the platform resolves for the pair, so the
+  // exported PAGX carries names a host process can look up with an exact-matching font lookup
+  // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
+  // Families registered or embedded in the document's FontConfig keep their names verbatim,
+  // because `LayoutContext` resolves those through an exact key; a family the platform substitutes
+  // with a different one also keeps the authored name. Results are memoised in `_fontFaceNameCache`.
+  void resolveFontFaceNames(std::string& family, std::string& style);
+
+  // Static trampoline adapting the cascade's `FontFaceNameThunk` to `resolveFontFaceNames`.
+  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack

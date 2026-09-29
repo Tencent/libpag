@@ -138,7 +138,7 @@ Options:
 
 `snapshot.js` also supports `-o -` to write the snapshot HTML to stdout (used as the
 `pagx import` bridge). `--embed-fonts` is a `html2pagx`-only flag; `snapshot.js` exposes
-only `--download-fonts` (embedding happens in the `pagx font embed` step downstream).
+only `--download-fonts` (embedding happens in the `pagx embed` step downstream).
 
 ### Inline icon fonts
 
@@ -223,7 +223,7 @@ typeface — `--fallback` both registers the face (matching the document's
 subset files jointly cover the text:
 
 ```bash
-pagx font embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
+pagx embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
 pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
 ```
 
@@ -275,7 +275,7 @@ Options:
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
 | `--capture-animations` | Forwarded to `snapshot.js`: capture the page's animations into the subset so the `.pagx` replays the motion (default: a single static frame) |
 | `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
-| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx font embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
+| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 |
 | `--image-dir <dir>` | Where downloaded images are written (default `<output>.images/`) |
@@ -551,6 +551,13 @@ Babel-compiled at runtime.
   captured in whatever state they are in; use `--wait-ms` or `--selector` to
   land on the desired frame. Some pages instead hide or remove animated content
   in their reduced-motion styles; use `--no-reduced-motion` for those pages.
+- `position: sticky` scrollytelling blocks — a pinned panel inside a tall
+  scroll track whose step layers cross-fade as the page scrolls — are expanded
+  before the snapshot: the panel is tiled once per step so the static output
+  shows every step instead of the frozen top frame plus blank track. The
+  detection is heuristic (a track at least twice the panel's height, stacked
+  same-size absolute layers with mutually exclusive opacities) and the
+  expansion is opt-out via `HTML_SNAPSHOT_NO_STICKY_EXPAND=1`.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
 - `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
@@ -561,6 +568,12 @@ Babel-compiled at runtime.
   and WebGL canvases created without `preserveDrawingBuffer: true` (the
   back buffer may be empty by the time we read it). Such canvases are
   dropped and render as empty boxes.
+- Images whose declared format is not PNG / JPEG / WebP / GIF — an AVIF or
+  HEIC served by a CDN, for instance — are re-encoded to WebP in the browser,
+  because PAGX consumers are only required to decode those four formats. An
+  animated source outside that set keeps only its first frame, a re-encode
+  failure keeps the original bytes and warns, and images saved by
+  `--download-images` are written to disk untouched.
 - Asymmetric borders are downgraded to overlay rectangles. Per-side `dashed` /
   `dotted` borders are coerced to `solid` (the closest visual approximation
   available in the subset).

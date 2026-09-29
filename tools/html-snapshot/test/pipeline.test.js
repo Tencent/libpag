@@ -286,7 +286,7 @@ describe('runPagxResolve / runPagxFontEmbed / runPagxRender', () => {
       fontFiles: ['/a.ttf', '/b.otf'],
     });
     expect(readArgv(argvPath)).toEqual([
-      'font', 'embed', '/x.pagx',
+      'embed', '/x.pagx', '--skip-images',
       '--fallback', '/a.ttf',
       '--fallback', '/b.otf',
     ]);
@@ -296,7 +296,7 @@ describe('runPagxResolve / runPagxFontEmbed / runPagxRender', () => {
     const argvPath = path.join(dir, 'argv.bin');
     const wrapper = makeArgvCapturingScript({ argvPath });
     await runPagxFontEmbed({ pagxBin: wrapper, pagxFile: '/x.pagx' });
-    expect(readArgv(argvPath)).toEqual(['font', 'embed', '/x.pagx']);
+    expect(readArgv(argvPath)).toEqual(['embed', '/x.pagx', '--skip-images']);
   });
 
   test('runPagxRender forwards scale and fallback args', async () => {
@@ -603,7 +603,7 @@ describe('runHtmlToPagx — orchestrator', () => {
 
     // Case B: embedFonts=true with a real font dir → font-embed step runs.
     fakePagx.callsByCmd.resolve = 0;
-    fakePagx.callsByCmd.font = 0;
+    fakePagx.callsByCmd.embed = 0;
     const snapImplB = async (a) => {
       fs.mkdirSync(a.fontDir, { recursive: true });
       fs.writeFileSync(path.join(a.fontDir, 'Real.ttf'), 'fake');
@@ -621,7 +621,7 @@ describe('runHtmlToPagx — orchestrator', () => {
       log: () => {},
     });
     expect(result.fonts).toHaveLength(1);
-    expect(fakePagx.callsByCmd.font).toBe(1);
+    expect(fakePagx.callsByCmd.embed).toBe(1);
   });
 
   test('keepSubsetHtml=false writes the subset to a temp dir', async () => {
@@ -698,7 +698,7 @@ function makeFakePagx({ allowRender = true } = {}) {
     'case "$cmd" in',
     '  import) [ -n "$out" ] && echo -n "<pag/>" > "$out" ;;',
     '  resolve) : ;;',
-    '  font) : ;;',                          // font-embed: subcommand is `font embed`
+    '  embed) : ;;',                         // font-embed: subcommand is `embed`
     `  render) ${allowRender ? '[ -n "$out" ] && echo -n "PNG" > "$out"' : 'exit 99'} ;;`,
     'esac',
   ].join('\n'));
@@ -711,7 +711,7 @@ function makeFakePagx({ allowRender = true } = {}) {
     path: file,
     get callsByCmd() {
       const text = fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '';
-      const out = { import: 0, resolve: 0, font: 0, render: 0 };
+      const out = { import: 0, resolve: 0, embed: 0, render: 0 };
       for (const line of text.split('\n')) {
         if (line && Object.prototype.hasOwnProperty.call(out, line)) out[line]++;
       }

@@ -41,8 +41,8 @@ static constexpr const char* HTML_DEFAULT_FONT_FAMILY = "Arial";
 /**
  * Default font style/variant name written to every imported `Text` node. The synthesis in
  * `ResolveFontStyleSynthesis` leaves the style label empty for the plain Regular-weight upright
- * face (italic is carried by `fauxItalic`); this constant substitutes the canonical "Regular"
- * name so every HTML-imported `Text` node always carries a concrete `fontStyle`.
+ * face; this constant substitutes the canonical "Regular" name so every HTML-imported `Text`
+ * node always carries a concrete `fontStyle`.
  */
 static constexpr const char* HTML_DEFAULT_FONT_STYLE = "Regular";
 
@@ -74,13 +74,15 @@ struct HTMLInheritedStyle {
   std::string fontSize = {};
   std::string fontWeight = {};
   std::string fontStyle = {};
-  std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Black" / ""
+  std::string fontStyleName = {};  // real-face style label, e.g. "Light" / "Bold" / "Italic" / ""
   // Synthetic slant the renderer must emboss on top of the resolved face. Set by
-  // `resolveInheritedStyle` for italic/oblique requests, whose axis is dropped from `fontStyleName`
-  // (see `ResolveFontStyleSynthesis`) and carried through to `Text::fauxItalic` so the authored
-  // slant survives even when the styled italic face is not installed on the render host. The
-  // importer never pre-synthesises the weight axis: it stays in `fontStyleName` as a real-face
-  // keyword, so `fauxBold` remains false even if font lookup later falls back to a lighter face.
+  // `resolveInheritedStyle` for italic/oblique requests and carried through to `Text::fauxItalic`
+  // so the authored slant survives even when the styled italic face is not installed on the
+  // render host. The face label itself keeps the italic axis (`fontStyleName` may be "Italic" or
+  // "Medium Italic"); text layout drops this flag when the resolved typeface already provides a
+  // real italic face, so the slant is never applied twice. The importer never pre-synthesises the
+  // weight axis: it stays in `fontStyleName` as a real-face keyword, so `fauxBold` remains false
+  // even if font lookup later falls back to a lighter face.
   bool fauxBold = false;
   bool fauxItalic = false;
   std::string letterSpacing = {};
@@ -101,6 +103,13 @@ struct HTMLInheritedStyle {
   // inherited from the nearest ancestor that combined `background-clip: text` with a gradient
   // `background-image`. Empty means descendants paint text with their own solid `color`.
   std::string textFillImage = {};
+  // Solid colour inherited from the nearest ancestor that combined `background-clip: text`
+  // with a solid `background-color` (the same CSS technique as `textFillImage`, without a
+  // gradient layer). In CSS the background clipped to the glyphs is what paints the text, so
+  // this outranks `color`; `textFillSolidSet` stays false when no such ancestor exists and
+  // descendants keep painting with their own resolved `color`.
+  Color textFillSolid = {0, 0, 0, 1, ColorSpace::SRGB};
+  bool textFillSolidSet = false;
 
   // Pre-resolved numeric forms of the cascade. Kept in lock-step with the string fields by
   // `resolveInheritedStyle` so text-leaf conversion doesn't re-parse the same `font-size` /
@@ -235,6 +244,12 @@ struct HTMLBoxAttributes {
   // `background-image`; the gradient is then routed onto descendant text fills instead of
   // painting a rectangle on this element.
   bool backgroundClipText = false;
+  // Per-layer `background-clip` box keywords (`border-box` / `padding-box`), comma-separated
+  // in CSS layer order (first entry clips the top-most background-image layer, matching
+  // `backgroundImage`'s order). Empty means every layer clips to the default `border-box`.
+  // A `padding-box` layer is how CSS paints gradient borders: the layer inset by the border
+  // width lets the border-box layer beneath show through as a frame.
+  std::string backgroundClip = {};
 
   // CSS `background-size` / `background-repeat` / `background-position`, kept lower-cased and
   // trimmed. Only meaningful when `backgroundImage` is a `url(...)` reference; the importer maps

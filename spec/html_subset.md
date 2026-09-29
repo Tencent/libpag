@@ -177,7 +177,7 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | inline `<LinearGradient>` inside `<Fill>` (`startPoint`/`endPoint` derived from angle) |
 | `background-image: radial-gradient(…)` | inline `<RadialGradient>` (center/radius derived from `circle at … N%`) |
 | `background-image: conic-gradient(from angle, …)` | inline `<ConicGradient>` (CSS 0° = top, PAGX 0° = right; angle shifted by −90°) |
-| `background-clip: text` (alias `-webkit-background-clip: text`) | combined with a gradient `background-image`: routes the gradient onto descendant text fills (`<TextBox>` / `<Text>` get a `<Fill>` carrying the gradient) and suppresses the rectangle that would otherwise paint behind the text. Without a gradient `background-image`, the property is a no-op. |
+| `background-clip: text` (alias `-webkit-background-clip: text`) | routes the element's background onto descendant text fills (`<TextBox>` / `<Text>` get a `<Fill>` carrying the gradient, or the solid colour when no gradient layer is present) and suppresses the rectangle that would otherwise paint behind the text. This mirrors CSS, where the inherited transparent `text-fill-color` leaves the clipped background as the only glyph paint, so the background outranks `color`. A gradient `background-image` wins over a solid `background-color` (CSS paints the colour below the image layers). A fully transparent `background-color` carries no paint: the property is a no-op for that element. |
 | `background-image: url(...)` | recovered as an `<ImagePattern>` fill on the background rectangle (the inverse of `HTMLWriter`'s url-background emission). `background-size` / `background-repeat` / `background-position` drive the pattern's `scaleMode` / tile modes / matrix |
 | `background-blend-mode: <mode>` | sets `Fill.blendMode` on the gradient / image fill so it composites against the `background-color`, which is kept as a solid `<Fill>` underneath (the backdrop the blend needs). `normal` (the default) is a no-op and the opaque gradient/image keeps hiding the colour |
 | `mask-image: url(data:image/svg+xml,...)` (+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`) | the referenced SVG becomes a PAGX mask layer; `mask-mode` selects Alpha vs Luminance, `mask-size` / `mask-position` drive its scale / offset |
@@ -192,9 +192,12 @@ also a no-op (the offsets are ignored alongside the dropped position).
 | `transform: <fn>` | mapped onto `Layer.matrix`. Single-function forms (`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`) plus `matrix3d(...)` (projected to its 2D affine components) are supported; compound chains and other 3D variants (`rotate3d`/`perspective`) are dropped with a warning |
 | `transform-origin` | forwarded; honoured when it resolves to the box center (`50% 50%`, `center`, `center center`, or px values equal to the box center); other origins warn |
 | `overflow: hidden` on a Layer | `Layer.clipToBounds = true` |
+| `overflow: <x> <y>` (two-value shorthand) on a Layer | `Layer.clipToBounds = true` when either axis is not `visible` (`hidden` / `clip` / `scroll` / `auto` / `overlay`), matching CSS's rule that a non-`visible` axis makes the box a clipping container; `visible visible` leaves the box unclipped. `scroll` / `auto` / `overlay` additionally warn, since PAGX cannot model the scroll affordance they imply |
 
-`background-clip: border-box` / `padding-box` / `content-box` are silent no-ops (only the
-`text` keyword has a PAGX effect, see above).
+`background-clip: text` fills the glyphs (see the row above). `border-box` is the default and
+collapses silently. `padding-box` / `content-box` are kept: each gradient layer carrying one is
+rebuilt as an inset child layer, which is how CSS paints gradient borders (a plain
+`background-color` still paints the border box). Any other value is dropped with a diagnostic.
 
 Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `border-*-radius`,
 `outline`, `perspective`, geometric `clip-path` forms (`inset`/`circle`/`ellipse`/`polygon`/
@@ -217,7 +220,7 @@ Disallowed (warning + skip): `border-{top,right,bottom,left}`, per-corner `borde
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` overlay (`bottom="0"` / `centerY="0"`), see §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
 | `writing-mode: vertical-rl | vertical-lr` | `TextBox.writingMode = "Vertical"` (horizontal modes are the default) |
-| `overflow: hidden` on a text container | `TextBox.overflow = "hidden"` |
+| `overflow: hidden` (or any non-`visible` axis) on a text container | `TextBox.overflow = "hidden"` |
 | `text-overflow: ellipsis` | warning (not implemented in PAGX) |
 
 Disallowed (warning + skip): `text-transform`, `text-indent`, `word-spacing`, `direction`,
@@ -375,7 +378,7 @@ form so that the rest of the pipeline only ever sees compliant HTML. It is on by
 `HTMLImporter::Options::autoNormalize = false` disables it (API-level only — `pagx import`
 exposes no `--html-*` flag for it).
 
-The transformer runs as a fixed pipeline of eight core passes plus one optional pass (the
+The transformer runs as a fixed pipeline of nine core passes plus one optional pass (the
 optional `HTMLFlexInference` runs between PropertyFilter and MarginToGapPromotion).
 Behaviour:
 
@@ -388,6 +391,7 @@ Behaviour:
 | HTMLFlexInference *(on by default: `Options::inferFlexFromAbsolute`; no effect when `autoNormalize` is false)* | rewrites a container whose children form a clean 1D row or column of `position: absolute` boxes into `display: flex` with inferred `gap`, `padding`, `align-items`, `flex-direction`; when the container has an explicit main-axis size and the content sits with (near-)equal leading/trailing insets, emits `justify-content: center` instead of symmetric main-axis padding; strips the children's `position` / `left` / `right` / `top` / `bottom` (`subset:flex-inferred`) | containers whose children overlap on both axes, mix cross-axis alignment, or have inconsistent main-axis spacing are left untouched (`subset:flex-inference-skipped`) |
 | MarginToGapPromotion | on a `display: flex` container whose in-flow children carry a uniform per-child main-axis margin (leading or trailing pattern), lifts that margin onto the container's `gap` and clears the per-child margins (`subset:margin-promoted-to-gap`) | bails out (leaving margins for `wrapForMargin` to fold) when the container wraps, already has a positive `gap`, has fewer than two participating children, a child has `flex` grow, or any margin is non-px |
 | SpaceJustifyOverflowCollapse | on a `display: flex` container using `space-between` / `space-around` / `space-evenly` whose children overflow the main axis, rewrites `justify-content` to `flex-start` so PAGX's flex engine does not overlap items (`subset:space-justify-collapsed-on-overflow`) | left untouched when the size data is incomplete (no explicit px main-axis size, non-px padding/gap, unresolvable child size, or a child with `flex` grow) |
+| SpaceEvenlyPaddingCompensation | on a `display: flex` container using `space-evenly`, rewrites `justify-content` to `space-between` and adds the freed step `g = R / (n + 1)` (`R` = free space left after the children and the `n - 1` gaps) to both main-axis paddings, which places every child exactly where `space-evenly` would (`subset:space-evenly-padding-compensated`) | left untouched unless the container has an explicit px main-axis size, a px `gap`, and free space left on the line; an in-flow child whose main-axis size does not resolve to px, that declares `flex` grow, or that carries a non-zero main-axis margin also bails out, as does a padding that does not resolve to px |
 | StructureNormalization | wraps stray text inside a container in `<p>` (`subset:text-wrapped`); drops whitespace-only text nodes between elements; leaves `<svg>` subtrees opaque so the SVG resolver can see them verbatim | unknown tags (`<table>`, `<form>`, `<input>`, `<button>`, custom elements, etc.) are removed (`subset:unsupported-tag`); with `HTMLImporter::Options::preserveUnknownElements` they're kept as `<div data-html-unknown="<tag>">` instead |
 | InlineStyleEmitter | rewrites every element's resolved style map back into `style="…"` with alphabetically sorted properties for deterministic output; drops the now-redundant `class` attribute (kept when `Options::preserveClassAttribute` is true) | — |
 

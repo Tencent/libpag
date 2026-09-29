@@ -1,0 +1,24 @@
+<pagx width="120" height="120">
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Path data="M10,10 L50,10 L50,50 L10,50 Z M20,20 L40,20 L40,40 L20,40 Z"/>
+    <Fill color="#EC4899" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="30,80" size="40,40"/>
+    <Ellipse position="50,80" size="40,40"/>
+    <MergePath mode="append"/>
+    <Fill color="#8B5CF6" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,30" size="40,40"/>
+    <Ellipse position="100,30" size="40,40"/>
+    <MergePath mode="intersect"/>
+    <Fill color="#F59E0B" fillRule="evenOdd"/>
+  </Layer>
+  <Layer left="0" right="0" top="0" bottom="0">
+    <Rectangle position="80,80" size="40,40"/>
+    <Ellipse position="100,80" size="40,40"/>
+    <MergePath mode="xor"/>
+    <Fill color="#10B981" fillRule="evenOdd"/>
+  </Layer>
+</pagx>

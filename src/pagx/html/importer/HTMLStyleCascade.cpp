@@ -38,6 +38,27 @@ using namespace pagx::html;
 
 namespace {
 
+// The element's effective `background-image`: the longhand, or the `background` shorthand when
+// that carries a gradient (the only shorthand form PAGX can paint). `none` declares no image but
+// is a non-empty computed value, so it folds to empty here — every downstream "does this element
+// have a background image?" decision, including the `background-clip: text` redirect, treats the
+// two alike, and a literal "none" would otherwise be painted as an image or block the
+// solid-colour channel.
+std::string LookupEffectiveBackgroundImage(
+    const std::unordered_map<std::string, std::string>& props) {
+  std::string bgImage = LookupProperty(props, "background-image");
+  if (ToLower(Trim(bgImage)) == "none") {
+    return {};
+  }
+  if (bgImage.empty()) {
+    const std::string& shorthand = LookupProperty(props, "background");
+    if (!shorthand.empty() && ToLower(shorthand).find("gradient") != std::string::npos) {
+      return shorthand;
+    }
+  }
+  return bgImage;
+}
+
 // Splits a CSS function argument list (the slice between `(` and `)`) on top-level commas,
 // trimming each token. Used by `ParseTransformFunction` so multi-arg forms like
 // `scale(1.5, 0.75)` and `translate(10px, 20px)` round-trip without a heavier parser.
@@ -353,6 +374,26 @@ void HTMLStyleCascade::setFontAvailabilitySink(FontAvailabilityThunk thunk, void
   _fontAvailabilityUserData = userData;
 }
 
+void HTMLStyleCascade::setFontFaceNameSink(FontFaceNameThunk thunk, void* userData) {
+  _fontFaceNameThunk = thunk;
+  _fontFaceNameUserData = userData;
+}
+
+void HTMLStyleCascade::applyFontFaceNames(HTMLInheritedStyle& out,
+                                          const HTMLInheritedStyle& parent) {
+  if (_fontFaceNameThunk == nullptr || out.primaryFontFamily.empty()) {
+    return;
+  }
+  // The parent's pair was already normalised, so a child that neither changed the family nor the
+  // weight inherits it as-is. Only a pair this element actually introduced needs the platform
+  // lookup, which keeps the one-lookup-per-distinct-pair cost.
+  if (out.primaryFontFamily == parent.primaryFontFamily &&
+      out.fontStyleName == parent.fontStyleName) {
+    return;
+  }
+  _fontFaceNameThunk(_fontFaceNameUserData, out.primaryFontFamily, out.fontStyleName);
+}
+
 void HTMLStyleCascade::collectStyles(const std::shared_ptr<DOMNode>& head) {
   auto child = head->getFirstChild();
   while (child) {
@@ -536,31 +577,40 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
   CopyProperty(props, "text-decoration-color", out.textDecorationColor);
   CopyProperty(props, "white-space", out.whiteSpace);
   CopyProperty(props, "writing-mode", out.writingMode);
-  // Propagate gradient text fill from the nearest clip-to-text ancestor. `out.textFillImage`
-  // already inherits the parent's value via `out = parent`; we only override when this element
-  // itself sets `background-clip: text` together with a gradient `background-image`.
-  std::string ownBgImage = LookupProperty(props, "background-image");
-  if (ownBgImage.empty()) {
-    const std::string& sh = LookupProperty(props, "background");
-    if (!sh.empty() && sh.find("gradient") != std::string::npos) {
-      ownBgImage = sh;
+  // Propagate the glyph fill from the nearest clip-to-text ancestor. Both `textFillImage` and
+  // `textFillSolid` already inherit the parent's values via `out = parent`; we only override
+  // when this element itself sets `background-clip: text`. Such an element's own background
+  // paints its glyphs, so it replaces the inherited fill of the other channel and outranks
+  // `color` — CSS inherits a transparent text-fill-color through the subtree, leaving the
+  // clipped background as the only glyph paint.
+  std::string ownBgImage = LookupEffectiveBackgroundImage(props);
+  if (LookupLowerTrimmed(props, "background-clip") == "text") {
+    if (!ownBgImage.empty() && ToLower(ownBgImage).find("gradient") != std::string::npos) {
+      out.textFillImage = ownBgImage;
+      out.textFillSolidSet = false;
+    } else if (ownBgImage.empty()) {
+      // The solid-colour half of the same technique. A fully transparent colour carries no
+      // paint, so it keeps the box path untouched rather than blanking the text.
+      Color background = {};
+      if (resolveBackgroundColor(props, &background) && background.alpha > 0.0f) {
+        out.textFillSolid = background;
+        out.textFillSolidSet = true;
+        out.textFillImage.clear();
+      }
     }
   }
-  if (LookupLowerTrimmed(props, "background-clip") == "text" && !ownBgImage.empty() &&
-      ownBgImage.find("gradient") != std::string::npos) {
-    out.textFillImage = ownBgImage;
-  }
   // Split the CSS font-weight / font-style request into the real-face style label PAGX Text
-  // resolves plus the synthetic (faux) italic axis the renderer embosses on top. The weight axis
-  // is always written as a real-face keyword (Bold / SemiBold / Black) so the renderer resolves the
-  // authored heavy face when it is installed or embedded and preserves the SemiBold / Bold / Black
-  // distinction. If that face is unavailable, normal font lookup fallback applies without faux
-  // bold. Italic stays a faux flag so an oblique slant survives when the styled italic face is
-  // unavailable.
+  // resolves plus the synthetic (faux) italic axis the renderer may emboss on top. Both axes are
+  // written as real-face keywords (Bold / SemiBold / Italic / Medium Italic ...) so the renderer
+  // resolves the authored face when it is installed or embedded. If that face is unavailable,
+  // normal font lookup fallback applies without faux bold. Italic additionally keeps a faux flag
+  // so an oblique slant survives when the styled italic face is unavailable; text layout drops
+  // the flag when the resolved typeface already provides a real italic face.
   FontStyleSynthesis fontSynthesis = ResolveFontStyleSynthesis(out.fontWeight, out.fontStyle);
   out.fontStyleName = fontSynthesis.fontStyleName;
   out.fauxBold = fontSynthesis.fauxBold;
   out.fauxItalic = fontSynthesis.fauxItalic;
+  applyFontFaceNames(out, parent);
 
   static const char* TextDisallowed[] = {
       "text-transform", "text-indent",  "word-spacing", "unicode-bidi",
@@ -816,25 +866,26 @@ void HTMLStyleCascade::parseBoxMargin(HTMLBoxAttributes& box, const PropertyMap&
   applyMarginLonghand(props, "margin-left", box.marginLeftPx);
 }
 
-void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
+bool HTMLStyleCascade::resolveBackgroundColor(const PropertyMap& props, Color* out) {
   std::string bgColor = LookupProperty(props, "background-color");
   if (bgColor.empty()) {
     bgColor = LookupProperty(props, "background");  // accept shorthand if it's color-only
   }
   // `parseColor` accepts hex, named colors, and `rgb()/rgba()` literals. We only need to bail
   // out when the value is actually a non-color shorthand (gradient / url-image).
-  if (!bgColor.empty() && bgColor.find("gradient") == std::string::npos &&
-      bgColor.find("url(") == std::string::npos) {
-    box.backgroundColor = _valueParser.parseColor(bgColor);
+  if (bgColor.empty() || bgColor.find("gradient") != std::string::npos ||
+      bgColor.find("url(") != std::string::npos) {
+    return false;
+  }
+  *out = _valueParser.parseColor(bgColor);
+  return true;
+}
+
+void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap& props) {
+  if (resolveBackgroundColor(props, &box.backgroundColor)) {
     box.backgroundColorSet = true;
   }
-  std::string bgImage = LookupProperty(props, "background-image");
-  if (bgImage.empty()) {
-    const std::string& sh = LookupProperty(props, "background");
-    if (!sh.empty() && sh.find("gradient") != std::string::npos) {
-      bgImage = sh;
-    }
-  }
+  std::string bgImage = LookupEffectiveBackgroundImage(props);
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
   }
@@ -865,11 +916,17 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
                         firstMode + "' for every background layer");
     }
   }
-  // `background-clip: text` is the only clip value the importer models. The subset transformer
-  // already normalises every other keyword to empty, so a non-empty value here equals `text`.
+  // `background-clip: text` routes the gradient onto descendant text fills. Any other
+  // non-empty list carries per-layer box clips (`padding-box`, comma-separated in CSS layer
+  // order) — kept raw so `applyBackgroundFill` can rebuild each layer with its own inset
+  // geometry (gradient borders). The subset transformer has already dropped all-default
+  // `border-box` lists, so a non-`text` value here always contains at least one
+  // `padding-box` / `content-box` layer.
   std::string bgClip = LookupLowerTrimmed(props, "background-clip");
   if (bgClip == "text") {
     box.backgroundClipText = true;
+  } else if (!bgClip.empty()) {
+    box.backgroundClip = bgClip;
   }
 
   const std::string& br = LookupProperty(props, "border-radius");
@@ -906,11 +963,35 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   }
   box.mixBlendMode = LookupLowerTrimmed(props, "mix-blend-mode");
 
+  // CSS `overflow` takes one or two values (`<x> <y>`) and clips the box whenever either axis is
+  // not `visible` (the other axis computes to `auto` and still clips), so every clipping axis
+  // folds into PAGX's single `Layer.clipToBounds` flag. `hidden` / `clip` clip without implying
+  // any scrolling and map silently; `auto` / `scroll` / `overlay` also clip but lose a scroll
+  // affordance PAGX cannot model, so they keep a diagnostic. Chromium emits the two-value form
+  // for per-axis CSS (`overflow-x: auto; overflow-y: hidden` → `overflow: auto hidden`);
+  // comparing against the whole string would drop the clip and let off-screen content bleed in —
+  // carousel clones parked at a negative offset are the common case.
   std::string overflow = LookupLowerTrimmed(props, "overflow");
-  if (overflow == "hidden") {
-    box.clipOverflow = true;
-  } else if (!overflow.empty() && overflow != "visible") {
-    _diagnostics.warn("html: overflow: " + overflow + " not fully supported");
+  if (!overflow.empty()) {
+    bool clips = false;
+    bool silent = true;
+    for (const auto& token : SplitTopLevelWhitespace(overflow)) {
+      if (token == "visible") {
+        continue;
+      }
+      if (token == "hidden" || token == "clip") {
+        clips = true;
+      } else if (token == "auto" || token == "scroll" || token == "overlay") {
+        clips = true;
+        silent = false;
+      } else {
+        silent = false;
+      }
+    }
+    box.clipOverflow = clips;
+    if (!silent) {
+      _diagnostics.warn("html: overflow: " + overflow + " not fully supported");
+    }
   }
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");

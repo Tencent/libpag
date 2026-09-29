@@ -2545,7 +2545,9 @@ class PAG_API Codec {
   static void InstallReferences(const std::vector<Composition*>& compositions);
 
   /**
-   * Return null if the the specified data are not valid to create a pag file.
+   * Return null if the specified data are not valid to create a pag file. The composition
+   * references and the layer parent chains must be acyclic, and the composition nesting depth
+   * must not exceed 128.
    */
   static std::shared_ptr<File> VerifyAndMake(const std::vector<Composition*>& compositions,
                                              const std::vector<pag::ImageBytes*>& images);

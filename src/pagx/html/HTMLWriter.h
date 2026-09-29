@@ -97,7 +97,7 @@ std::string PaddingToCSS(const Padding& padding);
 bool TextStartsWithRTL(const std::string& utf8Text);
 
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx);
-// DetectImageMime / DetectImageMimeOrPNG now live in pagx/utils/ImageMime.h.
+// DetectImageMime / IsSupportedImageMime now live in pagx/utils/ImageMime.h.
 // Include that header directly when sniffing image data.
 
 /**
@@ -576,7 +576,7 @@ class HTMLWriter {
   static bool NeedsMirrorTiling(const Layer* layer);
 
   // Mask/clip defs
-  std::string writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos = {});
+  std::string writeMaskCSS(const Layer* mask, MaskType type);
   std::string writeClipDef(const Layer* mask);
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
 

@@ -29,7 +29,7 @@ After installation, the following commands are available in After Effects:
 - **Adobe After Effects 2020+** (CC 2023 recommended)
 - **Qt 6.2.0+** (Qt 6.6.1 recommended)
 - **CLion** IDE
-- **macOS 10.15+** or **Windows 10+** (64-bit)
+- **macOS 12.0+** or **Windows 10+** (64-bit)
 - **After Effects SDK** (2023 Windows version recommended)
 - Successfully built libpag library (see [main README](../README.md))
 

@@ -175,13 +175,11 @@ bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::D
     }
 
     if (mimeType == "video/hevc") {
-      if (@available(iOS 11.0, *)) {
-        status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
-            kCFAllocatorDefault, size, parameterSetPointers.data(), parameterSetSizes.data(), 4,
-            NULL, &videoFormatDescription);
-      } else {
-        status = -1;
-      }
+      // CMVideoFormatDescriptionCreateFromHEVCParameterSets needs iOS 11.0, well below the 15.0
+      // floor.
+      status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
+          kCFAllocatorDefault, size, parameterSetPointers.data(), parameterSetSizes.data(), 4, NULL,
+          &videoFormatDescription);
       if (status != noErr) {
         LOGE("HardwareDecoder:format description create failed status = %d", status);
         return false;
@@ -253,37 +251,35 @@ bool HardwareDecoder::resetVideoToolBox() {
   CFRelease(openGLESCompatibilityValue);
   CFRelease(ioSurfaceParam);
 
-  if (@available(iOS 10.0, *)) {
-    if (newSession != nullptr && (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
-                                  sourceColorSpace == tgfx::YUVColorSpace::BT2020_FULL)) {
-      CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
-          kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
-      CFStringRef destinationTransferFunction = CFStringCreateWithCString(
-          kCFAllocatorDefault, "DestinationTransferFunction", kCFStringEncodingUTF8);
-      CFStringRef destinationYCbCrMatrix = CFStringCreateWithCString(
-          kCFAllocatorDefault, "DestinationYCbCrMatrix", kCFStringEncodingUTF8);
-      CFStringRef pixelTransferProperties = CFStringCreateWithCString(
-          kCFAllocatorDefault, "PixelTransferProperties", kCFStringEncodingUTF8);
+  if (newSession != nullptr && (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
+                                sourceColorSpace == tgfx::YUVColorSpace::BT2020_FULL)) {
+    CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
+        kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
+    CFStringRef destinationTransferFunction = CFStringCreateWithCString(
+        kCFAllocatorDefault, "DestinationTransferFunction", kCFStringEncodingUTF8);
+    CFStringRef destinationYCbCrMatrix = CFStringCreateWithCString(
+        kCFAllocatorDefault, "DestinationYCbCrMatrix", kCFStringEncodingUTF8);
+    CFStringRef pixelTransferProperties = CFStringCreateWithCString(
+        kCFAllocatorDefault, "PixelTransferProperties", kCFStringEncodingUTF8);
 
-      CFMutableDictionaryRef pixelTransferPropertiesParam = CFDictionaryCreateMutable(
-          kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationColorPrimaries,
-                           kCVImageBufferColorPrimaries_ITU_R_709_2);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationTransferFunction,
-                           kCVImageBufferTransferFunction_ITU_R_709_2);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationYCbCrMatrix,
-                           kCVImageBufferYCbCrMatrix_ITU_R_709_2);
-      VTSessionSetProperty(newSession, pixelTransferProperties, pixelTransferPropertiesParam);
+    CFMutableDictionaryRef pixelTransferPropertiesParam = CFDictionaryCreateMutable(
+        kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(pixelTransferPropertiesParam, destinationColorPrimaries,
+                         kCVImageBufferColorPrimaries_ITU_R_709_2);
+    CFDictionarySetValue(pixelTransferPropertiesParam, destinationTransferFunction,
+                         kCVImageBufferTransferFunction_ITU_R_709_2);
+    CFDictionarySetValue(pixelTransferPropertiesParam, destinationYCbCrMatrix,
+                         kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+    VTSessionSetProperty(newSession, pixelTransferProperties, pixelTransferPropertiesParam);
 
-      CFRelease(destinationColorPrimaries);
-      CFRelease(destinationTransferFunction);
-      CFRelease(destinationYCbCrMatrix);
-      CFRelease(pixelTransferProperties);
-      if (tgfx::IsLimitedYUVColorRange(sourceColorSpace)) {
-        destinationColorSpace = tgfx::YUVColorSpace::BT709_LIMITED;
-      } else {
-        destinationColorSpace = tgfx::YUVColorSpace::BT709_FULL;
-      }
+    CFRelease(destinationColorPrimaries);
+    CFRelease(destinationTransferFunction);
+    CFRelease(destinationYCbCrMatrix);
+    CFRelease(pixelTransferProperties);
+    if (tgfx::IsLimitedYUVColorRange(sourceColorSpace)) {
+      destinationColorSpace = tgfx::YUVColorSpace::BT709_LIMITED;
+    } else {
+      destinationColorSpace = tgfx::YUVColorSpace::BT709_FULL;
     }
   }
 

@@ -73,6 +73,7 @@
 #include "pagx/utils/Base64.h"
 #include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageFormatUtils.h"
+#include "pagx/utils/ImageMime.h"
 #include "pagx/utils/ModifierResolver.h"
 #include "pagx/utils/RasterUtils.h"
 #include "pagx/utils/StringParser.h"
@@ -258,34 +259,18 @@ static std::string QuoteFontFamilyIfNeeded(const std::string& family) {
   return "'" + EscapeCssFontFamily(family) + "'";
 }
 
-// Detects an image MIME type from the leading bytes of the encoded stream so that
-// data URIs declare the actual format (PNG/JPEG/WebP). Returns nullptr when the
-// magic bytes match no known signature so callers can surface the degradation.
-static const char* DetectImageMimeType(const uint8_t* data, size_t size) {
-  if (size >= 8 && data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47) {
-    return "image/png";
-  }
-  if (size >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) {
-    return "image/jpeg";
-  }
-  if (size >= 12 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
-      data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P') {
-    return "image/webp";
-  }
-  return nullptr;
-}
-
-// Encodes the image bytes as a data URI. Falls back to declaring image/png when the
-// signature does not match a known format — preserves the long-standing legacy
-// behaviour. When `recognized` is non-null it is set to false in the fallback path so
-// callers can surface a warning to the caller-supplied diagnostics channel.
+// Encodes the image bytes as a data URI. The MIME is sniffed from the payload rather than
+// guessed: bytes whose format matches no known signature are labelled `application/octet-stream`
+// instead of being passed off as a PNG. `recognized` (when non-null) reports whether the payload
+// sits inside the set SVG consumers are required to decode (PNG/JPEG/WebP/GIF), so callers can
+// surface the degradation to the caller-supplied diagnostics channel.
 static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size, bool* recognized) {
-  const char* mime = DetectImageMimeType(bytes, size);
+  const char* mime = DetectImageMime(bytes, size);
   if (recognized != nullptr) {
-    *recognized = (mime != nullptr);
+    *recognized = IsSupportedImageMime(mime);
   }
   std::string href = "data:";
-  href += (mime != nullptr ? mime : "image/png");
+  href += (mime != nullptr ? mime : "application/octet-stream");
   href += ";base64,";
   href += Base64Encode(bytes, size);
   return href;
@@ -296,8 +281,8 @@ static std::string EncodeImageDataURI(const uint8_t* bytes, size_t size, bool* r
 // bytes as a data URI. Reads from disk on demand when only filePath is populated. When
 // reading fails, return empty so the caller skips the asset rather than embedding a
 // host-local path that would leak filesystem layout and never resolve elsewhere. The
-// optional `mimeRecognized` outparam is set to false when the encoded bytes do not
-// match any known format signature so the caller can record a warning.
+// optional `mimeRecognized` outparam is set to false when the encoded bytes fall outside the
+// PNG/JPEG/WebP/GIF set so the caller can record a warning.
 static std::string GetImageHref(const Image* image, bool* mimeRecognized = nullptr) {
   if (image->data) {
     return EncodeImageDataURI(image->data->bytes(), image->data->size(), mimeRecognized);
@@ -788,8 +773,9 @@ std::string SVGWriter::writeImagePatternDef(const ImagePattern* pattern, const R
   }
   if (!mimeRecognized) {
     addWarning(
-        "ImagePattern: encoded bytes do not match PNG/JPEG/WebP signature; declared as image/png "
-        "fallback — viewers may fail to decode.");
+        "ImagePattern: encoded bytes are outside the PNG/JPEG/WebP/GIF set; declared with the "
+        "MIME type sniffed from the payload (application/octet-stream when unrecognised) — "
+        "viewers may fail to decode.");
   }
 
   std::string defId = generateId("pattern");
@@ -2234,8 +2220,9 @@ void SVGWriter::writeTextAsPath(SVGBuilder& out, const Text* text, const FillStr
     }
     if (!mimeRecognized) {
       addWarning(
-          "Glyph bitmap: encoded bytes do not match PNG/JPEG/WebP signature; declared as image/png "
-          "fallback — viewers may fail to decode.");
+          "Glyph bitmap: encoded bytes are outside the PNG/JPEG/WebP/GIF set; declared with the "
+          "MIME type sniffed from the payload (application/octet-stream when unrecognised) — "
+          "viewers may fail to decode.");
     }
     int imgW = 0;
     int imgH = 0;

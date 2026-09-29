@@ -1050,6 +1050,20 @@ void HTMLValueParser::parseRadialDescriptor(const std::string& descriptor, float
   if (!sizeTokens.empty() && boxWidth > 0) {
     float radius = resolveRadialLength(sizeTokens[0], boxWidth);
     if (!std::isnan(radius)) {
+      // CSS `radial-gradient(<rx> <ry> ...)` is an ellipse: the y-axis radius resolves against
+      // boxHeight. PAGX's RadialGradient carries a single normalised radius (scaled by the box's
+      // width and height independently), so approximate the ellipse with the geometric mean of
+      // the two normalised radii — the coverage area (and therefore colour saturation) stays
+      // close to the authored ellipse on both axes.
+      if (sizeTokens.size() > 1 && boxHeight > 0) {
+        float ry = resolveRadialLength(sizeTokens[1], boxHeight);
+        if (!std::isnan(ry)) {
+          radius = std::sqrt(radius * ry);
+        } else {
+          _diagnostics.warn("html: radial-gradient size '" + sizeTokens[1] +
+                            "' not supported; using the x radius");
+        }
+      }
       grad->radius = radius;
       radiusFromPxLength = !sizeTokens[0].empty() && sizeTokens[0].back() != '%';
     } else if (IsRadialExtentKeyword(sizeTokens[0])) {

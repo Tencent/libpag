@@ -882,6 +882,118 @@ void SpaceJustifyOverflowCollapsePass::apply(const std::shared_ptr<DOMNode>& roo
 }
 
 //==================================================================================================
+// SpaceEvenlyPaddingCompensationPass
+//==================================================================================================
+
+namespace {
+
+// Rewrites a single `justify-content: space-evenly` flex container into the equivalent
+// `space-between` form with the main-axis padding expanded by the space-evenly step `g`. See the
+// pass documentation for the equivalence; conservative in the same way as TryCollapseSpaceJustify
+// — any container whose geometry is not expressible in plain px is left untouched.
+void TryCompensateSpaceEvenly(const std::shared_ptr<DOMNode>& parent, HTMLTransformContext& ctx) {
+  if (!parent || parent->type != DOMNodeType::Element) return;
+  auto* parentResolved = ctx.findResolved(parent.get());
+  if (!parentResolved) return;
+  if (LookupResolvedLower(*parentResolved, "display") != "flex") return;
+  if (LookupResolvedLower(*parentResolved, "justify-content") != "space-evenly") return;
+
+  bool row = LookupResolvedLower(*parentResolved, "flex-direction") != "column";
+  float availableMain = 0.0f;
+  float gap = 0.0f;
+  if (!ResolveParentMainGeometry(*parentResolved, row, availableMain, gap)) return;
+  if (!std::isfinite(availableMain)) return;
+
+  float total = 0.0f;
+  size_t inFlowCount = 0;
+  for (auto c = parent->firstChild; c; c = c->nextSibling) {
+    if (c->type != DOMNodeType::Element) continue;
+    auto* childResolved = ctx.findResolved(c.get());
+    if (!childResolved) return;
+    std::string pos = LookupResolvedLower(*childResolved, "position");
+    if (pos == "absolute" || pos == "fixed") continue;
+    // A grow factor routes the leftover space into the child rather than the packing gaps.
+    if (ChildHasFlexGrow(*childResolved)) return;
+    // Only plain px child sizes keep their value under the compensated content box; a percentage
+    // child re-resolves against the shrunken box and would silently change size.
+    float childMain = 0.0f;
+    if (!ParseNormalisedPx(LookupResolved(*childResolved, row ? "width" : "height"), childMain)) {
+      return;
+    }
+    if (!std::isfinite(childMain)) return;
+    // PAGX has no per-child margin concept, so margins never occupy space in the laid-out line.
+    // Containers whose leading/trailing margins were not lifted onto `gap` by
+    // MarginToGapPromotionPass are left untouched rather than compensated around a size the
+    // runtime will not honour.
+    float leadMargin = 0.0f;
+    float trailMargin = 0.0f;
+    if (!ResolveChildMainMargin(*childResolved, row, leadMargin, trailMargin)) return;
+    if (leadMargin != 0.0f || trailMargin != 0.0f) return;
+    total += childMain;
+    inFlowCount++;
+  }
+  if (inFlowCount == 0) return;
+
+  // Overflow already collapsed to `flex-start` upstream; no free space means no compensation.
+  // The authored `gap` between adjacent children already consumes part of the content box and is
+  // replayed verbatim by the rewritten container, so only the space left after those `n - 1` gaps
+  // is distributed into the space-evenly steps.
+  float freeSpace = availableMain - total - gap * static_cast<float>(inFlowCount - 1);
+  if (freeSpace <= 0.5f) return;
+
+  float step = freeSpace / static_cast<float>(inFlowCount + 1);
+
+  float padTop = 0.0f;
+  float padRight = 0.0f;
+  float padBottom = 0.0f;
+  float padLeft = 0.0f;
+  if (!ParsePaddingFromResolved(*parentResolved, padTop, padRight, padBottom, padLeft)) return;
+  if (row) {
+    padLeft += step;
+    padRight += step;
+  } else {
+    padTop += step;
+    padBottom += step;
+  }
+
+  (*parentResolved)["justify-content"] = "space-between";
+  // Collapse the padding back to the shorthand so a leftover longhand cannot override the
+  // compensated value (longhands win over the shorthand when the cascade reads them back).
+  (*parentResolved)["padding"] = EmitPaddingShorthand(padTop, padRight, padBottom, padLeft);
+  (*parentResolved).erase("padding-top");
+  (*parentResolved).erase("padding-right");
+  (*parentResolved).erase("padding-bottom");
+  (*parentResolved).erase("padding-left");
+  ctx.warn("subset:space-evenly-padding-compensated",
+           "html: <" + parent->name + "> justify-content 'space-evenly' rewritten to " +
+               "'space-between' with " + EmitPx(step) + " main-axis padding compensation",
+           parent);
+}
+
+void WalkCompensateSpaceEvenly(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx,
+                               int depth) {
+  if (ShouldSkipWalkerNode(node, depth, ctx, "space-evenly compensation")) return;
+  // SVG subtrees use an independent layout model; skip them entirely.
+  if (IsOpaqueSubtreeRoot(node)) return;
+  TryCompensateSpaceEvenly(node, ctx);
+  auto child = node->firstChild;
+  while (child) {
+    WalkCompensateSpaceEvenly(child, ctx, depth + 1);
+    child = child->nextSibling;
+  }
+}
+
+}  // namespace
+
+void SpaceEvenlyPaddingCompensationPass::apply(const std::shared_ptr<DOMNode>& root,
+                                               HTMLTransformContext& ctx) {
+  if (!root || ctx.hasFatal()) return;
+  auto body = root->getFirstChild("body");
+  if (!body) return;
+  WalkCompensateSpaceEvenly(body, ctx, 0);
+}
+
+//==================================================================================================
 // StructureNormalizationPass
 //==================================================================================================
 

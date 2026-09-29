@@ -83,6 +83,13 @@ class HTMLTextFragmentBuilder {
     // `buildTextFill` emits a gradient Fill instead of a solid Fill (matching CSS
     // `background-clip: text` semantics from the nearest clip-to-text ancestor).
     std::string fillImage = {};
+    // Solid colour copied from `HTMLInheritedStyle::textFillSolid` — the other half of the same
+    // CSS technique, where the clip-to-text ancestor paints the glyphs with a plain
+    // `background-color` instead of a gradient. When `fillSolidSet` is true `buildTextFill`
+    // prefers it over `color`, mirroring CSS where the inherited transparent text-fill-color
+    // leaves the clipped background as the only glyph paint.
+    Color fillSolid = {0, 0, 0, 1, ColorSpace::SRGB};
+    bool fillSolidSet = false;
     // Resolved CSS line-height in pixels for this run, captured at fragment creation time so
     // an inner-span override (e.g. `<span style="line-height:20px">` inside a fixed-height
     // outer span used as a digit/badge box) survives to the TextBox, where it determines the

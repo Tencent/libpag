@@ -150,23 +150,21 @@ static void StartPreview(const std::string& pagFilePath) {
       return;
     }
 
-    if (@available(macOS 10.15, *)) {
-      NSWorkspaceOpenConfiguration* configuration = [NSWorkspaceOpenConfiguration new];
-      [[NSWorkspace sharedWorkspace] openURLs:@[ fileURL ]
-                         withApplicationAtURL:appURL
-                                configuration:configuration
-                            completionHandler:^(NSRunningApplication* _Nullable __unused app,
-                                                NSError* _Nullable error) {
-                              if (error) {
-                                dispatch_async(dispatch_get_main_queue(), ^{
-                                  QString errorMsg =
-                                      QString::fromUtf8(Messages::PAGVIEWER_OPEN_FAILED) +
-                                      QString::fromUtf8([error.localizedDescription UTF8String]);
-                                  WindowManager::GetInstance().showSimpleError(errorMsg);
-                                });
-                              }
-                            }];
-    }
+    NSWorkspaceOpenConfiguration* configuration = [NSWorkspaceOpenConfiguration new];
+    [[NSWorkspace sharedWorkspace] openURLs:@[ fileURL ]
+                       withApplicationAtURL:appURL
+                              configuration:configuration
+                          completionHandler:^(NSRunningApplication* _Nullable __unused app,
+                                              NSError* _Nullable error) {
+                            if (error) {
+                              dispatch_async(dispatch_get_main_queue(), ^{
+                                QString errorMsg =
+                                    QString::fromUtf8(Messages::PAGVIEWER_OPEN_FAILED) +
+                                    QString::fromUtf8([error.localizedDescription UTF8String]);
+                                WindowManager::GetInstance().showSimpleError(errorMsg);
+                              });
+                            }
+                          }];
   }
 }
 
