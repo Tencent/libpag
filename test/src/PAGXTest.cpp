@@ -196,8 +196,7 @@ static std::string SavePAGXFile(const std::string& xml, const std::string& key) 
   return outPath;
 }
 
-static void VerifyLayerConsistency(const std::shared_ptr<pagx::PAGScene>& scene,
-                                   pagx::RuntimeBinding* binding,
+static void VerifyLayerConsistency(pagx::RuntimeBinding* binding,
                                    const std::shared_ptr<pagx::PAGLayer>& layer) {
   if (layer == nullptr) {
     return;
@@ -208,17 +207,8 @@ static void VerifyLayerConsistency(const std::shared_ptr<pagx::PAGScene>& scene,
     EXPECT_EQ(bound.get(), layer->runtimeLayer.get())
         << "binding mismatch: promotion sync may not have run for this layer";
   }
-  if (layer->runtimeLayer != nullptr) {
-    auto it = scene->layerRegistry.find(layer->runtimeLayer.get());
-    EXPECT_NE(it, scene->layerRegistry.end())
-        << "layerRegistry missing entry: hit-test will miss this layer";
-    if (it != scene->layerRegistry.end()) {
-      EXPECT_EQ(it->second, layer.get())
-          << "layerRegistry maps to wrong PAGLayer: hit-test returns incorrect layer";
-    }
-  }
   for (auto& child : layer->getChildren()) {
-    VerifyLayerConsistency(scene, binding, child);
+    VerifyLayerConsistency(binding, child);
   }
 }
 
@@ -230,7 +220,7 @@ static void AssertSceneConsistent(const std::shared_ptr<pagx::PAGScene>& scene) 
   if (binding == nullptr) {
     return;
   }
-  VerifyLayerConsistency(scene, binding, scene->rootComposition());
+  VerifyLayerConsistency(binding, scene->rootComposition());
 }
 
 /**
@@ -1445,6 +1435,368 @@ PAGX_TEST(PAGXTest, CustomDataSVGRootElement) {
   EXPECT_EQ(doc2->customData, doc->customData);
   ASSERT_EQ(doc2->layers.size(), 1u);
   EXPECT_EQ(doc2->layers[0]->customData, doc->layers[0]->customData);
+}
+
+/**
+ * Test case: adoptNodes() fully integrates adopted ids into the document's id index — findNode()
+ * resolves them like any authored node — and a colliding id is reported as a document error
+ * instead of silently coexisting with the host's ids.
+ */
+PAGX_TEST(PAGXTest, AdoptNodesRegistersIdsAndReportsDuplicates) {
+  auto host = pagx::PAGXDocument::Make(100, 100);
+  host->layers.push_back(host->makeNode<pagx::Layer>("hostLayer"));
+
+  auto foreign = pagx::PAGXDocument::Make(50, 50);
+  auto foreignLayer = foreign->makeNode<pagx::Layer>("inner");
+  foreign->layers.push_back(foreignLayer);
+
+  host->adoptNodes(foreign->nodes);
+  EXPECT_NE(host->findNode<pagx::Layer>("inner"), nullptr);
+  EXPECT_TRUE(host->ownsNode(foreignLayer));
+
+  auto second = pagx::PAGXDocument::Make(50, 50);
+  auto* foreignDuplicate = second->makeNode<pagx::Layer>("hostLayer");
+  second->layers.push_back(foreignDuplicate);
+  host->adoptNodes(second->nodes);
+  bool hasDuplicateError = false;
+  for (const auto& error : host->errors) {
+    if (error.find("Duplicate node id 'hostLayer'") != std::string::npos) {
+      hasDuplicateError = true;
+    }
+  }
+  EXPECT_TRUE(hasDuplicateError);
+  // The host mapping wins on collision: the host's "@id" references keep resolving to the host
+  // node instead of being hijacked by the adopted one.
+  EXPECT_EQ(host->findNode<pagx::Layer>("hostLayer"), host->layers[0]);
+}
+
+/**
+ * Test case: renameCollidingIds() renames the ids of the given document that collide with the
+ * host's used ids or repeat within the given document itself, so a subsequent adoptNodes()
+ * registers them without duplicate errors. This is the path importers take for auto-generated
+ * ids (image1, path1, ...), which collide as a matter of course across separately imported SVGs.
+ */
+PAGX_TEST(PAGXTest, RenameCollidingIdsAvoidsHostAndSelfCollisions) {
+  auto host = pagx::PAGXDocument::Make(100, 100);
+  host->layers.push_back(host->makeNode<pagx::Layer>("image1"));
+
+  auto foreign = pagx::PAGXDocument::Make(50, 50);
+  auto* first = foreign->makeNode<pagx::Layer>("image1");
+  auto* repeated = foreign->makeNode<pagx::Layer>("image1");
+  auto* unique = foreign->makeNode<pagx::Layer>("unique");
+  foreign->layers.push_back(first);
+  foreign->layers.push_back(repeated);
+  foreign->layers.push_back(unique);
+
+  host->renameCollidingIds(foreign.get());
+  EXPECT_EQ(first->id, "image1_2");
+  EXPECT_EQ(repeated->id, "image1_3");
+  EXPECT_EQ(unique->id, "unique");
+
+  host->adoptNodes(foreign->nodes);
+  EXPECT_TRUE(host->errors.empty());
+  EXPECT_NE(host->findNode<pagx::Layer>("image1_2"), nullptr);
+  EXPECT_NE(host->findNode<pagx::Layer>("image1_3"), nullptr);
+  EXPECT_NE(host->findNode<pagx::Layer>("unique"), nullptr);
+}
+
+// Shared document for the inline-import mounting tests: a 20x20 inline SVG under a 40x40 layer,
+// so the mount must also apply the explicit-size scale the flattened resolve path would apply.
+static const char* InlineImportSvgDocument() {
+  return R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" x="10" y="10" width="40" height="40" importFormat="svg">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect x="0" y="0" width="10" height="10" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)";
+}
+
+/**
+ * Test case: loading a document mounts a layer's inline import content as a sub-document — the SVG
+ * parses into its own document with its own id space, a wrapper Composition registers in the host,
+ * and the layer renders through the composition reference without a prior resolve. Content scales
+ * to an explicitly-sized layer (mirroring the flatten semantics), the host node list gains only the
+ * wrapper, and hasUnresolvedImports() stops reporting the mounted directive. A later applyLayout
+ * is idempotent (no duplicate mount).
+ */
+PAGX_TEST(PAGXTest, InlineImportMountsAsSubDocument) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  ASSERT_NE(host->externalDoc, nullptr);
+  // The mount delegates scaling to the SVG importer's target-size path (the same semantics
+  // 'pagx resolve' applies), so the sub-document's size equals the layer's authored size and the
+  // wrapper keeps the wrapper-size == sub-document-size invariant of external compositions.
+  EXPECT_FLOAT_EQ(host->externalDoc->width, 40.0f);
+  EXPECT_FLOAT_EQ(host->externalDoc->height, 40.0f);
+  EXPECT_FLOAT_EQ(host->composition->width, host->externalDoc->width);
+  EXPECT_FLOAT_EQ(host->composition->height, host->externalDoc->height);
+  EXPECT_EQ(host->externalDoc->layers.size(), 1u);
+
+  // A later layout pass must not mount again (the mount is idempotent).
+  const auto nodeCountWhileMounted = doc->nodes.size();
+  doc->applyLayout();
+  EXPECT_EQ(doc->nodes.size(), nodeCountWhileMounted);
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+
+  // Detaching removes exactly one host node (the wrapper); the SVG's content is never visible to
+  // the host's id index, so the sub-document keeps its own node list entirely.
+  EXPECT_TRUE(doc->detachInlineImport(host));
+  EXPECT_EQ(doc->nodes.size(), nodeCountWhileMounted - 1u);
+}
+
+/**
+ * Test case: mounting scales content uniformly to fit — never stretched — when the layer's aspect
+ * ratio differs from the SVG's. A 20x20 SVG in a 40x20 layer scales by min(2, 1) = 1 and centers
+ * horizontally; a non-uniform stretch would bake scale (2, 1) into the content matrix instead.
+ * This is the same aspect-fit semantics 'pagx resolve' applies, so the mounted reference and the
+ * flattened form render identically.
+ */
+PAGX_TEST(PAGXTest, InlineImportMountScalesUniformlyNotStretched) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" x="10" y="10" width="40" height="20" importFormat="svg">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect x="0" y="0" width="10" height="10" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->externalDoc, nullptr);
+  EXPECT_FLOAT_EQ(host->externalDoc->width, 40.0f);
+  EXPECT_FLOAT_EQ(host->externalDoc->height, 20.0f);
+  ASSERT_EQ(host->externalDoc->layers.size(), 1u);
+  // Uniform fit: scale 1 on both axes (a stretch would give a == 2), centered horizontally.
+  const auto& m = host->externalDoc->layers[0]->matrix;
+  EXPECT_FLOAT_EQ(m.a, 1.0f);
+  EXPECT_FLOAT_EQ(m.d, 1.0f);
+  EXPECT_FLOAT_EQ(m.tx, 10.0f);
+}
+
+/**
+ * Test case: an inline <svg> without an explicit importFormat is classified by sniffing the
+ * content's first tag — the same normalization 'pagx resolve' applies — so hand-written documents
+ * that omit the attribute still mount.
+ */
+PAGX_TEST(PAGXTest, InlineImportWithoutFormatSniffsSvg) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx version="1.0" width="100" height="100">
+  <Layer id="host" x="10" y="10" width="20" height="20">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect x="0" y="0" width="10" height="10" fill="#FF0000"/>
+    </svg>
+  </Layer>
+</pagx>)");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->errors.empty());
+  EXPECT_FALSE(doc->hasUnresolvedImports());
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  EXPECT_NE(host->composition, nullptr);
+}
+
+/**
+ * Test case: a mounted inline import round-trips through the exporter — the import directive and
+ * its content are written back (the id-less wrapper is skipped by the Resources pass), so a
+ * re-imported document mounts the sub-document again.
+ */
+PAGX_TEST(PAGXTest, InlineImportExportRoundTrips) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
+
+  auto out = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(out.find("importFormat=\"svg\""), std::string::npos);
+  EXPECT_NE(out.find("<svg"), std::string::npos);
+  // The mount itself leaves no visible trace: no Composition resource is written.
+  EXPECT_EQ(out.find("<Composition "), std::string::npos);
+
+  auto doc2 = pagx::PAGXImporter::FromXML(out);
+  ASSERT_NE(doc2, nullptr);
+  EXPECT_FALSE(doc2->hasUnresolvedImports());
+  auto* host2 = doc2->findNode<pagx::Layer>("host");
+  ASSERT_NE(host2, nullptr);
+  ASSERT_NE(host2->composition, nullptr);
+}
+
+/**
+ * Test case: detachInlineImport() removes a mount (the inverse of the load-time mount), so a
+ * later resolve flattens into the layer instead of leaving the composition reference shadowing
+ * the flattened contents. The import directive survives the detach.
+ */
+PAGX_TEST(PAGXTest, DetachInlineImportForResolve) {
+  auto doc = pagx::PAGXImporter::FromXML(InlineImportSvgDocument());
+  ASSERT_NE(doc, nullptr);
+
+  auto* host = doc->findNode<pagx::Layer>("host");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(host->composition, nullptr);
+  const auto nodeCountWhileMounted = doc->nodes.size();
+
+  EXPECT_TRUE(doc->detachInlineImport(host));
+  EXPECT_EQ(host->composition, nullptr);
+  EXPECT_EQ(host->externalDoc, nullptr);
+  EXPECT_EQ(doc->nodes.size(), nodeCountWhileMounted - 1u);
+  // The directive is untouched, so the import counts as unresolved until it is flattened.
+  EXPECT_TRUE(doc->hasUnresolvedImports());
+
+  // Detaching a layer without a mounted inline import is a no-op.
+  EXPECT_FALSE(doc->detachInlineImport(host));
+}
+
+/**
+ * Test case: detachInlineImport() leaves a file-loaded external composition alone, even when the
+ * layer also carries leftover inline import content — the compositionFilePath origin retained by
+ * the file mount is the discriminator that keeps our detach from removing a wrapper we did not
+ * create.
+ */
+PAGX_TEST(PAGXTest, DetachInlineImportKeepsFileMountedWrapper) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* host = doc->makeNode<pagx::Layer>("host");
+  doc->layers.push_back(host);
+  // Simulate a file-loaded external composition mount alongside leftover inline content.
+  auto externalDoc = pagx::PAGXDocument::Make(20, 20);
+  auto* wrapper = doc->makeNode<pagx::Composition>();
+  wrapper->width = 20;
+  wrapper->height = 20;
+  host->composition = wrapper;
+  host->externalDoc = externalDoc;
+  host->compositionFilePath = "external.pagx";
+  host->importDirective.content =
+      "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" "
+      "height=\"10\"/>";
+
+  EXPECT_FALSE(doc->detachInlineImport(host));
+  EXPECT_EQ(host->composition, wrapper);
+  EXPECT_EQ(host->externalDoc, externalDoc);
+  EXPECT_EQ(host->compositionFilePath, "external.pagx");
+  // The wrapper is still a live host node.
+  size_t wrapperCount = 0;
+  for (const auto& node : doc->nodes) {
+    if (node.get() == static_cast<pagx::Node*>(wrapper)) {
+      wrapperCount++;
+    }
+  }
+  EXPECT_EQ(wrapperCount, 1u);
+}
+
+// Builds a document where the same StateMachine source node backs two instances: a top-level one
+// (pre-created into the root binding by PAGScene::Make) and a composition-spawned one (a
+// <Timelines> driver inside a Composition, bound against the composition's own binding). A
+// DataBind drives the SM input from a ViewModel property through the composition's runtime.
+static void BuildSharedStateMachineDocument(pagx::PAGXDocument* doc) {
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "flag";
+  prop->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+
+  auto comp = doc->makeNode<pagx::Composition>("holder");
+  comp->width = 50;
+  comp->height = 50;
+  auto sm = doc->makeNode<pagx::StateMachine>("sharedSM");
+  doc->animations.push_back(sm);
+  comp->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  input->defaultBool = false;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto stateIdle = doc->makeNode<pagx::AnimationState>();
+  stateIdle->name = "idle";
+  region->states.push_back(stateIdle);
+  auto stateActive = doc->makeNode<pagx::AnimationState>();
+  stateActive->name = "active";
+  region->states.push_back(stateActive);
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "idle";
+  transition->to = "active";
+  transition->duration = 0;
+  auto condition = doc->makeNode<pagx::TransitionCondition>();
+  condition->inputName = "go";
+  condition->op = pagx::TransitionConditionOp::Equal;
+  condition->valueBool = true;
+  transition->conditions.push_back(condition);
+  region->transitions.push_back(transition);
+  sm->regions.push_back(region);
+
+  auto* slot = doc->makeNode<pagx::Layer>("slot");
+  slot->width = 50;
+  slot->height = 50;
+  slot->composition = comp;
+  auto driver = std::make_unique<pagx::StateMachineTimeline>();
+  driver->stateMachineId = "sharedSM";
+  slot->timelines.push_back(std::move(driver));
+  doc->layers.push_back(slot);
+
+  // The DataBind targets the SM through the composition's scope; its runtime therefore lives on
+  // the composition instance, not the root.
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.flag";
+  db->target = "@sharedSM";
+  db->channel = "go";
+  db->direction = pagx::DataBindDirection::ToTarget;
+  comp->dataBinds.push_back(db);
+}
+
+/**
+ * Test case: the same StateMachine source node backs a top-level instance and a
+ * composition-spawned instance at once, and a DataBind drives the input through the composition's
+ * runtime. reset() on the top-level instance must not touch the composition instance: the
+ * re-apply is scoped to the resetting instance's binding, so a host-set input on the sibling
+ * instance survives (the documented "host-set values are not re-applied" contract).
+ */
+PAGX_TEST(PAGXTest, SMResetDoesNotCrosstalkAcrossInstances) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  BuildSharedStateMachineDocument(doc.get());
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto topLevel = scene->getStateMachineTimeline("sharedSM");
+  ASSERT_TRUE(topLevel != nullptr);
+
+  // The composition instance is driven by the <Timelines> driver inside the child composition
+  // (the root composition has no source node, so it spawns no timelines of its own); find it
+  // through the child compositions' timeline lists.
+  auto root = scene->rootComposition();
+  ASSERT_TRUE(root != nullptr);
+  std::vector<pagx::PAGComposition*> childComps = {};
+  pagx::PAGComposition::CollectChildCompositions(root.get(), childComps);
+  std::shared_ptr<pagx::PAGStateMachine> compInstance = nullptr;
+  for (auto* childComp : childComps) {
+    for (const auto& timeline : childComp->timelines) {
+      if (timeline != nullptr && timeline->type() == pagx::TimelineType::StateMachine) {
+        compInstance = std::static_pointer_cast<pagx::PAGStateMachine>(timeline);
+      }
+    }
+  }
+  ASSERT_TRUE(compInstance != nullptr);
+
+  // The composition instance's input is host-set to true (bypassing the ViewModel) and its region
+  // has transitioned to active; the bound ViewModel property stays at its default (false).
+  ASSERT_TRUE(compInstance->setBool("go", true));
+  compInstance->advance(0);
+  EXPECT_EQ(compInstance->getCurrentState("main"), "active");
+
+  // Resetting the top-level instance must leave the composition instance's host-set input and
+  // state untouched: the re-apply is scoped to the top-level instance's root binding, and the
+  // DataBind entry lives on the composition's runtime.
+  topLevel->reset();
+  EXPECT_EQ(compInstance->getCurrentState("main"), "active");
+  compInstance->advance(0);
+  EXPECT_EQ(compInstance->getCurrentState("main"), "active");
 }
 
 PAGX_TEST(PAGXTest, CustomDataKeyValidation) {
@@ -14841,9 +15193,155 @@ PAGX_TEST(PAGXTest, SMResetRestoresStateInputsAndNotifies) {
 }
 
 /**
- * Test case: hitTest() inside a <Layer composition="@X"> instance resolves to the referencing
- * host layer rather than the internal definition layer, and reports the instance's on-screen
- * bounds. A click in the empty area returns index -1.
+ * Test case: reset() clears every input to its declared default, then immediately re-applies the
+ * ViewModel's current values to the data-bound ones — the ViewModel is the truth source, so a
+ * bound input never holds a stale default after reset(). The re-applied value satisfies the
+ * transition condition, so advancing right after reset() (before any draw) leaves the initialState
+ * again; setting the bound property back first keeps the machine on the initialState.
+ */
+PAGX_TEST(PAGXTest, SMResetReappliesDataBoundInputsImmediately) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "flag";
+  prop->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  input->defaultBool = false;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto stateIdle = doc->makeNode<pagx::AnimationState>();
+  stateIdle->name = "idle";
+  region->states.push_back(stateIdle);
+  auto stateActive = doc->makeNode<pagx::AnimationState>();
+  stateActive->name = "active";
+  region->states.push_back(stateActive);
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "idle";
+  transition->to = "active";
+  transition->duration = 0;
+  auto condition = doc->makeNode<pagx::TransitionCondition>();
+  condition->inputName = "go";
+  condition->op = pagx::TransitionConditionOp::Equal;
+  condition->valueBool = true;
+  transition->conditions.push_back(condition);
+  region->transitions.push_back(transition);
+  sm->regions.push_back(region);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.flag";
+  db->target = "@testSM";
+  db->channel = "go";
+  db->direction = pagx::DataBindDirection::ToTarget;
+  doc->dataBinds.push_back(db);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+  auto vmBool = scene->viewModel()->propertyBoolean("flag");
+  ASSERT_TRUE(vmBool != nullptr);
+
+  vmBool->value(true);
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+
+  timeline->reset();
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // The bound input holds the ViewModel's current value (true), not its declared default: the
+  // transition fires again on the very next advance, without any draw in between.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+
+  // With the ViewModel property back at false, reset() leaves the machine on the initialState.
+  vmBool->value(false);
+  timeline->reset();
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+}
+
+/**
+ * Test case: reset() re-arms a Once-direction data bind targeting a state-machine input. After the
+ * host overwrites the input (bypassing the ViewModel), reset() restores the ViewModel's current
+ * value by re-applying the Once binding, matching a fresh construction.
+ */
+PAGX_TEST(PAGXTest, SMResetReplaysOnceDataBind) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto vm = doc->makeNode<pagx::ViewModel>("testVM");
+  auto prop = doc->makeNode<pagx::ViewModelProperty>();
+  prop->name = "flag";
+  prop->propertyType = pagx::ViewModelPropertyType::Boolean;
+  vm->properties.push_back(prop);
+  doc->viewModel = vm;
+  auto sm = doc->makeNode<pagx::StateMachine>("testSM");
+  doc->animations.push_back(sm);
+  auto input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  input->defaultBool = false;
+  sm->inputs.push_back(input);
+  auto region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "idle";
+  auto stateIdle = doc->makeNode<pagx::AnimationState>();
+  stateIdle->name = "idle";
+  region->states.push_back(stateIdle);
+  auto stateActive = doc->makeNode<pagx::AnimationState>();
+  stateActive->name = "active";
+  region->states.push_back(stateActive);
+  auto transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "idle";
+  transition->to = "active";
+  transition->duration = 0;
+  auto condition = doc->makeNode<pagx::TransitionCondition>();
+  condition->inputName = "go";
+  condition->op = pagx::TransitionConditionOp::Equal;
+  condition->valueBool = true;
+  transition->conditions.push_back(condition);
+  region->transitions.push_back(transition);
+  sm->regions.push_back(region);
+  auto db = doc->makeNode<pagx::DataBind>();
+  db->source = "$vm.flag";
+  db->target = "@testSM";
+  db->channel = "go";
+  db->direction = pagx::DataBindDirection::Once;
+  doc->dataBinds.push_back(db);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_TRUE(scene != nullptr);
+  auto timeline = scene->getStateMachineTimeline("testSM");
+  ASSERT_TRUE(timeline != nullptr);
+  auto vmBool = scene->viewModel()->propertyBoolean("flag");
+  ASSERT_TRUE(vmBool != nullptr);
+
+  vmBool->value(true);
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+
+  // Host-side overwrite bypassing the ViewModel; a Once binding will not re-apply on its own.
+  ASSERT_TRUE(timeline->setBool("go", false));
+
+  timeline->reset();
+  EXPECT_EQ(timeline->getCurrentState("main"), "idle");
+  // The Once binding re-armed and re-applied the ViewModel's value (true), so the transition fires
+  // again; without the re-arm the input would stay at the host-written false.
+  timeline->advance(0);
+  EXPECT_EQ(timeline->getCurrentState("main"), "active");
+}
+
+/**
+ * Test case: resolving a click inside a <Layer composition="@X"> instance climbs from the top-most
+ * hit to the first Composition whose source node the document owns, so the referencing host layer is
+ * selected rather than the internal definition layer. The core supplies only the runtime primitives
+ * for this (getLayersUnderPoint / getParent / getNode / getTightGlobalBounds); the source-node to
+ * runtime-layer mapping is the host's, so this locks the primitives that mapping relies on.
  */
 PAGX_TEST(PAGXTest, HitTestResolvesCompositionReference) {
   const std::string xml = R"(<pagx version="1.0" width="200" height="200">
@@ -14867,24 +15365,36 @@ PAGX_TEST(PAGXTest, HitTestResolvesCompositionReference) {
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_NE(scene, nullptr);
 
-  // A click inside the composition instance resolves to the referencing host layer, not the
-  // internal definition layer.
-  auto hit = scene->hitTest(70, 70);
-  EXPECT_EQ(hit.index, host->index);
-  EXPECT_NE(hit.index, innerLayer->index);
-  EXPECT_FALSE(hit.bounds.isEmpty());
+  // The top-most hit is the internal definition layer, so the host has to climb to reach the
+  // referencing layer.
+  auto hits = scene->getLayersUnderPoint(70, 70);
+  ASSERT_FALSE(hits.empty());
+  EXPECT_EQ(hits[0]->getNode(), innerLayer);
+
+  auto target = hits[0];
+  for (auto walker = target; walker != nullptr; walker = walker->getParent()) {
+    const auto* node = walker->getNode();
+    if (walker->layerType() == pagx::LayerType::Composition && node != nullptr &&
+        doc->ownsNode(node)) {
+      target = walker;
+      break;
+    }
+  }
+  // The climb lands on the referencing host layer, not the internal definition layer.
+  EXPECT_EQ(target->getNode(), host);
+  EXPECT_NE(target->getNode(), innerLayer);
+  EXPECT_FALSE(scene->getTightGlobalBounds(target).isEmpty());
 
   // A click in the empty area hits nothing.
-  EXPECT_EQ(scene->hitTest(10, 10).index, -1);
+  EXPECT_TRUE(scene->getLayersUnderPoint(10, 10).empty());
 }
 
 /**
- * Test case: an incremental layout triggered by notifyChange({owningLayer}, layoutChanged=true)
- * after editing an element nested inside a Group produces the same geometry as a full re-layout.
- * The nested element is deeper than layer->contents' top level, so the reset collection must
- * recurse through Group::elements to reach it.
+ * Test case: notifyChange({owningLayer}, layoutChanged=true) after editing an element nested
+ * inside a Group re-runs layout over the whole document, so the nested element is re-measured
+ * through Group::elements and picks up the edited geometry.
  */
-PAGX_TEST(PAGXTest, IncrementalLayoutMatchesFullLayoutForNestedGroupContents) {
+PAGX_TEST(PAGXTest, NotifyChangeRelayoutsNestedGroupContents) {
   const std::string xml = R"(<pagx version="1.0" width="200" height="200">
   <Layer id="host" x="10" y="10" width="180" height="180">
     <Group>
@@ -14897,36 +15407,24 @@ PAGX_TEST(PAGXTest, IncrementalLayoutMatchesFullLayoutForNestedGroupContents) {
     </Group>
   </Layer>
 </pagx>)";
-  auto incrementalDoc = pagx::PAGXImporter::FromXML(xml);
-  auto fullDoc = pagx::PAGXImporter::FromXML(xml);
-  ASSERT_NE(incrementalDoc, nullptr);
-  ASSERT_NE(fullDoc, nullptr);
-  incrementalDoc->applyLayout();
-  fullDoc->applyLayout();
+  auto doc = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(doc, nullptr);
+  doc->applyLayout();
 
-  auto* incrementalHost = incrementalDoc->findNode<pagx::Layer>("host");
-  auto* fullHost = fullDoc->findNode<pagx::Layer>("host");
-  auto* incrementalR2 = incrementalDoc->findNode<pagx::Rectangle>("r2");
-  auto* fullR2 = fullDoc->findNode<pagx::Rectangle>("r2");
-  ASSERT_NE(incrementalHost, nullptr);
-  ASSERT_NE(fullHost, nullptr);
-  ASSERT_NE(incrementalR2, nullptr);
-  ASSERT_NE(fullR2, nullptr);
+  auto* host = doc->findNode<pagx::Layer>("host");
+  auto* r2 = doc->findNode<pagx::Rectangle>("r2");
+  ASSERT_NE(host, nullptr);
+  ASSERT_NE(r2, nullptr);
 
   // Edit an element nested inside the inner Group and report the owning Layer: notifyChange's
-  // documented "prefer passing the owning Layer" route, which takes the incremental path.
-  incrementalR2->height = 90;
-  fullR2->height = 90;
-  incrementalDoc->notifyChange({incrementalHost}, /*layoutChanged=*/true);
-  fullDoc->applyLayout();
+  // documented "prefer passing the owning Layer" route.
+  r2->height = 90;
+  doc->notifyChange({host}, /*layoutChanged=*/true);
 
   // Compare the nested element's own geometry, not the host layer's: the host has authored
   // width/height, so Layer::onMeasure skips content measurement and its layoutBounds stays
-  // (10,10,180,180) no matter whether the Group recursion ran — that comparison cannot catch a
-  // missing CollectContentResetNodes recursion. r2's memo does: without the recursive reset the
-  // incremental path keeps the stale preferred height (30) while the full re-layout measures 90.
-  EXPECT_EQ(incrementalR2->layoutBounds(), fullR2->layoutBounds());
-  EXPECT_FLOAT_EQ(incrementalR2->layoutBounds().height, 90.0f);
+  // (10,10,180,180) regardless. r2 is re-measured by the re-layout and reflects the edit.
+  EXPECT_FLOAT_EQ(r2->layoutBounds().height, 90.0f);
 }
 
 /**

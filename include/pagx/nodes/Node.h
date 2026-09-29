@@ -304,8 +304,9 @@ class Node {
    * WARNING: this is a positional index into a mutable vector, not a stable identity. It is
    * invalidated whenever the node list changes: reloading the document, importer reruns, and
    * PAGXDocument::removeNodes all renumber every remaining node. Callers MUST NOT cache this
-   * value across any operation that may mutate the node list; re-query hitTest() /
-   * getNodeSourceMap() and use the freshly returned index instead.
+   * value across any operation that may mutate the node list; re-query getNodeSourceMap() (or
+   * re-resolve the node from a runtime layer the host hit-tested) and use the freshly returned
+   * index instead.
    */
   int index = -1;
 

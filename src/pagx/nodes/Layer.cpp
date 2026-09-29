@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include "pagx/LayoutContext.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/types/Alignment.h"
@@ -199,14 +200,13 @@ void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targe
   // unaffected by the parent's refined size (absolute / content-sized axes stay NaN in both passes)
   // are skipped here, collapsing the otherwise exponential 2^depth re-layout to linear. layoutWidth/
   // layoutHeight retain their previously resolved values, so the parent still positions this layer
-  // via setLayoutPosition. resetLayout() clears layoutResolved before a re-run after an edit.
-  if (layoutResolved && SameLayoutInput(targetWidth, lastLayoutTargetWidth) &&
-      SameLayoutInput(targetHeight, lastLayoutTargetHeight)) {
+  // via setLayoutPosition. The memo lives in the LayoutContext, so it dies with the pass.
+  auto memo = context->layoutTargets.find(this);
+  if (memo != context->layoutTargets.end() && SameLayoutInput(targetWidth, memo->second.first) &&
+      SameLayoutInput(targetHeight, memo->second.second)) {
     return;
   }
-  lastLayoutTargetWidth = targetWidth;
-  lastLayoutTargetHeight = targetHeight;
-  layoutResolved = true;
+  context->layoutTargets[this] = {targetWidth, targetHeight};
   // A content-measured axis is one the parent did not constrain and the layer did not author.
   // For a non-flex Layer without a composition backing, defer such axes to NaN during pass 1 so
   // percent-sized descendants fall back to their preferred size instead of locking onto a

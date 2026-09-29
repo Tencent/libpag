@@ -18,12 +18,18 @@
 
 #include "pagx/PAGXDocument.h"
 #include <algorithm>
+#if defined(PAG_BUILD_SVG)
+#include <cctype>
+#endif
 #include <unordered_set>
 #include "LayoutContext.h"
 #include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/PAGXNodeChannel.h"
+#if defined(PAG_BUILD_SVG)
+#include "pagx/SVGImporter.h"
+#endif
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/Element.h"
 #include "pagx/nodes/Fill.h"
@@ -209,6 +215,10 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   if (config != nullptr) {
     _fontConfig = *config;
   }
+  // Mount inline import content as sub-documents before anything reads the tree: the wrapper
+  // compositions join the node list here, so the bounds snapshot below and every layout pass
+  // observe the mounted structure. Idempotent — already-mounted layers are skipped.
+  attachInlineImportDocuments();
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
@@ -294,161 +304,6 @@ void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float contain
   LayoutNode::PerformConstraintLayout(nodes, containerW, containerH, {}, context);
 }
 
-namespace {
-// Above this many resets the incremental path stops paying off versus a full layout, so callers
-// fall back to applyLayout. Kept small since the reset set covers only the edited Layers, their
-// ancestor chains and the edited Layers' content elements, never full subtrees.
-constexpr size_t MAX_INCREMENTAL_LAYOUT_LAYERS = 64;
-
-// Collects a content element into resetNodes, recursing through nested Group::elements: a group's
-// measure reads its children's preferred sizes, so a nested element's stale memo leaks through
-// the group exactly like a top-level content element's would. Returns false when the total reset
-// set exceeds the incremental cap.
-bool CollectContentResetNodes(Element* element, std::unordered_set<LayoutNode*>* resetNodes) {
-  auto* contentNode = LayoutNode::AsLayoutNode(element);
-  if (contentNode == nullptr || !resetNodes->insert(contentNode).second) {
-    return true;
-  }
-  if (resetNodes->size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
-    return false;
-  }
-  if (element->nodeType() == NodeType::Group) {
-    for (auto* child : static_cast<Group*>(element)->elements) {
-      if (!CollectContentResetNodes(child, resetNodes)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-}  // namespace
-
-void PAGXDocument::rebuildParentOfCache() {
-  parentOfCache.clear();
-  for (auto& node : nodes) {
-    if (node->nodeType() == NodeType::Layer) {
-      auto* layer = static_cast<Layer*>(node.get());
-      for (auto* child : layer->children) {
-        parentOfCache[child] = layer;
-      }
-    }
-  }
-  parentOfCacheValid = true;
-}
-
-bool PAGXDocument::applyLayoutIncremental(const std::vector<Node*>& dirtyNodes,
-                                          std::vector<Layer*>* changedOut) {
-  if (!layoutApplied) {
-    return false;
-  }
-  // Only a pure set of this document's Layer nodes qualifies; any non-Layer (or foreign) dirty
-  // node forces the full path. A dirty Layer stands for an edit to its own fields or to any node
-  // in its contents, so the reset below invalidates both.
-  std::vector<Layer*> changedLayers;
-  changedLayers.reserve(dirtyNodes.size());
-  for (auto* node : dirtyNodes) {
-    if (node == nullptr || node->nodeType() != NodeType::Layer || nodeSet.count(node) == 0) {
-      return false;
-    }
-    changedLayers.push_back(static_cast<Layer*>(node));
-  }
-  if (changedLayers.empty()) {
-    return false;
-  }
-  // Child -> parent map over every Layer (document and composition trees alike). Top-level layers
-  // have no entry, so the ancestor walk below naturally stops at each tree's root. The map is
-  // cached across calls and invalidated only by removeNodes(); attribute edits do not touch
-  // Layer::children, so a single build covers many incremental applies. Host-side structural
-  // child-list edits are caught by the consistency check below, which falls back to the full
-  // path.
-  if (!parentOfCacheValid) {
-    rebuildParentOfCache();
-  }
-  const auto& parentOf = parentOfCache;
-  // Layer::children is public, so a host can make a structural child-list edit (add / remove /
-  // move) and report the container Layer with layoutChanged. The cached map predates such an
-  // edit: a newly added child has no entry (it would be treated as a root), a moved child still
-  // maps to its old parent (outside the reset set), and the edited container's own cached parent
-  // may no longer hold it. Verify the dirty containers against the cache and fall back to the
-  // full path on any mismatch — short of removeNodes(), the full rebuild is the only correct
-  // handling of structural changes.
-  for (auto* layer : changedLayers) {
-    for (auto* child : layer->children) {
-      auto it = parentOf.find(child);
-      if (it == parentOf.end() || it->second != layer) {
-        return false;
-      }
-    }
-    auto parentIt = parentOf.find(layer);
-    if (parentIt != parentOf.end() &&
-        std::find(parentIt->second->children.begin(), parentIt->second->children.end(), layer) ==
-            parentIt->second->children.end()) {
-      return false;
-    }
-  }
-  // Reset set: each edited Layer plus its ancestor chain up to the root, plus the edited Layers'
-  // content elements. Resetting the whole chain is required — if any ancestor kept its memo it
-  // would be skipped on the top-down pass and its edited descendant would never be revisited.
-  // Content elements must be reset as well (recursing through nested Group::elements) because a
-  // content-node edit is reported with the host Layer dirty; their stale preferred sizes would
-  // otherwise leak through MeasureChildNodes and the layer would keep its pre-edit geometry.
-  // Child Layers and sibling subtrees are intentionally left memoized; target-size changes
-  // cascade to them through the per-node constraint memo.
-  std::unordered_set<LayoutNode*> resetNodes = {};
-  for (auto* layer : changedLayers) {
-    Layer* cursor = layer;
-    while (cursor != nullptr && resetNodes.insert(cursor).second) {
-      if (resetNodes.size() > MAX_INCREMENTAL_LAYOUT_LAYERS) {
-        LOGI("applyLayoutIncremental: falling back to full layout (reset=%zu > max=%zu).",
-             resetNodes.size(), MAX_INCREMENTAL_LAYOUT_LAYERS);
-        return false;
-      }
-      auto it = parentOf.find(cursor);
-      cursor = it != parentOf.end() ? it->second : nullptr;
-    }
-    for (auto* element : layer->contents) {
-      if (!CollectContentResetNodes(element, &resetNodes)) {
-        LOGI("applyLayoutIncremental: falling back to full layout (reset=%zu > max=%zu).",
-             resetNodes.size(), MAX_INCREMENTAL_LAYOUT_LAYERS);
-        return false;
-      }
-    }
-  }
-  // Snapshot layoutBounds before resetting so the post-pass can report which Layers actually moved
-  // (mirrors applyLayout). Only reset nodes lose their memo; everything else is skipped below.
-  std::unordered_map<Layer*, Rect> beforeBounds = {};
-  if (changedOut != nullptr) {
-    for (auto& node : nodes) {
-      if (node->nodeType() == NodeType::Layer) {
-        auto* layer = static_cast<Layer*>(node.get());
-        beforeBounds.emplace(layer, layer->layoutBounds());
-      }
-    }
-  }
-  for (auto* node : resetNodes) {
-    node->resetLayout();
-  }
-  // Re-run the normal top-down pass. Composition layers first (they may be referenced by document
-  // layers). External documents are intentionally not recursed: their content is unchanged and they
-  // were already laid out by the initial full pass.
-  LayoutContext context(&_fontConfig);
-  for (auto& node : nodes) {
-    if (node->nodeType() == NodeType::Composition) {
-      auto* comp = static_cast<Composition*>(node.get());
-      layoutLayers(comp->layers, comp->width, comp->height, &context);
-    }
-  }
-  layoutLayers(layers, width, height, &context);
-  if (changedOut != nullptr) {
-    for (auto& [layer, oldBounds] : beforeBounds) {
-      if (layer->layoutBounds() != oldBounds) {
-        changedOut->push_back(layer);
-      }
-    }
-  }
-  return true;
-}
-
 std::shared_ptr<PAGXDocument> PAGXDocument::Make(float docWidth, float docHeight) {
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   doc->width = docWidth;
@@ -466,9 +321,47 @@ void PAGXDocument::adoptNodes(std::vector<std::unique_ptr<Node>>& other) {
   for (auto& node : other) {
     node->index = static_cast<int>(nodes.size());
     nodeSet.insert(node.get());
+    // Adopted content is part of this document after the transfer, so its ids join the id index
+    // exactly like import-time registration: findNode(), data-bind "@id" targets, and deferred
+    // mask resolution must see these nodes. A collision is reported and the HOST mapping is kept
+    // — registerNode would overwrite it with the adopted node, hijacking every host "@id"
+    // reference to it, which is worse than not registering the foreign id at all.
+    if (!node->id.empty() && nodeMap.find(node->id) != nodeMap.end()) {
+      errors.push_back("Duplicate node id '" + node->id + "'.");
+    } else {
+      registerNode(node.get(), node->id);
+    }
     nodes.push_back(std::move(node));
   }
   other.clear();
+}
+
+void PAGXDocument::renameCollidingIds(PAGXDocument* other) {
+  if (other == nullptr || other == this) {
+    return;
+  }
+  std::unordered_set<std::string> usedIds = {};
+  for (auto& node : nodes) {
+    if (!node->id.empty()) {
+      usedIds.insert(node->id);
+    }
+  }
+  for (auto& node : other->nodes) {
+    if (node->id.empty()) {
+      continue;
+    }
+    if (usedIds.insert(node->id).second) {
+      continue;
+    }
+    std::string base = node->id;
+    std::string candidate = {};
+    int suffix = 2;
+    do {
+      candidate = base + "_" + std::to_string(suffix++);
+    } while (usedIds.count(candidate) > 0);
+    node->id = candidate;
+    usedIds.insert(candidate);
+  }
 }
 
 void PAGXDocument::registerNode(Node* node, const std::string& id) {
@@ -503,11 +396,6 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
   for (size_t i = 0; i < nodes.size(); i++) {
     nodes[i]->index = static_cast<int>(i);
   }
-  // Removals may drop entire Layer subtrees, so the cached child -> parent map is no longer
-  // guaranteed to be a superset of the current tree. Invalidate it lazily; the next
-  // applyLayoutIncremental call will rebuild it.
-  parentOfCacheValid = false;
-  parentOfCache.clear();
 }
 
 void PAGXDocument::setNodeId(Node* node, const std::string& id) {
@@ -529,7 +417,11 @@ void PAGXDocument::resetLayoutState() {
 
 static bool LayersHaveImports(const std::vector<Layer*>& layers) {
   for (auto* layer : layers) {
-    if (!layer->importDirective.source.empty() || !layer->importDirective.content.empty()) {
+    // An inline import that has been mounted as a sub-document (applyLayout mounts them) renders
+    // through its composition reference and no longer blocks consumers; only unmounted directives
+    // (inline content that failed to parse, or file-based import sources) count as unresolved.
+    if (layer->composition == nullptr &&
+        (!layer->importDirective.source.empty() || !layer->importDirective.content.empty())) {
       return true;
     }
     if (LayersHaveImports(layer->children)) {
@@ -538,6 +430,100 @@ static bool LayersHaveImports(const std::vector<Layer*>& layers) {
   }
   return false;
 }
+
+// Mounting inline imports needs a parser for the inline format. The SVG importer is an optional
+// module (PAG_BUILD_SVG), so everything that parses content is compiled only when it is linked;
+// without it a document keeps its inline directives unmounted, which hasUnresolvedImports() reports
+// and 'pagx resolve' can still flatten.
+#if defined(PAG_BUILD_SVG)
+
+// Returns the lowercased tag name of the first element in the given XML content, mirroring the
+// CLI importer's InferFormatFromContent so an inline import without an explicit importFormat is
+// classified the same way 'pagx resolve' classifies it.
+static std::string FirstContentTagName(const std::string& content) {
+  auto pos = content.find('<');
+  while (pos != std::string::npos) {
+    if (pos + 1 < content.size() && content[pos + 1] != '/' && content[pos + 1] != '!' &&
+        content[pos + 1] != '?') {
+      auto tagEnd = content.find_first_of(" \t\n/>", pos + 1);
+      if (tagEnd != std::string::npos) {
+        auto tagName = content.substr(pos + 1, tagEnd - pos - 1);
+        for (auto& ch : tagName) {
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        }
+        return tagName;
+      }
+    }
+    pos = content.find('<', pos + 1);
+  }
+  return {};
+}
+
+// True when the layer's inline import content is SVG: an explicit (case-insensitive) svg format
+// wins; an empty format sniffs the content's first tag, exactly like the resolve path.
+static bool IsInlineSvgImport(const Layer* layer) {
+  if (layer->importDirective.content.empty()) {
+    return false;
+  }
+  std::string format = layer->importDirective.format;
+  for (auto& ch : format) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  if (format.empty()) {
+    format = FirstContentTagName(layer->importDirective.content);
+  }
+  return format == "svg";
+}
+
+// Collects layers whose inline import content is not mounted yet. Recurses into child layers;
+// the SVG content itself never carries import directives, so mounted subtrees are not scanned.
+static void CollectLayersWithInlineImports(const std::vector<Layer*>& layers,
+                                           std::vector<Layer*>* out) {
+  for (auto* layer : layers) {
+    if (layer == nullptr) {
+      continue;
+    }
+    if (layer->composition == nullptr && layer->externalDoc == nullptr &&
+        IsInlineSvgImport(layer)) {
+      out->push_back(layer);
+    }
+    CollectLayersWithInlineImports(layer->children, out);
+  }
+}
+
+// Mounts the layer's inline import content as a sub-document, mirroring LoadExternalComposition:
+// the SVG parses into its own document (own id space and node list), a wrapper Composition with no
+// id registers in the host (layout, binding, and export walks find it; the id-less wrapper is
+// skipped by the exporter's Resources pass), and the layer renders through the composition
+// reference. The import directive is kept — it is the serialization anchor the exporter writes
+// back, and 'pagx resolve' still flattens it on demand. When the layer authors both dimensions,
+// they are passed as the importer's target size so the content is uniformly scaled to fit — the
+// same semantics 'pagx resolve' applies — and the sub-document's size equals the target, keeping
+// the wrapper-size == sub-document-size invariant of external compositions. Content that parses
+// but has no drawable layers (e.g. a defs-only SVG kept as a shared-resource carrier) mounts an
+// empty wrapper, which renders as nothing — exactly what that content should produce. Returns
+// false (leaving the directive unresolved) only when the content cannot be parsed at all.
+static bool AttachInlineImport(PAGXDocument* host, Layer* layer) {
+  SVGImporter::Options options = {};
+  if (!std::isnan(layer->width) && !std::isnan(layer->height)) {
+    options.targetWidth = layer->width;
+    options.targetHeight = layer->height;
+  }
+  auto svgDoc = SVGImporter::ParseString(layer->importDirective.content, options);
+  if (svgDoc == nullptr) {
+    return false;
+  }
+  auto* wrapper = host->makeNode<Composition>();
+  wrapper->width = svgDoc->width;
+  wrapper->height = svgDoc->height;
+  wrapper->layers = svgDoc->layers;
+  wrapper->animations = svgDoc->animations;
+  layer->composition = wrapper;
+  layer->externalDoc = svgDoc;
+  return true;
+}
+
+#endif  // PAG_BUILD_SVG
 
 bool PAGXDocument::hasUnresolvedImports() const {
   if (LayersHaveImports(layers)) {
@@ -552,6 +538,52 @@ bool PAGXDocument::hasUnresolvedImports() const {
     }
   }
   return false;
+}
+
+void PAGXDocument::attachInlineImportDocuments() {
+#if defined(PAG_BUILD_SVG)
+  // Snapshot the layers to mount before mounting any of them: AttachInlineImport calls
+  // makeNode<Composition>(), which push_back()s into nodes and would invalidate an active
+  // iterator over the composition list.
+  std::vector<Layer*> pending = {};
+  CollectLayersWithInlineImports(layers, &pending);
+  for (auto& node : nodes) {
+    if (node->nodeType() == NodeType::Composition) {
+      CollectLayersWithInlineImports(static_cast<Composition*>(node.get())->layers, &pending);
+    }
+  }
+  for (auto* layer : pending) {
+    // A layer whose content failed to parse once is not retried on every layout pass —
+    // applyLayout runs on each notifyChange, and each retry would append the same error again.
+    if (inlineImportMountFailures.find(layer) != inlineImportMountFailures.end()) {
+      continue;
+    }
+    if (!AttachInlineImport(this, layer)) {
+      inlineImportMountFailures.insert(layer);
+      errors.push_back("Failed to parse inline import content" +
+                       (layer->id.empty() ? std::string(".") : " on layer '" + layer->id + "'."));
+    }
+  }
+#endif
+}
+
+bool PAGXDocument::detachInlineImport(Layer* layer) {
+  // compositionFilePath is the precise discriminator between the two mount kinds: a file-loaded
+  // external composition retains it as its origin (LoadExternalComposition), while an inline
+  // import mount never sets it. A layer carrying BOTH a file composition and leftover inline
+  // content must not have its file wrapper detached here.
+  if (layer == nullptr || layer->composition == nullptr || layer->externalDoc == nullptr ||
+      !layer->compositionFilePath.empty() || layer->importDirective.content.empty()) {
+    return false;
+  }
+  auto* wrapper = layer->composition;
+  layer->composition = nullptr;
+  layer->externalDoc = nullptr;
+  removeNodes({wrapper});
+  // The layer is back to its unmounted state; a later attach attempt (e.g. a re-parse after the
+  // content is fixed) must not be suppressed by a stale failure record.
+  inlineImportMountFailures.erase(layer);
+  return true;
 }
 
 std::vector<std::string> PAGXDocument::getExternalFilePaths() const {
@@ -854,10 +886,6 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
       changedImages.push_back(static_cast<Image*>(node));
     }
   }
-  // Snapshot the owned dirty set before the Layer collapse below. The incremental layout path keys
-  // off the pre-collapse nodes: it only engages when every edited node is a Layer, since a content
-  // node collapsed to its owning Layer loses the precise measure dependency and must go full.
-  std::vector<Node*> dirtyBeforeCollapse = ownedDirty;
   {
     std::vector<Node*> layerDirty = {};
     for (auto* node : ownedDirty) {
@@ -908,13 +936,8 @@ void PAGXDocument::notifyChange(const std::vector<Node*>& dirtyNodes, bool layou
   // transform too.
   if (layoutChanged) {
     std::vector<Layer*> layoutRepositioned = {};
-    // Try the incremental subtree re-layout first (resets only the edited Layers and their ancestor
-    // chains, letting unchanged subtrees hit the layout memo). It declines (returns false) for
-    // content-node edits or oversized reset sets, in which case fall back to the full applyLayout.
-    if (!applyLayoutIncremental(dirtyBeforeCollapse, &layoutRepositioned)) {
-      std::unordered_set<const PAGXDocument*> visited = {};
-      applyLayout(nullptr, visited, &layoutRepositioned);
-    }
+    std::unordered_set<const PAGXDocument*> visited = {};
+    applyLayout(nullptr, visited, &layoutRepositioned);
     if (!layoutRepositioned.empty()) {
       ownedDirty.reserve(ownedDirty.size() + layoutRepositioned.size());
       for (auto* layer : layoutRepositioned) {

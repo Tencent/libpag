@@ -115,6 +115,29 @@ function NeedsLaneRouting(fromCell: { col: number; row: number },
   return toCell.col === fromCell.col && Math.abs(toCell.row - fromCell.row) > 1;
 }
 
+/** Whether an edge renders as one straight segment with no bends: a forward edge whose endpoints
+ *  share a row (BFS bounds a forward edge to one column, so that is a single horizontal run across
+ *  a node-free gutter), or a same-column edge between adjacent rows (a vertical crossing only the
+ *  row gap). A straight edge has a single y (or x), so the per-port exit/entry fans do not apply to
+ *  it — only the pair offset, which shifts both ends equally. AssignVerticalTracks already relies
+ *  on exactly this predicate when it skips requesting a turn track, so computeEdgeSlots (fan
+ *  groups) and drawEdge (path shape) have to agree with it too; an earlier revision let drawEdge
+ *  re-derive straightness from a 1px endpoint comparison instead, which the differently-stepped
+ *  fans defeated and bent every fanned same-row edge at its midpoint. */
+function IsStraightEdge(fromAny: boolean, fromCell: { col: number; row: number },
+                        toCell: { col: number; row: number }): boolean {
+  if (fromAny) {
+    return false;
+  }
+  if (toCell.col > fromCell.col) {
+    return toCell.row === fromCell.row;
+  }
+  if (toCell.col === fromCell.col) {
+    return Math.abs(toCell.row - fromCell.row) === 1;
+  }
+  return false;
+}
+
 /** The vertical tracks one transition uses. Forward/any edges turn once (`turnX`); a lane-routed
  *  edge descends in the corridor to the RIGHT of its source column and climbs in the one LEFT of
  *  its target column (`backDownX` / `backUpX`). Null means "not applicable to this edge's
@@ -240,6 +263,10 @@ interface EdgeSlots {
    *  within the region), or -1 when the edge is not lane-routed. Doubles as drawEdge's test for
    *  the lane-routed shape, so the NeedsLaneRouting predicate is evaluated exactly once. */
   backLaneIndex: number;
+  /** Whether the edge renders as one straight segment (IsStraightEdge). drawEdge then draws a
+   *  single line carrying only the pair offset, and the edge was kept out of the exit/entry fan
+   *  groups in the first place. Same single-source-of-truth pattern as backLaneIndex. */
+  straight: boolean;
 }
 
 interface SMRegionData {
@@ -703,9 +730,11 @@ export class SMBlueprint {
 
   /** Assigns routing slots to every transition of a region: which fan position it takes among the
    *  edges sharing its pair / source port / target port, plus the horizontal lane it travels in
-   *  (above the grid for any-source edges, below it for lane-routed ones). Doing this up front
-   *  rather than per edge is what lets drawEdge pick a corridor no sibling edge occupies. The
-   *  vertical tracks inside those corridors are allocated separately by AssignVerticalTracks. */
+   *  (above the grid for any-source edges, below it for lane-routed ones). Straight edges
+   *  (IsStraightEdge) join only the pair group — they have no bends, so there is no exit or entry
+   *  port to fan. Doing this up front rather than per edge is what lets drawEdge pick a corridor
+   *  no sibling edge occupies. The vertical tracks inside those corridors are allocated separately
+   *  by AssignVerticalTracks. */
   private computeEdgeSlots(region: SMRegionData,
                            cells: Map<string, { col: number; row: number }>): EdgeSlots[] {
     const pairTotals = new Map<string, number>();
@@ -714,6 +743,7 @@ export class SMBlueprint {
     const pairKeys: string[] = [];
     const exitKeys: string[] = [];
     const entryKeys: string[] = [];
+    const straightFlags: boolean[] = [];
     for (const transition of region.transitions) {
       const source = transition.fromAny ? ANY_NODE_KEY : transition.from;
       const pairKey = `${source}|${transition.to}`;
@@ -722,12 +752,22 @@ export class SMBlueprint {
       // group (as an earlier revision did, back when they entered from the top) made both groups
       // fan around the same centre line and stacked their arrow heads at the same point.
       const entryKey = transition.to;
+      const fromCell = cells.get(source);
+      const toCell = cells.get(transition.to);
+      const straight = fromCell != null && toCell != null &&
+        IsStraightEdge(transition.fromAny, fromCell, toCell);
+      straightFlags.push(straight);
       pairKeys.push(pairKey);
       exitKeys.push(source);
       entryKeys.push(entryKey);
       pairTotals.set(pairKey, (pairTotals.get(pairKey) ?? 0) + 1);
-      exitTotals.set(source, (exitTotals.get(source) ?? 0) + 1);
-      entryTotals.set(entryKey, (entryTotals.get(entryKey) ?? 0) + 1);
+      // A straight edge renders with a single y and uses no exit/entry fan, so it does not
+      // consume a slot in those groups: the edges that do bend keep their fan centred on the
+      // ports actually in play instead of on a slot reserved for an edge that never lands there.
+      if (!straight) {
+        exitTotals.set(source, (exitTotals.get(source) ?? 0) + 1);
+        entryTotals.set(entryKey, (entryTotals.get(entryKey) ?? 0) + 1);
+      }
     }
     const pairSeen = new Map<string, number>();
     const exitSeen = new Map<string, number>();
@@ -738,12 +778,15 @@ export class SMBlueprint {
       const pairKey = pairKeys[index];
       const exitKey = exitKeys[index];
       const entryKey = entryKeys[index];
+      const straight = straightFlags[index];
       const pairIndex = pairSeen.get(pairKey) ?? 0;
-      const exitIndex = exitSeen.get(exitKey) ?? 0;
-      const entryIndex = entrySeen.get(entryKey) ?? 0;
+      const exitIndex = straight ? 0 : (exitSeen.get(exitKey) ?? 0);
+      const entryIndex = straight ? 0 : (entrySeen.get(entryKey) ?? 0);
       pairSeen.set(pairKey, pairIndex + 1);
-      exitSeen.set(exitKey, exitIndex + 1);
-      entrySeen.set(entryKey, entryIndex + 1);
+      if (!straight) {
+        exitSeen.set(exitKey, exitIndex + 1);
+        entrySeen.set(entryKey, entryIndex + 1);
+      }
       const fromCell = cells.get(transition.fromAny ? ANY_NODE_KEY : transition.from);
       const toCell = cells.get(transition.to);
       const laneRouted = fromCell != null && toCell != null &&
@@ -758,6 +801,7 @@ export class SMBlueprint {
         entryCount: entryTotals.get(entryKey) ?? 1,
         laneIndex: transition.fromAny ? laneCursor++ : 0,
         backLaneIndex: laneRouted ? backLaneCursor++ : -1,
+        straight,
       };
     });
   }
@@ -1048,22 +1092,27 @@ export class SMBlueprint {
       midX = (downX + upX) / 2;
       midY = laneY;
     } else if (forward) {
-      // Forward edge, routed orthogonally like the any-source ones so the two can share a gutter
-      // without crossing: run along the source row, turn down/up inside the gutter on a track no
-      // other edge occupies, then run along the target row into its left edge. A single wide
-      // bezier (the previous shape) swept across the whole corridor, so it inevitably crossed
-      // any descent line living there — no amount of label dodging could fix that, because it is
-      // the PATH that overlaps, not just the text.
+      // Forward edge. When source and target share a row the edge is a single straight horizontal
+      // run (BFS bounds a forward edge to one column, so it crosses only the node-free gutter) and
+      // its whole line carries the pair offset alone: a straight edge has ONE y, while the exit and
+      // entry fans — stepped differently (10 vs 14) and computed against different groups — put its
+      // two ends a couple of pixels apart, which the old 1px endpoint comparison read as "needs a
+      // turn" and bent every fanned same-row edge at its midpoint. AssignVerticalTracks never
+      // reserved a turn track for these edges, so that bend was generation-logic drift, not a
+      // routed corner. Different rows: run along the source row, turn down/up inside the gutter on
+      // a track no other edge occupies, then run along the target row into its left edge.
       const x1 = fromPos.x + NODE_W;
       const x2 = toPos.x;
-      const y1 = fromPos.y + NODE_H / 2 + offset + sourceOffset;
-      const y2 = toPos.y + NODE_H / 2 + offset + targetOffset;
-      if (Math.abs(y1 - y2) < 1) {
-        // Same row: a straight horizontal run, no turn needed.
-        path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+      const y1 = fromPos.y + NODE_H / 2 + offset + (slots.straight ? 0 : sourceOffset);
+      if (slots.straight) {
+        path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y1}`);
+        // Label rides the middle OF THE LINE, not above it: the backdrop is opaque, so the stroke
+        // it masks shows up as two stubs of equal length leaving the label on either side — the
+        // reading that makes "halfway along this edge" obvious.
         midX = (x1 + x2) / 2;
-        midY = y1 - 8;
+        midY = y1;
       } else {
+        const y2 = toPos.y + NODE_H / 2 + offset + targetOffset;
         const turnX = tracks.turnX ?? (x1 + x2) / 2;
         const sweep = y2 > y1 ? 1 : -1;
         const corner = Math.max(2, Math.min(EDGE_CORNER, Math.abs(y2 - y1) / 2,
@@ -1074,10 +1123,24 @@ export class SMBlueprint {
           ` L ${turnX} ${y2 - sweep * corner}` +
           ` Q ${turnX} ${y2} ${turnX + corner} ${y2}` +
           ` L ${x2} ${y2}`);
-        // Label rides the horizontal run on the SOURCE side of the turn, where the corridor is
-        // free of vertical tracks by construction.
-        midX = (x1 + turnX) / 2;
-        midY = y1 - 8;
+        // Label sits at the middle of the WHOLE path, found by walking its accumulated length, so
+        // it lands on whichever run holds the halfway point and the edge sticks out of the backdrop
+        // by the same length on both ends. Pinning it to the source-side run (the previous shape)
+        // put every label at the first quarter of its edge, next to the source node.
+        const runIn = turnX - x1;
+        const runAcross = Math.abs(y2 - y1);
+        const runOut = x2 - turnX;
+        const half = (runIn + runAcross + runOut) / 2;
+        if (half <= runIn) {
+          midX = x1 + half;
+          midY = y1;
+        } else if (half <= runIn + runAcross) {
+          midX = turnX;
+          midY = y1 + sweep * (half - runIn);
+        } else {
+          midX = turnX + (half - runIn - runAcross);
+          midY = y2;
+        }
       }
     } else {
       // Same-column neighbours (adjacent rows): a straight vertical line between the facing

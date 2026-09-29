@@ -169,6 +169,14 @@ void PAGComposition::spawnTimelines(const std::shared_ptr<PAGScene>& scene) {
       auto smTimeline =
           std::shared_ptr<PAGStateMachine>(new PAGStateMachine(sm, binding.get(), document, scene));
       binding->setTarget(sm, std::make_unique<StateMachineInputTarget>(smTimeline, sm));
+      // A timeline rebuild replaces the state-machine instance, dropping bound inputs back to
+      // their declared defaults while the data-bind entries stay clean (no ViewModel change is
+      // pending). Re-push the ViewModel's current values now, scoped to this composition's
+      // binding so sibling instances of the same source node are untouched; during initial
+      // construction the bind pass has not run yet, so this is a harmless no-op then.
+      if (scene != nullptr) {
+        scene->reapplyDataBindsForTarget(sm, binding.get());
+      }
       timelines.push_back(std::move(smTimeline));
     }
   }
@@ -334,9 +342,6 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     if (slot != nullptr && childComposition->runtimeLayer != nullptr) {
       slot->addChild(childComposition->runtimeLayer);
     }
-    if (scene != nullptr) {
-      scene->nodeToLayer[layer].push_back(childComposition.get());
-    }
     return childComposition;
   }
   auto layerRuntime = binding->get<tgfx::Layer>(layer);
@@ -348,9 +353,6 @@ std::shared_ptr<PAGLayer> PAGComposition::BuildChildLayer(
     return nullptr;
   }
   auto child = std::shared_ptr<PAGLayer>(new PAGLayer(layer, layerRuntime, scene));
-  if (scene != nullptr) {
-    scene->nodeToLayer[layer].push_back(child.get());
-  }
   if (!layer->children.empty()) {
     BuildChildren(binding, layer->children, child->children, scene, visited, child);
     for (auto& nestedChild : child->children) {
@@ -406,9 +408,6 @@ void PAGComposition::syncChildren(const std::vector<Layer*>& sourceLayers,
       slot->removeFromParent();
     }
     binding->remove(child->node);
-    if (scene != nullptr) {
-      scene->eraseNodeToLayerSubtree(child.get());
-    }
   }
   children = std::move(newChildren);
   // Re-parent every direct child so the parent chain matches the rebuilt tree. Existing children
@@ -479,7 +478,6 @@ void PAGComposition::refreshPlainContainerChildren(
           slot->removeFromParent();
         }
         binding->remove(oldChild->node);
-        scene->eraseNodeToLayerSubtree(oldChild.get());
       }
       container->children = std::move(newChildren);
       // Re-parent the container's direct children so the parent chain matches the rebuilt subtree.

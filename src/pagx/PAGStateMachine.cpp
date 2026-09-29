@@ -159,6 +159,15 @@ void PAGStateMachine::reset() {
       notifyStateChange(ri);
     }
   }
+  // DataBind-driven inputs were just cleared to their declared defaults, but their truth source is
+  // the ViewModel. Re-apply its current values immediately (not via the next draw's dirty pass)
+  // so condition evaluation right after reset() observes the same values a freshly constructed
+  // instance holds after its first data-bind flush. Scope the re-apply to this instance's
+  // binding: the same source node can back several instances (top-level plus
+  // composition-spawned), and resetting one must not overwrite the host-set inputs of the others.
+  if (auto scene = owner.lock()) {
+    scene->reapplyDataBindsForTarget(stateMachine, effectiveBinding());
+  }
 }
 
 // =============================================================================

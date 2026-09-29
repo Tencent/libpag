@@ -44,6 +44,8 @@
 #include "pagx/nodes/StateMachineTimeline.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/StateTransition.h"
+#include "pagx/nodes/Text.h"
+#include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TransitionCondition.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/Data.h"
@@ -214,26 +216,218 @@ std::vector<std::string> PAGXView::getExternalFilePaths() const {
   return document->getExternalFilePaths();
 }
 
+static bool LayerHasOwnText(const Layer* layer) {
+  for (const auto* element : layer->contents) {
+    if (element != nullptr &&
+        (element->nodeType() == NodeType::Text || element->nodeType() == NodeType::TextBox)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Returns the laid-out box of the layer's own text element in the layer's local coordinates (the
+// space the text positions its glyphs in), or an empty rect when the layer has no text of its own
+// or has not been laid out yet.
+static Rect TextBoxOf(const Layer* layer) {
+  for (const auto* element : layer->contents) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (element->nodeType() == NodeType::TextBox) {
+      return static_cast<const TextBox*>(element)->layoutBounds();
+    }
+    if (element->nodeType() == NodeType::Text) {
+      return static_cast<const Text*>(element)->layoutBounds();
+    }
+  }
+  return {};
+}
+
+static bool SurfaceToLayerLocal(const PAGLayer& layer, float surfaceX, float surfaceY,
+                                Point* localPoint) {
+  auto matrix = layer.getGlobalMatrix();
+  float determinant = matrix.a * matrix.d - matrix.b * matrix.c;
+  if (determinant == 0.0f) {
+    return false;
+  }
+  float dx = surfaceX - matrix.tx;
+  float dy = surfaceY - matrix.ty;
+  localPoint->x = (matrix.d * dx - matrix.c * dy) / determinant;
+  localPoint->y = (matrix.a * dy - matrix.b * dx) / determinant;
+  return true;
+}
+
+static bool RectContainsPoint(const Rect& rect, const Point& point) {
+  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y &&
+         point.y <= rect.y + rect.height;
+}
+
+// Finds the runtime instance of node inside one composition instance, without descending into
+// nested composition instances (a mask always refers to a layer of the same composition).
+static std::shared_ptr<PAGLayer> FindLayerInComposition(const std::shared_ptr<PAGLayer>& layer,
+                                                        const Layer* node) {
+  for (const auto& child : layer->getChildren()) {
+    if (child == nullptr) {
+      continue;
+    }
+    if (child->getNode() == node) {
+      return child;
+    }
+    if (child->layerType() == LayerType::Composition) {
+      continue;
+    }
+    auto found = FindLayerInComposition(child, node);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+// True when the authored visibility, scroll clip and mask of the layer and all of its ancestors
+// let the point through. The core already applies the runtime equivalents to its shape hits; this
+// check only gates the text boxes the host adds on top of them.
+static bool AuthoredChainAcceptsPoint(const std::shared_ptr<PAGLayer>& layer, float surfaceX,
+                                      float surfaceY) {
+  for (auto walker = layer; walker != nullptr; walker = walker->getParent()) {
+    const auto* node = walker->getNode();
+    if (node == nullptr) {
+      continue;
+    }
+    if (!node->visible) {
+      return false;
+    }
+    // Layout converts clipToBounds into scrollRect (Layer::updateScrollRect), so a single check
+    // covers both authored forms.
+    if (node->hasScrollRect) {
+      Point localPoint = {};
+      if (!SurfaceToLayerLocal(*walker, surfaceX, surfaceY, &localPoint) ||
+          !RectContainsPoint(node->scrollRect, localPoint)) {
+        return false;
+      }
+    }
+    if (node->mask != nullptr) {
+      // The masked layer's node lives in the composition that holds its parent, which is where
+      // the mask layer is searched for.
+      auto composition = walker->getParent();
+      while (composition != nullptr && composition->layerType() != LayerType::Composition) {
+        composition = composition->getParent();
+      }
+      auto maskLayer =
+          composition != nullptr ? FindLayerInComposition(composition, node->mask) : nullptr;
+      if (maskLayer != nullptr && !maskLayer->hitTestPoint(surfaceX, surfaceY, true)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+static bool TextBoxContainsPoint(const PAGLayer& layer, float surfaceX, float surfaceY) {
+  const auto* node = layer.getNode();
+  if (node == nullptr) {
+    return false;
+  }
+  auto box = TextBoxOf(node);
+  if (box.isEmpty()) {
+    return false;
+  }
+  Point localPoint = {};
+  return SurfaceToLayerLocal(layer, surfaceX, surfaceY, &localPoint) &&
+         RectContainsPoint(box, localPoint);
+}
+
+// Walks the runtime tree in reverse paint order (later children first, a layer's children before
+// the layer itself) and returns the first layer that is either the core's top-most shape hit or a
+// text layer whose laid-out box contains the point. Selecting text by its box is an editor policy:
+// the core reports exact glyph outlines, which reject the gaps between glyphs and make a text
+// block feel unclickable, so the host widens text to its box here without changing what the core
+// reports to other callers.
+static std::shared_ptr<PAGLayer> FindTopMostSelectable(const std::shared_ptr<PAGLayer>& layer,
+                                                       const PAGLayer* shapeHit, float surfaceX,
+                                                       float surfaceY) {
+  const auto& children = layer->getChildren();
+  for (auto item = children.rbegin(); item != children.rend(); ++item) {
+    if (*item == nullptr) {
+      continue;
+    }
+    auto found = FindTopMostSelectable(*item, shapeHit, surfaceX, surfaceY);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  if (layer.get() == shapeHit) {
+    return layer;
+  }
+  if (TextBoxContainsPoint(*layer, surfaceX, surfaceY) &&
+      AuthoredChainAcceptsPoint(layer, surfaceX, surfaceY)) {
+    return layer;
+  }
+  return nullptr;
+}
+
+// Resolves a surface point to the runtime layer a host should select: the top-most layer under the
+// point (a text layer counts over its whole laid-out box), walked up to the first Composition whose
+// source node belongs to the given document, so a click inside a <Layer composition="@X"> instance
+// selects the reference layer instead of the internal definition. Compositions built from an
+// embedded external document are skipped (their nodes are numbered against a different document),
+// and a hit that lands entirely inside one selects nothing rather than reporting a node the host
+// cannot map. The core runtime keeps no source-node -> runtime-layer map, so this resolution
+// belongs to the host, which owns the source document. Returns nullptr when nothing should be
+// selected.
+static std::shared_ptr<PAGLayer> ResolveSelectionTarget(const std::shared_ptr<PAGScene>& scene,
+                                                        PAGXDocument* document, float surfaceX,
+                                                        float surfaceY) {
+  if (scene == nullptr || document == nullptr) {
+    return nullptr;
+  }
+  auto root = scene->rootComposition();
+  if (root == nullptr) {
+    return nullptr;
+  }
+  auto layers = scene->getLayersUnderPoint(surfaceX, surfaceY);
+  const PAGLayer* shapeHit = layers.empty() ? nullptr : layers.front().get();
+  auto target = FindTopMostSelectable(root, shapeHit, surfaceX, surfaceY);
+  if (target == nullptr) {
+    return nullptr;
+  }
+  for (auto walker = target; walker != nullptr; walker = walker->getParent()) {
+    const auto* node = walker->getNode();
+    if (walker->layerType() == LayerType::Composition && node != nullptr &&
+        document->ownsNode(node)) {
+      target = walker;
+      break;
+    }
+  }
+  const auto* node = target->getNode();
+  if (node == nullptr || !document->ownsNode(node)) {
+    return nullptr;
+  }
+  return target;
+}
+
 emscripten::val PAGXView::hitTest(float surfaceX, float surfaceY) {
-  if (scene == nullptr) {
+  auto target = ResolveSelectionTarget(scene, document.get(), surfaceX, surfaceY);
+  if (target == nullptr) {
     return emscripten::val::null();
   }
-  auto hit = scene->hitTest(surfaceX, surfaceY);
-  if (hit.index < 0) {
-    return emscripten::val::null();
-  }
+  // The host owns the source document, so the source-side fields come from the node the runtime
+  // layer points at; the runtime itself only supplies the handle and its on-screen rect.
+  const auto* node = target->getNode();
+  auto bounds = scene->getTightGlobalBounds(target);
   auto obj = emscripten::val::object();
-  obj.set("index", hit.index);
-  obj.set("startLine", hit.startLine);
-  obj.set("endLine", hit.endLine);
-  if (hit.bounds.isEmpty()) {
+  obj.set("index", node->index);
+  obj.set("startLine", node->sourceLine);
+  obj.set("endLine", node->endLine);
+  if (bounds.isEmpty()) {
     obj.set("bounds", emscripten::val::null());
   } else {
     auto boundsObj = emscripten::val::object();
-    boundsObj.set("x", hit.bounds.x);
-    boundsObj.set("y", hit.bounds.y);
-    boundsObj.set("w", hit.bounds.width);
-    boundsObj.set("h", hit.bounds.height);
+    boundsObj.set("x", bounds.x);
+    boundsObj.set("y", bounds.y);
+    boundsObj.set("w", bounds.width);
+    boundsObj.set("h", bounds.height);
     obj.set("bounds", boundsObj);
   }
   return obj;
@@ -260,6 +454,24 @@ emscripten::val PAGXView::getNodeSourceMap() const {
   return array;
 }
 
+// Collects every runtime layer instance built from the given source node by walking the runtime
+// tree in pre-order. The core runtime intentionally does not maintain a source-node -> instance
+// map, so the host (which holds the source document) owns the node-to-runtime correspondence.
+// A pre-order walk matches the tree's construction order, so instances come back in the same
+// order the runtime tree declares them.
+static void CollectLayersForNode(const std::shared_ptr<PAGLayer>& layer, const Layer* node,
+                                 std::vector<std::shared_ptr<PAGLayer>>& out) {
+  if (layer == nullptr) {
+    return;
+  }
+  if (layer->getNode() == node) {
+    out.push_back(layer);
+  }
+  for (const auto& child : layer->getChildren()) {
+    CollectLayersForNode(child, node, out);
+  }
+}
+
 emscripten::val PAGXView::getNodeBounds(int index) const {
   if (document == nullptr || index < 0 || index >= static_cast<int>(document->nodes.size())) {
     return emscripten::val::null();
@@ -272,20 +484,31 @@ emscripten::val PAGXView::getNodeBounds(int index) const {
   if (scene == nullptr) {
     return emscripten::val::null();
   }
-  auto rects = scene->getGlobalBoundsForNode(static_cast<Layer*>(n));
+  auto root = scene->rootComposition();
+  if (root == nullptr) {
+    return emscripten::val::null();
+  }
+  auto* layerNode = static_cast<Layer*>(n);
+  std::vector<std::shared_ptr<PAGLayer>> instances = {};
+  CollectLayersForNode(root, layerNode, instances);
   // Selection-outline slack for FreeType's anti-aliasing overshoot: per-glyph tight bounds stop
   // at the geometric baseline while the rasterizer paints slightly below it, visually clipping
   // the last row of ink. Extending the bottom by 5% of the layer height covers the overshoot,
   // with a 0.5 root-space floor scaled by the current zoom. This is presentation-only slack,
-  // kept here so PAGScene::getGlobalBoundsForNode keeps returning tight bounds.
+  // kept here so the bounds query itself stays tight. Only glyphs overshoot, so layers without
+  // their own text (shapes, images, containers) keep their exact bounds.
+  bool applyTextSlack = LayerHasOwnText(layerNode);
   float zoom = contentScale * userZoom;
   auto array = emscripten::val::array();
   size_t visibleCount = 0;
-  for (auto& rect : rects) {
+  for (auto& layer : instances) {
+    auto rect = scene->getTightGlobalBounds(layer);
     if (rect.isEmpty()) {
       continue;
     }
-    rect.height += std::max(0.5f * zoom, rect.height * 0.05f);
+    if (applyTextSlack) {
+      rect.height += std::max(0.5f * zoom, rect.height * 0.05f);
+    }
     auto obj = emscripten::val::object();
     obj.set("x", rect.x);
     obj.set("y", rect.y);

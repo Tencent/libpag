@@ -50,9 +50,6 @@ void LayoutNode::resetLayout() {
   layoutY = NAN;
   layoutWidth = NAN;
   layoutHeight = NAN;
-  lastLayoutTargetWidth = NAN;
-  lastLayoutTargetHeight = NAN;
-  layoutResolved = false;
 }
 
 Rect LayoutNode::layoutBounds() const {

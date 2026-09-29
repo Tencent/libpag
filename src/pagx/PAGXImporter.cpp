@@ -2882,6 +2882,11 @@ std::shared_ptr<PAGXDocument> PAGXImporter::FromXML(const uint8_t* data, size_t 
   }
   auto doc = std::shared_ptr<PAGXDocument>(new PAGXDocument());
   ParseDocument(root.get(), doc.get());
+  // Mount inline import content as sub-documents at load time so hasUnresolvedImports() and
+  // every consumer observe a document whose inline imports are already renderable, without
+  // requiring a layout pass first. Idempotent; API-built documents mount at applyLayout instead.
+  // A no-op when the SVG importer is not linked (PAG_BUILD_SVG).
+  doc->attachInlineImportDocuments();
   return doc;
 }
 

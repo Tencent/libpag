@@ -113,10 +113,16 @@ class PAGStateMachine : public PAGTimeline,
    * Resets the state machine to its freshly-constructed state and restarts playback from the head:
    * every region returns to its initialState with a newly built animation at time 0 (crossfades,
    * pending transitions, and consumed triggers are discarded), and every input value returns to
-   * its declared default. Call apply() afterwards to reflect the reset state on the content. A
-   * state machine whose once-regions have finished cannot be resumed by advancing; reset() is the
-   * way to play it again. State-change listeners are notified for every region whose current
-   * state actually changes. No-op once the owning PAGScene has been destroyed.
+   * its declared default. Inputs driven by a data bind are immediately re-applied from their
+   * ViewModel's current values before reset() returns (Once-direction bindings re-arm and apply
+   * again, matching a fresh construction), so bound inputs never hold stale defaults; a host that
+   * wants playback to stay on the initialState should set the bound ViewModel properties back to
+   * their initial values before calling reset(). Host-set inputs (setBool/setNumber/fireTrigger)
+   * are not re-applied; set them again after reset() if needed. Call apply() afterwards to
+   * reflect the reset state on the content. A state machine whose once-regions have finished
+   * cannot be resumed by advancing; reset() is the way to play it again. State-change listeners
+   * are notified for every region whose current state actually changes. No-op once the owning
+   * PAGScene has been destroyed.
    */
   void reset();
 
