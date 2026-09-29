@@ -16,6 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Uses CAEAGLLayer, deprecated since iOS 12. libpag's own build defines
+// GLES_SILENCE_DEPRECATION (see CMakeLists); define it locally too so IDE indexing without the
+// build flags stays clean.
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #include "GPUDrawable.h"
 
 #if defined(TGFX_USE_OPENGL)

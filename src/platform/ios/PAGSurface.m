@@ -16,6 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #import "PAGSurface.h"
 #import "platform/ios/private/PAGSurfaceImpl.h"
 

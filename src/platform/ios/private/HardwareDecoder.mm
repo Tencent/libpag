@@ -16,6 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Uses CVPixelBuffer OpenGLES compatibility keys, deprecated since iOS 12 along with the rest of
+// the OpenGLES API. libpag's own build defines GLES_SILENCE_DEPRECATION (see CMakeLists); define
+// it locally too so IDE indexing without the build flags stays clean.
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #include "HardwareDecoder.h"
 #import <UIKit/UIKit.h>
 #include <algorithm>

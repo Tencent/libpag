@@ -16,6 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #import "PAGView.h"
 
 #include <mutex>
@@ -23,6 +26,9 @@
 #if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
 
 #import "PAGPlayer.h"
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #import "PAGSurface.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
