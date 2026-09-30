@@ -88,6 +88,9 @@ class VideoReader : public SequenceReader {
 
   DecodeStatus decodeFrame(int64_t sampleTime, int64_t deadline);
 
+  std::shared_ptr<tgfx::ImageBuffer> keepFallbackBuffer(
+      std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer);
+
   std::unique_ptr<VideoDecoder> makeVideoDecoder(int64_t deadline);
 };
 }  // namespace pag
