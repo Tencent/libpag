@@ -19,7 +19,7 @@ snapshot.js (Chromium)  ->  pagx import  ->  pagx render  ->  与 Chromium 基�
 
 | 目录 | 来源 | 规模 | 说明 |
 |------|------|------|------|
-| `cases/` | 单特性 importer 语料 | 187 个 `.html` | 每个文件隔离一个 HTML/CSS 特性，便于把回归定位到具体构造。含 `manifest.csv`、`coverage.md`、`README.md`（详见 [cases/README.md](cases/README.md)）。 |
+| `cases/` | 单特性 importer 语料 | 188 个 `.html` | 每个文件隔离一个 HTML/CSS 特性，便于把回归定位到具体构造。含 `manifest.csv`、`coverage.md`、`README.md`（详见 [cases/README.md](cases/README.md)）。 |
 | `corpus/cli/` | pagx CLI / 导出往返语料 | 276 个 `.html` + 必要图片/字体 | 按 `cli/ layout/ pagx_to_html/ spec/ text/` 分类，多为 `HTMLExporter` 产物，用于往返保真。 |
 | `corpus/websites/` | 真实网页手写快照 | 26 个 `.html` | 移动端页面的静态化版本，图片/字体一律运行时按需从 CDN 拉取，不入库。 |
 | `corpus/generated/` | 多模型生成的演示/技术页 | 162 个 `.html` | 按模型分子目录（`case/`、`glm5.1/`、`ima-*`、`tech-*`），多使用 Tailwind CDN + web 字体。 |

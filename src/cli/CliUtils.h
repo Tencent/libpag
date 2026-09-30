@@ -205,19 +205,45 @@ inline std::string EscapeJson(const std::string& input) {
 std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const std::string& command);
 
 /**
+ * A font file registered under an explicit family name instead of the name its own `name` table
+ * carries. PAGX resolves `Text::fontFamily` by exact string match, and the name inside a web font
+ * need not match the name the document uses: a page may alias a file (`font-family:
+ * MaShanZheng` serving a file whose family is "Ma Shan Zheng"), and a font whose typographic name
+ * (nameID 16/17) exists only in a non-English record is reported as "?????" by the platform font
+ * reader, which can only produce ASCII. Callers that know the authored pairing — the HTML
+ * snapshot pipeline records it from the page's `@font-face` rules — pass it here so the file is
+ * reachable by the name the document actually uses.
+ */
+struct FontAlias {
+  std::string family;
+  std::string path;
+};
+
+/**
+ * Parses a `--font-alias` value: `<family>=<path>`. The family is taken verbatim (it has to match
+ * the document's `fontFamily` byte for byte); the path is everything after the first '=', so a
+ * path may itself contain one. Every face of the file is registered under its own style, so the
+ * alias has no style half. Prints an error and returns false for a value missing either half.
+ */
+bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command);
+
+/**
  * Loads font files and fallback typefaces into a FontConfig. Every face of a font file is
  * registered, so a collection such as PingFang.ttc contributes each of its (family, style) pairs.
- * Prints errors to stderr using the given command name as prefix. Returns false when a requested
- * source cannot be loaded — the caller named that exact source, so dropping it would shape text
- * with a substituted face.
+ * A font alias registers its file the same way but under the given family name. Prints errors to
+ * stderr using the given command name as prefix. Returns false when a requested source cannot be
+ * loaded — the caller named that exact source, so dropping it would shape text with a substituted
+ * face.
  */
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
-                    const std::vector<std::string>& fallbacks, const std::string& command);
+                    const std::vector<std::string>& fallbacks,
+                    const std::vector<FontAlias>& aliases, const std::string& command);
 
 /**
  * Converts the document's text into pre-shaped glyph runs so that it renders without the original
- * fonts. Registers the document's own <Font> resources plus the given fallback specifiers for
- * shaping, runs layout, and writes the resulting glyph outlines back into the document.
+ * fonts. Registers the document's own <Font> resources plus the given fallback specifiers and font
+ * aliases for shaping, runs layout, and writes the resulting glyph outlines back into the
+ * document.
  *
  * Prints messages to stderr using the given command name as prefix. Returns false when a font
  * source cannot be loaded and the document still requires a font; a source that cannot be loaded
@@ -226,7 +252,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
  * document would render that text as blank on hosts lacking the authored font.
  */
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
-                const std::string& command);
+                const std::vector<FontAlias>& aliases, const std::string& command);
 
 /**
  * Writes a string to a file. Prints errors to stderr using the given command name as prefix.

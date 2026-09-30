@@ -38,10 +38,12 @@ cases/
 ```
 
 Sub-directory numbering mirrors the feature taxonomy in the test plan. The
-corpus currently holds **187 cases** across 20 categories (167 `subset` +
-20 `snapshot`); `validate.sh` reports **162 subset pass, 5 XFAIL, 0 fail** (the
-5 XFAILs are known importer/SVG-resolver `pagx verify` defects, listed in
-`coverage.md`).
+corpus currently holds **188 cases** across 20 categories (168 `subset` +
+20 `snapshot`); `validate.sh` reports **164 subset pass, 2 XFAIL, 2 warn-diff** —
+the 2 XFAILs are known importer/SVG-resolver `pagx verify` defects listed in
+`coverage.md`, and the 2 warn-diffs (`12-opacity-blend__background-blend-mode`,
+`14-overflow-clip__clip-path-polygon`) are stale `expected_warnings` entries
+whose `subset:unsupported-property` code the importer no longer emits.
 
 ## Naming
 

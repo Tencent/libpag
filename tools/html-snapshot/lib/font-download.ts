@@ -41,7 +41,7 @@ import * as crypto from 'crypto';
 import { errMessage } from './common';
 import { writeFileAtomic } from './atomic-write';
 import { makeCaptureListener, type CaptureLogger, type CaptureResponseListener } from './capture-listener';
-import { loadFontCodec } from './font-codec';
+import { decompressWoff2, loadFontCodec } from './font-codec';
 import type { EngineName } from './browser-engine';
 
 const fsp = fs.promises;
@@ -61,6 +61,16 @@ export interface SavedFont {
   path: string;
   family: string;
   style: string;
+  // The document's CSS family names that resolved to this file (lower-cased keys are not needed
+  // here; these travel verbatim to `pagx embed --font-alias`). Empty when the file was captured
+  // without a matching `@font-face` rule.
+  cssFamilies: string[];
+}
+
+/** A captured font file plus the CSS family it should answer to (empty when unknown). */
+export interface CapturedFontRef {
+  path: string;
+  family: string;
 }
 
 // View a Node Buffer as a standalone ArrayBuffer slice for opentype.js
@@ -89,11 +99,12 @@ function isWoff(buf: Buffer): boolean {
 //   - WOFF:  opentype.js parses the zlib-compressed tables; we re-serialise
 //     to SFNT with `font.toArrayBuffer()` so tgfx can load it.
 //   - SFNT:  returned unchanged.
+// WOFF2 decoding goes through `decompressWoff2`, which copies the bytes out of
+// the decoder's shared WASM heap before any other decode can overwrite them.
 export async function toSfnt(buffer: Buffer): Promise<Buffer> {
-  const { opentype: ot, wawoff2: w2 } = loadFontCodec();
+  const { opentype: ot } = loadFontCodec();
   if (isWoff2(buffer)) {
-    const decoded = await w2.decompress(buffer);
-    return Buffer.isBuffer(decoded) ? decoded : Buffer.from(decoded);
+    return await decompressWoff2(buffer);
   }
   if (isWoff(buffer)) {
     const font = ot.parse(toArrayBuffer(buffer));
@@ -168,6 +179,101 @@ function sanitize(value: string): string {
   return slug || 'font';
 }
 
+/** One `@font-face` source recorded from the page's CSSOM. */
+export interface FontFaceSource {
+  family: string;
+  style: string;
+  weight: string;
+  url: string;
+}
+
+// Decode the payload of a `data:` URL. Returns null when `url` is not a data
+// URL or its payload is malformed; both the base64 and the percent-encoded
+// forms appear in real `@font-face` rules.
+export function dataUrlBytes(url: string): Buffer | null {
+  if (!url.startsWith('data:')) {
+    return null;
+  }
+  const comma = url.indexOf(',');
+  if (comma < 0) {
+    return null;
+  }
+  const header = url.slice('data:'.length, comma);
+  const payload = url.slice(comma + 1);
+  try {
+    if (/;base64/i.test(header)) {
+      return Buffer.from(payload, 'base64');
+    }
+    return Buffer.from(decodeURIComponent(payload), 'binary');
+  } catch (_err) {
+    return null;
+  }
+}
+
+// Decode every captured web font to SFNT and collect the document's CSS family names per file.
+//
+// Two sources feed this:
+//   - `sources`, the page's `@font-face` entries. Rules whose `src` is a `data:` URL matter most:
+//     Chromium issues no request for an inline font, so the response listener above can never see
+//     one, and without this pass the font would neither be saved nor registered. Their bytes are
+//     added to `bytesByUrl` so the regular save step writes them like any other font.
+//   - Network fonts already captured in `bytesByUrl`.
+//
+// The returned map (cache key → CSS family names) exists because a page may alias a font under a
+// name that has nothing to do with the file it serves (`font-family: MaShanZheng` → the file's
+// internal family is "Ma Shan Zheng"; `QingKeHuangYou` → "ZCOOL QingKe HuangYou"), and for a font
+// whose typographic name (nameID 16/17) exists only in a non-English record the platform font
+// reader reports it as "?????" because it can only produce ASCII. PAGX resolves text by the name
+// the document carries, so the caller forwards these pairs to `pagx embed --font-alias` /
+// `pagx render --font-alias`, which register the file under the authored name and bypass the
+// file's own name table entirely.
+//
+// Every successfully decoded entry is written back into `bytesByUrl` as SFNT, so the save step
+// below skips a second decode.
+export async function resolveFontFamilies(
+  sources: FontFaceSource[],
+  bytesByUrl: Map<string, Buffer>,
+  logger?: CaptureLogger | null,
+): Promise<Map<string, string[]>> {
+  const log: CaptureLogger = typeof logger === 'function' ? logger : () => {};
+  const familiesByKey = new Map<string, string[]>();
+  // One payload may be declared for several families; remember its cache key so the second
+  // declaration reuses the decoded entry instead of decoding again.
+  const keyByUrl = new Map<string, string>();
+  let inlineIndex = 0;
+
+  for (const source of sources) {
+    if (!source || !source.family || !source.url) {
+      continue;
+    }
+    const inline = dataUrlBytes(source.url);
+    let key = keyByUrl.get(source.url) || '';
+    if (!key) {
+      const raw = inline === null ? bytesByUrl.get(source.url) : inline;
+      if (!raw || raw.length === 0) {
+        continue;
+      }
+      key = inline === null ? source.url : `inline-font:${inlineIndex++}:${source.family}`;
+      let sfnt: Buffer;
+      try {
+        sfnt = await toSfnt(raw);
+      } catch (err) {
+        log(`font decode skipped for '${source.family}': ${errMessage(err)}`);
+        continue;
+      }
+      // Normalise the cache entry to SFNT so the save step skips a second decode.
+      bytesByUrl.set(key, sfnt);
+      keyByUrl.set(source.url, key);
+    }
+    const families = familiesByKey.get(key) || [];
+    if (!families.includes(source.family)) {
+      families.push(source.family);
+    }
+    familiesByKey.set(key, families);
+  }
+  return familiesByKey;
+}
+
 // Build a content-addressed `<Family>-<Style>-<hash>.<ext>` filename. The
 // hash suffix (first 16 hex chars of the SFNT's SHA-1) makes the name a pure
 // function of the bytes, which gives us two properties for free:
@@ -217,6 +323,7 @@ export async function saveDownloadedFonts(
   fontBytesByUrl: Map<string, Buffer> | null | undefined,
   outDir: string,
   logger?: CaptureLogger,
+  cssFamiliesByKey?: Map<string, string[]>,
 ): Promise<SavedFont[]> {
   const log: CaptureLogger = typeof logger === 'function' ? logger : () => {};
   const entries = fontBytesByUrl ? Array.from(fontBytesByUrl.entries()) : [];
@@ -224,9 +331,10 @@ export async function saveDownloadedFonts(
 
   await fsp.mkdir(outDir, { recursive: true });
 
-  // Decompress + hash in parallel: WOFF2 → SFNT decoding is non-trivial CPU
-  // work and the original loop did it one at a time. Each entry is wrapped
-  // in its own try so a single bad font doesn't poison the batch.
+  // Decompress + hash in parallel. The WOFF2 decompression itself is serialised inside
+  // `decompressWoff2` (the decoder's WASM heap is shared), so this Promise.all only overlaps the
+  // hashing and name-table reads. Each entry is wrapped in its own try so a single bad font
+  // doesn't poison the batch.
   type Decoded = { url: string; sfnt: Buffer; hash: string; meta: ReturnType<typeof readFontMeta> };
   const decoded = await Promise.all(entries.map(async ([url, raw]): Promise<Decoded | null> => {
     try {
@@ -243,32 +351,54 @@ export async function saveDownloadedFonts(
 
   // Dedupe by content hash sequentially so the order in which fonts win the
   // unique slot is deterministic (mirrors the previous loop's behaviour).
-  type Pending = { url: string; sfnt: Buffer; filePath: string; meta: ReturnType<typeof readFontMeta> };
-  const seenHashes = new Set<string>();
-  const pending: Pending[] = [];
+  // Identical bytes served under different URLs may carry different CSS names (two subsets of one
+  // family, a mirror URL), so the families of every duplicate merge into the surviving entry.
+  type Pending = {
+    url: string;
+    sfnt: Buffer;
+    filePath: string;
+    meta: ReturnType<typeof readFontMeta>;
+    cssFamilies: string[];
+  };
+  const pendingByHash = new Map<string, Pending>();
   for (const item of decoded) {
     if (!item) continue;
-    if (seenHashes.has(item.hash)) continue;
-    seenHashes.add(item.hash);
+    const families = cssFamiliesByKey ? cssFamiliesByKey.get(item.url) || [] : [];
+    const existing = pendingByHash.get(item.hash);
+    if (existing) {
+      for (const family of families) {
+        if (!existing.cssFamilies.includes(family)) {
+          existing.cssFamilies.push(family);
+        }
+      }
+      continue;
+    }
     const fileName = contentFileName(item.meta, item.hash);
-    const filePath = path.join(outDir, fileName);
-    pending.push({ url: item.url, sfnt: item.sfnt, filePath, meta: item.meta });
+    pendingByHash.set(item.hash, {
+      url: item.url,
+      sfnt: item.sfnt,
+      filePath: path.join(outDir, fileName),
+      meta: item.meta,
+      cssFamilies: families.slice(),
+    });
   }
 
   // Content-addressed name ⇒ an existing file with this name already holds
   // the same bytes, so skip the rewrite (and the duplicate download cost on
   // disk). Otherwise stage + atomically rename so parallel cases never
   // observe a partial file.
-  const results = await Promise.all(pending.map(async ({ url, sfnt, filePath, meta }) => {
-    try {
-      if (!fs.existsSync(filePath)) {
-        await writeFileAtomic(filePath, sfnt);
+  const results = await Promise.all(Array.from(pendingByHash.values()).map(
+    async ({ url, sfnt, filePath, meta, cssFamilies }) => {
+      try {
+        if (!fs.existsSync(filePath)) {
+          await writeFileAtomic(filePath, sfnt);
+        }
+        return { url, path: filePath, family: meta.family, style: meta.style, cssFamilies } as SavedFont;
+      } catch (err) {
+        log(`failed to save font ${url}: ${errMessage(err)}`);
+        return null;
       }
-      return { url, path: filePath, family: meta.family, style: meta.style } as SavedFont;
-    } catch (err) {
-      log(`failed to save font ${url}: ${errMessage(err)}`);
-      return null;
-    }
-  }));
+    },
+  ));
   return results.filter((r): r is SavedFont => r !== null);
 }

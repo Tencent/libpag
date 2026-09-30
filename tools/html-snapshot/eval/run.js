@@ -370,14 +370,17 @@ async function processCase(entry, outDir, opts, browser) {
   row.flexInferred = w.flexInferred;
   row.flexSkipped = w.flexSkipped;
 
-  // The fonts this case uses (from its manifest) become `--fallback` args for
-  // `pagx render` (and `pagx embed` when --embed-fonts is set), so text
-  // in an uninstalled web font resolves against the real typeface instead of
-  // a host system fallback. Only this case's fonts are passed — the shared
-  // cache also holds other cases' fonts, which this render must not see.
-  let fontFallbacks = [];
+  // The fonts this case uses (from its manifest) are passed to `pagx render` (and
+  // `pagx embed` when --embed-fonts is set) so text in an uninstalled web font
+  // resolves against the real typeface instead of a host system fallback. Each
+  // entry carries the CSS family the page declared: the pipeline turns those into
+  // `--font-alias "<family>=<path>"`, which is what makes a file whose name table
+  // differs from the authored name (an aliased font, or one whose typographic name
+  // is non-English) resolvable at all. Only this case's fonts are passed — the
+  // shared cache also holds other cases' fonts, which this render must not see.
+  let fontRefs = [];
   if (opts.downloadFonts) {
-    fontFallbacks = readFontManifest({ manifestPath: fontManifest });
+    fontRefs = readFontManifest({ manifestPath: fontManifest });
   }
 
   // 4. resolve + (font embed) + render
@@ -394,24 +397,24 @@ async function processCase(entry, outDir, opts, browser) {
     });
     // Optionally embed the downloaded faces into the resolved .pagx so the
     // document is self-contained and its glyph metrics match the snapshot.
-    // Gated on --embed-fonts; the faces are still passed to `pagx render` as
-    // fallbacks below regardless.
-    if (opts.embedFonts && fontFallbacks.length > 0) {
+    // Gated on --embed-fonts; the faces are still passed to `pagx render`
+    // below regardless.
+    if (opts.embedFonts && fontRefs.length > 0) {
       await runPagxFontEmbed({
         pagxBin: opts.pagxBin,
         pagxFile: subsetPagx,
-        fontFiles: fontFallbacks,
+        fonts: fontRefs,
         stderrPath: path.join(caseDir, 'font-embed.stderr.txt'),
       });
     }
     // Only pass fonts to render when the case actually has some; an empty
-    // --fallback list keeps the command identical to a no-font render.
+    // font list keeps the command identical to a no-font render.
     const r = await runPagxRender({
       pagxBin: opts.pagxBin,
       pagxFile: subsetPagx,
       output: subsetPng,
       scale: 1,
-      fontFallbacks,
+      fonts: fontRefs,
       stderrPath: path.join(caseDir, 'render.stderr.txt'),
     });
     row.renderMs = r.durationMs;
