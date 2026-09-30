@@ -22,11 +22,10 @@
 namespace pag {
 
 namespace {
-// Per-thread record of the device locked by the outermost DeviceLockScope. Inner scopes created
+// Per-thread record of the context locked by the outermost DeviceLockScope. Inner scopes created
 // on the same thread reuse the recorded context instead of re-entering tgfx's non-recursive
 // device mutex (see the class comment in Devices.h). Only DeviceLockScope maintains this record;
 // raw tgfx::Device::lockContext() callers are outside its protection.
-thread_local tgfx::Device* tlsLockedDevice = nullptr;
 thread_local tgfx::Context* tlsLockedContext = nullptr;
 thread_local int tlsLockDepth = 0;
 }  // namespace
@@ -50,7 +49,6 @@ DeviceLockScope::DeviceLockScope() {
   }
   _ownsLock = true;
   _context = context;
-  tlsLockedDevice = _device.get();
   tlsLockedContext = context;
   tlsLockDepth = 1;
 }
@@ -68,7 +66,6 @@ DeviceLockScope::~DeviceLockScope() {
   if (_ownsLock && _device) {
     _device->unlock();
   }
-  tlsLockedDevice = nullptr;
   tlsLockedContext = nullptr;
   _context = nullptr;
 }
