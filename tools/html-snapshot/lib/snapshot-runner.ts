@@ -29,7 +29,9 @@ import {
 } from './animation-capture';
 import {
   makeFontCaptureListener,
+  resolveFontFamilies,
   saveDownloadedFonts,
+  type FontFaceSource,
   type SavedFont,
 } from './font-download';
 import {
@@ -53,6 +55,13 @@ import type {
   EngineWrapper,
 } from './browser-engine';
 import { ResourceCache, type CachedResource } from './resource-cache';
+
+// Entry expression for the page's `@font-face` map. The collector ships with
+// ICON_FONT_INIT_SCRIPT (registered at navigation time), so this stays a
+// sub-100-byte round trip. Guarded so a caller that never installed the init
+// script degrades to "no sources" instead of throwing.
+const COLLECT_FONT_FACE_MAP_EXPR =
+  '(async () => (window.__pagxIconFont ? await window.__pagxIconFont.collectFontFaceMap() : {}))()';
 
 // Build a `page.on('response')` listener that captures every successful
 // image response into `cache` as a `url -> { buffer, contentType }` mapping.
@@ -770,14 +779,52 @@ export async function runSnapshot(
       html: string; width: number; height: number;
     };
 
-    // Write the web fonts the browser fetched to disk. The font bytes were
-    // captured off the `response` event during load + settle, so they are
-    // already in `fontBytesByUrl` by now (no page interaction needed). This
-    // is best-effort: a decode/write failure degrades to "no fonts on disk"
-    // and the rest of the snapshot still returns.
-    const fonts: SavedFont[] = (downloadFonts && fontDir)
-      ? await bestEffortSave(saveDownloadedFonts, fontBytesByUrl, fontDir, log, 'font')
-      : [];
+    // Write the web fonts to disk: the ones the browser fetched (captured off
+    // the `response` event during load + settle) plus the ones inlined as
+    // `data:` URLs (collected from the page's `@font-face` rules here — a
+    // `data:` URI issues no request, so the response listener can never see
+    // one). Deferring the collection to this point costs nothing and lets the
+    // CSS-family pass below see every font the page loaded.
+    //
+    // `resolveFontFamilies` also returns each file's authored CSS family names:
+    // PAGX resolves text by the name the document carries, which need not match
+    // the name inside the file (`font-family: MaShanZheng` for a file whose
+    // family is "Ma Shan Zheng"; a font whose typographic name exists only in a
+    // non-English record is reported as "?????" by the platform reader). The
+    // caller forwards the pairs to `pagx embed` / `pagx render` as
+    // `--font-alias`. This is best-effort: a failure degrades to "no fonts on
+    // disk" and the rest of the snapshot still returns.
+    let fonts: SavedFont[] = [];
+    if (downloadFonts && fontDir) {
+      let cssFamiliesByKey: Map<string, string[]> | undefined;
+      try {
+        const fontFaceMap = (await page.evaluate(COLLECT_FONT_FACE_MAP_EXPR)) as Record<
+          string,
+          Array<{ family?: string; style?: string; weight?: string; url?: string }>
+        >;
+        const sources: FontFaceSource[] = [];
+        for (const family of Object.keys(fontFaceMap || {})) {
+          for (const entry of fontFaceMap[family] || []) {
+            sources.push({
+              family: entry.family || family,
+              style: entry.style || '',
+              weight: entry.weight || '',
+              url: entry.url || '',
+            });
+          }
+        }
+        cssFamiliesByKey = await resolveFontFamilies(sources, fontBytesByUrl, log);
+      } catch (err) {
+        if (log) log(`font-family collection skipped: ${errMessage(err)}`);
+      }
+      fonts = await bestEffortSave(
+        (cache, dir, saveLog) => saveDownloadedFonts(cache, dir, saveLog, cssFamiliesByKey),
+        fontBytesByUrl,
+        fontDir,
+        log,
+        'font',
+      );
+    }
     return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does

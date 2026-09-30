@@ -113,6 +113,7 @@ pagx render -o output.jpg --format jpg --quality 90 --background "#FFFFFF" input
 pagx render --font CustomFont.ttf input.pagx
 pagx render --font a.ttf --fallback "PingFang SC" input.pagx
 pagx render --font a.ttf --fallback b.otf --fallback "Noto Emoji" input.pagx
+pagx render --font-alias "MaShanZheng=mashanzheng.woff2.ttf" input.pagx
 pagx render --id "btnLayer" input.pagx            # render only the Layer with id="btnLayer"
 pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Layer
 ```
@@ -129,6 +130,7 @@ pagx render --xpath "/pagx/Layer[2]" input.pagx   # render only the matched Laye
 | `--background <color>` | Background color (#RRGGBB or #RRGGBBAA) |
 | `--font <path>` | Register a font file (can be specified multiple times) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+| `--font-alias <family>=<path>` | Register a font file under an explicit family name (repeatable) |
 
 `--id` and `--xpath` are mutually exclusive. When either is specified, only the target Layer
 is rendered, cropped to that Layer's bounds.
@@ -137,6 +139,14 @@ is rendered, cropped to that Layer's bounds.
 `--fallback` accepts either a file path (e.g., `b.otf`) or a system font name (e.g.,
 `"PingFang SC"` or `"Arial,Bold"`). Fallback fonts are tried in order when a character is
 not found in the primary font.
+
+`--font-alias "<family>=<path>"` registers a font file under the given family name instead of
+the name inside the file. Use it whenever the document's `fontFamily` does not match the file's
+own name table: a page can alias a file under any name (`font-family: MaShanZheng` serving a
+font whose family is "Ma Shan Zheng"), and a font whose typographic name exists only in a
+non-English record is reported as `?????` by the platform reader. The family must equal the
+document's `fontFamily` byte for byte; every face of the file is registered under its own style
+and added to the fallback chain, so only the family half is needed.
 
 Always output to the same directory as the input `.pagx` file. Do not commit rendered
 image files.
@@ -310,13 +320,15 @@ pagx embed --skip-images input.pagx                      # embed fonts only
 |--------|-------------|
 | `-o, --output <path>` | Output file path (default: overwrite input) |
 | `--fallback <path\|name>` | Fallback font file or system font name (can be specified multiple times) |
+| `--font-alias <family>=<path>` | Register a font file under an explicit family name (repeatable) |
 | `--skip-fonts` | Skip font embedding |
 | `--skip-images` | Skip image embedding |
 | `-h, --help` | Show this help message |
 
 Fonts are resolved in the following order:
 1. Font nodes with `file` attribute are loaded and registered by their internal family name
-2. `--fallback` fonts are tried when a character is not found in the primary font
+2. `--font-alias` files are registered under the given family name (see `pagx render`)
+3. `--fallback` fonts are tried when a character is not found in the primary font
 
 Image embedding inlines external file references (Image nodes with `filePath`) as base64 data. See the Font `file` attribute in `attributes.md` for details on external font references.
 

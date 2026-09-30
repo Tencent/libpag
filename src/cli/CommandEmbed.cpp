@@ -33,6 +33,7 @@ struct EmbedOptions {
   std::string inputFile = {};
   std::string outputFile = {};
   std::vector<std::string> fallbacks = {};
+  std::vector<FontAlias> aliases = {};
   bool skipFonts = false;
   bool skipImages = false;
 };
@@ -47,6 +48,8 @@ static void PrintEmbedUsage() {
       << "  -o, --output <path>              Output file path (default: overwrite input)\n"
       << "  --fallback <path|name>           Add a fallback font file or system font name (can\n"
       << "                                   be specified multiple times)\n"
+      << "  --font-alias <family>=<path>     Register a font file under an explicit family name\n"
+      << "                                   instead of the name inside the file (repeatable)\n"
       << "  --skip-fonts                     Skip font embedding\n"
       << "  --skip-images                    Skip image embedding\n"
       << "  -h, --help                       Show this help message\n";
@@ -60,6 +63,12 @@ static int ParseEmbedOptions(int argc, char* argv[], EmbedOptions* options) {
       options->outputFile = argv[++i];
     } else if (arg == "--fallback" && i + 1 < argc) {
       options->fallbacks.push_back(argv[++i]);
+    } else if (arg == "--font-alias" && i + 1 < argc) {
+      FontAlias alias = {};
+      if (!ParseFontAlias(argv[++i], &alias, "pagx embed")) {
+        return 1;
+      }
+      options->aliases.push_back(std::move(alias));
     } else if (arg == "--skip-fonts") {
       options->skipFonts = true;
     } else if (arg == "--skip-images") {
@@ -99,8 +108,8 @@ int RunEmbed(int argc, char* argv[]) {
     std::cerr << "pagx embed: --skip-fonts and --skip-images cannot both be set\n";
     return 1;
   }
-  if (options.skipFonts && !options.fallbacks.empty()) {
-    std::cerr << "pagx embed: --skip-fonts and --fallback cannot both be set\n";
+  if (options.skipFonts && (!options.fallbacks.empty() || !options.aliases.empty())) {
+    std::cerr << "pagx embed: --skip-fonts cannot be combined with --fallback or --font-alias\n";
     return 1;
   }
 
@@ -114,7 +123,7 @@ int RunEmbed(int argc, char* argv[]) {
   }
 
   if (!options.skipFonts) {
-    if (!EmbedFonts(document.get(), options.fallbacks, "pagx embed")) {
+    if (!EmbedFonts(document.get(), options.fallbacks, options.aliases, "pagx embed")) {
       return 1;
     }
   }

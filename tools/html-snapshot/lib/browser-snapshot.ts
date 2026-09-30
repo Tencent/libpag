@@ -89,7 +89,14 @@ const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
 // like `"PingFang SC", -apple-system, sans-serif` round-trips: the
 // importer's first concrete family lands on `Text::fontFamily` and the
 // remaining concrete entries are registered as document-level fallbacks.
-function normalizeFontFamily(value) {
+//
+// The authored names are kept verbatim. A page may serve a font under a name
+// the file itself does not carry (`font-family: MaShanZheng` for a file whose
+// family is "Ma Shan Zheng"), so the snapshot pipeline records the (CSS family
+// → file) pairing and hands it to `pagx embed` / `pagx render` as
+// `--font-alias`, which resolves the authored name without renaming anything
+// here.
+function normalizeFontFamily(value: string): string {
   if (!value) return '';
   return value.replace(/"/g, "'");
 }
@@ -5031,6 +5038,7 @@ const INTRINSIC_WIDTH_ATTR = '${INTRINSIC_WIDTH_ATTR}';
 // raw-JS helpers below run inside this IIFE, so they resolve this payload-side
 // const rather than the TS module one.
 const COLLAPSIBLE_WS = /[^\\S\\u00a0]+/g;
+
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 

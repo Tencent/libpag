@@ -45,9 +45,12 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
 // whole of a single-face file but merely the first of a collection: PingFang.ttc holds 24 faces,
 // and a request for "PingFang SC Medium" resolves to face 7 — unreachable unless every face is
 // registered under its own (family, style) key. Probing stops at the first index that fails to
-// open, so a single-face file costs one extra call.
+// open, so a single-face file costs one extra call. `familyOverride` registers every face under
+// that family instead of the one its name table carries, which is how a font alias reaches the
+// name the document uses; the style half always comes from the face, so the faces of a collection
+// stay distinguishable.
 static int RegisterFontFaces(FontConfig* fontConfig, const std::string& path,
-                             bool addToFallbackChain) {
+                             bool addToFallbackChain, const std::string& familyOverride = "") {
   static constexpr int MaxFontFaces = 64;
   int faceCount = 0;
   for (int index = 0; index < MaxFontFaces; index++) {
@@ -55,17 +58,31 @@ static int RegisterFontFaces(FontConfig* fontConfig, const std::string& path,
     if (typeface == nullptr) {
       break;
     }
-    fontConfig->registerFont(path, index, typeface->fontFamily(), typeface->fontStyle());
+    auto family = familyOverride.empty() ? typeface->fontFamily() : familyOverride;
+    fontConfig->registerFont(path, index, family, typeface->fontStyle());
     if (addToFallbackChain) {
-      fontConfig->addFallbackFont(path, index);
+      fontConfig->addFallbackFont(path, index, family, typeface->fontStyle());
     }
     faceCount++;
   }
   return faceCount;
 }
 
+bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command) {
+  auto equals = value.find('=');
+  if (equals == std::string::npos || equals == 0 || equals + 1 >= value.size()) {
+    std::cerr << command << ": malformed --font-alias '" << value
+              << "' (expected <family>=<path>)\n";
+    return false;
+  }
+  alias->family = value.substr(0, equals);
+  alias->path = value.substr(equals + 1);
+  return true;
+}
+
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
-                    const std::vector<std::string>& fallbacks, const std::string& command) {
+                    const std::vector<std::string>& fallbacks,
+                    const std::vector<FontAlias>& aliases, const std::string& command) {
   for (const auto& fontFile : fontFiles) {
     if (RegisterFontFaces(fontConfig, fontFile, false) == 0) {
       std::cerr << command << ": failed to load font '" << fontFile << "'\n";
@@ -99,15 +116,24 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       fontConfig->addFallbackSystemFont(family, style);
     }
   }
+  // Font aliases come last so an explicit (family, file) pair always wins over a plain file
+  // registration whose name table happened to produce the same key.
+  for (const auto& alias : aliases) {
+    if (RegisterFontFaces(fontConfig, alias.path, true, alias.family) == 0) {
+      std::cerr << command << ": font alias '" << alias.family << "=" << alias.path
+                << "' not found\n";
+      return false;
+    }
+  }
   return true;
 }
 
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
-                const std::string& command) {
+                const std::vector<FontAlias>& aliases, const std::string& command) {
   // Start from the document's own fallback chain: the HTML importer records the CSS font-family
   // stacks there, and applyLayout below replaces the whole config with the one passed in.
   FontConfig fontConfig = document->fontConfig();
-  if (!LoadFontConfig(&fontConfig, {}, fallbacks, command)) {
+  if (!LoadFontConfig(&fontConfig, {}, fallbacks, aliases, command)) {
     return false;
   }
   // A source file is the only record of the family/style it provides, so a missing one cannot be

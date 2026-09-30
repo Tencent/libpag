@@ -393,11 +393,16 @@ Options:
                              <output-without-ext>.images/). May be shared across
                              runs; identical images are stored once (content-
                              addressed filenames).
-  --font-manifest <file>     Write the font files this page uses (one absolute
-                             path per line) to <file>. Requires
-                             --download-fonts. Lets callers pass only the fonts
-                             this page needs to 'pagx render' / 'pagx embed'
-                             when --font-dir is shared.
+  --font-manifest <file>     Write the font files this page uses to <file>, one
+                             entry per line: "<absolute-path>" or
+                             "<absolute-path>\t<css-family-name>". The family is
+                             the name the page's @font-face rule declares; pass
+                             the pair to 'pagx render' / 'pagx embed' as
+                             --font-alias "<family>=<path>" so the document's
+                             font name resolves even when the file carries a
+                             different one. Requires --download-fonts. Lets
+                             callers pass only the fonts this page needs when
+                             --font-dir is shared.
   --browser-engine <name>    Headless browser driver: one of
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);

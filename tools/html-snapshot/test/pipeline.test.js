@@ -11,7 +11,6 @@ const {
   runPagxResolve,
   runPagxFontEmbed,
   runPagxRender,
-  collectFontFallbacks,
   readFontManifest,
   runHtmlToPagx,
   isHttpUrl,
@@ -277,29 +276,33 @@ describe('runPagxResolve / runPagxFontEmbed / runPagxRender', () => {
       .rejects.toThrow(/pagxFile is required/);
   });
 
-  test('runPagxFontEmbed appends each fallback path', async () => {
+  test('runPagxFontEmbed aliases a family-bearing font and falls back on a bare one', async () => {
     const argvPath = path.join(dir, 'argv.bin');
     const wrapper = makeArgvCapturingScript({ argvPath });
     await runPagxFontEmbed({
       pagxBin: wrapper,
       pagxFile: '/x.pagx',
-      fontFiles: ['/a.ttf', '/b.otf'],
+      fonts: [
+        { path: '/a.ttf', family: 'MaShanZheng' },
+        { path: '/b.otf', family: '' },
+      ],
     });
     expect(readArgv(argvPath)).toEqual([
       'embed', '/x.pagx', '--skip-images',
-      '--fallback', '/a.ttf',
+      // The authored family travels with the file: the name inside it need not match.
+      '--font-alias', 'MaShanZheng=/a.ttf',
       '--fallback', '/b.otf',
     ]);
   });
 
-  test('runPagxFontEmbed accepts an empty fontFiles list', async () => {
+  test('runPagxFontEmbed accepts an empty font list', async () => {
     const argvPath = path.join(dir, 'argv.bin');
     const wrapper = makeArgvCapturingScript({ argvPath });
     await runPagxFontEmbed({ pagxBin: wrapper, pagxFile: '/x.pagx' });
     expect(readArgv(argvPath)).toEqual(['embed', '/x.pagx', '--skip-images']);
   });
 
-  test('runPagxRender forwards scale and fallback args', async () => {
+  test('runPagxRender forwards scale and font args', async () => {
     const argvPath = path.join(dir, 'argv.bin');
     const wrapper = makeArgvCapturingScript({ argvPath });
     await runPagxRender({
@@ -307,7 +310,7 @@ describe('runPagxResolve / runPagxFontEmbed / runPagxRender', () => {
       pagxFile: '/x.pagx',
       output: '/out.png',
       scale: 2,
-      fontFallbacks: ['/a.ttf'],
+      fonts: [{ path: '/a.ttf', family: '' }],
     });
     expect(readArgv(argvPath)).toEqual([
       'render', '/x.pagx',
@@ -338,27 +341,6 @@ describe('runPagxResolve / runPagxFontEmbed / runPagxRender', () => {
   });
 });
 
-describe('collectFontFallbacks', () => {
-  test('returns [] when no fontDir is provided', () => {
-    expect(collectFontFallbacks({})).toEqual([]);
-  });
-
-  test('returns [] for a non-existent directory', () => {
-    expect(collectFontFallbacks({ fontDir: path.join(dir, 'missing') })).toEqual([]);
-  });
-
-  test('returns absolute SFNT paths sorted alphabetically', () => {
-    fs.writeFileSync(path.join(dir, 'b.ttf'), '');
-    fs.writeFileSync(path.join(dir, 'a.OTF'), '');
-    fs.writeFileSync(path.join(dir, 'c.ttc'), '');
-    fs.writeFileSync(path.join(dir, 'note.txt'), '');
-    fs.writeFileSync(path.join(dir, 'icon.svg'), '');
-    const fonts = collectFontFallbacks({ fontDir: dir });
-    expect(fonts.map((p) => path.basename(p))).toEqual(['a.OTF', 'b.ttf', 'c.ttc']);
-    fonts.forEach((p) => expect(path.isAbsolute(p)).toBe(true));
-  });
-});
-
 describe('readFontManifest', () => {
   test('returns [] when manifestPath is missing', () => {
     expect(readFontManifest({})).toEqual([]);
@@ -368,14 +350,27 @@ describe('readFontManifest', () => {
     expect(readFontManifest({ manifestPath: path.join(dir, 'no.txt') })).toEqual([]);
   });
 
-  test('skips blank lines and non-existent paths', () => {
+  test('skips blank lines and non-existent paths, keeping the family column', () => {
     const real = path.join(dir, 'a.ttf');
     fs.writeFileSync(real, '');
+    const aliased = path.join(dir, 'b.ttf');
+    fs.writeFileSync(aliased, '');
     const ghost = path.join(dir, 'ghost.ttf');
     const manifest = path.join(dir, 'manifest.txt');
-    fs.writeFileSync(manifest, [real, '', '   ', ghost, real].join('\n'));
+    fs.writeFileSync(manifest, [
+      real,
+      '',
+      '   ',
+      ghost,
+      `${aliased}\tMaShanZheng`,
+      `${aliased}\tZCOOL XiaoWei`,
+    ].join('\n'));
     const out = readFontManifest({ manifestPath: manifest });
-    expect(out).toEqual([real, real]);
+    expect(out).toEqual([
+      { path: real, family: '' },
+      { path: aliased, family: 'MaShanZheng' },
+      { path: aliased, family: 'ZCOOL XiaoWei' },
+    ]);
   });
 });
 
@@ -583,9 +578,10 @@ describe('runHtmlToPagx — orchestrator', () => {
     // Case A: empty font dir → "no web fonts were captured" log.
     let logsA = [];
     const snapImplA = async (a) => {
-      // The pipeline pre-creates the font dir via the snapshot child; mimic
-      // that here so collectFontFallbacks finds the directory but no entries.
+      // The snapshot child pre-creates the font dir and writes the manifest
+      // (empty when the page has no web fonts); mimic both here.
       fs.mkdirSync(a.fontDir, { recursive: true });
+      fs.writeFileSync(a.fontManifest, '');
       fs.writeFileSync(a.output, '<html/>');
       return { code: 0, durationMs: 1, stdout: '', stderr: '' };
     };
@@ -606,7 +602,9 @@ describe('runHtmlToPagx — orchestrator', () => {
     fakePagx.callsByCmd.embed = 0;
     const snapImplB = async (a) => {
       fs.mkdirSync(a.fontDir, { recursive: true });
-      fs.writeFileSync(path.join(a.fontDir, 'Real.ttf'), 'fake');
+      const fontPath = path.join(a.fontDir, 'Real.ttf');
+      fs.writeFileSync(fontPath, 'fake');
+      fs.writeFileSync(a.fontManifest, `${fontPath}\tCSS Family\n`);
       fs.writeFileSync(a.output, '<html/>');
       return { code: 0, durationMs: 1, stdout: '', stderr: '' };
     };
@@ -620,7 +618,7 @@ describe('runHtmlToPagx — orchestrator', () => {
       snapshotImpl: snapImplB,
       log: () => {},
     });
-    expect(result.fonts).toHaveLength(1);
+    expect(result.fonts).toEqual([expect.objectContaining({ family: 'CSS Family' })]);
     expect(fakePagx.callsByCmd.embed).toBe(1);
   });
 
