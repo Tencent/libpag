@@ -22,6 +22,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/ImageFormatUtils.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
@@ -31,7 +32,6 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -210,23 +210,24 @@ struct TiledPatternDrawer {
 
 }  // namespace
 
-GPUContext::~GPUContext() {
-  _device = nullptr;
-}
+GPUContext::~GPUContext() = default;
 
 tgfx::Context* GPUContext::lockContext() {
-  if (!_device) {
-    _device = tgfx::GLDevice::Make();
-    if (!_device) {
-      return nullptr;
-    }
+  // Nested pairs reuse the already-locked context (pag::DeviceLockScope) instead of re-entering
+  // tgfx's non-recursive device mutex, which deadlocks once devices are deduplicated per native
+  // GPU object (tgfx #1581).
+  auto scope = std::make_unique<pag::DeviceLockScope>();
+  if (!*scope) {
+    return nullptr;
   }
-  return _device->lockContext();
+  auto* context = scope->context();
+  _lockStack.push_back(std::move(scope));
+  return context;
 }
 
 void GPUContext::unlock() {
-  if (_device) {
-    _device->unlock();
+  if (!_lockStack.empty()) {
+    _lockStack.pop_back();
   }
 }
 

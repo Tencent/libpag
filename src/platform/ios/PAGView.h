@@ -20,6 +20,12 @@
 #import "PAGImage.h"
 #import "PAGLayer.h"
 
+// PAGView is a UIView-backed UI wrapper. On the OpenGL backend it renders into a CAEAGLLayer
+// via GPUDrawable; on the Metal backend it renders into a CAMetalLayer via
+// [PAGSurface FromMetalLayer:]. Both backends share the same PAGPlayer + PAGAnimator animation
+// loop and listener surface. The public API is backend-agnostic, so the class is always declared
+// here; backend-specific surface creation is resolved inside the implementation.
+
 @class PAGView;
 
 @protocol PAGViewListener <NSObject>
@@ -270,6 +276,11 @@ PAG_API @interface PAGView : UIView
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGView. Subsequent rendering of
  * the PAGView will not be captured. Returns nil if the PAGView hasn't been presented yet.
+ * Limitation: on the Metal backend this method is unreliable — the underlying tgfx window
+ * releases its CAMetalDrawable right after presentation, so a later readback receives whichever
+ * drawable comes off the layer's rotation queue (often blank or stale). This is not fixable on
+ * the libpag side alone; use an offscreen PAGSurface if you need reliable snapshots with Metal.
+ * The OpenGL backend is not affected.
  */
 - (CVPixelBufferRef)makeSnapshot;
 

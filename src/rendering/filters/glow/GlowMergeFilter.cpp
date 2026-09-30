@@ -58,7 +58,7 @@ std::string GlowMergeRuntimeFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> GlowMergeRuntimeFilter::uniformBlocks() const {
-  return {{"FilterUniforms", 0}};
+  return {{"FilterUniforms", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 std::vector<tgfx::BindingEntry> GlowMergeRuntimeFilter::textureSamplers() const {

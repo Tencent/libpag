@@ -38,6 +38,16 @@
   return pagSurface;
 }
 
++ (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMetalLayer:metalLayer];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
 + (PAGSurface*)MakeFromGPU:(CGSize)size {
   return [PAGSurface MakeOffscreen:size];
 }

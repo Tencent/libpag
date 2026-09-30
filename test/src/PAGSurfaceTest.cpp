@@ -17,8 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
+
+// The GL section exercises GL-specific behavior (external GLTextureInfo binding, share-context
+// verification via GLDevice::sharableWith, and the GLRestorer external-state guard). None of
+// these have exact Metal / Vulkan / D3D12 / WebGPU equivalents, so it is gated on
+// TGFX_USE_OPENGL. The Metal section at the bottom of this file mirrors the ImageOrigin-related
+// tests via MTLTexture — those parts *do* have Metal semantics and are gated on TGFX_USE_METAL.
+#ifdef TGFX_USE_OPENGL
+
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
@@ -256,3 +264,76 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
   device->unlock();
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL
+
+// Metal-backend PAGSurface tests. These mirror the GL cases above but source their external
+// textures from an id<MTLTexture> instead of a GLuint texture id, so they exercise the Metal
+// side of PAGSurface::MakeFrom(BackendTexture) and the ImageOrigin::BottomLeft handling in the
+// Metal render path.
+#ifdef TGFX_USE_METAL
+
+namespace pag {
+using namespace tgfx;
+
+/**
+ * 用例描述: Metal backend equivalent of PAGSurfaceTest.Mask. External MTLTexture with
+ * BottomLeft origin used as the render target.
+ */
+PAG_TEST(PAGSurfaceMetalTest, Mask) {
+  auto pagFile = LoadPAGFile("assets/test2.pag");
+  auto width = pagFile->width();
+  auto height = pagFile->height();
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  device->unlock();
+  ASSERT_TRUE(pagSurface != nullptr);
+
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(Matrix::I());
+  pagPlayer->setProgress(0.9);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSurfaceMetalTest/Mask"));
+
+  ReleaseMetalTexture(&textureInfo);
+}
+
+/**
+ * 用例描述: Metal backend equivalent of PAGSurfaceTest.BottomLeftScissor — verifies that the
+ * scissor rect is flipped correctly on BottomLeft-origin external textures.
+ */
+PAG_TEST(PAGSurfaceMetalTest, BottomLeftScissor) {
+  auto pagFile = LoadPAGFile("assets/test.pag");
+  auto width = pagFile->width();
+  auto height = pagFile->height() * 2;
+  auto device = DevicePool::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::MetalTextureInfo textureInfo = {};
+  ASSERT_TRUE(CreateMetalTexture(context, width, height, &textureInfo));
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  device->unlock();
+  ASSERT_TRUE(pagSurface != nullptr);
+
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(pag::Matrix::MakeTrans(0, static_cast<float>(pagFile->height())));
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSurfaceMetalTest/BottomLeftScissor"));
+
+  ReleaseMetalTexture(&textureInfo);
+}
+}  // namespace pag
+
+#endif  // TGFX_USE_METAL

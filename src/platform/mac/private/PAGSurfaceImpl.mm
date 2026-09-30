@@ -17,10 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurfaceImpl.h"
-#include "GPUDrawable.h"
 #import "PAGLayerImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
+
+#if defined(TGFX_USE_OPENGL)
+#include "GPUDrawable.h"
+#endif
+
+#if defined(TGFX_USE_METAL)
+#include "platform/cocoa/private/MetalGPUDrawable.h"
+#endif
 
 @interface PAGSurfaceImpl ()
 
@@ -33,12 +40,31 @@
 }
 
 + (PAGSurfaceImpl*)FromView:(NSView*)view {
+#if defined(TGFX_USE_OPENGL)
   auto drawable = pag::GPUDrawable::FromView(view);
   auto surface = pag::PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     return nil;
   }
   return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromView:].");
+  return nil;
+#endif
+}
+
++ (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer {
+#if defined(TGFX_USE_METAL)
+  auto drawable = pag::MetalGPUDrawable::FromLayer(layer);
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    return nil;
+  }
+  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+#else
+  LOGE("The current libpag build does not support [PAGSurface FromMetalLayer:].");
+  return nil;
+#endif
 }
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {

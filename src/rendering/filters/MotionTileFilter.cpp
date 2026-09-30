@@ -113,7 +113,7 @@ std::string MotionTileFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> MotionTileFilter::uniformBlocks() const {
-  return {{"Args", 0}};
+  return {{"Args", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void MotionTileFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

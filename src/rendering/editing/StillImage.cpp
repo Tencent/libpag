@@ -21,9 +21,9 @@
 #include "base/utils/UniqueID.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/gpu/Devices.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Picture.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {
@@ -61,15 +61,18 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> im
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
-  auto context = tgfx::GLDevice::CurrentNativeHandle();
-  if (context == nullptr) {
-    LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
-    return nullptr;
-  }
   auto pagImage = std::shared_ptr<StillImage>(new StillImage(texture.width(), texture.height()));
+  // Picture::MakeFrom() captures the owning device identity from the texture in one shot. On GL
+  // it requires a current GPU context on the calling thread (capturing the native handle for the
+  // later share-compatibility check); on other backends a null capture is normal and not an
+  // error. Distinguish the two cases so the GL user gets an actionable message.
   auto picture = Picture::MakeFrom(pagImage->uniqueID(), ToTGFX(texture), ToTGFX(origin));
   if (!picture) {
-    LOGE("PAGImage.MakeFrom() The texture is invalid.");
+    if (Devices::RequiresCapturedIdentity()) {
+      LOGE("PAGImage.FromTexture() There is no current GPU context on the calling thread.");
+    } else {
+      LOGE("PAGImage.MakeFrom() The texture is invalid.");
+    }
     return nullptr;
   }
   pagImage->graphic = picture;

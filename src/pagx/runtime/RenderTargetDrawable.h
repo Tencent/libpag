@@ -24,8 +24,8 @@ namespace pagx {
 
 /**
  * RenderTargetDrawable backs a PAGSurface with an externally created backend render target. The
- * device is obtained from GLDevice::Current() so that the PAGSurface shares the same GPU context
- * as the caller.
+ * device is adopted from the host thread's current GPU context (via pag::Devices::AdoptCurrent())
+ * so that the PAGSurface shares the same GPU context as the caller.
  */
 class RenderTargetDrawable : public Drawable {
  public:

@@ -30,6 +30,8 @@
 
 + (PAGSurfaceImpl*)FromView:(NSView*)view;
 
++ (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer;
+
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 
 - (void)updateSize;
