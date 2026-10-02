@@ -686,8 +686,7 @@ class PPTWriter {
 
   void writeLayer(XMLBuilder& out, const Layer* layer,
                   const std::shared_ptr<tgfx::Layer>& tgfxLayer, const Matrix& parentMatrix = {},
-                  float parentAlpha = 1.0f, const std::vector<LayerFilter*>& inheritedFilters = {},
-                  const std::vector<LayerStyle*>& inheritedStyles = {});
+                  float parentAlpha = 1.0f);
 
  private:
   // Returns true iff the layer was successfully rasterized and emitted as p:pic.

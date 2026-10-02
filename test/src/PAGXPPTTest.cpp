@@ -23,6 +23,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -75,6 +76,7 @@
 #include "utils/PAGXImageTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
+#include "utils/ZipTestUtils.h"
 
 namespace pag {
 
@@ -2872,6 +2874,85 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithShadow) {
   pagx::PPTExportOptions options;
   options.convertTextToPath = false;
   ASSERT_TRUE(ExportAndVerify(*doc, "native_text_shadow", options));
+}
+
+PAGX_TEST(PAGXPPTTest, ParentLayerEffectsDoNotLeakIntoChildTextRun) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  auto* card = doc->makeNode<pagx::Layer>();
+  card->name = "Card";
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {260, 160};
+  auto* cardFill = doc->makeNode<pagx::Fill>();
+  auto* cardColor = doc->makeNode<pagx::SolidColor>();
+  cardColor->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  cardFill->color = cardColor;
+  card->contents.push_back(rect);
+  card->contents.push_back(cardFill);
+
+  auto* shadow = doc->makeNode<pagx::DropShadowStyle>();
+  shadow->offsetY = 14;
+  shadow->blurX = 17;
+  shadow->blurY = 17;
+  shadow->color = {1.0f, 0.54f, 0.12f, 0.16f};
+  card->styles.push_back(shadow);
+
+  auto* blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 3;
+  blur->blurY = 3;
+  card->filters.push_back(blur);
+
+  auto* label = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Child Label";
+  text->position = {125, 155};
+  text->fontFamily = "Arial";
+  text->fontSize = 28;
+  auto* textFill = doc->makeNode<pagx::Fill>();
+  auto* textColor = doc->makeNode<pagx::SolidColor>();
+  textColor->color = {0.2f, 0.25f, 0.35f, 1.0f};
+  textFill->color = textColor;
+  label->contents.push_back(text);
+  label->contents.push_back(textFill);
+  card->children.push_back(label);
+  doc->layers.push_back(card);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = false;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+
+  std::unordered_map<std::string, std::string> entries;
+  std::string error;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  const auto& slide = entries.at("ppt/slides/slide1.xml");
+
+  auto shadowPos = slide.find("<a:outerShdw");
+  ASSERT_NE(shadowPos, std::string::npos);
+  EXPECT_EQ(slide.find("<a:outerShdw", shadowPos + 1), std::string::npos);
+  auto blurPos = slide.find("<a:blur");
+  ASSERT_NE(blurPos, std::string::npos);
+  EXPECT_EQ(slide.find("<a:blur", blurPos + 1), std::string::npos);
+
+  auto textPos = slide.find("<a:t>Child Label</a:t>");
+  ASSERT_NE(textPos, std::string::npos);
+  auto runStart = slide.rfind("<a:rPr", textPos);
+  auto runEnd = slide.find("</a:rPr>", runStart);
+  ASSERT_NE(runStart, std::string::npos);
+  ASSERT_NE(runEnd, std::string::npos);
+  auto runProperties = slide.substr(runStart, runEnd - runStart);
+  EXPECT_EQ(runProperties.find("outerShdw"), std::string::npos);
+  EXPECT_EQ(runProperties.find("<a:blur"), std::string::npos);
+
+  auto groupPropsStart = slide.rfind("<p:grpSpPr>", shadowPos);
+  auto groupPropsEnd = slide.find("</p:grpSpPr>", shadowPos);
+  ASSERT_NE(groupPropsStart, std::string::npos);
+  ASSERT_NE(groupPropsEnd, std::string::npos);
+  EXPECT_LT(groupPropsStart, shadowPos);
+  EXPECT_LT(shadowPos, groupPropsEnd);
+  EXPECT_LT(groupPropsStart, blurPos);
+  EXPECT_LT(blurPos, groupPropsEnd);
 }
 
 PAGX_TEST(PAGXPPTTest, PathZeroBoundsSkipped) {

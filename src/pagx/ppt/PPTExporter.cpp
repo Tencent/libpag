@@ -722,35 +722,9 @@ bool PPTWriter::rasterizeLayerAsPicture(XMLBuilder& out, const Layer* layer,
   return true;
 }
 
-// Layer filters and styles follow identical merge semantics: own entries come
-// first (so CollectEffectSources picks the layer's own effect when both the
-// layer and a parent carry the same effect type), then inherited entries.
-// Shortcuts handle the common empty-on-either-side cases without allocating a
-// new vector.
-namespace {
-
-template <typename T>
-std::vector<T*> MergeLayerLists(const std::vector<T*>& own, const std::vector<T*>& inherited) {
-  if (inherited.empty()) {
-    return own;
-  }
-  if (own.empty()) {
-    return inherited;
-  }
-  std::vector<T*> merged;
-  merged.reserve(own.size() + inherited.size());
-  merged.insert(merged.end(), own.begin(), own.end());
-  merged.insert(merged.end(), inherited.begin(), inherited.end());
-  return merged;
-}
-
-}  // namespace
-
 void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
                            const std::shared_ptr<tgfx::Layer>& tgfxLayer,
-                           const Matrix& parentMatrix, float parentAlpha,
-                           const std::vector<LayerFilter*>& inheritedFilters,
-                           const std::vector<LayerStyle*>& inheritedStyles) {
+                           const Matrix& parentMatrix, float parentAlpha) {
   if (!layer->visible && layer->mask == nullptr) {
     return;
   }
@@ -822,11 +796,49 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
     layerMatrix = layerMatrix * Matrix::Translate(-layer->scrollRect.x, -layer->scrollRect.y);
   }
 
-  // Merge the layer's own filters/styles with any inherited from a parent layer.
-  // Own entries come first so CollectEffectSources picks the layer's own effects
-  // when both layers carry the same effect type (e.g. both have a BlurFilter).
-  auto effectiveFilters = MergeLayerLists(layer->filters, inheritedFilters);
-  auto effectiveStyles = MergeLayerLists(layer->styles, inheritedStyles);
+  // PPTX has no generic layer node, but a group shape is the correct scope for effects that PAGX
+  // applies to a Layer's composited output. Applying those effects independently to every emitted
+  // descendant changes their source alpha and duplicates shadows/blur on child text and geometry.
+  // Wrap only layers with an OOXML-representable effect; otherwise keep the historical flat output.
+  // Child coordinates already include the full PAGX matrix chain, so this group uses an identity
+  // document-sized coordinate mapping and exists solely as an effect/compositing boundary.
+  bool hasGroupEffects = !CollectEffectSources(layer->filters, layer->styles).empty();
+  if (hasGroupEffects) {
+    int id = _ctx->nextShapeId();
+    out.openElement("p:grpSp").closeElementStart();
+    out.openElement("p:nvGrpSpPr").closeElementStart();
+    out.openElement("p:cNvPr")
+        .addRequiredAttribute("id", id)
+        .addRequiredAttribute("name", layer->name.empty() ? "Layer" : layer->name)
+        .closeElementSelfClosing();
+    out.openElement("p:cNvGrpSpPr").closeElementSelfClosing();
+    out.openElement("p:nvPr").closeElementSelfClosing();
+    out.closeElement();  // p:nvGrpSpPr
+
+    auto width = std::max(int64_t(1), PxToEMU(_doc->width));
+    auto height = std::max(int64_t(1), PxToEMU(_doc->height));
+    out.openElement("p:grpSpPr").closeElementStart();
+    out.openElement("a:xfrm").closeElementStart();
+    out.openElement("a:off")
+        .addRequiredAttribute("x", 0)
+        .addRequiredAttribute("y", 0)
+        .closeElementSelfClosing();
+    out.openElement("a:ext")
+        .addRequiredAttribute("cx", width)
+        .addRequiredAttribute("cy", height)
+        .closeElementSelfClosing();
+    out.openElement("a:chOff")
+        .addRequiredAttribute("x", 0)
+        .addRequiredAttribute("y", 0)
+        .closeElementSelfClosing();
+    out.openElement("a:chExt")
+        .addRequiredAttribute("cx", width)
+        .addRequiredAttribute("cy", height)
+        .closeElementSelfClosing();
+    out.closeElement();  // a:xfrm
+    writeEffects(out, layer->filters, layer->styles);
+    out.closeElement();  // p:grpSpPr
+  }
 
   // PAGX placement: Fill/Stroke with placement="foreground" paint AFTER child layers and
   // composition layers, so they overlay child content. Mirror HTMLWriter::writeLayerInner's
@@ -836,7 +848,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   // shallow flat-list scan would otherwise leave it suppressed by both passes' filters.
   bool hasForeground = HasForegroundPainter(layer->contents);
 
-  writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles,
+  writeElements(out, layer->contents, layerMatrix, layerAlpha, {}, {},
                 /*parentTextBox=*/nullptr, LayerPlacement::Background);
 
   // Descend into the matching tgfx subtree: LayerBuilder pushes one tgfx::Layer per child in the
@@ -853,8 +865,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
         childTgfx = (*tgfxChildren)[tgfxChildIndex];
       }
       ++tgfxChildIndex;
-      writeLayer(out, compLayer, childTgfx, layerMatrix, layerAlpha, effectiveFilters,
-                 effectiveStyles);
+      writeLayer(out, compLayer, childTgfx, layerMatrix, layerAlpha);
     }
   }
 
@@ -874,12 +885,16 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
     if (child == layer->mask) {
       continue;
     }
-    writeLayer(out, child, childTgfx, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles);
+    writeLayer(out, child, childTgfx, layerMatrix, layerAlpha);
   }
 
   if (hasForeground) {
-    writeElements(out, layer->contents, layerMatrix, layerAlpha, effectiveFilters, effectiveStyles,
+    writeElements(out, layer->contents, layerMatrix, layerAlpha, {}, {},
                   /*parentTextBox=*/nullptr, LayerPlacement::Foreground);
+  }
+
+  if (hasGroupEffects) {
+    out.closeElement();  // p:grpSp
   }
 }
 

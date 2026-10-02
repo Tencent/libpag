@@ -1,0 +1,5 @@
+{
+  "_comment": "Renderer-specific corpus means for PPTTest. Seed on a trusted fixed environment with PPT_EVAL_UPDATE_BASELINE=1. Until then all corpora are report-only.",
+  "updatedAt": null,
+  "corpora": {}
+}
