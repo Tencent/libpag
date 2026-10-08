@@ -228,7 +228,7 @@ public class PAGImageView extends View implements PAGAnimator.Listener {
      * current matrix of the PAGImageView changes when this method is called.
      */
     public void setScaleMode(int scaleMode) {
-        if (scaleMode == _scaleMode) {
+        if (scaleMode == _scaleMode && matrixDrivenByScaleMode) {
             return;
         }
         _scaleMode = scaleMode;
