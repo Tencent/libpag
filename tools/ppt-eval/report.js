@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
+// Keep these display helpers aligned with summary.js.
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const format = (value, digits = 4) => finite(value) ? value.toFixed(digits) : '-';
 const percent = (value, digits = 2) => finite(value) ? `${(value * 100).toFixed(digits)}%` : '-';

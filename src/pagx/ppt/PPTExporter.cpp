@@ -62,14 +62,12 @@ using pag::RadiansToDegrees;
 namespace {
 
 // True when an ImagePattern fill was already emitted as a standalone <p:pic>
-// and the surrounding shape adds nothing — no stroke painter, no layer
-// filters, no layer styles. In that case the caller can skip emitting a
+// and the surrounding shape adds nothing because it has no stroke painter.
+// Layer effects belong to the enclosing group. The caller can skip emitting a
 // redundant <p:sp> envelope and return early. Centralizes the guard shared by
 // writeRectangle / writeEllipse / writePath.
-bool CanSkipShapeAfterPicture(bool imageWritten, const FillStrokeInfo& fs,
-                              const std::vector<LayerFilter*>& filters,
-                              const std::vector<LayerStyle*>& styles) {
-  return imageWritten && !fs.stroke && filters.empty() && styles.empty();
+bool CanSkipShapeAfterPicture(bool imageWritten, const FillStrokeInfo& fs) {
+  return imageWritten && !fs.stroke;
 }
 
 struct EditableTextScope {
@@ -217,16 +215,13 @@ void PPTWriter::writeGlyphShape(XMLBuilder& out, const Fill* fill, float alpha) 
 }
 
 void PPTWriter::writeShapeTail(XMLBuilder& out, const FillStrokeInfo& fs, float alpha,
-                               const Rect& shapeBounds, bool imageWritten,
-                               const std::vector<LayerFilter*>& filters,
-                               const std::vector<LayerStyle*>& styles) {
+                               const Rect& shapeBounds, bool imageWritten) {
   if (imageWritten) {
     out.openElement("a:noFill").closeElementSelfClosing();
   } else {
     writeFill(out, fs.fill, alpha, shapeBounds);
   }
   writeStroke(out, fs.stroke, alpha);
-  writeEffects(out, filters, styles);
   endShape(out);
 }
 
@@ -263,9 +258,7 @@ void PPTWriter::writeContourGeom(XMLBuilder& out, std::vector<PathContour>& cont
 // ── Shape writers ──────────────────────────────────────────────────────────
 
 void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const FillStrokeInfo& fs,
-                               const Matrix& m, float alpha,
-                               const std::vector<LayerFilter*>& filters,
-                               const std::vector<LayerStyle*>& styles) {
+                               const Matrix& m, float alpha) {
   auto renderPos = rect->renderPosition();
   auto renderSize = rect->renderSize();
   float x = renderPos.x - renderSize.width / 2.0f;
@@ -284,7 +277,7 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
   Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (CanSkipShapeAfterPicture(imageWritten, fs, filters, styles)) {
+  if (CanSkipShapeAfterPicture(imageWritten, fs)) {
     return;
   }
 
@@ -309,12 +302,11 @@ void PPTWriter::writeRectangle(XMLBuilder& out, const Rectangle* rect, const Fil
     out.closeElement();
   }
 
-  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten);
 }
 
 void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const FillStrokeInfo& fs,
-                             const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
-                             const std::vector<LayerStyle*>& styles) {
+                             const Matrix& m, float alpha) {
   auto renderSize = ellipse->renderSize();
   float rx = renderSize.width / 2.0f;
   float ry = renderSize.height / 2.0f;
@@ -331,7 +323,7 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   Rect shapeBounds = Rect::MakeXYWH(x, y, w, h);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (CanSkipShapeAfterPicture(imageWritten, fs, filters, styles)) {
+  if (CanSkipShapeAfterPicture(imageWritten, fs)) {
     return;
   }
 
@@ -342,12 +334,11 @@ void PPTWriter::writeEllipse(XMLBuilder& out, const Ellipse* ellipse, const Fill
   out.openElement("a:avLst").closeElementSelfClosing();
   out.closeElement();
 
-  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten);
 }
 
 void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInfo& fs,
-                          const Matrix& m, float alpha, const std::vector<LayerFilter*>& filters,
-                          const std::vector<LayerStyle*>& styles) {
+                          const Matrix& m, float alpha) {
   if (!path->data || path->data->isEmpty()) {
     return;
   }
@@ -376,7 +367,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   Rect shapeBounds = Rect::MakeXYWH(adjustedX, adjustedY, adjustedW, adjustedH);
 
   bool imageWritten = writeImagePatternAsPicture(out, fs.fill, shapeBounds, m, alpha);
-  if (CanSkipShapeAfterPicture(imageWritten, fs, filters, styles)) {
+  if (CanSkipShapeAfterPicture(imageWritten, fs)) {
     return;
   }
 
@@ -397,7 +388,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   if (!_bridgeContours || contours.size() <= 1) {
     beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
     writeContourGeom(out, contours, pw, ph, scale, scale, ofsX, ofsY, fillRule);
-    writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
+    writeShapeTail(out, fs, alpha, shapeBounds, imageWritten);
     return;
   }
 
@@ -411,7 +402,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
       beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
       EmitGroupCustGeom(out, contours, group, pw, ph, scale, scale, ofsX, ofsY,
                         BoundsMarkerStyle::StandaloneStrokelessPath, _bridgeContours);
-      writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
+      writeShapeTail(out, fs, alpha, shapeBounds, imageWritten);
     }
     return;
   }
@@ -420,7 +411,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
   // that writeContourGeom would otherwise repeat).
   beginShape(out, "Path", xf.offX, xf.offY, xf.extCX, xf.extCY, xf.rotation);
   EmitContourGeomFromGroups(out, contours, groups, pw, ph, scale, scale, ofsX, ofsY);
-  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten, filters, styles);
+  writeShapeTail(out, fs, alpha, shapeBounds, imageWritten);
 }
 
 // Dispatch a single accumulated geometry through the appropriate per-shape
@@ -430,9 +421,7 @@ void PPTWriter::writePath(XMLBuilder& out, const Path* path, const FillStrokeInf
 // `alpha` is the alpha of the Painter's enclosing scope, NOT the alpha that
 // was in effect when the entry was collected — see processVectorScope.
 void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& entry,
-                                   const FillStrokeInfo& fs, float alpha,
-                                   const std::vector<LayerFilter*>& filters,
-                                   const std::vector<LayerStyle*>& styles) {
+                                   const FillStrokeInfo& fs, float alpha) {
   FillStrokeInfo localFs = fs;
   if (localFs.textBox == nullptr) {
     localFs.textBox = entry.textBox;
@@ -440,15 +429,14 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
   switch (entry.element->nodeType()) {
     case NodeType::Rectangle:
       writeRectangle(out, static_cast<const Rectangle*>(entry.element), localFs, entry.transform,
-                     alpha, filters, styles);
+                     alpha);
       break;
     case NodeType::Ellipse:
-      writeEllipse(out, static_cast<const Ellipse*>(entry.element), localFs, entry.transform, alpha,
-                   filters, styles);
+      writeEllipse(out, static_cast<const Ellipse*>(entry.element), localFs, entry.transform,
+                   alpha);
       break;
     case NodeType::Path:
-      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform, alpha,
-                filters, styles);
+      writePath(out, static_cast<const Path*>(entry.element), localFs, entry.transform, alpha);
       break;
     case NodeType::Text: {
       auto* text = static_cast<const Text*>(entry.element);
@@ -467,9 +455,9 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
       // GlyphRun geometry and forces native text even when GlyphRun data is
       // present, trading glyph-level fidelity for editable PowerPoint text.
       if (!text->glyphRuns.empty() && !_ignoreGlyphRuns) {
-        writeTextAsPath(out, text, localFs, entry.transform, alpha, filters, styles);
+        writeTextAsPath(out, text, localFs, entry.transform, alpha);
       } else {
-        writeNativeText(out, text, localFs, entry.transform, alpha, filters, styles);
+        writeNativeText(out, text, localFs, entry.transform, alpha);
       }
       break;
     }
@@ -487,8 +475,6 @@ void PPTWriter::emitGeometryWithFs(XMLBuilder& out, const AccumulatedGeometry& e
 // the scope unwinds.
 void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>& elements,
                                    const Matrix& transform, float alpha,
-                                   const std::vector<LayerFilter*>& filters,
-                                   const std::vector<LayerStyle*>& styles,
                                    const TextBox* parentTextBox,
                                    std::vector<AccumulatedGeometry>& accumulator, size_t scopeStart,
                                    LayerPlacement targetPlacement) {
@@ -503,7 +489,7 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         editableScope.textCount >= 2 && editableScope.hasPainter) {
       if (editableScope.placement == targetPlacement) {
         auto textBoxMatrix = transform * BuildGroupMatrix(localTextBox);
-        writeTextBoxGroup(out, localTextBox, elements, textBoxMatrix, alpha, filters, styles);
+        writeTextBoxGroup(out, localTextBox, elements, textBoxMatrix, alpha);
       }
       return;
     }
@@ -573,7 +559,7 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         // Group is an isolation boundary for painters even though geometry
         // propagates upward.
         for (size_t i = scopeStart; i < accumulator.size(); ++i) {
-          emitGeometryWithFs(out, accumulator[i], painterFs, alpha, filters, styles);
+          emitGeometryWithFs(out, accumulator[i], painterFs, alpha);
         }
         break;
       }
@@ -606,14 +592,14 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
           // box only sees its sibling shapes (matches the renderer behaviour).
           const std::vector<Element*>& innerWalked =
               _resolveModifiers ? _resolver.resolve(tb->elements) : tb->elements;
-          processVectorScope(out, innerWalked, tbMatrix, tbAlpha, filters, styles, tb, accumulator,
+          processVectorScope(out, innerWalked, tbMatrix, tbAlpha, tb, accumulator,
                              accumulator.size(), targetPlacement);
         } else {
           // Native PowerPoint text rendering still goes through the dedicated
           // multi-run text-box writer: PPTX represents multi-style text with
           // its own a:p/a:r runs and we don't accumulate Text geometry into
           // the surrounding scope in that mode.
-          writeTextBoxGroup(out, tb, tb->elements, tbMatrix, tbAlpha, filters, styles);
+          writeTextBoxGroup(out, tb, tb->elements, tbMatrix, tbAlpha);
         }
         break;
       }
@@ -632,8 +618,8 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
         // Group, matching the tgfx renderer's per-Group VectorContext.
         const std::vector<Element*>& innerWalked =
             _resolveModifiers ? _resolver.resolve(group->elements) : group->elements;
-        processVectorScope(out, innerWalked, groupMatrix, groupAlpha, filters, styles, localTextBox,
-                           accumulator, accumulator.size(), targetPlacement);
+        processVectorScope(out, innerWalked, groupMatrix, groupAlpha, localTextBox, accumulator,
+                           accumulator.size(), targetPlacement);
         break;
       }
       case NodeType::Repeater:
@@ -655,9 +641,7 @@ void PPTWriter::processVectorScope(XMLBuilder& out, const std::vector<Element*>&
 }
 
 void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elements,
-                              const Matrix& transform, float alpha,
-                              const std::vector<LayerFilter*>& filters,
-                              const std::vector<LayerStyle*>& styles, const TextBox* parentTextBox,
+                              const Matrix& transform, float alpha, const TextBox* parentTextBox,
                               LayerPlacement targetPlacement) {
   // Bake every path-modifier (Polystar -> Path, Repeater -> grouped copies,
   // TrimPath / RoundCorner / MergePath -> editable Path via tgfx). Painters
@@ -667,7 +651,7 @@ void PPTWriter::writeElements(XMLBuilder& out, const std::vector<Element*>& elem
 
   std::vector<AccumulatedGeometry> accumulator;
   accumulator.reserve(walked.size());
-  processVectorScope(out, walked, transform, alpha, filters, styles, parentTextBox, accumulator,
+  processVectorScope(out, walked, transform, alpha, parentTextBox, accumulator,
                      /*scopeStart=*/0, targetPlacement);
 }
 
@@ -802,7 +786,8 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   // Wrap only layers with an OOXML-representable effect; otherwise keep the historical flat output.
   // Child coordinates already include the full PAGX matrix chain, so this group uses an identity
   // document-sized coordinate mapping and exists solely as an effect/compositing boundary.
-  bool hasGroupEffects = !CollectEffectSources(layer->filters, layer->styles).empty();
+  auto effectSources = CollectEffectSources(layer->filters, layer->styles);
+  bool hasGroupEffects = !effectSources.empty();
   if (hasGroupEffects) {
     int id = _ctx->nextShapeId();
     out.openElement("p:grpSp").closeElementStart();
@@ -836,7 +821,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
         .addRequiredAttribute("cy", height)
         .closeElementSelfClosing();
     out.closeElement();  // a:xfrm
-    writeEffects(out, layer->filters, layer->styles);
+    writeEffects(out, effectSources);
     out.closeElement();  // p:grpSpPr
   }
 
@@ -848,7 +833,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   // shallow flat-list scan would otherwise leave it suppressed by both passes' filters.
   bool hasForeground = HasForegroundPainter(layer->contents);
 
-  writeElements(out, layer->contents, layerMatrix, layerAlpha, {}, {},
+  writeElements(out, layer->contents, layerMatrix, layerAlpha,
                 /*parentTextBox=*/nullptr, LayerPlacement::Background);
 
   // Descend into the matching tgfx subtree: LayerBuilder pushes one tgfx::Layer per child in the
@@ -889,7 +874,7 @@ void PPTWriter::writeLayer(XMLBuilder& out, const Layer* layer,
   }
 
   if (hasForeground) {
-    writeElements(out, layer->contents, layerMatrix, layerAlpha, {}, {},
+    writeElements(out, layer->contents, layerMatrix, layerAlpha,
                   /*parentTextBox=*/nullptr, LayerPlacement::Foreground);
   }
 

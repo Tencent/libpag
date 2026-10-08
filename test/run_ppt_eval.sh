@@ -15,7 +15,7 @@ PPT_EVAL_CORPORA="${PPT_EVAL_CORPORA:-}"
 PPT_EVAL_EXTRA_ARGS="${PPT_EVAL_EXTRA_ARGS:-}"
 PPT_EVAL_ALLOW_PNG_FALLBACK="${PPT_EVAL_ALLOW_PNG_FALLBACK:-0}"
 PPT_EVAL_UPDATE_BASELINE="${PPT_EVAL_UPDATE_BASELINE:-0}"
-PPT_EVAL_REQUIRE_BASELINE="${PPT_EVAL_REQUIRE_BASELINE:-0}"
+PPT_EVAL_REQUIRE_BASELINE="${PPT_EVAL_REQUIRE_BASELINE:-1}"
 PPT_BASELINE="${PPT_BASELINE:-$ROOT/resources/ppt/baseline.json}"
 
 DEFAULT_CORPORA=(features layout text cli spec smoke decks)
@@ -70,9 +70,11 @@ for corpus in "${CORPORA[@]}"; do
   fi
 done
 
+node "$TOOL_DIR/preflight.js" "$ROOT/resources/ppt/corpora.json" "${CORPORA[@]}" || exit 1
+
 echo "run_ppt_eval: installing Node dependencies from package-lock.json..."
-(cd "$TOOL_DIR" && npm install) || {
-  echo "run_ppt_eval: npm install failed" >&2
+(cd "$TOOL_DIR" && npm ci) || {
+  echo "run_ppt_eval: npm ci failed" >&2
   exit 1
 }
 

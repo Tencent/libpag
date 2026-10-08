@@ -2,12 +2,15 @@
   "version": 1,
   "corpora": {
     "features": {
-      "description": "Feature-oriented PAGX documents used by the HTML exporter tests.",
+      "description": "Feature-oriented PAGX documents, including unit fixtures for parent/child effects.",
       "roots": [
         {
           "path": "resources/pagx_to_html",
-          "recursive": false
+          "recursive": true
         }
+      ],
+      "resources": [
+        "resources/apitest/test_timestretch.png"
       ]
     },
     "layout": {

@@ -16,6 +16,7 @@ const {
   toolVersion,
 } = require('./pipeline');
 const { summarize, writeCsv, writeHtml, writeMarkdown } = require('./report');
+const { checkAssets } = require('./preflight');
 
 const SCRIPT_DIR = __dirname;
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
@@ -394,6 +395,9 @@ async function processCase(entry, options, context) {
 
 async function main() {
   const options = parseArgs(process.argv);
+  if (process.platform === 'win32') {
+    throw new Error('PPT evaluation supports macOS and Linux; use WSL on Windows');
+  }
   if (!fs.existsSync(options.manifest)) throw new Error(`manifest missing: ${options.manifest}`);
   if (!fs.existsSync(options.pagxBin)) throw new Error(`pagx binary missing: ${options.pagxBin}`);
   const soffice = findSoffice(options.soffice);
@@ -413,6 +417,10 @@ async function main() {
       'the LibreOffice PNG fallback cannot validate multi-slide decks; install pdftocairo/pdftoppm',
     );
   }
+  if (!pdfRasterizer && options.scale !== 1) {
+    throw new Error('LibreOffice PNG fallback supports only --scale 1');
+  }
+  checkAssets(manifest, [options.corpus], REPO_ROOT);
   fs.mkdirSync(options.outDir, { recursive: true });
 
   const [sofficeVersion, rasterizerVersion] = await Promise.all([
@@ -439,6 +447,8 @@ async function main() {
       sha256File(path.join(SCRIPT_DIR, 'pipeline.js')),
       sha256File(path.join(SCRIPT_DIR, 'compare.js')),
       sha256File(path.join(SCRIPT_DIR, 'report.js')),
+      sha256File(path.join(SCRIPT_DIR, 'preflight.js')),
+      sha256File(path.join(SCRIPT_DIR, 'package-lock.json')),
     ]),
     scale: options.scale,
     corpusResources: collectResourceHashes(corpus),

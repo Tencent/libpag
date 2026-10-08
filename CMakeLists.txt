@@ -928,6 +928,7 @@ if (PAG_BUILD_CLI)
     #   cmake --build <build-dir> --target PPTTest
     add_custom_target(PPTTest
             COMMAND ${CMAKE_COMMAND} -E env PAGX_BIN=$<TARGET_FILE:pagx-cli>
+            PPT_EVAL_REQUIRE_BASELINE=1
             bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_ppt_eval.sh
             DEPENDS pagx-cli
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

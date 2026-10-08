@@ -9,6 +9,11 @@ const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 
 const DEFAULT_TIMEOUT_MS = 120000;
+const MAX_OUTPUT_BYTES = 64 * 1024;
+
+function outputTail(previous, chunk) {
+  return Buffer.concat([previous, chunk]).subarray(-MAX_OUTPUT_BYTES);
+}
 
 function runCommand(command, args, options = {}) {
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
@@ -20,8 +25,8 @@ function runCommand(command, args, options = {}) {
       detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    let stderr = '';
+    let stdout = Buffer.alloc(0);
+    let stderr = Buffer.alloc(0);
     let finished = false;
     let timedOut = false;
     const finish = (code) => {
@@ -30,8 +35,8 @@ function runCommand(command, args, options = {}) {
       clearTimeout(timer);
       resolve({
         code,
-        stdout,
-        stderr: stderr + (timedOut ? `\ntimed out after ${timeoutMs} ms` : ''),
+        stdout: stdout.toString('utf8'),
+        stderr: stderr.toString('utf8') + (timedOut ? `\ntimed out after ${timeoutMs} ms` : ''),
         durationMs: Date.now() - startedAt,
         timedOut,
       });
@@ -46,10 +51,10 @@ function runCommand(command, args, options = {}) {
       }
     };
     const timer = setTimeout(terminate, timeoutMs);
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
-    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.stdout.on('data', (chunk) => { stdout = outputTail(stdout, chunk); });
+    child.stderr.on('data', (chunk) => { stderr = outputTail(stderr, chunk); });
     child.on('error', (error) => {
-      stderr += `${error.message}\n`;
+      stderr = outputTail(stderr, Buffer.from(`${error.message}\n`));
       finish(-1);
     });
     child.on('close', (code) => finish(timedOut ? -1 : code));

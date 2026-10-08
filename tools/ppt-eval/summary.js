@@ -31,6 +31,7 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
+// Keep these display helpers aligned with report.js.
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const format = (value, digits = 4) => finite(value) ? value.toFixed(digits) : '-';
 const percent = (value) => finite(value) ? `${(value * 100).toFixed(2)}%` : '-';
@@ -44,12 +45,14 @@ function environmentCompatible(expected, actual) {
 }
 
 function tolerance(corpusEntry, environmentEntry) {
-  return environmentEntry.tolerance || corpusEntry.tolerance || {
+  return {
     ssim: 0.02,
     pd: 0.02,
     rgb: 2,
     roiSsim: 0.03,
     roiRgb: 3,
+    ...corpusEntry.tolerance,
+    ...environmentEntry.tolerance,
   };
 }
 
@@ -100,12 +103,14 @@ function checkCorpus(report, baseline, requireBaseline) {
   }
 
   const pageChecks = [];
-  const pageTolerance = entry.pageTolerance || corpusEntry.pageTolerance || {
+  const pageTolerance = {
     ssim: 0.05,
     pd: 0.05,
     rgb: 5,
     roiSsim: 0.08,
     roiRgb: 8,
+    ...corpusEntry.pageTolerance,
+    ...entry.pageTolerance,
   };
   if (entry.pages) {
     const currentPages = new Map(
@@ -228,10 +233,19 @@ function main() {
       throw new Error('refusing to update baseline from a filtered or incomplete report');
     }
     writeBaseline(options.baseline, reports);
+    const results = reports.map(() => ({ status: 'UPDATED' }));
+    fs.writeFileSync(path.join(options.outDir, 'summary.html'), renderHtml(reports, results));
+    console.log('ppt-summary: baseline updated; regression gate was not run');
+    return;
   }
   let baseline = null;
   if (options.baseline && fs.existsSync(options.baseline)) baseline = readJson(options.baseline);
   const results = reports.map((report) => checkCorpus(report, baseline, options.requireBaseline));
+  if (!baseline || !Object.keys(baseline.corpora || {}).length) {
+    console.warn('WARNING: PPT baseline is empty or missing; no visual regressions can be checked. Seed it on a trusted, fixed environment.');
+  } else if (results.every((result) => result.status === 'SKIP')) {
+    console.warn('WARNING: all PPT baseline gates were SKIP; no visual regressions were checked.');
+  }
   console.log('');
   console.log('=== PPT eval baseline gate ===');
   reports.forEach((report, index) => {

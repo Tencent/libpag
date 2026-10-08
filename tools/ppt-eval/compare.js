@@ -3,6 +3,8 @@
 
 const fs = require('fs');
 const { PNG } = require('pngjs');
+// Keep pixelmatch, SSIM and RGB delta aligned with ../html-snapshot/eval/compare.js.
+// pixelmatch 7 is ESM; require() on supported Node versions returns its namespace.
 const pixelmatchModule = require('pixelmatch');
 const pixelmatch = typeof pixelmatchModule === 'function'
   ? pixelmatchModule

@@ -2955,6 +2955,50 @@ PAGX_TEST(PAGXPPTTest, ParentLayerEffectsDoNotLeakIntoChildTextRun) {
   EXPECT_LT(blurPos, groupPropsEnd);
 }
 
+PAGX_TEST(PAGXPPTTest, NoOpEffectsDoNotCreateGroups) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {0.3f, 0.5f, 0.7f, 1.0f};
+  fill->color = color;
+  layer->contents = {rect, fill};
+  auto* blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 0;
+  blur->blurY = 0;
+  auto* blend = doc->makeNode<pagx::BlendFilter>();
+  blend->blendMode = pagx::BlendMode::ColorBurn;
+  layer->filters = {blur, blend};
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  std::string error;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  const auto& slide = entries.at("ppt/slides/slide1.xml");
+  EXPECT_NE(slide.find("<p:sp>"), std::string::npos);
+  EXPECT_EQ(slide.find("<p:grpSp>"), std::string::npos);
+  EXPECT_EQ(slide.find("<a:effectLst"), std::string::npos);
+
+  // A supported effect still creates its group when paired with a dropped effect.
+  blur->blurX = 3;
+  blur->blurY = 3;
+  data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  entries.clear();
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  const auto& blurredSlide = entries.at("ppt/slides/slide1.xml");
+  EXPECT_NE(blurredSlide.find("<p:grpSp>"), std::string::npos);
+  EXPECT_NE(blurredSlide.find("<a:blur"), std::string::npos);
+  EXPECT_EQ(blurredSlide.find("<a:fillOverlay"), std::string::npos);
+}
+
 PAGX_TEST(PAGXPPTTest, PathZeroBoundsSkipped) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();

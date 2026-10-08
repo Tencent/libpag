@@ -188,9 +188,7 @@ bool PPTWriter::firstEmbeddedBaselineY(const Text& text, float* baselineY) {
 }
 
 void PPTWriter::writeTextAsPath(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                                const Matrix& m, float alpha,
-                                const std::vector<LayerFilter*>& /*filters*/,
-                                const std::vector<LayerStyle*>& /*styles*/) {
+                                const Matrix& m, float alpha) {
   auto renderPos = text->renderPosition();
   std::vector<GlyphPath> glyphPaths;
   std::vector<GlyphImage> glyphImages;
@@ -536,9 +534,7 @@ void PPTWriter::emitNativeTextShapeFrame(XMLBuilder& out, const Matrix& m,
 void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
                                    const std::vector<TextLayoutLineInfo>* lines,
                                    const PPTRunStyle& style, int64_t lnSpcPts, bool rtl,
-                                   bool useLineLayout, int64_t defTabSzEMU,
-                                   const std::vector<LayerFilter*>& filters,
-                                   const std::vector<LayerStyle*>& styles) {
+                                   bool useLineLayout, int64_t defTabSzEMU) {
   if (useLineLayout) {
     // Emit ALL visual lines inside a single <a:p> separated by soft <a:br/>
     // breaks. OOXML's algn="just" never justifies the last line of a
@@ -576,7 +572,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
       std::string line =
           text->text.substr(lineInfo.byteStart, lineInfo.byteEnd - lineInfo.byteStart);
       if (!line.empty()) {
-        writeParagraphRun(out, line, style, filters, styles);
+        writeParagraphRun(out, line, style);
       }
       prevByteEnd = lineInfo.byteEnd;
       wroteAny = true;
@@ -601,7 +597,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
     size_t nl = remaining.find('\n', pos);
     std::string line =
         (nl == std::string::npos) ? remaining.substr(pos) : remaining.substr(pos, nl - pos);
-    writeParagraph(out, line, style, filters, styles, lnSpcPts, rtl, defTabSzEMU);
+    writeParagraph(out, line, style, lnSpcPts, rtl, defTabSzEMU);
     if (nl == std::string::npos) {
       break;
     }
@@ -610,10 +606,7 @@ void PPTWriter::emitNativeTextBody(XMLBuilder& out, const Text* text,
 }
 
 void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStrokeInfo& fs,
-                                const Matrix& m, float alpha,
-                                const std::vector<LayerFilter*>& filters,
-                                const std::vector<LayerStyle*>& styles,
-                                const TextLayoutResult* precomputed) {
+                                const Matrix& m, float alpha, const TextLayoutResult* precomputed) {
   if (text->text.empty()) {
     return;
   }
@@ -743,17 +736,14 @@ void PPTWriter::writeNativeText(XMLBuilder& out, const Text* text, const FillStr
   int64_t defTabSzEMU =
       (text->text.find('\t') != std::string::npos) ? PagxTabSizeEMU(text->renderFontSize()) : 0;
 
-  emitNativeTextBody(out, text, lines, style, lnSpcPts, emitRtl, useLineLayout, defTabSzEMU,
-                     filters, styles);
+  emitNativeTextBody(out, text, lines, style, lnSpcPts, emitRtl, useLineLayout, defTabSzEMU);
 
   out.closeElement();  // p:txBody
   out.closeElement();  // p:sp
 }
 
 void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
-                                  const PPTRunStyle& style,
-                                  const std::vector<LayerFilter*>& filters,
-                                  const std::vector<LayerStyle*>& styles) {
+                                  const PPTRunStyle& style) {
   out.openElement("a:r").closeElementStart();
   out.openElement("a:rPr")
       .addRequiredAttribute("lang", DetectTextLang(runText))
@@ -792,7 +782,6 @@ void PPTWriter::writeParagraphRun(XMLBuilder& out, const std::string& runText,
     // default theme colour (black) which hides the gradient text below.
     writeSolidColorFill(out, Color{0.0f, 0.0f, 0.0f, 0.0f}, 1.0f);
   }
-  writeEffects(out, filters, styles);
   if (!style.typeface.empty()) {
     WriteRunTypeface(out, style.typeface);
   }
@@ -866,12 +855,11 @@ size_t PPTWriter::writeNewlineBreaksAcrossRuns(ParagraphEmitter& emitter,
 }
 
 void PPTWriter::writeParagraph(XMLBuilder& out, const std::string& lineText,
-                               const PPTRunStyle& style, const std::vector<LayerFilter*>& filters,
-                               const std::vector<LayerStyle*>& styles, int64_t lnSpcPts, bool rtl,
+                               const PPTRunStyle& style, int64_t lnSpcPts, bool rtl,
                                int64_t defTabSzEMU) {
   out.openElement("a:p").closeElementStart();
   WriteParagraphProperties(out, style.algn, lnSpcPts, rtl, defTabSzEMU);
-  writeParagraphRun(out, lineText, style, filters, styles);
+  writeParagraphRun(out, lineText, style);
   out.closeElement();  // a:p
 }
 
@@ -904,7 +892,7 @@ void PPTWriter::ParagraphEmitter::emitRun(const std::string& fragment, const PPT
   if (!paragraphOpen) {
     openParagraph();
   }
-  writer->writeParagraphRun(out, fragment, style, filters, styles);
+  writer->writeParagraphRun(out, fragment, style);
 }
 
 void PPTWriter::ParagraphEmitter::emitLineBreak(const PPTRunStyle& style) {
@@ -1090,8 +1078,7 @@ void PPTWriter::emitTextBoxBody(const std::vector<RichTextRun>& runs,
 
 void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
                                   const std::vector<Element*>& elements, const Matrix& transform,
-                                  float alpha, const std::vector<LayerFilter*>& filters,
-                                  const std::vector<LayerStyle*>& styles) {
+                                  float alpha) {
   auto* box = static_cast<const TextBox*>(textBox);
   auto topLevelFs = CollectFillStroke(elements);
 
@@ -1327,7 +1314,7 @@ void PPTWriter::writeTextBoxGroup(XMLBuilder& out, const Group* textBox,
     }
   }
 
-  ParagraphEmitter emitter{this, out, algn, lnSpcPts, rtl, defTabSzEMU, filters, styles};
+  ParagraphEmitter emitter{this, out, algn, lnSpcPts, rtl, defTabSzEMU};
   emitTextBoxBody(runs, runStyles, lineEntries, useLineLayout, emitter);
 
   out.closeElement();  // p:txBody
