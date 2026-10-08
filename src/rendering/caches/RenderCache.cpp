@@ -414,7 +414,10 @@ std::shared_ptr<tgfx::Image> RenderCache::getAssetImage(ID assetID, const ImageP
 
 std::shared_ptr<tgfx::Image> RenderCache::applyAssetMipmaps(ID assetID,
                                                             std::shared_ptr<tgfx::Image> image) {
-  if (image != nullptr && stage->getAssetMinScale(assetID) < MIPMAP_ENABLED_THRESHOLD) {
+  // Texture-backed images wrap host-owned textures (PAGImage.FromTexture). Generating mipmaps on
+  // them is not supported and returns nullptr, which would drop the image and render nothing.
+  if (image != nullptr && !image->isTextureBacked() &&
+      stage->getAssetMinScale(assetID) < MIPMAP_ENABLED_THRESHOLD) {
     image = image->makeMipmapped(true);
   }
   return image;
