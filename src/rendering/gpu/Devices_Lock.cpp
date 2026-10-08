@@ -30,15 +30,21 @@ thread_local tgfx::Context* tlsLockedContext = nullptr;
 thread_local int tlsLockDepth = 0;
 }  // namespace
 
-DeviceLockScope::DeviceLockScope() {
+DeviceLockScope::DeviceLockScope() : DeviceLockScope(Devices::MakeDefault()) {
+}
+
+DeviceLockScope::DeviceLockScope(std::shared_ptr<tgfx::Device> device) {
   if (tlsLockDepth > 0) {
     // The calling thread already holds the default device through an outer scope: reuse its
-    // context. The outer scope keeps the device alive, so the raw pointers stay valid.
+    // context. The outer scope keeps the device alive, so the raw pointers stay valid. The passed
+    // device is ignored here: callers that cache Devices::MakeDefault() results resolve to the
+    // same deduplicated instance anyway, and honoring the outer scope is what prevents the
+    // same-thread re-entry that a raw tgfx::Device::lockContext() call would cause.
     tlsLockDepth++;
     _context = tlsLockedContext;
     return;
   }
-  _device = Devices::MakeDefault();
+  _device = std::move(device);
   if (!_device) {
     return;
   }

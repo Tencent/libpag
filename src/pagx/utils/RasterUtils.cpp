@@ -213,10 +213,19 @@ struct TiledPatternDrawer {
 GPUContext::~GPUContext() = default;
 
 tgfx::Context* GPUContext::lockContext() {
-  // Nested pairs reuse the already-locked context (pag::DeviceLockScope) instead of re-entering
-  // tgfx's non-recursive device mutex, which deadlocks once devices are deduplicated per native
-  // GPU object (tgfx #1581).
-  auto scope = std::make_unique<pag::DeviceLockScope>();
+  // The device is created once and cached for the lifetime of this GPUContext: on the GL backend
+  // every Devices::MakeDefault() builds a brand-new GL context, so a fresh device per call would
+  // recompile all shaders for each pattern bake in SVG/PPT export. Nested pairs and outer
+  // DeviceLockScope holders still reuse the already-locked context (see DeviceLockScope) instead
+  // of re-entering tgfx's non-recursive device mutex, which deadlocks once devices are
+  // deduplicated per native GPU object (tgfx #1581).
+  if (_device == nullptr) {
+    _device = pag::Devices::MakeDefault();
+    if (_device == nullptr) {
+      return nullptr;
+    }
+  }
+  auto scope = std::make_unique<pag::DeviceLockScope>(_device);
   if (!*scope) {
     return nullptr;
   }

@@ -36,7 +36,9 @@ class ImagePattern;
 
 /**
  * Manages a lazily-created GPU device and context for off-screen rendering.
- * Reuse a single instance across multiple render calls to avoid repeated GL context creation.
+ * Reuse a single instance across multiple render calls to avoid repeated GL context creation
+ * (each Devices::MakeDefault() on the GL backend builds a brand-new GL context, which would make
+ * per-pattern bakes in SVG/PPT export repeatedly recompile shaders).
  * lockContext()/unlock() pairs may nest: inner pairs reuse the already-locked context through
  * pag::DeviceLockScope instead of re-entering tgfx's non-recursive device mutex.
  */
@@ -52,6 +54,7 @@ class GPUContext {
   void unlock();
 
  private:
+  std::shared_ptr<tgfx::Device> _device = {};
   std::vector<std::unique_ptr<pag::DeviceLockScope>> _lockStack = {};
 };
 

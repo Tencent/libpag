@@ -125,26 +125,12 @@
   }
 }
 
-- (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (pagSurface != nil &&
-      (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
-#if defined(TGFX_USE_METAL)
-    [self updateLayerDrawableSize];
-#endif
-    [pagSurface updateSize];
-    if (oldRect.size.width == 0 || oldRect.size.height == 0) {
-      [animator update];
-    }
-  }
-}
-
 - (void)setFrameSize:(NSSize)newSize {
   NSSize oldSize = self.bounds.size;
   [super setFrameSize:newSize];
-  // Autoresizing-driven layout resizes through setFrameSize:, which does not pass through
-  // setFrame:, so mirror the size-change handling of setFrame: here.
+  // Every size change funnels through setFrameSize:: setFrame: calls it internally, and
+  // autoresizing / Auto Layout drive it directly, so this is the single place to react — handling
+  // the same change in setFrame: as well would run updateSize twice per resize.
   if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
 #if defined(TGFX_USE_METAL)
     [self updateLayerDrawableSize];

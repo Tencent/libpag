@@ -229,6 +229,14 @@ class DeviceLockScope {
   DeviceLockScope();
 
   /**
+   * Locks the given device instead of fetching the default one, so callers that cache a device
+   * (e.g. GPUContext reusing one GL context across many rasterization calls) do not create a new
+   * device per scope. Behaves exactly like the default constructor otherwise, including reusing
+   * the context of an outer DeviceLockScope when the calling thread already holds one.
+   */
+  explicit DeviceLockScope(std::shared_ptr<tgfx::Device> device);
+
+  /**
    * Releases the device lock, unless the calling thread still holds an outer DeviceLockScope
    * (the lock is released when the outermost scope is destroyed).
    */

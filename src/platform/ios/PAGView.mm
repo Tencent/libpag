@@ -131,12 +131,21 @@
   [super setBounds:bounds];
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
-    // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize can
-    // never overlap with the render thread reading it inside flush (tgfx MetalWindow).
-    std::lock_guard<std::mutex> autoLock(lock);
-    [self updateLayerDrawableSize];
-    [pagSurface updateSize];
-    if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
+    bool fromZero = (oldBounds.size.width == 0 || oldBounds.size.height == 0);
+    {
+#if defined(TGFX_USE_METAL)
+      // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize
+      // can never overlap with the render thread reading it inside flush (tgfx MetalWindow).
+      // The GL backend serializes updateSize against flush through the device lock already and
+      // has no drawableSize, so the lock is Metal-only.
+      std::lock_guard<std::mutex> autoLock(lock);
+#endif
+      [self updateLayerDrawableSize];
+      [pagSurface updateSize];
+    }
+    // [animator update] must stay outside the lock: in sync mode it re-enters onAnimationFlush:
+    // on the same thread, which lock_guards the same non-recursive mutex and would deadlock.
+    if (fromZero) {
       [animator update];
     }
   }
@@ -147,11 +156,17 @@
   [super setFrame:frame];
   if (pagSurface != nil &&
       (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
-    // Same locking rationale as setBounds:.
-    std::lock_guard<std::mutex> autoLock(lock);
-    [self updateLayerDrawableSize];
-    [pagSurface updateSize];
-    if (oldRect.size.width == 0 || oldRect.size.height == 0) {
+    bool fromZero = (oldRect.size.width == 0 || oldRect.size.height == 0);
+    {
+#if defined(TGFX_USE_METAL)
+      // Same locking rationale as setBounds:.
+      std::lock_guard<std::mutex> autoLock(lock);
+#endif
+      [self updateLayerDrawableSize];
+      [pagSurface updateSize];
+    }
+    // Same deadlock rationale as setBounds: keep this call outside the lock.
+    if (fromZero) {
       [animator update];
     }
   }
@@ -161,8 +176,10 @@
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
   if (pagSurface != nil && oldScaleFactor != scaleFactor) {
+#if defined(TGFX_USE_METAL)
     // Same locking rationale as setBounds:.
     std::lock_guard<std::mutex> autoLock(lock);
+#endif
     [self updateLayerDrawableSize];
     [pagSurface updateSize];
   }

@@ -360,8 +360,11 @@ class PAG_API BackendSemaphore {
 
  private:
   // The initialized state is derived from _backend plus the stored handle instead of a dedicated
-  // flag, which keeps sizeof(BackendSemaphore) and member offsets identical to earlier releases
-  // (binary compatibility).
+  // flag. NOTE: this layout is binary-incompatible with earlier releases. Although sizeof stays
+  // 24, MtlEventInfo::value now occupies the offset where the old _isInitialized bool lived, and
+  // isInitialized() was inline in those headers — binaries compiled against them keep reading
+  // that offset directly and observe an indeterminate byte. Integrators must recompile against
+  // this header; the change must be noted in the release notes.
   Backend _backend = Backend::MOCK;
   union {
     void* _glSync;
