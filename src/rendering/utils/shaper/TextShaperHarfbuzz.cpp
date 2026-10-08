@@ -19,8 +19,10 @@
 #ifdef PAG_USE_HARFBUZZ
 
 #include "TextShaperHarfbuzz.h"
+#include <algorithm>
 #include <list>
 #include <map>
+#include <vector>
 #include "base/utils/Log.h"
 #include "hb.h"
 #include "rendering/FontManager.h"
@@ -180,13 +182,26 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
   hb_shape(hbFont.get(), hbBuffer.get(), nullptr, 0);
   unsigned count = 0;
   auto* infos = hb_buffer_get_glyph_infos(hbBuffer.get(), &count);
+  // HarfBuzz returns the glyphs of RTL text in visual order, where the cluster values are
+  // descending. Resolving the end of a cluster against the next cluster in logical order keeps
+  // every glyph bound to the characters it actually covers. Reading the end from the next glyph
+  // instead underflows for RTL text and makes a glyph swallow the whole remaining text, which
+  // multiplies the glyph list on every fallback font and can stall the caller for seconds.
+  std::vector<uint32_t> clusterBounds = {};
+  clusterBounds.reserve(count);
+  for (unsigned i = 0; i < count; ++i) {
+    clusterBounds.push_back(infos[i].cluster);
+  }
+  std::sort(clusterBounds.begin(), clusterBounds.end());
+  clusterBounds.erase(std::unique(clusterBounds.begin(), clusterBounds.end()), clusterBounds.end());
   std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> result;
   for (unsigned i = 0; i < count; ++i) {
-    auto length = (i + 1 == count ? text.length() : infos[i + 1].cluster) - infos[i].cluster;
-    if (length == 0) {
+    if (i + 1 < count && infos[i + 1].cluster == infos[i].cluster) {
       continue;
     }
-    result.emplace_back(infos[i].codepoint, infos[i].cluster, length);
+    auto bound = std::upper_bound(clusterBounds.begin(), clusterBounds.end(), infos[i].cluster);
+    auto clusterEnd = bound == clusterBounds.end() ? static_cast<uint32_t>(text.length()) : *bound;
+    result.emplace_back(infos[i].codepoint, infos[i].cluster, clusterEnd - infos[i].cluster);
   }
   return result;
 }

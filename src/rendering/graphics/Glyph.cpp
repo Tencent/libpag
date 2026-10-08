@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Glyph.h"
+#include <algorithm>
 #include <unordered_map>
+#include <vector>
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/utils/UTF.h"
 
@@ -29,10 +31,24 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgf
   std::vector<GlyphHandle> glyphList;
   auto shapedGlyphs = TextShaper::Shape(text, font.getTypeface());
   auto count = shapedGlyphs.size();
+  // The HarfBuzz shaper returns the glyphs of RTL text in visual order, where the string indexes
+  // are descending. Resolving the end of a glyph against the next index in logical order keeps
+  // every glyph named after the characters it actually covers. Reading the end from the next
+  // glyph instead underflows for RTL text and the glyph would take the whole remaining text as
+  // its name.
+  std::vector<uint32_t> stringIndexes = {};
+  stringIndexes.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    stringIndexes.push_back(shapedGlyphs[i].stringIndex);
+  }
+  std::sort(stringIndexes.begin(), stringIndexes.end());
+  stringIndexes.erase(std::unique(stringIndexes.begin(), stringIndexes.end()), stringIndexes.end());
   for (size_t i = 0; i < count; ++i) {
     auto& shapedGlyph = shapedGlyphs[i];
-    auto length = (i + 1 == count ? text.length() : shapedGlyphs[i + 1].stringIndex) -
-                  shapedGlyph.stringIndex;
+    auto bound =
+        std::upper_bound(stringIndexes.begin(), stringIndexes.end(), shapedGlyph.stringIndex);
+    auto end = bound == stringIndexes.end() ? text.length() : static_cast<size_t>(*bound);
+    auto length = end - shapedGlyph.stringIndex;
     auto name = text.substr(shapedGlyph.stringIndex, length);
     if (glyphMap.find(name) != glyphMap.end()) {
       glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
