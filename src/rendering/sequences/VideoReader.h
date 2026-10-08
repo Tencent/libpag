@@ -43,7 +43,8 @@ class VideoReader : public SequenceReader {
   }
 
  protected:
-  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) override;
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(
+      Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result) override;
 
   void onReportPerformance(Performance* performance, int64_t decodingTime) override;
 
@@ -89,7 +90,8 @@ class VideoReader : public SequenceReader {
   DecodeStatus decodeFrame(int64_t sampleTime, int64_t deadline);
 
   std::shared_ptr<tgfx::ImageBuffer> keepFallbackBuffer(
-      std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer);
+      std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer,
+      const std::shared_ptr<SequenceReadResult>& result);
 
   std::unique_ptr<VideoDecoder> makeVideoDecoder(int64_t deadline);
 };

@@ -58,7 +58,8 @@ VideoReader::~VideoReader() {
   delete demuxer;
 }
 
-std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) {
+std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(
+    Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result) {
   auto deadline = tgfx::Clock::Now() + MAX_TOTAL_DECODE_TIME_US;
   // The deadline includes lock contention so each readBuffer() request has one shared wall-clock
   // budget. A single blocking platform codec call still cannot be interrupted by this soft budget.
@@ -69,7 +70,7 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
   // becomes active again.
   auto fallbackBuffer = lastBuffer;
   if (tgfx::Clock::Now() >= deadline) {
-    return fallbackBuffer;
+    return keepFallbackBuffer(std::move(fallbackBuffer), result);
   }
   if (fallbackPending) {
     destroyVideoDecoder();
@@ -85,7 +86,7 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
   currentRenderedTime = INT64_MIN;
   if (tgfx::Clock::Now() >= deadline || !checkVideoDecoder(deadline) ||
       tgfx::Clock::Now() >= deadline) {
-    return keepFallbackBuffer(fallbackBuffer);
+    return keepFallbackBuffer(std::move(fallbackBuffer), result);
   }
   auto status = decodeFrame(sampleTime, deadline);
   if (status == DecodeStatus::Error && tgfx::Clock::Now() < deadline) {
@@ -102,7 +103,7 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
   }
   if (status == DecodeStatus::Stalled) {
     fallbackPending = true;
-    return keepFallbackBuffer(fallbackBuffer);
+    return keepFallbackBuffer(std::move(fallbackBuffer), result);
   }
   if (status != DecodeStatus::Success) {
     // A platform call may return an error only after crossing the deadline. Defer fallback to the
@@ -111,32 +112,39 @@ std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) 
       fallbackPending = true;
     }
     LOGE("VideoDecoder: Error on decoding frame.\n");
-    return keepFallbackBuffer(fallbackBuffer);
+    return keepFallbackBuffer(std::move(fallbackBuffer), result);
   }
   if (!outputEndOfStream) {
     if (tgfx::Clock::Now() >= deadline) {
       fallbackPending = true;
-      return keepFallbackBuffer(fallbackBuffer);
+      return keepFallbackBuffer(std::move(fallbackBuffer), result);
     }
     lastBuffer = videoDecoder->onRenderFrame();
     if (lastBuffer) {
       currentRenderedTime = currentDecodedTime;
     } else {
       fallbackPending = true;
-      return keepFallbackBuffer(fallbackBuffer);
+      return keepFallbackBuffer(std::move(fallbackBuffer), result);
     }
   }
   if (lastBuffer == nullptr) {
-    return keepFallbackBuffer(fallbackBuffer);
+    return keepFallbackBuffer(std::move(fallbackBuffer), result);
   }
   return lastBuffer;
 }
 
 std::shared_ptr<tgfx::ImageBuffer> VideoReader::keepFallbackBuffer(
-    std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer) {
+    std::shared_ptr<tgfx::ImageBuffer> fallbackBuffer,
+    const std::shared_ptr<SequenceReadResult>& result) {
   // Store the fallback buffer back so consecutive failing requests keep returning the last
   // visible frame until decoding succeeds again.
   lastBuffer = std::move(fallbackBuffer);
+  if (lastBuffer != nullptr && result != nullptr) {
+    // The buffer holds a previously decoded frame instead of the requested one. Report it as a
+    // fallback so consumers (the disk sequence cache, the retry throttling and the same-frame
+    // cache) don't treat this read as a real decode success.
+    result->status.store(SequenceReadStatus::Fallback, std::memory_order_release);
+  }
   return lastBuffer;
 }
 

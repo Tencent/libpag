@@ -39,7 +39,8 @@ class BitmapSequenceReader : public SequenceReader {
   ~BitmapSequenceReader() override;
 
  protected:
-  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) override;
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(
+      Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result) override;
 
   void onReportPerformance(Performance* performance, int64_t decodingTime) override;
 

@@ -26,11 +26,15 @@ namespace pag {
 std::shared_ptr<tgfx::ImageBuffer> SequenceReader::readBuffer(
     Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result) {
   tgfx::Clock clock = {};
-  auto buffer = onMakeBuffer(targetFrame);
+  auto buffer = onMakeBuffer(targetFrame, result);
   decodingTime += clock.measure();
   if (result != nullptr) {
-    auto status = buffer != nullptr ? SequenceReadStatus::Succeeded : SequenceReadStatus::Failed;
-    result->status.store(status, std::memory_order_release);
+    // An implementation may have already reported a more precise status (such as Fallback).
+    auto status = result->status.load(std::memory_order_acquire);
+    if (status == SequenceReadStatus::Pending) {
+      status = buffer != nullptr ? SequenceReadStatus::Succeeded : SequenceReadStatus::Failed;
+      result->status.store(status, std::memory_order_release);
+    }
   }
   return buffer;
 }

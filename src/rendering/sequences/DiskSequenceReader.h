@@ -37,7 +37,8 @@ class DiskSequenceReader : public SequenceReader {
   Sequence* sequence = nullptr;
   std::shared_ptr<PAGDecoder> pagDecoder;
   std::shared_ptr<File> file;
-  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) override;
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(
+      Frame targetFrame, const std::shared_ptr<SequenceReadResult>& result) override;
   void onReportPerformance(Performance* performance, int64_t decodingTime) override;
   std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
   tgfx::ImageInfo info = {};
