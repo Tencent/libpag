@@ -101,6 +101,7 @@ class JPAGImageViewRenderSession : public std::enable_shared_from_this<JPAGImage
   void setScaleMode(PAGScaleMode value) {
     std::lock_guard<std::mutex> autoLock(operationLocker);
     scaleMode = value;
+    matrixDrivenByScaleMode = true;
     refreshMatrixFromScaleMode();
   }
 
@@ -113,6 +114,7 @@ class JPAGImageViewRenderSession : public std::enable_shared_from_this<JPAGImage
     std::lock_guard<std::mutex> autoLock(operationLocker);
     matrix = ToTGFX(value);
     scaleMode = PAGScaleMode::None;
+    matrixDrivenByScaleMode = false;
   }
 
   Matrix getMatrix() {
@@ -183,6 +185,7 @@ class JPAGImageViewRenderSession : public std::enable_shared_from_this<JPAGImage
   float renderScale = 1.0f;
   float frameRate = 30.0f;
   PAGScaleMode scaleMode = PAGScaleMode::LetterBox;
+  bool matrixDrivenByScaleMode = true;
   tgfx::Matrix matrix = tgfx::Matrix::I();
   bool cacheAllFramesInMemory = false;
   std::shared_ptr<PAGComposition> composition = nullptr;
@@ -239,7 +242,19 @@ class JPAGImageViewRenderSession : public std::enable_shared_from_this<JPAGImage
   }
 
   void refreshMatrixFromScaleMode() {
-    if (decoder == nullptr || scaleMode == PAGScaleMode::None) {
+    if (scaleMode == PAGScaleMode::None && !matrixDrivenByScaleMode) {
+      return;
+    }
+    if (decoder == nullptr || composition == nullptr) {
+      return;
+    }
+    if (scaleMode == PAGScaleMode::None) {
+      // The decoder pre-scales frames to roughly the view size, so undo that scaling to display
+      // the composition at its original size, matching the PAGView None semantics.
+      matrix = tgfx::Matrix::MakeScale(static_cast<float>(composition->width()) * renderScale /
+                                           static_cast<float>(decoder->width()),
+                                       static_cast<float>(composition->height()) * renderScale /
+                                           static_cast<float>(decoder->height()));
       return;
     }
     matrix = ToTGFX(ApplyScaleMode(scaleMode, decoder->width() / renderScale,
