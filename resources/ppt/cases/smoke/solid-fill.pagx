@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="400" height="300">
+  <Layer width="400" height="300">
+    <Rectangle width="400" height="300"/>
+    <Fill color="#F8FAFC"/>
+    <Group centerX="0" centerY="0">
+      <Rectangle width="220" height="120" roundness="20"/>
+      <Fill color="#2563EB"/>
+    </Group>
+  </Layer>
+</pagx>

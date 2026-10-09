@@ -1033,6 +1033,21 @@ if (PAG_BUILD_CLI)
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             USES_TERMINAL
             COMMENT "Running HTML browser-fidelity eval over resources/html corpora")
+
+    # PPT visual-fidelity eval target. This is an end-to-end test rather than a
+    # gtest binary: PAGX files are rendered natively, exported to PPTX, opened
+    # by headless LibreOffice, rasterized, and compared against the native
+    # renders. Defaults to the seeded smoke corpus; PPT_EVAL_CORPORA overrides it.
+    # A matching renderer environment baseline is required. Build & run with:
+    #   cmake --build <build-dir> --target PPTTest
+    add_custom_target(PPTTest
+            COMMAND ${CMAKE_COMMAND} -E env PAGX_BIN=$<TARGET_FILE:pagx-cli>
+            PPT_EVAL_REQUIRE_BASELINE=1
+            bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_ppt_eval.sh
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Running PPT visual-fidelity eval over PAGX corpora")
 endif ()
 
 if (PAG_BUILD_TESTS)

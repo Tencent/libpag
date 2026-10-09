@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="400" height="300">
+  <Layer width="400" height="300">
+    <Rectangle width="400" height="300"/>
+    <Fill color="#FFF7ED"/>
+    <TextBox left="70" top="100" width="260" height="100" textAlign="center" paragraphAlign="middle">
+      <Text text="PAGX PPT" fontSize="48" fontFamily="Arial"/>
+      <Fill color="#9A3412"/>
+    </TextBox>
+  </Layer>
+</pagx>
