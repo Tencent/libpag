@@ -81,10 +81,17 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(
     Frame targetFrame, std::shared_ptr<SequenceReadResult>* result) {
   lastRequestedFrame = targetFrame;
   if (targetFrame == currentFrame) {
-    if (result != nullptr) {
-      *result = currentResult;
+    auto status = currentResult == nullptr ? SequenceReadStatus::Pending
+                                           : currentResult->status.load(std::memory_order_acquire);
+    if (status != SequenceReadStatus::Fallback) {
+      if (result != nullptr) {
+        *result = currentResult;
+      }
+      return currentImage;
     }
-    return currentImage;
+    // The cached image holds stale content from an earlier frame. Bypass the same-frame cache so
+    // the request re-decodes once decoding recovers; if it still fails, the reader returns the
+    // fallback buffer again and the frozen content stays on screen.
   }
   if (targetFrame == preparedFrame) {
     currentImage = preparedImage;
@@ -125,6 +132,19 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(
   preparedResult = nullptr;
   if (result != nullptr) {
     *result = currentResult;
+  }
+  return currentImage;
+}
+
+std::shared_ptr<tgfx::Image> SequenceImageQueue::getCachedImage(Frame targetFrame) {
+  lastRequestedFrame = targetFrame;
+  if (targetFrame == preparedFrame && preparedImage != nullptr) {
+    currentImage = preparedImage;
+    currentFrame = preparedFrame;
+    currentResult = preparedResult;
+    preparedImage = nullptr;
+    preparedFrame = -1;
+    preparedResult = nullptr;
   }
   return currentImage;
 }

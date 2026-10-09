@@ -61,7 +61,8 @@ int DiskSequenceReader::height() const {
   return sequence->composition->height;
 }
 
-std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(Frame targetFrame) {
+std::shared_ptr<tgfx::ImageBuffer> DiskSequenceReader::onMakeBuffer(
+    Frame targetFrame, const std::shared_ptr<SequenceReadResult>&) {
   // Need a locker here in case there are other threads are decoding at the same time.
   std::lock_guard<std::mutex> autoLock(locker);
   if (pagDecoder == nullptr) {

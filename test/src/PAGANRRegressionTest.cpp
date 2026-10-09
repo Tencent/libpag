@@ -349,7 +349,8 @@ class ANRFailThenSucceedReader : public SequenceReader {
   }
 
  protected:
-  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame) override {
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(
+      Frame, const std::shared_ptr<SequenceReadResult>&) override {
     if (++reads == 1) {
       return nullptr;
     }
