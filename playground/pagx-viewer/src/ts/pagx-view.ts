@@ -16,7 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import type { _PAGXView } from './types';
+import type {
+  _PAGXView,
+  HitTestResult,
+  NodeBounds,
+  NodeSourceEntry,
+  PagxSchemaDiagnostic,
+  TimelineTreeNode,
+} from './types';
 import { getPAGXModule } from './pagx-module';
 import { destroyVerify } from './decorators';
 
@@ -331,6 +338,15 @@ export class PAGXView {
   }
 
   /**
+   * Returns true when the loaded document has a default timeline — even one without a queryable
+   * duration (e.g. a state machine). Used to keep the playback bar visible in a greyed-out
+   * fallback mode instead of hiding it entirely.
+   */
+  public hasTimeline(): boolean {
+    return this.nativeView._hasTimeline();
+  }
+
+  /**
    * Returns the frame rate of the animation. Returns 0 if no content is loaded.
    */
   public frameRate(): number {
@@ -363,6 +379,108 @@ export class PAGXView {
    */
   public isLoop(): boolean {
     return this.nativeView._isLoop();
+  }
+
+  /**
+   * Returns the source node under the surface point (index, source span, and on-screen
+   * bounds), or null when nothing is hit. Coordinates are surface (backing-store) pixels;
+   * convert from CSS pixels via canvas.width / rect.width so DPR is absorbed.
+   */
+  public hitTest(surfaceX: number, surfaceY: number): HitTestResult | null {
+    return this.nativeView._hitTest(surfaceX, surfaceY);
+  }
+
+  /**
+   * Exports every node's source span and incrementable channel list. Call after buildLayers()
+   * and rebuild on full reload. Returns a plain JS array (emscripten::val, no delete() needed).
+   */
+  public getNodeSourceMap(): NodeSourceEntry[] {
+    return this.nativeView._getNodeSourceMap();
+  }
+
+  /**
+   * Returns the current-frame surface bounds { x, y, w, h } of every runtime layer instance
+   * built from nodes[index] — one array entry per instance when the node is referenced by
+   * several composition layers — or null if the index is out of range or has no runtime layer.
+   */
+  public getNodeBounds(index: number): NodeBounds[] | null {
+    return this.nativeView._getNodeBounds(index);
+  }
+
+  /**
+   * Validates well-formed PAGX XML against the importer schema without changing the document
+   * currently being rendered. XML syntax errors are handled separately by the source editor;
+   * this returns importer diagnostics for valid XML with invalid PAGX semantics.
+   */
+  public validatePAGX(data: Uint8Array): PagxSchemaDiagnostic[] {
+    return this.nativeView._validatePAGX(data);
+  }
+
+  /**
+   * Sets a channel on nodes[index] from its raw PAGX attribute string and refreshes the scene in
+   * place (the incremental fast path for a source-editor attribute edit). Returns false when the
+   * index is invalid, the channel is unknown for the node type, or the string cannot be parsed;
+   * the caller should then fall back to a full reparse.
+   * @param index Node index from the source map
+   * @param channel Channel name (e.g. `'alpha'`, `'color'`, `'position.x'`)
+   * @param value Value in PAGX attribute string form
+   */
+  public setNodeChannel(index: number, channel: string, value: string): boolean {
+    return this.nativeView._setNodeChannel(index, channel, value);
+  }
+
+  /**
+   * Sets a bool input on the default state machine timeline (playground hook for testing
+   * interactive state machines from the console). Returns false when the loaded document's
+   * default timeline is not a state machine or the input is unknown/wrong-typed.
+   */
+  public setSMInputBool(name: string, value: boolean): boolean {
+    return this.nativeView._setSMInputBool(name, value);
+  }
+
+  /**
+   * Number-input counterpart of setSMInputBool.
+   */
+  public setSMInputNumber(name: string, value: number): boolean {
+    return this.nativeView._setSMInputNumber(name, value);
+  }
+
+  /**
+   * Trigger-input counterpart of setSMInputBool.
+   */
+  public fireSMInputTrigger(name: string): boolean {
+    return this.nativeView._fireSMInputTrigger(name);
+  }
+
+  /**
+   * Exports the animation-unit tree of the loaded document: every top-level Animation/StateMachine
+   * definition plus every <Timelines> mount point, nested by composition reference.
+   */
+  public getTimelineTree(): TimelineTreeNode[] {
+    return this.nativeView._getTimelineTree();
+  }
+
+  /**
+   * Selects one unit of the timeline tree for solo preview (empty id clears the selection):
+   * playback values route to the selected animation while every other clock freezes; a selected
+   * state machine freezes the clocks and exposes no time axis.
+   */
+  public selectTimelineUnit(kind: string, id: string): boolean {
+    return this.nativeView._selectTimelineUnit(kind, id);
+  }
+
+  /** Returns the current solo-preview selection, or null when none is selected. */
+  public getSelectedTimelineUnit(): { kind: string; id: string } | null {
+    return this.nativeView._getSelectedTimelineUnit();
+  }
+
+  /**
+   * Returns the live { regionName: currentStateName } map of the default state machine timeline,
+   * or an empty object when the default timeline is not a state machine. Polling endpoint for the
+   * blueprint view's active-state highlight.
+   */
+  public getSMCurrentStates(): Record<string, string> {
+    return this.nativeView._getSMCurrentStates();
   }
 
   /**

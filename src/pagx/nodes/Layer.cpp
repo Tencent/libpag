@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include "pagx/LayoutContext.h"
 #include "pagx/nodes/Composition.h"
 #include "pagx/nodes/LayoutNode.h"
 #include "pagx/types/Alignment.h"
@@ -28,6 +29,17 @@
 #include "pagx/types/Rect.h"
 
 namespace pagx {
+
+// NaN-aware equality for a memoized layout target: a content-measured axis arrives as NaN in every
+// pass and must compare equal so an unchanged target is recognized across two-pass layout.
+// Infinities never match: a caller passing inf (or -inf) means "unbounded" from an upstream flex /
+// PPT measurement, and letting the memo hit for it would freeze a layer at an out-of-range target.
+static bool SameLayoutInput(float a, float b) {
+  if (std::isinf(a) || std::isinf(b)) {
+    return false;
+  }
+  return (std::isnan(a) && std::isnan(b)) || a == b;
+}
 
 static float ComputeCrossTarget(Alignment alignment, bool horizontal, const Layer* child,
                                 float alignCrossSize) {
@@ -182,6 +194,19 @@ void Layer::onMeasure(LayoutContext*) {
 }
 
 void Layer::setLayoutSize(LayoutContext* context, float targetWidth, float targetHeight) {
+  // Memoized skip: within one applyLayout pass the subtree's measured (preferred) sizes are fixed,
+  // so an unchanged (targetWidth, targetHeight) input necessarily reproduces the same layout. When a
+  // content-measured parent re-descends during its two-pass refinement, children whose target is
+  // unaffected by the parent's refined size (absolute / content-sized axes stay NaN in both passes)
+  // are skipped here, collapsing the otherwise exponential 2^depth re-layout to linear. layoutWidth/
+  // layoutHeight retain their previously resolved values, so the parent still positions this layer
+  // via setLayoutPosition. The memo lives in the LayoutContext, so it dies with the pass.
+  auto memo = context->layoutTargets.find(this);
+  if (memo != context->layoutTargets.end() && SameLayoutInput(targetWidth, memo->second.first) &&
+      SameLayoutInput(targetHeight, memo->second.second)) {
+    return;
+  }
+  context->layoutTargets[this] = {targetWidth, targetHeight};
   // A content-measured axis is one the parent did not constrain and the layer did not author.
   // For a non-flex Layer without a composition backing, defer such axes to NaN during pass 1 so
   // percent-sized descendants fall back to their preferred size instead of locking onto a

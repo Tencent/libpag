@@ -19,7 +19,6 @@
 #include "pagx/PAGAnimation.h"
 #include <algorithm>
 #include <cstdint>
-#include "base/utils/Log.h"
 #include "pagx/PAGScene.h"
 #include "pagx/PAGStateMachineRegion.h"
 #include "pagx/PAGXDocument.h"
@@ -49,8 +48,8 @@ static void ApplyResolved(
   for (const auto& entry : resolvedTargets) {
     auto* targetNode = entry.first;
     for (auto* channel : entry.second) {
-      binding->apply(targetNode, channel->name,
-                     channel->evaluateAt(microseconds, animation->frameRate), mix);
+      auto value = channel->evaluateAt(microseconds, animation->frameRate);
+      binding->apply(targetNode, channel->name, value, mix);
     }
   }
 }

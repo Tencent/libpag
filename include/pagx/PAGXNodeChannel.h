@@ -64,6 +64,28 @@ bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out)
 bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& value);
 
 /**
+ * Writes a raw string value into the node field identified by channel, parsing it into the
+ * KeyValue alternative the channel expects. The string uses the exact PAGX XML attribute syntax.
+ * Dimension channels ("100" / "50%", where the percent form writes the percent member and clears
+ * the absolute one and vice versa), bool, color ("#RGB"/"#RRGGBB"/"#RRGGBBAA"/"srgb(...)"/"p3(...)"),
+ * enum, and string channels are parsed with the same rules as document import, so an incremental
+ * edit produces the value a full reparse would. Float and int channels are intentionally stricter
+ * than the importer's attribute parsing: they require the whole string to be consumed and reject
+ * non-finite values (the importer's strtof-based reader accepts trailing junk like "10px" and
+ * "inf"). A false return for such inputs is not a document error — treat it as "cannot go
+ * incremental" and fall back to a full reparse. This is the convenience entry point for editors
+ * that hold the value as text (e.g. a source-editor attribute edit); prefer SetNodeChannel when
+ * the value is already typed. Edits are applied to the document; refresh any associated scene
+ * separately via PAGXDocument::notifyChange (use RequiresLayout to decide the layoutChanged flag).
+ * @param node  the node to write to; must not be null.
+ * @param channel  the channel name (see the encoding notes above).
+ * @param raw  the value in PAGX attribute string form.
+ * @return true on success; false if node is null, the channel is unknown for the node type, the
+ * string cannot be parsed into the channel's type, or an enum string is invalid.
+ */
+bool SetNodeChannelFromString(Node* node, const std::string& channel, const std::string& raw);
+
+/**
  * Resets the node field identified by channel to its default — the value a freshly created node of
  * the same type carries. Use this to "clear" a previously edited channel: for optional fields
  * (e.g. a TextModifier's strokeWidth) the default is the unset state, so resetting removes the
