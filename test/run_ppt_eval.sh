@@ -18,7 +18,8 @@ PPT_EVAL_UPDATE_BASELINE="${PPT_EVAL_UPDATE_BASELINE:-0}"
 PPT_EVAL_REQUIRE_BASELINE="${PPT_EVAL_REQUIRE_BASELINE:-1}"
 PPT_BASELINE="${PPT_BASELINE:-$ROOT/resources/ppt/baseline.json}"
 
-DEFAULT_CORPORA=(features layout text cli spec smoke decks)
+# Expand the default gate only after seeding and reviewing each corpus baseline.
+DEFAULT_CORPORA=(smoke)
 VALID_CORPORA=(features layout text cli spec smoke decks)
 if [ "$#" -gt 0 ]; then
   CORPORA=("$@")

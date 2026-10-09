@@ -11,15 +11,20 @@ pagx export --format pptx → LibreOffice PDF → 96 DPI PNG → compare
 
 ## 运行
 
+默认仅运行已有基准的 `smoke`，严格门禁要求当前渲染环境匹配基准。其他环境可先使用下面的报告模式，再按 Baseline 一节建立并审核对应环境的基准。
+
 ```bash
 cmake --build cmake-build-debug --target PPTTest
 
-# 快速验证
-test/run_ppt_eval.sh smoke
+# shell 入口同样默认只跑 smoke
+test/run_ppt_eval.sh
 
-# 通过 CMake 只跑 smoke
-PPT_EVAL_CORPORA=smoke \
+# 通过 CMake 选择其他语料（需先建立对应环境的基准）
+PPT_EVAL_CORPORA=smoke,decks \
   cmake --build cmake-build-debug --target PPTTest
+
+# 全量生成报告
+PPT_EVAL_REQUIRE_BASELINE=0 test/run_ppt_eval.sh features layout text cli spec smoke decks
 
 # 筛选用例、调整并发
 PPT_EVAL_REQUIRE_BASELINE=0 PPT_EVAL_ONLY=text CONCURRENCY=1 test/run_ppt_eval.sh features
@@ -29,7 +34,7 @@ PPT_EVAL_REQUIRE_BASELINE=0 PPT_EVAL_ONLY=text CONCURRENCY=1 test/run_ppt_eval.s
 
 - macOS 或 Linux；原生 Windows 暂不支持，Windows 上请在 WSL 中使用 Linux 版工具链；
 - 已构建 `pagx` CLI；
-- Node.js；
+- Node.js 22.12.0 或更高版本（Node.js 20.x 至少为 20.19.0）；CommonJS 评测脚本通过无需实验标志的 `require(esm)` 加载纯 ESM 的 `pixelmatch`；
 - LibreOffice (`soffice`)；
 - `pdftocairo` 或 `pdftoppm`（Poppler），用于把每页 PDF 固定以 96 DPI 光栅化。
 - 已执行 `git lfs pull`；入口会检查语料目录、声明的外部资源和 `resources/font`，发现 pointer 文件立即失败。
@@ -72,7 +77,7 @@ Baseline 与操作系统、架构、LibreOffice 和 PDF 光栅化器版本绑定
 
 首份 `smoke` 基准由本地真实渲染生成，并人工核对两页输出：macOS 15.7.9（arm64）、LibreOffice 26.2.2.2（`1f77d10d6938fd34972958f64b2bcfa54f8b1ba5`）、pdftocairo 26.09.0，默认导出参数、scale 1。原生文字在 LibreOffice 中存在字宽差异；该基准记录当前表现，用于检测后续退化，不代表像素完全一致。
 
-其他语料和 CI 环境尚未 seed，严格模式会失败。首次启用 CI 视觉门禁时，先固定操作系统、字体、LibreOffice 和 Poppler 版本，执行 LFS 检查并完整运行 `smoke`，人工核对参考图、实际图和 diff 后提交对应环境的基准；其他 corpus 按相同步骤逐套纳入，禁止用自动更新覆盖回归。
+其他语料和 CI 环境尚未 seed，显式选择这些语料或环境运行严格模式会失败。默认语料暂时只包含 `smoke`；其他 corpus 在完成基准生成和人工核对后，再逐套加入默认集合。首次启用 CI 视觉门禁时，先固定操作系统、字体、LibreOffice 和 Poppler 版本，执行 LFS 检查并完整运行 `smoke`，人工核对参考图、实际图和 diff 后提交对应环境的基准；其他 corpus 按相同步骤逐套纳入，禁止用自动更新覆盖回归。
 
 在固定、可信环境完成所选语料的全量运行后更新：
 

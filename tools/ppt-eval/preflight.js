@@ -10,8 +10,11 @@ function checkAssets(manifest, labels, repoRoot) {
   const pointers = [];
   const visit = (file) => {
     file = path.resolve(repoRoot, file);
-    if (visited.has(file)) return;
-    visited.add(file);
+    if (!fs.existsSync(file)) throw new Error(`asset missing: ${path.relative(repoRoot, file)}`);
+    // Follow linked assets, but visit each target only once to stop directory cycles.
+    const realPath = fs.realpathSync(file);
+    if (visited.has(realPath)) return;
+    visited.add(realPath);
     if (fs.statSync(file).isDirectory()) {
       for (const name of fs.readdirSync(file)) visit(path.join(file, name));
       return;
