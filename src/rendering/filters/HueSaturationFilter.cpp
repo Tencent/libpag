@@ -114,7 +114,7 @@ std::string HueSaturationFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> HueSaturationFilter::uniformBlocks() const {
-  return {{"Args", 0}};
+  return {{"Args", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void HueSaturationFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

@@ -23,7 +23,10 @@ import { TGFXBind } from '@tgfx/binding';
  * Binding pag js module on pag webassembly module.
  */
 export const PAGBind = (module: PAG) => {
-  TGFXBind(module);
+  // TGFXBind() forwards setTaskMaxThreadCounts/taskMaxThreadCounts from the TGFX runtime onto
+  // the module. They are tgfx runtime members, not part of the public PAG interface, so satisfy
+  // TGFXBind's parameter type with a local assertion instead of declaring them on PAG.
+  TGFXBind(module as unknown as Parameters<typeof TGFXBind>[0]);
   setPAGModule(module);
   module.module = module;
   module.PAGFile = PAGFile;

@@ -31,10 +31,17 @@
 #include "utils/ProjectPath.h"
 #include "utils/Semaphore.h"
 
+#ifdef TGFX_USE_OPENGL
+#include "tgfx/gpu/opengl/GLTypes.h"
+#endif
+
 namespace pag {
 std::string ToString(Frame frame);
 
+#ifdef TGFX_USE_OPENGL
 BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, int height);
+bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLTextureInfo* texture);
+#endif
 
 std::vector<std::string> GetAllPAGFiles(const std::string& path);
 
@@ -42,8 +49,6 @@ tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);
-
-bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLTextureInfo* texture);
 
 std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path);
 

@@ -34,6 +34,7 @@
 #include "utils/Baseline.h"
 #include "utils/TestUtils.h"
 
+#ifdef TGFX_USE_OPENGL
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
 #else
@@ -42,6 +43,7 @@
 #endif
 #include <OpenGL/gl3.h>
 #endif
+#endif  // TGFX_USE_OPENGL
 
 namespace pag {
 
@@ -278,21 +280,36 @@ PAGX_TEST(PAGXRuntimeTest, PAGSceneDrawAutoClearOverlay) {
 /**
  * Test case: PAGSurface::MakeFrom(BackendTexture) creates a surface that can render PAGScene
  * content and produce a correct screenshot.
+ *
+ * GL-specific: this exercises the GL-backed BackendTexture path (external GLTextureInfo + share-
+ * context adoption). No equivalent public API exists yet on non-GL backends. The following two
+ * test cases are gated on TGFX_USE_OPENGL until Metal-friendly BackendTexture APIs are
+ * introduced.
  */
+#ifdef TGFX_USE_OPENGL
 PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
   const int width = 100;
   const int height = 100;
 
+  // Hold the device lock across texture + surface creation (GL needs a current context there),
+  // then release before PAGScene::draw() below, which acquires the device on its own. The device
+  // is created once and reused by the cleanup block below: on the GL backend every
+  // Devices::MakeDefault() builds a new, non-sharing GL context, so deleting the texture under a
+  // different device would be a silent no-op on the creating context.
   tgfx::GLTextureInfo textureInfo = {};
-  CreateGLTexture(context, width, height, &textureInfo);
-  auto backendTexture = ToBackendTexture(textureInfo, width, height);
-
-  auto surface = pagx::PAGSurface::MakeFrom(backendTexture, pag::ImageOrigin::TopLeft);
+  std::shared_ptr<pagx::PAGSurface> surface = nullptr;
+  auto device = pag::Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  {
+    pag::DeviceLockScope deviceLock(device);
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    CreateGLTexture(deviceLock.context(), width, height, &textureInfo);
+    auto backendTexture = ToBackendTexture(textureInfo, width, height);
+    surface = pagx::PAGSurface::MakeFrom(backendTexture, pag::ImageOrigin::TopLeft);
+  }
   ASSERT_TRUE(surface != nullptr);
   EXPECT_EQ(surface->width(), width);
   EXPECT_EQ(surface->height(), height);
-
-  device->unlock();
 
   auto doc = pagx::PAGXDocument::Make(width, height);
   auto layer = doc->makeNode<pagx::Layer>("L");
@@ -333,8 +350,12 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendTexture) {
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSurfaceFromBackendTexture"));
 
-  context = device->lockContext();
-  glDeleteTextures(1, &textureInfo.id);
+  {
+    // Lock the same device that created the texture (see the comment at the top of this test).
+    pag::DeviceLockScope lock(device);
+    ASSERT_TRUE(static_cast<bool>(lock));
+    glDeleteTextures(1, &textureInfo.id);
+  }
 }
 
 /**
@@ -345,26 +366,34 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   const int width = 100;
   const int height = 100;
 
+  // Hold the device lock across GL object + surface creation (GL needs a current context there),
+  // then release before PAGScene::draw() below, which acquires the device on its own. The device
+  // is created once and reused by the cleanup block below: on the GL backend every
+  // Devices::MakeDefault() builds a new, non-sharing GL context, so deleting the GL objects under
+  // a different device would be a silent no-op on the creating context.
   tgfx::GLTextureInfo textureInfo = {};
-  CreateGLTexture(context, width, height, &textureInfo);
-
   GLuint fbo = 0;
-  glGenFramebuffers(1, &fbo);
-  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureInfo.id, 0);
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  std::shared_ptr<pagx::PAGSurface> surface = nullptr;
+  auto device = pag::Devices::MakeDefault();
+  ASSERT_TRUE(device != nullptr);
+  {
+    pag::DeviceLockScope deviceLock(device);
+    ASSERT_TRUE(static_cast<bool>(deviceLock));
+    CreateGLTexture(deviceLock.context(), width, height, &textureInfo);
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureInfo.id, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  pag::GLFrameBufferInfo fbInfo = {};
-  fbInfo.id = fbo;
-  fbInfo.format = GL_RGBA8;
-  pag::BackendRenderTarget backendRT(fbInfo, width, height);
-
-  auto surface = pagx::PAGSurface::MakeFrom(backendRT, pag::ImageOrigin::TopLeft);
+    pag::GLFrameBufferInfo fbInfo = {};
+    fbInfo.id = fbo;
+    fbInfo.format = GL_RGBA8;
+    pag::BackendRenderTarget backendRT(fbInfo, width, height);
+    surface = pagx::PAGSurface::MakeFrom(backendRT, pag::ImageOrigin::TopLeft);
+  }
   ASSERT_TRUE(surface != nullptr);
   EXPECT_EQ(surface->width(), width);
   EXPECT_EQ(surface->height(), height);
-
-  device->unlock();
 
   auto doc = pagx::PAGXDocument::Make(width, height);
   auto layer = doc->makeNode<pagx::Layer>("L");
@@ -405,10 +434,15 @@ PAGX_TEST(PAGXRuntimeTest, PAGSurfaceFromBackendRenderTarget) {
   ASSERT_TRUE(scene->draw(surface));
   EXPECT_TRUE(Baseline::Compare(surface, "PAGXRuntimeTest/PAGSurfaceFromBackendRenderTarget"));
 
-  context = device->lockContext();
-  glDeleteFramebuffers(1, &fbo);
-  glDeleteTextures(1, &textureInfo.id);
+  {
+    // Lock the same device that created the GL objects (see the comment at the top of this test).
+    pag::DeviceLockScope lock(device);
+    ASSERT_TRUE(static_cast<bool>(lock));
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &textureInfo.id);
+  }
 }
+#endif  // TGFX_USE_OPENGL
 
 /**
  * Test case: EvaluateKeyframeSequence treats KeyframeInterpolationType::None identically to Hold,

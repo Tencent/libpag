@@ -16,6 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Uses CVPixelBuffer OpenGLES compatibility keys, deprecated since iOS 12 along with the rest of
+// the OpenGLES API. libpag's own build defines GLES_SILENCE_DEPRECATION (see CMakeLists); define
+// it locally too so IDE indexing without the build flags stays clean.
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #include "HardwareDecoder.h"
 #import <UIKit/UIKit.h>
 #include <algorithm>
@@ -219,21 +225,30 @@ bool HardwareDecoder::resetVideoToolBox() {
 
   // create decompression session
   CFDictionaryRef attrs = NULL;
+  // Ask CoreVideo to make the decoded CVPixelBuffer usable directly by whichever GPU backend
+  // libpag was built against. Wrong compatibility flag causes tgfx to fall back to a CPU copy
+  // and hurts decode → render performance.
+#if defined(TGFX_USE_METAL)
+  const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferMetalCompatibilityKey,
+                        kCVPixelBufferIOSurfacePropertiesKey};
+#else
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLESCompatibilityKey,
                         kCVPixelBufferIOSurfacePropertiesKey};
+#endif
 
-  uint32_t openGLESCompatibility = true;
   uint32_t pixelFormatType = tgfx::IsLimitedYUVColorRange(sourceColorSpace)
                                  ? kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
                                  : kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
-  CFNumberRef openGLESCompatibilityValue =
-      CFNumberCreate(NULL, kCFNumberSInt32Type, &openGLESCompatibility);
   CFDictionaryRef ioSurfaceParam =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
 
-  const void* values[] = {pixelFormatTypeValue, openGLESCompatibilityValue, ioSurfaceParam};
+  // The compatibility keys expect a CFBoolean, not a CFNumber: passing a CFNumber makes
+  // CVPixelBufferCreateResolvedAttributesDictionary reject the whole attribute set on newer
+  // systems (the same issue main fixed for macOS in PR #3745). kCFBooleanTrue is a shared
+  // constant and must not be released.
+  const void* values[] = {pixelFormatTypeValue, kCFBooleanTrue, ioSurfaceParam};
 
   attrs = CFDictionaryCreate(NULL, keys, values, 3, NULL, NULL);
 
@@ -248,7 +263,6 @@ bool HardwareDecoder::resetVideoToolBox() {
 
   CFRelease(attrs);
   CFRelease(pixelFormatTypeValue);
-  CFRelease(openGLESCompatibilityValue);
   CFRelease(ioSurfaceParam);
 
   if (newSession != nullptr && (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||

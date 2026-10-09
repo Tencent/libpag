@@ -22,13 +22,36 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
+@protocol MTLDevice;
+
+// The CAEAGLLayer / EAGLContext APIs below are deprecated since iOS 12 but remain part of the
+// published GL-backend API surface. Silence the deprecation warnings locally: framework
+// consumers compile this header without libpag's GLES_SILENCE_DEPRECATION build define, and
+// defining that macro here would leak into their whole translation unit.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 PAG_API @interface PAGSurface : NSObject
 
 /**
  * Creates a new PAGSurface from specified CAEAGLLayer. The GPU context will be created internally
- * by PAGSurface.
+ * by PAGSurface. Returns nil if the current libpag build does not use the OpenGL backend.
  */
 + (PAGSurface*)FromLayer:(CAEAGLLayer*)layer;
+
+/**
+ * Creates a new PAGSurface from a CAMetalLayer. The MTLDevice on the layer (or the system
+ * default) is adopted internally. Multiple PAGSurfaces whose layers share the same MTLDevice
+ * share the same GPU caches. Returns nil if the current libpag build does not use the Metal
+ * backend. The caller must keep the CAMetalLayer alive for the lifetime of the PAGSurface —
+ * libpag does not retain it (retaining would risk a reference cycle in typical view-layer
+ * setups), so releasing the layer while the PAGSurface is still in use is undefined behavior.
+ * The caller must also maintain layer.drawableSize (in pixels) — CAMetalLayer does not derive it
+ * from bounds automatically, and if it stays at zero the surface reports a fallback size but
+ * never actually renders. When the size changes, update layer.drawableSize and call updateSize
+ * on the PAGSurface.
+ */
++ (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
 
 /**
  * Creates a new PAGSurface from specified CVPixelBuffer. The GPU context will be created internally
@@ -39,9 +62,19 @@ PAG_API @interface PAGSurface : NSObject
 /**
  * Creates a new PAGSurface from specified CVPixelBuffer and EAGLContext. Multiple PAGSurfaces with
  * the same context share the same GPU caches. The caches are not destroyed when resetting a
- * PAGPlayer's surface to another PAGSurface with the same context.
+ * PAGPlayer's surface to another PAGSurface with the same context. Returns nil if the current
+ * libpag build does not use the OpenGL backend.
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext;
+
+/**
+ * Creates a new PAGSurface from specified CVPixelBuffer and MTLDevice. The MTLDevice is used as
+ * the rendering device — the CVPixelBuffer must have been created with kCVPixelBufferMetal-
+ * CompatibilityKey set. Multiple PAGSurfaces with the same MTLDevice share the same GPU caches.
+ * The caches are not destroyed when resetting a PAGPlayer's surface to another PAGSurface with
+ * the same device. Returns nil if the current libpag build does not use the Metal backend.
+ */
++ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead)
@@ -100,3 +133,5 @@ PAG_API @interface PAGSurface : NSObject
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 
 @end
+
+#pragma clang diagnostic pop

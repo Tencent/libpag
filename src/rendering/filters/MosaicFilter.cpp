@@ -59,7 +59,7 @@ std::string MosaicFilter::onBuildFragmentShader() const {
 }
 
 std::vector<tgfx::BindingEntry> MosaicFilter::uniformBlocks() const {
-  return {{"Args", 0}};
+  return {{"Args", 0, tgfx::ShaderVisibility::Fragment}};
 }
 
 void MosaicFilter::onUpdateUniforms(tgfx::RenderPass* renderPass, tgfx::GPU* gpu,

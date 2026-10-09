@@ -25,7 +25,25 @@
 
 PAG_API @interface PAGSurface : NSObject
 
+/**
+ * Creates a new PAGSurface from a NSView. Returns nil if the current libpag build does not use
+ * the OpenGL backend.
+ */
 + (PAGSurface*)FromView:(NSView*)view;
+
+/**
+ * Creates a new PAGSurface from a CAMetalLayer. The MTLDevice on the layer (or the system
+ * default) is adopted internally. Multiple PAGSurfaces whose layers share the same MTLDevice
+ * share the same GPU caches. Returns nil if the current libpag build does not use the Metal
+ * backend. The caller must keep the CAMetalLayer alive for the lifetime of the PAGSurface —
+ * libpag does not retain it (retaining would risk a reference cycle in typical view-layer
+ * setups), so releasing the layer while the PAGSurface is still in use is undefined behavior.
+ * The caller must also maintain layer.drawableSize (in pixels) — CAMetalLayer does not derive it
+ * from bounds automatically, and if it stays at zero the surface reports a fallback size but
+ * never actually renders. When the size changes, update layer.drawableSize and call updateSize
+ * on the PAGSurface.
+ */
++ (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead.)
@@ -67,7 +85,7 @@ PAG_API @interface PAGSurface : NSObject
 
 /**
  * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if this
- * PAGSurface is created by [PAGSurface FromLayer].
+ * PAGSurface is created by [PAGSurface FromView].
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 

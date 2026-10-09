@@ -17,10 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGView.h"
+
+#if defined(TGFX_USE_OPENGL) || defined(TGFX_USE_METAL)
+
 #import "PAGPlayer.h"
 #import "platform/cocoa/private/PAGAnimator.h"
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
+
+#if defined(TGFX_USE_OPENGL)
 #import "platform/mac/private/GPUDrawable.h"
+#endif
+
+#if defined(TGFX_USE_METAL)
+#import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#include "platform/cocoa/private/PAGMetalLayerHelper.h"
+#endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
 @end
@@ -44,7 +56,25 @@
   return self;
 }
 
+#if defined(TGFX_USE_METAL)
+- (CALayer*)makeBackingLayer {
+  return [CAMetalLayer layer];
+}
+
+- (void)updateLayerDrawableSize {
+  // NSView's layer.contentsScale does not track window.backingScaleFactor automatically, so the
+  // scale is read from the window (defaulting to 1.0) and synced by the shared helper.
+  CGFloat scale = self.window.backingScaleFactor > 0 ? self.window.backingScaleFactor : 1.0;
+  pag::cocoa::UpdateMetalLayerDrawableSize((CAMetalLayer*)self.layer, self.bounds.size, scale);
+}
+#endif
+
 - (void)initPAG {
+#if defined(TGFX_USE_METAL)
+  // NSView is not layer-backed by default; enable it so makeBackingLayer creates the CAMetalLayer
+  // and self.layer returns a valid CAMetalLayer to render into.
+  self.wantsLayer = YES;
+#endif
   _isVisible = FALSE;
   pagFile = nil;
   filePath = nil;
@@ -58,10 +88,12 @@
   // The animator must be set to sync mode. Otherwise, the internal surface in the PAGSurface could
   // not be created.
   [animator setSync:YES];
+#if defined(TGFX_USE_OPENGL)
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(onAsyncSurfacePrepared:)
                                                name:pag::AsyncSurfacePreparedNotification
                                              object:self];
+#endif
 }
 
 - (void)dealloc {
@@ -83,6 +115,9 @@
   [super setBounds:bounds];
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
+#if defined(TGFX_USE_METAL)
+    [self updateLayerDrawableSize];
+#endif
     [pagSurface updateSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
       [animator update];
@@ -90,13 +125,18 @@
   }
 }
 
-- (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (pagSurface != nil &&
-      (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
+- (void)setFrameSize:(NSSize)newSize {
+  NSSize oldSize = self.bounds.size;
+  [super setFrameSize:newSize];
+  // Every size change funnels through setFrameSize:: setFrame: calls it internally, and
+  // autoresizing / Auto Layout drive it directly, so this is the single place to react — handling
+  // the same change in setFrame: as well would run updateSize twice per resize.
+  if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
+#if defined(TGFX_USE_METAL)
+    [self updateLayerDrawableSize];
+#endif
     [pagSurface updateSize];
-    if (oldRect.size.width == 0 || oldRect.size.height == 0) {
+    if (oldSize.width == 0 || oldSize.height == 0) {
       [animator update];
     }
   }
@@ -106,6 +146,19 @@
   [super viewDidMoveToWindow];
   [self checkVisible];
 }
+
+#if defined(TGFX_USE_METAL)
+- (void)viewDidChangeBackingProperties {
+  [super viewDidChangeBackingProperties];
+  // Moving the window between displays with different backing scales does not change bounds, so
+  // setBounds:/setFrame: never fire and contentsScale would stay stuck on the old display's
+  // scale (blurry or clipped content).
+  if (pagSurface != nil) {
+    [self updateLayerDrawableSize];
+    [pagSurface updateSize];
+  }
+}
+#endif
 
 - (void)setAlphaValue:(CGFloat)alphaValue {
   [super setAlphaValue:alphaValue];
@@ -134,7 +187,16 @@
 }
 
 - (void)initPAGSurface {
+#if defined(TGFX_USE_METAL)
+  CAMetalLayer* layer = (CAMetalLayer*)self.layer;
+  pag::cocoa::SetUpPAGMetalLayer(layer);
+  // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
+  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
+  [self updateLayerDrawableSize];
+  pagSurface = [[PAGSurface FromMetalLayer:layer] retain];
+#else
   pagSurface = [[PAGSurface FromView:self] retain];
+#endif
   [pagPlayer setSurface:pagSurface];
   [animator update];
 }
@@ -342,7 +404,11 @@
   return CGRectNull;
 }
 
+#if defined(TGFX_USE_OPENGL)
 - (void)onAsyncSurfacePrepared:(NSNotification*)notification {
   [animator update];
 }
+#endif
 @end
+
+#endif  // TGFX_USE_OPENGL || TGFX_USE_METAL

@@ -24,7 +24,9 @@ import { TGFXBind } from '@tgfx/wechat/binding';
  * Binding pag js module on pag webassembly module.
  */
 export const binding = (module: PAG) => {
-  TGFXBind(module);
+  // Same local assertion as web/src/binding.ts: the task thread methods are TGFX runtime
+  // members, not part of the public PAG interface.
+  TGFXBind(module as unknown as Parameters<typeof TGFXBind>[0]);
   setPAGModule(module);
   module.module = module;
   module.PAGFile = PAGFile;

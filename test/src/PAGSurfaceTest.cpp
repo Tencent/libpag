@@ -17,8 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "rendering/drawables/TextureDrawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
+
+// The GL section exercises GL-specific behavior (external GLTextureInfo binding, share-context
+// verification via GLDevice::sharableWith, and the GLRestorer external-state guard). None of
+// these have exact Metal / Vulkan / D3D12 / WebGPU equivalents, so it is gated on
+// TGFX_USE_OPENGL. Metal equivalents (mirroring the ImageOrigin-related tests via MTLTexture)
+// are tracked for a follow-up PR together with their baseline keys (main has no Metal code yet,
+// so the baseline script cannot generate them here).
+#ifdef TGFX_USE_OPENGL
+
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 #ifdef PAG_USE_SWIFTSHADER
 #include <GLES3/gl3.h>
@@ -256,3 +265,5 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
   device->unlock();
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

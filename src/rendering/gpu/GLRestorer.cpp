@@ -12,13 +12,13 @@
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.˙
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRestorer.h"
 
-#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
+#if defined(TGFX_USE_OPENGL) && !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -30,8 +30,6 @@
 #endif
 #include <OpenGL/gl3.h>
 #endif
-#elif defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__) || defined(_WIN32)
-#include <GLES3/gl3.h>
 #else
 #include <GLES3/gl3.h>
 #endif
@@ -43,7 +41,7 @@ static void ClearGLError() {
   }
 }
 
-void GLRestorer::save() {
+void GLRestorer::save(tgfx::Context*) {
   ClearGLError();
 
   glGetIntegerv(GL_VIEWPORT, viewport);
@@ -105,4 +103,4 @@ void GLRestorer::restore() {
 
 }  // namespace pag
 
-#endif  // PAG_BUILD_FOR_WEB
+#endif  // TGFX_USE_OPENGL && !PAG_BUILD_FOR_WEB && !_WIN32

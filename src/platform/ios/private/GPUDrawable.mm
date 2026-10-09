@@ -16,7 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Uses CAEAGLLayer, deprecated since iOS 12. libpag's own build defines
+// GLES_SILENCE_DEPRECATION (see CMakeLists); define it locally too so IDE indexing without the
+// build flags stays clean.
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #include "GPUDrawable.h"
+
+#if defined(TGFX_USE_OPENGL)
 
 namespace pag {
 NSString* const AsyncSurfacePreparedNotification = @"io.pag.AsyncSurfacePrepared";
@@ -124,3 +132,5 @@ void GPUDrawable::present(tgfx::Context*) {
   // DrawingBuffer::presentWindows() after command submission.
 }
 }  // namespace pag
+
+#endif  // TGFX_USE_OPENGL

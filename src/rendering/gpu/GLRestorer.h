@@ -12,31 +12,30 @@
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.˙
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
+#if defined(TGFX_USE_OPENGL) && !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
+
+#include "rendering/gpu/Devices.h"
 
 namespace pag {
 
 /**
- * Saves and restores OpenGL state when rendering to a shared texture (external context).
- * This prevents PAG's rendering from interfering with the external OpenGL rendering.
+ * OpenGL implementation of ExternalStateGuard. Saves and restores the host GL global state
+ * (viewport / scissor / program / framebuffer binding / active texture / VAO / VBOs / blend
+ * equations) so that libpag rendering into a caller-owned GL context does not corrupt the
+ * caller's state.
+ * Instantiated once per PAGSurface (via Devices::MakeExternalStateGuard()) and reused across
+ * frames via save()/restore() to avoid per-frame heap allocation.
  */
-class GLRestorer {
+class GLRestorer : public ExternalStateGuard {
  public:
-  /**
-   * Saves the current OpenGL state.
-   */
-  void save();
-
-  /**
-   * Restores the previously saved OpenGL state.
-   */
-  void restore();
+  void save(tgfx::Context* context) override;
+  void restore() override;
 
  private:
   int viewport[4] = {};
@@ -60,4 +59,4 @@ class GLRestorer {
 
 }  // namespace pag
 
-#endif  // PAG_BUILD_FOR_WEB
+#endif  // TGFX_USE_OPENGL && !PAG_BUILD_FOR_WEB && !_WIN32

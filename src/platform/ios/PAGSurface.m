@@ -16,6 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef GLES_SILENCE_DEPRECATION
+#define GLES_SILENCE_DEPRECATION 1
+#endif
 #import "PAGSurface.h"
 #import "platform/ios/private/PAGSurfaceImpl.h"
 
@@ -42,6 +45,16 @@
   return pagSurface;
 }
 
++ (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromMetalLayer:metalLayer];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer];
   if (surface == nil) {
@@ -54,6 +67,16 @@
 
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext {
   PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:eaglContext];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
++ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:device];
   if (surface == nil) {
     return nil;
   }
