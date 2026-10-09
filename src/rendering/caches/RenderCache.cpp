@@ -147,7 +147,7 @@ void RenderCache::checkSequenceDecodeFailure() {
       succeededAssets.insert(item.first);
       continue;
     }
-    if (status != SequenceReadStatus::Failed) {
+    if (status != SequenceReadStatus::Failed && status != SequenceReadStatus::Fallback) {
       continue;
     }
     failedAssets.insert(item.first);
@@ -169,13 +169,18 @@ void RenderCache::checkSequenceDecodeFailure() {
         succeededAssets.insert(item.first);
         continue;
       }
-      if (status != SequenceReadStatus::Failed) {
+      if (status != SequenceReadStatus::Failed && status != SequenceReadStatus::Fallback) {
         continue;
       }
       failedAssets.insert(item.first);
       lastFrameHasSequenceDecodeFailure = true;
       _sequenceCacheInvalidated = true;
-      usage.queue->invalidateFailedRequest(usage.result->requestID, usage.result->targetFrame);
+      if (status == SequenceReadStatus::Failed) {
+        usage.queue->invalidateFailedRequest(usage.result->requestID, usage.result->targetFrame);
+      }
+      // A fallback read keeps its stale image cached in the queue, so the frozen frame can stay
+      // on screen while the sequence is cooling down. getImage() bypasses the same-frame cache
+      // for fallback results, so a recovered decode refreshes the content.
     }
   }
   for (auto assetID : failedAssets) {
@@ -543,12 +548,19 @@ void RenderCache::prepareSequenceImage(std::shared_ptr<SequenceInfo> sequence, F
 
 std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(std::shared_ptr<SequenceInfo> sequence,
                                                            Frame targetFrame) {
-  if (sequence == nullptr || !canRetrySequence(sequence->uniqueID())) {
+  if (sequence == nullptr) {
     return nullptr;
   }
   auto queue = getSequenceImageQueue(sequence, targetFrame);
   if (queue == nullptr) {
     return nullptr;
+  }
+  if (!canRetrySequence(sequence->uniqueID())) {
+    // The sequence is cooling down after decode failures, so no new decoding is scheduled. Keep
+    // displaying the last decoded frame (the queue still holds it from a fallback read) instead
+    // of flashing a transparent frame. canRetrySequence() has already marked this frame as
+    // failed, so the stale content is never persisted into a disk cache.
+    return queue->getCachedImage(targetFrame);
   }
   std::shared_ptr<SequenceReadResult> result = nullptr;
   auto image = queue->getImage(targetFrame, &result);
