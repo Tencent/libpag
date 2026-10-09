@@ -499,9 +499,7 @@ void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX
   out.closeElement();  // tag
 }
 
-void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters,
-                             const std::vector<LayerStyle*>& styles) {
-  auto sources = CollectEffectSources(filters, styles);
+void PPTWriter::writeEffects(XMLBuilder& out, const EffectSources& sources) {
   if (sources.empty()) {
     return;
   }
@@ -526,23 +524,19 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   // PPTFeatureProbe).
   if (sources.blur) {
     float avgBlur = (sources.blur->blurX + sources.blur->blurY) / 2.0f;
-    if (avgBlur > 0) {
-      out.openElement("a:blur")
-          .addRequiredAttribute("rad", PxToEMU(avgBlur))
-          .addRequiredAttribute("grow", "true")
-          .closeElementSelfClosing();
-    }
+    out.openElement("a:blur")
+        .addRequiredAttribute("rad", PxToEMU(avgBlur))
+        .addRequiredAttribute("grow", "true")
+        .closeElementSelfClosing();
   }
 
   if (sources.blend) {
     const char* blendStr = BlendModeToPPT(sources.blend->blendMode);
-    if (blendStr) {
-      out.openElement("a:fillOverlay").addRequiredAttribute("blend", blendStr).closeElementStart();
-      out.openElement("a:solidFill").closeElementStart();
-      WriteSrgbClr(out, sources.blend->color, sources.blend->color.alpha);
-      out.closeElement();  // a:solidFill
-      out.closeElement();  // a:fillOverlay
-    }
+    out.openElement("a:fillOverlay").addRequiredAttribute("blend", blendStr).closeElementStart();
+    out.openElement("a:solidFill").closeElementStart();
+    WriteSrgbClr(out, sources.blend->color, sources.blend->color.alpha);
+    out.closeElement();  // a:solidFill
+    out.closeElement();  // a:fillOverlay
   }
 
   // OOXML §20.1.8.20 allows at most one <a:innerShdw> and one <a:outerShdw>

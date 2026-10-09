@@ -53,6 +53,12 @@ jobs:
           npm ci
         shell: bash
 
+      - name: Test PPT Evaluator
+        run: |
+          npm ci --prefix tools/ppt-eval
+          npm test --prefix tools/ppt-eval
+        shell: bash
+
       - name: Check Code Format
         run: |
           chmod +x codeformat.sh
