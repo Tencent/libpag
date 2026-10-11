@@ -1323,8 +1323,24 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
       box.borderStyle = BorderStyle::Dotted;
       continue;
     }
-    if (lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
-      _diagnostics.warn("html: border style '" + lt + "' not supported; treated as solid");
+    if (lt == "double") {
+      box.borderStyle = BorderStyle::Double;
+      continue;
+    }
+    if (lt == "groove") {
+      box.borderStyle = BorderStyle::Groove;
+      continue;
+    }
+    if (lt == "ridge") {
+      box.borderStyle = BorderStyle::Ridge;
+      continue;
+    }
+    if (lt == "inset") {
+      box.borderStyle = BorderStyle::Inset;
+      continue;
+    }
+    if (lt == "outset") {
+      box.borderStyle = BorderStyle::Outset;
       continue;
     }
     if (colorToken.empty()) {

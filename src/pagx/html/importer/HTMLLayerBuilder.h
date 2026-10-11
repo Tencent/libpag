@@ -146,6 +146,8 @@ class HTMLLayerBuilder {
                                 const Padding& inset, BlendMode blendMode);
   void applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
                          bool& emitted);
+  void appendInsetBorderRing(Layer* layer, const HTMLBoxAttributes& box, float inset,
+                             float strokeWidth, const Color& color);
   void applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
   void applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
 

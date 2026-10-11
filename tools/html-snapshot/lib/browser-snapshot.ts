@@ -862,7 +862,14 @@ function paddingBoxOrigin(rect, computed) {
 // computed-style serialisation never sneaks past the equality check.
 function isUniformBorder(computed) {
   const top = readBorderSide(computed, 'top');
-  if (top.style !== 'solid' && top.style !== 'dashed' && top.style !== 'dotted') return false;
+  // Two-line / bevelled styles (`double`, `groove`, `ridge`, `inset`, `outset`) round-trip through
+  // the `border` shorthand so the importer can rebuild them with two concentric rings. The
+  // per-side overlay fallback below would otherwise bake them into four flat solid strips.
+  if (top.style !== 'solid' && top.style !== 'dashed' && top.style !== 'dotted' &&
+      top.style !== 'double' && top.style !== 'groove' && top.style !== 'ridge' &&
+      top.style !== 'inset' && top.style !== 'outset') {
+    return false;
+  }
   if (top.width <= 0) return false;
   for (const side of SIDES) {
     if (side === 'top') continue;
