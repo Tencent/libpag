@@ -944,6 +944,77 @@ function resolveChildStacking(hostEl, child, childComputed, flexOrGridParent) {
   };
 }
 
+// A "pure stacking wrapper" paints nothing of its own — no background, border,
+// shadow, outline, transform, filter, mask or clip — so the only mark it leaves
+// is the paint of its children. When every element child is stackable
+// (positioned, or a flex/grid item) and none is pulled below the flow with a
+// negative z-index, those children participate directly in the wrapper's
+// enclosing stacking context: a static wrapper holding `z-index: 3…10` children
+// paints at their z, i.e. above a later `position: absolute` sibling the browser
+// still draws the wrapper underneath. Because the subset flattens every box to
+// `position: absolute` and replays paint order per parent, such a wrapper would
+// otherwise sort by its own (static, in-flow) position and lose the children's
+// stacking entirely — the negative-margin pull-card pattern where a stack of
+// `z-index` photos must cover the later `z-index: auto` card that slides up
+// under them. The wrapper's own paint collapses to nothing, so stepping it to
+// its greatest child z-index reproduces the browser. Returns that z-index, or
+// null when the box is not such a wrapper (it paints itself, clips, or holds
+// non-stackable / negative-z content), leaving the caller to use the wrapper's
+// own stacking.
+function resolveEscapingWrapperZIndex(el, computed) {
+  if (computed.position !== 'static') return null;
+  if (computed.display === 'contents') return null;
+  const opacity = parseFloat(computed.getPropertyValue('opacity'));
+  if (isFinite(opacity) && opacity < 1) return null;
+  if ((computed.getPropertyValue('transform') || 'none').trim() !== 'none') return null;
+  if ((computed.getPropertyValue('filter') || 'none').trim() !== 'none') return null;
+  if ((computed.getPropertyValue('clip-path') || 'none').trim() !== 'none') return null;
+  if ((computed.getPropertyValue('mix-blend-mode') || 'normal').trim() !== 'normal') return null;
+  if ((computed.getPropertyValue('isolation') || 'auto').trim() === 'isolate') return null;
+  const maskImage = (computed.getPropertyValue('mask-image') || 'none').trim();
+  const webkitMaskImage = (computed.getPropertyValue('-webkit-mask-image') || 'none').trim();
+  if ((maskImage && maskImage !== 'none') || (webkitMaskImage && webkitMaskImage !== 'none')) return null;
+  if (colorAlpha(computed.getPropertyValue('background-color')) > 0) return null;
+  const backgroundImage = (computed.getPropertyValue('background-image') || 'none').trim();
+  if (backgroundImage && backgroundImage !== 'none') return null;
+  // Any painted border side means the wrapper has a box of its own. Checked
+  // inline (rather than via hasAnyBorder) so the helper only closes over
+  // module-scope consts, not the browser-payload-only `SIDES`.
+  if (borderWidthOf(computed, 'top') > 0 || borderWidthOf(computed, 'right') > 0 ||
+      borderWidthOf(computed, 'bottom') > 0 || borderWidthOf(computed, 'left') > 0) {
+    return null;
+  }
+  const boxShadow = (computed.getPropertyValue('box-shadow') || 'none').trim();
+  if (boxShadow && boxShadow !== 'none') return null;
+  const outlineStyle = (computed.getPropertyValue('outline-style') || 'none').trim();
+  if (outlineStyle && outlineStyle !== 'none') return null;
+  const overflowX = (computed.getPropertyValue('overflow-x') || 'visible').trim();
+  const overflowY = (computed.getPropertyValue('overflow-y') || 'visible').trim();
+  if (overflowX !== 'visible' || overflowY !== 'visible') return null;
+  if (gatherDirectText(el)) return null;
+  const display = computed.display;
+  const childFlexOrGrid =
+    display === 'flex' || display === 'inline-flex' ||
+    display === 'grid' || display === 'inline-grid';
+  let childCount = 0;
+  let maxZ = 0;
+  let minZ = 0;
+  for (const child of el.children) {
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    childCount++;
+    const stacking = resolveChildStacking(el, child, getComputedStyle(child), childFlexOrGrid);
+    // A non-stackable child would paint in the flow band, which collapsing the
+    // whole wrapper onto one z-index cannot represent — bail and stay static.
+    if (!stacking.stackable) return null;
+    if (stacking.zIndex > maxZ) maxZ = stacking.zIndex;
+    if (stacking.zIndex < minZ) minZ = stacking.zIndex;
+  }
+  // No element children, or a child pulled behind the flow (negative z) that a
+  // single raised z-index would lift out of place.
+  if (childCount === 0 || minZ < 0) return null;
+  return maxZ;
+}
+
 // ===== DOM-node helpers =====
 
 function gatherDirectText(el) {
@@ -4361,9 +4432,29 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const childComputed = getComputedStyle(n);
       const stacking = resolveChildStacking(el, n, childComputed, flexOrGridParent);
+      let stackable = stacking.stackable;
+      let zIndex = stacking.zIndex;
+      // A static wrapper that paints nothing of its own but holds only
+      // stackable children contributes those children's stacking, not its own
+      // in-flow position — replay that by sorting the wrapper at their highest
+      // z-index (see resolveEscapingWrapperZIndex). Materialised pseudo
+      // stand-ins are excluded: resolveChildStacking already reads the pseudo's
+      // own stacking, and their polluted computed style must not be re-read here.
+      if (!stackable) {
+        const pseudoAttr = typeof n.getAttribute === 'function'
+          ? n.getAttribute('data-snapshot-pseudo')
+          : null;
+        if (!pseudoAttr) {
+          const wrapperZ = resolveEscapingWrapperZIndex(n, childComputed);
+          if (wrapperZ !== null) {
+            stackable = true;
+            zIndex = wrapperZ;
+          }
+        }
+      }
       items.push({
-        stackable: stacking.stackable,
-        zIndex: stacking.zIndex,
+        stackable,
+        zIndex,
         domIndex: domIndex++,
         // Forward childComputed so render() can skip its own
         // getComputedStyle call on this node.
@@ -5289,6 +5380,7 @@ const HELPER_FNS = [
   renderContainer,
   renderChildrenInto,
   resolveChildStacking,
+  resolveEscapingWrapperZIndex,
   stripNameAnchor,
   applyLayerName,
   renderElementBox,
@@ -6600,6 +6692,7 @@ export {
   inlineBoxLineRects,
   emitInlineBoxFragments,
   resolveChildStacking,
+  resolveEscapingWrapperZIndex,
   flexCharCarriesReveal,
   pagxEvalLengthPx,
   pagxParseClipShape,
