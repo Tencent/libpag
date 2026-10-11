@@ -177,13 +177,19 @@ struct HTMLTransform {
 
 /**
  * CSS border line styles supported by the HTML subset. Mirrors a subset of
- * `border-style` keywords; other styles (`double`, `groove`, …) are downgraded
- * to `Solid` by the resolver.
+ * `border-style` keywords. `double`, `groove`, `ridge`, `inset` and `outset`
+ * cannot be expressed by a single uniform stroke; they are approximated with
+ * two concentric rings by the layer builder.
  */
 enum class BorderStyle {
   Solid,
   Dashed,
   Dotted,
+  Double,
+  Groove,
+  Ridge,
+  Inset,
+  Outset,
 };
 
 /**
