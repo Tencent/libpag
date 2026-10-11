@@ -39,7 +39,8 @@ view.registerFonts(fontData, emojiFontData);
 // 步骤 1：解析 PAGX 数据，但不构建图层。
 view.parsePAGX(pagxData);
 
-// 步骤 2：获取文档中引用的外部文件路径（例如图片）。
+// 步骤 2：获取文档中引用的外部文件路径（图片、<Font file> 字体、嵌套的 pagx），
+// 相对路径均相对于 .pagx 文件本身。
 const paths = view.getExternalFilePaths();
 
 // 步骤 3：下载每个外部文件，并将其数据回填到视图中。

@@ -40,7 +40,8 @@ view.registerFonts(fontData, emojiFontData);
 // Step 1: Parse PAGX data without building layers.
 view.parsePAGX(pagxData);
 
-// Step 2: Get external file paths (e.g., images) referenced by the document.
+// Step 2: Get external file paths (images, <Font file> fonts, nested pagx) referenced by the
+// document. Relative paths are relative to the .pagx file.
 const paths = view.getExternalFilePaths();
 
 // Step 3: Download each external file and inject it back into the view.

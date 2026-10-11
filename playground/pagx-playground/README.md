@@ -12,7 +12,9 @@ browsing the PAGX specification documentation.
 
 ## Features
 
-- Load and preview PAGX files directly in the browser
+- Load and preview PAGX files directly in the browser. Drop (or pick) the folder that holds a
+  `.pagx` to also load the images and fonts it references by paths relative to the `.pagx`;
+  a lone `.pagx` opens without them
 - Sample browser with pre-loaded PAGX files
 - Interactive rendering controls
 - PAGX specification documentation viewer

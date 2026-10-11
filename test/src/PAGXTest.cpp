@@ -920,6 +920,88 @@ PAGX_TEST(PAGXTest, FontFileRegisteredByLayout) {
   EXPECT_EQ(text->glyphData->layoutRuns.front().font.getTypeface()->fontFamily(), "pagx-font-f0");
 }
 
+static pagx::Text* FirstText(const pagx::PAGXDocument* doc) {
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Text) {
+      return static_cast<pagx::Text*>(node.get());
+    }
+  }
+  return nullptr;
+}
+
+static std::string TypefaceFamilyOfFirstRun(const pagx::Text* text) {
+  if (text == nullptr || text->glyphData->layoutRuns.empty()) {
+    return {};
+  }
+  auto typeface = text->glyphData->layoutRuns.front().font.getTypeface();
+  return typeface != nullptr ? typeface->fontFamily() : std::string();
+}
+
+// The web host flow: the document is parsed from memory (no base directory), so the Font file is a
+// relative path the process cannot open. The path is reported by getExternalFilePaths and the
+// host feeds the fetched bytes back through loadFileData.
+static const char* WEB_HOST_FONT_DOC = R"(<pagx width="200" height="60">
+  <Layer>
+    <Text text="&#xE000;&#xE001;&#xE002;" fontFamily="pagx-font-f0" fontSize="24"/>
+    <Fill color="#000000"/>
+  </Layer>
+  <Resources>
+    <Font id="webFont" file="assets/fonts/font_f0.woff2"/>
+  </Resources>
+</pagx>)";
+
+/**
+ * Test case: a Font file the process cannot read is reported by getExternalFilePaths, and WOFF2
+ * bytes supplied through loadFileData before the first layout are what layout registers.
+ */
+PAGX_TEST(PAGXTest, FontFileDataLoadedBeforeLayout) {
+  auto doc = pagx::PAGXImporter::FromXML(WEB_HOST_FONT_DOC);
+  ASSERT_NE(doc, nullptr);
+  auto paths = doc->getExternalFilePaths();
+  ASSERT_EQ(paths.size(), 1u);
+  EXPECT_EQ(paths.front(), "assets/fonts/font_f0.woff2");
+
+  auto bytes = tgfx::Data::MakeFromFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_NE(bytes, nullptr);
+  auto data = pagx::Data::MakeWithCopy(bytes->data(), bytes->size());
+  EXPECT_TRUE(doc->loadFileData("assets/fonts/font_f0.woff2", data));
+  EXPECT_FALSE(doc->loadFileData("assets/fonts/other.woff2", data));
+  EXPECT_TRUE(doc->getExternalFilePaths().empty());
+  EXPECT_FALSE(doc->isLayoutApplied());
+
+  doc->applyLayout();
+  EXPECT_EQ(TypefaceFamilyOfFirstRun(FirstText(doc.get())), "pagx-font-f0");
+  EXPECT_EQ(CountFallbackFamily(doc->fontConfig(), "pagx-font-f0"), 1u);
+  doc->applyLayout();
+  EXPECT_EQ(CountFallbackFamily(doc->fontConfig(), "pagx-font-f0"), 1u);
+
+  // The bytes are runtime-only: export keeps the authored file reference.
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find(R"(<Font id="webFont" file="assets/fonts/font_f0.woff2"/>)"),
+            std::string::npos);
+}
+
+/**
+ * Test case: font bytes that arrive after a scene was built re-run layout, so the live scene's text
+ * switches to the supplied font without the host rebuilding anything.
+ */
+PAGX_TEST(PAGXTest, FontFileDataLoadedAfterSceneRelayouts) {
+  auto doc = pagx::PAGXImporter::FromXML(WEB_HOST_FONT_DOC);
+  ASSERT_NE(doc, nullptr);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* text = FirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_NE(TypefaceFamilyOfFirstRun(text), "pagx-font-f0");
+
+  auto bytes = tgfx::Data::MakeFromFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_NE(bytes, nullptr);
+  EXPECT_TRUE(doc->loadFileData("assets/fonts/font_f0.woff2",
+                                pagx::Data::MakeWithCopy(bytes->data(), bytes->size())));
+  EXPECT_EQ(TypefaceFamilyOfFirstRun(text), "pagx-font-f0");
+  EXPECT_EQ(CountFallbackFamily(doc->fontConfig(), "pagx-font-f0"), 1u);
+}
+
 /**
  * Test case: the optimizer keeps Font nodes that carry a file. Text reaches them through
  * fontFamily rather than an id reference, so pruning them as unreferenced would drop the font.
