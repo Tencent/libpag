@@ -93,6 +93,37 @@ void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl
   out.close();
 }
 
+// Same outline as BuildPerCornerRoundedRectPathData, but with an independent radius per axis on
+// each corner (rx, ry) so the quarter-arcs are true ellipse segments — the CSS
+// `border-radius: rx… / ry…` form. A corner with either axis at 0 collapses to a sharp vertex.
+void BuildPerCornerEllipticalRectPathData(PathData& out, float w, float h, float tlX, float tlY,
+                                          float trX, float trY, float brX, float brY, float blX,
+                                          float blY) {
+  const float k = 1.0f - BEZIER_KAPPA;
+  out.moveTo(w, trY);
+  // Right edge.
+  out.lineTo(w, h - brY);
+  if (brX > 0 && brY > 0) {
+    out.cubicTo(w, h - brY * k, w - brX * k, h, w - brX, h);
+  }
+  // Bottom edge.
+  out.lineTo(blX, h);
+  if (blX > 0 && blY > 0) {
+    out.cubicTo(blX * k, h, 0, h - blY * k, 0, h - blY);
+  }
+  // Left edge.
+  out.lineTo(0, tlY);
+  if (tlX > 0 && tlY > 0) {
+    out.cubicTo(0, tlY * k, tlX * k, 0, tlX, 0);
+  }
+  // Top edge.
+  out.lineTo(w - trX, 0);
+  if (trX > 0 && trY > 0) {
+    out.cubicTo(w - trX * k, 0, w, trY * k, w, trY);
+  }
+  out.close();
+}
+
 // Hands the parent-facing layout slot (positional anchors, percent sizing, and flex
 // participation) over from `inner` to `outer`. Used by the wrapper helpers that hoist a Layer
 // "out from under" inner so the wrapper occupies the same space `inner` previously held.
@@ -352,9 +383,16 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
   }
 
   auto* data = _document->makeNode<PathData>();
-  BuildPerCornerRoundedRectPathData(*data, box.widthPx, box.heightPx, box.borderRadiusTLPx,
-                                    box.borderRadiusTRPx, box.borderRadiusBRPx,
-                                    box.borderRadiusBLPx);
+  if (box.borderRadiusPerCornerElliptical) {
+    BuildPerCornerEllipticalRectPathData(
+        *data, box.widthPx, box.heightPx, box.borderRadiusTLPx, box.borderRadiusTLYPx,
+        box.borderRadiusTRPx, box.borderRadiusTRYpx, box.borderRadiusBRPx, box.borderRadiusBRYpx,
+        box.borderRadiusBLPx, box.borderRadiusBLYpx);
+  } else {
+    BuildPerCornerRoundedRectPathData(*data, box.widthPx, box.heightPx, box.borderRadiusTLPx,
+                                      box.borderRadiusTRPx, box.borderRadiusBRPx,
+                                      box.borderRadiusBLPx);
+  }
   auto* path = _document->makeNode<Path>();
   path->data = data;
   // Path geometry uses the parent layer's local coordinate space (already laid out at the
@@ -636,8 +674,8 @@ Color TintBorderColor(const Color& c, float amount) {
 
 }  // namespace
 
-void HTMLLayerBuilder::appendInsetBorderRing(Layer* layer, const HTMLBoxAttributes& box, float inset,
-                                             float strokeWidth, const Color& color) {
+void HTMLLayerBuilder::appendInsetBorderRing(Layer* layer, const HTMLBoxAttributes& box,
+                                             float inset, float strokeWidth, const Color& color) {
   // The inner ring of a two-line / two-tone border: a child layer inset by `inset` px carrying a
   // Rectangle + Stroke of `strokeWidth`, flush against the outer ring so the two read as one
   // split border. Mirrors the padding-box gradient-frame emission (emitInsetBackgroundLayer).
@@ -671,9 +709,9 @@ void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& 
   // `border-color`. Rebuild the gradient as the stroke's colour source; the gradient line spans the
   // border box, matching how CSS paints border-image over the border area.
   if (!box.borderImageSource.empty()) {
-    ColorSource* gradient = parseGradientByValue(
-        box.borderImageSource, std::isfinite(box.widthPx) ? box.widthPx : 0.0f,
-        std::isfinite(box.heightPx) ? box.heightPx : 0.0f);
+    ColorSource* gradient =
+        parseGradientByValue(box.borderImageSource, std::isfinite(box.widthPx) ? box.widthPx : 0.0f,
+                             std::isfinite(box.heightPx) ? box.heightPx : 0.0f);
     if (gradient != nullptr) {
       auto* gradientStroke = _document->makeNode<Stroke>();
       gradientStroke->color = gradient;
@@ -689,10 +727,9 @@ void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& 
   // stroke. Approximate them with two concentric solid rings: an outer stroke plus the inset inner
   // ring. Needs the resolved border-box size, so fall through to a plain stroke when it is unknown.
   const bool doubleRing = box.borderStyle == BorderStyle::Double;
-  const bool toneRing = box.borderStyle == BorderStyle::Groove ||
-                        box.borderStyle == BorderStyle::Ridge ||
-                        box.borderStyle == BorderStyle::Inset ||
-                        box.borderStyle == BorderStyle::Outset;
+  const bool toneRing =
+      box.borderStyle == BorderStyle::Groove || box.borderStyle == BorderStyle::Ridge ||
+      box.borderStyle == BorderStyle::Inset || box.borderStyle == BorderStyle::Outset;
   if ((doubleRing || toneRing) && std::isfinite(box.widthPx) && std::isfinite(box.heightPx) &&
       w > 0.0f) {
     // `double` splits the border into two w/3 lines with a w/3 gap; the bevelled styles split it
@@ -704,8 +741,8 @@ void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& 
     if (toneRing) {
       // groove/inset shade the outer band dark and the inner band light; ridge/outset invert it so
       // the highlight reads as a raised bevel.
-      const bool outerDark = box.borderStyle == BorderStyle::Groove ||
-                             box.borderStyle == BorderStyle::Inset;
+      const bool outerDark =
+          box.borderStyle == BorderStyle::Groove || box.borderStyle == BorderStyle::Inset;
       outerColor = outerDark ? ShadeBorderColor(box.borderColor, 0.55f)
                              : TintBorderColor(box.borderColor, 0.5f);
       innerColor = outerDark ? TintBorderColor(box.borderColor, 0.5f)

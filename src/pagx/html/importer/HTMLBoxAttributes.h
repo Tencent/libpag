@@ -290,6 +290,13 @@ struct HTMLBoxAttributes {
   float borderRadiusTRPx = 0.0f;
   float borderRadiusBRPx = 0.0f;
   float borderRadiusBLPx = 0.0f;
+  // Vertical (y-axis) radii for the elliptical `border-radius: rx… / ry…` form. Only read when
+  // `borderRadiusPerCornerElliptical` is set; otherwise every corner is circular (ry == rx).
+  float borderRadiusTLYPx = 0.0f;
+  float borderRadiusTRYpx = 0.0f;
+  float borderRadiusBRYpx = 0.0f;
+  float borderRadiusBLYpx = 0.0f;
+  bool borderRadiusPerCornerElliptical = false;
   bool borderRadiusSet = false;
   bool borderRadiusUniform = true;
   // True when every corner's horizontal radius equals half the box width and every corner's
