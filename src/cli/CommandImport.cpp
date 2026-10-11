@@ -692,6 +692,9 @@ int RunImport(int argc, char* argv[]) {
     // The importer anchors relative `<img>` paths at the input file's directory, so that is the
     // prefix to strip back off when recovering the authored `source`.
     imageOptions.documentDir = inputDir;
+    if (!archive.directory().empty()) {
+      imageOptions.archiveDir = archive.directory() + "/";
+    }
     imageOptions.outputDir = GetDirectory(options.outputFile);
     ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
     ApplyFontStorage(result.document.get(), imageOptions, "pagx import");

@@ -18,10 +18,12 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include "base/PAGTest.h"
 #include "cli/ImageStorage.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Rectangle.h"
 #include "pagx/types/Data.h"
@@ -373,6 +375,43 @@ CLI_TEST(ImageStorageTest, ExternalCopiesRelativeFileToOutputDir) {
 
   EXPECT_EQ(image->filePath, "assets/pic.png");
   EXPECT_TRUE(std::filesystem::exists(out + "/assets/pic.png"));
+}
+
+CLI_TEST(ImageStorageTest, FontAndImageFilesOutsideArchiveEntryDirectoryAreCopied) {
+  auto archive = ScratchDir("ArchiveResources");
+  auto out = ScratchDir("ArchiveResourcesOut");
+  std::filesystem::create_directories(archive + "/site");
+  WriteFile(archive + "/fonts/font.woff2", "WOFF2");
+  WriteFile(archive + "/fonts/font.ttf", "TTF");
+  WriteFile(archive + "/images/pic.png", "IMAGE");
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* woff2 = doc->makeNode<Font>("woff2");
+  woff2->file = archive + "/fonts/font.woff2";
+  auto* ttf = doc->makeNode<Font>("ttf");
+  ttf->file = archive + "/fonts/font.ttf";
+  auto* image = AddImage(doc.get(), archive + "/images/pic.png");
+
+  ImageStorageOptions options = {};
+  options.baseDir = WithSlash(archive + "/site");
+  options.documentDir = options.baseDir;
+  options.archiveDir = WithSlash(archive);
+  options.outputDir = WithSlash(out);
+  ApplyImageStorage(doc.get(), options, "test");
+  ApplyFontStorage(doc.get(), options, "test");
+
+  EXPECT_EQ(woff2->file, "fonts/font.woff2");
+  EXPECT_EQ(woff2->fileOriginal, woff2->file);
+  EXPECT_EQ(ttf->file, "fonts/font.ttf");
+  EXPECT_EQ(ttf->fileOriginal, ttf->file);
+  EXPECT_EQ(image->filePath, "images/pic.png");
+  for (const auto& relative : {woff2->file, ttf->file, image->filePath}) {
+    std::ifstream original(archive + "/" + relative, std::ios::binary);
+    std::ifstream copied(out + "/" + relative, std::ios::binary);
+    ASSERT_TRUE(copied.good());
+    EXPECT_EQ(
+        std::string(std::istreambuf_iterator<char>(copied), std::istreambuf_iterator<char>()),
+        std::string(std::istreambuf_iterator<char>(original), std::istreambuf_iterator<char>()));
+  }
 }
 
 CLI_TEST(ImageStorageTest, ExternalStripsDocumentDirPrefix) {

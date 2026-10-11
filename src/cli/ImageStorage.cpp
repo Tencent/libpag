@@ -80,12 +80,12 @@ std::string FindExistingSource(const std::string& rel, const std::string& baseDi
 // `documentDir` is the true prefix, while `baseDir` (the loose-file search root, which may point
 // elsewhere) is tried as a fallback. The remainder is normalised to collapse redundant separators
 // while preserving intentional leading `..`. Returns an empty string when the path sits under
-// neither dir (e.g. a genuinely authored absolute path or remote URL), signalling the caller to
+// none of these dirs (e.g. a genuinely authored absolute path or remote URL), signalling the caller to
 // leave the reference untouched.
 std::string AuthoredRelativeSource(const std::string& filePath, const std::string& documentDir,
-                                   const std::string& baseDir) {
+                                   const std::string& baseDir, const std::string& archiveDir) {
   std::string rel = filePath;
-  for (const std::string& prefix : {documentDir, baseDir}) {
+  for (const std::string& prefix : {documentDir, baseDir, archiveDir}) {
     if (!prefix.empty() && rel.rfind(prefix, 0) == 0) {
       rel = rel.substr(prefix.size());
       break;
@@ -109,7 +109,8 @@ std::string RelocateExternalFile(const std::string& filePath, const ImageStorage
   // FromFile may have prefixed the document directory, so a clean `assets/x.png` can arrive as an
   // absolute or `..`-laden string; strip that back out so the copy destination and rewritten
   // reference keep the original name.
-  std::string relSource = AuthoredRelativeSource(filePath, options.documentDir, baseDir);
+  std::string relSource =
+      AuthoredRelativeSource(filePath, options.documentDir, baseDir, options.archiveDir);
   if (relSource.empty()) {
     return {};
   }
