@@ -131,20 +131,6 @@ html, body {
     margin: 0;
 }
 
-.drop-folder-btn {
-    margin-top: 16px;
-    padding: 0;
-    border: none;
-    background: none;
-    color: #4d8bff;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-.drop-folder-btn:hover {
-    text-decoration: underline;
-}
-
 .nav-btns {
     position: absolute;
     top: 16px;
