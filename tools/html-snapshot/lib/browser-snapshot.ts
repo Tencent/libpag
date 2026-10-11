@@ -3365,13 +3365,33 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     ? getComputedStyle(el, '::placeholder').getPropertyValue('color').trim()
     : '';
   const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
-  const textStyle = buildStyle(0, 0, 0, 0, computed, {
+  let textStyle = buildStyle(0, 0, 0, 0, computed, {
     box: false, text: true, positioned: false,
     textColorOverride: placeholderColor || undefined,
   });
-  const finalTextStyle = withNowrap(textStyle);
-  const innerLayout = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-  const inner = `<span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  // A <textarea> soft-wraps its value to the box width (and keeps embedded
+  // newlines), unlike <input>/<select> which never wrap. The default path forces
+  // `white-space: nowrap`, but even with the textarea's own `pre-wrap` a bare
+  // <Text> never wraps — the importer only synthesises a wrapping TextBox when
+  // the text leaf hands it a box to wrap against. Pinning the span to the
+  // content-box width and adding `overflow: hidden` (a textarea clips its
+  // content) gives it that box, so the value wraps instead of running off as one
+  // long line. The content is top-aligned, as a textarea's is.
+  const isTextarea = String(el.tagName || '').toLowerCase() === 'textarea';
+  let alignItems = 'center';
+  if (isTextarea) {
+    const contentWidth = Math.max(0, rect.width
+      - borderWidthOf(computed, 'left') - borderWidthOf(computed, 'right')
+      - pad.left - pad.right);
+    const wrap = /white-space:/.test(textStyle) ? '' : '; white-space: pre-wrap';
+    const extra = `width: ${px(contentWidth)}; overflow: hidden${wrap}`;
+    textStyle = textStyle ? `${textStyle}; ${extra}` : extra;
+    alignItems = 'flex-start';
+  } else {
+    textStyle = withNowrap(textStyle);
+  }
+  const innerLayout = `display: flex; align-items: ${alignItems}` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  const inner = `<span style="${textStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
 
