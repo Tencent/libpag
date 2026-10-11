@@ -33,6 +33,7 @@
 namespace pagx {
 
 class DataBind;
+class Font;
 class PAGImage;
 class LayoutContext;
 class PAGScene;
@@ -144,9 +145,11 @@ class PAGXDocument : public Node {
   bool hasUnresolvedImports() const;
 
   /**
-   * Returns a list of external file paths referenced by Image nodes or external composition layers
-   * that have no embedded data. Data URIs (paths starting with "data:") are excluded. The caller is
-   * responsible for skipping paths it has already supplied (e.g. via PAGXDocument::loadFileData).
+   * Returns a list of external file paths referenced by Image nodes, Font nodes (their `file`
+   * attribute) or external composition layers that have no data loaded yet. Data URIs (paths
+   * starting with "data:") are excluded. Hosts without file system access fetch each path and
+   * supply its bytes via PAGXDocument::loadFileData; the caller is responsible for skipping paths
+   * it has already supplied.
    */
   std::vector<std::string> getExternalFilePaths() const;
 
@@ -161,13 +164,17 @@ class PAGXDocument : public Node {
 
   /**
    * Loads external file data matching the given file path. Image data is embedded into matching
-   * Image nodes, while PAGX data is parsed and attached to matching external composition layers.
-   * For performance, load all external file data before creating any PAGScene from this document.
-   * If called after a PAGScene exists, changes are reflected in existing scenes via notifyChange.
-   * When structural nodes (e.g. composition layers) are loaded, applyLayout() is triggered as part
-   * of the propagation, so the document is laid out even if no scene exists yet.
-   * @param filePath the external file path to match against Image nodes or composition layers
-   * @param data the file content to embed or parse
+   * Image nodes, font file data is attached to Font nodes whose `file` matches (runtime-only, never
+   * serialized; layout registers it instead of reading the file from disk), and PAGX data is
+   * parsed and attached to matching external composition layers. For performance, load all
+   * external file data before creating any PAGScene from this document. If called after a PAGScene
+   * exists, changes are reflected in existing scenes via notifyChange. When structural nodes
+   * (e.g. composition layers) are loaded, applyLayout() is triggered as part of the propagation,
+   * so the document is laid out even if no scene exists yet; font data loaded into an already
+   * laid-out document re-runs layout the same way.
+   * @param filePath the external file path to match against Image nodes, Font nodes or
+   *                 composition layers
+   * @param data the file content to embed, register or parse
    * @return true if a matching node was found and its data was loaded successfully
    */
   bool loadFileData(const std::string& filePath, std::shared_ptr<Data> data);
@@ -220,7 +227,8 @@ class PAGXDocument : public Node {
    * clearEmbed() so layout uses fresh shaping data. Font files referenced by the `file` attribute
    * of Font nodes (TrueType, OpenType, TTC or WOFF2) are registered on top of the font config, by
    * the family and style names inside each file, so text naming those families renders without
-   * embedded glyphs. A file that cannot be read is skipped.
+   * embedded glyphs. Bytes supplied via loadFileData take precedence over reading the file from
+   * disk. A file that cannot be read is skipped.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
@@ -329,10 +337,11 @@ class PAGXDocument : public Node {
   void unregisterLiveScene(PAGScene* scene);
 
   FontConfig _fontConfig;
-  // Whether the font files of this document's Font nodes are already part of _fontConfig. Reset
-  // whenever applyLayout replaces the config, so re-layouts do not append them to the fallback
-  // chain again.
-  bool fontFilesRegistered = false;
+  // Font nodes whose font file has already been registered into _fontConfig, mapped to the
+  // fileData they were registered from (nullptr when read from disk). Cleared whenever
+  // applyLayout replaces the config. Keeps re-layouts from appending the same file to the fallback
+  // chain again, while bytes that loadFileData supplies later are still picked up.
+  std::unordered_map<const Font*, const Data*> registeredFontFiles = {};
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
   // O(1) containment check for ownsNode(), maintained alongside nodes.

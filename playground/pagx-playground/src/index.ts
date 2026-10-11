@@ -34,6 +34,8 @@ interface I18nStrings {
     errorBrowser: string;
     openFile: string;
     invalidFile: string;
+    chooseFolder: string;
+    missingResources: string;
     docs: string;
     specification: string;
     aiSkills: string;
@@ -45,14 +47,17 @@ interface I18nStrings {
 
 const i18n: Record<string, I18nStrings> = {
     en: {
-        dropText: 'Drag & Drop PAGX file here',
+        dropText: 'Drag & Drop a PAGX file or its folder here',
         dropSubtext: 'or click to browse',
         loading: 'Loading...',
         errorTitle: 'Failed to load',
         errorFormat: 'Invalid file format. Please use a valid .pagx file.',
         errorBrowser: 'Minimum browser versions required:',
         openFile: 'Open PAGX File',
-        invalidFile: 'Please drop a .pagx file',
+        invalidFile: 'Please drop a .pagx file or a folder containing one',
+        chooseFolder: 'Open a folder (loads images and fonts next to the .pagx)',
+        missingResources:
+            'This file references external images or fonts. Drop its whole folder to load them.',
         docs: 'Docs',
         specification: 'Specification',
         aiSkills: 'AI Skills',
@@ -62,14 +67,16 @@ const i18n: Record<string, I18nStrings> = {
         back: 'Back',
     },
     zh: {
-        dropText: '拖放 PAGX 文件到此处',
+        dropText: '拖放 PAGX 文件或其所在文件夹到此处',
         dropSubtext: '或点击选择文件',
         loading: '加载中...',
         errorTitle: '加载失败',
         errorFormat: '无效的文件格式，请使用有效的 .pagx 文件。',
         errorBrowser: '浏览器最低版本要求：',
         openFile: '打开 PAGX 文件',
-        invalidFile: '请拖放 .pagx 文件',
+        invalidFile: '请拖放 .pagx 文件，或包含 .pagx 的文件夹',
+        chooseFolder: '选择文件夹（同时加载 .pagx 旁边的图片和字体）',
+        missingResources: '该文件引用了外部图片或字体，请拖入它所在的整个文件夹以加载这些资源。',
         docs: '文档',
         specification: '格式规范',
         aiSkills: 'AI Skills',
@@ -187,6 +194,9 @@ let player: PAGXPlayer | null = null;
 let sampleFiles: string[] = [];
 let currentPlayingFile: string | null = null;
 let currentFileName: string = 'export.pagx';
+// Resolver the current document's external references were loaded with (a sample's base URL or
+// the files dropped with it). Reused by the source editor's Apply so edits keep their resources.
+let currentResourceResolver: ResourceResolver | undefined = undefined;
 // Snapshot of the player's playing state at the moment the samples overlay is opened. Used
 // by hideSamplesPage() to restore the exact play/pause state on return so the samples page
 // visit is transparent to the user - a running animation resumes, a paused one stays paused.
@@ -414,6 +424,144 @@ function makeResourceResolver(baseUrl: string) {
     };
 }
 
+type ResourceResolver = (relPath: string) => Promise<Uint8Array | null>;
+
+// A file picked or dropped from the user's disk, keyed by its '/'-separated path relative to the
+// picked or dropped root (e.g. "export/assets/fonts/font_f1.woff2").
+interface LocalFile {
+    path: string;
+    file: File;
+}
+
+function directoryOf(path: string): string {
+    const slash = path.lastIndexOf('/');
+    return slash < 0 ? '' : path.slice(0, slash + 1);
+}
+
+// Joins a pagx-relative reference onto the pagx's directory, folding '.' and '..' segments the
+// way a browser resolves a relative URL. Returns null when the path climbs above the root, since
+// nothing outside the dropped files can be served.
+function joinRelativePath(baseDir: string, relPath: string): string | null {
+    const segments: string[] = [];
+    for (const segment of (baseDir + relPath).split('/')) {
+        if (segment === '' || segment === '.') {
+            continue;
+        }
+        if (segment === '..') {
+            if (segments.length === 0) {
+                return null;
+            }
+            segments.pop();
+            continue;
+        }
+        segments.push(segment);
+    }
+    return segments.join('/');
+}
+
+// Build a resolveResource callback that serves a pagx's external references (images, fonts,
+// nested pagx) from files the user dropped or picked along with it. References resolve against
+// the pagx's own directory, the same way relative paths resolve next to a .pagx on disk. Absolute
+// paths and URLs cannot be served from the browser and are reported as missing.
+function makeLocalResourceResolver(files: LocalFile[], entryPath: string): ResourceResolver {
+    const byPath = new Map<string, File>();
+    for (const item of files) {
+        byPath.set(item.path, item.file);
+    }
+    const baseDir = directoryOf(entryPath);
+    return async (relPath: string): Promise<Uint8Array | null> => {
+        if (relPath.includes('://') || relPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(relPath)) {
+            console.warn(`Absolute external file paths cannot be loaded in the browser: ${relPath}`);
+            return null;
+        }
+        const resolved = joinRelativePath(baseDir, relPath.replace(/\\/g, '/'));
+        const file = resolved === null ? undefined : byPath.get(resolved);
+        if (!file) {
+            console.warn(`External file not found among the dropped files: ${relPath}`);
+            return null;
+        }
+        return new Uint8Array(await file.arrayBuffer());
+    };
+}
+
+// Pick the document to open from a set of local files: the shallowest .pagx, ties broken by path
+// so the choice is stable. Returns null when there is no .pagx at all.
+function pickEntryPAGX(files: LocalFile[]): LocalFile | null {
+    let best: LocalFile | null = null;
+    let bestDepth = 0;
+    for (const item of files) {
+        if (!item.path.toLowerCase().endsWith('.pagx')) {
+            continue;
+        }
+        const depth = item.path.split('/').length;
+        if (best === null || depth < bestDepth || (depth === bestDepth && item.path < best.path)) {
+            best = item;
+            bestDepth = depth;
+        }
+    }
+    return best;
+}
+
+function readDirectoryEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+    return new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+}
+
+function readEntryFile(entry: FileSystemFileEntry): Promise<File> {
+    return new Promise((resolve, reject) => entry.file(resolve, reject));
+}
+
+// Recursively collect the files under a dropped entry. readEntries() returns at most ~100 entries
+// per call, so a directory is read until it reports an empty batch.
+async function collectEntryFiles(entry: FileSystemEntry, out: LocalFile[]): Promise<void> {
+    if (entry.isFile) {
+        const file = await readEntryFile(entry as FileSystemFileEntry);
+        out.push({ path: entry.fullPath.replace(/^\/+/, ''), file });
+        return;
+    }
+    if (!entry.isDirectory) {
+        return;
+    }
+    const reader = (entry as FileSystemDirectoryEntry).createReader();
+    for (;;) {
+        const batch = await readDirectoryEntries(reader);
+        if (batch.length === 0) {
+            break;
+        }
+        for (const child of batch) {
+            await collectEntryFiles(child, out);
+        }
+    }
+}
+
+// Collect everything a drop delivered, preserving folder structure when folders were dropped.
+// The entries have to be taken synchronously inside the drop event: the DataTransfer is cleared
+// as soon as the handler yields.
+async function collectDroppedFiles(dataTransfer: DataTransfer): Promise<LocalFile[]> {
+    const entries: FileSystemEntry[] = [];
+    for (const item of Array.from(dataTransfer.items)) {
+        const entry = item.kind === 'file' ? item.webkitGetAsEntry() : null;
+        if (entry) {
+            entries.push(entry);
+        }
+    }
+    if (entries.length === 0) {
+        return Array.from(dataTransfer.files).map((file) => ({ path: file.name, file }));
+    }
+    const files: LocalFile[] = [];
+    for (const entry of entries) {
+        await collectEntryFiles(entry, files);
+    }
+    return files;
+}
+
+// Files from an <input webkitdirectory> carry their path below the picked folder.
+function collectInputFiles(fileList: FileList): LocalFile[] {
+    return Array.from(fileList).map((file) => ({
+        path: (file.webkitRelativePath || file.name).replace(/\\/g, '/'),
+        file,
+    }));
+}
+
 // Feed cached font bytes into the freshly parsed view. pagx-viewer's PAGXView.registerFonts
 // is not on the structural PlayerView interface exposed by pagx-player, so we cast to reach it
 // - the wasm module we injected via moduleFactory really is a pagx-viewer instance underneath.
@@ -484,15 +632,13 @@ async function applyXml(xmlText: string): Promise<string> {
     try {
         const bytes = new TextEncoder().encode(xmlText);
         // Preserve playback position so an Apply doesn't jump the animation back to frame 0.
-        // baseURL for external resources stays the same as the currently loaded sample (or
-        // empty for drag-and-drop) - re-editing XML keeps the same resource root.
+        // External resources resolve the same way as for the loaded document (the sample's base
+        // URL, or the files dropped with it) - re-editing XML keeps the same resource root.
         await player.load(bytes, {
             preserveCurrentTime: true,
             xmlText,
             registerFonts: registerFontsToView,
-            resolveResource: currentPlayingFile
-                ? makeResourceResolver(assetUrl('samples/'))
-                : undefined,
+            resolveResource: currentResourceResolver,
         });
         return '';
     } catch (e) {
@@ -609,7 +755,7 @@ async function prepareForLoading(): Promise<void> {
 async function loadPAGXData(
     data: Uint8Array,
     name: string,
-    resolveResource?: (relPath: string) => Promise<Uint8Array | null>,
+    resolveResource?: ResourceResolver,
 ): Promise<void> {
     // Callers (loadPAGXFile / loadPAGXSample) invoke prepareForLoading() and closeEditor()
     // before their own file / network read so the loading overlay is visible - and the editor
@@ -633,9 +779,17 @@ async function loadPAGXData(
     hideDropZone();
     document.title = `PAGX Playground - ${name}`;
     currentFileName = name;
+    currentResourceResolver = resolveResource;
+    // A lone .pagx dropped without its folder cannot reach the images and fonts next to it; say
+    // so instead of leaving the user with silently missing pictures and blank text.
+    const missing = resolveResource ? [] : p.getView()?.getExternalFilePaths() ?? [];
+    if (missing.length > 0) {
+        console.warn('External files not loaded:', missing);
+        p.showStatus(t().missingResources, { kind: 'error', autoHideMs: 8000 });
+    }
 }
 
-async function loadPAGXFile(file: File): Promise<void> {
+async function loadPAGXFile(file: File, resolveResource?: ResourceResolver): Promise<void> {
     try {
         // Close the source editor and show the loading overlay before reading the file so
         // users get immediate feedback that the drop was accepted, and don't see the editor
@@ -646,10 +800,9 @@ async function loadPAGXFile(file: File): Promise<void> {
         player?.closeEditor();
         await prepareForLoading();
         const fileBuffer = await file.arrayBuffer();
-        // Drag-and-drop files have no baseURL for external references (external assets
-        // packaged next to a .pagx aren't accessible over http); pass undefined so the
-        // player's default (no external fetches) applies.
-        await loadPAGXData(new Uint8Array(fileBuffer), file.name);
+        // External references resolve against the files picked or dropped together with the
+        // .pagx. A lone .pagx has none, so the player skips external fetches.
+        await loadPAGXData(new Uint8Array(fileBuffer), file.name, resolveResource);
         currentPlayingFile = null;
         history.replaceState(null, '', window.location.pathname);
     } catch (error) {
@@ -660,6 +813,7 @@ async function loadPAGXFile(file: File): Promise<void> {
         // from the error state and so a stale sample name doesn't leak into any subsequent
         // editor Apply that would otherwise fetch resources from the previous sample's base.
         currentPlayingFile = null;
+        currentResourceResolver = undefined;
         document.getElementById('nav-btns')?.classList.remove('hidden');
         showErrorUI(error instanceof Error ? error.message : t().errorFormat);
     }
@@ -707,6 +861,7 @@ async function loadPAGXSample(name: string, pushHistory: boolean = true): Promis
         // stranded on the error UI, and null out currentPlayingFile so a stale name from a
         // prior successful load doesn't drive resource resolution on the next Apply.
         currentPlayingFile = null;
+        currentResourceResolver = undefined;
         document.getElementById('nav-btns')?.classList.remove('hidden');
         showErrorUI(error instanceof Error ? error.message : 'Unknown error');
     }
@@ -729,6 +884,7 @@ function goHome(pushHistory: boolean = true): void {
     document.title = DEFAULT_TITLE;
     currentPlayingFile = null;
     currentFileName = 'export.pagx';
+    currentResourceResolver = undefined;
     // Going home discards any pre-samples playback state: hideSamplesPage may still fire
     // afterwards (popstate path that leaves #samples), and without this reset it would call
     // player.play() on the just-hidden player, resuming the render loop against a hidden
@@ -787,14 +943,11 @@ function setupDragAndDrop(): void {
     });
 
     container.addEventListener('drop', (e: DragEvent) => {
-        const files = e.dataTransfer?.files;
-        if (files && files.length > 0) {
-            const file = files[0];
-            if (file.name.endsWith('.pagx')) {
-                loadPAGXFile(file);
-            } else {
+        if (e.dataTransfer && e.dataTransfer.items.length > 0) {
+            collectDroppedFiles(e.dataTransfer).then(loadLocalFiles, (error) => {
+                console.error('Failed to read dropped files:', error);
                 alert(t().invalidFile);
-            }
+            });
         }
     }, false);
 
@@ -813,6 +966,33 @@ function setupDragAndDrop(): void {
         }
         fileInput.value = '';
     });
+
+    const folderInput = document.getElementById('folder-input') as HTMLInputElement;
+    const chooseFolderButton = document.getElementById('choose-folder-btn') as HTMLButtonElement;
+    chooseFolderButton.addEventListener('click', (e: Event) => {
+        // The button sits inside the drop zone, whose own click opens the single-file picker.
+        e.stopPropagation();
+        folderInput.click();
+    });
+    folderInput.addEventListener('change', () => {
+        const files = folderInput.files;
+        if (files && files.length > 0) {
+            loadLocalFiles(collectInputFiles(files));
+        }
+        folderInput.value = '';
+    });
+}
+
+// Open the .pagx among files the user dropped or picked, serving its relative references from the
+// rest of them. A single dropped .pagx still opens, just without external resources.
+function loadLocalFiles(files: LocalFile[]): void {
+    const entry = pickEntryPAGX(files);
+    if (entry === null) {
+        alert(t().invalidFile);
+        return;
+    }
+    const resolver = files.length > 1 ? makeLocalResourceResolver(files, entry.path) : undefined;
+    loadPAGXFile(entry.file, resolver);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -860,6 +1040,8 @@ function applyI18n(): void {
 
     if (dropText) dropText.textContent = strings.dropText;
     if (dropSubtext) dropSubtext.textContent = strings.dropSubtext;
+    const chooseFolderButton = document.getElementById('choose-folder-btn');
+    if (chooseFolderButton) chooseFolderButton.textContent = strings.chooseFolder;
     if (loadingText) loadingText.textContent = strings.loading;
     if (errorTitle) errorTitle.textContent = strings.errorTitle;
 
