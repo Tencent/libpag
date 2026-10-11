@@ -148,6 +148,7 @@ class HTMLLayerBuilder {
                          bool& emitted);
   void appendInsetBorderRing(Layer* layer, const HTMLBoxAttributes& box, float inset,
                              float strokeWidth, const Color& color);
+  void applyOutline(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
   void applyBoxShadows(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
   void applyBackdropFilter(Layer* layer, const HTMLBoxAttributes& box, bool& emitted);
 

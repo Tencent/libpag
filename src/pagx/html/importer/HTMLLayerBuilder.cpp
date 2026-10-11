@@ -391,6 +391,7 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
     emitted = true;
   }
   applyBorderStroke(layer, box, geometry, emitted);
+  applyOutline(layer, box, emitted);
   applyBoxShadows(layer, box, emitted);
   applyBackdropFilter(layer, box, emitted);
   return emitted;
@@ -666,6 +667,23 @@ void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& 
                                          Element* geometry, bool& emitted) {
   if (!geometry || !box.borderSet) return;
   const float w = box.borderWidthPx;
+  // `border-image: linear-gradient(...) 1` paints the border with the gradient instead of
+  // `border-color`. Rebuild the gradient as the stroke's colour source; the gradient line spans the
+  // border box, matching how CSS paints border-image over the border area.
+  if (!box.borderImageSource.empty()) {
+    ColorSource* gradient = parseGradientByValue(
+        box.borderImageSource, std::isfinite(box.widthPx) ? box.widthPx : 0.0f,
+        std::isfinite(box.heightPx) ? box.heightPx : 0.0f);
+    if (gradient != nullptr) {
+      auto* gradientStroke = _document->makeNode<Stroke>();
+      gradientStroke->color = gradient;
+      gradientStroke->width = w;
+      gradientStroke->align = StrokeAlign::Inside;
+      layer->contents.push_back(gradientStroke);
+      emitted = true;
+      return;
+    }
+  }
   // A single PAGX Stroke paints one uniform band around the geometry, so `double` (two lines with
   // a gap) and the bevelled two-tone styles (`groove`/`ridge`/`inset`/`outset`) cannot be one
   // stroke. Approximate them with two concentric solid rings: an outer stroke plus the inset inner
@@ -723,6 +741,39 @@ void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& 
     stroke->dashes = {0.0f, 2.0f * w};
   }
   layer->contents.push_back(stroke);
+  emitted = true;
+}
+
+void HTMLLayerBuilder::applyOutline(Layer* layer, const HTMLBoxAttributes& box, bool& emitted) {
+  if (!box.outlineSet || box.outlineWidthPx <= 0.0f) return;
+  if (!std::isfinite(box.widthPx) || !std::isfinite(box.heightPx)) return;
+  // CSS draws the outline just outside the border box, pushed further out by `outline-offset`. PAGX
+  // has no outline primitive, so wrap the box in an oversized ring layer and stroke its edge from
+  // the inside. `outline-offset` is the gap between the border box and the outline's INNER edge, so
+  // the ring is grown by offset + width and stroked from its own outer edge back in by `width`; the
+  // stroke then lands in the CSS outline band [offset, offset + width] outside the box.
+  const float offset = std::max(0.0f, box.outlineOffsetPx);
+  const float grown = offset + box.outlineWidthPx;
+  auto* ring = _document->makeNode<Layer>();
+  ring->includeInLayout = false;
+  ring->left = -grown;
+  ring->top = -grown;
+  ring->width = box.widthPx + 2.0f * grown;
+  ring->height = box.heightPx + 2.0f * grown;
+  auto* rect = _document->makeNode<Rectangle>();
+  rect->percentWidth = 100.0f;
+  rect->percentHeight = 100.0f;
+  // Grow the corner radius by the same amount so the outline stays concentric with a rounded box.
+  rect->roundness = std::max(0.0f, box.borderRadiusTLPx + grown);
+  ring->contents.push_back(rect);
+  auto* stroke = _document->makeNode<Stroke>();
+  auto* solid = _document->makeNode<SolidColor>();
+  solid->color = box.outlineColor;
+  stroke->color = solid;
+  stroke->width = box.outlineWidthPx;
+  stroke->align = StrokeAlign::Inside;
+  ring->contents.push_back(stroke);
+  layer->children.push_back(ring);
   emitted = true;
 }
 
