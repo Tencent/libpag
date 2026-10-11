@@ -5,6 +5,27 @@
 
 ---
 
+## 〇、设计红线：导入器只做「翻译」，不做「绘制算法」
+
+`src/pagx/html`（importer）与 `tools/html-snapshot` 是**翻译器**，不是渲染器。
+仓库里 PAGX 的格式转换**没有任何"复刻浏览器绘制算法"的代码**，新增改动也必须避免。
+
+- ✅ **允许（把 CSS 声明映射到 PAGX 已有图元）**：渐变 → `LinearGradient` ColorSource；
+  per-corner `border-radius` → `Path` 几何（因 `Rectangle.roundness` 只能表达单一半径）；
+  `box-shadow` → `DropShadowStyle`；`dashed/dotted` → `Stroke.dashes`。
+- ❌ **禁止（复刻渲染器的画法）**：自行推导 bevel 高光/阴影系数；把某个 `border-style`
+  分解成计算出来的中间几何（如 double 边框的同心环、outline 的外扩环）；拟合椭圆弧等。
+
+判定一句话：**这段计算是不是在替渲染器决定"像素长什么样"？**是 → 就不该放在导入器。
+PAGX 没有对应图元时，二选一：**带诊断地丢弃**，或**在 PAGX schema / 渲染器新增图元**
+让 importer 只做声明式表达。
+
+> 实例：2026-10-11 按此原则撤回了 E25（double/groove 明暗+双线）、E27（椭圆弧拟合）、
+> E31（outline 环层）三处复刻实现，各自退回"不支持 → solid / Drop + warning"；
+> 保留了 E26（`border-image: linear-gradient` → 渐变 `Stroke`，纯翻译）。commit `00824fc7f`。
+
+---
+
 ## 一、层叠 / z-index 类（最容易误判）
 
 所有渲染器都按**图层树顺序**绘制，PAGX 没有跨层 z-index。因此「谁盖住谁」完全取决于
