@@ -17,6 +17,7 @@ import {
   dropCollapsedDetailsContent,
   materializeDecorativePseudoElements,
   inlineMaskImages,
+  inlineSvgVectorPatterns,
   expandStickyScrollytelling,
 } from './browser-snapshot';
 import { inlineIconFontsOnPage, ICON_FONT_INIT_SCRIPT } from './icon-font';
@@ -662,6 +663,18 @@ export async function runSnapshot(
     } catch (err) {
       if (log) {
         log(`WARNING: mask-image inlining skipped — remote mask urls stay remote and the importer will drop those masks: ${errMessage(err)}`);
+      }
+    }
+
+    // Rasterize inline-SVG `<pattern>` fills whose content is vector geometry into a tile image.
+    // The importer can only tile a bitmap, so an un-rasterized vector pattern is dropped and the
+    // painted shape loses its texture. Best-effort: a failure leaves the pattern vector, which the
+    // importer drops exactly as before.
+    try {
+      await page.evaluate(inlineSvgVectorPatterns);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: inline SVG pattern rasterization skipped — vector patterns stay unresolved: ${errMessage(err)}`);
       }
     }
 
