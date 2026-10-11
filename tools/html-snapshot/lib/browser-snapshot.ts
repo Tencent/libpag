@@ -1240,6 +1240,13 @@ function imgAlt(el) {
 // metadata (`"on"`, hidden file path, ISO date) that would only confuse
 // downstream rendering, so we return empty and let `classify` drop the
 // element.
+// The masked echo a browser paints for a password field: one bullet per
+// character. Emitting the raw `value` would leak the password into the snapshot
+// as plain text (and render it verbatim in PAGX).
+function maskPasswordText(value) {
+  return value ? '\u2022'.repeat(value.length) : '';
+}
+
 function syntheticText(el) {
   const tag = el.tagName.toLowerCase();
   if (tag === 'textarea') {
@@ -1248,6 +1255,11 @@ function syntheticText(el) {
   if (tag === 'input') {
     const type = (el.getAttribute('type') || 'text').toLowerCase();
     if (NON_TEXT_INPUT_TYPES.has(type)) return '';
+    if (type === 'password') {
+      const value = el.value || '';
+      if (value) return maskPasswordText(value);
+      return (el.getAttribute('placeholder') || '').trim();
+    }
     return (el.value || el.getAttribute('placeholder') || '').trim();
   }
   if (tag === 'select') {
@@ -3363,6 +3375,226 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
 
+// ===== Native form controls (checkbox / radio / range / progress / meter /
+// color / date) =====
+//
+// The browser paints these through its UA shadow DOM — the check tick, the
+// radio dot, the range track/thumb/fill, the progress/meter bar, the colour
+// swatch, the date field's value text + calendar glyph. The snapshot walks the
+// *light* DOM only, so none of that internal paint is reachable: `classify`
+// used to drop the element entirely (checkbox / radio / range — no text, no
+// authored box visuals) or keep a bare box (color / date / progress / meter),
+// leaving a visible hole where the browser drew a real control.
+//
+// We instead synthesise the control's *static appearance* as an inline <svg>
+// so the imported PAGX shows a form that looks like a form. Interactivity is
+// deliberately not modelled — PAGX is a static format — but the visual *is*
+// design content. Geometry comes from the element's measured rect plus the
+// authored/computed styles; the UA's own paint constants (tick geometry, track
+// thickness, swatch inset, bar colours) are approximated from the reference
+// rendering, which clears the pixel diff that the missing controls produced.
+
+const NATIVE_INPUT_CONTROL_TYPES = new Set([
+  'checkbox', 'radio', 'range', 'color',
+  'date', 'datetime-local', 'month', 'time', 'week',
+]);
+
+function nativeControlKind(el) {
+  if (!el || !el.tagName) return null;
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'progress' || tag === 'meter') return tag;
+  if (tag === 'input') {
+    const type = (el.getAttribute('type') || 'text').toLowerCase();
+    if (NATIVE_INPUT_CONTROL_TYPES.has(type)) return type;
+  }
+  return null;
+}
+
+function controlNum(value, fallback) {
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  return isFinite(n) ? n : fallback;
+}
+
+function accentColorOf(computed) {
+  const raw = (computed.getPropertyValue('accent-color') || '').trim();
+  return (!raw || raw === 'auto') ? '' : raw;
+}
+
+function svgDoc(w, h, inner) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px(w)}" height="${px(h)}"`
+    + ` viewBox="0 0 ${roundPx(w)} ${roundPx(h)}">${inner}</svg>`;
+}
+
+function svgCheckbox(el, computed, w, h) {
+  const accent = accentColorOf(computed) || 'rgb(22, 93, 255)';
+  const unit = Math.min(w, h);
+  const r = roundPx(unit * 0.18);
+  if (el.checked) {
+    const d = `M${roundPx(w * 0.25)} ${roundPx(h * 0.52)}`
+      + ` L${roundPx(w * 0.44)} ${roundPx(h * 0.72)}`
+      + ` L${roundPx(w * 0.76)} ${roundPx(h * 0.31)}`;
+    return svgDoc(w, h,
+      `<rect x="0" y="0" width="${roundPx(w)}" height="${roundPx(h)}" rx="${r}" fill="${accent}"/>`
+      + `<path d="${d}" fill="none" stroke="#FFFFFF" stroke-width="${roundPx(unit * 0.125)}"`
+      + ` stroke-linecap="round" stroke-linejoin="round"/>`);
+  }
+  return svgDoc(w, h,
+    `<rect x="0.5" y="0.5" width="${roundPx(w - 1)}" height="${roundPx(h - 1)}" rx="${r}"`
+    + ` fill="#FFFFFF" stroke="#767676" stroke-width="1"/>`);
+}
+
+function svgRadio(el, computed, w, h) {
+  const accent = accentColorOf(computed) || 'rgb(22, 93, 255)';
+  const cx = roundPx(w / 2);
+  const cy = roundPx(h / 2);
+  const unit = Math.min(w, h);
+  const outer = roundPx(unit / 2 - unit * 0.09);
+  const sw = roundPx(unit * 0.11);
+  if (el.checked) {
+    return svgDoc(w, h,
+      `<circle cx="${cx}" cy="${cy}" r="${outer}" fill="none" stroke="${accent}" stroke-width="${sw}"/>`
+      + `<circle cx="${cx}" cy="${cy}" r="${roundPx(unit * 0.25)}" fill="${accent}"/>`);
+  }
+  return svgDoc(w, h,
+    `<circle cx="${cx}" cy="${cy}" r="${outer}" fill="#FFFFFF" stroke="#767676" stroke-width="${sw}"/>`);
+}
+
+function svgRange(el, computed, w, h) {
+  const accent = accentColorOf(computed) || 'rgb(22, 93, 255)';
+  const min = controlNum(el.min, 0);
+  const maxRaw = controlNum(el.max, 100);
+  const max = maxRaw > min ? maxRaw : min + 1;
+  const val = controlNum(el.value, min);
+  const frac = Math.max(0, Math.min(1, (val - min) / (max - min)));
+  const unit = Math.min(w, h);
+  const thumbR = unit / 2;
+  const trackH = Math.max(4, Math.round(unit * 0.375));
+  const ty = (h - trackH) / 2;
+  const rr = trackH / 2;
+  const cx = thumbR + (w - 2 * thumbR) * frac;
+  return svgDoc(w, h,
+    `<rect x="0" y="${roundPx(ty)}" width="${roundPx(w)}" height="${roundPx(trackH)}" rx="${roundPx(rr)}" fill="#EFEFEF"/>`
+    + `<rect x="0" y="${roundPx(ty)}" width="${roundPx(cx)}" height="${roundPx(trackH)}" rx="${roundPx(rr)}" fill="${accent}"/>`
+    + `<circle cx="${roundPx(cx)}" cy="${roundPx(h / 2)}" r="${roundPx(thumbR)}" fill="${accent}"/>`);
+}
+
+function svgBar(w, h, frac, fill) {
+  const rr = roundPx(Math.min(h / 2, 3));
+  let s = `<rect x="0" y="0" width="${roundPx(w)}" height="${roundPx(h)}" rx="${rr}" fill="#EFEFEF"/>`;
+  if (frac > 0) {
+    s += `<rect x="0" y="0" width="${roundPx(w * frac)}" height="${roundPx(h)}" rx="${rr}" fill="${fill}"/>`;
+  }
+  return svgDoc(w, h, s);
+}
+
+function svgProgress(el, computed, w, h) {
+  const min = controlNum(el.min, 0);
+  const max = controlNum(el.max, 1);
+  const val = controlNum(el.value, 0);
+  const frac = max > min ? Math.max(0, Math.min(1, (val - min) / (max - min))) : 0;
+  return svgBar(w, h, frac, accentColorOf(computed) || 'rgb(0, 117, 255)');
+}
+
+function svgMeter(el, computed, w, h) {
+  const min = controlNum(el.min, 0);
+  const maxRaw = controlNum(el.max, 1);
+  const max = maxRaw > min ? maxRaw : min + 1;
+  const val = controlNum(el.value, min);
+  const low = controlNum(el.low, min);
+  const high = controlNum(el.high, max);
+  const opt = controlNum(el.optimum, (min + max) / 2);
+  const frac = Math.max(0, Math.min(1, (val - min) / (max - min)));
+  const belowLow = val < low;
+  const aboveHigh = val > high;
+  let color;
+  if (opt > high) {
+    color = aboveHigh ? '#00B34A' : (!belowLow ? 'rgb(255, 185, 0)' : '#F53F3F');
+  } else if (opt < low) {
+    color = belowLow ? '#00B34A' : (!aboveHigh ? 'rgb(255, 185, 0)' : '#F53F3F');
+  } else {
+    color = (!belowLow && !aboveHigh) ? '#00B34A' : 'rgb(255, 185, 0)';
+  }
+  return svgBar(w, h, frac, color);
+}
+
+// Chrome insets the colour swatch inside the (author-padded) input box rather
+// than filling it; the reference rendering lands the swatch 6px in horizontally
+// and 8px in vertically for the canonical 44×32 colour input.
+function svgColorSwatch(el, w, h) {
+  const value = (el.value || '').trim() || '#000000';
+  const sw = Math.max(0, w - 12);
+  const sh = Math.max(0, h - 16);
+  return svgDoc(sw, sh,
+    `<rect x="0.5" y="0.5" width="${roundPx(Math.max(0, sw - 1))}" height="${roundPx(Math.max(0, sh - 1))}"`
+    + ` rx="2" fill="${value}" stroke="#767676" stroke-width="1"/>`);
+}
+
+// `value` on a date-family input is always ISO; render the locale-formatted
+// form the browser would paint (the snapshot browser and `pagx render` share a
+// locale, so `toLocaleDateString` matches the reference). Non-date pickers fall
+// back to the raw ISO string rather than risk a locale-specific layout.
+function formatDateControlValue(value, kind) {
+  if (!value) return '';
+  if (kind === 'date') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      try {
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
+      } catch (err) {
+        return `${m[2]}/${m[3]}/${m[1]}`;
+      }
+    }
+  }
+  return value;
+}
+
+function svgCalendarGlyph() {
+  const c = 'rgb(95, 99, 104)';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" viewBox="0 0 16 16">`
+    + `<rect x="2.75" y="3.25" width="10.5" height="10" rx="1.75" fill="none" stroke="${c}" stroke-width="1.5"/>`
+    + `<line x1="2.75" y1="6.25" x2="13.25" y2="6.25" stroke="${c}" stroke-width="1.5"/>`
+    + `<line x1="5.5" y1="1.75" x2="5.5" y2="4" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`
+    + `<line x1="10.5" y1="1.75" x2="10.5" y2="4" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`
+    + `</svg>`;
+}
+
+function renderDateControl(el, kind, rect, left, top, computed, opts) {
+  const text = formatDateControlValue((el.value || '').trim(), kind);
+  const pad = readPadding(computed);
+  const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
+  const textStyle = withNowrap(buildStyle(0, 0, 0, 0, computed, {
+    box: false, text: true, positioned: false,
+  }));
+  let inner = text ? `<span style="${textStyle}">${escapeHtml(text)}</span>` : '';
+  inner += svgCalendarGlyph();
+  const layout = 'display: flex; align-items: center; justify-content: space-between'
+    + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  return renderBoxedReplaced(rect, left, top, computed, opts, inner, layout);
+}
+
+function renderNativeControl(el, kind, rect, left, top, computed, opts) {
+  const w = rect.width;
+  const h = rect.height;
+  const center = 'display: flex; align-items: center; justify-content: center';
+  switch (kind) {
+    case 'checkbox':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgCheckbox(el, computed, w, h), center);
+    case 'radio':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgRadio(el, computed, w, h), center);
+    case 'range':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgRange(el, computed, w, h), center);
+    case 'progress':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgProgress(el, computed, w, h), center);
+    case 'meter':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgMeter(el, computed, w, h), center);
+    case 'color':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgColorSwatch(el, w, h), center);
+    default:
+      return renderDateControl(el, kind, rect, left, top, computed, opts);
+  }
+}
+
 // True when an element child of a flex container can be safely rendered as a
 // bare <span> flex item rather than wrapped in a sized <div>. Bare emission
 // lets PAGX measure the text's natural width with its own font metrics, so a
@@ -4624,6 +4856,23 @@ function renderElementBox(el, parentRect, opts, precomputed) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
   }
 
+  // Native form controls have no light-DOM paint for `classify` to keep (their
+  // check tick / radio dot / range thumb / bar / swatch / date text all live in
+  // the UA shadow DOM), so synthesise their static appearance inline before the
+  // kind dispatch can drop them. Handled here — ahead of `classify` and outside
+  // the flex branch above — so a control that is itself a flex item (the common
+  // `<label style="display:flex"><input type=checkbox>…`) is covered too.
+  const nativeKind = nativeControlKind(el);
+  if (nativeKind) {
+    const controlRect = el.getBoundingClientRect();
+    if (opts.flexItem || nonZero(controlRect)) {
+      const controlLeft = controlRect.left - parentRect.left;
+      const controlTop = controlRect.top - parentRect.top;
+      return renderNativeControl(el, nativeKind, controlRect, controlLeft, controlTop, computed, opts);
+    }
+    return '';
+  }
+
   const kind = classify(el, computed);
   if (!kind) return '';
 
@@ -5272,6 +5521,11 @@ const NON_TEXT_INPUT_TYPES = new Set([
   'date', 'datetime-local', 'month', 'time', 'week',
 ]);
 
+const NATIVE_INPUT_CONTROL_TYPES = new Set([
+  'checkbox', 'radio', 'range', 'color',
+  'date', 'datetime-local', 'month', 'time', 'week',
+]);
+
 const SIDES = ['top', 'right', 'bottom', 'left'];
 
 const SIDE_OVERLAY = {
@@ -5416,6 +5670,7 @@ const HELPER_FNS = [
   normalizeEmptyImagePlaceholders,
   restoreEmptyImagePlaceholders,
   imgAlt,
+  maskPasswordText,
   syntheticText,
   applyTextTransform,
   classify,
@@ -5484,6 +5739,21 @@ const HELPER_FNS = [
   renderImg,
   renderCanvas,
   renderTextInput,
+  nativeControlKind,
+  controlNum,
+  accentColorOf,
+  svgDoc,
+  svgCheckbox,
+  svgRadio,
+  svgRange,
+  svgBar,
+  svgProgress,
+  svgMeter,
+  svgColorSwatch,
+  formatDateControlValue,
+  svgCalendarGlyph,
+  renderDateControl,
+  renderNativeControl,
   textLeafInnerLayout,
   renderTextLeaf,
   renderPseudoTextLeaf,
@@ -6934,6 +7204,16 @@ export {
   canvasRootRect,
   cssQuotedString,
   collectLocalFontFaces,
+  nativeControlKind,
+  syntheticText,
+  maskPasswordText,
+  svgCheckbox,
+  svgRadio,
+  svgRange,
+  svgProgress,
+  svgMeter,
+  svgColorSwatch,
+  formatDateControlValue,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };
