@@ -1240,8 +1240,33 @@ void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyM
   }
 
   if (slashPos != std::string::npos) {
-    _diagnostics.warn("html: elliptical border-radius '" + br +
-                      "' not supported by PAGX Rectangle; ignored");
+    // Elliptical corners that do not degenerate into a full ellipse. PAGX `Rectangle` carries a
+    // single radius, so carry the per-corner (rx, ry) pairs into a synthesised Path
+    // (buildBackgroundGeometry). Resolving the percentages against the box needs concrete px
+    // dimensions; without them keep only the horizontal radii (a circular approximation).
+    if (std::isnan(box.widthPx) || std::isnan(box.heightPx) || box.widthPx <= 0.0f ||
+        box.heightPx <= 0.0f) {
+      _diagnostics.warn("html: elliptical border-radius '" + br +
+                        "' without fixed px width/height; approximated with the horizontal radii");
+      return;
+    }
+    FourSidedValue h{};
+    FourSidedValue v{};
+    if (!ResolveBorderRadiusAxis(hTokens, box.widthPx, _valueParser, _diagnostics, h) ||
+        !ResolveBorderRadiusAxis(vTokens, box.heightPx, _valueParser, _diagnostics, v)) {
+      return;
+    }
+    box.borderRadiusTLPx = h.top;
+    box.borderRadiusTRPx = h.right;
+    box.borderRadiusBRPx = h.bottom;
+    box.borderRadiusBLPx = h.left;
+    box.borderRadiusTLYPx = v.top;
+    box.borderRadiusTRYpx = v.right;
+    box.borderRadiusBRYpx = v.bottom;
+    box.borderRadiusBLYpx = v.left;
+    box.borderRadiusPerCornerElliptical = true;
+    box.borderRadiusUniform = false;
+    box.borderRadiusSet = true;
     return;
   }
   auto tokens = hTokens;
@@ -1388,8 +1413,7 @@ void HTMLStyleCascade::parseOutline(HTMLBoxAttributes& box, const std::string& o
     }
     std::string lt = ToLower(t);
     if (lt == "none" || lt == "auto" || lt == "solid" || lt == "dashed" || lt == "dotted" ||
-        lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" ||
-        lt == "outset") {
+        lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
       continue;
     }
     if (colorToken.empty()) {
