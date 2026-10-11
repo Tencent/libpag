@@ -129,6 +129,7 @@ class HTMLStyleCascade {
 
   void parseBorderRadius(HTMLBoxAttributes& box, const PropertyMap& props);
   void parseBorder(HTMLBoxAttributes& box, const std::string& border);
+  void parseOutline(HTMLBoxAttributes& box, const std::string& outline);
 
   // Resolves the element's background paint colour — the `background-color` longhand, falling
   // back to a colour-only `background` shorthand — into `out`. Returns false when no colour

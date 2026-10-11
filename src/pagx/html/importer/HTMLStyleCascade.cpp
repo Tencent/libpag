@@ -893,6 +893,9 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
   }
+  // `border-image-source: linear-gradient(...)` paints the border with a gradient instead of the
+  // `border-color`; the layer builder turns it into a gradient Stroke.
+  CopyProperty(props, "border-image-source", box.borderImageSource);
   // A `url(...)` background round-trips through `ImagePattern`, which needs the CSS fitting
   // hints the exporter emitted alongside it. Capture them only for url backgrounds; gradients
   // ignore size/repeat/position entirely.
@@ -941,6 +944,18 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   const std::string& border = LookupProperty(props, "border");
   if (!border.empty()) {
     parseBorder(box, border);
+  }
+
+  const std::string& outline = LookupProperty(props, "outline");
+  if (!outline.empty()) {
+    parseOutline(box, outline);
+  }
+  const std::string& outlineOffset = LookupProperty(props, "outline-offset");
+  if (!outlineOffset.empty()) {
+    float offset = _valueParser.parseAbsoluteLengthPx(outlineOffset);
+    if (!std::isnan(offset)) {
+      box.outlineOffsetPx = offset;
+    }
   }
 
   box.boxShadow = LookupProperty(props, "box-shadow");
@@ -1000,7 +1015,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
-  static const char* VisualsDisallowed[] = {"outline", "perspective"};
+  static const char* VisualsDisallowed[] = {"perspective"};
   for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
@@ -1357,6 +1372,34 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
     box.borderColor = _valueParser.parseColor(colorToken);
   }
   box.borderSet = box.borderWidthPx > 0;
+}
+
+void HTMLStyleCascade::parseOutline(HTMLBoxAttributes& box, const std::string& outline) {
+  // Mirrors parseBorder's token walk (width / keyword / colour) but writes the outline fields. The
+  // line style is kept uniform: PAGX rebuilds the outline as a solid ring in every style, since a
+  // dashed/dotted outline around an arbitrary box rarely reads at these sizes.
+  auto tokens = SplitTopLevelWhitespace(outline);
+  std::string colorToken;
+  for (auto& t : tokens) {
+    float w = _valueParser.parseAbsoluteLengthPx(t);
+    if (!std::isnan(w)) {
+      box.outlineWidthPx = w;
+      continue;
+    }
+    std::string lt = ToLower(t);
+    if (lt == "none" || lt == "auto" || lt == "solid" || lt == "dashed" || lt == "dotted" ||
+        lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" ||
+        lt == "outset") {
+      continue;
+    }
+    if (colorToken.empty()) {
+      colorToken = t;
+    }
+  }
+  if (!colorToken.empty()) {
+    box.outlineColor = _valueParser.parseColor(colorToken);
+  }
+  box.outlineSet = box.outlineWidthPx > 0;
 }
 
 }  // namespace pagx

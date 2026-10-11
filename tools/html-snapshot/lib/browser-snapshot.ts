@@ -114,6 +114,17 @@ function normalizeOverflow(value) {
 // 0px`) pollutes the diff. Collapse `T R B L` → single value when all four
 // lengths agree, and drop entirely when they all collapse to zero. Mixed values
 // are passed through verbatim and left to the importer to handle.
+// `border-image-source` round-trips only when it is a gradient — the importer rebuilds it as a
+// gradient Stroke (the inverse of a CSS gradient border). `none` and `url(...)` sources collapse
+// to '' so the defaults filter drops them; sliced bitmap border-images are unsupported.
+function normalizeBorderImage(value) {
+  if (!value) return '';
+  const v = value.trim();
+  if (!v || v === 'none') return '';
+  if (/(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(v)) return v;
+  return '';
+}
+
 function normalizeBorderRadius(value) {
   if (!value) return '';
   const tokens = value.split(/\s+/).filter(Boolean);
@@ -1354,6 +1365,19 @@ function appendBoxShadow(parts, computed) {
   if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
 }
 
+// Forward a CSS `outline` as the `outline` shorthand plus `outline-offset`. Outline is dropped by
+// default (it is not in the subset), so emitting these declarations is what opts the box in. Gated
+// on a non-`none` style and a positive width so boxes without an outline stay clean.
+function appendOutline(parts, computed) {
+  const style = (computed.getPropertyValue('outline-style') || 'none').trim();
+  if (!style || style === 'none') return;
+  const width = (computed.getPropertyValue('outline-width') || '').trim();
+  if (!(parseFloat(width) > 0)) return;
+  parts.push(`outline: ${width} ${style} ${(computed.getPropertyValue('outline-color') || '').trim()}`);
+  const offset = (computed.getPropertyValue('outline-offset') || '').trim();
+  if (offset && offset !== '0px') parts.push(`outline-offset: ${offset}`);
+}
+
 // Emit the `animation-*` longhands for an element animated by the capture pass
 // (animation-capture.ts). Only `pagxAnim*` names are forwarded: those are the
 // canonical animations whose `@keyframes` the capture pass injected into the
@@ -1673,6 +1697,7 @@ function buildStyle(left, top, width, height, computed, opts) {
     // layout. See appendBorder / appendBoxShadow for the per-helper
     // rationale.
     appendBorder(parts, computed);
+    appendOutline(parts, computed);
     appendBoxShadow(parts, computed);
     appendBackgroundImageFitting(parts, computed);
     appendMaskFitting(parts, computed);
@@ -5302,6 +5327,10 @@ const STYLE_SCHEMA = [
   // gradient/image Fill's blendMode and keeps the background-color Fill underneath so the
   // blend has a backdrop (the inverse of a plain opaque gradient that would hide the colour).
   { prop: 'background-blend-mode', scope: 'box', defaults: ['normal'] },
+  // border-image-source: a linear-gradient(...) paints the border with a gradient instead of
+  // border-color. Only gradients round-trip (the importer rebuilds them as a gradient Stroke);
+  // the normalizer drops none and url(...) sources, whose sliced bitmap form is unsupported.
+  { prop: 'border-image-source', scope: 'box', defaults: ['none'], normalize: normalizeBorderImage },
   { prop: 'border-radius',    scope: 'box',  defaults: ['0px', '0px 0px 0px 0px'], normalize: normalizeBorderRadius },
   { prop: 'overflow',         scope: 'box',  defaults: ['visible'], normalize: normalizeOverflow },
   { prop: 'opacity',          scope: 'box',  defaults: ['1'] },
@@ -5355,6 +5384,7 @@ const HELPER_FNS = [
   normalizeOverflow,
   normalizeBorderRadius,
   normalizeBackgroundImage,
+  normalizeBorderImage,
   normalizeMaskImage,
   normalizeBackgroundClip,
   normalizeClipPath,
@@ -5408,6 +5438,7 @@ const HELPER_FNS = [
   classify,
   appendStyleProp,
   appendBorder,
+  appendOutline,
   appendBoxShadow,
   appendAnimation,
   resolveTextStroke,
@@ -6803,6 +6834,7 @@ export {
   forwardDataAttrs,
   applyLayerName,
   normalizeBackgroundImage,
+  normalizeBorderImage,
   canForwardFlexGrow,
   shouldPinFlexGrowItems,
   isIntrinsicInlineContentWidth,

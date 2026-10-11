@@ -428,6 +428,9 @@ const PropertyEntry SubsetPropertyEntries[] = {
     // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.
     {"border-radius", PropAction::Transform, &ResolveLengthShorthand, nullptr},
     {"box-shadow", PropAction::Keep, nullptr, nullptr},
+    // `border-image-source` (gradient form) paints the border with the gradient; the layer builder
+    // rebuilds it as a gradient Stroke. Non-gradient sources never reach the subset.
+    {"border-image-source", PropAction::Keep, nullptr, nullptr},
     {"filter", PropAction::Keep, nullptr, nullptr},
     {"backdrop-filter", PropAction::Keep, nullptr, nullptr},
     {"opacity", PropAction::Transform, &TransformOpacity, nullptr},
@@ -489,7 +492,9 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
-    {"outline", PropAction::Drop, nullptr, "is not in the subset"},
+    // CSS `outline` is rebuilt as an outside Stroke ring by the layer builder.
+    {"outline", PropAction::Keep, nullptr, nullptr},
+    {"outline-offset", PropAction::Keep, nullptr, nullptr},
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},
     {"align-content", PropAction::Drop, nullptr, "is not in the subset"},

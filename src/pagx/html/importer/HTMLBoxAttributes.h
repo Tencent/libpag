@@ -246,6 +246,10 @@ struct HTMLBoxAttributes {
   Color backgroundColor = {0, 0, 0, 0, ColorSpace::SRGB};
   bool backgroundColorSet = false;
   std::string backgroundImage = {};
+  // `border-image-source` when it is a gradient: CSS paints the border with this gradient instead
+  // of `border-color`. The layer builder rebuilds it as a gradient Stroke. Sliced bitmap
+  // border-images are not supported and never reach here (the snapshot drops non-gradient values).
+  std::string borderImageSource = {};
   // True when computed style had `background-clip: text`. Only meaningful with a gradient
   // `background-image`; the gradient is then routed onto descendant text fills instead of
   // painting a rectangle on this element.
@@ -299,6 +303,12 @@ struct HTMLBoxAttributes {
   Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};
   BorderStyle borderStyle = BorderStyle::Solid;
   bool borderSet = false;
+  // CSS `outline`: a uniform ring drawn outside the border box, pushed out by `outline-offset`.
+  // PAGX has no outline primitive, so the layer builder rebuilds it as an outside Stroke ring.
+  float outlineWidthPx = 0.0f;
+  float outlineOffsetPx = 0.0f;
+  Color outlineColor = {0, 0, 0, 1, ColorSpace::SRGB};
+  bool outlineSet = false;
 
   std::string boxShadow = {};
   std::string filter = {};
