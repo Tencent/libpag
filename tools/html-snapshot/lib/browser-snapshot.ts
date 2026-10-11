@@ -923,6 +923,27 @@ function paintOrder(a, b) {
   return a.domIndex - b.domIndex;
 }
 
+// Resolve a child box's participation in its parent's paint order. A
+// materialised ::before / ::after stand-in is a real <div> in the DOM, so a
+// document rule that matches it (e.g. `.hero div { position: relative; z-index:
+// 1 }`) leaks onto its computed style and would sort it by that unrelated author
+// rule instead of by the pseudo's own stacking — which paints the stand-in on
+// top of a sibling the pseudo should sit under. Read position / z-index from the
+// pseudo's computed style when the child is a stand-in so the replayed order
+// matches the browser.
+function resolveChildStacking(hostEl, child, childComputed, flexOrGridParent) {
+  const pseudo = child && typeof child.getAttribute === 'function'
+    ? child.getAttribute('data-snapshot-pseudo')
+    : null;
+  const stackComputed = pseudo ? getComputedStyle(hostEl, pseudo) : childComputed;
+  const isPositioned = stackComputed.position !== 'static';
+  const isStackable = isPositioned || flexOrGridParent;
+  return {
+    stackable: isStackable,
+    zIndex: isStackable ? resolveZIndex(stackComputed) : 0,
+  };
+}
+
 // ===== DOM-node helpers =====
 
 function gatherDirectText(el) {
@@ -4339,11 +4360,10 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const childComputed = getComputedStyle(n);
-      const isPositioned = childComputed.position !== 'static';
-      const isStackable = isPositioned || flexOrGridParent;
+      const stacking = resolveChildStacking(el, n, childComputed, flexOrGridParent);
       items.push({
-        stackable: isStackable,
-        zIndex: isStackable ? resolveZIndex(childComputed) : 0,
+        stackable: stacking.stackable,
+        zIndex: stacking.zIndex,
         domIndex: domIndex++,
         // Forward childComputed so render() can skip its own
         // getComputedStyle call on this node.
@@ -5268,6 +5288,7 @@ const HELPER_FNS = [
   isIntrinsicInlineContentWidth,
   renderContainer,
   renderChildrenInto,
+  resolveChildStacking,
   stripNameAnchor,
   applyLayerName,
   renderElementBox,
@@ -6578,6 +6599,7 @@ export {
   bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
+  resolveChildStacking,
   flexCharCarriesReveal,
   pagxEvalLengthPx,
   pagxParseClipShape,
