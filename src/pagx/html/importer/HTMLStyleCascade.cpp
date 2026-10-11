@@ -946,18 +946,6 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
     parseBorder(box, border);
   }
 
-  const std::string& outline = LookupProperty(props, "outline");
-  if (!outline.empty()) {
-    parseOutline(box, outline);
-  }
-  const std::string& outlineOffset = LookupProperty(props, "outline-offset");
-  if (!outlineOffset.empty()) {
-    float offset = _valueParser.parseAbsoluteLengthPx(outlineOffset);
-    if (!std::isnan(offset)) {
-      box.outlineOffsetPx = offset;
-    }
-  }
-
   box.boxShadow = LookupProperty(props, "box-shadow");
   box.filter = LookupProperty(props, "filter");
   box.backdropFilter = LookupProperty(props, "backdrop-filter");
@@ -1015,7 +1003,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
 
   box.objectFit = LookupLowerTrimmed(props, "object-fit");
 
-  static const char* VisualsDisallowed[] = {"perspective"};
+  static const char* VisualsDisallowed[] = {"outline", "perspective"};
   for (const auto* prop : VisualsDisallowed) {
     if (!LookupProperty(props, prop).empty()) {
       _diagnostics.warn(std::string("html: ") + prop + " not supported; ignored");
@@ -1240,33 +1228,8 @@ void HTMLStyleCascade::parseBorderRadius(HTMLBoxAttributes& box, const PropertyM
   }
 
   if (slashPos != std::string::npos) {
-    // Elliptical corners that do not degenerate into a full ellipse. PAGX `Rectangle` carries a
-    // single radius, so carry the per-corner (rx, ry) pairs into a synthesised Path
-    // (buildBackgroundGeometry). Resolving the percentages against the box needs concrete px
-    // dimensions; without them keep only the horizontal radii (a circular approximation).
-    if (std::isnan(box.widthPx) || std::isnan(box.heightPx) || box.widthPx <= 0.0f ||
-        box.heightPx <= 0.0f) {
-      _diagnostics.warn("html: elliptical border-radius '" + br +
-                        "' without fixed px width/height; approximated with the horizontal radii");
-      return;
-    }
-    FourSidedValue h{};
-    FourSidedValue v{};
-    if (!ResolveBorderRadiusAxis(hTokens, box.widthPx, _valueParser, _diagnostics, h) ||
-        !ResolveBorderRadiusAxis(vTokens, box.heightPx, _valueParser, _diagnostics, v)) {
-      return;
-    }
-    box.borderRadiusTLPx = h.top;
-    box.borderRadiusTRPx = h.right;
-    box.borderRadiusBRPx = h.bottom;
-    box.borderRadiusBLPx = h.left;
-    box.borderRadiusTLYPx = v.top;
-    box.borderRadiusTRYpx = v.right;
-    box.borderRadiusBRYpx = v.bottom;
-    box.borderRadiusBLYpx = v.left;
-    box.borderRadiusPerCornerElliptical = true;
-    box.borderRadiusUniform = false;
-    box.borderRadiusSet = true;
+    _diagnostics.warn("html: elliptical border-radius '" + br +
+                      "' not supported by PAGX Rectangle; ignored");
     return;
   }
   auto tokens = hTokens;
@@ -1363,24 +1326,8 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
       box.borderStyle = BorderStyle::Dotted;
       continue;
     }
-    if (lt == "double") {
-      box.borderStyle = BorderStyle::Double;
-      continue;
-    }
-    if (lt == "groove") {
-      box.borderStyle = BorderStyle::Groove;
-      continue;
-    }
-    if (lt == "ridge") {
-      box.borderStyle = BorderStyle::Ridge;
-      continue;
-    }
-    if (lt == "inset") {
-      box.borderStyle = BorderStyle::Inset;
-      continue;
-    }
-    if (lt == "outset") {
-      box.borderStyle = BorderStyle::Outset;
+    if (lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
+      _diagnostics.warn("html: border style '" + lt + "' not supported; treated as solid");
       continue;
     }
     if (colorToken.empty()) {
@@ -1397,33 +1344,6 @@ void HTMLStyleCascade::parseBorder(HTMLBoxAttributes& box, const std::string& bo
     box.borderColor = _valueParser.parseColor(colorToken);
   }
   box.borderSet = box.borderWidthPx > 0;
-}
-
-void HTMLStyleCascade::parseOutline(HTMLBoxAttributes& box, const std::string& outline) {
-  // Mirrors parseBorder's token walk (width / keyword / colour) but writes the outline fields. The
-  // line style is kept uniform: PAGX rebuilds the outline as a solid ring in every style, since a
-  // dashed/dotted outline around an arbitrary box rarely reads at these sizes.
-  auto tokens = SplitTopLevelWhitespace(outline);
-  std::string colorToken;
-  for (auto& t : tokens) {
-    float w = _valueParser.parseAbsoluteLengthPx(t);
-    if (!std::isnan(w)) {
-      box.outlineWidthPx = w;
-      continue;
-    }
-    std::string lt = ToLower(t);
-    if (lt == "none" || lt == "auto" || lt == "solid" || lt == "dashed" || lt == "dotted" ||
-        lt == "double" || lt == "groove" || lt == "ridge" || lt == "inset" || lt == "outset") {
-      continue;
-    }
-    if (colorToken.empty()) {
-      colorToken = t;
-    }
-  }
-  if (!colorToken.empty()) {
-    box.outlineColor = _valueParser.parseColor(colorToken);
-  }
-  box.outlineSet = box.outlineWidthPx > 0;
 }
 
 }  // namespace pagx

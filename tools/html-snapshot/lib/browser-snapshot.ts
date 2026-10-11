@@ -873,14 +873,7 @@ function paddingBoxOrigin(rect, computed) {
 // computed-style serialisation never sneaks past the equality check.
 function isUniformBorder(computed) {
   const top = readBorderSide(computed, 'top');
-  // Two-line / bevelled styles (`double`, `groove`, `ridge`, `inset`, `outset`) round-trip through
-  // the `border` shorthand so the importer can rebuild them with two concentric rings. The
-  // per-side overlay fallback below would otherwise bake them into four flat solid strips.
-  if (top.style !== 'solid' && top.style !== 'dashed' && top.style !== 'dotted' &&
-      top.style !== 'double' && top.style !== 'groove' && top.style !== 'ridge' &&
-      top.style !== 'inset' && top.style !== 'outset') {
-    return false;
-  }
+  if (top.style !== 'solid' && top.style !== 'dashed' && top.style !== 'dotted') return false;
   if (top.width <= 0) return false;
   for (const side of SIDES) {
     if (side === 'top') continue;
@@ -1365,19 +1358,6 @@ function appendBoxShadow(parts, computed) {
   if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
 }
 
-// Forward a CSS `outline` as the `outline` shorthand plus `outline-offset`. Outline is dropped by
-// default (it is not in the subset), so emitting these declarations is what opts the box in. Gated
-// on a non-`none` style and a positive width so boxes without an outline stay clean.
-function appendOutline(parts, computed) {
-  const style = (computed.getPropertyValue('outline-style') || 'none').trim();
-  if (!style || style === 'none') return;
-  const width = (computed.getPropertyValue('outline-width') || '').trim();
-  if (!(parseFloat(width) > 0)) return;
-  parts.push(`outline: ${width} ${style} ${(computed.getPropertyValue('outline-color') || '').trim()}`);
-  const offset = (computed.getPropertyValue('outline-offset') || '').trim();
-  if (offset && offset !== '0px') parts.push(`outline-offset: ${offset}`);
-}
-
 // Emit the `animation-*` longhands for an element animated by the capture pass
 // (animation-capture.ts). Only `pagxAnim*` names are forwarded: those are the
 // canonical animations whose `@keyframes` the capture pass injected into the
@@ -1697,7 +1677,6 @@ function buildStyle(left, top, width, height, computed, opts) {
     // layout. See appendBorder / appendBoxShadow for the per-helper
     // rationale.
     appendBorder(parts, computed);
-    appendOutline(parts, computed);
     appendBoxShadow(parts, computed);
     appendBackgroundImageFitting(parts, computed);
     appendMaskFitting(parts, computed);
@@ -5438,7 +5417,6 @@ const HELPER_FNS = [
   classify,
   appendStyleProp,
   appendBorder,
-  appendOutline,
   appendBoxShadow,
   appendAnimation,
   resolveTextStroke,

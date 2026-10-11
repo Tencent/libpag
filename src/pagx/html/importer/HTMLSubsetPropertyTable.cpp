@@ -492,9 +492,7 @@ const PropertyEntry SubsetPropertyEntries[] = {
     {"margin-left", PropAction::Transform, &ResolveLength, nullptr},
     // Explicit drops -- recorded with rich diagnostics rather than the default "not in subset".
     {"perspective", PropAction::Drop, nullptr, "is not in the subset"},
-    // CSS `outline` is rebuilt as an outside Stroke ring by the layer builder.
-    {"outline", PropAction::Keep, nullptr, nullptr},
-    {"outline-offset", PropAction::Keep, nullptr, nullptr},
+    {"outline", PropAction::Drop, nullptr, "is not in the subset"},
     {"float", PropAction::Drop, nullptr, "is not in the subset"},
     {"order", PropAction::Drop, nullptr, "is not in the subset"},
     {"align-content", PropAction::Drop, nullptr, "is not in the subset"},
@@ -624,14 +622,6 @@ std::string ResolveLengthShorthand(const std::string& value, const PropertyConte
   std::string out;
   out.reserve(trimmed.size());
   for (auto& t : tokens) {
-    // Keep the `border-radius` shorthand's `/` separator (it splits the horizontal and vertical
-    // radii of elliptical corners). It is not a length, so ResolveLength would otherwise drop it
-    // and the cascade would see a single-axis value, losing the two-axis corners.
-    if (Trim(t) == "/") {
-      if (!out.empty()) out.push_back(' ');
-      out += "/";
-      continue;
-    }
     std::string resolved = ResolveLength(t, ctx, diagnostics);
     if (resolved.empty()) {
       continue;  // diagnostic already recorded by ResolveLength
