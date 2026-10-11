@@ -1703,8 +1703,12 @@ function buildStyle(left, top, width, height, computed, opts) {
     }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
-    // currentColor stroke/fill picks up the right tint.
+    // currentColor stroke/fill picks up the right tint, plus `font-family` so a
+    // `<text>` inside the inline SVG inherits the document's face. The SVG is
+    // serialized standalone and re-imported without the HTML cascade, so the
+    // family must ride along on the wrapper for the importer to see it.
     appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('color'));
+    appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('font-family'));
   }
 
   // Forward the host's resolved CSS `transform` (and `transform-origin`) when

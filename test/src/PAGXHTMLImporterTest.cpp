@@ -2510,6 +2510,31 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgPassedAsImportDirective) {
   EXPECT_NE(leaf->importDirective.content.find("circle"), std::string::npos);
 }
 
+// Regression: an inline <svg> whose <text> omits font-family must inherit the document's face. The
+// wrapper's CSS family stack has to be resolved to its first available concrete family and stamped
+// onto the serialized SVG root, otherwise the nested SVG import reads the raw stack as one literal
+// family name and falls back to the default face (rendering lighter / with the wrong metrics).
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgTextInheritsResolvedFontFamily) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:100px;height:100px;font-family:'NoSuchFamilyXyz', sans-serif">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <text x="10" y="50" font-size="12">Hi</text>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* leaf = doc->layers.front()->children.front();
+  const auto& content = leaf->importDirective.content;
+  ASSERT_FALSE(content.empty());
+  // The stack must be collapsed to a single resolved family, not carried verbatim into the SVG —
+  // the SVG importer has no stack resolution and would treat the whole string as one literal name.
+  auto pos = content.find("font-family:");
+  ASSERT_NE(pos, std::string::npos);
+  auto end = content.find(';', pos);
+  auto value = content.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+  EXPECT_EQ(value.find(','), std::string::npos) << value;
+}
+
 // Regression: an inline <svg> carrying its own `opacity` (presentation attribute and/or inline
 // `style`) must hoist that opacity onto the enclosing Layer's alpha exactly once. The serialized
 // import-directive content must NOT keep the root opacity, otherwise the SVG importer run during
