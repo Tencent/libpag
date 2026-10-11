@@ -23,6 +23,7 @@
 #include <iostream>
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "renderer/FontEmbedder.h"
 
 namespace pagx::cli {
@@ -38,34 +39,6 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath,
     std::cerr << command << ": warning: " << error << "\n";
   }
   return document;
-}
-
-// Registers every face of a font file and returns how many could be opened, 0 meaning the file
-// itself cannot be read. `MakeFromPath` and `registerFont` both default to face 0, which is the
-// whole of a single-face file but merely the first of a collection: PingFang.ttc holds 24 faces,
-// and a request for "PingFang SC Medium" resolves to face 7 — unreachable unless every face is
-// registered under its own (family, style) key. Probing stops at the first index that fails to
-// open, so a single-face file costs one extra call. `familyOverride` registers every face under
-// that family instead of the one its name table carries, which is how a font alias reaches the
-// name the document uses; the style half always comes from the face, so the faces of a collection
-// stay distinguishable.
-static int RegisterFontFaces(FontConfig* fontConfig, const std::string& path,
-                             bool addToFallbackChain, const std::string& familyOverride = "") {
-  static constexpr int MaxFontFaces = 64;
-  int faceCount = 0;
-  for (int index = 0; index < MaxFontFaces; index++) {
-    auto typeface = tgfx::Typeface::MakeFromPath(path, index);
-    if (typeface == nullptr) {
-      break;
-    }
-    auto family = familyOverride.empty() ? typeface->fontFamily() : familyOverride;
-    fontConfig->registerFont(path, index, family, typeface->fontStyle());
-    if (addToFallbackChain) {
-      fontConfig->addFallbackFont(path, index, family, typeface->fontStyle());
-    }
-    faceCount++;
-  }
-  return faceCount;
 }
 
 bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::string& command) {
@@ -84,7 +57,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
                     const std::vector<std::string>& fallbacks,
                     const std::vector<FontAlias>& aliases, const std::string& command) {
   for (const auto& fontFile : fontFiles) {
-    if (RegisterFontFaces(fontConfig, fontFile, false) == 0) {
+    if (RegisterFontFileFaces(fontConfig, fontFile, false) == 0) {
       std::cerr << command << ": failed to load font '" << fontFile << "'\n";
       return false;
     }
@@ -101,7 +74,7 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
       // pre-refactor behavior where fallback fonts were also reachable via exact family lookup.
       // A file that cannot be read is fatal: the caller asked for this exact source, and silently
       // dropping it would shape the text with a substituted face instead.
-      if (RegisterFontFaces(fontConfig, fallbackStr, true) == 0) {
+      if (RegisterFontFileFaces(fontConfig, fallbackStr, true) == 0) {
         std::cerr << command << ": fallback font '" << fallbackStr << "' not found\n";
         return false;
       }
@@ -117,15 +90,30 @@ bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& font
     }
   }
   // Font aliases come last so an explicit (family, file) pair always wins over a plain file
-  // registration whose name table happened to produce the same key.
+  // registration whose name table happened to produce the same key. The style half always comes
+  // from each face, so the faces of an aliased collection stay distinguishable.
   for (const auto& alias : aliases) {
-    if (RegisterFontFaces(fontConfig, alias.path, true, alias.family) == 0) {
+    if (RegisterFontFileFaces(fontConfig, alias.path, true, alias.family) == 0) {
       std::cerr << command << ": font alias '" << alias.family << "=" << alias.path
                 << "' not found\n";
       return false;
     }
   }
   return true;
+}
+
+std::vector<std::string> FindUnloadableFontFiles(const PAGXDocument* document) {
+  std::vector<std::string> files = {};
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<const Font*>(node.get());
+    if (!font->file.empty() && MakeTypefacesFromFile(font->file).empty()) {
+      files.push_back(font->file);
+    }
+  }
+  return files;
 }
 
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
@@ -141,27 +129,16 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   // substituted font with different outlines. Only a document that needs no font at all can skip
   // such a source.
   bool requiresFonts = !document->getRequiredFonts().empty();
-  for (auto& node : document->nodes) {
-    if (node->nodeType() != NodeType::Font) {
-      continue;
+  for (auto& file : FindUnloadableFontFiles(document)) {
+    if (requiresFonts) {
+      std::cerr << command << ": failed to load font '" << file << "'\n";
+      return false;
     }
-    auto* font = static_cast<Font*>(node.get());
-    if (font->file.empty()) {
-      continue;
-    }
-    // Also reach this file through the fallback chain: a (family, style) key holds one primary
-    // registration, so unicode-range subset files sharing that key would otherwise overwrite each
-    // other and drop every glyph that lives in an earlier subset.
-    if (RegisterFontFaces(&fontConfig, font->file, true) == 0) {
-      if (requiresFonts) {
-        std::cerr << command << ": failed to load font '" << font->file << "'\n";
-        return false;
-      }
-      std::cerr << command << ": failed to load font '" << font->file
-                << "', skipped because the document needs no font\n";
-    }
+    std::cerr << command << ": failed to load font '" << file
+              << "', skipped because the document needs no font\n";
   }
   FontEmbedder::ClearEmbeddedGlyphRuns(document);
+  // applyLayout registers the document's own font files on top of this config.
   document->applyLayout(&fontConfig);
   FontEmbedder embedder = {};
   if (!embedder.embed(document)) {

@@ -29,7 +29,8 @@ namespace pagx {
 /**
  * FontConfig manages registered and fallback fonts for font lookup during text layout and
  * rendering. It decouples font configuration from the layout process, allowing multiple components
- * to share the same font registry.
+ * to share the same font registry. Font files and buffers may hold TrueType, OpenType, font
+ * collection (TTC) or WOFF2 data; WOFF2 is decoded to SFNT when the typeface is loaded.
  */
 class FontConfig {
  public:

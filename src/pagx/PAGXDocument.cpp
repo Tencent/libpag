@@ -37,6 +37,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -207,6 +208,11 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   }
   if (config != nullptr) {
     _fontConfig = *config;
+    fontFilesRegistered = false;
+  }
+  if (!fontFilesRegistered) {
+    registerFontFiles();
+    fontFilesRegistered = true;
   }
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
@@ -282,6 +288,20 @@ void PAGXDocument::applyLayout(const FontConfig* config,
     }
   }
   visited.erase(this);
+}
+
+// The document's own font files go on top of the caller's config: they are what the document was
+// authored against, so a same-named registration from the caller must not shadow them.
+void PAGXDocument::registerFontFiles() {
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<Font*>(node.get());
+    if (IsLocalFilePath(font->file)) {
+      RegisterFontFileFaces(&_fontConfig, font->file, true);
+    }
+  }
 }
 
 void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,

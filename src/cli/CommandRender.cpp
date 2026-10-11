@@ -354,6 +354,10 @@ static tgfx::Bitmap RenderCore(const RenderOptions& options) {
                       "pagx render")) {
     return {};
   }
+  for (auto& file : FindUnloadableFontFiles(document.get())) {
+    std::cerr << "pagx render: warning: failed to load font '" << file
+              << "', text using it falls back to other fonts\n";
+  }
   document->applyLayout(&fontConfig);
 
   // Animated frame requested: evaluate the timelines at the requested playback time and render

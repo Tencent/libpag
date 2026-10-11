@@ -217,7 +217,10 @@ class PAGXDocument : public Node {
    * already-laid-out document is supported (notifyChange relies on this to reflect edits): the
    * reset branch discards the cached layout outputs first so nodes are re-measured from their
    * current fields. Before re-embedding a document that already has embedded fonts, call
-   * clearEmbed() so layout uses fresh shaping data.
+   * clearEmbed() so layout uses fresh shaping data. Font files referenced by the `file` attribute
+   * of Font nodes (TrueType, OpenType, TTC or WOFF2) are registered on top of the font config, by
+   * the family and style names inside each file, so text naming those families renders without
+   * embedded glyphs. A file that cannot be read is skipped.
    * @param fontConfig Optional font config for text measurement and rendering. When provided,
    *                   updates the internal config before layout. Pass nullptr to use the
    *                   previously set config (or no config).
@@ -317,6 +320,7 @@ class PAGXDocument : public Node {
                    std::vector<Layer*>* changedOut);
   static void layoutLayers(const std::vector<Layer*>& layers, float containerW, float containerH,
                            LayoutContext* context);
+  void registerFontFiles();
 
   void registerNode(Node* node, const std::string& id);
 
@@ -325,6 +329,10 @@ class PAGXDocument : public Node {
   void unregisterLiveScene(PAGScene* scene);
 
   FontConfig _fontConfig;
+  // Whether the font files of this document's Font nodes are already part of _fontConfig. Reset
+  // whenever applyLayout replaces the config, so re-layouts do not append them to the fallback
+  // chain again.
+  bool fontFilesRegistered = false;
   bool layoutApplied = false;
   std::unordered_map<std::string, Node*> nodeMap = {};
   // O(1) containment check for ownsNode(), maintained alongside nodes.

@@ -181,15 +181,27 @@ pre-flag behaviour. Use this when:
 - network egress is undesirable (the pass fetches each unique font URL
   once via Node's `fetch`).
 
+### Local web fonts
+
+A page whose `@font-face` rules point at font files on **local disk** (a saved
+page, or a design-tool HTML export with an `assets/fonts/` folder) needs no
+extra flag: the snapshot carries every such rule over into its `<style>` block
+as `@font-face{font-family:"…";src:url("<absolute path>")}` — the same absolute
+path form local images take — and the importer turns each font file a
+`font-family` stack uses into a PAGX `<Font file>` resource. PAGX layout loads
+those files (TTF/OTF/TTC/WOFF2) directly, so the text renders with its web font
+without embedded glyphs. Remote and `data:` sources are not carried over this
+way; use `--download-fonts` below for them.
+
 ### Download web fonts
 
 The snapshot bakes each text node's computed `font-family` **name** into its
-inline style, but it cannot embed the font itself: the HTML subset disallows
-`@font-face`, so the importer drops it. At render time PAGX resolves a family
-by name via `tgfx::Typeface::MakeFromName`, which only finds fonts **installed
-on the rendering host**. A page styled with a Google-Fonts / self-hosted web
-font that isn't installed locally therefore renders with a wrong fallback face
-(e.g. the `font-[900] italic` `Noto Sans SC` heading falls back to a default
+inline style, but only `@font-face` rules backed by a local file (see above)
+reach the importer. At render time PAGX resolves any other family by name via
+`tgfx::Typeface::MakeFromName`, which only finds fonts **installed on the
+rendering host**. A page styled with a Google-Fonts / remote web font that
+isn't installed locally therefore renders with a wrong fallback face (e.g. the
+`font-[900] italic` `Noto Sans SC` heading falls back to a default
 sans-serif).
 
 Pass `--download-fonts` to capture the actual font files. Two sources are

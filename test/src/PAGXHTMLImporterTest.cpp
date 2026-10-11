@@ -37,6 +37,7 @@
 #include "pagx/SVGImporter.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/TextLayout.h"
+#include "pagx/html/importer/HTMLCssCascade.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLIdAllocator.h"
@@ -59,6 +60,7 @@
 #include "pagx/nodes/DropShadowStyle.h"
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
@@ -6990,6 +6992,140 @@ PAG_TEST(PAGXHTMLImporterTest, DuplicateBodyIsMergedBySubsetTransformer) {
   EXPECT_FLOAT_EQ(doc->width, 50.0f);
   EXPECT_FLOAT_EQ(doc->height, 50.0f);
   EXPECT_EQ(doc->layers.front()->children.size(), 2u);
+}
+
+//==================================================================================================
+// Web fonts: local @font-face files -> PAGX <Font file> (spec/html_subset.md §3.5)
+//==================================================================================================
+
+// A WOFF2 subset font whose glyphs sit at Private Use Area codepoints from U+E000 under the family
+// "pagx-font-f0", so only the file itself can render the test text.
+static std::string PuaWoff2FontPath() {
+  return ProjectPath::Absolute("resources/html/corpus/cli/spec/glyph_run/fonts/font_f0.woff2");
+}
+
+static std::string WebFontPage(const std::string& fontPath) {
+  return R"HTML(<html><head><style>
+      @font-face { font-family: "pagx-font-f0"; src: local("Missing"), url(")HTML" +
+         fontPath + R"HTML(") format("woff2"); }
+      @font-face { font-family: "Unused Face"; src: url(")HTML" +
+         fontPath + R"HTML("); }
+      @font-face { font-family: "Remote Face"; src: url(https://example.com/remote.woff2); }
+      .label { font-family: 'pagx-font-f0', 'Remote Face', sans-serif; font-size: 20px; }
+    </style></head>
+    <body style="width:120px;height:40px">
+      <span class="label" style="position:absolute;left:0px;top:0px;white-space:nowrap">&#xE000;&#xE001;</span>
+    </body></html>)HTML";
+}
+
+static std::vector<pagx::Font*> CollectFonts(const pagx::PAGXDocument* doc) {
+  std::vector<pagx::Font*> fonts = {};
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Font) {
+      fonts.push_back(static_cast<pagx::Font*>(node.get()));
+    }
+  }
+  return fonts;
+}
+
+static pagx::Text* FindFirstText(const pagx::PAGXDocument* doc) {
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() == pagx::NodeType::Text) {
+      return static_cast<pagx::Text*>(node.get());
+    }
+  }
+  return nullptr;
+}
+
+static void ExpectWebFontImported(const std::shared_ptr<pagx::PAGXDocument>& doc,
+                                  const std::string& fontPath) {
+  ASSERT_NE(doc, nullptr);
+  // Only the face a font-family stack uses becomes a resource; the unused face and the remote one
+  // are left out.
+  auto fonts = CollectFonts(doc.get());
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts.front()->file, fontPath);
+  EXPECT_FALSE(fonts.front()->id.empty());
+  EXPECT_TRUE(fonts.front()->glyphs.empty());
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "subset:font-face-no-local-source"));
+
+  auto* text = FindFirstText(doc.get());
+  ASSERT_NE(text, nullptr);
+  EXPECT_EQ(text->fontFamily, "pagx-font-f0");
+  doc->applyLayout();
+  ASSERT_FALSE(text->glyphData->layoutRuns.empty());
+  for (auto& run : text->glyphData->layoutRuns) {
+    ASSERT_NE(run.font.getTypeface(), nullptr);
+    EXPECT_EQ(run.font.getTypeface()->fontFamily(), "pagx-font-f0");
+  }
+}
+
+PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileBecomesFontResource) {
+  auto fontPath = PuaWoff2FontPath();
+  ExpectWebFontImported(ParseFromString(WebFontPage(fontPath)), fontPath);
+}
+
+// With the subset transformer off, the importer reads `@font-face` from the original <style>
+// instead of the block the transformer re-emits; both routes must yield the same resource.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileWithoutNormalization) {
+  auto fontPath = PuaWoff2FontPath();
+  ExpectWebFontImported(ParseRaw(WebFontPage(fontPath)), fontPath);
+}
+
+// A relative `url()` resolves against the importer's base path, the same anchor `<img src>` uses.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceRelativeUrlResolvesAgainstBasePath) {
+  auto fontPath = PuaWoff2FontPath();
+  auto fontDir = std::filesystem::path(fontPath).parent_path().string() + "/";
+  pagx::HTMLImporter::Options options;
+  options.basePath = fontDir;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(<html><head><style>
+      @font-face { font-family: pagx-font-f0; src: url(font_f0.woff2); }
+    </style></head>
+    <body style="width:60px;height:30px">
+      <span style="position:absolute;left:0px;top:0px;font-family:pagx-font-f0;font-size:20px">&#xE000;</span>
+    </body></html>)HTML",
+                                             options);
+  ASSERT_NE(doc, nullptr);
+  auto fonts = CollectFonts(doc.get());
+  ASSERT_EQ(fonts.size(), 1u);
+  EXPECT_EQ(fonts.front()->file, fontDir + "font_f0.woff2");
+}
+
+// The tokenizer resolves CSS escapes in `@font-face` strings, keeps every url() source in order,
+// skips local() and format(), and drops a rule that has no url() source. Serializing the parsed
+// rules and tokenizing them again must reproduce them exactly.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceRulesTokenizeAndSerialize) {
+  std::vector<std::string> dropped;
+  std::vector<pagx::html::CssKeyframesRule> keyframes;
+  std::vector<pagx::html::CssFontFaceRule> fontFaces;
+  pagx::html::TokenizeStyleSheet(R"CSS(
+      @font-face { font-family: "a\"b\3c c"; src: local("x)"), url(  'f\27 .woff2'  ) format("woff2"), url(g.ttf); font-weight: 700; }
+      @font-face { font-family: Local Only; src: local(Foo); }
+      @font-face { font-family: Brand  Sans; src: url("data:font/woff2;base64,AAAA"); }
+      .a { color: red; }
+    )CSS",
+                                 dropped, keyframes, fontFaces);
+  ASSERT_EQ(fontFaces.size(), 2u);
+  EXPECT_EQ(fontFaces[0].family, "a\"b<c");
+  ASSERT_EQ(fontFaces[0].sources.size(), 2u);
+  EXPECT_EQ(fontFaces[0].sources[0], "f'.woff2");
+  EXPECT_EQ(fontFaces[0].sources[1], "g.ttf");
+  EXPECT_EQ(fontFaces[1].family, "Brand Sans");
+  ASSERT_EQ(fontFaces[1].sources.size(), 1u);
+  EXPECT_EQ(fontFaces[1].sources[0], "data:font/woff2;base64,AAAA");
+  ASSERT_EQ(dropped.size(), 1u);
+  EXPECT_EQ(dropped[0], "@font-face");
+
+  std::vector<std::string> reDropped;
+  std::vector<pagx::html::CssFontFaceRule> reparsed;
+  pagx::html::TokenizeStyleSheet(pagx::html::SerializeFontFaces(fontFaces), reDropped, keyframes,
+                                 reparsed);
+  EXPECT_TRUE(reDropped.empty());
+  ASSERT_EQ(reparsed.size(), fontFaces.size());
+  for (size_t i = 0; i < fontFaces.size(); i++) {
+    EXPECT_EQ(reparsed[i].family, fontFaces[i].family);
+    EXPECT_EQ(reparsed[i].sources, fontFaces[i].sources);
+  }
 }
 
 //==================================================================================================

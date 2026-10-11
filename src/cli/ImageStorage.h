@@ -81,4 +81,15 @@ struct ImageStorageOptions {
 void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
                        const std::string& command);
 
+/**
+ * Relocates the font files referenced by the `file` attribute of Font nodes the same way External
+ * image storage relocates image files: each local file is copied under `outputDir` at its authored
+ * relative path and the reference is rewritten to that relative path, so the exported PAGX and its
+ * fonts travel together. Fonts are always stored as external files, so `options.mode` is not
+ * consulted. Absolute paths, remote URLs and data URIs are left untouched; missing files are left
+ * as references with a warning.
+ */
+void ApplyFontStorage(PAGXDocument* doc, const ImageStorageOptions& options,
+                      const std::string& command);
+
 }  // namespace pagx::cli

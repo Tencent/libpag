@@ -20,6 +20,7 @@
 #include <memory>
 #include "FontConfigData.h"
 #include "SystemFonts.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
@@ -51,9 +52,9 @@ TypefaceHolder::TypefaceHolder(std::shared_ptr<tgfx::Typeface> typeface, std::st
 std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
   if (typeface == nullptr) {
     if (!path.empty()) {
-      typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+      typeface = MakeTypefaceFromFile(path, ttcIndex);
     } else if (bytes != nullptr && !bytes->empty()) {
-      typeface = tgfx::Typeface::MakeFromBytes(bytes->data(), bytes->size(), ttcIndex);
+      typeface = MakeTypefaceFromBytes(bytes->data(), bytes->size(), ttcIndex);
     }
   }
   return typeface;
@@ -98,7 +99,7 @@ void FontConfig::registerFont(const std::string& path, int ttcIndex, const std::
   if (fontFamily.empty()) {
     // Reverse-lookup: build typeface now to read its family/style, then hold the typeface directly
     // to avoid a second lazy build.
-    auto typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+    auto typeface = MakeTypefaceFromFile(path, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -120,7 +121,7 @@ void FontConfig::registerFont(const std::string& path, int ttcIndex, const std::
 void FontConfig::registerFont(const void* bytes, size_t length, int ttcIndex,
                               const std::string& fontFamily, const std::string& fontStyle) {
   if (fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromBytes(bytes, length, ttcIndex);
+    auto typeface = MakeTypefaceFromBytes(bytes, length, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -154,7 +155,7 @@ void FontConfig::addFallbackFont(const PAGFont& font, const void* bytes, size_t 
 void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
                                  const std::string& fontFamily, const std::string& fontStyle) {
   if (fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromPath(path, ttcIndex);
+    auto typeface = MakeTypefaceFromFile(path, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
@@ -170,7 +171,7 @@ void FontConfig::addFallbackFont(const std::string& path, int ttcIndex,
 void FontConfig::addFallbackFont(const void* bytes, size_t length, int ttcIndex,
                                  const std::string& fontFamily, const std::string& fontStyle) {
   if (fontFamily.empty()) {
-    auto typeface = tgfx::Typeface::MakeFromBytes(bytes, length, ttcIndex);
+    auto typeface = MakeTypefaceFromBytes(bytes, length, ttcIndex);
     if (typeface == nullptr) {
       return;
     }
