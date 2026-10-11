@@ -731,6 +731,34 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPath) {
 }
 
 /**
+ * Test SVG import: text-anchor carried on the <textPath> element (which SVG inherits into the
+ * referenced run) is mapped onto the Text node's TextAnchor, so the run is anchored on the path
+ * the same way SVG anchors it. Without this the run starts at startOffset instead of centring.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPathAnchor) {
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<defs><path id=\"arc\" d=\"M10 80A140 140 0 0 1 290 80\"/></defs>"
+      "<text font-family=\"Arial\" font-size=\"12\" fill=\"#10B981\">"
+      "<textPath href=\"#arc\" startOffset=\"50%\" text-anchor=\"middle\">Curved Label</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  ASSERT_EQ(textPaths.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->textAnchor, pagx::TextAnchor::Center);
+}
+
+/**
  * Test SVG import: a <textPath> whose href does not resolve to a defined <path> drops the path
  * modifier but still keeps the text content as a plain Text node, so the run is not lost.
  */

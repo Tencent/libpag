@@ -1130,6 +1130,16 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     child = child->getNextSibling();
   }
 
+  // SVG also permits text-anchor on the <textPath> element, where it is inherited by the
+  // referenced run. When present there it governs how the run is anchored along the path, so it
+  // takes precedence over the <text> element's anchor for path text.
+  if (textPathElement) {
+    std::string pathAnchor = getAttribute(textPathElement, "text-anchor");
+    if (!pathAnchor.empty()) {
+      anchor = pathAnchor;
+    }
+  }
+
   // SVG whitespace normalization: replace newlines and tabs with spaces,
   // collapse consecutive spaces, and trim leading/trailing spaces.
   for (auto& ch : textContent) {
