@@ -260,13 +260,22 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // mapping covers the whole subtree without introducing an extra wrapper. Otherwise wrap all
   // layers in a fresh root layer that carries the transform.
   if (needsContentTransform) {
+    // The content transform maps the viewBox coordinate space onto the target pixel box, so the
+    // layer that carries it sizes to that target box — not the unscaled content extent. Without
+    // this the layer measures to its children's viewBox-space size, and a parent that sizes to
+    // content (an inline SVG's flex wrapper, a `width:100%` host) then lays it out a scale factor
+    // too wide and clips the result.
     if (convertedLayers.size() == 1) {
       auto* singleLayer = convertedLayers[0];
       singleLayer->matrix = contentMatrix * singleLayer->matrix;
+      singleLayer->width = targetW;
+      singleLayer->height = targetH;
       _document->layers.push_back(singleLayer);
     } else {
       auto rootLayer = _document->makeNode<Layer>();
       rootLayer->matrix = contentMatrix;
+      rootLayer->width = targetW;
+      rootLayer->height = targetH;
       for (auto& layer : convertedLayers) {
         rootLayer->children.push_back(layer);
       }
