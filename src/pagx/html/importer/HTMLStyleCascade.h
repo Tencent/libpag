@@ -110,6 +110,12 @@ class HTMLStyleCascade {
     return _keyframes;
   }
 
+  /** Returns the `@font-face` rules collected from `<style>` blocks in source order. Populated by
+   *  `collectStyles`; the parser context loads their font files into Font resources. */
+  const std::vector<html::CssFontFaceRule>& fontFaces() const {
+    return _fontFaces;
+  }
+
  private:
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
   void mergeClassRules(const std::string& classAttribute, PropertyMap& out);
@@ -173,6 +179,9 @@ class HTMLStyleCascade {
   // `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name. The last
   // definition of a given name wins, matching CSS cascade order.
   std::unordered_map<std::string, html::CssKeyframesRule> _keyframes = {};
+
+  // `@font-face` rules collected from `<style>` blocks, in source order.
+  std::vector<html::CssFontFaceRule> _fontFaces = {};
 };
 
 }  // namespace pagx

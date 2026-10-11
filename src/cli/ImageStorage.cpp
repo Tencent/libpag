@@ -23,6 +23,7 @@
 #include <iostream>
 #include <system_error>
 #include <vector>
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 
 namespace pagx::cli {
@@ -97,6 +98,61 @@ std::string AuthoredRelativeSource(const std::string& filePath, const std::strin
   return IsRelativeFilePath(normalized) ? normalized : std::string{};
 }
 
+// Copies the local file a `filePath` reference points at under `options.outputDir`, at the
+// authored relative path recovered from the reference, and returns that relative path for the
+// rewritten reference ("path names unchanged"). Returns an empty string when the reference must
+// stay as it is: genuinely absolute paths and remote URLs are not relocatable, and a missing file
+// or failed copy is reported as a warning naming the resource `kind`.
+std::string RelocateExternalFile(const std::string& filePath, const ImageStorageOptions& options,
+                                 const std::string& kind, const std::string& command) {
+  std::string baseDir = options.baseDir.empty() ? options.outputDir : options.baseDir;
+  // FromFile may have prefixed the document directory, so a clean `assets/x.png` can arrive as an
+  // absolute or `..`-laden string; strip that back out so the copy destination and rewritten
+  // reference keep the original name.
+  std::string relSource = AuthoredRelativeSource(filePath, options.documentDir, baseDir);
+  if (relSource.empty()) {
+    return {};
+  }
+  // Locate the physical file: the (prefixed) filePath usually resolves directly; otherwise fall
+  // back to joining the recovered relative path with baseDir.
+  std::string resolvedSrc;
+  std::error_code exists_ec;
+  if (std::filesystem::exists(filePath, exists_ec) && !exists_ec) {
+    resolvedSrc = filePath;
+  } else {
+    resolvedSrc = FindExistingSource(relSource, baseDir);
+  }
+  if (resolvedSrc.empty()) {
+    std::cerr << command << ": warning: " << kind
+              << " source not found, leaving reference unchanged: '" << filePath << "'\n";
+    return {};
+  }
+  std::filesystem::path src(resolvedSrc);
+  std::filesystem::path dst = std::filesystem::path(options.outputDir) / relSource;
+  std::error_code ec;
+  auto canonSrc = std::filesystem::weakly_canonical(src, ec);
+  auto canonDst = std::filesystem::weakly_canonical(dst, ec);
+  if (!ec && canonSrc == canonDst) {
+    return relSource;  // Already co-located; just clean up the reference.
+  }
+  auto parent = dst.parent_path();
+  if (!parent.empty()) {
+    std::filesystem::create_directories(parent, ec);
+    if (ec) {
+      std::cerr << command << ": warning: failed to create " << kind << " directory '"
+                << parent.string() << "'\n";
+      return {};
+    }
+  }
+  std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
+  if (ec) {
+    std::cerr << command << ": warning: failed to copy " << kind << " '" << src.string() << "' -> '"
+              << dst.string() << "': " << ec.message() << "\n";
+    return {};
+  }
+  return relSource;
+}
+
 std::shared_ptr<Data> ReadFileToData(const std::string& path) {
   std::ifstream file(path, std::ios::binary | std::ios::ate);
   if (!file.good()) {
@@ -139,9 +195,6 @@ void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
     return;
   }
   std::string baseDir = options.baseDir.empty() ? options.outputDir : options.baseDir;
-  const std::string& documentDir = options.documentDir;
-  const std::string& outputDir = options.outputDir;
-
   for (auto& nodePtr : doc->nodes) {
     if (nodePtr->nodeType() != NodeType::Image) {
       continue;
@@ -176,58 +229,35 @@ void ApplyImageStorage(PAGXDocument* doc, const ImageStorageOptions& options,
     if (image->data || IsDataUri(image->filePath)) {
       continue;
     }
-    if (outputDir.empty()) {
+    if (options.outputDir.empty()) {
       // No place to write files; leave references as-is.
       continue;
     }
-    // Recover the authored relative path. FromFile may have prefixed the document directory, so a
-    // clean `assets/x.png` can arrive as an absolute or `..`-laden string; strip that back out so
-    // the copy destination and rewritten `source` keep the original name ("path names unchanged").
-    std::string relSource = AuthoredRelativeSource(image->filePath, documentDir, baseDir);
-    if (relSource.empty()) {
-      // Genuinely absolute paths and remote URLs are not relocatable without changing the
-      // reference, so they stay as-is.
+    auto relSource = RelocateExternalFile(image->filePath, options, "image", command);
+    if (!relSource.empty()) {
+      image->filePath = relSource;
+    }
+  }
+}
+
+void ApplyFontStorage(PAGXDocument* doc, const ImageStorageOptions& options,
+                      const std::string& command) {
+  if (doc == nullptr || options.outputDir.empty()) {
+    return;
+  }
+  for (auto& nodePtr : doc->nodes) {
+    if (nodePtr->nodeType() != NodeType::Font) {
       continue;
     }
-    // Locate the physical file: the (prefixed) filePath usually resolves directly; otherwise fall
-    // back to joining the recovered relative path with baseDir.
-    std::string resolvedSrc;
-    std::error_code exists_ec;
-    if (std::filesystem::exists(image->filePath, exists_ec) && !exists_ec) {
-      resolvedSrc = image->filePath;
-    } else {
-      resolvedSrc = FindExistingSource(relSource, baseDir);
-    }
-    if (resolvedSrc.empty()) {
-      std::cerr << command << ": warning: image source not found, leaving reference unchanged: '"
-                << image->filePath << "'\n";
+    auto* font = static_cast<Font*>(nodePtr.get());
+    if (font->file.empty() || IsDataUri(font->file)) {
       continue;
     }
-    std::filesystem::path src(resolvedSrc);
-    std::filesystem::path dst = std::filesystem::path(outputDir) / relSource;
-    std::error_code ec;
-    auto canonSrc = std::filesystem::weakly_canonical(src, ec);
-    auto canonDst = std::filesystem::weakly_canonical(dst, ec);
-    if (!ec && canonSrc == canonDst) {
-      image->filePath = relSource;  // Already co-located; just clean up the reference.
-      continue;
+    auto relSource = RelocateExternalFile(font->file, options, "font", command);
+    if (!relSource.empty()) {
+      font->file = relSource;
+      font->fileOriginal = relSource;
     }
-    auto parent = dst.parent_path();
-    if (!parent.empty()) {
-      std::filesystem::create_directories(parent, ec);
-      if (ec) {
-        std::cerr << command << ": warning: failed to create image directory '" << parent.string()
-                  << "'\n";
-        continue;
-      }
-    }
-    std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
-    if (ec) {
-      std::cerr << command << ": warning: failed to copy image '" << src.string() << "' -> '"
-                << dst.string() << "': " << ec.message() << "\n";
-      continue;
-    }
-    image->filePath = relSource;  // Point the reference at the copied file's clean relative path.
   }
 }
 

@@ -28,12 +28,14 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/State.h"
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 #include "tgfx/core/Typeface.h"
@@ -165,6 +167,10 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // it must not be served from — or written to — the spacing/case-insensitive cache below: two
   // variants sharing a normalised key can disagree on the exact match (only one is registered),
   // and caching one variant's verdict under the shared key would wrongly answer the other.
+  // Web font families follow the same exact-match rule, since layout registers them the same way.
+  if (_webFontFamilies.count(family) > 0) {
+    return true;
+  }
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
     return true;
   }
@@ -190,7 +196,10 @@ void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& s
   }
   // Registered/embedded families are resolved by `LayoutContext` through an exact (family, style)
   // key, so their names must stay verbatim — renaming them would miss the registration and fall
-  // through to a system face instead.
+  // through to a system face instead. Web font families are registered the same way at layout.
+  if (_webFontFamilies.count(family) > 0) {
+    return;
+  }
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
     return;
   }
@@ -329,6 +338,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _textFragmentBuilder->bindDocument(_document.get());
   _animationBuilder->bindDocument(_document.get());
   _animationBuilder->setKeyframes(&_styleCascade->keyframes());
+  loadWebFontFiles();
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -374,6 +384,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   coalesceAnimations();
   buildAnimationStateMachine();
   suppressBackdropBlurUnderOpacityFade();
+  emitWebFontResources();
   flushFontFallbacksToDocument();
   return _document;
 }
@@ -519,6 +530,60 @@ void HTMLParserContext::flushFontFallbacksToDocument() {
     // name only (style is ignored for per-glyph fallback), so registering a single
     // deferred record per family is sufficient.
     cfg.addFallbackFont(/*path=*/std::string(), /*ttcIndex=*/0, name, "Regular");
+  }
+}
+
+// Only a file on local disk can become a `<Font file>` reference: layout reads the file directly,
+// and nothing downstream fetches remote URLs or inlines data URIs into Font nodes.
+static bool IsLocalFontSource(const std::string& source) {
+  return ToLower(source.substr(0, 5)) != "data:" && source.find("://") == std::string::npos;
+}
+
+void HTMLParserContext::loadWebFontFiles() {
+  for (const auto& rule : _styleCascade->fontFaces()) {
+    std::string loadedPath = {};
+    for (const auto& source : rule.sources) {
+      if (!IsLocalFontSource(source)) {
+        continue;
+      }
+      auto path = _imageResources->resolveSource(source);
+      auto faces = MakeTypefacesFromFile(path);
+      if (faces.empty()) {
+        warn("html: @font-face '" + rule.family + "' source '" + path +
+             "' cannot be loaded as a font; skipped (subset:font-face-unloadable)");
+        continue;
+      }
+      for (auto& face : faces) {
+        _webFontFamilies.insert(face->fontFamily());
+      }
+      loadedPath = path;
+      break;
+    }
+    if (loadedPath.empty()) {
+      warn("html: @font-face '" + rule.family +
+           "' has no loadable local font file; text using it falls back to other fonts "
+           "(subset:font-face-no-local-source)");
+      continue;
+    }
+    _webFontFiles.push_back({ToLower(rule.family), loadedPath});
+  }
+}
+
+void HTMLParserContext::emitWebFontResources() {
+  if (_webFontFiles.empty()) {
+    return;
+  }
+  std::unordered_set<std::string> namedFamilies = {};
+  for (const auto& name : _fallbackFamilyNames) {
+    namedFamilies.insert(ToLower(name));
+  }
+  std::unordered_set<std::string> emittedPaths = {};
+  for (const auto& file : _webFontFiles) {
+    if (namedFamilies.count(file.cssFamily) == 0 || !emittedPaths.insert(file.path).second) {
+      continue;
+    }
+    auto* font = _document->makeNode<Font>(_idAllocator->generateUnique("font"));
+    font->file = file.path;
   }
 }
 

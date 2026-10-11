@@ -171,7 +171,7 @@ int RunFont(int argc, char* argv[]) {
 
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
   if (!options.fontFile.empty()) {
-    typeface = tgfx::Typeface::MakeFromPath(options.fontFile);
+    typeface = MakeTypefaceFromFile(options.fontFile);
     if (typeface == nullptr) {
       std::cerr << "pagx font: failed to load font file '" << options.fontFile << "'\n";
       return 1;

@@ -549,6 +549,11 @@ static void DetectUnreferencedResources(const PAGXDocument* doc,
         type == NodeType::StateMachineInput || type == NodeType::ViewModelProperty) {
       continue;
     }
+    // A Font with a file is a font source that layout registers by the names inside the file, so
+    // Text reaches it through fontFamily rather than an id reference.
+    if (type == NodeType::Font && !static_cast<const Font*>(node)->file.empty()) {
+      continue;
+    }
     if (refs.find(node->id) == refs.end()) {
       AddDiagnostic(diagnostics, node->sourceLine,
                     std::string("unreferenced resource <") + NodeTypeName(type) + "> id=\"" +

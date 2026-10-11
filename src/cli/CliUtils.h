@@ -29,6 +29,7 @@
 #include "pagx/PAGXDocument.h"
 #include "pagx/SystemFonts.h"
 #include "pagx/nodes/Layer.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/VerifyUtils.h"
 #include "tgfx/core/Typeface.h"
 
@@ -61,7 +62,7 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
     }
   }
   if (isFilePath) {
-    return tgfx::Typeface::MakeFromPath(specifier);
+    return MakeTypefaceFromFile(specifier);
   }
   auto commaPos = specifier.find(',');
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
@@ -238,6 +239,13 @@ bool ParseFontAlias(const std::string& value, FontAlias* alias, const std::strin
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
                     const std::vector<std::string>& fallbacks,
                     const std::vector<FontAlias>& aliases, const std::string& command);
+
+/**
+ * Returns the `file` paths of the document's Font nodes that cannot be loaded as fonts (missing,
+ * unreadable, or not a supported font format). Layout skips such files silently, so commands call
+ * this to tell the user why text naming those fonts falls back to other faces.
+ */
+std::vector<std::string> FindUnloadableFontFiles(const PAGXDocument* document);
 
 /**
  * Converts the document's text into pre-shaped glyph runs so that it renders without the original

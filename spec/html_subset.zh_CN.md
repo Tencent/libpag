@@ -96,6 +96,24 @@
 
 `<link rel="stylesheet">` 一律禁止。转换器不执行任何网络 I/O。
 
+### 3.5 Web 字体（`@font-face`）
+
+`<style>` 块中引用本地字体文件的 `@font-face` 规则会被采纳：
+
+```css
+@font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
+```
+
+- 只读取 `font-family` 与 `src` 两个描述符。按顺序扫描 `src` 中的 `url()` 源，取第一个本地路径
+  （相对路径基于 HTML 文件所在目录解析）且能作为 TTF、OTF、TTC 或 WOFF2 字体打开的文件；
+  `local()` 名称、`format()` 提示及其他描述符均被忽略。
+- 文档中被某个 font-family 栈用到的字体文件会生成 `<Font file="…">` 资源，排版时按文件内记录的
+  字体族名与样式名注册（见 PAGX 规范 §3.3.5）。因此 CSS 中的字体族名应与文件自身的字体族名
+  一致，文本才能匹配到该字体。
+- 远程（`http(s)://`）与 `data:` 源不会被使用（`subset:font-face-no-local-source`）；无法作为
+  字体加载的本地文件会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持
+  的 at-rule 一样被丢弃。
+
 ## 4. 允许的 CSS 属性
 
 长度均为像素；百分比仅在 `width`/`height` 上接受（按 PAGX 语义参考父节点的内 padding
@@ -210,7 +228,8 @@
 | `text-overflow: ellipsis` | 告警（PAGX 暂未实现） |
 
 禁用（告警并跳过）：`text-transform`、`text-indent`、`word-spacing`、`direction`、
-`unicode-bidi`、`font-variant`、`font-stretch`、`font` 缩写、web fonts (`@font-face`)。
+`unicode-bidi`、`font-variant`、`font-stretch`、`font` 缩写。Web 字体仅支持通过本地文件的
+`@font-face` 引入（见 §3.5）。
 
 **行内文本自适应宽度。** 不换行的行内文本叶子（`<span>` / `<a>`，且 `white-space: nowrap`
 或 `pre`）会丢弃其内联轴上的显式尺寸，改由排版后的文本撑起盒子，对应 CSS 的 shrink-to-fit。
@@ -377,7 +396,7 @@ CSS 绘制顺序一致）。SVG 图片源（`.svg`）不会被折叠 —— 它�
 | Pass | 静默改写 | 警告并丢弃 |
 |------|----------|------------|
 | DocumentSkeleton | 合并重复的 `<head>` / `<body>`、小写化标签、去掉注释与处理指令、丢弃 `<head>` 中除 `<title>` / `<meta>` / `<style>` 之外的元素 | `<script>` 等不允许的 `<head>` 内容（`subset:unsupported-tag`）；外部 `<link rel="stylesheet">`（`subset:external-stylesheet`）；`<html>` 与 `<body>` 之间的多余顶层元素（`subset:unsupported-tag`） |
-| StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身 | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、`@font-face`、`@keyframes` 等 at-rule（`subset:unsupported-at-rule`） |
+| StyleSheetCollector | 把 `<style>` 中的类选择器与元素选择器规则展开到每个元素的内联级联里，并移除 `<style>` 元素本身，再重新输出一个只包含 `@keyframes`（§13）与 `@font-face`（§3.5）规则的 `<style>` | `*`、后代/伪类/属性选择器（`subset:unsupported-selector`）；`@media`、没有 `url()` 源的 `@font-face` 等 at-rule（`subset:unsupported-at-rule`） |
 | ComputedStyle | 完成 CSS 级联（继承 → 元素默认 → 元素规则 → 类规则 → 内联 `style`），并把合并后的属性写回内联 style；把 `-webkit-` 前缀声明合并到标准名（如 `-webkit-background-clip` → `background-clip`） | — |
 | PropertyFilter | 把 `em` 转 px（基准为父元素计算后的 `font-size`），`rem` 转 px（基准 16px），`vw`/`vh` 转 px（基准为画布尺寸），`pt` 转 px（`subset:unit-coerced`）；把 `flex: <grow> <shrink> <basis>` 收敛为 `flex: <grow>`（`subset:flex-shorthand-collapsed`），`flex: none`→`0`、`auto`/`initial`→`1`；丢弃 `flex-shrink: 0`（PAGX 从不收缩）；把 `display: inline \| inline-block` 降级为 `block`、`flex-direction: *-reverse` 降为 `row`/`column`；静默丢弃 `position: relative`（PAGX 无操作,见 §4.3）；把 `position: fixed \| sticky` 降级为 `position: absolute`；保留 `margin*`（后续折叠）、`transform`/`transform-origin`（仅单函数/`matrix()`/`matrix3d()`）、`object-fit`、`writing-mode`、`background-image` + `background-size`/`background-repeat`/`background-position`（url 背景）、`mask-*`、`clip-path: url(#id)`、`-webkit-text-stroke*` | `transform` 复合链与非 `matrix3d` 的 3D 形式、`flex-shrink`（非零）、几何 `clip-path` 形式、`outline`、`float`、`order`、`align-content`、`align-self`、`direction`、`unicode-bidi`、`flex-wrap`、`flex-grow`、`flex-basis`、`min-*`、`max-*`、`aspect-ratio`、`text-transform`、`text-indent`、`word-*`、`overflow-wrap`、`font-variant`、`font-stretch`、`font` 简写、`grid-*`、单边 `border-*`、单角 `border-*-radius`、`z-index`、`cursor`、`pointer-events`、`user-select`、`visibility`（`subset:unsupported-property`）；`var()`、`calc()`、`min/max/clamp()`（`subset:unsupported-property`）；其它不支持的单位（`subset:unsupported-property`） |
 | HTMLFlexInference *（默认开启：`Options::inferFlexFromAbsolute`；`autoNormalize` 为 false 时无效）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`；当容器有显式主轴尺寸且内容两端留白（近似）相等时，用 `justify-content: center` 取代对称的主轴 padding；同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |

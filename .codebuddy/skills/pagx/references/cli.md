@@ -148,6 +148,11 @@ non-English record is reported as `?????` by the platform reader. The family mus
 document's `fontFamily` byte for byte; every face of the file is registered under its own style
 and added to the fallback chain, so only the family half is needed.
 
+Font files referenced by the document's own `<Font file="…">` nodes are registered automatically
+(on top of `--font` / `--fallback` / `--font-alias`), so such a document renders its text without
+embedded glyphs. A referenced file that cannot be loaded prints a warning and its text falls back
+to other fonts. Every font option accepts TTF, OTF, TTC and WOFF2 files.
+
 Always output to the same directory as the input `.pagx` file. Do not commit rendered
 image files.
 
@@ -327,8 +332,13 @@ pagx embed --skip-images input.pagx                      # embed fonts only
 
 Fonts are resolved in the following order:
 1. Font nodes with `file` attribute are loaded and registered by their internal family name
+   (layout registers them last, so they win over a same-named `--font-alias` registration)
 2. `--font-alias` files are registered under the given family name (see `pagx render`)
 3. `--fallback` fonts are tried when a character is not found in the primary font
+
+A Font `file` that cannot be loaded is fatal while any Text needs a font. Embedding is optional for
+documents that reference their fonts through Font `file`: `pagx render` and the runtime already
+render them; embed only to make the `.pagx` independent of the font files.
 
 Image embedding inlines external file references (Image nodes with `filePath`) as base64 data. See the Font `file` attribute in `attributes.md` for details on external font references.
 
@@ -363,11 +373,12 @@ pagx import --input layout.html                   # HTML to layout.pagx (import 
 pagx import --input page.html --output card.pagx  # HTML to card.pagx
 pagx import --input page.html --no-resolve        # keep inline <svg>/import directives unexpanded
 pagx import --input page.html -v                  # print conversion warnings
+pagx import --input export.zip                    # zipped HTML export (page + assets) to export.pagx
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--input <file\|url>` | Input file or URL to import (required) |
+| `--input <file\|url>` | Input file or URL to import (required). A `.zip` HTML export is extracted to a temporary directory and its entry page imported — see [Zip input](#zip-input) |
 | `-o, --output <file>` | Output PAGX file (default: `<input>.pagx`; required when `--input` is a URL) |
 | `--format <format>` | Force input format (`svg` or `html`; default: inferred from the input file extension) |
 | `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
@@ -398,6 +409,25 @@ the files on disk; it defaults to the input file's directory.
 pagx import --input page.html --output card.pagx                 # external (default): sidecar images
 pagx import --input page.html --output card.pagx --images embed  # self-contained: base64 images
 ```
+
+### Font files
+
+Web fonts the page loads from local files through `@font-face` become `<Font file="…">`
+resources (only fonts some `font-family` stack in the page uses). Font files are always stored
+externally, like `--images external`: each file is copied next to the output `.pagx` at its
+original relative path (e.g. `assets/fonts/font_f1.woff2`). Text keeps runtime shaping and renders
+with those files — no glyph outlines are embedded. Run `pagx embed` afterwards only if the `.pagx`
+must render without the font files. Remote and `data:` font sources are not carried over.
+
+### Zip input
+
+`--input` accepts a `.zip` holding an HTML export (a page plus its `assets/`). The archive is
+extracted to a temporary directory that is removed afterwards; the entry page is the shallowest
+`index.html`, or the only HTML file when there is no `index.html`. Images and fonts are copied next
+to the output at their relative paths, so the default output `export.pagx` sits next to the zip
+together with its `assets/` folder. Write to a dedicated directory (`-o out/export.pagx`) when
+several exports share a folder, since their asset names may collide. Entries that would extract
+outside the temporary directory (absolute paths or `..`) are rejected.
 
 ### SVG options
 
