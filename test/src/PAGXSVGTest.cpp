@@ -831,6 +831,30 @@ PAGX_TEST(PAGXSVGTest, SVGImport_MarkersExpandToLayers) {
 }
 
 /**
+ * Test SVG import: `marker-*` are inherited presentation attributes, so a shape inside a `<g>` that
+ * carries the marker reference must use it. Reading the marker only from the shape element dropped
+ * any group-level marker entirely (a dashed callout arrow lost its head).
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_MarkersInheritFromGroup) {
+  std::string svg =
+      "<svg width=\"200\" height=\"200\" viewBox=\"0 0 200 200\">"
+      "<defs><marker id=\"arrow\" markerWidth=\"6\" markerHeight=\"6\" refX=\"3\" refY=\"3\""
+      " orient=\"auto\"><path d=\"M0 0 L6 3 L0 6 Z\" fill=\"#000000\"/></marker></defs>"
+      "<g stroke=\"#111111\" stroke-width=\"4\" fill=\"none\" marker-end=\"url(#arrow)\">"
+      "<path d=\"M10 100 L190 100\"/></g></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> paths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Path, paths);
+  }
+  // One path for the line plus one for the inherited end marker.
+  EXPECT_GE(paths.size(), 2u);
+}
+
+/**
  * Test SVG import: a marker on a path ending in a cubic segment, with a numeric `orient` and
  * `markerUnits="userSpaceOnUse"`, still resolves its end point/tangent and emits a marker layer
  * that is not scaled by the referencing stroke width.
