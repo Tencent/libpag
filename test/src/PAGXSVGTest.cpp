@@ -785,6 +785,26 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
 }
 
 /**
+ * Test SVG import: when the viewBox maps onto a different target box, the layer that carries the
+ * content transform must size to the target box, not the unscaled viewBox extent. Otherwise a
+ * parent that sizes to content (an inline SVG's flex wrapper) lays the layer out a scale factor too
+ * wide and clips the rendered result.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxContentLayerSizedToTarget) {
+  std::string svg =
+      "<svg width=\"100\" height=\"50\" viewBox=\"0 0 200 100\">"
+      "<rect x=\"0\" y=\"0\" width=\"200\" height=\"100\" fill=\"#123456\"/>"
+      "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#654321\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* root = doc->layers[0];
+  EXPECT_FLOAT_EQ(root->width, 100.0f);
+  EXPECT_FLOAT_EQ(root->height, 50.0f);
+}
+
+/**
  * Test SVG import: `marker-start` / `marker-mid` / `marker-end` on a multi-segment path expand into
  * additional child layers wrapped alongside the shape. The polyline has two interior vertices so
  * the mid marker is instanced twice; every marker triangle contributes its own Path node.
