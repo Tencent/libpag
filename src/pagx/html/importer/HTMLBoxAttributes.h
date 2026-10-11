@@ -177,19 +177,13 @@ struct HTMLTransform {
 
 /**
  * CSS border line styles supported by the HTML subset. Mirrors a subset of
- * `border-style` keywords. `double`, `groove`, `ridge`, `inset` and `outset`
- * cannot be expressed by a single uniform stroke; they are approximated with
- * two concentric rings by the layer builder.
+ * `border-style` keywords; other styles (`double`, `groove`, …) are downgraded
+ * to `Solid` by the resolver.
  */
 enum class BorderStyle {
   Solid,
   Dashed,
   Dotted,
-  Double,
-  Groove,
-  Ridge,
-  Inset,
-  Outset,
 };
 
 /**
@@ -290,13 +284,6 @@ struct HTMLBoxAttributes {
   float borderRadiusTRPx = 0.0f;
   float borderRadiusBRPx = 0.0f;
   float borderRadiusBLPx = 0.0f;
-  // Vertical (y-axis) radii for the elliptical `border-radius: rx… / ry…` form. Only read when
-  // `borderRadiusPerCornerElliptical` is set; otherwise every corner is circular (ry == rx).
-  float borderRadiusTLYPx = 0.0f;
-  float borderRadiusTRYpx = 0.0f;
-  float borderRadiusBRYpx = 0.0f;
-  float borderRadiusBLYpx = 0.0f;
-  bool borderRadiusPerCornerElliptical = false;
   bool borderRadiusSet = false;
   bool borderRadiusUniform = true;
   // True when every corner's horizontal radius equals half the box width and every corner's
@@ -310,12 +297,6 @@ struct HTMLBoxAttributes {
   Color borderColor = {0, 0, 0, 1, ColorSpace::SRGB};
   BorderStyle borderStyle = BorderStyle::Solid;
   bool borderSet = false;
-  // CSS `outline`: a uniform ring drawn outside the border box, pushed out by `outline-offset`.
-  // PAGX has no outline primitive, so the layer builder rebuilds it as an outside Stroke ring.
-  float outlineWidthPx = 0.0f;
-  float outlineOffsetPx = 0.0f;
-  Color outlineColor = {0, 0, 0, 1, ColorSpace::SRGB};
-  bool outlineSet = false;
 
   std::string boxShadow = {};
   std::string filter = {};

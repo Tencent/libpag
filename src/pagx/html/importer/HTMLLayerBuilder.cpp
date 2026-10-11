@@ -93,37 +93,6 @@ void BuildPerCornerRoundedRectPathData(PathData& out, float w, float h, float tl
   out.close();
 }
 
-// Same outline as BuildPerCornerRoundedRectPathData, but with an independent radius per axis on
-// each corner (rx, ry) so the quarter-arcs are true ellipse segments — the CSS
-// `border-radius: rx… / ry…` form. A corner with either axis at 0 collapses to a sharp vertex.
-void BuildPerCornerEllipticalRectPathData(PathData& out, float w, float h, float tlX, float tlY,
-                                          float trX, float trY, float brX, float brY, float blX,
-                                          float blY) {
-  const float k = 1.0f - BEZIER_KAPPA;
-  out.moveTo(w, trY);
-  // Right edge.
-  out.lineTo(w, h - brY);
-  if (brX > 0 && brY > 0) {
-    out.cubicTo(w, h - brY * k, w - brX * k, h, w - brX, h);
-  }
-  // Bottom edge.
-  out.lineTo(blX, h);
-  if (blX > 0 && blY > 0) {
-    out.cubicTo(blX * k, h, 0, h - blY * k, 0, h - blY);
-  }
-  // Left edge.
-  out.lineTo(0, tlY);
-  if (tlX > 0 && tlY > 0) {
-    out.cubicTo(0, tlY * k, tlX * k, 0, tlX, 0);
-  }
-  // Top edge.
-  out.lineTo(w - trX, 0);
-  if (trX > 0 && trY > 0) {
-    out.cubicTo(w - trX * k, 0, w, trY * k, w, trY);
-  }
-  out.close();
-}
-
 // Hands the parent-facing layout slot (positional anchors, percent sizing, and flex
 // participation) over from `inner` to `outer`. Used by the wrapper helpers that hoist a Layer
 // "out from under" inner so the wrapper occupies the same space `inner` previously held.
@@ -383,16 +352,9 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
   }
 
   auto* data = _document->makeNode<PathData>();
-  if (box.borderRadiusPerCornerElliptical) {
-    BuildPerCornerEllipticalRectPathData(
-        *data, box.widthPx, box.heightPx, box.borderRadiusTLPx, box.borderRadiusTLYPx,
-        box.borderRadiusTRPx, box.borderRadiusTRYpx, box.borderRadiusBRPx, box.borderRadiusBRYpx,
-        box.borderRadiusBLPx, box.borderRadiusBLYpx);
-  } else {
-    BuildPerCornerRoundedRectPathData(*data, box.widthPx, box.heightPx, box.borderRadiusTLPx,
-                                      box.borderRadiusTRPx, box.borderRadiusBRPx,
-                                      box.borderRadiusBLPx);
-  }
+  BuildPerCornerRoundedRectPathData(*data, box.widthPx, box.heightPx, box.borderRadiusTLPx,
+                                    box.borderRadiusTRPx, box.borderRadiusBRPx,
+                                    box.borderRadiusBLPx);
   auto* path = _document->makeNode<Path>();
   path->data = data;
   // Path geometry uses the parent layer's local coordinate space (already laid out at the
@@ -429,7 +391,6 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
     emitted = true;
   }
   applyBorderStroke(layer, box, geometry, emitted);
-  applyOutline(layer, box, emitted);
   applyBoxShadows(layer, box, emitted);
   applyBackdropFilter(layer, box, emitted);
   return emitted;
@@ -659,48 +620,6 @@ void HTMLLayerBuilder::emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttri
   layer->children.push_back(inner);
 }
 
-namespace {
-
-// Darken towards black / lighten towards white. Used to shade the two bands of a
-// `groove` / `ridge` / `inset` / `outset` border, which CSS paints as a bevelled two-tone frame.
-Color ShadeBorderColor(const Color& c, float factor) {
-  return {c.red * factor, c.green * factor, c.blue * factor, c.alpha, c.colorSpace};
-}
-
-Color TintBorderColor(const Color& c, float amount) {
-  return {c.red + (1.0f - c.red) * amount, c.green + (1.0f - c.green) * amount,
-          c.blue + (1.0f - c.blue) * amount, c.alpha, c.colorSpace};
-}
-
-}  // namespace
-
-void HTMLLayerBuilder::appendInsetBorderRing(Layer* layer, const HTMLBoxAttributes& box,
-                                             float inset, float strokeWidth, const Color& color) {
-  // The inner ring of a two-line / two-tone border: a child layer inset by `inset` px carrying a
-  // Rectangle + Stroke of `strokeWidth`, flush against the outer ring so the two read as one
-  // split border. Mirrors the padding-box gradient-frame emission (emitInsetBackgroundLayer).
-  auto* ring = _document->makeNode<Layer>();
-  ring->includeInLayout = false;
-  ring->left = inset;
-  ring->top = inset;
-  ring->width = std::max(0.0f, box.widthPx - 2.0f * inset);
-  ring->height = std::max(0.0f, box.heightPx - 2.0f * inset);
-  auto* rect = _document->makeNode<Rectangle>();
-  rect->percentWidth = 100.0f;
-  rect->percentHeight = 100.0f;
-  // Shrink the corner radius by the inset so the inner ring stays concentric on rounded boxes.
-  rect->roundness = std::max(0.0f, box.borderRadiusTLPx - inset);
-  ring->contents.push_back(rect);
-  auto* stroke = _document->makeNode<Stroke>();
-  auto* solid = _document->makeNode<SolidColor>();
-  solid->color = color;
-  stroke->color = solid;
-  stroke->width = strokeWidth;
-  stroke->align = StrokeAlign::Inside;
-  ring->contents.push_back(stroke);
-  layer->children.push_back(ring);
-}
-
 void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& box,
                                          Element* geometry, bool& emitted) {
   if (!geometry || !box.borderSet) return;
@@ -722,43 +641,6 @@ void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& 
       return;
     }
   }
-  // A single PAGX Stroke paints one uniform band around the geometry, so `double` (two lines with
-  // a gap) and the bevelled two-tone styles (`groove`/`ridge`/`inset`/`outset`) cannot be one
-  // stroke. Approximate them with two concentric solid rings: an outer stroke plus the inset inner
-  // ring. Needs the resolved border-box size, so fall through to a plain stroke when it is unknown.
-  const bool doubleRing = box.borderStyle == BorderStyle::Double;
-  const bool toneRing =
-      box.borderStyle == BorderStyle::Groove || box.borderStyle == BorderStyle::Ridge ||
-      box.borderStyle == BorderStyle::Inset || box.borderStyle == BorderStyle::Outset;
-  if ((doubleRing || toneRing) && std::isfinite(box.widthPx) && std::isfinite(box.heightPx) &&
-      w > 0.0f) {
-    // `double` splits the border into two w/3 lines with a w/3 gap; the bevelled styles split it
-    // into two w/2 bands.
-    const float outerWidth = doubleRing ? w / 3.0f : w / 2.0f;
-    const float inset = doubleRing ? 2.0f * w / 3.0f : w / 2.0f;
-    Color outerColor = box.borderColor;
-    Color innerColor = box.borderColor;
-    if (toneRing) {
-      // groove/inset shade the outer band dark and the inner band light; ridge/outset invert it so
-      // the highlight reads as a raised bevel.
-      const bool outerDark =
-          box.borderStyle == BorderStyle::Groove || box.borderStyle == BorderStyle::Inset;
-      outerColor = outerDark ? ShadeBorderColor(box.borderColor, 0.55f)
-                             : TintBorderColor(box.borderColor, 0.5f);
-      innerColor = outerDark ? TintBorderColor(box.borderColor, 0.5f)
-                             : ShadeBorderColor(box.borderColor, 0.55f);
-    }
-    auto* outerStroke = _document->makeNode<Stroke>();
-    auto* outerSolid = _document->makeNode<SolidColor>();
-    outerSolid->color = outerColor;
-    outerStroke->color = outerSolid;
-    outerStroke->width = outerWidth;
-    outerStroke->align = StrokeAlign::Inside;
-    layer->contents.push_back(outerStroke);
-    appendInsetBorderRing(layer, box, inset, outerWidth, innerColor);
-    emitted = true;
-    return;
-  }
   auto stroke = _document->makeNode<Stroke>();
   auto solid = _document->makeNode<SolidColor>();
   solid->color = box.borderColor;
@@ -778,39 +660,6 @@ void HTMLLayerBuilder::applyBorderStroke(Layer* layer, const HTMLBoxAttributes& 
     stroke->dashes = {0.0f, 2.0f * w};
   }
   layer->contents.push_back(stroke);
-  emitted = true;
-}
-
-void HTMLLayerBuilder::applyOutline(Layer* layer, const HTMLBoxAttributes& box, bool& emitted) {
-  if (!box.outlineSet || box.outlineWidthPx <= 0.0f) return;
-  if (!std::isfinite(box.widthPx) || !std::isfinite(box.heightPx)) return;
-  // CSS draws the outline just outside the border box, pushed further out by `outline-offset`. PAGX
-  // has no outline primitive, so wrap the box in an oversized ring layer and stroke its edge from
-  // the inside. `outline-offset` is the gap between the border box and the outline's INNER edge, so
-  // the ring is grown by offset + width and stroked from its own outer edge back in by `width`; the
-  // stroke then lands in the CSS outline band [offset, offset + width] outside the box.
-  const float offset = std::max(0.0f, box.outlineOffsetPx);
-  const float grown = offset + box.outlineWidthPx;
-  auto* ring = _document->makeNode<Layer>();
-  ring->includeInLayout = false;
-  ring->left = -grown;
-  ring->top = -grown;
-  ring->width = box.widthPx + 2.0f * grown;
-  ring->height = box.heightPx + 2.0f * grown;
-  auto* rect = _document->makeNode<Rectangle>();
-  rect->percentWidth = 100.0f;
-  rect->percentHeight = 100.0f;
-  // Grow the corner radius by the same amount so the outline stays concentric with a rounded box.
-  rect->roundness = std::max(0.0f, box.borderRadiusTLPx + grown);
-  ring->contents.push_back(rect);
-  auto* stroke = _document->makeNode<Stroke>();
-  auto* solid = _document->makeNode<SolidColor>();
-  solid->color = box.outlineColor;
-  stroke->color = solid;
-  stroke->width = box.outlineWidthPx;
-  stroke->align = StrokeAlign::Inside;
-  ring->contents.push_back(stroke);
-  layer->children.push_back(ring);
   emitted = true;
 }
 
