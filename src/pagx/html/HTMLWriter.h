@@ -260,6 +260,12 @@ class HTMLWriterContext {
   // embedded vector Font resource. writeEmbeddedShapeGlyphs checks this mapping to decide whether
   // to emit @font-face + PUA <span> (WOFF2 path) or fall back to the SVG <path> path.
   std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
+  std::unordered_map<const Font*, uint32_t> woff2GlyphOffsets = {};
+
+  uint32_t fontGlyphCodepoint(const Font* font, uint16_t glyphID) const {
+    auto offset = woff2GlyphOffsets.find(font);
+    return 0xE000u + glyphID - 1u + (offset == woff2GlyphOffsets.end() ? 0u : offset->second);
+  }
 
   // Text nodes whose data-pagx-text host metadata has already been emitted. The attribute marks
   // "one restored Text" and must appear at most once per node, while writeLayerContents runs a

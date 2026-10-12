@@ -86,10 +86,14 @@ class HTMLExporter {
    * CSS styles and SVG elements that visually reproduce the PAGX content in modern browsers.
    *
    * Resource directory contract: `resourceDir` is a mandatory absolute directory path where the
-   * exporter writes auxiliary image files. Two kinds of files land there:
+   * exporter writes auxiliary resource files. These include:
    *   1. PNGs rasterized from shapes whose color sources CSS cannot express natively
    *      (DiamondGradient, tiled ImagePattern, PlusDarker backdrops).
    *   2. Copies of external image files referenced by Image resources via `filePath`.
+   *   3. WOFF2 fonts generated from embedded glyphs. Vector Font resources share one font file
+   *      when their combined glyph count fits the BMP private-use range (6400 glyphs). Bitmap
+   *      fonts and vector groups beyond that capacity retain separate files. Glyph numbering in
+   *      the HTML is remapped without changing the source Font or GlyphRun nodes.
    * The exporter creates the directory if it does not exist. The generated HTML references these
    * assets via a relative URL whose prefix is the basename of `resourceDir` followed by `/`
    * (e.g. `resourceDir = "/tmp/abc"` produces `<img src="abc/dgc0.png">`). Callers must write
@@ -200,9 +204,9 @@ class HTMLExporter {
    * resets the zoom so every page starts fit to the window.
    *
    * Precondition: the exporter reads layout-resolved geometry from every document, applying
-   * layout automatically if needed. Element ids, class names, and resource filenames are
-   * namespaced with a per-page prefix so pages cannot collide with each other; author-assigned
-   * node ids are prefixed the same way.
+   * layout automatically if needed. Element ids, class names, and page-specific resource filenames
+   * are namespaced with a per-page prefix; author-assigned node ids are prefixed the same way.
+   * Eligible vector fonts share one WOFF2 across all pages, within the 6400-glyph capacity.
    *
    * Resource handling matches the single-document ToData: Image::data takes precedence
    * (populated via PAGXDocument::loadFileDataMap()), base64 data URIs in filePath are decoded
