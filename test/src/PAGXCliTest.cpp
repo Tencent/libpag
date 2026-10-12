@@ -40,9 +40,11 @@
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/ImagePattern.h"
+#include "pagx/nodes/Text.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
@@ -3804,6 +3806,36 @@ CLI_TEST(PAGXCliTest, Embed_MissingFontFile_FailsLoud) {
   EXPECT_EQ(ret, 1);
   EXPECT_NE(errCapture.str().find("pagx embed: failed to load font '"), std::string::npos);
   EXPECT_FALSE(std::filesystem::exists(outPagx));
+}
+
+CLI_TEST(PAGXCliTest, Embed_ReferencedGlyphsPreserveOriginalTextAcrossRepeatedEmbed) {
+  auto fontPath =
+      ProjectPath::Absolute("resources/html/corpus/cli/spec/glyph_run/fonts/font_f0.woff2");
+  auto input = TempDir() + "/original_text_file_glyphs.pagx";
+  std::ofstream stream(input);
+  stream << "<pagx width='80' height='40'><Resources><Font id='source' file='" << fontPath
+         << "'/></Resources><Layer><Text text='搜索' fontFamily='pagx-font-f0' fontSize='20'>"
+            "<GlyphRun font='@source' fontSize='20' glyphs='1,2' positions='0,20,20,20' "
+            "bounds='0,0,40,20'/></Text><Fill color='#000000'/></Layer></pagx>";
+  stream.close();
+  auto first = TempDir() + "/original_text_embedded1.pagx";
+  auto second = TempDir() + "/original_text_embedded2.pagx";
+  ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", input, "-o", first}), 0);
+  ASSERT_EQ(CallRun(pagx::cli::RunEmbed, {"embed", first, "-o", second}), 0);
+  EXPECT_EQ(ReadFile(first), ReadFile(second));
+  auto doc = pagx::PAGXImporter::FromFile(second);
+  ASSERT_NE(doc, nullptr);
+  bool found = false;
+  for (auto& node : doc->nodes) {
+    if (node->nodeType() != pagx::NodeType::Text) continue;
+    auto* text = static_cast<pagx::Text*>(node.get());
+    EXPECT_EQ(text->text, "搜索");
+    ASSERT_FALSE(text->glyphRuns.empty());
+    EXPECT_TRUE(text->glyphRuns[0]->font->file.empty());
+    EXPECT_FALSE(text->glyphRuns[0]->font->glyphs.empty());
+    found = true;
+  }
+  EXPECT_TRUE(found);
 }
 
 CLI_TEST(PAGXCliTest, Embed_FontFile_ReembedPreservesNode) {

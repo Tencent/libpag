@@ -125,6 +125,14 @@ disk:
   local file that cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule
   without a `url()` source is dropped like any other unsupported at-rule.
 
+HTML exported by PAGX may render pre-shaped glyphs as private-use characters while keeping
+readable text in `data-pagx-text`. The snapshot bridge preserves this attribute and filters the
+other `data-pagx-*` attributes. Import restores it to `Text.text` while retaining the displayed
+glyph IDs, font-file references and positions in `GlyphRun` children. Restoring the original
+text does not reshape these runs. `pagx embed` embeds their referenced glyphs without changing
+the original text; already embedded runs are preserved unless font overrides explicitly request
+reshaping.
+
 ## 4. Allowed CSS Properties
 
 Lengths are pixels. Percentages are accepted only on `width` and `height` (resolved
@@ -135,6 +143,7 @@ against the canvas size) and emit a `subset:unit-coerced` warning. `vw`/`vh` are
 a `subset:unsupported-property` warning when the canvas size is not yet known. `calc()`,
 `var()`, `min()`, `max()`, and `clamp()` are rejected with a `subset:unsupported-property`
 warning.
+
 
 ### 4.1 Layout
 

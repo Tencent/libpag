@@ -19,9 +19,15 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include "tgfx/core/Typeface.h"
 
 namespace pagx {
+
+class PAGXDocument;
+class Glyph;
+class Data;
 
 // Internal render-side cache attached to each Font node. Defined in a private header so that
 // public consumers of pagx::Font never see tgfx types in their include graph.
@@ -36,6 +42,10 @@ struct FontRenderCache {
   // Sentinel that tracks whether the typeface build was already attempted (success or failure).
   // Used to avoid re-running the (potentially expensive or pathological) build on every render.
   bool built = false;
+  std::string sourceFile = {};
+  const Data* sourceData = nullptr;
+  std::shared_ptr<PAGXDocument> glyphDocument = nullptr;
+  std::unordered_map<uint16_t, Glyph*> glyphs = {};
 };
 
 }  // namespace pagx

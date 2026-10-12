@@ -571,6 +571,7 @@ void HTMLParserContext::loadWebFontFiles() {
       continue;
     }
     _webFontFiles.push_back({ToLower(rule.family), loadedPath});
+    _textFragmentBuilder->registerFontFile(rule.family, loadedPath);
   }
 }
 
@@ -583,6 +584,11 @@ void HTMLParserContext::emitWebFontResources() {
     namedFamilies.insert(ToLower(name));
   }
   std::unordered_set<std::string> emittedPaths = {};
+  for (auto& node : _document->nodes) {
+    if (node->nodeType() == NodeType::Font) {
+      emittedPaths.insert(static_cast<Font*>(node.get())->file);
+    }
+  }
   for (const auto& file : _webFontFiles) {
     if (namedFamilies.count(file.cssFamily) == 0 || !emittedPaths.insert(file.path).second) {
       continue;

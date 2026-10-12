@@ -553,6 +553,8 @@ void TryInferFlexOnContainer(const std::shared_ptr<DOMNode>& parent, HTMLTransfo
 
 void WalkInferFlex(const std::shared_ptr<DOMNode>& node, HTMLTransformContext& ctx, int depth) {
   if (ShouldSkipWalkerNode(node, depth, ctx, "flex inference")) return;
+  // Pre-shaped text hosts need the authored glyph offsets, including their descendant boxes.
+  if (node->findAttribute("data-pagx-text") != nullptr) return;
   if (IsOpaqueSubtreeRoot(node)) return;
   // Recurse children first: a parent that folds into `align-items: stretch` erases its
   // children's cross-axis size, so each child must finish its own inference while its
