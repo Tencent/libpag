@@ -49,7 +49,7 @@ import { DROP_TAG_NAMES_JSON } from './dom-tags';
 import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 
 // Marker a renderer stamps on the box that must carry the author `name` when the element's
-// own outer box is not the first emitted tag (see `applyLayerName`). Declared as a plain
+// own outer box is not the first emitted tag (see `applyLayerAttributes`). Declared as a plain
 // module-level `const` (not an import) so tsc leaves the bare identifier untouched when it
 // stringifies the helper functions into the browser payload; the same value is re-declared in
 // PAYLOAD_CONSTANTS_SRC via interpolation so the shipped helpers resolve it in-page, while the
@@ -2711,6 +2711,68 @@ const BOUNDARY_SPACE = '\u00a0';
 //
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
+//
+// `-webkit-line-clamp`: the browser keeps the clamped box at N line-heights
+// and its `overflow: hidden` cuts the text at that height, appending "…" to
+// the last visible line. The DOM still holds every character, so without a
+// pass here the walker materialises the overflowing lines into spans as well
+// — PAGX then paints the clamped box with the extra lines cut mid-glyph and
+// no ellipsis, which reads differently from the browser's "…" ending. The
+// helpers below rebuild the browser's decision: only `clampCount` lines are
+// emitted, and the last visible line's tail is replaced by the longest
+// prefix that still leaves room for an ellipsis.
+function readLineClamp(computed) {
+  const raw = String(computed.getPropertyValue('-webkit-line-clamp') || '').trim();
+  if (!raw || raw === 'none') return 0;
+  const count = parseInt(raw, 10);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+// Fit `text` + "…" into the line's remaining width and return the result.
+// Widths come from a scratch canvas rather than a live Range so the DOM stays
+// untouched — every later node still measures the original layout. The
+// remaining width is the container's content width minus the line's own
+// indent (a wrapped line after an inline marker starts further right).
+function ellipsizeClampedLine(text, lineRect, computed, parentRect) {
+  const ELLIPSIS = '\u2026';
+  const contentWidth = readNum(computed, 'width');
+  if (!(contentWidth > 0)) {
+    return text;
+  }
+  const contentLeft = parentRect.left + readNum(computed, 'padding-left');
+  const indent = Math.max(0, lineRect.left - contentLeft);
+  const available = contentWidth - indent;
+  if (!(available > 0)) {
+    return text;
+  }
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) {
+    return text;
+  }
+  const fontParts = ['font-style', 'font-variant', 'font-weight', 'font-size', 'font-family']
+    .map((prop) => String(computed.getPropertyValue(prop) || '').trim())
+    .filter(Boolean);
+  ctx.font = fontParts.join(' ');
+  const chars = Array.from(text);
+  const ellipsisWidth = ctx.measureText(ELLIPSIS).width;
+  // The widest prefix whose width plus the ellipsis stays within the line box
+  // is monotonic in the prefix length, so a binary search finds Chromium's
+  // cut position. The epsilon absorbs sub-pixel canvas/layout divergence.
+  let lo = 0;
+  let hi = chars.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const width = ctx.measureText(chars.slice(0, mid).join('')).width + ellipsisWidth;
+    if (width <= available + 0.05) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  const prefix = chars.slice(0, lo).join('').replace(/\s+$/, '');
+  return prefix + ELLIPSIS;
+}
+
 function emitTextSpans(textNode, parentRect, computed, opts) {
   const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
@@ -2720,8 +2782,14 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
   const ws = computed.getPropertyValue('white-space');
   const lines = splitTextNodeIntoLines(textNode, ws, 'y');
   const lineHeightPx = readNum(computed, 'line-height');
+  // A clamped box hides everything past its Nth line; drop those lines and
+  // let the line below close the visible text with an ellipsis.
+  const clampCount = readLineClamp(computed);
+  const visibleLines = clampCount > 0 && lines.length > clampCount
+    ? clampCount : lines.length;
+  const clamped = visibleLines < lines.length;
   const out = [];
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < visibleLines; i++) {
     const line = lines[i];
     let lt = line.rect.top;
     let lh = line.rect.height;
@@ -2741,6 +2809,11 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
     let transformed = applyTextTransform(line.text, computed);
+    // Close a clamped run the way the browser does: the last visible line's
+    // overflow is replaced by an ellipsis instead of being painted/cut.
+    if (clamped && i === visibleLines - 1) {
+      transformed = ellipsizeClampedLine(transformed, line.rect, computed, parentRect);
+    }
     // Re-materialise the seam whitespace the browser rendered against an
     // inline sibling: leading on the first line, trailing on the last.
     if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
@@ -4439,7 +4512,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   if (fragments) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {});
     // The leading tag here is a visuals-only line fragment, not this element's box; mark the
-    // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
+    // child-bearing wrapper so `applyLayerAttributes` forwards `name` onto it (see NAME_ANCHOR_ATTR).
     return `${fragments}<div ${NAME_ANCHOR_ATTR} style="${wrapperStyle}">${lineSpans.join('')}</div>`;
   }
   return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
@@ -4667,7 +4740,7 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   if (fragments) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { ...opts });
     // The leading tag here is a visuals-only line fragment, not this element's box; mark the
-    // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
+    // child-bearing wrapper so `applyLayerAttributes` forwards `name` onto it (see NAME_ANCHOR_ATTR).
     return `${fragments}<div ${NAME_ANCHOR_ATTR}${intrinsicAttr} style="${wrapperStyle}">${childHTML}</div>`;
   }
   const style = buildStyle(left, top, rect.width, rect.height, computed, {
@@ -4747,7 +4820,7 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
 // element's own outer box is NOT the first tag in the emitted markup. A wrapped inline box
 // emits `${fragments}<div>…children…</div>`, whose leading tag is a visuals-only line
 // fragment — naming that fragment would strand `layer->name` on a box with no children. The
-// renderer marks the child-bearing wrapper with this attribute so `applyLayerName` targets it
+// renderer marks the child-bearing wrapper with this attribute so `applyLayerAttributes` targets it
 // instead of the first tag, then removes the marker so it never reaches the output.
 // NOTE: `NAME_ANCHOR_ATTR` is declared once near the top of this module (Node scope) and
 // re-declared in PAYLOAD_CONSTANTS_SRC (browser scope); the helpers below resolve it in both.
@@ -4766,54 +4839,38 @@ function stripNameAnchor(html) {
 // bounding rect (used to compute relative left/top). `precomputed`, when
 // supplied, is the result of a prior `getComputedStyle(el)` call upstream;
 // reusing it avoids a redundant style query on every visited element.
-// Forward an author `name` attribute onto the outer box the element emits so the PAGX
-// importer can surface it as `layer->name` (mirroring how `id` maps to `layer->id`). The
-// snapshot rebuilds every element from computed style rather than cloning the live tree, so
-// the attribute has to be re-emitted here or it never reaches the importer. `html` is the
-// markup an element renderer produced; its first tag is normally that element's own outer box,
-// except in the wrapped-inline-box path where a renderer marks the real wrapper with
-// `NAME_ANCHOR_ATTR` (see below). No-op when the element carries no `name`, when `html` is
-// empty, when the box already has a `name`, or for `display: contents` hosts (which emit their
-// children's markup, not a box of their own).
-function applyLayerName(el, html, opts, precomputed) {
+// Forward the author name and original text onto the element's emitted box. Other
+// data-pagx-* attributes remain internal and are not forwarded. Inline fragments use the
+// name anchor to identify the real box, and transform re-entry defers to the outer call.
+function applyLayerAttributes(el, html, opts, precomputed) {
   if (!html || !el || typeof el.getAttribute !== 'function') return html;
-  // `_strippedTransform` marks the recursive re-entry that re-renders this same element with
-  // its transform cleared; let the outer (non-stripped) call own the name so it is added once.
-  // Still strip any anchor marker so it never leaks into the re-entry's output.
   if (opts && opts._strippedTransform) return stripNameAnchor(html);
   const name = el.getAttribute('name');
-  // A renderer may have stamped the anchor marker on the child-bearing wrapper (it is emitted
-  // unconditionally in the fragment path). When there is no name to forward, strip it so the
-  // marker never leaks into the snapshot output.
-  if (!name) return stripNameAnchor(html);
+  const text = el.getAttribute('data-pagx-text');
+  let attrs = name ? ` name="${escapeHtml(name)}"` : '';
+  if (text !== null) attrs += ` data-pagx-text="${escapeHtml(text)}"`;
+  if (!attrs) return stripNameAnchor(html);
   const computed = precomputed || getComputedStyle(el);
   if (computed.display === 'contents') return stripNameAnchor(html);
-  // Wrapped inline box: the child-bearing wrapper is not the first tag, so its renderer marked
-  // it with NAME_ANCHOR_ATTR. Replace the marker with the name attribute so `layer->name` lands
-  // on the box that actually carries the element's children rather than a leading line fragment.
+  // Inline fragments precede their child-bearing box. Keep the original text and name on
+  // that box, and let the outer call own both attributes during transform re-entry.
   const anchor = ` ${NAME_ANCHOR_ATTR}`;
   const anchorAt = html.indexOf(anchor);
   if (anchorAt !== -1) {
-    return html.slice(0, anchorAt) + ` name="${escapeHtml(name)}"` +
-           html.slice(anchorAt + anchor.length);
+    return html.slice(0, anchorAt) + attrs + html.slice(anchorAt + anchor.length);
   }
-  // Insert the attribute immediately after the opening tag's NAME, never scanning the
-  // attribute list: an outer box `style` can legitimately contain a raw '>' (e.g. an
-  // inline-SVG `data:` URI in `background-image`), which an attribute-aware splice would
-  // mistake for the end of the tag and corrupt. No renderer emits `name`, and the
-  // stripped-transform re-entry is guarded above, so a single element box is never named twice.
+  // Match only the tag name: a style may contain a raw '>' inside an SVG data URI.
   const match = html.match(/^<([a-zA-Z][\w-]*)/);
   if (!match) return html;
-  return `<${match[1]} name="${escapeHtml(name)}"` + html.slice(match[0].length);
+  return `<${match[1]}${attrs}` + html.slice(match[0].length);
 }
 
 // Thin dispatcher wrapper: delegates to `renderElementBox` for the actual markup, then folds
-// the author `name` attribute onto the emitted box. Kept separate so every render path (flex
-// children, absolute children, body roots, stripped-transform re-entry) picks up name
-// forwarding through the single entry point they all already call.
+// the author name and original text onto the emitted box. Every render path (flex children,
+// absolute children, body roots, transform re-entry) forwards them through this entry point.
 function render(el, parentRect, opts, precomputed) {
   const html = renderElementBox(el, parentRect, opts, precomputed);
-  return applyLayerName(el, html, opts, precomputed);
+  return applyLayerAttributes(el, html, opts, precomputed);
 }
 
 function renderElementBox(el, parentRect, opts, precomputed) {
@@ -5723,6 +5780,8 @@ const HELPER_FNS = [
   splitTextNodeIntoLines,
   isInlineLevelSibling,
   boundarySpacePreservation,
+  readLineClamp,
+  ellipsizeClampedLine,
   emitTextSpans,
   emitVerticalTextSpans,
   hasBoxVisualsForInline,
@@ -5785,7 +5844,7 @@ const HELPER_FNS = [
   resolveChildStacking,
   resolveEscapingWrapperZIndex,
   stripNameAnchor,
-  applyLayerName,
+  applyLayerAttributes,
   renderElementBox,
   render,
   readRootScrollOffset,
@@ -7491,7 +7550,7 @@ export {
   pagxClipPathInnerMarkup,
   dashedBorderSideSvg,
   forwardDataAttrs,
-  applyLayerName,
+  applyLayerAttributes,
   normalizeBackgroundImage,
   normalizeBorderImage,
   canForwardFlexGrow,
@@ -7502,6 +7561,8 @@ export {
   canvasRootRect,
   cssQuotedString,
   collectLocalFontFaces,
+  readLineClamp,
+  ellipsizeClampedLine,
   nativeControlKind,
   syntheticText,
   maskPasswordText,

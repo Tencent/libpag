@@ -75,6 +75,22 @@ describe('parseArgs — file inputs', () => {
     expect(opts.fontDir).toBe(path.resolve('/tmp/out.fonts'));
   });
 
+  test('defaults --font-dir without --download-fonts so inline data: fonts land on disk', () => {
+    const opts = parseArgs(argv('/tmp/page.html', '-o', '/tmp/out.subset.html'));
+    expect(opts.downloadFonts).toBe(false);
+    expect(opts.fontDir).toBe(path.resolve('/tmp/out.fonts'));
+  });
+
+  test('strips a .subset suffix from the derived --font-dir', () => {
+    const opts = parseArgs(argv('/tmp/page.html', '-o', '/tmp/case.subset.html'));
+    expect(opts.fontDir).toBe(path.resolve('/tmp/case.fonts'));
+  });
+
+  test('leaves --font-dir unset for stdout output unless the caller asks for fonts', () => {
+    const opts = parseArgs(argv('/tmp/page.html', '-o', '-'));
+    expect(opts.fontDir).toBe('');
+  });
+
   test('--font-dir overrides the default destination', () => {
     const opts = parseArgs(argv('/tmp/page.html', '--download-fonts', '--font-dir', '/tmp/fonts'));
     expect(opts.fontDir).toBe(path.resolve('/tmp/fonts'));

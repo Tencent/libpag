@@ -10,6 +10,8 @@ const {
   makeFontCaptureListener,
   resolveFontFamilies,
   saveDownloadedFonts,
+  injectInlineFontFaces,
+  isInlineFontUrl,
 } = require('../dist/lib/font-download');
 
 // A throwaway buffer that is neither WOFF nor WOFF2 (so toSfnt returns it
@@ -195,7 +197,7 @@ describe('saveDownloadedFonts', () => {
     }
   });
 
-  test('attaches the CSS families and merges them across duplicate payloads', async () => {
+  test('attaches the CSS faces and merges them across duplicate payloads', async () => {
     const { woff2Fixture } = require('./font-fixtures');
     const bytes = await woff2Fixture('Shared Family');
     const map = new Map([
@@ -203,15 +205,19 @@ describe('saveDownloadedFonts', () => {
       // Identical bytes served from a second URL under another family.
       ['https://x/b.woff2', Buffer.from(bytes)],
     ]);
-    const familiesByKey = new Map([
-      ['https://x/a.woff2', ['Family One']],
-      ['https://x/b.woff2', ['Family Two']],
+    const facesByKey = new Map([
+      ['https://x/a.woff2', [{ family: 'Family One', style: '', weight: '', url: 'https://x/a.woff2' }]],
+      ['https://x/b.woff2', [{ family: 'Family Two', style: 'italic', weight: '700', url: 'https://x/b.woff2' }]],
     ]);
 
-    const saved = await saveDownloadedFonts(map, outDir, undefined, familiesByKey);
+    const saved = await saveDownloadedFonts(map, outDir, undefined, facesByKey);
 
     expect(saved).toHaveLength(1);
     expect(saved[0].cssFamilies).toEqual(['Family One', 'Family Two']);
+    expect(saved[0].cssFaces).toEqual([
+      { family: 'Family One', style: '', weight: '', url: 'https://x/a.woff2' },
+      { family: 'Family Two', style: 'italic', weight: '700', url: 'https://x/b.woff2' },
+    ]);
   });
 
   test('writes every WOFF2 of a multi-font page intact', async () => {
@@ -358,6 +364,13 @@ describe('dataUrlBytes', () => {
 });
 
 describe('resolveFontFamilies', () => {
+  // Project the returned face map down to family names. These tests pin the
+  // family grouping; the face-level detail (style/weight) has its own test
+  // below.
+  function familyNames(map) {
+    return Array.from(map.values()).map((faces) => faces.map((face) => face.family));
+  }
+
   test('registers an inline font and keeps the CSS family it was declared under', async () => {
     const { woff2DataUrl } = require('./font-fixtures');
     const cache = new Map();
@@ -369,7 +382,7 @@ describe('resolveFontFamilies', () => {
 
     // The family is the authored one, not the one inside the file — that mismatch is exactly why
     // the caller forwards the pair to `pagx embed/render --font-alias`.
-    expect(Array.from(families.values())).toEqual([['MaShanZheng']]);
+    expect(familyNames(families)).toEqual([['MaShanZheng']]);
     expect(cache.size).toBe(1);
     const cached = Array.from(cache.values())[0];
     // The cache is normalised to SFNT so the save step skips a second decode.
@@ -386,7 +399,7 @@ describe('resolveFontFamilies', () => {
       cache,
     );
 
-    expect(families.get('https://x/xiaowei.woff2')).toEqual(['XiaoWei']);
+    expect(familyNames(families)).toEqual([['XiaoWei']]);
   });
 
   test('groups several CSS families serving one payload under a single entry', async () => {
@@ -402,7 +415,27 @@ describe('resolveFontFamilies', () => {
       new Map(),
     );
 
-    expect(Array.from(families.values())).toEqual([['AliasA', 'AliasB']]);
+    expect(familyNames(families)).toEqual([['AliasA', 'AliasB']]);
+  });
+
+  test('keeps one entry per authored face so roman and italic cuts stay distinct', async () => {
+    const { woff2DataUrl } = require('./font-fixtures');
+    const roman = await woff2DataUrl('Roman Cut');
+    const italic = await woff2DataUrl('Italic Cut');
+    const family = 'Playfair';
+    const faces = await resolveFontFamilies(
+      [
+        { family, style: 'normal', weight: '400 900', url: roman },
+        { family, style: 'italic', weight: '400 900', url: italic },
+        // The same face declared twice must not duplicate the entry.
+        { family, style: 'italic', weight: '400 900', url: italic },
+      ],
+      new Map(),
+    );
+    const entries = Array.from(faces.values());
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual([{ family, style: 'normal', weight: '400 900', url: roman }]);
+    expect(entries[1]).toEqual([{ family, style: 'italic', weight: '400 900', url: italic }]);
   });
 
   test('skips a family whose file was neither inlined nor captured', async () => {
@@ -426,7 +459,115 @@ describe('resolveFontFamilies', () => {
       (message) => logs.push(message),
     );
 
-    expect(Array.from(families.values())).toEqual([['Good']]);
+    expect(familyNames(families)).toEqual([['Good']]);
     expect(logs.join('\n')).toMatch(/font decode skipped for 'Broken'/);
+  });
+});
+
+describe('injectInlineFontFaces', () => {
+  const PAGE = '<!DOCTYPE html><html><head><title>x</title></head><body>hi</body></html>';
+
+  function face(family, overrides) {
+    return Object.assign({ family, style: '', weight: '', url: 'inline-font:0:' + family }, overrides);
+  }
+
+  function inlineFont(overrides) {
+    return Object.assign({
+      url: 'inline-font:0:Material Icons',
+      path: '/out/case.fonts/Material-Icons-Regular-abc.ttf',
+      family: 'Material Icons',
+      style: 'Regular',
+      cssFamilies: ['Material Icons'],
+      cssFaces: [face('Material Icons')],
+    }, overrides);
+  }
+
+  test('re-declares a saved inline face before </head>', () => {
+    const out = injectInlineFontFaces(PAGE, [inlineFont()]);
+    expect(out).toContain(
+      '<style id="__pagx_web_fonts">' +
+        '@font-face{font-family:"Material Icons";src:url("/out/case.fonts/Material-Icons-Regular-abc.ttf")}' +
+        '</style>',
+    );
+    expect(out.indexOf('__pagx_web_fonts')).toBeLessThan(out.indexOf('</head>'));
+    expect(out).toContain('<body>hi</body>');
+  });
+
+  test('leaves network fonts to the font manifest', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ url: 'https://cdn.example/font.woff2', cssFamilies: ['WebFont'], cssFaces: [face('WebFont')] }),
+    ]);
+    expect(out).toBe(PAGE);
+  });
+
+  test('skips a face whose CSS name only matches through an alias', () => {
+    // A `<Font file>` resource registers under the file's own family, so an
+    // aliased face (CSS "Playfair" → file family "Playfair Display") could
+    // never resolve through this route — it must reach the renderer through
+    // the manifest's --font-alias instead.
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ family: 'Playfair Display', cssFamilies: ['Playfair'], cssFaces: [face('Playfair')] }),
+    ]);
+    expect(out).toBe(PAGE);
+  });
+
+  test('accepts a CSS name that differs only in case or spacing', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ family: 'Material  ICONS', cssFamilies: ['material icons'], cssFaces: [face('material icons')] }),
+    ]);
+    expect(out).toContain('font-family:"material icons"');
+  });
+
+  test('emits every cut of a family, carrying its style and weight', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({
+        cssFamilies: ['Material Icons'],
+        cssFaces: [
+          face('Material Icons'),
+          face('Material Icons', { style: 'italic' }),
+          face('Material Icons', { style: 'italic', weight: '700' }),
+          face('Material Icons', { style: 'normal', weight: '400 900', url: 'inline-font:1:Material Icons' }),
+        ],
+      }),
+    ]);
+    expect(out).toContain('@font-face{font-family:"Material Icons";src:url("/out/case.fonts/Material-Icons-Regular-abc.ttf")}');
+    expect(out).toContain('@font-face{font-family:"Material Icons";font-style:"italic";src:url(');
+    expect(out).toContain('@font-face{font-family:"Material Icons";font-style:"italic";font-weight:700;src:url(');
+    expect(out).toContain('@font-face{font-family:"Material Icons";font-weight:400 900;src:url(');
+  });
+
+  test('de-duplicates identical faces across entries', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont(),
+      inlineFont({ url: 'inline-font:1:Material Icons' }),
+    ]);
+    expect(out.match(/@font-face\{/g)).toHaveLength(1);
+  });
+
+  test('quotes families and paths that need escaping', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ family: 'Weird "Family"', cssFamilies: ['Weird "Family"'], cssFaces: [face('Weird "Family"')], path: '/out/a b/f.otf' }),
+    ]);
+    expect(out).toContain('font-family:"Weird \\22 Family\\22 "');
+    expect(out).toContain('src:url("/out/a b/f.otf")');
+  });
+
+  test('returns the html unchanged when nothing qualifies', () => {
+    expect(injectInlineFontFaces(PAGE, [])).toBe(PAGE);
+    expect(injectInlineFontFaces(PAGE, [inlineFont({ cssFaces: [] })])).toBe(PAGE);
+    expect(injectInlineFontFaces(PAGE, [inlineFont({ path: '' })])).toBe(PAGE);
+  });
+
+  test('returns the html unchanged when there is no head to inject into', () => {
+    const bare = '<body>hi</body>';
+    expect(injectInlineFontFaces(bare, [inlineFont()])).toBe(bare);
+  });
+});
+
+describe('isInlineFontUrl', () => {
+  test('matches the keys resolveFontFamilies mints for data: sources', () => {
+    expect(isInlineFontUrl('inline-font:0:Material Icons')).toBe(true);
+    expect(isInlineFontUrl('https://cdn.example/f.woff2')).toBe(false);
+    expect(isInlineFontUrl('')).toBe(false);
   });
 });

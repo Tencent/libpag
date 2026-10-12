@@ -31,6 +31,7 @@ import {
   PAGX_VIRTUAL_CLOCK_INIT_SCRIPT,
 } from './animation-capture';
 import {
+  injectInlineFontFaces,
   makeFontCaptureListener,
   resolveFontFamilies,
   saveDownloadedFonts,
@@ -360,10 +361,12 @@ async function bestEffortSave<TItem, TCache>(
 ): Promise<TItem[]> {
   try {
     const arr = await saveFn(cache, dir, log || (() => {}));
-    if (log) log(`downloaded ${arr.length} ${label} file(s) to ${dir}`);
+    // "saved", not "downloaded": a font may be a `data:` URL decoded from the
+    // page rather than a network response.
+    if (log) log(`saved ${arr.length} ${label} file(s) to ${dir}`);
     return arr;
   } catch (err) {
-    if (log) log(`${label} download failed: ${errMessage(err)}`);
+    if (log) log(`${label} save failed: ${errMessage(err)}`);
     return [];
   }
 }
@@ -815,11 +818,19 @@ export async function runSnapshot(
     };
 
     // Write the web fonts to disk: the ones the browser fetched (captured off
-    // the `response` event during load + settle) plus the ones inlined as
-    // `data:` URLs (collected from the page's `@font-face` rules here — a
-    // `data:` URI issues no request, so the response listener can never see
-    // one). Deferring the collection to this point costs nothing and lets the
-    // CSS-family pass below see every font the page loaded.
+    // the `response` event during load + settle, only when `downloadFonts`
+    // asked for them) plus the ones inlined as `data:` URLs (collected from
+    // the page's `@font-face` rules here — a `data:` URI issues no request, so
+    // the response listener can never see one, and without this pass the font
+    // would neither be saved nor registered). Deferring the collection to this
+    // point costs nothing and lets the CSS-family pass below see every font
+    // the page loaded.
+    //
+    // The inline half runs whenever a directory is set: those faces live only
+    // inside the document, so they have no other way onto disk and the subset
+    // carries no rule that references them (see `injectInlineFontFaces`).
+    // With `fontBytesByUrl` empty the call below naturally only decodes the
+    // data: sources, so nothing here reaches the network on its own.
     //
     // `resolveFontFamilies` also returns each file's authored CSS family names:
     // PAGX resolves text by the name the document carries, which need not match
@@ -830,8 +841,8 @@ export async function runSnapshot(
     // `--font-alias`. This is best-effort: a failure degrades to "no fonts on
     // disk" and the rest of the snapshot still returns.
     let fonts: SavedFont[] = [];
-    if (downloadFonts && fontDir) {
-      let cssFamiliesByKey: Map<string, string[]> | undefined;
+    if (fontDir) {
+      let cssFacesByKey: Map<string, FontFaceSource[]> | undefined;
       try {
         const fontFaceMap = (await page.evaluate(COLLECT_FONT_FACE_MAP_EXPR)) as Record<
           string,
@@ -848,19 +859,22 @@ export async function runSnapshot(
             });
           }
         }
-        cssFamiliesByKey = await resolveFontFamilies(sources, fontBytesByUrl, log);
+        cssFacesByKey = await resolveFontFamilies(sources, fontBytesByUrl, log);
       } catch (err) {
         if (log) log(`font-family collection skipped: ${errMessage(err)}`);
       }
       fonts = await bestEffortSave(
-        (cache, dir, saveLog) => saveDownloadedFonts(cache, dir, saveLog, cssFamiliesByKey),
+        (cache, dir, saveLog) => saveDownloadedFonts(cache, dir, saveLog, cssFacesByKey),
         fontBytesByUrl,
         fontDir,
         log,
         'font',
       );
     }
-    return { ...snapshot, fonts, images };
+    // Re-declare the saved inline faces in the subset so the importer turns
+    // them into PAGX `<Font file>` resources; network fonts keep travelling
+    // through the font manifest instead.
+    return { ...snapshot, html: injectInlineFontFaces(snapshot.html, fonts), fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
     // not leak a tab per request. Swallow close-time errors — the
