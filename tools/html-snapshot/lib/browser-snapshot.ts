@@ -866,6 +866,20 @@ function paddingBoxOrigin(rect, computed) {
   };
 }
 
+// Resolve the origin used for an element's children's `left`/`top`. The
+// padding-box shift above is only sound while the border itself rides on the
+// emitted wrapper: a *uniform* border round-trips as the wrapper's `border`
+// shorthand, and both a browser re-layout and the importer re-apply it as an
+// inset for the absolutely-positioned children (verified end-to-end). An
+// *asymmetric* border is emitted as overlay rectangles inside the wrapper and
+// never reaches the wrapper's own style, so a padding-box-relative child
+// would silently lose the border inset — a `border-top: 8px` parent shifted
+// its text 8 px up (footer of 12-grid-magazine). Anchor children to the
+// border box in that case, matching the wrapper's own origin.
+function childContentOrigin(rect, computed) {
+  return isUniformBorder(computed) ? paddingBoxOrigin(rect, computed) : rect;
+}
+
 // True iff all four borders have the same non-zero width, the same supported
 // style (`solid`, `dashed`, or `dotted`), and the same color — i.e. cases the
 // subset's single `border` shorthand can losslessly express. Compares the raw
@@ -1071,31 +1085,214 @@ function firstTextNodeChild(el) {
   return null;
 }
 
+// ===== CSS counter resolution for pseudo `content` =====
+//
+// `getComputedStyle(el, pseudo).content` reports `counter(name[, style])`
+// verbatim — the browser resolves counter values at layout time and never
+// writes them back into the style. The walker and the decorative-pseudo
+// materialiser still need the resolved glyphs, otherwise a plain
+// `.list div::before { content: counter(s, decimal-leading-zero) }` numbering
+// renders as a text-less (stand-in) box and the digits are silently dropped.
+//
+// The value is evaluated the way the common authoring patterns lay it out:
+// the nearest ancestor-or-self `counter-reset` for the name opens the counter
+// scope with its base value, and every element in tree order between that
+// scope root and the host (inclusive) adds its `counter-increment` delta; a
+// deeper reset on the host's own ancestor chain restarts the count. The
+// remaining CSS counter subtleties (sibling-scoped restarts, `counters()`)
+// keep the historical "contributes nothing" contract.
+function parseCssCounterList(value, defaultDelta) {
+  const out = [];
+  const re = /([A-Za-z_][\w-]*)\s*(-?\d+)?/g;
+  let m;
+  while ((m = re.exec(value || '')) !== null) {
+    if (m[1].toLowerCase() === 'none') continue;
+    out.push([m[1], m[2] !== undefined ? parseInt(m[2], 10) : defaultDelta]);
+  }
+  return out;
+}
+
+function cssRomanCounter(value) {
+  const ROMAN = [
+    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
+    [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+  ];
+  let s = '';
+  let n = value;
+  for (let i = 0; i < ROMAN.length; i++) {
+    while (n >= ROMAN[i][0]) {
+      s += ROMAN[i][1];
+      n -= ROMAN[i][0];
+    }
+  }
+  return s;
+}
+
+function cssAlphaCounter(value) {
+  let s = '';
+  let n = value;
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(97 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function formatCssCounterValue(value, style) {
+  const n = Math.trunc(value);
+  switch ((style || 'decimal').trim().toLowerCase()) {
+    case 'decimal-leading-zero':
+      return (n < 0 ? '-' : '') + String(Math.abs(n)).padStart(2, '0');
+    case 'lower-alpha': case 'lower-latin': return n > 0 ? cssAlphaCounter(n) : String(n);
+    case 'upper-alpha': case 'upper-latin': return n > 0 ? cssAlphaCounter(n).toUpperCase() : String(n);
+    case 'lower-roman': return n > 0 && n < 4000 ? cssRomanCounter(n) : String(n);
+    case 'upper-roman': return n > 0 && n < 4000 ? cssRomanCounter(n).toUpperCase() : String(n);
+    case 'none': return '';
+    case 'decimal': default: return String(n);
+  }
+}
+
+function resolveCssCounterValue(el, name) {
+  let scope = null;
+  let value = 0;
+  for (let node = el; node; node = node.parentElement) {
+    const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+    let hit = null;
+    for (let i = 0; i < resets.length; i++) {
+      if (resets[i][0] === name) hit = resets[i][1];
+    }
+    if (hit !== null) {
+      scope = node;
+      value = hit;
+      break;
+    }
+  }
+  const root = scope || el.ownerDocument.documentElement;
+  if (!root) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  let node = root;
+  while (node) {
+    if (node !== scope) {
+      // A reset restarts this counter only when it scopes the host (its own
+      // subtree contains the host); a reset on a sibling subtree opens a
+      // different counter instance and must not leak in.
+      const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+      for (let i = 0; i < resets.length; i++) {
+        if (resets[i][0] === name && (node === el || node.contains(el))) value = resets[i][1];
+      }
+    }
+    const incs = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-increment'), 1);
+    for (let i = 0; i < incs.length; i++) {
+      if (incs[i][0] === name) value += incs[i][1];
+    }
+    if (node === el) break;
+    node = walker.nextNode();
+  }
+  return value;
+}
+
+// Resolve a pseudo `content` value into the text a browser would paint.
+// Quoted strings concatenate in place; `counter(...)` receives its evaluated
+// value; every other form (`attr()` / `url()` / `counters()` / the quote
+// keywords) still contributes nothing, preserving the historical contract of
+// the quoted-run scan this replaces. Returns null when the pseudo is not
+// generated (`content: none` / `normal`).
+//
+// `pseudoComputed` (the pseudo's own computed style, when the caller has it)
+// contributes the pseudo's own counter operations — the classic
+// `::before { counter-increment: s; content: counter(s) }` self-increment
+// pattern, which never shows up on the host's computed style.
+function resolvePseudoContentText(el, raw, pseudoComputed) {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  if (trimmed === 'none' || trimmed === 'normal') return null;
+  if (trimmed.indexOf('counter(') === -1) {
+    // Identical to the legacy scan: concatenate every quoted run.
+    let out = '';
+    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+    let m;
+    while ((m = re.exec(trimmed)) !== null) {
+      out += (m[1] !== undefined ? m[1] : m[2]);
+    }
+    return out;
+  }
+  // Positional scan so `"a" counter(x) "b"` keeps its authored order.
+  let out = '';
+  let i = 0;
+  while (i < trimmed.length) {
+    const ch = trimmed[i];
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      let s = '';
+      while (j < trimmed.length && trimmed[j] !== ch) {
+        if (trimmed[j] === '\\' && j + 1 < trimmed.length) {
+          s += trimmed[j] + trimmed[j + 1];
+          j += 2;
+        } else {
+          s += trimmed[j];
+          j += 1;
+        }
+      }
+      out += s;
+      i = j + 1;
+      continue;
+    }
+    const fn = /^(counter|counters|attr|url)\(/i.exec(trimmed.slice(i, i + 9));
+    if (fn) {
+      const open = i + fn[0].length;
+      const close = trimmed.indexOf(')', open);
+      const inner = close === -1 ? trimmed.slice(open) : trimmed.slice(open, close);
+      if (fn[1].toLowerCase() === 'counter') {
+        const parts = inner.split(',');
+        const name = (parts[0] || '').trim();
+        const style = (parts[1] || 'decimal').trim();
+        if (name) {
+          const value = resolveCssCounterValue(el, name);
+          if (value !== null) out += formatCssCounterValue(applyPseudoCounterOps(value, name, pseudoComputed), style);
+        }
+      }
+      i = close === -1 ? trimmed.length : close + 1;
+      continue;
+    }
+    i += 1;
+  }
+  return out;
+}
+
+// Fold the pseudo's own `counter-reset` / `counter-increment` into the host
+// value resolved by `resolveCssCounterValue`.
+function applyPseudoCounterOps(value, name, pseudoComputed) {
+  if (!pseudoComputed) return value;
+  let v = value;
+  const resets = parseCssCounterList(pseudoComputed.getPropertyValue('counter-reset'), 0);
+  for (let i = 0; i < resets.length; i++) {
+    if (resets[i][0] === name) v = resets[i][1];
+  }
+  const incs = parseCssCounterList(pseudoComputed.getPropertyValue('counter-increment'), 1);
+  for (let i = 0; i < incs.length; i++) {
+    if (incs[i][0] === name) v += incs[i][1];
+  }
+  return v;
+}
+
 // Resolve the text content of `el`'s ::before / ::after pseudo-element. Used
 // to surface icon-font glyphs (Phosphor, Font Awesome, Material Icons, ...)
 // whose visible character is composed by the stylesheet via
-// `content: "\e123"`. Without this hook the host element renders as an
-// empty box in the snapshot because the glyph lives in a pseudo node that
-// has no DOM presence.
+// `content: "\e123"`, and CSS counters (`content: counter(s)`) whose value
+// only exists in the layout tree. Without this hook the host element renders
+// as an empty box in the snapshot because the glyphs live in a pseudo node
+// that has no DOM presence.
 //
-// Returns '' when the pseudo has no content (the CSS defaults `none` /
-// `normal`) or when the value can't be expressed as a plain string —
-// `url(...)`, `attr(...)`, `counter(...)` and the quote keywords are not
-// supported because we have no clean way to render them inside a `<span>`.
-// Chromium's getComputedStyle returns the value with escapes already
-// resolved into actual characters and string tokens wrapped in double
-// quotes, so the parser only needs to extract quoted runs.
+// Returns '' when the pseudo has no content or produces no plain text —
+// `url(...)`, `attr(...)`, `counters(...)` and the quote keywords contribute
+// nothing (see `resolvePseudoContentText`). Chromium's getComputedStyle
+// returns the value with escapes already resolved into actual characters and
+// string tokens wrapped in double quotes.
 function pseudoText(el, pseudo) {
   const cs = getComputedStyle(el, pseudo);
-  const raw = (cs.getPropertyValue('content') || '').trim();
-  if (!raw || raw === 'none' || raw === 'normal') return '';
-  let out = '';
-  const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
-  let m;
-  while ((m = re.exec(raw)) !== null) {
-    out += (m[1] !== undefined ? m[1] : m[2]);
-  }
-  return out;
+  const text = resolvePseudoContentText(el, (cs.getPropertyValue('content') || '').trim(), cs);
+  return text === null ? '' : text;
 }
 
 // True when `el` has a non-empty ::before and/or ::after pseudo content.
@@ -4343,7 +4540,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     if (flexCharCarriesReveal(computed)) {
       const textNode = firstTextNodeChild(el);
       const revealSpans = textNode
-        ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+        ? emitTextSpans(textNode, childContentOrigin(rect, computed), computed)
         : [];
       return `<div style="${boxStyle}">${revealSpans.join('')}${overlays}</div>`;
     }
@@ -4450,7 +4647,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     withStrippedTransform(el, () => {
       preRect = el.getBoundingClientRect();
       const tn = firstTextNodeChild(el);
-      preSpans = tn ? emitTextSpans(tn, paddingBoxOrigin(preRect, computed), computed) : [];
+      preSpans = tn ? emitTextSpans(tn, childContentOrigin(preRect, computed), computed) : [];
     });
     const preLeft = preRect.left - parentRect.left;
     const preTop = preRect.top - parentRect.top;
@@ -4501,7 +4698,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   const inlineLevelDisplay = display.startsWith('inline') && display !== 'inline-block';
   const intrinsicWidth = (textAlign === 'center' && !inlineLevelDisplay) ? 'center' : false;
   const lineSpans = textNode
-    ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed, { intrinsicWidth })
+    ? emitTextSpans(textNode, childContentOrigin(rect, computed), computed, { intrinsicWidth })
     : [];
   // Wrapped inline box (e.g. a `<mark>` spanning two lines): paint the box
   // visuals once per line fragment behind a transparent positioning wrapper so
@@ -4727,7 +4924,7 @@ function isIntrinsicInlineContentWidth(el, computed, rect, opts) {
 // CSS, which renders borders after content.
 function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const intrinsicWidth = isIntrinsicInlineContentWidth(el, computed, rect, opts);
-  const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed, {
+  const childHTML = renderChildrenInto(el, childContentOrigin(rect, computed), computed, {
     intrinsicWidth,
   });
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
@@ -5732,6 +5929,7 @@ const HELPER_FNS = [
   borderWidthOf,
   readBorderSide,
   paddingBoxOrigin,
+  childContentOrigin,
   isUniformBorder,
   hasAnyBorder,
   resolveZIndex,
@@ -5741,6 +5939,13 @@ const HELPER_FNS = [
   elementHasChildren,
   scanChildNodes,
   firstTextNodeChild,
+  parseCssCounterList,
+  cssRomanCounter,
+  cssAlphaCounter,
+  formatCssCounterValue,
+  resolveCssCounterValue,
+  applyPseudoCounterOps,
+  resolvePseudoContentText,
   pseudoText,
   hasPseudoContent,
   imgSrc,
@@ -6461,6 +6666,11 @@ async function materializeDecorativePseudoElements() {
     return parseFloat(computed.getPropertyValue(prop)) || 0;
   }
   const PSEUDO_TYPES = ['::before', '::after'];
+  // Tag for the synthetic stand-in box. Deliberately NOT `div`: the stand-in
+  // must not be re-matched by the author's element selectors (see its
+  // creation site). The walker re-emits every box as a `<div>` anyway, so the
+  // custom tag never reaches the subset or the importer.
+  const STANDIN_TAG = 'snapshot-pseudo';
   // Properties whose computed value the snapshot walker reads from the
   // element. Listing them explicitly keeps the synthetic style attribute
   // bounded and deterministic. Border longhands are expanded so asymmetric
@@ -6496,6 +6706,10 @@ async function materializeDecorativePseudoElements() {
     'box-sizing',
     'color', 'font-family', 'font-size', 'font-weight', 'font-style',
     'line-height', 'letter-spacing', 'text-align',
+    // An inline text pseudo can sit off the baseline (`.q::before { content:
+    // "“"; vertical-align: -24px }`). The stand-in is an inline box of its own,
+    // so it needs the same offset or the glyph lands ~24 px above the paint.
+    'vertical-align',
     // Animation longhands are forwarded so an *animated* decorative pseudo
     // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
     // -> scaleX(1)`) keeps its motion on the synthetic node. The animation is
@@ -6548,29 +6762,185 @@ async function materializeDecorativePseudoElements() {
     ['filter', 'none'], ['backdrop-filter', 'none'], ['overflow', 'visible'],
     ['transform', 'none'],
     ['z-index', 'auto'],
-    ['box-sizing', 'content-box'],
+    ['vertical-align', 'baseline'],
+    // `box-sizing` is deliberately NOT defaulted away. The stand-in is a real
+    // element, so a page-level `* { box-sizing: border-box }` (or the subset's
+    // own global rule for div/span) reinterprets every copied `width` /
+    // `height` — and a pseudo's computed size is a *content-box* value. Emitting
+    // the pseudo's own box-sizing keeps those numbers meaning what they meant
+    // on the live page; skipping it collapsed a `content: counter(…)` badge to
+    // its padding box and clipped the digits to "0".
     ['animation-name', 'none'], ['animation-duration', '0s'],
     ['animation-timing-function', 'ease'], ['animation-delay', '0s'],
     ['animation-iteration-count', '1'], ['animation-direction', 'normal'],
     ['animation-fill-mode', 'none'],
   ]);
 
-  // A pseudo's `content` value reaches us with quotes preserved
-  // ("\"\"" for content: ""). Strip surrounding ASCII quotes so the
-  // empty-vs-text branch can be decided on the inner string.
-  function unquoteContent(raw) {
+  // Resolve a pseudo's `content` value into the text a browser would paint —
+  // a local copy of the Node-side `resolvePseudoContentText` / counter
+  // helpers (see the file's top section); they must be duplicated here because
+  // this function ships to the page through `page.evaluate` on its own source
+  // and can only reference its own lexical body. Quoted strings concatenate in
+  // place, `counter(...)` is evaluated against the live counter tree, and
+  // every other form (`attr()` / `url()` / `counters()`) contributes nothing —
+  // the historical contract of the quoted-run scan this replaces.
+  function parseCssCounterList(value, defaultDelta) {
+    const out = [];
+    const re = /([A-Za-z_][\w-]*)\s*(-?\d+)?/g;
+    let m;
+    while ((m = re.exec(value || '')) !== null) {
+      if (m[1].toLowerCase() === 'none') continue;
+      out.push([m[1], m[2] !== undefined ? parseInt(m[2], 10) : defaultDelta]);
+    }
+    return out;
+  }
+
+  function cssRomanCounter(value) {
+    const ROMAN = [
+      [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
+      [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+    ];
+    let s = '';
+    let n = value;
+    for (let r = 0; r < ROMAN.length; r++) {
+      while (n >= ROMAN[r][0]) {
+        s += ROMAN[r][1];
+        n -= ROMAN[r][0];
+      }
+    }
+    return s;
+  }
+
+  function cssAlphaCounter(value) {
+    let s = '';
+    let n = value;
+    while (n > 0) {
+      const m = (n - 1) % 26;
+      s = String.fromCharCode(97 + m) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+
+  function formatCssCounterValue(value, style) {
+    const n = Math.trunc(value);
+    switch ((style || 'decimal').trim().toLowerCase()) {
+      case 'decimal-leading-zero':
+        return (n < 0 ? '-' : '') + String(Math.abs(n)).padStart(2, '0');
+      case 'lower-alpha': case 'lower-latin': return n > 0 ? cssAlphaCounter(n) : String(n);
+      case 'upper-alpha': case 'upper-latin': return n > 0 ? cssAlphaCounter(n).toUpperCase() : String(n);
+      case 'lower-roman': return n > 0 && n < 4000 ? cssRomanCounter(n) : String(n);
+      case 'upper-roman': return n > 0 && n < 4000 ? cssRomanCounter(n).toUpperCase() : String(n);
+      case 'none': return '';
+      case 'decimal': default: return String(n);
+    }
+  }
+
+  function resolveCssCounterValue(el, name) {
+    let scope = null;
+    let value = 0;
+    for (let node = el; node; node = node.parentElement) {
+      const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+      let hit = null;
+      for (let r = 0; r < resets.length; r++) {
+        if (resets[r][0] === name) hit = resets[r][1];
+      }
+      if (hit !== null) {
+        scope = node;
+        value = hit;
+        break;
+      }
+    }
+    const root = scope || el.ownerDocument.documentElement;
+    if (!root) return null;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    let node = root;
+    while (node) {
+      if (node !== scope) {
+        const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+        for (let r = 0; r < resets.length; r++) {
+          if (resets[r][0] === name && (node === el || node.contains(el))) value = resets[r][1];
+        }
+      }
+      const incs = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-increment'), 1);
+      for (let r = 0; r < incs.length; r++) {
+        if (incs[r][0] === name) value += incs[r][1];
+      }
+      if (node === el) break;
+      node = walker.nextNode();
+    }
+    return value;
+  }
+
+  // Fold the pseudo's own `counter-reset` / `counter-increment` into the host
+  // value (the `::before { counter-increment: s; content: counter(s) }`
+  // self-increment pattern never shows up on the host's computed style).
+  function applyPseudoCounterOps(value, name, pseudoComputed) {
+    if (!pseudoComputed) return value;
+    let v = value;
+    const resets = parseCssCounterList(pseudoComputed.getPropertyValue('counter-reset'), 0);
+    for (let r = 0; r < resets.length; r++) {
+      if (resets[r][0] === name) v = resets[r][1];
+    }
+    const incs = parseCssCounterList(pseudoComputed.getPropertyValue('counter-increment'), 1);
+    for (let r = 0; r < incs.length; r++) {
+      if (incs[r][0] === name) v += incs[r][1];
+    }
+    return v;
+  }
+
+  function resolvePseudoContentText(el, raw, pseudoComputed) {
     const trimmed = (raw || '').trim();
     if (!trimmed) return '';
     if (trimmed === 'none' || trimmed === 'normal') return null;
-    // Concatenate every quoted run; ignore counter() / attr() / url() forms
-    // (they don't contribute a stable visible string, and a non-empty
-    // catch-all `out` still routes through the `renderPseudoTextLeaf` path
-    // for any glyph contribution).
-    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+    if (trimmed.indexOf('counter(') === -1) {
+      const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+      let out = '';
+      let m;
+      while ((m = re.exec(trimmed)) !== null) {
+        out += (m[1] !== undefined ? m[1] : m[2]);
+      }
+      return out;
+    }
+    // Slow path: positional scan so `"a" counter(x) "b"` keeps its authored order.
     let out = '';
-    let m;
-    while ((m = re.exec(trimmed)) !== null) {
-      out += (m[1] !== undefined ? m[1] : m[2]);
+    let i = 0;
+    while (i < trimmed.length) {
+      const ch = trimmed[i];
+      if (ch === '"' || ch === "'") {
+        let j = i + 1;
+        let s = '';
+        while (j < trimmed.length && trimmed[j] !== ch) {
+          if (trimmed[j] === '\\' && j + 1 < trimmed.length) {
+            s += trimmed[j] + trimmed[j + 1];
+            j += 2;
+          } else {
+            s += trimmed[j];
+            j += 1;
+          }
+        }
+        out += s;
+        i = j + 1;
+        continue;
+      }
+      const fn = /^(counter|counters|attr|url)\(/i.exec(trimmed.slice(i, i + 9));
+      if (fn) {
+        const open = i + fn[0].length;
+        const close = trimmed.indexOf(')', open);
+        const inner = close === -1 ? trimmed.slice(open) : trimmed.slice(open, close);
+        if (fn[1].toLowerCase() === 'counter') {
+          const parts = inner.split(',');
+          const name = (parts[0] || '').trim();
+          const style = (parts[1] || 'decimal').trim();
+          if (name) {
+            const value = resolveCssCounterValue(el, name);
+            if (value !== null) out += formatCssCounterValue(applyPseudoCounterOps(value, name, pseudoComputed), style);
+          }
+        }
+        i = close === -1 ? trimmed.length : close + 1;
+        continue;
+      }
+      i += 1;
     }
     return out;
   }
@@ -6610,19 +6980,28 @@ async function materializeDecorativePseudoElements() {
   // height:22px;background:rgba(73,83,102,.1);content:"本机"`, which would land flush with the
   // host's leading edge — no band, wrong axis — instead of sitting on the circle's bottom edge.
   // Such a pseudo materialises like any other box, with its text carried on the stand-in.
-  function shouldMaterialise(cs, pseudoText) {
+  function shouldMaterialise(cs, pseudoText, textLeafAvailable) {
     const position = (cs.getPropertyValue('position') || '').trim();
     if (position !== 'absolute' && position !== 'fixed' &&
         position !== 'static' && position !== 'relative') {
       return { ok: false, reason: 'position-' + (position || 'unknown') };
     }
     const outOfFlow = position === 'absolute' || position === 'fixed';
-    if (pseudoText !== '' && !outOfFlow) {
+    // An in-flow text-bearing pseudo normally stays on the walker's
+    // `renderPseudoTextLeaf` path, which re-emits the glyphs inside the host's
+    // own flow. That path only fires for a host with no element children and
+    // no direct text; on any other host the glyphs would be silently dropped,
+    // so the stand-in has to carry them instead (see the caller).
+    if (pseudoText !== '' && !outOfFlow && textLeafAvailable) {
       return { ok: false, reason: 'text-content' };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
-    if (widthPx <= 0 && heightPx <= 0) {
+    // A text-bearing pseudo is never "zero-size": an auto-sized inline box such
+    // as `.q::before { content: "“" }` resolves both longhands to `auto`
+    // (readNum -> 0) yet is fully sized by its own glyphs on the live page.
+    // Only a text-less box has nothing to paint at zero size.
+    if (widthPx <= 0 && heightPx <= 0 && pseudoText === '') {
       return { ok: false, reason: 'zero-size' };
     }
     return { ok: true, inFlow: !outOfFlow };
@@ -6719,12 +7098,30 @@ async function materializeDecorativePseudoElements() {
     // A stand-in therefore has to carry every text-bearing pseudo of that host, or the ones left
     // behind silently lose their glyphs; a host whose text pseudos do not all materialise keeps
     // the text-leaf path untouched.
+    // Whether the walker's pseudo-text leaf can still carry this host's
+    // pseudo glyphs: `renderPseudoTextLeaf` fires only for a host with no
+    // element children and no direct text. On any other host a refused
+    // materialisation loses the glyphs outright, so in-flow text pseudos are
+    // materialised with their text on the stand-in instead.
+    let hostHasElementChild = false;
+    let hostHasDirectText = false;
+    const hostChildren = el.childNodes || [];
+    for (let c = 0; c < hostChildren.length; c++) {
+      const child = hostChildren[c];
+      if (child.nodeType === 1) {                       // Node.ELEMENT_NODE
+        hostHasElementChild = true;
+      } else if (child.nodeType === 3 && child.nodeValue && child.nodeValue.trim()) {
+        hostHasDirectText = true;                       // Node.TEXT_NODE
+      }
+    }
+    const textLeafAvailable = !hostHasElementChild && !hostHasDirectText;
+
     const pseudoData = [];
     let hasTextPseudo = false;
     for (const pseudo of PSEUDO_TYPES) {
       const cs = getComputedStyle(el, pseudo);
       const contentRaw = (cs.getPropertyValue('content') || '').trim();
-      const pseudoText = unquoteContent(contentRaw);
+      const pseudoText = resolvePseudoContentText(el, contentRaw, cs);
       if (pseudoText === null) {
         // content: none / normal — pseudo not generated.
         pseudoData.push(null);
@@ -6735,7 +7132,7 @@ async function materializeDecorativePseudoElements() {
     }
     const decisions = pseudoData.map((slot) => {
       if (!slot) return null;
-      return shouldMaterialise(slot.cs, slot.pseudoText);
+      return shouldMaterialise(slot.cs, slot.pseudoText, textLeafAvailable);
     });
     if (hasTextPseudo) {
       let textLeftBehind = false;
@@ -6743,7 +7140,12 @@ async function materializeDecorativePseudoElements() {
         const slot = pseudoData[i];
         if (slot && slot.pseudoText !== '' && !decisions[i].ok) textLeftBehind = true;
       }
-      if (textLeftBehind) continue;
+      // Only a host that can still reach the pseudo-text leaf needs the
+      // all-or-nothing veto (a stand-in suppresses that path for the whole
+      // host). On a container host the leaf path never fires, so a pseudo that
+      // cannot materialise (zero-size inline box, sticky) must not veto the
+      // siblings that can.
+      if (textLeftBehind && textLeafAvailable) continue;
     }
 
     let materialisedAny = false;
@@ -6758,7 +7160,14 @@ async function materializeDecorativePseudoElements() {
         continue;
       }
 
-      const div = document.createElement('div');
+      // Custom tag, NOT `div`: the stand-in must not be re-matched by the
+      // author's element selectors — a `.list div { … }` rule would otherwise
+      // inject padding / a `border-bottom` (recoloured through the copied
+      // `border-color: currentColor` and visible as a stray red 1px line) /
+      // `counter-increment` (double-counting the numbering) onto the synthetic
+      // box. The tag never reaches the subset (the walker re-emits every box
+      // as a `<div>`); it only shields the live-page measurement.
+      const div = document.createElement(STANDIN_TAG);
       div.setAttribute('data-snapshot-pseudo', slot.pseudo);
       // Read the pseudo's resting style (cancelling its own animation) so an
       // entrance-animated pseudo isn't baked at its invisible 0% keyframe; the
@@ -7027,6 +7436,22 @@ function materializeListMarkers() {
       case 'decimal': default: return n + '.';
     }
   }
+  // Text of an authored `::marker { content: … }`. Chromium reports the quoted
+  // runs verbatim, and a custom string replaces the UA marker entirely — it
+  // also overrides a `list-style-type: none`. `counter()` / `counters()` /
+  // `attr()` / `url()` contribute nothing here, so those forms keep falling
+  // back to the type-based `markerText` (the pre-existing behaviour).
+  function markerContentText(raw) {
+    const trimmed = (raw || '').trim();
+    if (!trimmed || trimmed === 'none' || trimmed === 'normal') return '';
+    let out = '';
+    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+    let m;
+    while ((m = re.exec(trimmed)) !== null) {
+      out += (m[1] !== undefined ? m[1] : m[2]);
+    }
+    return out;
+  }
   // 1-based index the browser would give this item, honouring `<ol start>` and
   // per-item `value`.
   function itemIndex(li) {
@@ -7060,10 +7485,15 @@ function materializeListMarkers() {
     if (li.hasAttribute('data-snapshot-marker')) continue;
     const cs = getComputedStyle(li);
     const type = (cs.getPropertyValue('list-style-type') || '').trim();
-    if (!type || type === 'none') continue;
-    const text = markerText(type, itemIndex(li));
-    if (!text) continue;
     const mk = getComputedStyle(li, '::marker');
+    // An authored `::marker { content: "➤ " }` wins over the fabricated
+    // `list-style-type` glyphs — and over a `none` type, which `content` is
+    // allowed to override.
+    const custom = markerContentText(mk.getPropertyValue('content'));
+    const text = custom !== ''
+      ? custom
+      : (type && type !== 'none' ? markerText(type, itemIndex(li)) : '');
+    if (!text) continue;
     const width = parseFloat(mk.getPropertyValue('width')) || 0;
     const height = parseFloat(mk.getPropertyValue('height')) || 0;
 

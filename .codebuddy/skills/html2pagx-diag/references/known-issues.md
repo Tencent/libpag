@@ -1,6 +1,7 @@
 # 已知问题与实战经验（html2pagx 保真度）
 
-本文件沉淀自真实排查（`930测试集/04-image-heavy-gallery.html`、`06-deep-nesting-stacking.html`）。
+本文件沉淀自真实排查（`930测试集/04-image-heavy-gallery.html`、`06-deep-nesting-stacking.html`、
+`12-grid-magazine-vertical.html`）。
 按现象查表 → 定位 → 确认归属。
 
 ---
@@ -101,6 +102,10 @@ PAGX 没有对应图元时，二选一：**带诊断地丢弃**，或**在 PAGX 
 
 - `font-weight:800` → `fontStyle="ExtraBold"`，Helvetica Neue 无该字面 → 回退 Regular（字变细）。
 - `h1` 带 `letter-spacing:-2px` 时，PAGX 墨迹宽比浏览器**窄**（曾测 503 vs 519，逐字 ~1px 累积）。
+- **可变字体字重轴被忽略**（12-grid-magazine 引文）：Playfair Display Italic（fvar wght 400–900）
+  CSS `font-weight:600` → 渲染为默认 400（ink -20%、略窄）；最小 PAGX 复现：
+  `Regular / SemiBold Italic / Bold Italic` 三行逐像素相同（`--font-alias` 注册的 face 不随
+  fontStyle 变轴）。归属渲染器/tgfx 字体机制，另案。
 - 判断口径：字号（cap height）一致、字重/字距/字形微差 → 文字引擎问题，不要当结构问题修。
 
 ---
@@ -124,3 +129,53 @@ PAGX 没有对应图元时，二选一：**带诊断地丢弃**，或**在 PAGX 
   头像是否正圆、contain 留白宽度）。
 - **改动验证要求**：修复后重跑管线，确认目标行区间差异消失，且**其它行区间逐行不变**
   （说明改动是外科手术式的、无回归）。
+
+---
+
+## 七、伪元素内容 / CSS 计数器类（2026-10-12，12-grid-magazine 排查）
+
+### 1. `content: counter(...)` 编号丢失 + 行距错乱（已修，`lib/browser-snapshot.ts`）
+- 现象：`.list div:before{content:counter(s,decimal-leading-zero)}` 的 01..05 不渲染，
+  原地出现 **60×1px 红色短线**；行距 70→81px，逐行累积漂移（末行 ~54px）。
+- 根因链（阶段 A）：
+  1. `unquoteContent()` 忽略 `counter()` 形式 → 伪元素被判"无文本"；
+  2. `materializeDecorativePseudoElements()` 见其有可用宽高（grid item 60×41）→ 物化成
+     **无文本 stand-in div**（空盒无文本基线，`align-items:baseline` 行高被推大）；
+  3. stand-in 是 `<div>`，被作者 `.list div` 选择器重新命中：注入 padding、`border-bottom`
+     （颜色被复制的 `border-*-color: currentColor` 覆盖成红 → 红线）、`counter-increment`
+     （双重自增）。
+- 修法：`resolvePseudoContentText()`（Node 侧 + pass 内各一份，HELPER_FNS 双清单都要登记）：
+  最近 `counter-reset` 祖先开域 → 树序 `counter-increment` 求和（更深的祖先链 reset 重启）
+  → 叠加伪元素自身 counter 操作（`::before{counter-increment:s;content:counter(s)}` 自增模式）；
+  容器宿主（有元素子/直接文本，walker 的伪元素文本 leaf 路径打不到）允许在流内物化并携带文本；
+  stand-in 改用自定义标签（`snapshot-pseudo`）避免作者元素选择器污染（walker 输出仍重写为
+  `<div>`，自定义标签不进 subset/importer）。
+- 备选方案（未采用）：CDP `DOMSnapshot.captureSnapshot` 的 `layout.text` 可直接读到解析值
+  （实测 `["01","深圳…",…]`），配对 layout 树即可，但引入 CDP 依赖、实现更重。
+
+### 2. 非对称 border 的父容器，子元素整体上移 border-top 宽度（已修，`lib/browser-snapshot.ts`）
+- 现象：`.foot{border-top:8px}` 文本上移 **8px**；`.quote{border-top:4px}` 引文上移 4px、
+  其内 absolute `.side` 标签上移 4px 并被 z:1 图片盖到近乎不可见。
+- 根因（阶段 A）：`paddingBoxOrigin()` 把子元素坐标原点内移 border 宽——uniform border 时
+  wrapper 携带 `border` 简写、importer/浏览器重排都会给子元素补回 inset（实测口径一致）；
+  非对称 border 只以 overlay 矩形并列输出、wrapper 不带任何 border 信息，内移量纯丢失。
+- 修法：`childContentOrigin()`——仅 `isUniformBorder()` 时用 padding box，否则用 border box；
+  替换 `renderContainer` 与三处 `emitTextSpans` 调用点。
+- 最小复现：`border.html`（`.b` 单边 `border-top:6px` → 子元素被发成 `top:0`，浏览器在 6px）。
+
+### 3. 计数器解析后暴露的四类收尾问题（2026-10-12 补，`15-edge-cases-mixed` 排查）
+- **stand-in 尺寸语义**：stand-in 复制伪元素的 `width/height`（伪元素是 **content-box** 的 used
+  值），自己却落在页面 / 子集的 `* { box-sizing: border-box }` 下被重新解释 → h2 序号徽标
+  01..16 的盒宽被 padding 吃光、数字裁成半个（`z_h2_cur.png` 现象）。修法：`emitInlineStyle`
+  不再把 `box-sizing: content-box` 当默认跳过，stand-in 必须显式带回伪元素的 box-sizing。
+- **`zero-size` 守卫误杀文字伪元素**：有直接文本的宿主上 `ul li:before` 的 "Step N · "、
+  `.q` 的前后引号整体丢失——`shouldMaterialise` 把 `width/height: auto`（`readNum`→0）判成
+  零尺寸。修法：文字伪元素不参与 zero-size 判定（尺寸由自己的字形决定）。
+- **`vertical-align` 未复制**：`.q:before{vertical-align:-24px}` 这类 inline 文字伪元素，stand-in
+  不复制该属性会让字形偏高一个位移量（引号偏高 24px）。
+- **`li::marker { content: "➤ " }` 被无视**：`materializeListMarkers` 原先只按 `list-style-type`
+  伪造文本（渲染成默认 "1."）。修法：`::marker` 的计算 `content` 为引号串时优先于类型回退
+  （`content` 可覆盖 `list-style-type:none`）；`counter()` 形式仍走类型回退。
+- 复验口径：`930测试集/15-edge-cases-mixed.html` 整页 mean 15.9→12.7（0-765），
+  h2 徽标行 28.8→4.5、Step 列表 28.8→4.6、`::marker` 20.0→5.3；语料门禁 cases/cli 双 PASS
+  且均值优于仓库 `baseline.json`（cases SSIM 0.8705→0.9688）。
