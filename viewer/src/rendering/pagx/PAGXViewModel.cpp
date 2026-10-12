@@ -34,6 +34,9 @@
 #include <limits>
 #include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/Image.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pag {
 
@@ -344,6 +347,70 @@ void PAGXViewModel::setProgress(double newProgress) {
 void PAGXViewModel::setShowVideoFrames(bool) {
 }
 
+// True for paths that must not be prefixed with the pagx directory: absolute POSIX paths,
+// absolute Windows paths (drive letter or UNC), and URL schemes.
+static bool IsAbsolutePathOrUrl(const std::string& path) {
+  if (path.empty() || path[0] == '/' || path[0] == '\\') {
+    return true;
+  }
+  if (path.find("://") != std::string::npos) {
+    return true;
+  }
+  return path.size() >= 2 &&
+         ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) &&
+         path[1] == ':';
+}
+
+// Resolves relative Image/Font resource paths against the pagx file's directory, mirroring
+// PAGXImporter::FromFile(). The viewer imports through FromXML() because it also needs the raw
+// XML text for the source editor, and FromXML() leaves resource paths untouched: relative
+// path resolution requires the file origin, which only FromFile() knows. Absolute paths and
+// URLs are passed through unchanged.
+static void ResolveResourcePaths(pagx::PAGXDocument* document, const std::string& pagxFilePath) {
+  auto lastSlash = pagxFilePath.find_last_of("/\\");
+  if (lastSlash == std::string::npos) {
+    return;
+  }
+  auto basePath = pagxFilePath.substr(0, lastSlash + 1);
+  for (auto& node : document->nodes) {
+    std::string* path = nullptr;
+    if (node->nodeType() == pagx::NodeType::Image) {
+      path = &static_cast<pagx::Image*>(node.get())->filePath;
+    } else if (node->nodeType() == pagx::NodeType::Font) {
+      path = &static_cast<pagx::Font*>(node.get())->file;
+    }
+    if (path != nullptr && !IsAbsolutePathOrUrl(*path)) {
+      *path = basePath + *path;
+    }
+  }
+}
+
+// Registers the document's file-backed Font resources into its fontConfig, following the host
+// contract documented on PAGXDocument::fontConfig(). Without this, applyLayout() resolves
+// document font families (e.g. icon fonts) through the system fallback chain, and private-use
+// codepoints render as arbitrary glyphs from unrelated system fonts. The file also joins the
+// fallback chain because a (family, style) key holds one primary registration: unicode-range
+// subset files sharing a key would otherwise overwrite each other.
+static void RegisterDocumentFonts(pagx::PAGXDocument* document) {
+  auto& fontConfig = document->fontConfig();
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != pagx::NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<pagx::Font*>(node.get());
+    if (font->file.empty()) {
+      continue;
+    }
+    auto typeface = tgfx::Typeface::MakeFromPath(font->file);
+    if (typeface == nullptr) {
+      EditorLog("failed to load document font: " + QString::fromStdString(font->file));
+      continue;
+    }
+    fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
+    fontConfig.addFallbackFont(font->file, 0);
+  }
+}
+
 bool PAGXViewModel::loadFile(const QString& filePath) {
   auto strPath = std::string(filePath.toLocal8Bit());
   if (filePath.startsWith("file://")) {
@@ -362,6 +429,8 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     Q_EMIT filePathChanged("");
     return false;
   }
+  ResolveResourcePaths(document.get(), strPath);
+  RegisterDocumentFonts(document.get());
   document->applyLayout();
 
   auto newScene = pagx::PAGScene::Make(document);
@@ -508,6 +577,10 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   if (document == nullptr) {
     return tr("Failed to parse XML: invalid syntax or structure");
   }
+  // The editor text carries the original relative resource paths, so an Apply rebuild needs the
+  // same resolution and font registration as the initial load.
+  ResolveResourcePaths(document.get(), currentFilePath);
+  RegisterDocumentFonts(document.get());
   document->applyLayout();
 
   auto newScene = pagx::PAGScene::Make(document);
