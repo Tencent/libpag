@@ -15,6 +15,8 @@ import {
   normalizeEmptyImagePlaceholders,
   inlineCanvases,
   dropCollapsedDetailsContent,
+  materializeFirstLetter,
+  materializeListMarkers,
   materializeDecorativePseudoElements,
   inlineMaskImages,
   inlineSvgVectorPatterns,
@@ -632,6 +634,26 @@ export async function runSnapshot(
         // operator can decide whether to investigate, but never abort
         // the snapshot — the rest of the page still has to make it out.
         if (log) log(`inline-icon-fonts failed: ${errMessage(err)}`);
+      }
+    }
+
+    // Materialise `::first-letter` drop caps and `::marker` list markers. Both run
+    // before the decorative-pseudo pass: the cap is lifted off the paragraph's text
+    // node while it is still that node's first child, and the marker stand-in is
+    // inserted at the item's front before any `::before` stand-in joins it.
+    // Best-effort, same rationale as the pseudo pass below.
+    try {
+      await page.evaluate(materializeFirstLetter);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: ::first-letter materialisation skipped — drop caps and their paragraph line breaks will be missing from the snapshot: ${errMessage(err)}`);
+      }
+    }
+    try {
+      await page.evaluate(materializeListMarkers);
+    } catch (err) {
+      if (log) {
+        log(`WARNING: list-marker materialisation skipped — <ol>/<ul> markers will be missing from the snapshot: ${errMessage(err)}`);
       }
     }
 
