@@ -6762,6 +6762,282 @@ async function materializeDecorativePseudoElements() {
   }
 }
 
+// ===== Pre-snapshot pass: materialise `::first-letter` drop caps =====
+//
+// A drop cap — `.body p.first::first-letter { float: left; font-size: 96px; ... }` —
+// is painted by the browser from a pseudo-element the walker cannot see. Worse, the
+// cap's tall float box (96px) overlaps the first three line rects of the paragraph's
+// own text node, so the line splitter (which groups rects by vertical overlap) folds
+// the cap and those three lines into a single span: the paragraph then emits one
+// run-together "line" that overflows its column.
+//
+// Fix: replace the pseudo with a real floated <span> carrying the matched character
+// and the pseudo's own box/text styles, then drop that character from the paragraph's
+// text node. The browser reflows the paragraph around the real float (same geometry as
+// the pseudo produced) and the text node now reports clean per-line rects, which is
+// exactly what the walker needs.
+function materializeFirstLetter() {
+  // Properties that decide a cap's box and glyphs. Everything else keeps inheriting
+  // from the host paragraph, exactly as the pseudo did.
+  const COPY_PROPS = [
+    'float',
+    'width', 'height',
+    'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
+    'line-height', 'letter-spacing',
+    'color', 'text-align', 'text-transform',
+    'text-decoration-line', 'text-decoration-color', 'text-decoration-style',
+    'text-shadow', '-webkit-text-stroke-width', '-webkit-text-stroke-color',
+    'background-color', 'background-image', 'background-clip',
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+    'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+    'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+    'border-top-left-radius', 'border-top-right-radius',
+    'border-bottom-left-radius', 'border-bottom-right-radius',
+    'box-sizing', 'opacity', 'transform', 'transform-origin', 'z-index',
+  ];
+  const DEFAULTS = {
+    'float': 'none',
+    'padding-top': '0px', 'padding-right': '0px', 'padding-bottom': '0px', 'padding-left': '0px',
+    'margin-top': '0px', 'margin-right': '0px', 'margin-bottom': '0px', 'margin-left': '0px',
+    'text-decoration-line': 'none', 'text-decoration-color': 'currentcolor',
+    'text-decoration-style': 'solid',
+    'text-shadow': 'none', '-webkit-text-stroke-width': '0px',
+    'background-color': 'rgba(0, 0, 0, 0)', 'background-image': 'none',
+    'background-clip': 'border-box',
+    'border-top-width': '0px', 'border-right-width': '0px',
+    'border-bottom-width': '0px', 'border-left-width': '0px',
+    'border-top-style': 'none', 'border-right-style': 'none',
+    'border-bottom-style': 'none', 'border-left-style': 'none',
+    'border-top-left-radius': '0px', 'border-top-right-radius': '0px',
+    'border-bottom-left-radius': '0px', 'border-bottom-right-radius': '0px',
+    'box-sizing': 'content-box', 'opacity': '1', 'transform': 'none', 'z-index': 'auto',
+  };
+  // Properties compared against the host's own style to decide whether a
+  // `::first-letter` rule is present at all (Chromium returns an inherited computed
+  // style for the pseudo even when no rule targets it).
+  const PROBE_PROPS = ['float', 'font-size', 'font-family', 'font-weight', 'font-style', 'color'];
+  // CSS folds any leading punctuation into `::first-letter` (`"Hello` → `"H`).
+  const LEADING_PUNCT = '([{"\'“‘（【《〔';
+  function firstLetterText(str) {
+    let i = 0;
+    while (i < str.length && /\s/.test(str.charAt(i))) i++;
+    while (i < str.length && LEADING_PUNCT.indexOf(str.charAt(i)) !== -1) i++;
+    if (i >= str.length) return '';
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+      const it = seg.segment(str.slice(i))[Symbol.iterator]();
+      const firstSeg = it.next();
+      if (!firstSeg.done) return str.slice(0, i + firstSeg.value.segment.length);
+    }
+    const cp = str.codePointAt(i);
+    return str.slice(0, i + (cp > 0xFFFF ? 2 : 1));
+  }
+
+  const all = document.querySelectorAll('*');
+  let materialisedAny = false;
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    if (!(el instanceof Element)) continue;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'script' || tag === 'style' || tag === 'meta' || tag === 'link' ||
+        tag === 'title' || tag === 'head' || tag === 'html') continue;
+    if (el.closest('svg') && tag !== 'svg') continue;
+    if (el.hasAttribute('data-snapshot-first-letter')) continue;
+    // The cap is the host's first formatted character, so it only exists when the
+    // first child is a non-empty text node.
+    const first = el.firstChild;
+    if (!first || first.nodeType !== 3 || !first.nodeValue || !first.nodeValue.trim()) continue;
+
+    const fl = getComputedStyle(el, '::first-letter');
+    const own = getComputedStyle(el);
+    let differs = false;
+    for (const prop of PROBE_PROPS) {
+      if ((fl.getPropertyValue(prop) || '').trim() !== (own.getPropertyValue(prop) || '').trim()) {
+        differs = true;
+        break;
+      }
+    }
+    if (!differs) continue;
+
+    const letter = firstLetterText(first.nodeValue);
+    if (!letter) continue;
+
+    const span = document.createElement('span');
+    span.setAttribute('data-snapshot-first-letter', '');
+    const parts = [];
+    for (const prop of COPY_PROPS) {
+      const raw = (fl.getPropertyValue(prop) || '').trim();
+      if (!raw) continue;
+      if (DEFAULTS[prop] !== undefined && raw === DEFAULTS[prop]) continue;
+      // Single-quote embedded double quotes so the value survives the style="…" attribute.
+      parts.push(prop + ': ' + raw.replace(/"/g, "'"));
+    }
+    if (parts.length) span.setAttribute('style', parts.join('; '));
+    span.textContent = letter;
+    el.insertBefore(span, first);
+    first.nodeValue = first.nodeValue.slice(letter.length);
+    materialisedAny = true;
+  }
+
+  // The original `::first-letter` rule still matches — and now matches *our* float,
+  // which has become the host's first content, so Chromium styles it a second time
+  // (an extra float box that shoves the paragraph text right, or a 96px inline letter
+  // that inflates the first line box). The stand-in carries the same font/colour/box
+  // values, so the rule has nothing left to contribute: drop every `::first-letter`
+  // rule from the page's stylesheets now that the caps are real elements.
+  if (materialisedAny) {
+    const stripFirstLetterRules = (group) => {
+      let rules;
+      try {
+        rules = group.cssRules;
+      } catch (err) {
+        return; // cross-origin sheet — skip
+      }
+      if (!rules) return;
+      for (let i = rules.length - 1; i >= 0; i--) {
+        let rule;
+        try {
+          rule = rules[i];
+        } catch (err) {
+          continue;
+        }
+        const selector = rule.selectorText;
+        if (typeof selector === 'string' && /::?first-letter/i.test(selector)) {
+          try {
+            group.deleteRule(i);
+          } catch (err) { /* ignore */ }
+          continue;
+        }
+        // Recurse into grouping rules (@media, @supports) — and into nested rules,
+        // which every CSSStyleRule now carries an (often empty) `cssRules` for.
+        if (rule.cssRules && rule.cssRules.length) stripFirstLetterRules(rule);
+      }
+    };
+    const sheets = document.styleSheets;
+    for (let s = 0; s < sheets.length; s++) stripFirstLetterRules(sheets[s]);
+  }
+}
+
+// ===== Pre-snapshot pass: materialise list markers (`::marker`) =====
+//
+// `<ol>` / `<ul>` numbers and bullets are painted from the `::marker` pseudo-element,
+// which has no DOM node, so the snapshot drops every list marker — a table of contents
+// loses its "1. 2. 3.", a footnote list its numbers. Chromium does not expose the
+// marker's text either (`content` computes to `normal`), so it is derived here from
+// `list-style-type` plus the item's index in its list, then re-emitted as an
+// absolutely-positioned box pinned to the item's start edge (`right: 100%`), which is
+// where an outside marker is drawn. `::marker` *does* report its resolved width/height,
+// so the marker box matches what the browser laid out.
+function materializeListMarkers() {
+  const ROMAN = [
+    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
+    [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+  ];
+  function toRoman(n) {
+    let s = '';
+    for (let i = 0; i < ROMAN.length; i++) {
+      while (n >= ROMAN[i][0]) {
+        s += ROMAN[i][1];
+        n -= ROMAN[i][0];
+      }
+    }
+    return s;
+  }
+  function toAlpha(n) {
+    let s = '';
+    while (n > 0) {
+      const m = (n - 1) % 26;
+      s = String.fromCharCode(97 + m) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+  function markerText(type, n) {
+    switch (type) {
+      case 'none': return '';
+      case 'disc': return '\u2022';
+      case 'circle': return '\u25E6';
+      case 'square': return '\u25AA';
+      case 'decimal-leading-zero': return (n < 10 ? '0' + n : String(n)) + '.';
+      case 'lower-alpha': case 'lower-latin': return toAlpha(n) + '.';
+      case 'upper-alpha': case 'upper-latin': return toAlpha(n).toUpperCase() + '.';
+      case 'lower-roman': return toRoman(n) + '.';
+      case 'upper-roman': return toRoman(n).toUpperCase() + '.';
+      case 'decimal': default: return n + '.';
+    }
+  }
+  // 1-based index the browser would give this item, honouring `<ol start>` and
+  // per-item `value`.
+  function itemIndex(li) {
+    const list = li.parentElement;
+    if (!list) return 1;
+    let idx = 1;
+    if (list.tagName.toLowerCase() === 'ol') {
+      const start = parseInt(list.getAttribute('start'), 10);
+      if (isFinite(start)) idx = start;
+    }
+    const kids = list.children;
+    for (let k = 0; k < kids.length; k++) {
+      if (kids[k].tagName.toLowerCase() !== 'li') continue;
+      const value = parseInt(kids[k].getAttribute('value'), 10);
+      if (isFinite(value)) idx = value;
+      if (kids[k] === li) return idx;
+      idx++;
+    }
+    return idx;
+  }
+  const COPY_PROPS = [
+    'font-family', 'font-size', 'font-weight', 'font-style',
+    'font-variant-numeric', 'line-height', 'letter-spacing',
+    'color', 'text-transform',
+  ];
+
+  const items = document.querySelectorAll('li');
+  for (let i = 0; i < items.length; i++) {
+    const li = items[i];
+    if (!(li instanceof Element)) continue;
+    if (li.hasAttribute('data-snapshot-marker')) continue;
+    const cs = getComputedStyle(li);
+    const type = (cs.getPropertyValue('list-style-type') || '').trim();
+    if (!type || type === 'none') continue;
+    const text = markerText(type, itemIndex(li));
+    if (!text) continue;
+    const mk = getComputedStyle(li, '::marker');
+    const width = parseFloat(mk.getPropertyValue('width')) || 0;
+    const height = parseFloat(mk.getPropertyValue('height')) || 0;
+
+    // The marker box is positioned against the item, so a static item has to become
+    // the containing block (`position: relative` changes no layout of its own).
+    if ((cs.getPropertyValue('position') || 'static').trim() === 'static') {
+      li.style.position = 'relative';
+    }
+    const span = document.createElement('span');
+    span.setAttribute('data-snapshot-marker', '');
+    const parts = [];
+    for (const prop of COPY_PROPS) {
+      const raw = (mk.getPropertyValue(prop) || '').trim();
+      if (raw) parts.push(prop + ': ' + raw.replace(/"/g, "'"));
+    }
+    parts.push('position: absolute');
+    parts.push('right: 100%');
+    parts.push('top: 0');
+    // Chromium's `decimal` marker carries a trailing space after the dot, which it
+    // trims from the box when the text is right-aligned but which still shows up as
+    // the gap before the item text. Re-create that gap (a trailing space in our own
+    // text would just be trimmed again).
+    parts.push('margin-right: 0.4em');
+    if (width > 0) parts.push('width: ' + width + 'px');
+    if (height > 0) parts.push('height: ' + height + 'px');
+    parts.push('text-align: right');
+    parts.push('white-space: nowrap');
+    span.setAttribute('style', parts.join('; '));
+    span.textContent = text;
+    li.insertBefore(span, li.firstChild);
+  }
+}
+
 /* eslint-enable no-undef, no-inner-declarations */
 
 /* eslint-disable no-undef, no-inner-declarations */
@@ -7197,6 +7473,8 @@ export {
   imgAlt,
   inlineCanvases,
   dropCollapsedDetailsContent,
+  materializeFirstLetter,
+  materializeListMarkers,
   materializeDecorativePseudoElements,
   inlineMaskImages,
   inlineSvgVectorPatterns,

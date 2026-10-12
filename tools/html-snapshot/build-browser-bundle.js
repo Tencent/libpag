@@ -27,6 +27,8 @@ const {
   inlineExternalImages,
   inlineCanvases,
   dropCollapsedDetailsContent,
+  materializeFirstLetter,
+  materializeListMarkers,
   materializeDecorativePseudoElements,
   inlineMaskImages,
   HELPERS_SRC,
@@ -52,6 +54,8 @@ const BROWSER_EXPORTS = [
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
   { name: 'dropCollapsedDetailsContent', fn: dropCollapsedDetailsContent },
+  { name: 'materializeFirstLetter', fn: materializeFirstLetter },
+  { name: 'materializeListMarkers', fn: materializeListMarkers },
   { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },
   { name: 'inlineMaskImages',       fn: inlineMaskImages },
   { name: 'collectFontFaceMap',     fn: browserCollectFontFaceMap },
@@ -112,6 +116,8 @@ return {
   inlineExternalImages: inlineExternalImages,
   inlineCanvases: inlineCanvases,
   dropCollapsedDetailsContent: dropCollapsedDetailsContent,
+  materializeFirstLetter: materializeFirstLetter,
+  materializeListMarkers: materializeListMarkers,
   materializeDecorativePseudoElements: materializeDecorativePseudoElements,
   // Icon-font hooks: callers running outside of node (no opentype.js /
   // wawoff2 available) can still tag icon-font hosts via
