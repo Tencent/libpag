@@ -76,16 +76,20 @@ Options (any unknown flag is forwarded to snapshot.js):
                              bottom before snapshotting so scroll-triggered
                              reveal animations fire and lazy media loads
                              (default: disabled)
-  --download-fonts           Download the web fonts the page uses and register
-                             them as render fallbacks so text in uninstalled
-                             web fonts renders correctly. The fonts are not
-                             embedded into the .pagx. Default: disabled.
+  --download-fonts           Download the web fonts the page fetches from the
+                             network and register them as render fallbacks so
+                             text in uninstalled web fonts renders correctly.
+                             The fonts are not embedded into the .pagx.
+                             Default: disabled. Fonts the page inlines as
+                             data: URLs (icon fonts most often) are always
+                             saved and referenced from the .pagx, no flag
+                             needed.
   --embed-fonts              On top of --download-fonts, embed the downloaded
                              faces into the .pagx (pagx embed) so the
                              document is self-contained and its glyph metrics
                              match the snapshot on any host. Implies
                              --download-fonts. Default: disabled.
-  --font-dir <dir>           Where downloaded fonts are written
+  --font-dir <dir>           Where saved font files are written
                              (default: <output>.fonts/)
   --download-images          Download the external images the page uses and
                              reference them by local file path instead of

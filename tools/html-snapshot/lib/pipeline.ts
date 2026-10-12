@@ -155,9 +155,9 @@ function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   if (Array.isArray(opts.headers)) {
     for (const h of opts.headers) args.push('--header', h);
   }
+  if (opts.fontDir) args.push('--font-dir', opts.fontDir);
   if (opts.downloadFonts) {
     args.push('--download-fonts');
-    if (opts.fontDir) args.push('--font-dir', opts.fontDir);
     if (opts.fontManifest) args.push('--font-manifest', opts.fontManifest);
   }
   if (opts.downloadImages) {
@@ -440,8 +440,11 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   const downloadFonts = !!opts.downloadFonts || embedFonts;
   const downloadImages = !!opts.downloadImages;
 
+  // Font files always land next to the outputs: even without --download-fonts a page may inline
+  // its fonts as `data:` URLs (icon fonts most often) and the importer needs a real file on disk
+  // to reference. Network fonts stay opt-in, so the default costs nothing extra.
   let fontDir = opts.fontDir || '';
-  if (downloadFonts && !fontDir) {
+  if (!fontDir) {
     fontDir = path.join(outputDir, `${baseName}.fonts`);
   }
   // The manifest is what carries each captured file's authored CSS family down to
@@ -533,7 +536,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     // step unconditionally keeps pages that rely on system fonts (most sites) self-contained too;
     // `fontFiles` stays empty for them, which just means nothing extra is registered for shaping.
     if (embedFonts) {
-      log(`[font-embed] ${pagxFile} (${fonts.length} downloaded font file(s))`);
+      log(`[font-embed] ${pagxFile} (${fonts.length} saved font file(s))`);
       const embedResult = await runPagxFontEmbed({ pagxBin, pagxFile, fonts });
       assertStepOk('pagx embed', embedResult);
     }

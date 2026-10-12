@@ -65,6 +65,12 @@ export interface SavedFont {
   // here; these travel verbatim to `pagx embed --font-alias`). Empty when the file was captured
   // without a matching `@font-face` rule.
   cssFamilies: string[];
+  // The full `@font-face` declarations that resolved to this file (family + style + weight).
+  // `cssFamilies` is the de-duplicated family projection of this list; the face list also keeps
+  // the per-face style/weight, which `injectInlineFontFaces` needs to re-declare a face without
+  // letting a sibling face of the same family shadow it. Empty under the same conditions as
+  // `cssFamilies`.
+  cssFaces: FontFaceSource[];
 }
 
 /** A captured font file plus the CSS family it should answer to (empty when unknown). */
@@ -210,7 +216,8 @@ export function dataUrlBytes(url: string): Buffer | null {
   }
 }
 
-// Decode every captured web font to SFNT and collect the document's CSS family names per file.
+// Decode every captured web font to SFNT and collect the document's `@font-face` declarations per
+// file.
 //
 // Two sources feed this:
 //   - `sources`, the page's `@font-face` entries. Rules whose `src` is a `data:` URL matter most:
@@ -219,7 +226,7 @@ export function dataUrlBytes(url: string): Buffer | null {
 //     added to `bytesByUrl` so the regular save step writes them like any other font.
 //   - Network fonts already captured in `bytesByUrl`.
 //
-// The returned map (cache key → CSS family names) exists because a page may alias a font under a
+// The returned map (cache key → authored faces) exists because a page may alias a font under a
 // name that has nothing to do with the file it serves (`font-family: MaShanZheng` → the file's
 // internal family is "Ma Shan Zheng"; `QingKeHuangYou` → "ZCOOL QingKe HuangYou"), and for a font
 // whose typographic name (nameID 16/17) exists only in a non-English record the platform font
@@ -230,13 +237,18 @@ export function dataUrlBytes(url: string): Buffer | null {
 //
 // Every successfully decoded entry is written back into `bytesByUrl` as SFNT, so the save step
 // below skips a second decode.
+//
+// Returns each cache key's authored `@font-face` declarations (family + style + weight), not just
+// the family names: a family may ship several faces as separate inline files (a roman and an
+// italic cut, say), and the writing-back step needs the style/weight to re-declare them without
+// one face shadowing the other.
 export async function resolveFontFamilies(
   sources: FontFaceSource[],
   bytesByUrl: Map<string, Buffer>,
   logger?: CaptureLogger | null,
-): Promise<Map<string, string[]>> {
+): Promise<Map<string, FontFaceSource[]>> {
   const log: CaptureLogger = typeof logger === 'function' ? logger : () => {};
-  const familiesByKey = new Map<string, string[]>();
+  const facesByKey = new Map<string, FontFaceSource[]>();
   // One payload may be declared for several families; remember its cache key so the second
   // declaration reuses the decoded entry instead of decoding again.
   const keyByUrl = new Map<string, string>();
@@ -265,13 +277,113 @@ export async function resolveFontFamilies(
       bytesByUrl.set(key, sfnt);
       keyByUrl.set(source.url, key);
     }
-    const families = familiesByKey.get(key) || [];
-    if (!families.includes(source.family)) {
-      families.push(source.family);
+    const faces = facesByKey.get(key) || [];
+    const style = String(source.style || '').trim();
+    const weight = String(source.weight || '').trim();
+    if (!faces.some((face) => face.family === source.family && face.style === style &&
+                              face.weight === weight)) {
+      faces.push({ family: source.family, style, weight, url: source.url });
     }
-    familiesByKey.set(key, families);
+    facesByKey.set(key, faces);
   }
-  return familiesByKey;
+  return facesByKey;
+}
+
+// True for a cache key `resolveFontFamilies` minted for an inline (`data:`)
+// source. Such a font has no URL to re-fetch and no `@font-face` rule left in
+// the subset, so it is the only kind this pass writes back below.
+export function isInlineFontUrl(url: string): boolean {
+  return url.startsWith('inline-font:');
+}
+
+// Quote a string for a CSS `font-family` / `url()` value. Mirrors
+// browser-snapshot's `cssQuotedString` so the faces this module writes back
+// and the ones `collectLocalFontFaces` carry over encode names identically.
+function cssQuotedString(value: string): string {
+  let out = '"';
+  for (const ch of String(value)) {
+    if (ch === '"' || ch === '\\' || ch === '<' || ch === '>' || ch === '&' || ch < ' ') {
+      out += '\\' + ch.codePointAt(0)!.toString(16) + ' ';
+    } else {
+      out += ch;
+    }
+  }
+  return out + '"';
+}
+
+// Normalise a family name for comparison the way the font stack does:
+// case-insensitive, trimmed, internal whitespace collapsed to one space.
+function normalizeFontName(name: string): string {
+  return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Write the inline (`data:`) fonts saved during this snapshot back into the
+// subset HTML as `@font-face` rules pointing at their on-disk files.
+//
+// A `data:` font exists only inside the original document — the browser never
+// requests it, so nothing carries it into the subset: the computed
+// `font-family` name survives on each text node, but the importer has no file
+// to turn into a PAGX `<Font file>` resource. Text then falls back to a host
+// font, which for icon fonts (Material Icons, …) means the ligature name
+// itself is drawn ("location_on" instead of a pin). Re-declaring the saved
+// file here closes that gap: the importer's `loadWebFontFiles` picks up local
+// `@font-face` rules and emits the font resource, so the .pagx carries its
+// icon fonts instead of depending on out-of-band `--font-alias`
+// registrations at render time.
+//
+// Two restrictions keep this pass strictly additive:
+//   - Network fonts stay out of it entirely: their multi-subset CJK families
+//     would need `unicode-range` pairing to stay faithful, and they already
+//     reach `pagx render/embed` through the font manifest.
+//   - A face is only re-declared when its authored CSS name matches the
+//     file's own family name. `<Font file>` resources register under the
+//     font's internal family, so an aliased face (CSS "Playfair" → file
+//     family "Playfair Display") could never resolve through this route —
+//     writing the rule anyway would only shadow the working alias path with
+//     a dead reference.
+//
+// Every qualifying face is emitted, carrying its own style/weight, so a
+// family served as several inline files (roman + italic cuts) keeps both
+// cuts distinct instead of letting the later rule shadow the earlier one.
+export function injectInlineFontFaces(html: string, fonts: SavedFont[]): string {
+  const rules: string[] = [];
+  const seenFaces = new Set<string>();
+  for (const font of fonts) {
+    if (!font.path || !isInlineFontUrl(font.url)) {
+      continue;
+    }
+    const internalFamily = normalizeFontName(font.family);
+    for (const face of font.cssFaces || []) {
+      if (!face.family || normalizeFontName(face.family) !== internalFamily) {
+        continue;
+      }
+      const style = String(face.style || '').trim();
+      const weight = String(face.weight || '').trim();
+      const faceKey = face.family + '\n' + style + '\n' + weight;
+      if (seenFaces.has(faceKey)) {
+        continue;
+      }
+      seenFaces.add(faceKey);
+      let rule = '@font-face{font-family:' + cssQuotedString(face.family);
+      if (style && style !== 'normal') {
+        rule += ';font-style:' + cssQuotedString(style);
+      }
+      if (weight && weight !== 'normal' && weight !== '400') {
+        rule += ';font-weight:' + weight;
+      }
+      rule += ';src:url(' + cssQuotedString(font.path) + ')}';
+      rules.push(rule);
+    }
+  }
+  if (rules.length === 0) {
+    return html;
+  }
+  const style = '<style id="__pagx_web_fonts">' + rules.join('') + '</style>';
+  const headEnd = html.indexOf('</head>');
+  if (headEnd < 0) {
+    return html;
+  }
+  return html.slice(0, headEnd) + style + '\n' + html.slice(headEnd);
 }
 
 // Build a content-addressed `<Family>-<Style>-<hash>.<ext>` filename. The
@@ -323,7 +435,7 @@ export async function saveDownloadedFonts(
   fontBytesByUrl: Map<string, Buffer> | null | undefined,
   outDir: string,
   logger?: CaptureLogger,
-  cssFamiliesByKey?: Map<string, string[]>,
+  cssFacesByKey?: Map<string, FontFaceSource[]>,
 ): Promise<SavedFont[]> {
   const log: CaptureLogger = typeof logger === 'function' ? logger : () => {};
   const entries = fontBytesByUrl ? Array.from(fontBytesByUrl.entries()) : [];
@@ -351,24 +463,25 @@ export async function saveDownloadedFonts(
 
   // Dedupe by content hash sequentially so the order in which fonts win the
   // unique slot is deterministic (mirrors the previous loop's behaviour).
-  // Identical bytes served under different URLs may carry different CSS names (two subsets of one
-  // family, a mirror URL), so the families of every duplicate merge into the surviving entry.
+  // Identical bytes served under different URLs may carry different CSS faces (two subsets of one
+  // family, a mirror URL), so the faces of every duplicate merge into the surviving entry.
   type Pending = {
     url: string;
     sfnt: Buffer;
     filePath: string;
     meta: ReturnType<typeof readFontMeta>;
-    cssFamilies: string[];
+    cssFaces: FontFaceSource[];
   };
   const pendingByHash = new Map<string, Pending>();
   for (const item of decoded) {
     if (!item) continue;
-    const families = cssFamiliesByKey ? cssFamiliesByKey.get(item.url) || [] : [];
+    const faces = cssFacesByKey ? cssFacesByKey.get(item.url) || [] : [];
     const existing = pendingByHash.get(item.hash);
     if (existing) {
-      for (const family of families) {
-        if (!existing.cssFamilies.includes(family)) {
-          existing.cssFamilies.push(family);
+      for (const face of faces) {
+        if (!existing.cssFaces.some((f) => f.family === face.family && f.style === face.style &&
+                                            f.weight === face.weight)) {
+          existing.cssFaces.push(face);
         }
       }
       continue;
@@ -379,7 +492,7 @@ export async function saveDownloadedFonts(
       sfnt: item.sfnt,
       filePath: path.join(outDir, fileName),
       meta: item.meta,
-      cssFamilies: families.slice(),
+      cssFaces: faces.slice(),
     });
   }
 
@@ -388,12 +501,20 @@ export async function saveDownloadedFonts(
   // disk). Otherwise stage + atomically rename so parallel cases never
   // observe a partial file.
   const results = await Promise.all(Array.from(pendingByHash.values()).map(
-    async ({ url, sfnt, filePath, meta, cssFamilies }) => {
+    async ({ url, sfnt, filePath, meta, cssFaces }) => {
       try {
         if (!fs.existsSync(filePath)) {
           await writeFileAtomic(filePath, sfnt);
         }
-        return { url, path: filePath, family: meta.family, style: meta.style, cssFamilies } as SavedFont;
+        const cssFamilies: string[] = [];
+        for (const face of cssFaces) {
+          if (!cssFamilies.includes(face.family)) {
+            cssFamilies.push(face.family);
+          }
+        }
+        return {
+          url, path: filePath, family: meta.family, style: meta.style, cssFamilies, cssFaces,
+        } as SavedFont;
       } catch (err) {
         log(`failed to save font ${url}: ${errMessage(err)}`);
         return null;
