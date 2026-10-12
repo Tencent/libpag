@@ -54,6 +54,21 @@ Rectangle {
     // Chunked loading progress in the 0..1 range, fed by editorLoadProgress.
     property real loadProgress: 0
 
+    // Real content height measured from per-block layout heights by the view model. CJK lines
+    // render taller than ASCII lines under font fallback, so the former
+    // documentLineCount * lineHeight estimate fell short of the real height and the last lines
+    // could never be scrolled into view.
+    property real realContentHeight: 0
+
+    // True when the view model provides the real editor geometry helpers.
+    readonly property bool hasEditorGeometry: viewModel
+                                              && typeof viewModel.editorLineAtY === "function"
+
+    // Total number of lines backing the gutter's "is this line real" test. The geometry table
+    // lags user edits by its debounce window, so this uses the live documentLineCount single
+    // binding (re-evaluated only on lineCountChanged, see its comment) instead.
+    readonly property int totalLines: root.documentLineCount
+
     // StackLayout zeroes the geometry of inactive tabs. Resizing the editor stack on every tab
     // switch forces the text backend to re-layout and rebuild render nodes, so the last
     // non-zero size is cached and used while the panel is hidden.
@@ -96,9 +111,18 @@ Rectangle {
         }
     }
 
+    // Forces QQuickTextEdit to drop its cached text nodes and rebuild the visible band; see the
+    // scroll-recovery comment on the Flickable for why every scroll frame calls this.
+    function refreshEditorNodes() {
+        if (viewModel && typeof viewModel.refreshEditorRendering === "function") {
+            viewModel.refreshEditorRendering(textArea);
+        }
+    }
+
     function loadXml(xml, keepScrollPosition) {
         baselineXml = xml;
         maxLineWidth = 0;
+        realContentHeight = 0;
         loadProgress = 0;
         savedScrollX = (keepScrollPosition === true) ? flick.contentX : 0;
         savedScrollY = (keepScrollPosition === true) ? flick.contentY : 0;
@@ -235,12 +259,21 @@ Rectangle {
 
         function onEditorLoadFinished(maxLineWidth) {
             root.maxLineWidth = maxLineWidth;
+            if (typeof viewModel.editorContentHeight === "function") {
+                root.realContentHeight = viewModel.editorContentHeight();
+            }
             // Clearing the document pulls the caret to position 0, which drags the viewport
             // to the top-left; restore the saved position after the content is complete.
             flick.contentX = root.savedScrollX;
             flick.contentY = root.savedScrollY;
             dirty = false;
             busy = false;
+        }
+
+        function onEditorGeometryChanged() {
+            if (typeof viewModel.editorContentHeight === "function") {
+                root.realContentHeight = viewModel.editorContentHeight();
+            }
         }
     }
 
@@ -305,9 +338,17 @@ Rectangle {
 
             // One extra line above/below the viewport keeps numbers ahead of fast scrolls.
             readonly property int visibleLineCount: Math.ceil(height / root.lineHeight) + 2
-            readonly property int firstLine: Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1)
+            // The first line at the top of the viewport, mapped through the real per-block
+            // height table: with fallback fonts some lines are taller, so the uniform
+            // line-height estimate desyncs the numbers from the text while scrolling. Falls
+            // back to the estimate when the view model has no geometry helpers.
+            readonly property int firstLine: root.hasEditorGeometry
+                ? Math.max(0, viewModel.editorLineAtY(flick.contentY) - 1)
+                : Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1)
             // cursorRectangle is in content coordinates, so it identifies the caret line.
-            readonly property int caretLine: Math.round(textArea.cursorRectangle.y / root.lineHeight)
+            readonly property int caretLine: root.hasEditorGeometry
+                ? viewModel.editorLineAtY(textArea.cursorRectangle.y)
+                : Math.round(textArea.cursorRectangle.y / root.lineHeight)
 
             Repeater {
                 model: gutter.visibleLineCount
@@ -316,8 +357,12 @@ Rectangle {
                     x: 0
                     width: gutter.width - 10
                     height: root.lineHeight
-                    y: (gutter.firstLine + index) * root.lineHeight - flick.contentY
-                    text: gutter.firstLine + index < root.documentLineCount
+                    // Anchored to the line's real top from the height table, so numbers stay
+                    // aligned with the text even when line heights vary (CJK fallback fonts).
+                    y: (root.hasEditorGeometry
+                        ? viewModel.editorLineTopY(gutter.firstLine + index)
+                        : (gutter.firstLine + index) * root.lineHeight) - flick.contentY
+                    text: gutter.firstLine + index < root.totalLines
                               ? String(gutter.firstLine + index + 1) : ""
                     color: (gutter.firstLine + index) === gutter.caretLine
                                ? root.gutterActiveTextColor : root.gutterTextColor
@@ -336,13 +381,44 @@ Rectangle {
             anchors.left: gutter.right
             anchors.right: parent.right
 
-            // Estimated from line metrics: reading the document's content size here would
-            // force a full layout pass over every block and freeze the UI on large files.
+            // Estimated from the real measured content size: reading the document's content
+            // size from a binding would force a full layout pass over every block and freeze
+            // the UI on large files, so the view model measures it once (refreshed debounced
+            // after edits) instead of the lineCount * lineHeight estimate, which fell short
+            // whenever fallback fonts made some lines taller.
             contentWidth: Math.max(width, root.maxLineWidth)
-            contentHeight: Math.max(height, root.documentLineCount * root.lineHeight)
+            contentHeight: Math.max(height, root.realContentHeight)
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             flickableDirection: Flickable.HorizontalAndVerticalFlick
+
+            // Scroll recovery: QQuickTextEdit's ItemObservesViewport optimization wipes every
+            // cached text node on a viewport-triggered rebuild while keeping the accumulated
+            // rendered-region extent, and the rebuild trigger only checks the vertical extents.
+            // Vertical scrolling into fresh territory gets a per-frame native rebuild, but
+            // horizontal scrolling and back-scrolling into covered bands have no native path,
+            // so wiped nodes stay blank until something else rebuilds them. Refresh on every
+            // scroll frame instead: the call is idempotent with the native per-frame rebuild
+            // (same-frame dirty marks collapse into one updatePaintNode pass) and only rebuilds
+            // the visible band, matching the cost of what vertical scrolling already pays.
+            onContentYChanged: refreshEditorNodes()
+            onContentXChanged: refreshEditorNodes()
+
+            // A vertical trackpad flick carries a small horizontal velocity from gesture noise,
+            // and Flickable's momentum amplifies it: successive vertical flicks accumulate a
+            // large contentX offset, which slices long lines and blanks the short indented ones
+            // until the user scrolls all the way back left. Browsers do not amplify gesture
+            // noise, so the web playground never drifts this way. Restart noise-level
+            // horizontal flicks with the horizontal momentum dropped; deliberate horizontal
+            // swipes are far faster and keep their momentum. The restarted flick reports
+            // horizontalVelocity 0, which also stops this handler from retriggering on it.
+            onFlickStarted: {
+                if (horizontalVelocity !== 0 && Math.abs(horizontalVelocity) < 150) {
+                    const vertical = verticalVelocity;
+                    cancelFlick();
+                    flick(0, vertical);
+                }
+            }
 
             // NOTE: the TextArea is a plain child of the Flickable's contentItem, NOT attached
             // via "TextArea.flickable". The attached property pipes the document's ideal width
@@ -380,7 +456,7 @@ Rectangle {
             TextArea {
                 id: textArea
                 width: Math.max(flick.width, root.maxLineWidth)
-                height: Math.max(flick.height, root.documentLineCount * root.lineHeight)
+                height: Math.max(flick.height, root.realContentHeight)
 
                 textFormat: TextEdit.PlainText
                 wrapMode: TextEdit.NoWrap

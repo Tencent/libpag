@@ -101,6 +101,29 @@ class PAGXViewModel : public ContentViewModel {
   Q_INVOKABLE void attachHighlighter(QObject* quickTextDocument);
 
   /**
+   * Editor geometry helpers backed by real per-block layout heights. CJK lines render taller
+   * than ASCII lines under font fallback, so a uniform line height underestimates the content
+   * height (bottom lines become unreachable by scrolling) and desynchronizes the gutter line
+   * numbers from the text. The height table is rebuilt debounced after edits and refreshed
+   * before editorLoadFinished, so these queries are O(1) on the QML side.
+   */
+  Q_INVOKABLE qreal editorContentHeight() const;
+  Q_INVOKABLE int editorLineCount() const;
+  Q_INVOKABLE qreal editorLineTopY(int line) const;
+  Q_INVOKABLE int editorLineAtY(qreal y) const;
+
+  /**
+   * Forces the given QQuickTextEdit to drop its cached text nodes and rebuild the ones
+   * intersecting the current viewport. Works around the ItemObservesViewport defect where
+   * rebuilding wipes every cached node but keeps the accumulated rendered-region extent, so
+   * scrolling back into a previously covered band renders blank lines that only recover when
+   * something else dirties the nodes (e.g. a text selection drag). Invoked by the editor's
+   * debounced scroll hook; returns false when the internal slot is unavailable (a Qt upgrade
+   * removing it would only bring back the blank-band symptom, not a crash).
+   */
+  Q_INVOKABLE bool refreshEditorRendering(QObject* textEditItem);
+
+  /**
    * Replaces the editor document's text. Large documents are appended in chunks driven by a
    * 16ms-interval timer so the attached highlighter only ever rehighlights one chunk at a
    * time and the UI thread is never blocked for long. editorLoadFinished() is emitted when
@@ -191,6 +214,14 @@ class PAGXViewModel : public ContentViewModel {
   Q_SIGNAL void editorLoadFinished(double maxLineWidth);
   // Loading progress in the 0..1 range, emitted once per inserted chunk.
   Q_SIGNAL void editorLoadProgress(double progress);
+  // Emitted after the per-block height table was rebuilt and the geometry answers changed.
+  Q_SIGNAL void editorGeometryChanged();
+
+  // Rebuilds the editor height table from the current block layout and notifies QML when the
+  // geometry answers change. All blocks are laid out by the load-time warmup, so each
+  // blockBoundingRect read hits the layout cache; blocks edited since (or freshly pasted ones)
+  // lay out on first read.
+  void rebuildEditorGeometry();
 
   /**
    * Called by PAGXView when the render thread completes a render.
@@ -205,6 +236,9 @@ class PAGXViewModel : public ContentViewModel {
   void clearContent();
   void clearDocumentXml();
   Q_SLOT void appendEditorChunk();
+  // Debounced rebuild driver after in-editor text edits; the chunked loader refreshes the
+  // table itself at load completion, so edits arriving while it is active are ignored.
+  Q_SLOT void onEditorContentsChange();
   void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
@@ -241,6 +275,14 @@ class PAGXViewModel : public ContentViewModel {
   QPointer<XmlDocumentHighlighter> highlighter = {};
   // Folded long lines of the currently loaded document.
   QList<ElidedLine> elidedLines = {};
+  // The persistent editor's QTextDocument; connected for contentsChange so edits invalidate
+  // the geometry table through the debounce timer. Distinct from loaderDocument, which only
+  // tracks the document while a chunked load is running.
+  QPointer<QTextDocument> editorDocument = {};
+  // Prefix sums of real block heights: editorBlockTops[i] is the content-space y of line i's
+  // top; the last element is the total content height. Empty when no document is attached.
+  QVector<qreal> editorBlockTops = {};
+  QTimer* editorGeometryTimer = nullptr;
   // Chunked editor-loading state; loading lives here so it survives QML rebinding of the editor.
   QPointer<QTextDocument> loaderDocument = {};
   QString loaderText = {};

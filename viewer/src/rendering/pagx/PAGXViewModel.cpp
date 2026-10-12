@@ -30,6 +30,7 @@
 #include <QTime>
 #include <QTimer>
 #include <QXmlStreamReader>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include "pag/pag.h"
@@ -674,6 +675,103 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   if (highlighter->document() != document) {
     highlighter->setDocument(document);
   }
+  if (editorDocument != document) {
+    if (editorDocument != nullptr) {
+      disconnect(editorDocument, &QTextDocument::contentsChange, this,
+                 &PAGXViewModel::onEditorContentsChange);
+    }
+    editorDocument = document;
+    if (document != nullptr) {
+      connect(document, &QTextDocument::contentsChange, this,
+              &PAGXViewModel::onEditorContentsChange);
+    }
+    rebuildEditorGeometry();
+  }
+}
+
+void PAGXViewModel::onEditorContentsChange() {
+  // The chunked loader refreshes the table itself at load completion; contents arriving while
+  // a load is running belong to that load, not to user edits.
+  if (loaderTimer != nullptr && loaderTimer->isActive()) {
+    return;
+  }
+  if (editorGeometryTimer == nullptr) {
+    editorGeometryTimer = new QTimer(this);
+    editorGeometryTimer->setSingleShot(true);
+    editorGeometryTimer->setInterval(300);
+    connect(editorGeometryTimer, &QTimer::timeout, this, &PAGXViewModel::rebuildEditorGeometry);
+  }
+  editorGeometryTimer->start();
+}
+
+void PAGXViewModel::rebuildEditorGeometry() {
+  if (editorGeometryTimer != nullptr) {
+    editorGeometryTimer->stop();
+  }
+  QVector<qreal> tops = {};
+  if (editorDocument != nullptr) {
+    auto* layout = editorDocument->documentLayout();
+    const auto count = editorDocument->blockCount();
+    tops.reserve(count + 1);
+    qreal y = 0;
+    for (auto i = 0; i < count; ++i) {
+      const auto block = editorDocument->findBlockByNumber(i);
+      if (!block.isValid()) {
+        break;
+      }
+      tops.append(y);
+      y += layout->blockBoundingRect(block).height();
+    }
+    tops.append(y);
+  }
+  if (tops == editorBlockTops) {
+    return;
+  }
+  editorBlockTops = std::move(tops);
+  Q_EMIT editorGeometryChanged();
+}
+
+qreal PAGXViewModel::editorContentHeight() const {
+  return editorBlockTops.isEmpty() ? 0 : editorBlockTops.last();
+}
+
+int PAGXViewModel::editorLineCount() const {
+  return editorBlockTops.isEmpty() ? 0 : static_cast<int>(editorBlockTops.size()) - 1;
+}
+
+qreal PAGXViewModel::editorLineTopY(int line) const {
+  if (line <= 0 || editorBlockTops.isEmpty()) {
+    return 0;
+  }
+  if (line >= editorLineCount()) {
+    return editorBlockTops.last();
+  }
+  return editorBlockTops[line];
+}
+
+int PAGXViewModel::editorLineAtY(qreal y) const {
+  if (editorBlockTops.size() < 2) {
+    return 0;
+  }
+  if (y <= 0) {
+    return 0;
+  }
+  if (y >= editorBlockTops.last()) {
+    return static_cast<int>(editorBlockTops.size()) - 2;
+  }
+  const auto upper = std::upper_bound(editorBlockTops.cbegin(), editorBlockTops.cend(), y);
+  return static_cast<int>(upper - editorBlockTops.cbegin()) - 1;
+}
+
+bool PAGXViewModel::refreshEditorRendering(QObject* textEditItem) {
+  auto* item = qobject_cast<QQuickItem*>(textEditItem);
+  if (item == nullptr) {
+    return false;
+  }
+  // QQuickTextEdit::updateWholeDocument() is a private slot, so it is reachable through the
+  // meta object by name but not through public Qt API. All cached text nodes are marked dirty
+  // and only the nodes intersecting the current viewport are rebuilt.
+  return QMetaObject::invokeMethod(item, "updateWholeDocument");
 }
 
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
@@ -712,6 +810,7 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
                   .arg(setMs)
                   .arg(timer.elapsed())
                   .arg(maxLineWidth));
+    rebuildEditorGeometry();
     Q_EMIT editorLoadFinished(maxLineWidth);
     return;
   }
@@ -794,6 +893,9 @@ void PAGXViewModel::appendEditorChunk() {
     // Finish the remaining blocks now, while the loading overlay still covers the editor:
     // the user never sees a partially warmed document.
     warmupLayouts(std::numeric_limits<int>::max());
+    // Refresh the geometry table while the overlay still hides the editor, so the restored
+    // scroll position and the gutter line up with the real block heights from the first frame.
+    rebuildEditorGeometry();
     EditorLog(QString("appendEditorChunk: chunked load finished, chunks=%1 totalMs=%2 "
                       "maxLineWidth=%3 warmupBlocks=%4")
                   .arg(loaderChunkCount)
