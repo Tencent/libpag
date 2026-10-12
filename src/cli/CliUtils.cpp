@@ -21,8 +21,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <unordered_set>
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
+#include "pagx/nodes/Text.h"
 #include "pagx/utils/FontFileLoader.h"
 #include "renderer/FontEmbedder.h"
 
@@ -124,20 +127,34 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   if (!LoadFontConfig(&fontConfig, {}, fallbacks, aliases, command)) {
     return false;
   }
+  if (!fallbacks.empty() || !aliases.empty()) {
+    FontEmbedder::ClearEmbeddedGlyphRuns(document);
+  }
   // A source file is the only record of the family/style it provides, so a missing one cannot be
   // proven unused while any Text still asks for a font: shaping would silently fall back to a
   // substituted font with different outlines. Only a document that needs no font at all can skip
-  // such a source.
-  bool requiresFonts = !document->getRequiredFonts().empty();
+  // such a source. Pre-shaped runs have an explicit font dependency, or embedded glyphs that
+  // need no source file at all.
+  bool runtimeNeedsFonts = false;
+  std::unordered_set<std::string> referencedFiles;
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Text) continue;
+    auto* text = static_cast<Text*>(node.get());
+    runtimeNeedsFonts |= text->glyphRuns.empty() && !text->text.empty();
+    for (auto* run : text->glyphRuns) {
+      if (run->font != nullptr && run->font->glyphs.empty()) {
+        referencedFiles.insert(run->font->file);
+      }
+    }
+  }
   for (auto& file : FindUnloadableFontFiles(document)) {
-    if (requiresFonts) {
+    if (runtimeNeedsFonts || referencedFiles.count(file) != 0) {
       std::cerr << command << ": failed to load font '" << file << "'\n";
       return false;
     }
     std::cerr << command << ": failed to load font '" << file
               << "', skipped because the document needs no font\n";
   }
-  FontEmbedder::ClearEmbeddedGlyphRuns(document);
   // applyLayout registers the document's own font files on top of this config.
   document->applyLayout(&fontConfig);
   FontEmbedder embedder = {};

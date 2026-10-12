@@ -25,6 +25,7 @@
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/PathData.h"
+#include "renderer/GlyphRunRenderer.h"
 
 namespace pagx {
 
@@ -149,11 +150,7 @@ static std::vector<PositionedGlyph> WalkGlyphs(const Text& text, float textPosX,
       if (glyphID == 0) {
         continue;
       }
-      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex >= run->font->glyphs.size()) {
-        continue;
-      }
-      auto* glyph = run->font->glyphs[glyphIndex];
+      auto* glyph = GlyphRunRenderer::GetGlyph(run->font, glyphID);
       if (!glyph) {
         continue;
       }
@@ -263,11 +260,7 @@ Rect ComputeGlyphRunTextBounds(const Text& text) {
       if (glyphID == 0) {
         continue;
       }
-      auto glyphIndex = static_cast<size_t>(glyphID) - 1;
-      if (glyphIndex >= run->font->glyphs.size()) {
-        continue;
-      }
-      auto* glyph = run->font->glyphs[glyphIndex];
+      auto* glyph = GlyphRunRenderer::GetGlyph(run->font, glyphID);
       if (!glyph) {
         continue;
       }

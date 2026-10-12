@@ -39,7 +39,7 @@ class FontEmbedder {
 
   /**
    * Resets previously-embedded font data in the document so it can be re-embedded from scratch.
-   * Clears the embedded GlyphRuns vector on every Text node and removes previously-installed
+   * Clears embedded GlyphRuns on every Text node, retaining runs that reference font files and removes previously-installed
    * Font nodes (along with their Glyph, PathData, and Image children) plus any orphan GlyphRun
    * nodes from document->nodes. Font nodes with a non-empty `file` attribute are preserved
    * (only their Glyph children are cleared); Font nodes without `file` are removed entirely.
@@ -55,7 +55,8 @@ class FontEmbedder {
   /**
    * Embeds font data into the document by collecting layout glyph runs from all Text nodes.
    * The document must have had applyLayout() called first so that Text nodes contain valid
-   * layout run data.
+   * layout run data. Pre-shaped runs referencing font files are embedded from their native
+   * glyph IDs and positions without reshaping the original text; existing embedded runs remain.
    */
   bool embed(PAGXDocument* document);
 

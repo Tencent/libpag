@@ -35,7 +35,8 @@ class Font;
 class GlyphRun : public Node {
  public:
   /**
-   * Reference to the Font resource.
+   * Reference to an embedded Font or an external Font file. External runs use the first face
+   * of the file, with native glyph IDs. Embedded runs use the Font::glyphs index plus one.
    */
   Font* font = nullptr;
 
