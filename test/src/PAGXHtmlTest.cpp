@@ -32,6 +32,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/PathData.h"
@@ -39,9 +40,12 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/Woff2FontGenerator.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Typeface.h"
 #include "utils/Baseline.h"
 #include "utils/ProjectPath.h"
 #include "utils/ZipTestUtils.h"
@@ -1228,23 +1232,135 @@ CLI_TEST(PAGXHtmlTest, RealTextWithGlyphRunUsesEmbeddedFont) {
   EXPECT_EQ(html.find(">搜索"), std::string::npos);
 }
 
-CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseTheirOwnEmbeddedFonts) {
+CLI_TEST(PAGXHtmlTest, MixedGlyphRunFontsUseOneEmbeddedFont) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto html = LoadAndConvert(
       ProjectPath::Absolute("resources/pagx_to_html/unit/mixed_glyph_run_fonts.pagx"), options);
   ASSERT_FALSE(html.empty());
-  size_t bulletFontCount = 0;
-  for (size_t pos = 0; (pos = html.find("pagx-font-f0", pos)) != std::string::npos; pos++) {
-    bulletFontCount++;
-  }
-  size_t textFontCount = 0;
-  for (size_t pos = 0; (pos = html.find("pagx-font-f1", pos)) != std::string::npos; pos++) {
-    textFontCount++;
-  }
-  EXPECT_GT(bulletFontCount, static_cast<size_t>(1));
-  EXPECT_GT(textFontCount, static_cast<size_t>(1));
+  EXPECT_EQ(CountOccurrences(html, "@font-face"), 1u);
+  EXPECT_EQ(html.find("pagx-font-f1"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
   EXPECT_NE(html.find("\xEE\x80\x81"), std::string::npos);
+  EXPECT_NE(html.find("\xEE\x80\x82"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, MergedVectorFontPreservesMetricsAndSourceGlyphs) {
+  auto doc = pagx::PAGXImporter::FromXML(R"(<pagx width="120" height="40">
+    <Resources>
+      <Font id="a" unitsPerEm="1000">
+        <Glyph advance="600" path="M0 0L400 0L400 -400L0 -400Z"/>
+        <Glyph advance="300"/>
+      </Font>
+      <Font id="b" unitsPerEm="2000">
+        <Glyph advance="1200" path="M0 0L1000 0L500 -1000Z"/>
+      </Font>
+    </Resources>
+    <Layer>
+      <Text text="A B" fontSize="20">
+        <GlyphRun font="@a" fontSize="20" glyphs="1,2" y="24"/>
+        <GlyphRun font="@b" fontSize="20" glyphs="1" x="24" y="24"/>
+      </Text>
+      <Fill color="#000000"/>
+    </Layer>
+  </pagx>)");
+  ASSERT_NE(doc, nullptr);
+  auto* a = static_cast<pagx::Font*>(doc->findNode("a"));
+  auto* b = static_cast<pagx::Font*>(doc->findNode("b"));
+  auto originalPoints = b->glyphs[0]->path->points();
+  auto data = pagx::HTMLExporter::ToData(*doc);
+  ASSERT_NE(data, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries));
+  ASSERT_EQ(entries.size(), 2u);
+  auto fontFile = entries.find("assets/fonts/font_f0.woff2");
+  ASSERT_NE(fontFile, entries.end());
+  const auto& bytes = fontFile->second;
+  auto typeface = pagx::MakeTypefaceFromBytes(bytes.data(), bytes.size());
+  ASSERT_NE(typeface, nullptr);
+  tgfx::Font font(typeface, 20);
+  auto first = typeface->getGlyphID(0xE000);
+  auto space = typeface->getGlyphID(0xE001);
+  auto second = typeface->getGlyphID(0xE002);
+  EXPECT_NE(first, 0);
+  EXPECT_NE(space, 0);
+  EXPECT_NE(second, 0);
+  EXPECT_FLOAT_EQ(font.getAdvance(first), 12);
+  EXPECT_FLOAT_EQ(font.getAdvance(space), 6);
+  EXPECT_FLOAT_EQ(font.getAdvance(second), 12);
+  EXPECT_FLOAT_EQ(font.getBounds(first).width(), 8);
+  EXPECT_FLOAT_EQ(font.getBounds(second).width(), 10);
+  EXPECT_EQ(a->unitsPerEm, 1000);
+  EXPECT_EQ(b->unitsPerEm, 2000);
+  EXPECT_EQ(b->glyphs[0]->path->points(), originalPoints);
+  EXPECT_FLOAT_EQ(a->glyphs[0]->advance, 600);
+  EXPECT_FLOAT_EQ(b->glyphs[0]->advance, 1200);
+  EXPECT_EQ(CountOccurrences(entries.at("index.html"), "@font-face"), 1u);
+  EXPECT_NE(entries.at("index.html").find("\xEE\x80\x82"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, MergedFontOffsetsApplyToTextModifierAndTextPath) {
+  const std::vector<std::string> modifiers = {
+      "<TextModifier position=\"8,0\"><RangeSelector start=\"0\" end=\"1\"/></TextModifier>",
+      "<TextPath path=\"@curve\" perpendicular=\"true\"/>"};
+  for (const auto& modifier : modifiers) {
+    SCOPED_TRACE(modifier);
+    std::string xml =
+        "<pagx width=\"200\" height=\"100\"><Resources>"
+        "<Font id=\"unused\"><Glyph advance=\"500\" path=\"M0 0L500 0L500 -500Z\"/></Font>"
+        "<Font id=\"used\" unitsPerEm=\"2000\">"
+        "<Glyph advance=\"500\" path=\"M0 0L400 0L400 -500Z\"/></Font>"
+        "<PathData id=\"curve\" data=\"M0 40L180 40\"/></Resources><Layer>"
+        "<Text text=\"A\" fontSize=\"16\"><GlyphRun font=\"@used\" glyphs=\"1\" "
+        "fontSize=\"16\"/></Text>" +
+        modifier + "<Fill color=\"#000000\"/></Layer></pagx>";
+    pagx::HTMLExportOptions options;
+    options.extractStyleSheet = false;
+    auto html = LoadXMLAndConvert(xml, options);
+    ASSERT_FALSE(html.empty());
+    EXPECT_EQ(CountOccurrences(html, "@font-face"), 1u);
+    EXPECT_NE(html.find("\xEE\x80\x81"), std::string::npos);
+    EXPECT_EQ(html.find("\xEE\x80\x80"), std::string::npos);
+    xml.insert(xml.find("<GlyphRun"), "<GlyphRun font=\"@unused\" fontSize=\"24\" glyphs=\"1\"/>");
+    auto mixed = LoadXMLAndConvert(xml, options);
+    EXPECT_NE(FindTagContaining(mixed, "\xEE\x80\x80").find("font-size:24px"), std::string::npos);
+    EXPECT_NE(FindTagContaining(mixed, "\xEE\x80\x81").find("font-size:16px"), std::string::npos);
+  }
+}
+
+CLI_TEST(PAGXHtmlTest, MergedFontRespectsPrivateUseCapacity) {
+  for (size_t firstCount : {3200u, 3201u}) {
+    SCOPED_TRACE(firstCount);
+    auto doc = pagx::PAGXImporter::FromXML(R"(<pagx width="100" height="40">
+      <Resources>
+        <Font id="a"><Glyph advance="500" path="M0 0L500 0L500 -500Z"/></Font>
+        <Font id="b"><Glyph advance="500" path="M0 0L400 0L400 -500Z"/></Font>
+      </Resources>
+      <Layer><Text id="text" text="B"><GlyphRun font="@b" glyphs="1"/></Text>
+        <Fill color="#000000"/></Layer>
+    </pagx>)");
+    ASSERT_NE(doc, nullptr);
+    auto* a = static_cast<pagx::Font*>(doc->findNode("a"));
+    auto* b = static_cast<pagx::Font*>(doc->findNode("b"));
+    a->glyphs.resize(firstCount, a->glyphs[0]);
+    b->glyphs.resize(3200, b->glyphs[0]);
+    auto* text = static_cast<pagx::Text*>(doc->findNode("text"));
+    text->glyphRuns[0]->glyphs[0] = 3200;
+    auto data = pagx::HTMLExporter::ToData(*doc);
+    ASSERT_NE(data, nullptr);
+    std::unordered_map<std::string, std::string> entries;
+    ASSERT_TRUE(ExtractZipEntries(data.get(), &entries));
+    EXPECT_EQ(entries.size(), firstCount == 3200 ? 2u : 3u);
+    if (firstCount == 3200) {
+      EXPECT_NE(entries.at("index.html").find("\xEF\xA3\xBF"), std::string::npos);
+      const auto& bytes = entries.at("assets/fonts/font_f0.woff2");
+      auto typeface = pagx::MakeTypefaceFromBytes(bytes.data(), bytes.size());
+      ASSERT_NE(typeface, nullptr);
+      EXPECT_EQ(typeface->getGlyphID(0xF8FF), 6400);
+    } else {
+      EXPECT_NE(entries.at("index.html").find("pagx-font-f1"), std::string::npos);
+    }
+  }
 }
 
 CLI_TEST(PAGXHtmlTest, SingleGroupTextBoxUsesTextBoxLayout) {
@@ -3068,6 +3184,33 @@ CLI_TEST(PAGXHtmlTest, DeckExport_SingleElementYieldsOnePage) {
   EXPECT_NE(html.find("id=\"deck\""), std::string::npos);
   EXPECT_EQ(CountOccurrences(html, "<section "), static_cast<size_t>(1));
   EXPECT_NE(html.find("<section data-w=\"360\" data-h=\"240\">"), std::string::npos);
+}
+
+CLI_TEST(PAGXHtmlTest, DeckExport_PagesShareOneVectorFont) {
+  auto page1 = LoadDeckPage(R"(<pagx width="100" height="40">
+    <Resources><Font id="font"><Glyph advance="500" path="M0 0L500 0L500 -500Z"/></Font></Resources>
+    <Layer><Text text="A"><GlyphRun font="@font" glyphs="1"/></Text><Fill color="#000000"/></Layer>
+  </pagx>)");
+  auto page2 = LoadDeckPage(R"(<pagx width="100" height="40">
+    <Resources><Font id="font"><Glyph advance="500" path="M0 0L400 0L400 -500Z"/></Font></Resources>
+    <Layer><Text text="B"><GlyphRun font="@font" glyphs="1"/></Text><Fill color="#000000"/></Layer>
+  </pagx>)");
+  ASSERT_NE(page1, nullptr);
+  ASSERT_NE(page2, nullptr);
+  for (auto* secondPage : {page1.get(), page2.get()}) {
+    std::vector<pagx::PAGXDocument*> documents = {page1.get(), secondPage};
+    auto data = pagx::HTMLExporter::ToData(documents);
+    ASSERT_NE(data, nullptr);
+    std::unordered_map<std::string, std::string> entries;
+    auto html = DeckHTMLFrom(data, &entries);
+    ASSERT_EQ(entries.size(), 2u);
+    EXPECT_EQ(entries.count("assets/fonts/font_f0.woff2"), 1u);
+    EXPECT_EQ(CountOccurrences(html, "@font-face"), 1u);
+    EXPECT_NE(html.find("\xEE\x80\x80"), std::string::npos);
+    if (secondPage == page2.get()) {
+      EXPECT_NE(html.find("\xEE\x80\x81"), std::string::npos);
+    }
+  }
 }
 
 // Each page's generated assets must land under distinct names inside the shared assets/
