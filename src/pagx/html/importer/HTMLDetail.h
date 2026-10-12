@@ -93,15 +93,25 @@ void ParseStyleString(const std::string& styleStr,
 
 // Splits a CSS font-family value into individual family tokens. Top-level commas split,
 // surrounding "..." or '...' quotes are stripped, blank tokens are dropped. Generic
-// keywords are NOT mapped here; pass each token through ResolveGenericFontFamily.
+// keywords are NOT mapped here; pass each token through ClassifyFontFamilyToken.
 std::vector<std::string> ParseFontFamilyTokens(const std::string& raw);
 
-// Maps a CSS generic family keyword (sans-serif, monospace, ...) to a concrete platform
-// font name. Returns the input unchanged when `name` is not a recognised generic.
-// Returns an empty string when the keyword is a recognised generic with no sensible
-// mapping (cursive, fantasy, ui-rounded, emoji, math, fangsong). Recognises -apple-system
-// and BlinkMacSystemFont as system-ui aliases. Matching is ASCII case-insensitive.
-std::string ResolveGenericFontFamily(const std::string& name);
+// Classification of one CSS font-family token.
+struct FontFamilyToken {
+  // Concrete name to use: the authored family name for a named family, or the platform face a
+  // generic keyword maps to. Empty when the keyword is a recognised generic with no sensible
+  // mapping (cursive, fantasy, ui-rounded, emoji, math, fangsong).
+  std::string resolved = {};
+  // True when the token was a generic keyword (sans-serif, system-ui, monospace, ...) rather
+  // than a family the page named. A generic defers the choice of face to the platform, so a
+  // caller that must produce a portable document keeps authored families ahead of it.
+  bool isGeneric = false;
+};
+
+// Classifies one CSS font-family token, mapping the generic keywords this platform can express
+// to a concrete face name. Recognises -apple-system and BlinkMacSystemFont as system-ui
+// aliases. Matching is ASCII case-insensitive.
+FontFamilyToken ClassifyFontFamilyToken(const std::string& name);
 
 // ----- Tag-set predicates -------------------------------------------------------------------
 

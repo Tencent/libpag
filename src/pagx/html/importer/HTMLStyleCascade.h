@@ -72,7 +72,7 @@ class HTMLStyleCascade {
   void setFontFallbackSink(FontFallbackThunk thunk, void* userData);
 
   /** Wires the predicate that reports whether a concrete family resolves to a matching typeface.
-   *  When unset, `resolveInheritedStyle` keeps the stack's first concrete family verbatim. */
+   *  When unset, `resolveInheritedStyle` keeps the stack's first entry verbatim. */
   void setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData);
 
   /** Wires the in-place normaliser mapping a resolved pair to the platform's own spelling.
@@ -148,6 +148,14 @@ class HTMLStyleCascade {
   // sink. Skipped for pairs the parent already produced, which keeps the platform lookup to one
   // call per distinct pair instead of one per element.
   void applyFontFaceNames(HTMLInheritedStyle& out, const HTMLInheritedStyle& parent);
+
+  // Picks the family to write to `Text::fontFamily`: the first entry of `authoredFamilies` the
+  // renderer can resolve, then the first of `genericFamilies`, and `fallback` when neither group
+  // yields one. Splitting the two groups keeps an authored family ahead of a generic keyword, so
+  // the written name does not depend on which platform ran the import.
+  std::string selectPrimaryFontFamily(const std::vector<std::string>& authoredFamilies,
+                                      const std::vector<std::string>& genericFamilies,
+                                      const std::string& fallback);
 
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;

@@ -183,7 +183,12 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
-  auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
+  // Probe with the same lookup the renderer uses, so the verdict matches what rendering would
+  // pick. `Typeface::MakeFromName` alone is not enough: backends whose name lookup never reaches
+  // the platform font manager (the FreeType builds) return null for every installed family, which
+  // would report every authored family as unavailable and leave the stack's generic keyword — a
+  // face chosen by the *importing* platform — as the only candidate left.
+  auto typeface = SystemFonts::ResolveTypeface(family, "Regular");
   bool available =
       typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
