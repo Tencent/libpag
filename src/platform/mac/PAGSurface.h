@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,27 +23,10 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
+// Backend-specific factory categories (PAGSurface+OpenGL.h / PAGSurface+Metal.h) are selected by
+// the libpag build and exported through the framework's umbrella header; only the
+// backend-agnostic surface entry points stay in this class interface.
 PAG_API @interface PAGSurface : NSObject
-
-/**
- * Creates a new PAGSurface from a NSView. Returns nil if the current libpag build does not use
- * the OpenGL backend.
- */
-+ (PAGSurface*)FromView:(NSView*)view;
-
-/**
- * Creates a new PAGSurface from a CAMetalLayer. The MTLDevice on the layer (or the system
- * default) is adopted internally. Multiple PAGSurfaces whose layers share the same MTLDevice
- * share the same GPU caches. Returns nil if the current libpag build does not use the Metal
- * backend. The caller must keep the CAMetalLayer alive for the lifetime of the PAGSurface —
- * libpag does not retain it (retaining would risk a reference cycle in typical view-layer
- * setups), so releasing the layer while the PAGSurface is still in use is undefined behavior.
- * The caller must also maintain layer.drawableSize (in pixels) — CAMetalLayer does not derive it
- * from bounds automatically, and if it stays at zero the surface reports a fallback size but
- * never actually renders. When the size changes, update layer.drawableSize and call updateSize
- * on the PAGSurface.
- */
-+ (PAGSurface*)FromMetalLayer:(CAMetalLayer*)metalLayer;
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead.)
@@ -84,14 +67,18 @@ PAG_API @interface PAGSurface : NSObject
 - (void)freeCache;
 
 /**
- * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if this
- * PAGSurface is created by [PAGSurface FromView].
+ * Returns the internal CVPixelBuffer object associated with this PAGSurface. Returns nil if this
+ * PAGSurface is created by a layer-backed surface ([PAGSurface+OpenGL FromView:] or
+ * [PAGSurface+Metal FromLayer:]), or if the surface was created by [PAGSurface MakeOffscreen].
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
- * the PAGSurface will not be captured.
+ * the PAGSurface will not be captured. On Metal-layer surfaces ([PAGSurface+Metal FromLayer:]) the
+ * CAMetalLayer is presented with framebufferOnly by default and the drawable is released right
+ * after present, so a snapshot taken after the last present may read back a blank or stale frame
+ * — capture right after a flush, before other frames get presented.
  */
 - (CVPixelBufferRef)makeSnapshot;
 @end

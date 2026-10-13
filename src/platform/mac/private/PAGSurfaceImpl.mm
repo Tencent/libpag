@@ -9,25 +9,18 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurfaceImpl.h"
 #import "PAGLayerImpl+Internal.h"
+#import "PAGSurfaceImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
-
-#if defined(TGFX_USE_OPENGL)
-#include "GPUDrawable.h"
-#endif
-
-#if defined(TGFX_USE_METAL)
-#include "platform/cocoa/private/MetalGPUDrawable.h"
-#endif
 
 @interface PAGSurfaceImpl ()
 
@@ -37,34 +30,6 @@
 
 @implementation PAGSurfaceImpl {
   CVPixelBufferRef pixelBuffer;
-}
-
-+ (PAGSurfaceImpl*)FromView:(NSView*)view {
-#if defined(TGFX_USE_OPENGL)
-  auto drawable = pag::GPUDrawable::FromView(view);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-#else
-  LOGE("The current libpag build does not support [PAGSurface FromView:].");
-  return nil;
-#endif
-}
-
-+ (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer {
-#if defined(TGFX_USE_METAL)
-  auto drawable = pag::MetalGPUDrawable::FromLayer(layer);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-#else
-  LOGE("The current libpag build does not support [PAGSurface FromMetalLayer:].");
-  return nil;
-#endif
 }
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
@@ -123,10 +88,10 @@
   uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(hardwareBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
+  CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
   if (!status) {
     LOGE("ReadPixels failed!");
   }
-  CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
   return hardwareBuffer;
 }
 

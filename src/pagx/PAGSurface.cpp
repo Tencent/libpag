@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGSurface.h"
+#include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
 #include "pagx/runtime/Drawable.h"
 #include "pagx/runtime/OffscreenDrawable.h"
@@ -43,6 +44,14 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendTexture& texture,
                                                  pag::ImageOrigin origin) {
   auto tgfxTexture = pag::ToTGFX(texture);
+  if (!pag::Devices::SupportsBackend(tgfxTexture.backend())) {
+    // Reject backend-mismatched descriptions up front instead of returning a surface that
+    // silently fails to draw later (the GPU context can never sample the foreign texture).
+    LOGE(
+        "The current libpag build does not support creating a PAGSurface from a texture of a "
+        "different backend.");
+    return nullptr;
+  }
   auto device = pag::Devices::AdoptCurrent().device;
   if (device == nullptr) {
     // Backends without a thread-local "current context" (Metal / D3D12) reach the render device
@@ -57,6 +66,13 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendTexture& text
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const pag::BackendRenderTarget& renderTarget,
                                                  pag::ImageOrigin origin) {
   auto tgfxRenderTarget = pag::ToTGFX(renderTarget);
+  if (!pag::Devices::SupportsBackend(tgfxRenderTarget.backend())) {
+    // Same rationale as the BackendTexture entry above.
+    LOGE(
+        "The current libpag build does not support creating a PAGSurface from a render target "
+        "of a different backend.");
+    return nullptr;
+  }
   auto device = pag::Devices::AdoptCurrent().device;
   if (device == nullptr) {
     device = pag::Devices::MakeForTexture(tgfxRenderTarget);

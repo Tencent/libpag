@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,9 +31,9 @@ namespace pag {
  * since Metal's CAMetalLayer API is identical across the two platforms — only the host layer
  * type name differs at the OC-facade level.
  */
-class MetalGPUDrawable : public Drawable {
+class MetalLayerDrawable : public Drawable {
  public:
-  static std::shared_ptr<MetalGPUDrawable> FromLayer(CAMetalLayer* layer);
+  static std::shared_ptr<MetalLayerDrawable> FromLayer(CAMetalLayer* layer);
 
   int width() const override {
     return _width;
@@ -60,7 +60,7 @@ class MetalGPUDrawable : public Drawable {
   CAMetalLayer* layer = nil;
   std::shared_ptr<tgfx::MetalWindow> window = nullptr;
 
-  explicit MetalGPUDrawable(CAMetalLayer* layer);
+  explicit MetalLayerDrawable(CAMetalLayer* layer);
 };
 
 }  // namespace pag

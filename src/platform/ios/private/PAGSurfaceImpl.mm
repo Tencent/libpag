@@ -9,37 +9,28 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The file uses CAEAGLLayer / EAGLContext, deprecated since iOS 12. libpag's own build defines
-// GLES_SILENCE_DEPRECATION (see CMakeLists); define it locally too so IDE indexing without the
-// build flags stays clean.
-#ifndef GLES_SILENCE_DEPRECATION
-#define GLES_SILENCE_DEPRECATION 1
-#endif
 #import "PAGSurfaceImpl.h"
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGSurface+Internal.h"
+#import "PAGSurfaceImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "pag/types.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
-#include "rendering/drawables/HardwareBufferDrawable.h"
 
 #if defined(TGFX_USE_OPENGL)
-#include "GPUDrawable.h"
-#include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
+#import "platform/ios/private/opengl/PAGSurfaceImpl+OpenGL.h"
 #endif
 
 #if defined(TGFX_USE_METAL)
-#import <Metal/Metal.h>
-#include "platform/cocoa/private/MetalGPUDrawable.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
+#import "platform/ios/private/metal/PAGSurfaceImpl+Metal.h"
 #endif
 
 @interface PAGSurfaceImpl ()
@@ -56,54 +47,6 @@
   return _pagSurface;
 }
 
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer {
-#if defined(TGFX_USE_OPENGL)
-  auto drawable = pag::GPUDrawable::FromLayer(layer);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-#else
-  LOGE("The current libpag build does not support [PAGSurface FromLayer:].");
-  return nil;
-#endif
-}
-
-+ (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer {
-#if defined(TGFX_USE_METAL)
-  auto drawable = pag::MetalGPUDrawable::FromLayer(layer);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
-#else
-  LOGE("The current libpag build does not support [PAGSurface FromMetalLayer:].");
-  return nil;
-#endif
-}
-
-#if TARGET_IPHONE_SIMULATOR
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:].");
-  return nil;
-}
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext {
-  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:context:].");
-  return nil;
-}
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
-  LOGE("The simulator does not support [PAGSurface FromCVPixelBuffer:mtlDevice:].");
-  return nil;
-}
-
-#else  // TARGET_IPHONE_SIMULATOR
-
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer {
 #if defined(TGFX_USE_OPENGL)
   return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer context:nil];
@@ -111,42 +54,6 @@
   return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer mtlDevice:nil];
 #endif
 }
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext {
-#if defined(TGFX_USE_OPENGL)
-  auto device = tgfx::EAGLDevice::MakeFrom(eaglContext);
-  auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, device);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
-#else
-  LOGE("The current libpag build does not support [PAGSurface FromCVPixelBuffer:context:].");
-  return nil;
-#endif
-}
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device {
-#if defined(TGFX_USE_METAL)
-  std::shared_ptr<tgfx::MetalDevice> metalDevice = nullptr;
-  if (device != nil) {
-    metalDevice = tgfx::MetalDevice::MakeFrom(device);
-  }
-  auto drawable = pag::HardwareBufferDrawable::MakeFrom(pixelBuffer, metalDevice);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface pixelBuffer:pixelBuffer] autorelease];
-#else
-  LOGE("The current libpag build does not support [PAGSurface FromCVPixelBuffer:mtlDevice:].");
-  return nil;
-#endif
-}
-
-#endif  // TARGET_IPHONE_SIMULATOR
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
   auto surface = pag::PAGSurface::MakeOffscreen(static_cast<int>(roundf(size.width)),

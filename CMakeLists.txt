@@ -569,12 +569,34 @@ elseif (IOS)
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
+        # Only the surface category matching the built backend may be compiled and exported: both
+        # categories declare colliding ObjC selectors (FromLayer:), so the loser's files are
+        # dropped here and only the winner's header is referenced by the generated umbrella.
+        # Framework consumers have no TGFX_USE_* build macros, so the selection cannot live in
+        # the public headers — it happens at build configuration time.
+        if (PAG_USE_METAL)
+            set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+Metal.h")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "PAGSurface\\+OpenGL\\.")
+        else ()
+            set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+OpenGL.h")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "PAGSurface\\+Metal\\.")
+        endif ()
+        # The umbrella header template is not a source file; the configured copy is generated
+        # below and exported instead of the template.
+        list(FILTER PLATFORM_FILES EXCLUDE REGEX "libpag\\.h\\.in$")
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
         # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
         set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
+        if (PAG_USE_METAL)
+            list(FILTER IOS_PLATFORM_HEADERS EXCLUDE REGEX "PAGSurface\\+OpenGL\\.")
+        else ()
+            list(FILTER IOS_PLATFORM_HEADERS EXCLUDE REGEX "PAGSurface\\+Metal\\.")
+        endif ()
+        configure_file(src/platform/ios/libpag.h.in ${CMAKE_CURRENT_BINARY_DIR}/ios/libpag.h @ONLY)
+        list(APPEND IOS_PLATFORM_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/ios/libpag.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
                 src/platform/ios/*.h
@@ -611,12 +633,34 @@ elseif (MACOS)
         endif ()
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
+        # Only the surface category matching the built backend may be compiled and exported: both
+        # categories declare colliding ObjC selectors (FromLayer:), so the loser's files are
+        # dropped here and only the winner's header is referenced by the generated umbrella.
+        # Framework consumers have no TGFX_USE_* build macros, so the selection cannot live in
+        # the public headers — it happens at build configuration time.
+        if (PAG_USE_METAL)
+            set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+Metal.h")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "PAGSurface\\+OpenGL\\.")
+        else ()
+            set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+OpenGL.h")
+            list(FILTER PLATFORM_FILES EXCLUDE REGEX "PAGSurface\\+Metal\\.")
+        endif ()
+        # The umbrella header template is not a source file; the configured copy is generated
+        # below and exported instead of the template.
+        list(FILTER PLATFORM_FILES EXCLUDE REGEX "libpag\\.h\\.in$")
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
         # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
         set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
+        if (PAG_USE_METAL)
+            list(FILTER MAC_PLATFORM_HEADERS EXCLUDE REGEX "PAGSurface\\+OpenGL\\.")
+        else ()
+            list(FILTER MAC_PLATFORM_HEADERS EXCLUDE REGEX "PAGSurface\\+Metal\\.")
+        endif ()
+        configure_file(src/platform/mac/libpag.h.in ${CMAKE_CURRENT_BINARY_DIR}/mac/libpag.h @ONLY)
+        list(APPEND MAC_PLATFORM_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/mac/libpag.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
                 src/platform/mac/*.h

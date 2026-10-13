@@ -25,13 +25,15 @@
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
 
 #if defined(TGFX_USE_OPENGL)
-#import "platform/mac/private/GPUDrawable.h"
+#import "PAGSurface+OpenGL.h"
+#import "platform/mac/private/opengl/CGLDrawable.h"
 #endif
 
 #if defined(TGFX_USE_METAL)
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
-#include "platform/cocoa/private/PAGMetalLayerHelper.h"
+#import "PAGSurface+Metal.h"
+#include "platform/cocoa/private/metal/MetalLayerHelper.h"
 #endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
@@ -193,7 +195,7 @@
   // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
   // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
   [self updateLayerDrawableSize];
-  pagSurface = [[PAGSurface FromMetalLayer:layer] retain];
+  pagSurface = [[PAGSurface FromLayer:layer] retain];
 #else
   pagSurface = [[PAGSurface FromView:self] retain];
 #endif

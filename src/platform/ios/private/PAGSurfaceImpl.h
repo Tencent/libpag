@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,26 +23,10 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayerImpl.h"
 
-@protocol MTLDevice;
-
-// The CAEAGLLayer / EAGLContext declarations below are deprecated since iOS 12 but remain part
-// of the published GL-backend API surface. Silence the deprecation warnings locally: this header
-// is included from platform files compiled without libpag's GLES_SILENCE_DEPRECATION build
-// define (e.g. the cocoa PAGPlayer bridge), and defining that macro here would leak into the
-// whole including translation unit.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
+// Backend-specific factory categories live in opengl/ and metal/ next to this file. They are
+// compiled per backend through their own TGFX_USE_* guards; only the backend-agnostic surface
+// entry points stay in this class interface.
 @interface PAGSurfaceImpl : NSObject
-
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromMetalLayer:(CAMetalLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
@@ -65,5 +49,3 @@
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 
 @end
-
-#pragma clang diagnostic pop

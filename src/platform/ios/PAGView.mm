@@ -34,12 +34,14 @@
 #import "platform/cocoa/private/PAGAnimatorListenerProxy.h"
 
 #if defined(TGFX_USE_OPENGL)
-#import "platform/ios/private/GPUDrawable.h"
+#import "PAGSurface+OpenGL.h"
+#import "platform/ios/private/opengl/EAGLDrawable.h"
 #endif
 
 #if defined(TGFX_USE_METAL)
 #import <Metal/Metal.h>
-#include "platform/cocoa/private/PAGMetalLayerHelper.h"
+#import "PAGSurface+Metal.h"
+#include "platform/cocoa/private/metal/MetalLayerHelper.h"
 #endif
 
 @interface PAGView () <PAGAnimatorUpdater, PAGViewAnimatorForwarder>
@@ -84,9 +86,9 @@
                                              object:nil];
 #if defined(TGFX_USE_OPENGL)
   // The async-surface-prepared dance is a GL-only workaround for issue #1870: creating a
-  // CAEAGLLayer surface off the main thread crashes, so GPUDrawable defers creation to the main
+  // CAEAGLLayer surface off the main thread crashes, so EAGLDrawable defers creation to the main
   // queue and notifies us to redraw. Metal does not need this — CAMetalLayer / nextDrawable
-  // support creating surfaces on the render thread, so MetalGPUDrawable creates them inline.
+  // support creating surfaces on the render thread, so MetalLayerDrawable creates them inline.
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(AsyncSurfacePrepared:)
                                                name:pag::AsyncSurfacePreparedNotification
@@ -223,7 +225,7 @@
   // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
   // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
   [self updateLayerDrawableSize];
-  pagSurface = [[PAGSurface FromMetalLayer:layer] retain];
+  pagSurface = [[PAGSurface FromLayer:layer] retain];
 #else
   CAEAGLLayer* layer = (CAEAGLLayer*)[self layer];
   pagSurface = [[PAGSurface FromLayer:layer] retain];

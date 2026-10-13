@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGImage.h"
+#include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
 #include "pagx/tgfx.h"
 #include "pagx/utils/Base64.h"
@@ -65,6 +66,14 @@ std::shared_ptr<PAGImage> PAGImage::MakeFromData(const std::shared_ptr<Data>& da
 std::shared_ptr<PAGImage> PAGImage::MakeFromTexture(const pag::BackendTexture& texture,
                                                     pag::ImageOrigin origin) {
   auto tgfxTexture = pag::ToTGFX(texture);
+  if (!pag::Devices::SupportsBackend(tgfxTexture.backend())) {
+    // Reject backend-mismatched descriptions up front instead of returning an image that
+    // silently fails to draw later (the GPU context can never sample the foreign texture).
+    LOGE(
+        "The current libpag build does not support creating an image from a texture of a "
+        "different backend.");
+    return nullptr;
+  }
   auto device = pag::Devices::AdoptCurrent().device;
   if (device == nullptr) {
     // Non-GL backends have no thread-local "current context"; recover the device from the
