@@ -60,6 +60,11 @@ Rectangle {
     // could never be scrolled into view.
     property real realContentHeight: 0
 
+    // Bumped whenever the C++ per-block height table is rebuilt (editorGeometryChanged). The
+    // gutter bindings reference it so they re-evaluate the geometry helpers on an in-viewport
+    // edit, which mutates the table without moving contentY (QML cannot track the C++ table).
+    property int geometryRevision: 0
+
     // True when the view model provides the real editor geometry helpers.
     readonly property bool hasEditorGeometry: viewModel
                                               && typeof viewModel.editorLineAtY === "function"
@@ -274,6 +279,7 @@ Rectangle {
             if (typeof viewModel.editorContentHeight === "function") {
                 root.realContentHeight = viewModel.editorContentHeight();
             }
+            root.geometryRevision++;
         }
     }
 
@@ -342,9 +348,15 @@ Rectangle {
             // height table: with fallback fonts some lines are taller, so the uniform
             // line-height estimate desyncs the numbers from the text while scrolling. Falls
             // back to the estimate when the view model has no geometry helpers.
-            readonly property int firstLine: root.hasEditorGeometry
-                ? Math.max(0, viewModel.editorLineAtY(flick.contentY) - 1)
-                : Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1)
+            readonly property int firstLine: {
+                // Reference geometryRevision so this re-evaluates when the C++ block-height
+                // table changes without contentY moving (in-viewport edits); editorLineAtY
+                // reads that table, which QML cannot track on its own.
+                root.geometryRevision;
+                return root.hasEditorGeometry
+                    ? Math.max(0, viewModel.editorLineAtY(flick.contentY) - 1)
+                    : Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1);
+            }
             // cursorRectangle is in content coordinates, so it identifies the caret line.
             readonly property int caretLine: root.hasEditorGeometry
                 ? viewModel.editorLineAtY(textArea.cursorRectangle.y)
@@ -359,9 +371,15 @@ Rectangle {
                     height: root.lineHeight
                     // Anchored to the line's real top from the height table, so numbers stay
                     // aligned with the text even when line heights vary (CJK fallback fonts).
-                    y: (root.hasEditorGeometry
-                        ? viewModel.editorLineTopY(gutter.firstLine + index)
-                        : (gutter.firstLine + index) * root.lineHeight) - flick.contentY
+                    y: {
+                        // Reference geometryRevision so this re-evaluates when the C++ block-
+                        // height table changes without contentY moving (in-viewport edits);
+                        // editorLineTopY reads that table, which QML cannot track on its own.
+                        root.geometryRevision;
+                        return (root.hasEditorGeometry
+                            ? viewModel.editorLineTopY(gutter.firstLine + index)
+                            : (gutter.firstLine + index) * root.lineHeight) - flick.contentY;
+                    }
                     text: gutter.firstLine + index < root.totalLines
                               ? String(gutter.firstLine + index + 1) : ""
                     color: (gutter.firstLine + index) === gutter.caretLine
@@ -467,7 +485,16 @@ Rectangle {
                 selectedTextColor: "#FFFFFF"
                 font.family: "Menlo"
                 font.pixelSize: 13
+                // The Universal style binds topPadding/rightPadding/bottomPadding to
+                // "padding - N" (N = 7/4/5), so a bare "padding: 0" leaves topPadding at -7 and
+                // paints the text 7px above the gutter origin (clipping the first line and
+                // desyncing every line number). Pin all edges to 0 so the text's document
+                // origin matches the gutter's content coordinates.
                 padding: 0
+                topPadding: 0
+                leftPadding: 0
+                rightPadding: 0
+                bottomPadding: 0
                 leftInset: 0
                 rightInset: 0
                 topInset: 0
