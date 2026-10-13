@@ -95,26 +95,26 @@
         <translation>导出错误，错误码：</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="648"/>
+        <location filename="../qml/Main.qml" line="680"/>
         <source>Open PAG File</source>
         <translation>打开PAG文件</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="735"/>
-        <location filename="../qml/Main.qml" line="760"/>
-        <location filename="../qml/Main.qml" line="783"/>
+        <location filename="../qml/Main.qml" line="767"/>
+        <location filename="../qml/Main.qml" line="792"/>
+        <location filename="../qml/Main.qml" line="815"/>
         <source>Select save path</source>
         <translation>选择保存路径</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="746"/>
-        <location filename="../qml/Main.qml" line="767"/>
-        <location filename="../qml/Main.qml" line="792"/>
+        <location filename="../qml/Main.qml" line="778"/>
+        <location filename="../qml/Main.qml" line="799"/>
+        <location filename="../qml/Main.qml" line="824"/>
         <source>Exporting</source>
         <translation>正在导出</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="810"/>
+        <location filename="../qml/Main.qml" line="842"/>
         <source>Profiling</source>
         <translation>分析</translation>
     </message>
@@ -614,54 +614,54 @@
         <translation type="vanished">正在编辑第 %1 行（Enter=下一行，Esc=退出）</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="137"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="166"/>
         <source>Nothing to discard</source>
         <translation>没有可放弃的修改</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="145"/>
-        <location filename="../qml/XMLSourceEditor.qml" line="149"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="174"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="178"/>
         <source>Changes discarded</source>
         <translation>修改已放弃</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="161"/>
-        <location filename="../qml/XMLSourceEditor.qml" line="189"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="190"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="218"/>
         <source>A folded data line was modified. Discard to restore it.</source>
         <translation>折叠的数据行被修改，放弃修改以恢复。</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="175"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="204"/>
         <source>Changes applied</source>
         <translation>修改已应用</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="207"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="236"/>
         <source>File saved</source>
         <translation>文件已保存</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="469"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="572"/>
         <source>Loading source... %1%</source>
         <translation>正在加载源码… %1%</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="470"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="573"/>
         <source>Loading source...</source>
         <translation>正在加载源码…</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="512"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="615"/>
         <source>Discard</source>
         <translation>放弃</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="520"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="623"/>
         <source>Apply</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../qml/XMLSourceEditor.qml" line="528"/>
+        <location filename="../qml/XMLSourceEditor.qml" line="631"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -669,7 +669,7 @@
 <context>
     <name>pag::PAGXViewModel</name>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="578"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="579"/>
         <source>Failed to parse XML: invalid syntax or structure</source>
         <translation>解析 XML 失败：语法或结构无效</translation>
     </message>
@@ -678,27 +678,27 @@
         <translation type="vanished">从 XML 文档构建图层失败</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="588"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="589"/>
         <source>Failed to build PAGScene from XML document</source>
         <translation>从 XML 文档构建 PAGScene 失败</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="624"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="625"/>
         <source>No file path specified</source>
         <translation>未指定文件路径</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="628"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="629"/>
         <source>Failed to open file for writing: %1</source>
         <translation>无法打开文件进行写入：%1</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="633"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="634"/>
         <source>Failed to write all data to file</source>
         <translation>写入文件数据不完整</translation>
     </message>
     <message>
-        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="645"/>
+        <location filename="../../src/rendering/pagx/PAGXViewModel.cpp" line="646"/>
         <source>Line %1, column %2: %3</source>
         <translation>第 %1 行第 %2 列：%3</translation>
     </message>
