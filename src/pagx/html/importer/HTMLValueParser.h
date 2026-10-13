@@ -75,6 +75,8 @@ class HTMLValueParser {
     float blurY = 0;
     ShadowSpec shadow = {};
     std::string refId = {};
+    // 4x5 colour matrix (row-major R, G, B, A rows; last column bias), applied as
+    // [R' G' B' A'] = [R G B A 1] * matrix. Only meaningful when `kind == ColorMatrix`.
     std::array<float, 20> matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
                                     0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
     std::string raw = {};
@@ -127,9 +129,13 @@ class HTMLValueParser {
   ConicGradient* parseConicGradient(const std::string& value, bool repeating = false);
 
   /** Parses the comma-separated tail of a gradient call into (offset, color) pairs. Offsets that
-   *  fail to parse are left as NaN for `finaliseGradientStops` to fill in. */
+   *  fail to parse are left as NaN for `finaliseGradientStops` to fill in. `pxOffsetScale` is the
+   *  gradient's extent in px (line length for linear, radius for radial): a px stop offset is an
+   *  absolute distance along the gradient ray, so it is divided by this to recover the normalised
+   *  [0,1] offset PAGX color stops use. Pass NaN (the default) when the extent is unknown to keep
+   *  the raw px value. */
   GradientStops parseGradientStops(const std::vector<std::string>& parts, size_t startIndex,
-                                   bool interpretAngularOffset);
+                                   bool interpretAngularOffset, float pxOffsetScale = NAN);
 
   /** Fills NaN offsets with sensible defaults (first/last → 0/1, intermediate gaps spread
    *  evenly). Returns false when the list is empty. */

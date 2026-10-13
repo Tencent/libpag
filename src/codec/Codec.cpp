@@ -147,11 +147,116 @@ void Codec::InstallReferences(const std::vector<Composition*>& compositions) {
   }
 }
 
+static const size_t MaxCompositionNestingDepth = 128;
+
+enum class VisitState {
+  Visiting,
+  Visited,
+};
+
+struct CompositionVisitInfo {
+  VisitState state;
+  // The maximum number of the compositions on a reference chain starting from this composition.
+  size_t depth;
+};
+
+// The parent of a layer is resolved by id inside its own composition without any validation, so a
+// corrupted file can make a parent chain point back to one of its own layers. Such a chain forms
+// an endless loop in the traversals of the layer tree.
+static bool VerifyLayerParentChains(const std::vector<Layer*>& layers) {
+  std::unordered_set<Layer*> verifiedLayers = {};
+  std::vector<Layer*> chain = {};
+  for (auto layer : layers) {
+    if (layer == nullptr) {
+      VerifyFailed();
+      return false;
+    }
+    chain.clear();
+    auto current = layer;
+    while (current != nullptr && verifiedLayers.find(current) == verifiedLayers.end() &&
+           chain.size() <= layers.size()) {
+      chain.push_back(current);
+      current = current->parent;
+    }
+    if (chain.size() > layers.size()) {
+      VerifyFailed();
+      return false;
+    }
+    for (auto item : chain) {
+      verifiedLayers.insert(item);
+    }
+  }
+  return true;
+}
+
+// The composition references are resolved by id without any validation, so a corrupted file can
+// make the references form a cycle. The depth of the reference chains is limited as well,
+// otherwise a deeply nested file would overflow the stack in the recursive traversals of the
+// layer tree. The depth is measured for every composition instead of the recursion itself,
+// because the order of the compositions in a file is arbitrary.
+static bool MeasureCompositionDepth(Composition* composition, size_t recursionDepth,
+                                    std::unordered_map<Composition*, CompositionVisitInfo>& states,
+                                    size_t* depth) {
+  if (composition == nullptr || recursionDepth > MaxCompositionNestingDepth) {
+    VerifyFailed();
+    return false;
+  }
+  auto result = states.find(composition);
+  if (result != states.end()) {
+    if (result->second.state == VisitState::Visiting) {
+      VerifyFailed();
+      return false;
+    }
+    *depth = result->second.depth;
+    return true;
+  }
+  states[composition] = {VisitState::Visiting, 0};
+  size_t maxChildDepth = 0;
+  if (composition->type() == CompositionType::Vector) {
+    auto vectorComposition = static_cast<VectorComposition*>(composition);
+    if (!VerifyLayerParentChains(vectorComposition->layers)) {
+      return false;
+    }
+    for (auto layer : vectorComposition->layers) {
+      if (layer->type() != LayerType::PreCompose) {
+        continue;
+      }
+      size_t childDepth = 0;
+      auto child = static_cast<PreComposeLayer*>(layer)->composition;
+      if (!MeasureCompositionDepth(child, recursionDepth + 1, states, &childDepth)) {
+        return false;
+      }
+      if (childDepth > maxChildDepth) {
+        maxChildDepth = childDepth;
+      }
+    }
+  }
+  auto compositionDepth = maxChildDepth + 1;
+  if (compositionDepth > MaxCompositionNestingDepth) {
+    VerifyFailed();
+    return false;
+  }
+  states[composition] = {VisitState::Visited, compositionDepth};
+  *depth = compositionDepth;
+  return true;
+}
+
+static bool VerifyCompositionGraph(const std::vector<Composition*>& compositions) {
+  std::unordered_map<Composition*, CompositionVisitInfo> states = {};
+  for (auto composition : compositions) {
+    size_t depth = 0;
+    if (!MeasureCompositionDepth(composition, 0, states, &depth)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::shared_ptr<File> Codec::VerifyAndMake(const std::vector<pag::Composition*>& compositions,
                                            const std::vector<pag::ImageBytes*>& images) {
-  bool success = !compositions.empty();
+  bool success = !compositions.empty() && VerifyCompositionGraph(compositions);
   for (auto composition : compositions) {
-    if (composition == nullptr || !composition->verify()) {
+    if (!success || composition == nullptr || !composition->verify()) {
       success = false;
       break;
     }

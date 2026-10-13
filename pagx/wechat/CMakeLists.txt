@@ -36,6 +36,17 @@ endif ()
 #     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msimd128")
 # endif ()
 
+# Enable LTO for cross-TU inlining among the targets built by this CMake project (tgfx / pagx /
+# pagx-renderer / pagx-viewer). Must be set before add_subdirectory so those targets compile to
+# LLVM bitcode; the final link step then performs whole-program optimization. Vendor libraries
+# (expat / SheenBidi / harfbuzz) are prebuilt by an external `node vendor-build` process and do
+# not participate in LTO. Kept out of Debug builds to preserve fast iteration and debuggability.
+if (DEFINED EMSCRIPTEN AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "WASM LTO enabled (-flto)")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -flto")
+endif ()
+
 # Add tgfx and pagx as dependencies
 if (NOT TARGET tgfx)
     set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -53,6 +64,8 @@ file(GLOB_RECURSE PAGX_RUNTIME_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pag
 file(GLOB_RECURSE PAGX_UTILS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/utils/*.cpp)
 # Woff2FontGenerator depends on the woff2 library which is only needed for HTML/SVG export.
 list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "Woff2FontGenerator\\.cpp$")
+# MemZip depends on minizip (zip.c/ioapi.c) which is only needed for PPT/HTML export.
+list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "MemZip\\.cpp$")
 file(GLOB_RECURSE PAGX_XML_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/pagx/xml/*.cpp)
 # Only SVGPathParser is needed (used by PAGXImporter for path data). SVG/HTML exporters are not
 # used in the wechat viewer and depend on woff2 which is not available in this build.
@@ -119,8 +132,10 @@ if (DEFINED EMSCRIPTEN)
         list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -O0 -g3)
         list(APPEND PAGX_VIEWER_LINK_OPTIONS -O0 -g3 -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)
     else ()
-        list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -Oz)
-        list(APPEND PAGX_VIEWER_LINK_OPTIONS -Oz)
+        # Link with -O3 (not -Oz) so the LTO inliner uses an O3 cost model: -Oz suppresses
+        # inlining at the link step, which would largely defeat the -flto win above.
+        list(APPEND PAGX_VIEWER_COMPILE_OPTIONS -O3)
+        list(APPEND PAGX_VIEWER_LINK_OPTIONS -O3 -flto)
     endif ()
 else ()
     add_library(pagx-viewer SHARED ${PAGX_VIEWER_FILES})

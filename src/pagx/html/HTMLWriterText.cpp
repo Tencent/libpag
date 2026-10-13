@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <random>
 #include <string>
@@ -54,6 +55,11 @@ using pag::FloatNearlyZero;
 //==============================================================================
 // Text helper statics
 //==============================================================================
+
+// PAGX round-trip metadata emitters (defined next to AppendUTF8 below; forward-declared here
+// because the TextModifier / TextPath branches call them earlier in the file).
+static void EmitPagxTextHostMetadata(HTMLBuilder& out, const Text* text);
+static void EmitPagxTextPartMarker(HTMLBuilder& out);
 
 // Decodes a single UTF-8 character from the byte stream.
 // Returns the number of bytes consumed, or 0 on error.
@@ -1080,6 +1086,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
       }
       out.openTag("div");
       out.addAttr("style", containerStyle);
+      emitTextHostMarker(out, text);
       out.closeTagStart();
 
       size_t glyphIdx = 0;
@@ -1191,6 +1198,7 @@ void HTMLWriter::writeTextModifier(HTMLBuilder& out, const std::vector<GeoInfo>&
           AppendUTF8(puaChar, 0xE000 + (glyphId - 1));
           out.openTag("span");
           out.addAttr("style", charStyle);
+          EmitPagxTextPartMarker(out);
           out.closeTagWithText(puaChar);
           glyphIdx++;
         }
@@ -1654,6 +1662,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
       }
       out.openTag("div");
       out.addAttr("style", containerStyle);
+      emitTextHostMarker(out, text);
       out.closeTagStart();
 
       for (auto* run : text->glyphRuns) {
@@ -1732,6 +1741,7 @@ void HTMLWriter::writeTextPath(HTMLBuilder& out, const std::vector<GeoInfo>& geo
           AppendUTF8(puaChar, 0xE000 + glyphId - 1);
           out.openTag("span");
           out.addAttr("style", charStyle);
+          EmitPagxTextPartMarker(out);
           out.closeTagWithText(puaChar);
           currentArcPos += glyphAdvance + extraSpacing;
         }
@@ -2133,6 +2143,45 @@ static void AppendUTF8(std::string& out, uint32_t cp) {
   }
 }
 
+//==============================================================================
+// PAGX text round-trip metadata (data-pagx-*)
+//==============================================================================
+
+// Emits the semantic host metadata of a WOFF2/PUA text group. The HTML importer restores the
+// original Text semantics (text content, font family / style, letter spacing, faux styles)
+// from these attributes instead of the PUA glyph characters, which carry no readable text.
+// The semantic attributes are always emitted, including empty values, so "the original value
+// was empty" stays distinguishable from "this element is not marked".
+static void EmitPagxTextHostMetadata(HTMLBuilder& out, const Text* text) {
+  out.addAttrAllowEmpty("data-pagx-text", text->text);
+  out.addAttrAllowEmpty("data-pagx-font-family", text->fontFamily);
+  out.addAttrAllowEmpty("data-pagx-font-style", text->fontStyle);
+  // %.9g gives FLT_DECIMAL_DIG significant digits so the float survives the round trip
+  // exactly (CssFloatToString's 4 fraction digits would not). NaN / infinity are treated as
+  // the default and skipped so the importer never sees a non-finite literal.
+  if (std::isfinite(text->letterSpacing) && text->letterSpacing != 0.0f) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.9g", text->letterSpacing);
+    out.addAttr("data-pagx-letter-spacing", buf);
+  }
+  out.addAttr("data-pagx-faux-bold", text->fauxBold ? "1" : "0");
+  out.addAttr("data-pagx-faux-italic", text->fauxItalic ? "1" : "0");
+}
+
+// Marks a WOFF2/PUA element as a non-host member of a text group. The importer skips marked
+// elements entirely so their PUA characters never leak into the restored document.
+static void EmitPagxTextPartMarker(HTMLBuilder& out) {
+  out.addAttr("data-pagx-text-part", "1");
+}
+
+void HTMLWriter::emitTextHostMarker(HTMLBuilder& out, const Text* text) {
+  if (_ctx->textHostsEmitted.insert(text).second) {
+    EmitPagxTextHostMetadata(out, text);
+  } else {
+    EmitPagxTextPartMarker(out);
+  }
+}
+
 void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text,
                                                 const Fill* fill, const Stroke* stroke,
                                                 float alpha) {
@@ -2242,6 +2291,9 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
       }
       out.openTag("span");
       out.addAttr("style", style);
+      // The first span that actually emits glyphs carries the round-trip semantics; later runs
+      // of the same Text are marked as parts and skipped by the importer.
+      emitTextHostMarker(out, text);
       out.closeTagWithText(puaText);
       emittedGlyph = true;
     }
@@ -2301,6 +2353,7 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
     }
     out.openTag("div");
     out.addAttr("style", containerStyle);
+    emitTextHostMarker(out, text);
     out.closeTagStart();
 
     for (auto* run : text->glyphRuns) {
@@ -2344,19 +2397,24 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
         float cssLeft = posX;
         float cssTop = runIsBitmapFont ? posY : (posY - fontSize);
 
-        std::string charStyle;
-        if (hasTransform && !useGradientFill) {
-          // When per-glyph transforms are present, compute the full CSS matrix that combines
-          // position + rotation/scale/skew around the PAGX anchor. We cannot use CSS
-          // transform-origin because PAGX's anchor arithmetic shifts only anchorX (not anchorY)
-          // before applying the rotation — the glyph's Y position (posY) participates in the
-          // rotation. CSS transform-origin subtracts origin from the local point before rotating,
-          // which produces different results when anchorY=0 but posY≠0.
+        // The span always sits at the glyph origin (cssLeft, cssTop), so the round-trip
+        // protocol recovers the position from left/top alone; a per-glyph transform only
+        // contributes its linear part and the residual translation on top of that origin.
+        std::string charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
+                                "px;top:" + CssFloatToString(cssTop) +
+                                "px;line-height:1;font-family:'" + fontResult.familyName + "'";
+        charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
+        if (hasTransform) {
+          // When per-glyph transforms are present, compute the CSS matrix that combines
+          // rotation/scale/skew around the PAGX anchor with the residual translation. We cannot
+          // use CSS transform-origin because PAGX's anchor arithmetic shifts only anchorX (not
+          // anchorY) before applying the rotation — the glyph's Y position (posY) participates in
+          // the rotation. CSS transform-origin subtracts origin from the local point before
+          // rotating, which produces different results when anchorY=0 but posY≠0.
           //
           // Native: T(-ax, -ay) * S(sx,sy) * Skew * R(θ) * T(ax, ay) * T(posX, posY) * S(fs/upm)
-          // We need: CSS matrix * browser_local_point = native screen position
+          // We need: span_origin + CSS matrix * browser_local_point = native screen position
           // Browser renders glyph at local (px*fs/upm, fontSize + py*fs/upm) within the span.
-          // With span at (0,0), the CSS matrix encodes both position and transform.
           auto gi = static_cast<size_t>(glyphID) - 1;
           float glyphAdvance = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
           float anchorX = glyphAdvance * 0.5f * (fontSize / run->font->unitsPerEm);
@@ -2394,24 +2452,18 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           m10 *= gsy;
           m11 *= gsy;
 
-          // Translation: T(-ax,-ay) * [linear] * T(ax+posX, ay+cssTop)
-          // Full translation = [linear] * (ax+posX, ay+cssTop) + (-ax, -ay)
-          float tx = m00 * (anchorX + posX) + m01 * (anchorY + cssTop) - anchorX;
-          float ty = m10 * (anchorX + posX) + m11 * (anchorY + cssTop) - anchorY;
+          // Translation: T(-ax,-ay) * [linear] * T(ax+posX, ay+cssTop) applied to the span
+          // origin already carried by left/top, i.e. the difference between the full native
+          // translation and the span position.
+          float txFull = m00 * (anchorX + posX) + m01 * (anchorY + cssTop) - anchorX;
+          float tyFull = m10 * (anchorX + posX) + m11 * (anchorY + cssTop) - anchorY;
 
           // CSS matrix(a, b, c, d, e, f) maps (x,y) to (a*x+c*y+e, b*x+d*y+f)
-          charStyle = "position:absolute;left:0;top:0;line-height:1;font-family:'" +
-                      fontResult.familyName + "'";
-          charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
           charStyle += ";transform:matrix(" + CssFloatToString(m00) + "," + CssFloatToString(m10) +
                        "," + CssFloatToString(m01) + "," + CssFloatToString(m11) + "," +
-                       CssFloatToString(tx) + "," + CssFloatToString(ty) + ")";
+                       CssFloatToString(txFull - cssLeft) + "," +
+                       CssFloatToString(tyFull - cssTop) + ")";
           charStyle += ";transform-origin:0 0";
-        } else {
-          charStyle = "position:absolute;left:" + CssFloatToString(cssLeft) +
-                      "px;top:" + CssFloatToString(cssTop) + "px;line-height:1;font-family:'" +
-                      fontResult.familyName + "'";
-          charStyle += ";font-size:" + CssFloatToString(fontSize) + "px";
         }
 
         if (useGradientFill) {
@@ -2432,66 +2484,11 @@ void HTMLWriter::writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* te
           charStyle += strokeCss;
         }
 
-        // For gradient fills that also have per-glyph transforms, use matrix() with the span
-        // at its normal left/top position (so gradient background-position works correctly).
-        // The matrix encodes the linear transform + position offset caused by the anchor-based
-        // rotation/scale/skew, with transform-origin:0 0 since all offsets are baked in.
-        if (hasTransform && useGradientFill) {
-          auto gi = static_cast<size_t>(glyphID) - 1;
-          float glyphAdvance = (gi < run->font->glyphs.size()) ? run->font->glyphs[gi]->advance : 0;
-          float anchorX = glyphAdvance * 0.5f * (fontSize / run->font->unitsPerEm);
-          float anchorY = 0.0f;
-          if (i < run->anchors.size()) {
-            anchorX += run->anchors[i].x;
-            anchorY += run->anchors[i].y;
-          }
-          // Build the same linear part as the non-gradient matrix path.
-          float cosR = 1.0f, sinR = 0.0f;
-          if (hasRotation) {
-            float rad = run->rotations[i] * static_cast<float>(M_PI) / 180.0f;
-            cosR = std::cos(rad);
-            sinR = std::sin(rad);
-          }
-          float m00 = cosR, m01 = -sinR, m10 = sinR, m11 = cosR;
-          if (hasSkew) {
-            float tanS = -std::tan(run->skews[i] * static_cast<float>(M_PI) / 180.0f);
-            float nm00 = m00 + tanS * m10;
-            float nm01 = m01 + tanS * m11;
-            m00 = nm00;
-            m01 = nm01;
-          }
-          float gsx = hasGlyphScale ? run->scales[i].x : 1.0f;
-          float gsy = hasGlyphScale ? run->scales[i].y : 1.0f;
-          m00 *= gsx;
-          m01 *= gsx;
-          m10 *= gsy;
-          m11 *= gsy;
-          // Compute the translation that the anchor-based transform produces relative to the
-          // span's (cssLeft, cssTop) position. This is the difference between the full native
-          // matrix translation and what CSS would produce with just left/top positioning.
-          // Native: Linear * (ax+posX, ay+cssTop) + (-ax,-ay) = full tx/ty from (0,0)
-          // CSS left/top already places span at (posX, cssTop), so the matrix translation is
-          // the residual: Linear*(ax, ay+cssTop-cssTop... no, let me derive properly.
-          // With span at (posX, cssTop) and transform-origin:0 0:
-          //   screen = (posX, cssTop) + matrix * local_point
-          //   We need: screen = native result = Linear*local_point + tx_full, ty_full
-          //   where tx_full = Linear*(ax+posX, ay+cssTop) + (-ax,-ay)  [from non-gradient path]
-          //   So: (posX,cssTop) + (dx,dy) + Linear*local = Linear*local + (tx_full, ty_full)
-          //   → dx = tx_full - posX, dy = ty_full - cssTop
-          float txFull = m00 * (anchorX + posX) + m01 * (anchorY + cssTop) - anchorX;
-          float tyFull = m10 * (anchorX + posX) + m11 * (anchorY + cssTop) - anchorY;
-          float dx = txFull - posX;
-          float dy = tyFull - cssTop;
-          charStyle += ";transform:matrix(" + CssFloatToString(m00) + "," + CssFloatToString(m10) +
-                       "," + CssFloatToString(m01) + "," + CssFloatToString(m11) + "," +
-                       CssFloatToString(dx) + "," + CssFloatToString(dy) + ")";
-          charStyle += ";transform-origin:0 0";
-        }
-
         std::string puaChar;
         AppendUTF8(puaChar, 0xE000 + (glyphID - 1));
         out.openTag("span");
         out.addAttr("style", charStyle);
+        EmitPagxTextPartMarker(out);
         out.closeTagWithText(puaChar);
       }
     }

@@ -56,6 +56,27 @@ import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 // Node-side helpers (and their unit tests) resolve it here.
 const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 
+// Internal bridge to the HTML importer for a measured width that must remain available while
+// the subset transformer recovers flex geometry, but must not become an authored PAGX width.
+// See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
+const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
+
+// Whitespace-collapse pattern that spares NBSP (U+00A0). Source pages run English-typography
+// pre-passes that glue short function words to their neighbours with NBSP (e.g. getflect.app's
+// `applyEnglishTypography` rewrites "to perform" / "But nowhere" into "to\u00a0perform" /
+// "But\u00a0nowhere"), which is exactly the line-break-unit semantics the author designed.
+// JS `\s` matches U+00A0, so a plain `/\s+/g` collapse would silently demote every NBSP to a
+// breakable ASCII space — nowrap protects the first paint, but any PAGX-side re-typeset
+// (text edit, box resize) would then break inside those glued pairs. `[^\S\u00a0]` matches
+// whitespace except NBSP (\S is the negated whitespace class, so its complement minus NBSP is
+// exactly the collapsible set). The PAGX importer already treats NBSP as a real glyph
+// (see BOUNDARY_SPACE) and LineBreaker maps it to the GL (glue) class, so a preserved NBSP
+// keeps its no-break meaning downstream. Note that every call site pairs the collapse with a
+// `.trim()`, which strips a leading/trailing NBSP as well, so only NBSPs inside the text are
+// preserved. Re-declared in PAYLOAD_CONSTANTS_SRC for the
+// browser payload (same pattern as BOUNDARY_SPACE).
+const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
+
 /* eslint-disable no-undef, no-inner-declarations */
 
 // ===== Style-value normalisers =====
@@ -151,16 +172,45 @@ function normalizeBackgroundImage(value) {
   return '';
 }
 
-// PAGX only models `background-clip: text` — combined with a gradient
-// `background-image`, the importer routes the gradient to descendant text
-// fills (so the text glyphs are filled with the gradient instead of the
-// element painting a rectangular gradient). Every other clip value is
-// dropped: PAGX has no `padding-box` / `content-box` distinction. Chromium
-// computed style already coalesces `-webkit-background-clip` into the
-// unprefixed `background-clip`, so a single schema entry suffices.
+// `background-clip: text` routes a gradient `background-image` to descendant
+// text fills in the importer (the text glyphs are filled with the gradient
+// instead of the element painting a rectangular gradient). Layered box clips
+// (`padding-box` / `content-box` / `border-box`, comma-separated per
+// background layer) are kept verbatim: a layer clipped tighter than the
+// border box is how CSS paints gradient borders (transparent border + a
+// border-box layer showing through a padding-box layer's inset), and the
+// importer rebuilds each layer with its own inset geometry. A list where
+// every layer is the default `border-box` still collapses to '' so the
+// STYLE_SCHEMA defaults filter drops the property. Chromium computed style
+// already coalesces `-webkit-background-clip` into the unprefixed
+// `background-clip`, so a single schema entry suffices.
+//
+// Keyword validation is deliberately left to the importer's
+// `TransformBackgroundClip`, which drops a value the subset cannot express
+// (an unknown keyword, or `text` mixed into a per-layer list) with a
+// diagnostic naming the offending value. Snapshot-side validation could only
+// drop silently, and would have to duplicate that table: this function's job
+// is to normalize the forms PAGX *can* express, not to re-check them.
 function normalizeBackgroundClip(value) {
   if (!value) return '';
-  return value.trim().toLowerCase() === 'text' ? 'text' : '';
+  const v = value.trim().toLowerCase();
+  if (v === 'text') return 'text';
+  const layers = v.split(',').map((s) => s.trim()).filter(Boolean);
+  if (layers.length === 0) return '';
+  if (layers.every((l) => l === 'border-box')) return '';
+  return layers.join(', ');
+}
+
+// PAGX's mask-image supports the same value forms as background-image: a
+// gradient function, an SVG `data:image/svg+xml,...` URI (rebuilt into a
+// contour/alpha mask layer), or a raster `url(...)` (PNG/JPEG/WebP) turned into
+// an image-backed alpha/luminance mask layer. All three share background-image's
+// URL handling, so reuse it verbatim: a local `file://` mask url is rewritten to
+// the plain absolute path the importer + tgfx load directly (an un-normalized
+// `file://` url reaches `ImageCodec::MakeFrom` as-is and fails to decode, which
+// silently drops the mask), while `data:` / `http(s)` urls pass through untouched.
+function normalizeMaskImage(value) {
+  return normalizeBackgroundImage(value);
 }
 
 // PAGX rebuilds `clip-path` into a contour mask layer, either from a `url(#id)`
@@ -174,6 +224,369 @@ function normalizeClipPath(value) {
   if (!value) return '';
   const trimmed = value.trim();
   return /^(url|polygon|path|circle|ellipse|inset)\(/i.test(trimmed) ? trimmed : '';
+}
+
+// Format a number for SVG geometry: round to sub-pixel precision and drop a
+// trailing `.0` so `10` stays `10` (not `10px` — SVG coordinates are unitless
+// user units) and `12.5` stays `12.5`.
+function pagxClipNum(n) {
+  if (!isFinite(n)) return '0';
+  const r = Math.round(n * 1000) / 1000;
+  return String(r);
+}
+
+// Split `str` on top-level occurrences of `sep` (a single char), ignoring any
+// separators nested inside parentheses (so `calc(100% - 10px)` and function
+// arguments survive intact). Used to break a `polygon()` vertex list on commas
+// and an argument on whitespace.
+function pagxClipSplitTop(str, sep) {
+  const out = [];
+  let depth = 0;
+  let cur = '';
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (sep === ' ' ? /\s/.test(c) : c === sep)) {
+      if (cur.trim() !== '') out.push(cur.trim());
+      cur = '';
+      continue;
+    }
+    cur += c;
+  }
+  if (cur.trim() !== '') out.push(cur.trim());
+  return out;
+}
+
+// Evaluate a CSS <length-percentage> (optionally wrapped in `calc()`, possibly
+// nested, with `+ - * /`) to pixels. `%` resolves against `basis`; unitless and
+// `px` values pass through. Unknown units / functions (min/max/clamp/var) yield
+// 0 for the offending term rather than throwing, so a partially-understood value
+// degrades instead of dropping the whole clip. This is a small recursive-descent
+// evaluator (expr → term → factor) matching CSS calc precedence.
+function pagxEvalLengthPx(token, basis) {
+  const s = String(token == null ? '' : token).trim();
+  if (s === '') return 0;
+  let i = 0;
+  function skip() { while (i < s.length && /\s/.test(s[i])) i++; }
+  function parseFactor() {
+    skip();
+    if (s[i] === '(') {
+      i++;
+      const v = parseExpr();
+      skip();
+      if (s[i] === ')') i++;
+      return v;
+    }
+    if (s.slice(i, i + 5).toLowerCase() === 'calc(') {
+      i += 5;
+      const v = parseExpr();
+      skip();
+      if (s[i] === ')') i++;
+      return v;
+    }
+    const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(px|%)?/i.exec(s.slice(i));
+    if (!m) { i = s.length; return 0; }
+    i += m[0].length;
+    let val = parseFloat(m[1]);
+    if (m[2] === '%') val = basis * val / 100;
+    return val;
+  }
+  function parseTerm() {
+    let v = parseFactor();
+    skip();
+    while (s[i] === '*' || s[i] === '/') {
+      const op = s[i++];
+      const r = parseFactor();
+      v = op === '*' ? v * r : (r !== 0 ? v / r : 0);
+      skip();
+    }
+    return v;
+  }
+  function parseExpr() {
+    let v = parseTerm();
+    skip();
+    while (s[i] === '+' || s[i] === '-') {
+      const op = s[i++];
+      const r = parseTerm();
+      v = op === '+' ? v + r : v - r;
+      skip();
+    }
+    return v;
+  }
+  return parseExpr();
+}
+
+// Parse a `clip-path` value into `{ shape, args, box }` where `shape` is one of
+// inset/circle/ellipse/polygon/path, `args` is the raw text inside the shape
+// function, and `box` is the resolved <geometry-box> keyword (defaults to
+// `border-box`, CSS's default reference box for HTML). Returns null for `none`,
+// `url(...)` (handled by the normalizer), and unrecognised values.
+function pagxParseClipShape(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '' || s.toLowerCase() === 'none') return null;
+  if (/^url\(/i.test(s)) return null;
+  const m = /(inset|circle|ellipse|polygon|path)\s*\(/i.exec(s);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  let depth = 1;
+  let j = start;
+  for (; j < s.length; j++) {
+    if (s[j] === '(') depth++;
+    else if (s[j] === ')') { depth--; if (depth === 0) break; }
+  }
+  const args = s.slice(start, j);
+  const outside = (s.slice(0, m.index) + ' ' + s.slice(j + 1)).toLowerCase();
+  const boxKeywords = [
+    'border-box', 'padding-box', 'content-box', 'margin-box',
+    'fill-box', 'stroke-box', 'view-box',
+  ];
+  let box = 'border-box';
+  for (const kw of boxKeywords) {
+    if (new RegExp('(^|\\s)' + kw + '(\\s|$)').test(outside)) { box = kw; break; }
+  }
+  return { shape: m[1].toLowerCase(), args, box };
+}
+
+// Resolve the clip-path reference box to a pixel rect `{ x, y, w, h }` in the
+// element's own border-box coordinate space (origin at the border-box top-left,
+// matching the `width`/`height` the snapshot emits and the `viewBox` the C++
+// importer frames the mask in). `fill-box` / `stroke-box` / `view-box` (SVG-only)
+// fall back to border-box for HTML boxes.
+function pagxClipRefRect(box, width, height, computed) {
+  const bt = borderWidthOf(computed, 'top');
+  const br = borderWidthOf(computed, 'right');
+  const bb = borderWidthOf(computed, 'bottom');
+  const bl = borderWidthOf(computed, 'left');
+  if (box === 'padding-box') {
+    return { x: bl, y: bt, w: width - bl - br, h: height - bt - bb };
+  }
+  if (box === 'content-box') {
+    const p = readPadding(computed);
+    return {
+      x: bl + p.left, y: bt + p.top,
+      w: width - bl - br - p.left - p.right,
+      h: height - bt - bb - p.top - p.bottom,
+    };
+  }
+  if (box === 'margin-box') {
+    const mgn = readMargin(computed);
+    return {
+      x: -mgn.left, y: -mgn.top,
+      w: width + mgn.left + mgn.right,
+      h: height + mgn.top + mgn.bottom,
+    };
+  }
+  return { x: 0, y: 0, w: width, h: height };
+}
+
+// Resolve an `at <position>` list (CSS <position>, 1-2 tokens handled) into an
+// absolute center point inside `rect`. Keywords map to edges/center; percentages
+// resolve against the rect axis; lengths are px offsets from the top-left.
+function pagxClipPosition(tokens, rect) {
+  function axis(tok, base, origin, isX) {
+    const t = String(tok || '').toLowerCase();
+    if (t === 'center' || t === '') return origin + base / 2;
+    if (isX && t === 'left') return origin;
+    if (isX && t === 'right') return origin + base;
+    if (!isX && t === 'top') return origin;
+    if (!isX && t === 'bottom') return origin + base;
+    return origin + pagxEvalLengthPx(tok, base);
+  }
+  let xTok = 'center';
+  let yTok = 'center';
+  if (tokens.length === 1) {
+    const t = tokens[0].toLowerCase();
+    if (t === 'top' || t === 'bottom') { yTok = t; } else { xTok = tokens[0]; }
+  } else if (tokens.length >= 2) {
+    // Vertical keyword may lead (e.g. `top right`); otherwise first token is X.
+    const a = tokens[0].toLowerCase();
+    const b = tokens[1].toLowerCase();
+    if (a === 'top' || a === 'bottom' || b === 'left' || b === 'right') {
+      yTok = tokens[0]; xTok = tokens[1];
+    } else {
+      xTok = tokens[0]; yTok = tokens[1];
+    }
+  }
+  return {
+    cx: axis(xTok, rect.w, rect.x, true),
+    cy: axis(yTok, rect.h, rect.y, false),
+  };
+}
+
+// Resolve a circle/ellipse shape radius token against a per-axis basis, honouring
+// the `closest-side` / `farthest-side` keywords (measured from the center `c`
+// within `[origin, origin+base]`). `null` basisDiagonal signals the ellipse
+// per-axis case; circle passes the diagonal basis for `%`.
+function pagxClipRadius(tok, base, origin, c, basisForPercent) {
+  const t = String(tok || '').toLowerCase().trim();
+  if (t === '' || t === 'closest-side') return Math.max(0, Math.min(c - origin, origin + base - c));
+  if (t === 'farthest-side') return Math.max(c - origin, origin + base - c);
+  return pagxEvalLengthPx(tok, basisForPercent == null ? base : basisForPercent);
+}
+
+// Convert a parsed clip-path shape to the INNER markup of a `<clipPath>` (the
+// child shape element(s)), with all coordinates resolved into `rect`'s pixel
+// space. Returns '' for shapes that cannot be represented. The C++ importer
+// serializes exactly these children into a white-filled `<svg>` and reads their
+// coverage as a contour mask, so no fill/stroke needs to be set here.
+function pagxClipShapeToInner(parsed, rect) {
+  const shape = parsed.shape;
+  const args = parsed.args;
+  if (shape === 'polygon') {
+    let segs = pagxClipSplitTop(args, ',');
+    if (segs.length && /^(nonzero|evenodd)$/i.test(segs[0])) {
+      const rule = segs.shift().toLowerCase();
+      const pts = segs.map((seg) => {
+        const xy = pagxClipSplitTop(seg, ' ');
+        return pagxClipNum(rect.x + pagxEvalLengthPx(xy[0], rect.w)) + ',' +
+               pagxClipNum(rect.y + pagxEvalLengthPx(xy[1], rect.h));
+      });
+      if (pts.length < 3) return '';
+      return '<polygon points="' + pts.join(' ') + '" clip-rule="' + rule +
+             '" fill-rule="' + rule + '"/>';
+    }
+    const pts = segs.map((seg) => {
+      const xy = pagxClipSplitTop(seg, ' ');
+      return pagxClipNum(rect.x + pagxEvalLengthPx(xy[0], rect.w)) + ',' +
+             pagxClipNum(rect.y + pagxEvalLengthPx(xy[1], rect.h));
+    });
+    if (pts.length < 3) return '';
+    return '<polygon points="' + pts.join(' ') + '"/>';
+  }
+  if (shape === 'inset') {
+    const tokens = pagxClipSplitTop(args, ' ');
+    const insets = [];
+    let radius = null;
+    for (let k = 0; k < tokens.length; k++) {
+      if (tokens[k].toLowerCase() === 'round') {
+        // Remaining tokens are border-radius; take the first horizontal radius
+        // (optionally before a `/`) as a uniform rx/ry approximation.
+        const rest = tokens.slice(k + 1).join(' ');
+        const firstH = pagxClipSplitTop(rest.split('/')[0], ' ')[0];
+        if (firstH != null) radius = firstH;
+        break;
+      }
+      insets.push(tokens[k]);
+    }
+    let t; let r; let b; let l;
+    if (insets.length === 1) { t = b = insets[0]; r = l = insets[0]; }
+    else if (insets.length === 2) { t = b = insets[0]; r = l = insets[1]; }
+    else if (insets.length === 3) { t = insets[0]; r = l = insets[1]; b = insets[2]; }
+    else if (insets.length >= 4) { t = insets[0]; r = insets[1]; b = insets[2]; l = insets[3]; }
+    else { t = r = b = l = '0'; }
+    const top = pagxEvalLengthPx(t, rect.h);
+    const right = pagxEvalLengthPx(r, rect.w);
+    const bottom = pagxEvalLengthPx(b, rect.h);
+    const left = pagxEvalLengthPx(l, rect.w);
+    const w = Math.max(0, rect.w - left - right);
+    const h = Math.max(0, rect.h - top - bottom);
+    if (w <= 0 || h <= 0) return '';
+    let attrs = 'x="' + pagxClipNum(rect.x + left) + '" y="' + pagxClipNum(rect.y + top) +
+                '" width="' + pagxClipNum(w) + '" height="' + pagxClipNum(h) + '"';
+    if (radius != null) {
+      const rad = pagxEvalLengthPx(radius, Math.min(rect.w, rect.h));
+      if (rad > 0) attrs += ' rx="' + pagxClipNum(rad) + '" ry="' + pagxClipNum(rad) + '"';
+    }
+    return '<rect ' + attrs + '/>';
+  }
+  if (shape === 'circle' || shape === 'ellipse') {
+    const parts = pagxClipSplitTop(args, ' ');
+    const atIdx = parts.findIndex((p) => p.toLowerCase() === 'at');
+    const radiusTokens = atIdx >= 0 ? parts.slice(0, atIdx) : parts.slice();
+    const posTokens = atIdx >= 0 ? parts.slice(atIdx + 1) : [];
+    const center = pagxClipPosition(posTokens, rect);
+    if (shape === 'circle') {
+      const diag = Math.sqrt(rect.w * rect.w + rect.h * rect.h) / Math.SQRT2;
+      const rTok = radiusTokens.length ? radiusTokens[0] : 'closest-side';
+      // For `closest-side`/`farthest-side` on a circle, use the min/max over all
+      // four side distances (not a single axis).
+      let r;
+      const lc = String(rTok).toLowerCase();
+      if (lc === 'closest-side' || lc === '') {
+        r = Math.min(center.cx - rect.x, rect.x + rect.w - center.cx,
+                     center.cy - rect.y, rect.y + rect.h - center.cy);
+      } else if (lc === 'farthest-side') {
+        r = Math.max(center.cx - rect.x, rect.x + rect.w - center.cx,
+                     center.cy - rect.y, rect.y + rect.h - center.cy);
+      } else {
+        r = pagxEvalLengthPx(rTok, diag);
+      }
+      r = Math.max(0, r);
+      if (r <= 0) return '';
+      return '<circle cx="' + pagxClipNum(center.cx) + '" cy="' + pagxClipNum(center.cy) +
+             '" r="' + pagxClipNum(r) + '"/>';
+    }
+    const rxTok = radiusTokens.length >= 1 ? radiusTokens[0] : 'closest-side';
+    const ryTok = radiusTokens.length >= 2 ? radiusTokens[1] : rxTok;
+    const rx = Math.max(0, pagxClipRadius(rxTok, rect.w, rect.x, center.cx, rect.w));
+    const ry = Math.max(0, pagxClipRadius(ryTok, rect.h, rect.y, center.cy, rect.h));
+    if (rx <= 0 || ry <= 0) return '';
+    return '<ellipse cx="' + pagxClipNum(center.cx) + '" cy="' + pagxClipNum(center.cy) +
+           '" rx="' + pagxClipNum(rx) + '" ry="' + pagxClipNum(ry) + '"/>';
+  }
+  if (shape === 'path') {
+    // path( [<fill-rule>,]? "<path data>" ). The data is in the reference box's
+    // pixel space, so only a translate onto the box origin is needed.
+    let rule = '';
+    let data = args.trim();
+    const ruleMatch = /^(nonzero|evenodd)\s*,/i.exec(data);
+    if (ruleMatch) {
+      rule = ruleMatch[1].toLowerCase();
+      data = data.slice(ruleMatch[0].length).trim();
+    }
+    const q = /^(['"])([\s\S]*)\1$/.exec(data);
+    if (!q) return '';
+    const d = q[2];
+    const ruleAttr = rule ? ' clip-rule="' + rule + '" fill-rule="' + rule + '"' : '';
+    const inner = '<path d="' + d.replace(/"/g, "'") + '"' + ruleAttr + '/>';
+    if (rect.x !== 0 || rect.y !== 0) {
+      return '<g transform="translate(' + pagxClipNum(rect.x) + ',' + pagxClipNum(rect.y) +
+             ')">' + inner + '</g>';
+    }
+    return inner;
+  }
+  return '';
+}
+
+// Convert a geometric `clip-path` value into the INNER markup of a `<clipPath>`
+// def, resolved into the element's border-box pixel space. Returns '' for `none`,
+// `url(...)`, and shapes that cannot be represented. Pure (no DOM side effects)
+// so it is unit-testable with a mock `computed`; the registration + id lives in
+// `appendGeometricClipPath`.
+function pagxClipPathInnerMarkup(raw, width, height, computed) {
+  const parsed = pagxParseClipShape(raw);
+  if (!parsed) return '';
+  const rect = pagxClipRefRect(parsed.box, width, height, computed);
+  if (!(rect.w > 0) || !(rect.h > 0)) return '';
+  return pagxClipShapeToInner(parsed, rect);
+}
+
+// Emit a geometric `clip-path` (inset/circle/ellipse/polygon/path) as a rewritten
+// `clip-path: url(#pagxClipN)` declaration, registering the synthesized
+// `<clipPath clipPathUnits="userSpaceOnUse">` in `window.__pagxClipDefs` for
+// `snapshotMain` to flush into a single hidden `<svg>` in the output body. The
+// importer's `collectSharedDefs` then indexes it and rebuilds a contour mask —
+// the same path a hand-authored `url(#id)` clip-path already takes. `url(...)`
+// values are handled by the STYLE_SCHEMA copy (via `normalizeClipPath`) and are
+// left untouched here; identical geometry is de-duplicated across elements.
+function appendGeometricClipPath(parts, computed, width, height) {
+  const raw = (computed.getPropertyValue('clip-path') || '').trim();
+  if (!raw || /^url\(/i.test(raw)) return;
+  const inner = pagxClipPathInnerMarkup(raw, width, height, computed);
+  if (!inner) return;
+  if (typeof window === 'undefined') return;
+  if (!window.__pagxClipDefs) window.__pagxClipDefs = [];
+  if (!window.__pagxClipDefMap) window.__pagxClipDefMap = {};
+  let id = window.__pagxClipDefMap[inner];
+  if (!id) {
+    id = 'pagxClip' + window.__pagxClipDefs.length;
+    window.__pagxClipDefMap[inner] = id;
+    window.__pagxClipDefs.push(
+      '<clipPath id="' + id + '" clipPathUnits="userSpaceOnUse">' + inner + '</clipPath>',
+    );
+  }
+  parts.push('clip-path: url(#' + id + ')');
 }
 
 // PAGX models only `WritingMode::Horizontal` and `WritingMode::Vertical`.
@@ -283,11 +696,63 @@ function nonZero(rect) {
 // Centralised visibility check. CSS `display: contents` is intentionally NOT
 // considered hidden here — it generates no box of its own but its children
 // still render, and the snapshot walker handles the pass-through separately.
-function isVisible(computed) {
+//
+// `opacity: 0` and `visibility: hidden` are treated as hidden EXCEPT when the
+// element is animated by the capture pass (animation-capture.ts marks such
+// elements with a `pagxAnim*` `animation-name`). An element legitimately reads
+// opacity=0 / visibility=hidden at the animation's starting phase; dropping it
+// here would erase the very subject of the animation (e.g. a
+// `0% { opacity: 0 } 100% { opacity: 1 }` fade-in dot), taking its keyframes
+// with it. This is the common shape of JS-driven entrances — GSAP's
+// `autoAlpha: 0`, for instance, sets BOTH `opacity: 0` and `visibility: hidden`
+// on every element waiting to fly in, so the capture-reset frame (timeline at
+// t=0) reports the not-yet-entered text as `visibility: hidden`.
+function isVisible(computed, el) {
   if (computed.display === 'none') return false;
-  if (computed.visibility === 'hidden') return false;
-  if (parseFloat(computed.opacity) === 0) return false;
+  if (computed.visibility === 'hidden' && !hasPagxAnimation(computed) &&
+      !hasHiddenAnimatedAncestor(el)) return false;
+  if (parseFloat(computed.opacity) === 0 && !hasPagxAnimation(computed)) return false;
   return true;
+}
+
+// True when `el`'s computed `visibility: hidden` is inherited from an ancestor
+// that carries a pagxAnimation (a captured reveal), rather than being the
+// element's own resting state. `visibility` is an *inherited* property, so an
+// element whose base state is `visibility: hidden` — but which a class toggle
+// later reveals, and whose reveal the capture pass baked into a `pagxAnim*`
+// animation on that element (e.g. a skill panel that fades in from
+// `opacity:0; visibility:hidden`) — propagates `hidden` to every descendant.
+// The animated ancestor itself survives `isVisible` via `hasPagxAnimation`, and
+// browser-snapshot never emits `visibility` at all, so at playback the whole
+// subtree is visible. Without this, the ancestor's non-animated descendants
+// (e.g. the panel's `display:grid` icon container and every perk inside it)
+// read `visibility: hidden` at snapshot time and would be dropped — silently
+// erasing the entire subtree even though its leaves were captured with their
+// own reveal animations. Walk up until the first ancestor whose own visibility
+// is not hidden: if any hidden ancestor along that contiguous chain is
+// pagx-animated, the element's hidden is an inherited reveal state, so keep it.
+function hasHiddenAnimatedAncestor(el) {
+  if (!el || !el.parentElement) return false;
+  let p = el.parentElement;
+  while (p && p !== document.body) {
+    const cs = getComputedStyle(p);
+    // The contiguous inherited-hidden chain ends here — anything above set its
+    // own visibility, so `el`'s hidden did not originate from an animated
+    // reveal ancestor.
+    if (cs.visibility !== 'hidden') return false;
+    if (hasPagxAnimation(cs)) return true;
+    p = p.parentElement;
+  }
+  return false;
+}
+
+// True when the element carries a canonical `pagxAnim*` animation injected by
+// animation-capture.ts. The capture pass owns the keyframes, so any zero-valued
+// channel on the element (opacity, transform out-of-frame) is part of the
+// animation's starting phase rather than a static-hidden state.
+function hasPagxAnimation(computed) {
+  const name = (computed.getPropertyValue('animation-name') || '').split(',')[0].trim();
+  return !!name && name !== 'none' && name.indexOf('pagxAnim') === 0;
 }
 
 // Read a single CSSOM declaration as a number, defaulting to 0 when the
@@ -298,6 +763,21 @@ function isVisible(computed) {
 // across this file stop carrying their own copy.
 function readNum(computed, prop) {
   return parseFloat(computed.getPropertyValue(prop)) || 0;
+}
+
+// True when a flex-item text leaf carries its own `pagxAnim*` reveal whose
+// starting phase hides the glyph (base `opacity` < 1) — the per-character
+// decode/typewriter shape where each char fades in on its own keyframes.
+// Such a leaf must NOT take renderTextLeaf's bare pure-inline `<span>` flex
+// path: that path forwards only text-scope declarations and drops the
+// box-scope `opacity`, so the importer folds the reveal into a static colour
+// alpha and freezes the glyph fully visible from t=0 (loose value text in a
+// `<div class="spec"><b>CLASS</b>/ ROGUE BLADE</div>` flex row popped in
+// immediately while the `<b>` label, emitted as an absolute char box,
+// correctly stayed hidden until typed). When this fires, renderTextLeaf emits
+// a sized flex-item box that keeps the opacity reveal on the outer Layer.
+function flexCharCarriesReveal(computed) {
+  return hasPagxAnimation(computed) && readNum(computed, 'opacity') < 1;
 }
 
 // Read a 4-sided CSS box (`padding-*`, `margin-*`, `border-*-width`, …) into
@@ -409,19 +889,29 @@ function resolveZIndex(computed) {
   return isFinite(v) ? v : 0;
 }
 
-// Replay CSS paint order: non-stackable (flow) children first, then
-// stackable children sorted by z-index ascending, with DOM order as
-// tie-break. A child is "stackable" when its z-index participates in
-// stacking — that is, when it is `position` != static (CSS2 rule) OR
-// when it is a flex / grid item (CSS Flexbox & Grid both honour
-// `z-index` on items regardless of `position`). Without the
-// flex/grid carve-out a `position: static` flex item authored with a
-// high z-index (e.g. the slide-13 `.center-node { z-index: 20 }`
-// sitting above its `.satellite-card` siblings at `z-index: 10`)
-// would always sort to the back, painting underneath siblings the
-// browser draws on top.
+// Replay CSS paint order (CSS 2.1 Appendix E): negative-z stackable
+// children paint behind the in-flow content, the flow content itself
+// next, and zero/positive-z stackable children on top — each band in
+// z-index order, with DOM order as tie-break. A child is "stackable"
+// when its z-index participates in stacking — that is, when it is
+// `position` != static (CSS2 rule) OR when it is a flex / grid item
+// (CSS Flexbox & Grid both honour `z-index` on items regardless of
+// `position`). Without the flex/grid carve-out a `position: static`
+// flex item authored with a high z-index (e.g. the slide-13
+// `.center-node { z-index: 20 }` sitting above its `.satellite-card`
+// siblings at `z-index: 10`) would always sort to the back, painting
+// underneath siblings the browser draws on top. The negative band is
+// what keeps a `z-index: -1` backdrop — the usual "photo behind the
+// card's text" pattern — underneath its siblings instead of covering
+// them.
+function paintBand(entry) {
+  if (!entry.stackable) return 1;
+  return entry.zIndex < 0 ? 0 : 2;
+}
+
 function paintOrder(a, b) {
-  if (a.stackable !== b.stackable) return a.stackable ? 1 : -1;
+  const bandDelta = paintBand(a) - paintBand(b);
+  if (bandDelta !== 0) return bandDelta;
   if (a.stackable && a.zIndex !== b.zIndex) return a.zIndex - b.zIndex;
   return a.domIndex - b.domIndex;
 }
@@ -433,7 +923,7 @@ function gatherDirectText(el) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.TEXT_NODE) s += n.nodeValue;
   }
-  return s.replace(/\s+/g, ' ').trim();
+  return s.replace(COLLAPSIBLE_WS, ' ').trim();
 }
 
 function elementHasChildren(el) {
@@ -461,7 +951,7 @@ function scanChildNodes(el) {
       directText += n.nodeValue;
     }
   }
-  return { hasElementChild, directText: directText.replace(/\s+/g, ' ').trim() };
+  return { hasElementChild, directText: directText.replace(COLLAPSIBLE_WS, ' ').trim() };
 }
 
 function firstTextNodeChild(el) {
@@ -689,7 +1179,7 @@ function applyTextTransform(text, computed) {
 function classify(el, computed) {
   const tag = el.tagName.toLowerCase();
   if (DROP_TAGS.has(tag)) return null;
-  if (!isVisible(computed)) return null;
+  if (!isVisible(computed, el)) return null;
   if (tag === 'svg') return 'svg';
   if (tag === 'img') return 'img';
   if (tag === 'canvas') {
@@ -758,6 +1248,55 @@ function appendBoxShadow(parts, computed) {
   if (shadow && shadow !== 'none') parts.push(`box-shadow: ${shadow}`);
 }
 
+// Emit the `animation-*` longhands for an element animated by the capture pass
+// (animation-capture.ts). Only `pagxAnim*` names are forwarded: those are the
+// canonical animations whose `@keyframes` the capture pass injected into the
+// `<style id="__pagx_anim_keyframes">` block (which snapshotMain copies into
+// the output <style>). Any other animation-name refers to a `@keyframes` that
+// only existed in the page's original stylesheet — which the snapshot rebuilds
+// from scratch and therefore does not carry — so emitting it would dangle.
+// The longhands are read straight from computed style; the importer folds them
+// back together (spec/html_subset.md §13).
+function appendAnimation(parts, computed) {
+  const name = (computed.getPropertyValue('animation-name') || '').split(',')[0].trim();
+  if (!name || name === 'none' || name.indexOf('pagxAnim') !== 0) return;
+  parts.push(`animation-name: ${name}`);
+  const longhands = [
+    'animation-duration',
+    'animation-timing-function',
+    'animation-iteration-count',
+    'animation-direction',
+    'animation-delay',
+    // Forward `animation-fill-mode` so the importer can hold the 0%-keyframe
+    // state during the delay (and the 100% state after the active window when
+    // `forwards`/`both`) instead of falling back to the inline base style.
+    // The capture pass writes `backwards` into the canonical shorthand so this
+    // longhand resolves to a non-default value; without it, every finite
+    // animation would visually collapse onto its post-active state at t=0.
+    'animation-fill-mode',
+  ];
+  for (const prop of longhands) {
+    const v = (computed.getPropertyValue(prop) || '').trim();
+    if (v) parts.push(`${prop}: ${v}`);
+  }
+  // Forward `transform-origin` for animated elements. The importer pivots an
+  // animated `transform` channel around this origin (`T(o)·M·T(-o)`), and the
+  // captured keyframe matrices are the origin-independent CSS values, so the
+  // origin must survive into the subset. The generic transform emission above
+  // only writes `transform-origin` alongside a non-`none` static `transform`
+  // (readBoxTransform returns null for `none`); an element whose *keyframes*
+  // drive the transform has its static transform pinned to `none` by the
+  // capture pass, which would otherwise drop the origin and force the importer
+  // to fall back to the box centre — visibly shifting any scaled / rotated
+  // keyframe whose CSS origin is off-centre. Skipped when a transform-origin
+  // was already emitted (static-transform path) to avoid a duplicate property.
+  const hasOrigin = parts.some((p) => p.indexOf('transform-origin:') === 0);
+  if (!hasOrigin) {
+    const origin = (computed.getPropertyValue('transform-origin') || '').trim();
+    if (origin) parts.push(`transform-origin: ${origin}`);
+  }
+}
+
 // Coalesce the two `-webkit-text-stroke` longhands Chromium's computed style
 // exposes (`-webkit-text-stroke-width` / `-webkit-text-stroke-color`) into the
 // single shorthand the HTML exporter emits and the importer parses. The
@@ -779,6 +1318,83 @@ function resolveTextStroke(computed) {
 function appendTextStroke(parts, computed) {
   const value = resolveTextStroke(computed);
   if (value) parts.push(`-webkit-text-stroke: ${value}`);
+}
+
+// Translate CSS `text-shadow` (a text glow like `0 0 12px rgba(...)`) into an
+// equivalent `filter: drop-shadow(...)` chain so it survives into PAGX. The
+// importer has no `text-shadow` property, but it lowers `filter: drop-shadow()`
+// onto a DropShadowFilter (HTMLLayerBuilder / HTMLAnimationBuilder). For an
+// element that paints no box, `filter: drop-shadow` glows only the rendered
+// glyphs — visually identical to `text-shadow`. The caller (buildStyle) gates
+// this on `!hasBoxVisualsForInline(computed)` so a solid panel is never haloed,
+// and only invokes it inside the `opts.text` branch (elements that render text
+// directly), which avoids double-glowing when the inherited `text-shadow`
+// re-appears on both a container and its text leaves.
+//
+// Computed `text-shadow` is `<color> <offX> <offY> [<blur>]` per shadow, comma
+// separated (no `inset`, no spread). Each maps to `drop-shadow(offX offY blur
+// color)`; a missing blur defaults to `0px`. The chain is merged into any
+// `filter` already emitted (a second inline `filter:` would clobber the first).
+function appendTextShadow(parts, computed) {
+  const raw = computed.getPropertyValue('text-shadow').trim();
+  if (!raw || raw === 'none') return;
+  // Top-level comma split that keeps `rgb(...)` / `hsl(...)` colour commas
+  // intact (they nest inside parens).
+  const items = [];
+  let depth = 0;
+  let seg = '';
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) {
+      items.push(seg);
+      seg = '';
+    } else {
+      seg += ch;
+    }
+  }
+  if (seg) items.push(seg);
+  const chain = [];
+  for (const item of items) {
+    const spec = item.trim();
+    if (!spec) continue;
+    // Whitespace tokeniser that keeps function args (`rgb(...)`) intact.
+    const tokens = [];
+    let d = 0;
+    let cur = '';
+    for (let i = 0; i < spec.length; i++) {
+      const c = spec[i];
+      if (c === '(') d++;
+      else if (c === ')') d = Math.max(0, d - 1);
+      if (d === 0 && /\s/.test(c)) {
+        if (cur) {
+          tokens.push(cur);
+          cur = '';
+        }
+      } else {
+        cur += c;
+      }
+    }
+    if (cur) tokens.push(cur);
+    const lengths = [];
+    const colors = [];
+    for (const t of tokens) {
+      if (/^-?[\d.]+(px)?$/.test(t)) lengths.push(t);
+      else colors.push(t);
+    }
+    if (lengths.length < 2) continue; // need at least offX / offY
+    const offX = lengths[0];
+    const offY = lengths[1];
+    const blur = lengths.length >= 3 ? lengths[2] : '0px';
+    const color = colors.length ? colors.join(' ') : 'rgb(0, 0, 0)';
+    chain.push(`drop-shadow(${offX} ${offY} ${blur} ${color})`);
+  }
+  if (!chain.length) return;
+  const glow = chain.join(' ');
+  const idx = parts.findIndex((p) => p.indexOf('filter:') === 0);
+  if (idx >= 0) parts[idx] = `${parts[idx]} ${glow}`;
+  else parts.push(`filter: ${glow}`);
 }
 
 // Forward `background-size` / `background-repeat` / `background-position` when the element
@@ -941,6 +1557,11 @@ function buildStyle(left, top, width, height, computed, opts) {
     for (const entry of STYLE_SCHEMA_BOX) {
       appendStyleProp(parts, computed, entry);
     }
+    // Geometric clip-path (inset/circle/ellipse/polygon/path) is not a plain
+    // property copy — it needs the element's box size to resolve %/calc, so it
+    // is synthesized into a `<clipPath>` def and rewritten to `url(#id)` here.
+    // (The STYLE_SCHEMA loop above already forwarded any `url(...)` clip-path.)
+    appendGeometricClipPath(parts, computed, width, height);
     // Border / shadow are emitted between the box-scope and text-scope blocks
     // so the resulting declaration order matches the historical hand-written
     // layout. See appendBorder / appendBoxShadow for the per-helper
@@ -958,6 +1579,18 @@ function buildStyle(left, top, width, height, computed, opts) {
       appendStyleProp(parts, computed, entry, ctx);
     }
     appendTextStroke(parts, computed);
+    // Text glow: forward `text-shadow` as a `filter: drop-shadow(...)` chain so
+    // the glow survives import (the importer lowers a drop-shadow filter onto a
+    // DropShadowFilter but has no `text-shadow`). `filter` glows the element's
+    // whole painted content, so only skip when THIS style call also paints a
+    // box (`opts.box` with a background/border/shadow) — a whole-element glow
+    // would then halo the box. A text-only span (`opts.box` false, the common
+    // case: a text leaf inside a separately-painted wrapper) always glows just
+    // its glyphs, matching CSS text-shadow, even when the inherited `computed`
+    // carries the wrapper's background.
+    if (!(opts.box && hasBoxVisualsForInline(computed))) {
+      appendTextShadow(parts, computed);
+    }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
     // currentColor stroke/fill picks up the right tint.
@@ -980,6 +1613,12 @@ function buildStyle(left, top, width, height, computed, opts) {
       parts.push(`transform-origin: ${opts.transform.transformOrigin}`);
     }
   }
+
+  // Forward a canonical `pagxAnim*` animation (set by animation-capture.ts) so
+  // the importer can map it onto a PAGX animation. Emitted for every element
+  // kind so animated containers, text leaves and replaced elements all carry
+  // their declaration.
+  appendAnimation(parts, computed);
 
   return parts.join('; ');
 }
@@ -1386,8 +2025,17 @@ function renderBorderTriangle(el, parentRect, rect, left, top, computed, opts) {
 // thumbnails authored with `object-fit: cover` (CMS hero images, avatar
 // crops, …) would render with the wrong aspect ratio against the live
 // browser baseline.
-function imageInnerStyle(rect, flexItem, objectFit) {
-  const base = flexItem
+function imageInnerStyle(rect, flexItem, objectFit, forceExplicitSize) {
+  // Under flex mode the wrapper is not absolutely positioned, so a raster image
+  // fills the wrapper via flow sizing (`width/height: 100%`). A *vector* source
+  // (`.svg`) is different: `pagx resolve` inlines the SVG as vector paths and
+  // must scale them to a concrete target read off this layer's width/height. A
+  // percentage size is NaN at resolve time (layout has not run), so the SVG
+  // falls back to its own intrinsic size (e.g. a potrace `width="477pt"` = 636
+  // px) and overflows the flex-sized box, rendering as a clipped corner. Emit
+  // the browser-measured pixel size so resolve gets a real target — this is
+  // also more faithful, since it is exactly the size the page painted the icon.
+  const base = (flexItem && !forceExplicitSize)
     ? `width: 100%; height: 100%`
     : `position: absolute; left: 0px; top: 0px; ` +
       `width: ${px(rect.width)}; height: ${px(rect.height)}`;
@@ -1397,12 +2045,23 @@ function imageInnerStyle(rect, flexItem, objectFit) {
   return base;
 }
 
+// True when an <img> source is an SVG (by extension or `data:` MIME). SVG
+// sources are inlined as resolvable vector paths downstream, so their host
+// layer needs an explicit pixel size (see imageInnerStyle); raster sources do
+// not. Query strings / fragments after the extension are tolerated.
+function isSvgSource(src) {
+  const s = (src || '').trim().toLowerCase();
+  if (!s) return false;
+  if (s.indexOf('data:image/svg+xml') === 0) return true;
+  return /\.svg(?:[?#]|$)/.test(s);
+}
+
 // Walk an SVG subtree and freeze the CSS-resolved paint state onto each
 // cloned element so the snapshot renders identically without the page's
 // original stylesheet:
 //
-//   1. `currentColor` / `context-fill` / `context-stroke` literal attribute
-//      values get rewritten to the node's resolved color.
+//   1. Literal `currentColor` attributes use their CSS-resolved paint value.
+//      `context-fill` / `context-stroke` are left as-is (no colour to freeze).
 //   2. Every presentation attribute in `SVG_PRESENTATION_ATTRS` (defined
 //      below as a function-local constant so it ships into the browser
 //      payload via `fn.toString()`) whose resolved value differs from what
@@ -1491,6 +2150,24 @@ function freezeSvg(svgEl, rect) {
     // opacity here; the walk below also skips freezing it back as an attribute. Only the
     // root is affected — CSS `opacity` does not inherit, so descendants keep theirs.
     clone.style.removeProperty('opacity');
+    // `animation` is wrapper-owned for the same reason: `renderSvg`'s wrapper `<div>`
+    // already carries the SVG's `pagxAnim*` animation and its `transform-origin`
+    // (buildStyle → appendAnimation), and that is the box the importer pivots the
+    // animated transform around. Leaving the identical `animation` on the root `<svg>`
+    // makes the runtime play it a SECOND time on the inner layer — doubling every
+    // scale/translate/opacity/filter step (e.g. a glitch glyph's `scale(2)` becomes
+    // ~4× and floods the frame as a solid block, with the drop-shadow copies smeared
+    // into offset colour bars). Strip the root's own animation so the transform lives
+    // on exactly one element. Descendant shape animations (buildForInlineSvgShape)
+    // target inner nodes, not the root, so they are untouched.
+    clone.style.removeProperty('animation');
+    clone.style.removeProperty('animation-name');
+    clone.style.removeProperty('animation-duration');
+    clone.style.removeProperty('animation-timing-function');
+    clone.style.removeProperty('animation-iteration-count');
+    clone.style.removeProperty('animation-direction');
+    clone.style.removeProperty('animation-delay');
+    clone.style.removeProperty('animation-fill-mode');
   }
   // A directly-authored `opacity` attribute on the root <svg> is the same wrapper-owned
   // value in attribute form; drop it so the walk's freeze pass treats the root as having
@@ -1524,11 +2201,18 @@ function freezeSvg(svgEl, rect) {
     if (dst && dst.nodeType === 1 && dst.getAttribute) {
       const stroke = dst.getAttribute('stroke');
       const fill = dst.getAttribute('fill');
-      if (stroke === 'currentColor' || stroke === 'context-stroke') {
-        dst.setAttribute('stroke', here);
+      // A stylesheet rule such as `.spark svg path { fill: #ffd76a }` outranks
+      // the element's own `fill="currentColor"` attribute, so use the resolved
+      // paint value and fall back to the resolved `color` only when it is empty.
+      // `context-fill` / `context-stroke` are deliberately left untouched: their
+      // resolved value stays the literal keyword (there is no colour to read),
+      // and the browser paints nothing without a context element, so freezing
+      // the element's `color` here would invent a paint the page never had.
+      if (stroke === 'currentColor') {
+        dst.setAttribute('stroke', resolvedAttrs['stroke'] || here);
       }
-      if (fill === 'currentColor' || fill === 'context-fill') {
-        dst.setAttribute('fill', here);
+      if (fill === 'currentColor') {
+        dst.setAttribute('fill', resolvedAttrs['fill'] || here);
       }
       // Inline `style="stroke: currentColor"` is uncommon but legal.
       if (dst.style) {
@@ -1701,10 +2385,13 @@ function splitTextNodeIntoLines(textNode, whiteSpace, axis) {
   // (nowrap) span carries no stray hard break; leading/internal spaces — i.e.
   // indentation — stay intact. The line's vertical offset is already encoded in
   // its rect, so dropping the break characters never loses positioning.
-  // Collapsing modes fold + trim all whitespace as before.
+  // Collapsing modes fold whitespace as before, except NBSP which carries the
+  // source page's no-break glue semantics (see COLLAPSIBLE_WS). The `.trim()`
+  // below still drops a leading/trailing NBSP, so only NBSPs inside the text
+  // survive.
   const cleanLine = (s) => {
     const stripped = s.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
-    return preserve ? stripped : stripped.replace(/\s+/g, ' ').trim();
+    return preserve ? stripped : stripped.replace(COLLAPSIBLE_WS, ' ').trim();
   };
   const range = document.createRange();
   range.selectNodeContents(textNode);
@@ -1898,7 +2585,7 @@ const BOUNDARY_SPACE = '\u00a0';
 //
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
-function emitTextSpans(textNode, parentRect, computed) {
+function emitTextSpans(textNode, parentRect, computed, opts) {
   const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   if (wm === 'vertical-rl' || wm === 'vertical-lr') {
@@ -1932,7 +2619,11 @@ function emitTextSpans(textNode, parentRect, computed) {
     // inline sibling: leading on the first line, trailing on the last.
     if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
     if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
-    out.push(`<span style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
+    const intrinsicMode = opts && opts.intrinsicWidth;
+    const intrinsicWidth = intrinsicMode
+      ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
+      : '';
+    out.push(`<span${intrinsicWidth} style="${withNowrap(base)}">${escapeHtml(transformed)}</span>`);
   }
   return out;
 }
@@ -2128,7 +2819,7 @@ function flexItemChildren(el) {
     const tag = c.tagName.toLowerCase();
     if (DROP_TAGS.has(tag)) continue;
     const cs = getComputedStyle(c);
-    if (!isVisible(cs)) continue;
+    if (!isVisible(cs, c)) continue;
     if (cs.display === 'contents') return null;
     const pos = cs.position;
     if (pos === 'absolute' || pos === 'fixed' || pos === 'sticky') return null;
@@ -2501,7 +3192,7 @@ function renderImg(el, parentRect, rect, left, top, computed, opts) {
   const src = imgSrc(el);
   const alt = escapeHtml(imgAlt(el));
   const objectFit = computed.objectFit || computed.getPropertyValue('object-fit') || '';
-  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit);
+  const imgStyle = imageInnerStyle(rect, opts.flexItem, objectFit, isSvgSource(src));
   const dataAttrs = forwardDataAttrs(el);
   const inner = `<img src="${escapeHtml(src)}" alt="${alt}"${dataAttrs} style="${imgStyle}"/>`;
   return renderBoxedReplaced(rect, left, top, computed, opts, inner);
@@ -2776,7 +3467,18 @@ function isInlineRunChild(el) {
   const tag = el.tagName.toLowerCase();
   if (!INLINE_RUN_TAGS.has(tag)) return false;
   const cs = getComputedStyle(el);
-  if (!isVisible(cs)) return false;
+  if (!isVisible(cs, el)) return false;
+  // An inline run carrying its own `pagxAnim*` animation (e.g. a per-character
+  // decode-typewriter where each `<span class="ch">` fades/decodes in on its own
+  // opacity/color keyframes) must NOT be collapsed into a static text leaf: the
+  // inline-run emit path forwards only text-scope declarations and folds the
+  // child's `opacity` into its `color` alpha at the static base value, silently
+  // dropping the animation (a t=0 `opacity:0` char is frozen fully transparent
+  // and never reveals). Bail so the element takes the absolute-positioned
+  // container path instead, which preserves each animated child as its own
+  // Layer that plays the reveal — matching how a multi-line / overlay-bearing
+  // sibling run is already handled.
+  if (hasPagxAnimation(cs)) return false;
   const display = cs.display;
   if (display !== 'inline' && display !== 'inline-block') return false;
   if (cs.position !== 'static') return false;
@@ -2801,6 +3503,32 @@ function isInlineRunChild(el) {
     if (c.nodeType === Node.TEXT_NODE) continue;
     if (c.nodeType !== Node.ELEMENT_NODE) return false;
     if (!isInlineRunChild(c)) return false;
+  }
+  return true;
+}
+
+// Narrower companion used only to recognise a content-sized inline row that could not be merged
+// into one TextBox because one of its runs carries margin. It intentionally allows margin (the
+// absolute-to-flex pass recovers it as `gap`) while retaining every other safety condition from
+// `isInlineRunChild`.
+function isIntrinsicWidthInlineRunChild(el) {
+  if (el.nodeType !== Node.ELEMENT_NODE) return false;
+  const tag = el.tagName.toLowerCase();
+  if (!INLINE_RUN_TAGS.has(tag)) return false;
+  const cs = getComputedStyle(el);
+  if (!isVisible(cs, el) || hasPagxAnimation(cs)) return false;
+  if (cs.display !== 'inline' && cs.display !== 'inline-block') return false;
+  if (cs.position !== 'static') return false;
+  const transform = cs.transform;
+  if (transform && transform !== 'none' && transform !== 'matrix(1, 0, 0, 1, 0, 0)') {
+    return false;
+  }
+  if (hasBoxVisualsForInline(cs)) return false;
+  const pad = readPadding(cs);
+  if (pad.top || pad.right || pad.bottom || pad.left) return false;
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) continue;
+    if (!isIntrinsicWidthInlineRunChild(child)) return false;
   }
   return true;
 }
@@ -3159,6 +3887,27 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   // metrics differ from Chromium's by a sub-pixel — the measured wrapper
   // rect already matches Chromium's natural line width.
   if (opts.flexItem) {
+    // A flex-item text leaf that carries its own `pagxAnim*` reveal AND whose
+    // base opacity is < 1 (a per-character decode/typewriter where each glyph
+    // fades in on its own opacity keyframes) must be emitted as a sized
+    // flex-item BOX that keeps that box-level `opacity` + animation — NOT the
+    // bare pure-inline `<span>` below. The pure-inline path forwards only
+    // text-scope declarations (color/font/letter-spacing/…) and drops the
+    // box-scope `opacity`, so the importer folds the reveal into a static
+    // colour alpha and freezes the glyph at its resting (fully-visible) state:
+    // the loose value text in a `<div class="spec"><b>CLASS</b>/ ROGUE BLADE</div>`
+    // flex row then pops in from t=0 while the `<b>` label (which takes the
+    // absolute-positioned char-box path) correctly stays hidden until typed.
+    // The box mirrors that char-box path — `opacity`/animation on the outer
+    // Layer, colour flash on the inner text span — so the reveal plays and the
+    // flex row still measures the item's width for layout.
+    if (flexCharCarriesReveal(computed)) {
+      const textNode = firstTextNodeChild(el);
+      const revealSpans = textNode
+        ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+        : [];
+      return `<div style="${boxStyle}">${revealSpans.join('')}${overlays}</div>`;
+    }
     const baseTextStyle = buildStyle(0, 0, 0, 0, computed, {
       box: false, text: true, positioned: false,
     });
@@ -3292,8 +4041,28 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   }
 
   const textNode = firstTextNodeChild(el);
+  // Every span emitted here represents a measured visual line, not an authored box. For
+  // centered text its width therefore belongs to the glyph content while its center belongs to
+  // the fixed host box. Preserve both facts explicitly: the importer drops the measured
+  // Chromium width and replaces the baked `left` offset with a PAGX centerX constraint. Merely
+  // dropping width would make an edited line grow only to the right and cease to be centered.
+  //
+  // The `text-align: center` -> `intrinsic-width=center` promotion applies to text leaves whose
+  // own box is a fixed-width host: every block-level display (`block`, `flex`, `grid`,
+  // `table-cell`, `list-item`, …) plus `inline-block`, whose parent is a real fixed-width box. An
+  // inline-level leaf that shares its line box with adjacent content (`display: inline`, e.g.
+  // `<em>` inside a centered paragraph) inherits its `text-align: center` for inline-flow
+  // character placement, NOT for the line fragment as a whole — Chromium measures each inline
+  // fragment at its inline-flow position, and marking those fragments `intrinsic-width=center`
+  // would re-center them inside the inline parent (e.g. putting "feel" at the em-container's
+  // horizontal centre instead of the line-end Chromium reported), breaking inline layout.
+  // `inline-flex` / `inline-grid` / `inline-table` are inline-level the same way and stay out.
+  const textAlign = String(computed.getPropertyValue('text-align') || '').trim().toLowerCase();
+  const display = String(computed.display || '').trim().toLowerCase();
+  const inlineLevelDisplay = display.startsWith('inline') && display !== 'inline-block';
+  const intrinsicWidth = (textAlign === 'center' && !inlineLevelDisplay) ? 'center' : false;
   const lineSpans = textNode
-    ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+    ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed, { intrinsicWidth })
     : [];
   // Wrapped inline box (e.g. a `<mark>` spanning two lines): paint the box
   // visuals once per line fragment behind a transparent positioning wrapper so
@@ -3387,7 +4156,7 @@ function renderPseudoTextLeaf(el, parentRect, rect, left, top, hostComputed, opt
 // for the same expansion applied along the absolute-positioning path.
 function renderFlexTextItem(child, parentComputed) {
   const r = child.rect;
-  const text = (child.node.nodeValue || '').replace(/\s+/g, ' ').trim();
+  const text = (child.node.nodeValue || '').replace(COLLAPSIBLE_WS, ' ').trim();
   const lineHeightPx = readNum(parentComputed, 'line-height');
   const height = lineHeightPx > r.height + 0.1 ? lineHeightPx : r.height;
   const baseStyle = buildStyle(0, 0, 0, 0, parentComputed, {
@@ -3440,6 +4209,64 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
   return `<div style="${style}">${childParts.join('')}</div>`;
 }
 
+// Returns true when a flex item is a single line of ordinary inline content whose used width is
+// exactly its content width and whose authored CSS width is `auto`. The snapshot must retain the
+// browser-measured width long enough for HTMLFlexInference to recover margins as flex gaps, but
+// the final PAGX Layer must remain content-sized so editing a text run reflows the whole row.
+//
+// CSS Typed OM is important here: getComputedStyle().width exposes the *used* pixel width for a
+// flex item, while computedStyleMap().get('width') preserves the computed `auto` keyword. Requiring
+// that keyword keeps a coincidentally equal authored pixel width fixed. The geometric equality
+// checks then reject `min-width`, flex-basis, stretch, and other constraints that expand an auto
+// box beyond its contents.
+function isIntrinsicInlineContentWidth(el, computed, rect, opts) {
+  if (!opts || !opts.flexItem || opts.flexMainSizePinned || opts.transform) return false;
+  if (readNum(computed, 'flex-grow') > 0) return false;
+  if (hasPagxAnimation(computed) || hasBoxVisualsForInline(computed)) return false;
+  const overflowX = String(computed.getPropertyValue('overflow-x') || '').trim().toLowerCase();
+  if (overflowX && overflowX !== 'visible') return false;
+  const pad = readPadding(computed);
+  if (pad.left || pad.right) return false;
+
+  // Only the margin-bearing inline-run family is handled here. Plain mixed inline runs already
+  // take renderInlineTextLeaf's single-TextBox path; block/replaced descendants need their
+  // measured container width for positioning or paint.
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) continue;
+    if (child.nodeType !== Node.ELEMENT_NODE || !isIntrinsicWidthInlineRunChild(child)) {
+      return false;
+    }
+  }
+
+  let typedWidth;
+  try {
+    const styleMap = typeof el.computedStyleMap === 'function' ? el.computedStyleMap() : null;
+    const value = styleMap && styleMap.get ? styleMap.get('width') : null;
+    typedWidth = value && value.value != null ? String(value.value).trim().toLowerCase() : '';
+  } catch (_) {
+    return false;
+  }
+  if (typedWidth !== 'auto') return false;
+
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const contentRect = range.getBoundingClientRect();
+  range.detach && range.detach();
+  if (!contentRect || contentRect.width <= 0 || contentRect.height <= 0) return false;
+
+  // The range must occupy the complete horizontal box (within sub-pixel rounding). A wider host
+  // is reserved/stretched space; a narrower host is a clipping or wrapping boundary.
+  const tolerance = 1.0;
+  if (Math.abs(contentRect.left - rect.left) > tolerance ||
+      Math.abs(contentRect.right - rect.right) > tolerance ||
+      Math.abs(contentRect.width - rect.width) > tolerance) {
+    return false;
+  }
+  const lineHeight = readNum(computed, 'line-height');
+  if (lineHeight > 0 && contentRect.height > lineHeight * 1.5) return false;
+  return true;
+}
+
 // Container with element children (and optionally direct text). Per direct
 // text node we measure the actual rendered rect via Range, so the text
 // lands where the browser put it (next to an <svg>, inside a flex row, …)
@@ -3460,8 +4287,12 @@ function renderFlexContainer(el, parentRect, computed, flexChildren, opts) {
 // Asymmetric border overlays paint *on top* of all children to match
 // CSS, which renders borders after content.
 function renderContainer(el, parentRect, rect, left, top, computed, opts) {
-  const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed);
+  const intrinsicWidth = isIntrinsicInlineContentWidth(el, computed, rect, opts);
+  const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed, {
+    intrinsicWidth,
+  });
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+  const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
   // Wrapped inline box with element children (e.g. a `<mark>` containing nested
   // styling that spans multiple lines): paint the box visuals per line fragment
   // behind a transparent positioning wrapper, matching how the browser paints a
@@ -3471,19 +4302,19 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { ...opts });
     // The leading tag here is a visuals-only line fragment, not this element's box; mark the
     // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
-    return `${fragments}<div ${NAME_ANCHOR_ATTR} style="${wrapperStyle}">${childHTML}</div>`;
+    return `${fragments}<div ${NAME_ANCHOR_ATTR}${intrinsicAttr} style="${wrapperStyle}">${childHTML}</div>`;
   }
   const style = buildStyle(left, top, rect.width, rect.height, computed, {
     box: true, ...opts,
   });
-  return `<div style="${style}">${childHTML}${overlays}</div>`;
+  return `<div${intrinsicAttr} style="${style}">${childHTML}${overlays}</div>`;
 }
 
 // Emit every visible child of `el` (elements + non-empty text nodes) into a
 // single HTML string, replaying browser paint order (flow-then-positioned,
 // both in DOM order). The host's computed style is passed in so we don't
 // have to ask the engine for it again.
-function renderChildrenInto(el, parentRect, hostComputed) {
+function renderChildrenInto(el, parentRect, hostComputed, opts) {
   const items = [];
   let domIndex = 0;
   const computedFor = hostComputed || getComputedStyle(el);
@@ -3512,7 +4343,7 @@ function renderChildrenInto(el, parentRect, hostComputed) {
         html: render(n, parentRect, undefined, childComputed),
       });
     } else if (n.nodeType === Node.TEXT_NODE && n.nodeValue && n.nodeValue.trim()) {
-      const spans = emitTextSpans(n, parentRect, computedFor);
+      const spans = emitTextSpans(n, parentRect, computedFor, opts);
       if (spans.length > 0) {
         items.push({
           stackable: false,
@@ -3748,6 +4579,82 @@ function renderElementBox(el, parentRect, opts, precomputed) {
 
 // ===== Main snapshot entry =====
 
+// Read the root scroll position from the actual scrolling element. `window.scrollX/Y`
+// normally report the same values, but the element is the more reliable source after a
+// direct `scrollTop` / `scrollLeft` assignment and is also available in browser-bundle
+// callers that replace `window.scrollTo`.
+function readRootScrollOffset() {
+  const docEl = document.documentElement;
+  const body = document.body;
+  const root = document.scrollingElement || docEl || body;
+  const finite = (value) => typeof value === 'number' && isFinite(value);
+  const windowX = typeof window !== 'undefined'
+    ? (finite(window.scrollX) ? window.scrollX : window.pageXOffset)
+    : 0;
+  const windowY = typeof window !== 'undefined'
+    ? (finite(window.scrollY) ? window.scrollY : window.pageYOffset)
+    : 0;
+  return {
+    left: root && finite(root.scrollLeft) ? root.scrollLeft : (finite(windowX) ? windowX : 0),
+    top: root && finite(root.scrollTop) ? root.scrollTop : (finite(windowY) ? windowY : 0),
+  };
+}
+
+// Put the document viewport at its geometric origin without depending solely on
+// `window.scrollTo`. A page may enable smooth scrolling, replace that method, or leave a
+// pending smooth-scroll animation running after the lazy-content sweep. Directly assigning
+// every plausible root scroller is synchronous in Chromium and cancels that residual state.
+// The second assignment deliberately follows `window.scrollTo`: if a page replaced the
+// method with a no-op (or redirected it elsewhere), the DOM properties remain authoritative.
+// Returns the residual offset so the tree walk can still normalise ordinary document-flow
+// geometry if a browser refuses the reset for any reason.
+function resetRootScroll() {
+  const docEl = document.documentElement;
+  const body = document.body;
+  if (docEl && docEl.style) docEl.style.setProperty('scroll-behavior', 'auto', 'important');
+  if (body && body.style) body.style.setProperty('scroll-behavior', 'auto', 'important');
+
+  const roots = [];
+  const addRoot = (root) => {
+    if (root && roots.indexOf(root) === -1) roots.push(root);
+  };
+  addRoot(document.scrollingElement);
+  addRoot(docEl);
+  addRoot(body);
+  const assignOrigin = () => {
+    for (let i = 0; i < roots.length; i++) {
+      try { roots[i].scrollLeft = 0; } catch (_) { /* ignore a read-only host object */ }
+      try { roots[i].scrollTop = 0; } catch (_) { /* ignore a read-only host object */ }
+    }
+  };
+
+  assignOrigin();
+  if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+    try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
+  }
+  assignOrigin();
+  return readRootScrollOffset();
+}
+
+// `getBoundingClientRect()` is viewport-relative. The normal path resets the root scroll and
+// therefore returns the familiar `(0,0,width,height)` rect; using the residual offset here is
+// a last-line defence for ordinary flow/absolute content when a hostile host prevents the
+// scroll reset. Child rect subtraction remains unchanged because both parent and child are in
+// the same viewport coordinate space.
+function canvasRootRect(canvasWidth, canvasHeight) {
+  const scroll = resetRootScroll();
+  return {
+    left: -scroll.left,
+    top: -scroll.top,
+    right: canvasWidth - scroll.left,
+    bottom: canvasHeight - scroll.top,
+    width: canvasWidth,
+    height: canvasHeight,
+    x: -scroll.left,
+    y: -scroll.top,
+  };
+}
+
 // Neutralise the <html>/<body> boxes exactly as baseline.js does before it
 // captures ground truth: zero <body>'s margin/padding, then zero <html>'s
 // margin/padding and force `display: block`. `pagx render` roots at <body> and
@@ -3761,31 +4668,71 @@ function renderElementBox(el, parentRect, opts, precomputed) {
 // is what makes the two renders comparable.
 function prepareBodyForSnapshot() {
   const body = document.body;
+  // Reset the geometric clip-path def registry so a re-run (this function is the
+  // registered `takeSnapshot` and may be evaluated more than once per page) does
+  // not accumulate defs from a previous pass. `appendGeometricClipPath` fills it
+  // during the tree walk; it is flushed into a hidden `<svg>` in the output below.
+  window.__pagxClipDefs = [];
+  window.__pagxClipDefMap = {};
   body.style.margin = '0';
   body.style.padding = '0';
+  // Make <body> a containing block before any measurement runs. The output
+  // <style> block pins `body{position:relative}` so that the emitted
+  // `position: absolute` children resolve against the body's box; mirror that on
+  // the LIVE document here so the source page (where <body> is `position: static`
+  // by default) resolves `right`/`bottom` anchors of absolute children against
+  // the body rather than the initial containing block, keeping the live
+  // measurements and the emitted subset on one origin.
+  body.style.position = 'relative';
   const docEl = document.documentElement;
   if (docEl && docEl.style) {
     docEl.style.margin = '0';
     docEl.style.padding = '0';
     docEl.style.display = 'block';
   }
-  // Force the scroll reset to be instant. A page that sets
-  // `html { scroll-behavior: smooth }` (increasingly common) turns the
-  // `window.scrollTo(0, 0)` below into an ASYNCHRONOUS animation: it does not
-  // jump to the origin, it eases there over several hundred ms. The very next
-  // `getBoundingClientRect` / `body.offsetHeight` runs mid-animation while the
-  // page is still scrolled down, so every element's measured `top` is offset by
-  // the residual scroll (e.g. a whole page rendered at `top: -1542px`, with a
-  // matching blank band at the bottom of the canvas). Overriding
-  // `scroll-behavior: auto !important` on <html> and <body> makes the reset the
-  // synchronous jump this function assumes.
-  if (docEl && docEl.style) docEl.style.setProperty('scroll-behavior', 'auto', 'important');
-  if (body && body.style) body.style.setProperty('scroll-behavior', 'auto', 'important');
-  if (typeof window.scrollTo === 'function') {
-    try { window.scrollTo(0, 0); } catch (_) { /* ignore */ }
-  }
+  // Reset before changing animation state, then once more after the layout flush below.
+  // The second pass handles scroll anchoring caused by those style/layout changes.
+  resetRootScroll();
+  // Cancel every running CSS animation so the snapshot measures the element
+  // in its base (un-animated) state. Without this, `direction: reverse` and
+  // any other non-zero starting phase would shift the element away from its
+  // CSS-declared position by the time `getBoundingClientRect()` runs — and
+  // the same offset would also surface through `getComputedStyle(.).transform`,
+  // so both the `top/left` and the static `transform: matrix(...)` written
+  // into the subset would carry the animation offset twice (once baked into
+  // the rect, once forwarded as a static transform). The PAGX importer then
+  // adds the keyframe channel on top, tripling the offset. CSS animations
+  // surface as WAAPI `Animation` objects via `getAnimations()`; calling
+  // `cancel()` on each removes the effect from computed style without
+  // touching the stylesheet rules, so longhand reads (`animation-name`,
+  // `-direction`, `-duration`, …) still resolve correctly when the snapshot
+  // walker emits them.
+  //
+  // The canonical `pagxAnim*` animations the capture layer just installed are
+  // cancelled too: the shorthand was written into the element's *inline*
+  // `style.animation` (animation-capture.ts), and `cancel()` only stops the
+  // running WAAPI effect — it does not erase the inline declaration, so
+  // `getComputedStyle(.).animation-name/-direction/-duration/…` still resolve
+  // to the captured longhand when `appendAnimation()` later serialises the
+  // element. Skipping them here was the source of a "double-write" bug:
+  // `direction: reverse` keeps the element pinned at its 100% keyframe (e.g.
+  // `translateY(120px)` + `opacity: 0`), so `getBoundingClientRect()` and
+  // `getComputedStyle().transform` both reported the offset position and the
+  // subset emitted the same translation twice (once as `top`, once as
+  // `transform: matrix(...)`).
+  try {
+    if (typeof document.getAnimations === 'function') {
+      const all = document.getAnimations();
+      for (let i = 0; i < all.length; i++) {
+        try {
+          all[i].cancel();
+        } catch (_) { /* ignore per-anim failure */ }
+      }
+    }
+  } catch (_) { /* ignore */ }
   // Force layout flush.
   void body.offsetHeight;
+  resetRootScroll();
 }
 
 // Neutralise the page and return the canvas dimensions the subset will use.
@@ -3810,16 +4757,94 @@ function measureCanvas() {
   prepareBodyForSnapshot();
   const body = document.body;
   const bodyRect = body.getBoundingClientRect();
-  const width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  // `prepareBodyForSnapshot` forces an inline `position: relative` on the live
+  // <body> so that `right`/`bottom`-anchored absolute children resolve against
+  // the body (not the initial containing block) during the emission walk. But
+  // that role change also makes every body-anchored `position: absolute` child
+  // part of the body's scrollable overflow, so `scrollWidth`/`scrollHeight`
+  // would grow to include any such child that overflows the body's own box —
+  // e.g. a bottom-pinned nav bar whose inner content is wider than the bar,
+  // which inflates the canvas past the body (weibo: 390x780 -> 422x796).
+  //
+  // The canvas must match the eval baseline's screenshot clip, and baseline.js
+  // measures `body.scrollWidth/scrollHeight` WITHOUT injecting any position (it
+  // only zeroes margin/padding), i.e. against the body's *authored* position.
+  // Mirror that here: drop the injected inline `relative` for the scroll read so
+  // the body falls back to its authored containing-block role (`static` unless
+  // the page's own CSS set it otherwise). In-flow content that overflows the
+  // declared size (fixed-size mocks, fluid feeds) still grows the canvas, while
+  // an absolute child whose containing block is the initial containing block —
+  // not the body — no longer does. The injected `relative` is restored right
+  // afterward so the tree walk keeps its body-anchored geometry.
+  const savedPosition = body.style.position;
+  body.style.position = '';
+  void body.offsetHeight;
+  let width = Math.max(body.scrollWidth, Math.round(bodyRect.width));
+  let height = Math.max(body.scrollHeight, Math.round(bodyRect.height));
+  // Fixed-canvas mocks routinely position EVERY child out of flow
+  // (`.stage { position: absolute; width: 672px; height: 480px }` with nothing
+  // else in the body). An out-of-flow child contributes no content size to its
+  // parent, and the scroll read above deliberately drops the injected
+  // `relative` so the body is back to its authored `static` role — which takes
+  // those children out of its scrollable overflow too. Both `scrollHeight` and
+  // `getBoundingClientRect().height` then read 0 even though the page paints
+  // normally in a browser. A zero canvas emits an empty <body> and the importer
+  // rejects the subset outright, so fall back to the union of the visible boxes
+  // — for the mock above that recovers exactly 672x480.
+  //
+  // `documentElement` is NOT a usable fallback here for the reason above: it is
+  // stretched to the viewport, so it would report the 1400x900 default rather
+  // than the design's own canvas. Each axis falls back independently: a body
+  // can collapse on the block axis alone (the common case, since the inline
+  // axis is filled by the containing block).
+  if (width <= 0 || height <= 0) {
+    const content = visibleContentExtent();
+    if (width <= 0 && content.right > 0) width = Math.ceil(content.right);
+    if (height <= 0 && content.bottom > 0) height = Math.ceil(content.bottom);
+  }
   // Clamp the canvas to a renderable maximum. Infinite-scroll feeds inflate the
   // body far past what a single GL render surface can hold; MAX_CAPTURE_HEIGHT_PX
   // (embedded as a literal in PAYLOAD_CONSTANTS_SRC) keeps the output renderable
   // and matches the same clamp baseline.js applies, so the two stay aligned.
-  const height = Math.min(
-    MAX_CAPTURE_HEIGHT_PX,
-    Math.max(body.scrollHeight, Math.round(bodyRect.height)),
-  );
+  height = Math.min(MAX_CAPTURE_HEIGHT_PX, height);
+  body.style.position = savedPosition;
+  void body.offsetHeight;
+  resetRootScroll();
   return { width, height };
+}
+
+// Far edges of every painted box in the body, measured from the canvas origin.
+// Only consulted when the body's own box has collapsed (see `measureCanvas`),
+// so the O(n) walk never runs for a page that measures normally.
+//
+// Rects are viewport-relative and the root scroll is already pinned to (0,0) by
+// `prepareBodyForSnapshot`, so `right`/`bottom` are already canvas coordinates.
+// Only the far edges matter: the canvas always starts at the origin, and a
+// child at a negative offset is clipped by `pagx render` the same way the
+// browser clips it above/left of the body.
+//
+// Visibility uses the same `isVisible` predicate as the snapshot walker — and
+// passes `el` so a capture-animated element whose resting state is
+// `opacity: 0` / `visibility: hidden` still counts, matching what the walker
+// will emit. A genuinely hidden subtree cannot inflate the canvas.
+// `getElementsByTagName('*')` does not descend into shadow roots, matching the
+// walker's own reach.
+function visibleContentExtent() {
+  let right = 0;
+  let bottom = 0;
+  const body = document.body;
+  if (!body) return { right, bottom };
+  const all = body.getElementsByTagName('*');
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    const computed = getComputedStyle(el);
+    if (!isVisible(computed, el)) continue;
+    const rect = el.getBoundingClientRect();
+    if (!nonZero(rect)) continue;
+    if (rect.right > right) right = rect.right;
+    if (rect.bottom > bottom) bottom = rect.bottom;
+  }
+  return { right, bottom };
 }
 
 function snapshotMainImpl(opts) {
@@ -3851,12 +4876,7 @@ function snapshotMainImpl(opts) {
   // the canvas origin reproduces the collapsed margin as leading space and
   // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
   // here (block body, zeroed margin), so the horizontal axis is unaffected.
-  const rootOrigin = {
-    left: 0, top: 0,
-    right: canvasWidth, bottom: canvasHeight,
-    width: canvasWidth, height: canvasHeight,
-    x: 0, y: 0,
-  };
+  const rootOrigin = canvasRootRect(canvasWidth, canvasHeight);
   const parts = [];
   for (const c of body.children) {
     parts.push(render(c, rootOrigin));
@@ -3911,11 +4931,36 @@ function snapshotMainImpl(opts) {
   // Element selectors inside a single `<style>` block are inside the
   // subset (`spec/html_subset.md` §3.3); the pagx importer parses them,
   // applies the (no-op) declarations, and drops the `<style>` element.
-  const styleBlock =
+  let styleBlock =
     'div,span,img,svg,body{box-sizing:border-box}' +
     'html{min-height:100vh;display:flex;justify-content:center;' +
     'align-items:flex-start;padding:32px 0}' +
     'body{margin:0;padding:0;position:relative;flex-shrink:0}';
+
+  // animation-capture.ts (run before this snapshot) stashes the canonical
+  // `@keyframes` it synthesised in a dedicated <style id="__pagx_anim_keyframes">.
+  // Fold them into the single output <style> so the importer's
+  // StyleSheetCollectorPass picks them up alongside the `animation-*` longhands
+  // that appendAnimation() forwarded onto each element. The block is appended
+  // (not prepended) so element selectors above keep their precedence.
+  const animKeyframes = document.getElementById('__pagx_anim_keyframes');
+  if (animKeyframes && animKeyframes.textContent) {
+    styleBlock += animKeyframes.textContent.trim();
+  }
+
+  // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
+  // hidden `<svg>` at the top of <body>. `display:none` keeps it out of the
+  // browser preview render, but the pagx importer's `collectSharedDefs` still
+  // indexes every id under a `<defs>` from the parsed DOM, so the `url(#pagxClipN)`
+  // rewrites resolve into contour masks. Coordinates are in userSpaceOnUse
+  // border-box pixels, which is also how a browser applies the url() clip.
+  const clipDefs = (window.__pagxClipDefs && window.__pagxClipDefs.length)
+    ? window.__pagxClipDefs : [];
+  const clipDefsSvg = clipDefs.length
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" ' +
+      'style="display:none" aria-hidden="true"><defs>' + clipDefs.join('') +
+      '</defs></svg>\n'
+    : '';
 
   return {
     html:
@@ -3926,7 +4971,7 @@ function snapshotMainImpl(opts) {
     <style>${styleBlock}</style>
   </head>
   <body style="${bodyStyle.join('; ')}">
-${parts.join('')}
+${clipDefsSvg}${parts.join('')}
   </body>
 </html>
 `,
@@ -3964,6 +5009,14 @@ const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};
 const BOUNDARY_SPACE = '\\u00a0';
 
 const NAME_ANCHOR_ATTR = '${NAME_ANCHOR_ATTR}';
+
+const INTRINSIC_WIDTH_ATTR = '${INTRINSIC_WIDTH_ATTR}';
+
+// Browser-scope twin of the module-level COLLAPSIBLE_WS (whitespace collapse
+// that spares NBSP; see the module-level declaration for the rationale). The
+// raw-JS helpers below run inside this IIFE, so they resolve this payload-side
+// const rather than the TS module one.
+const COLLAPSIBLE_WS = /[^\\S\\u00a0]+/g;
 
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
@@ -4029,7 +5082,7 @@ const STYLE_SCHEMA = [
   // group must survive the snapshot. mask-image defaults to none and is dropped;
   // the descriptors are forwarded only when the element actually carries a mask,
   // gated by appendMaskFitting below (they are noise on unmasked boxes).
-  { prop: 'mask-image',       scope: 'box',  defaults: ['none'] },
+  { prop: 'mask-image',       scope: 'box',  defaults: ['none'], normalize: normalizeMaskImage },
   // clip-path: url(#id) references a hidden clipPath def the snapshot keeps as an
   // inline svg; the importer resolves the def into a contour mask layer (the
   // inverse of HTMLWriter::writeClipDef). CSS basic shapes (polygon/path/circle/
@@ -4069,8 +5122,19 @@ const HELPER_FNS = [
   normalizeOverflow,
   normalizeBorderRadius,
   normalizeBackgroundImage,
+  normalizeMaskImage,
   normalizeBackgroundClip,
   normalizeClipPath,
+  pagxClipNum,
+  pagxClipSplitTop,
+  pagxEvalLengthPx,
+  pagxParseClipShape,
+  pagxClipRefRect,
+  pagxClipPosition,
+  pagxClipRadius,
+  pagxClipShapeToInner,
+  pagxClipPathInnerMarkup,
+  appendGeometricClipPath,
   normalizeWritingMode,
   roundPx,
   px,
@@ -4081,6 +5145,8 @@ const HELPER_FNS = [
   withNowrap,
   paddingShorthand,
   nonZero,
+  hasPagxAnimation,
+  hasHiddenAnimatedAncestor,
   isVisible,
   readNum,
   readBox,
@@ -4092,6 +5158,7 @@ const HELPER_FNS = [
   isUniformBorder,
   hasAnyBorder,
   resolveZIndex,
+  paintBand,
   paintOrder,
   gatherDirectText,
   elementHasChildren,
@@ -4109,8 +5176,10 @@ const HELPER_FNS = [
   appendStyleProp,
   appendBorder,
   appendBoxShadow,
+  appendAnimation,
   resolveTextStroke,
   appendTextStroke,
+  appendTextShadow,
   appendBackgroundImageFitting,
   appendMaskFitting,
   buildStyle,
@@ -4127,6 +5196,7 @@ const HELPER_FNS = [
   isCssBorderTrianglePattern,
   renderBorderTriangle,
   imageInnerStyle,
+  isSvgSource,
   freezeSvg,
   mergeRectsOnSameLine,
   splitTextNodeIntoLines,
@@ -4138,7 +5208,9 @@ const HELPER_FNS = [
   multiplyColorAlpha,
   resolveInlineTextValue,
   isInlineRunChild,
+  isIntrinsicWidthInlineRunChild,
   isInlineTextLeafCandidate,
+  flexCharCarriesReveal,
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
@@ -4171,13 +5243,18 @@ const HELPER_FNS = [
   renderPseudoTextLeaf,
   renderFlexTextItem,
   renderFlexContainer,
+  isIntrinsicInlineContentWidth,
   renderContainer,
   renderChildrenInto,
   stripNameAnchor,
   applyLayerName,
   renderElementBox,
   render,
+  readRootScrollOffset,
+  resetRootScroll,
+  canvasRootRect,
   prepareBodyForSnapshot,
+  visibleContentExtent,
   measureCanvas,
   snapshotMainImpl,
   snapshotMain,
@@ -4209,6 +5286,7 @@ ${PAYLOAD_CONSTANTS_SRC}
 window.__pagxSnapshot = {
   takeSnapshot: snapshotMain,
   measureCanvas: measureCanvas,
+  resetRootScroll: resetRootScroll,
 };
 })();`;
 
@@ -4277,6 +5355,93 @@ async function inlineExternalImages(cachedMap) {
     return `data:${mime};base64,${btoa(binary)}`;
   }
 
+  // Formats `<Image>` is allowed to carry, plus SVG (which the HTML importer routes to native
+  // vector nodes instead of a raster). Everything else has to be re-encoded: PAGX consumers are
+  // only required to decode PNG/JPEG/WebP/GIF, so an AVIF or HEIC that a CDN served would render
+  // on the machine that happens to have the codec and silently vanish everywhere else — Windows
+  // ships no AV1 decoder by default, and a design tool that reads the file with a narrow codec
+  // set drops it outright.
+  const PASSTHROUGH_MIMES = [
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/webp',
+    'image/gif',
+    'image/svg+xml',
+  ];
+
+  // WebP keeps alpha and is in the PAGX supported set with a software decoder in the engine, so it
+  // is the one target that every consumer can read. Quality is high enough that a lossy re-encode
+  // of an already-lossy source is not visible at the sizes these images are composited at.
+  const WEBP_QUALITY = 0.92;
+
+  // Media type declared by a `data:` URI, lower-cased and without parameters. Empty when the URI
+  // declares none (`data:;base64,…`), which is treated as "not known to be supported".
+  function dataUriMime(src) {
+    const match = /^data:([^;,]+)/i.exec(src);
+    return match ? match[1].toLowerCase() : '';
+  }
+
+  // Chromium is the only image codec available on this side of the pipeline (the Node side carries
+  // no AVIF/HEIC decoder), so the re-encode happens here: decode the blob, draw it 1:1 and let the
+  // browser's own WebP encoder produce the replacement bytes.
+  async function transcodeToWebpDataUri(blob) {
+    const bitmap = await createImageBitmap(blob);
+    try {
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+      const encoded = await canvas.convertToBlob({ type: 'image/webp', quality: WEBP_QUALITY });
+      // A browser without a WebP encoder hands back a PNG blob; labelling that as WebP would lie
+      // about the payload, so treat it as a failure and keep the original bytes.
+      if (encoded.type !== 'image/webp') {
+        throw new Error('no webp encoder');
+      }
+      return await blobToDataUri(encoded);
+    } finally {
+      // The bitmap owns a decoded copy of the image; release it explicitly instead of leaving a
+      // page full of large images to the garbage collector.
+      bitmap.close();
+    }
+  }
+
+  // Normalises the bytes of one fetched blob for the snapshot. A format PAGX can carry is inlined
+  // as-is; anything else is replaced by its WebP re-encode. Re-encoding failures keep the original
+  // bytes and warn — a kept AVIF still renders wherever the codec exists, whereas dropping the
+  // image would lose it everywhere.
+  async function blobToNormalizedDataUri(blob) {
+    const mime = (blob.type || '').split(';')[0].trim().toLowerCase();
+    if (PASSTHROUGH_MIMES.indexOf(mime) >= 0) {
+      return await blobToDataUri(blob);
+    }
+    try {
+      return await transcodeToWebpDataUri(blob);
+    } catch (err) {
+      console.warn(
+        `html-snapshot: keeping ${mime || 'unlabelled'} image as-is (${err && err.message})`,
+      );
+      return await blobToDataUri(blob);
+    }
+  }
+
+  // Normalises an already-resolved source string: a data URI whose format PAGX cannot carry is
+  // re-encoded, while a supported format is returned unchanged. Two forms are left alone by
+  // design: a remote URL (the callers fetch those separately) and a filesystem path — the shape
+  // `--download-images` passes, whose bytes never reach the browser, so the on-disk file keeps
+  // whatever format the server sent. That mode is a capture artifact rather than the input the
+  // PAGX pipeline consumes, so it is not re-encoded.
+  async function normalizeSource(src) {
+    if (!src.startsWith('data:')) return src;
+    if (PASSTHROUGH_MIMES.indexOf(dataUriMime(src)) >= 0) return src;
+    try {
+      const res = await fetch(src);
+      return await blobToNormalizedDataUri(await res.blob());
+    } catch (err) {
+      const mime = dataUriMime(src) || 'unlabelled';
+      console.warn(`html-snapshot: keeping ${mime} image as-is (${err && err.message})`);
+      return src;
+    }
+  }
+
   // Convert a `file://` URL (the absolute form the browser resolves a local /
   // relative <img src> into) back to a plain filesystem path. PAGX's importer
   // treats a leading `/` (POSIX) or `C:/` (Windows) as absolute and reads the
@@ -4299,7 +5464,10 @@ async function inlineExternalImages(cachedMap) {
 
   const cache = cachedMap || {};
   const imgs = Array.from(document.querySelectorAll('img'));
+  // `pending` needs a fetch; `inlinePending` already holds its bytes (a response-cache hit, or a
+  // data URI the page authored) and only needs normalising.
   const pending = [];
+  const inlinePending = [];
   for (const img of imgs) {
     // A placeholder <img> whose `src`/`srcset` attributes are empty or missing
     // is not a real image, but the IDL getters below (`currentSrc` / `img.src`)
@@ -4312,9 +5480,22 @@ async function inlineExternalImages(cachedMap) {
     const rawSrc = (img.getAttribute('src') || '').trim();
     const rawSrcset = (img.getAttribute('srcset') || '').trim();
     if (!rawSrc && !rawSrcset) continue;
+    // Skip images an earlier pass already inlined (a `data:` URI or local path
+    // stamped on `data-snapshot-src`). This function may run more than once on
+    // a JS-driven page — components can mount fresh <img>s after the first pass
+    // (e.g. once the animation-capture virtual clock advances) — so this guard
+    // keeps the repeat pass from needlessly re-fetching every already-inlined
+    // image and only lets the newly mounted ones fall through.
+    if ((img.getAttribute('data-snapshot-src') || '').trim()) continue;
     const src = img.currentSrc || img.src || img.getAttribute('src') || '';
     if (!src) continue;
-    if (src.startsWith('data:')) continue;
+    if (src.startsWith('data:')) {
+      // A page that inlines its own images still has to be normalised: the data URI may carry a
+      // format PAGX cannot (an AVIF the author embedded, for instance), and no later stage would
+      // re-encode it. A supported format is returned unchanged, so this costs a string compare.
+      inlinePending.push({ img, src });
+      continue;
+    }
     // Local image referenced by a relative (or absolute-but-relative-to-the-
     // source) path: the browser has already resolved it to an absolute
     // `file://` URL. Emit that as a plain absolute filesystem path so the
@@ -4331,7 +5512,9 @@ async function inlineExternalImages(cachedMap) {
     if (!/^https?:/i.test(src)) continue;
     const cached = cache[src];
     if (cached) {
-      img.setAttribute('data-snapshot-src', cached);
+      // Re-encoding an unsupported format needs the browser's codec, so it runs in the same
+      // chunked pass as the fetches below instead of one await per element here.
+      inlinePending.push({ img, src: cached });
       continue;
     }
     pending.push({ img, src });
@@ -4344,7 +5527,7 @@ async function inlineExternalImages(cachedMap) {
         console.warn(`html-snapshot: image fetch ${res.status} for ${entry.src}`);
         return;
       }
-      const dataUri = await blobToDataUri(await res.blob());
+      const dataUri = await blobToNormalizedDataUri(await res.blob());
       entry.img.setAttribute('data-snapshot-src', dataUri);
     } catch (err) {
       console.warn(`html-snapshot: failed to inline ${entry.src}: ${err && err.message}`);
@@ -4355,6 +5538,13 @@ async function inlineExternalImages(cachedMap) {
   // throttle aggressively past that. Keeping the in-flight window at 8
   // lets us saturate the bottleneck without queueing surprises.
   const FETCH_CHUNK_SIZE = 8;
+  async function applyInlineSource(entry) {
+    entry.img.setAttribute('data-snapshot-src', await normalizeSource(entry.src));
+  }
+  for (let i = 0; i < inlinePending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = inlinePending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(applyInlineSource));
+  }
   for (let i = 0; i < pending.length; i += FETCH_CHUNK_SIZE) {
     const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOne));
@@ -4364,28 +5554,62 @@ async function inlineExternalImages(cachedMap) {
   // to an absolute form. Local `file://` urls are handled at emit time by
   // `normalizeBackgroundImage` (stripped to a plain path the importer loads directly), so only
   // remote `http(s)` bytes need inlining here — fetch them and overwrite the element's inline
-  // `background-image` with a `data:` URI so the walker emits a self-contained reference. Only
-  // the first layer of a comma-separated stack is handled: that is the single-image case the
-  // exporter produces and the only one the importer recovers.
+  // `background-image` with a `data:` URI so the walker emits a self-contained reference.
   function firstCssUrl(value) {
     const m = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value || '');
     return m ? m[2] : '';
   }
 
+  // A stack that mixes a colour wash with a photo — `linear-gradient(...), url(photo.jpg)`, the
+  // usual "tinted card" pattern — is inlined layer by layer. Replacing the whole declaration
+  // would throw the gradient away, and leaving the photo remote makes the importer emit an
+  // `<Image source="https://…">` the renderer cannot fetch, so the card renders as bare text.
+  // Only a single-url stack is handled: `url(...), url(...)` has no gradient to preserve and
+  // keeps the previous whole-declaration replacement.
+  function hasGradientLayer(value) {
+    return /(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value || '');
+  }
+
+  // Replaces just the `url(...)` token, leaving every other background layer in place. The data
+  // URI is emitted single-quoted because `normalizeBackgroundImage` passes a gradient-bearing
+  // value through verbatim: the value lands inside the double-quoted `style="…"` attribute the
+  // walker writes, where a double-quoted url() would close the attribute early.
+  function replaceFirstCssUrl(value, replacement) {
+    const token = `url('${replacement.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+    return value.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/i, () => token);
+  }
+
   const bgPending = [];
+  const bgInlinePending = [];
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
     const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
-    if (!bg || !/^url\(/i.test(bg)) continue;
+    const layered = hasGradientLayer(bg) && (bg.match(/url\(/gi) || []).length === 1;
+    if (!bg || (!/^url\(/i.test(bg) && !layered)) continue;
     const url = firstCssUrl(bg);
-    if (!url || url.startsWith('data:') || /^file:/i.test(url)) continue;
+    if (!url || /^file:/i.test(url)) continue;
+    if (url.startsWith('data:')) {
+      bgInlinePending.push({ el, src: url, current: url, bg, layered });
+      continue;
+    }
     if (!/^https?:/i.test(url)) continue;
     const cached = cache[url];
     if (cached) {
-      el.style.backgroundImage = `url("${cached.replace(/"/g, '\\"')}")`;
+      // `current` records what the element still declares: a cache hit has to be written back even
+      // when the cached bytes already are in a portable format, because the element is carrying
+      // the remote URL that entry replaces.
+      bgInlinePending.push({ el, src: cached, current: url, bg, layered });
       continue;
     }
-    bgPending.push({ el, url });
+    bgPending.push({ el, url, bg, layered });
+  }
+
+  // The inline declaration a fetched/cached url layer is written back into: a layered stack gets
+  // only its url token swapped, anything else keeps the whole-declaration replacement.
+  function writeInlinedBackground(entry, value) {
+    entry.el.style.backgroundImage = entry.layered
+      ? replaceFirstCssUrl(entry.bg, value)
+      : `url("${value.replace(/"/g, '\\"')}")`;
   }
 
   async function processOneBg(entry) {
@@ -4395,17 +5619,100 @@ async function inlineExternalImages(cachedMap) {
         console.warn(`html-snapshot: bg-image fetch ${res.status} for ${entry.url}`);
         return;
       }
-      const dataUri = await blobToDataUri(await res.blob());
-      entry.el.style.backgroundImage = `url("${dataUri.replace(/"/g, '\\"')}")`;
+      writeInlinedBackground(entry, await blobToNormalizedDataUri(await res.blob()));
     } catch (err) {
       console.warn(`html-snapshot: failed to inline bg ${entry.url}: ${err && err.message}`);
     }
   }
 
+  async function applyInlineBgSource(entry) {
+    const normalized = await normalizeSource(entry.src);
+    // Skip the write only when the element already declares the value it would receive: an
+    // authored data URI that needed no re-encode stays untouched, so a page full of icon data
+    // URIs does not pay for a pointless style invalidation per element. Everything else — a cache
+    // hit above all — has to replace whatever the element declares now.
+    if (normalized !== entry.current) {
+      writeInlinedBackground(entry, normalized);
+    }
+  }
+  for (let i = 0; i < bgInlinePending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = bgInlinePending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(applyInlineBgSource));
+  }
   for (let i = 0; i < bgPending.length; i += FETCH_CHUNK_SIZE) {
     const slice = bgPending.slice(i, i + FETCH_CHUNK_SIZE);
     await Promise.all(slice.map(processOneBg));
   }
+
+  // Top-level comma split of a CSS value list. Commas nested inside `rgb(...)`,
+  // `linear-gradient(...)` or a quoted `url('…')` argument — a `data:` URI in particular — must
+  // not split the list. Mirrors the importer's `SplitTopLevelCommas`.
+  function splitTopLevelCommas(value) {
+    const out = [];
+    let depth = 0;
+    let cur = '';
+    for (const ch of String(value || '')) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth = Math.max(0, depth - 1);
+      if (ch === ',' && depth === 0) {
+        if (cur.trim() !== '') out.push(cur.trim());
+        cur = '';
+        continue;
+      }
+      cur += ch;
+    }
+    if (cur.trim() !== '') out.push(cur.trim());
+    return out;
+  }
+
+  // A stack that layers a colour wash over a photo cannot be expressed as one PAGX background:
+  // the importer paints either the gradient layers or the image, never both. Split it into two
+  // boxes that the existing paths already handle — the element keeps the photo as a lone url()
+  // background (so its `background-size` / `-position` / `-repeat` apply as usual), and a
+  // synthesized full-bleed child carries the wash on top of it. Only backdrop boxes are split:
+  // an element with content of its own would need the wash slotted between its background and
+  // that content, which the flattened subset has no way to express.
+  function splitTintedBackgrounds() {
+    for (const el of Array.from(document.querySelectorAll('*'))) {
+      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
+      const computed = getComputedStyle(el);
+      // The wash child is positioned against the element, so the element has to be its own
+      // containing block; on a static box the inset would resolve against some distant ancestor.
+      if (computed.position === 'static') continue;
+      const bg = (computed.getPropertyValue('background-image') || '').trim();
+      if (!hasGradientLayer(bg)) continue;
+      const layers = splitTopLevelCommas(bg);
+      const urlIndex = layers.findIndex((layer) => /^url\(/i.test(layer));
+      if (urlIndex < 0 || (bg.match(/url\(/gi) || []).length !== 1) continue;
+      const wash = layers.filter((layer, index) => index !== urlIndex);
+      if (wash.length === 0) continue;
+      // Each fitting property is a per-layer list; the element now carries a single layer, so it
+      // needs that layer's own entry rather than the list. A one-entry value is already shared by
+      // every layer and passes through unchanged.
+      const entryFor = (value, fallback) => {
+        const entries = splitTopLevelCommas(value);
+        const picked = entries.length > 1 ? entries[urlIndex] : entries[0];
+        return picked || fallback;
+      };
+      const size = entryFor(computed.getPropertyValue('background-size'), 'auto');
+      const position = entryFor(computed.getPropertyValue('background-position'), '0% 0%');
+      const repeat = entryFor(computed.getPropertyValue('background-repeat'), 'repeat');
+      el.style.backgroundImage = layers[urlIndex];
+      el.style.backgroundSize = size;
+      el.style.backgroundPosition = position;
+      el.style.backgroundRepeat = repeat;
+      const tint = document.createElement('div');
+      tint.setAttribute('data-pagx-tint', '');
+      tint.setAttribute(
+        'style',
+        'position:absolute;left:0;top:0;width:100%;height:100%;background-image:' +
+          wash.join(', ') +
+          ';'
+      );
+      el.appendChild(tint);
+    }
+  }
+  splitTintedBackgrounds();
 }
 
 // ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====
@@ -4502,6 +5809,12 @@ async function materializeDecorativePseudoElements() {
   const COPY_PROPS = [
     'position', 'left', 'right', 'top', 'bottom',
     'width', 'height',
+    // Layout identity for in-flow stand-ins: without the exact display / flex
+    // participation the synthetic div would occupy a different slot in the
+    // host's flow (flex item vs block) and shift the measured children.
+    'display',
+    'flex-grow', 'flex-shrink', 'flex-basis', 'align-self', 'order',
+    'min-width', 'min-height', 'max-width', 'max-height',
     'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
     'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
     'background-color', 'background-image', 'background-clip',
@@ -4519,6 +5832,20 @@ async function materializeDecorativePseudoElements() {
     'box-sizing',
     'color', 'font-family', 'font-size', 'font-weight', 'font-style',
     'line-height', 'letter-spacing', 'text-align',
+    // Animation longhands are forwarded so an *animated* decorative pseudo
+    // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
+    // -> scaleX(1)`) keeps its motion on the synthetic node. The animation is
+    // declared against the pseudo selector, which the synthetic `<div>` does
+    // not match, so without copying these the div would freeze at whatever
+    // phase the capture-pause init script left the pseudo in (t=0 = the 0%
+    // keyframe, typically `opacity: 0` / `scaleX(0)`) and then be dropped by
+    // the walker's `isVisible` (opacity 0, no `pagxAnim*`) or collapse to a
+    // zero-size box (`scaleX(0)`). `animation-play-state` is intentionally
+    // omitted: the global capture-pause rule owns it and the sampler drives
+    // `currentTime` directly.
+    'animation-name', 'animation-duration', 'animation-timing-function',
+    'animation-delay', 'animation-iteration-count', 'animation-direction',
+    'animation-fill-mode',
   ];
 
   // Defaults emitted by Chromium for properties that don't change anything.
@@ -4527,6 +5854,13 @@ async function materializeDecorativePseudoElements() {
   const DEFAULTS = new Map([
     ['position', 'static'],
     ['left', 'auto'], ['right', 'auto'], ['top', 'auto'], ['bottom', 'auto'],
+    // `display` is intentionally NOT default-suppressed: a `div` stand-in
+    // defaults to block, and an in-flow pseudo with `inline` / `inline-block`
+    // participation must keep it or the flow slot changes.
+    ['flex-grow', '0'], ['flex-shrink', '1'], ['flex-basis', 'auto'],
+    ['align-self', 'auto'], ['order', '0'],
+    ['min-width', 'auto'], ['min-height', 'auto'],
+    ['max-width', 'none'], ['max-height', 'none'],
     ['margin-top', '0px'], ['margin-right', '0px'],
     ['margin-bottom', '0px'], ['margin-left', '0px'],
     ['padding-top', '0px'], ['padding-right', '0px'],
@@ -4549,6 +5883,10 @@ async function materializeDecorativePseudoElements() {
     ['transform', 'none'],
     ['z-index', 'auto'],
     ['box-sizing', 'content-box'],
+    ['animation-name', 'none'], ['animation-duration', '0s'],
+    ['animation-timing-function', 'ease'], ['animation-delay', '0s'],
+    ['animation-iteration-count', '1'], ['animation-direction', 'normal'],
+    ['animation-fill-mode', 'none'],
   ]);
 
   // A pseudo's `content` value reaches us with quotes preserved
@@ -4571,25 +5909,57 @@ async function materializeDecorativePseudoElements() {
     return out;
   }
 
-  // Decide whether a pseudo with the given resolved style should be
-  // materialised. Out-of-flow position is required so the synthetic sibling
-  // doesn't push the host's real children around. A pseudo with no visible
-  // box (no width / height / background / border / shadow / transform) is
-  // skipped — there's nothing to render anyway.
-  function shouldMaterialise(cs, pseudoText) {
-    if (pseudoText !== '') {
-      return { ok: false, reason: 'text-content' };
+  // Local copy of the Node-side `applyTextTransform` (see the file's top section). A materialised
+  // pseudo carries its glyphs on the stand-in, so `text-transform` has to be baked into that text
+  // node the same way `renderPseudoTextLeaf` bakes it into its <span>.
+  function applyPseudoTextTransform(text, computed) {
+    if (!text) return text;
+    const tt = String(computed.getPropertyValue('text-transform') || '').trim().toLowerCase();
+    if (!tt || tt === 'none') return text;
+    if (tt === 'uppercase') return text.toUpperCase();
+    if (tt === 'lowercase') return text.toLowerCase();
+    if (tt === 'capitalize') {
+      return text.replace(/(^|\s)(\S)/g, (_, prefix, ch) => prefix + ch.toUpperCase());
     }
+    return text;
+  }
+
+  // Decide whether a pseudo with the given resolved style should be
+  // materialised. A pseudo with no visible box (no width / height) is
+  // skipped — there's nothing to render anyway. Out-of-flow pseudos
+  // (absolute/fixed) become detached synthetic siblings exactly as before.
+  // In-flow pseudos (static/relative) are materialised as layout-equivalent
+  // stand-ins: the synthetic div joins the same flow (flex item, inline
+  // block, …) with the pseudo's copied layout styles and the original pseudo
+  // is switched off via an injected `content: none` rule, so the host's
+  // measured layout is unchanged while the decorative box survives the
+  // snapshot. `sticky` keeps its old rejection: the stand-in would freeze it
+  // at the current scroll position and lose the sticky semantics.
+  //
+  // A *text*-bearing pseudo normally stays on `renderPseudoTextLeaf`, which re-emits the glyphs
+  // inside the host's own flow — the right approximation while the glyphs really do ride that
+  // flow. An out-of-flow pseudo carries a box of its own instead (`position` / `inset` /
+  // `width` / `height` / `background` / `transform`), and the text-only path drops every one of
+  // those: baidu-pan's "current device" badge is `position:absolute;bottom:-3px;width:90px;
+  // height:22px;background:rgba(73,83,102,.1);content:"本机"`, which would land flush with the
+  // host's leading edge — no band, wrong axis — instead of sitting on the circle's bottom edge.
+  // Such a pseudo materialises like any other box, with its text carried on the stand-in.
+  function shouldMaterialise(cs, pseudoText) {
     const position = (cs.getPropertyValue('position') || '').trim();
-    if (position !== 'absolute' && position !== 'fixed') {
-      return { ok: false, reason: 'in-flow' };
+    if (position !== 'absolute' && position !== 'fixed' &&
+        position !== 'static' && position !== 'relative') {
+      return { ok: false, reason: 'position-' + (position || 'unknown') };
+    }
+    const outOfFlow = position === 'absolute' || position === 'fixed';
+    if (pseudoText !== '' && !outOfFlow) {
+      return { ok: false, reason: 'text-content' };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
     if (widthPx <= 0 && heightPx <= 0) {
       return { ok: false, reason: 'zero-size' };
     }
-    return { ok: true };
+    return { ok: true, inFlow: !outOfFlow };
   }
 
   function emitInlineStyle(cs) {
@@ -4609,9 +5979,50 @@ async function materializeDecorativePseudoElements() {
     return parts.join('; ');
   }
 
+  // Return the pseudo's *resting* (un-animated) computed style so the copied
+  // box reflects the state the walker will measure after `takeSnapshot`
+  // cancels every animation — not the frozen 0%-keyframe phase the
+  // capture-pause init script leaves running pseudos in. When the pipeline
+  // freezes the page at t=0, an entrance-animated pseudo (e.g. `animation:
+  // nbLine ... { 0% { opacity: 0; transform: scaleX(0) } }`) reads as
+  // invisible / zero-scaled; baking that in would bury the box's real
+  // geometry and paint colour under transient keyframe values. Cancelling the
+  // pseudo's own WAAPI animation reverts its computed style to the base rule
+  // (the animatable channels fall back to their static / initial values)
+  // while leaving `animation-*` longhands intact for the forwarding copy, so
+  // the synthetic div lands with correct resting geometry AND the animation
+  // that the capture pass then re-samples into a `pagxAnim*`. The pseudo is
+  // never serialised itself (the walker only sees DOM nodes), so cancelling
+  // its animation on the live page has no output-visible side effect. Falls
+  // back to the original style object if `getAnimations` is unavailable or
+  // throws (older engines) — the frozen state is still better than dropping
+  // the box entirely.
+  function restingPseudoStyle(el, pseudo, cs) {
+    const animName = (cs.getPropertyValue('animation-name') || '').trim();
+    if (!animName || animName === 'none') return cs;
+    try {
+      if (typeof el.getAnimations !== 'function') return cs;
+      const anims = el.getAnimations({ subtree: true });
+      let cancelledAny = false;
+      for (let a = 0; a < anims.length; a++) {
+        const eff = anims[a].effect;
+        if (eff && eff.target === el && eff.pseudoElement === pseudo) {
+          try { anims[a].cancel(); cancelledAny = true; } catch (_) { /* ignore */ }
+        }
+      }
+      if (!cancelledAny) return cs;
+      // Flush style/layout so the fresh read reflects the cancelled state.
+      void el.offsetHeight;
+      return getComputedStyle(el, pseudo);
+    } catch (_) {
+      return cs;
+    }
+  }
+
   // `<svg>` subtrees are an opaque resolver target downstream — leaving
   // pseudo-elements declared on inline SVG markup alone matches how the
   // snapshot already passes the SVG through verbatim.
+  const pseudoOffRules = [];
   const all = document.querySelectorAll('*');
   for (let i = 0; i < all.length; i++) {
     const el = all[i];
@@ -4626,14 +6037,22 @@ async function materializeDecorativePseudoElements() {
     if (el.closest('svg') && tag !== 'svg') continue;
     // Skip our own synthetic nodes from a previous pass (defensive — the
     // pipeline today calls this exactly once per page, but the in-page
-    // helpers can also be invoked manually).
+    // helpers can also be invoked manually). A host that already went
+    // through materialisation is skipped entirely so a second pass cannot
+    // stack a second stand-in next to the first.
     if (el.hasAttribute('data-snapshot-pseudo')) continue;
+    if (el.hasAttribute('data-snapshot-pseudo-host')) continue;
+    // A host whose icon-font pseudo was already converted to an inline `<svg>` (the icon-font pass
+    // runs before this one) is rendered by `renderInlineIconSvg`; materialising its pseudo box too
+    // would draw the raw glyph next to the converted icon.
+    if (el.hasAttribute('data-snapshot-icon-svg-id')) continue;
 
-    // Two-phase decision: first read both pseudos so we know whether the
-    // host carries a text-bearing pseudo. If it does, leave the host alone
-    // — `renderPseudoTextLeaf` already produces the correct emission, and
-    // appending a real child would knock that path out by flipping
-    // `hasElementChild` to true.
+    // Two-phase decision: first read both pseudos, then decide per pseudo. Every pseudo on the
+    // host shares one fallback — appending a stand-in marks the host with
+    // `data-snapshot-pseudo-host`, which turns `renderPseudoTextLeaf` off for the *whole* host.
+    // A stand-in therefore has to carry every text-bearing pseudo of that host, or the ones left
+    // behind silently lose their glyphs; a host whose text pseudos do not all materialise keeps
+    // the text-leaf path untouched.
     const pseudoData = [];
     let hasTextPseudo = false;
     for (const pseudo of PSEUDO_TYPES) {
@@ -4648,12 +6067,24 @@ async function materializeDecorativePseudoElements() {
       if (pseudoText !== '') hasTextPseudo = true;
       pseudoData.push({ cs, pseudoText, pseudo });
     }
-    if (hasTextPseudo) continue;
+    const decisions = pseudoData.map((slot) => {
+      if (!slot) return null;
+      return shouldMaterialise(slot.cs, slot.pseudoText);
+    });
+    if (hasTextPseudo) {
+      let textLeftBehind = false;
+      for (let i = 0; i < pseudoData.length; i++) {
+        const slot = pseudoData[i];
+        if (slot && slot.pseudoText !== '' && !decisions[i].ok) textLeftBehind = true;
+      }
+      if (textLeftBehind) continue;
+    }
 
     let materialisedAny = false;
-    for (const slot of pseudoData) {
+    for (let i = 0; i < pseudoData.length; i++) {
+      const slot = pseudoData[i];
       if (!slot) continue;
-      const decision = shouldMaterialise(slot.cs, slot.pseudoText);
+      const decision = decisions[i];
       if (!decision.ok) {
         if (decision.reason !== 'text-content') {
           el.setAttribute('data-snapshot-pseudo-skipped', decision.reason);
@@ -4663,8 +6094,24 @@ async function materializeDecorativePseudoElements() {
 
       const div = document.createElement('div');
       div.setAttribute('data-snapshot-pseudo', slot.pseudo);
-      const style = emitInlineStyle(slot.cs);
+      // Read the pseudo's resting style (cancelling its own animation) so an
+      // entrance-animated pseudo isn't baked at its invisible 0% keyframe; the
+      // forwarded `animation-*` longhands (see COPY_PROPS) keep the motion.
+      const restingCs = restingPseudoStyle(el, slot.pseudo, slot.cs);
+      const style = emitInlineStyle(restingCs);
       if (style) div.setAttribute('style', style);
+      // A text-bearing pseudo (see shouldMaterialise) rides the stand-in as its text content, so
+      // the glyphs inherit the pseudo's own box and text styles instead of the host's flow.
+      // `white-space` is not part of COPY_PROPS, so it is appended only when the pseudo states
+      // something other than the default — a box sized by the page for one line must not rewrap.
+      if (slot.pseudoText) {
+        div.textContent = applyPseudoTextTransform(slot.pseudoText, restingCs);
+        const whiteSpace = (restingCs.getPropertyValue('white-space') || '').trim();
+        if (whiteSpace && whiteSpace !== 'normal') {
+          const base = div.getAttribute('style') || '';
+          div.setAttribute('style', base ? base + '; white-space: ' + whiteSpace : 'white-space: ' + whiteSpace);
+        }
+      }
       // `::before` is painted before the host's children, `::after` after.
       // Mirror that order in the DOM so the natural document order matches.
       if (slot.pseudo === '::before') {
@@ -4676,12 +6123,264 @@ async function materializeDecorativePseudoElements() {
       } else {
         el.appendChild(div);
       }
+      // An out-of-flow pseudo never affected the host's layout, so the
+      // original can keep rendering until the stylesheet is stripped. An
+      // in-flow stand-in DOES take a layout slot: without switching the
+      // original off, pseudo + stand-in would double-occupy the flow and
+      // shift every measured sibling. Record a `content: none` override and
+      // inject all rules after the walk — injecting mid-walk would be safe
+      // too (already-read styles are unaffected), but batching keeps the
+      // DOM mutation profile flat and the markers deterministic.
+      if (decision.inFlow) {
+        const marker = 'data-snapshot-pseudo-off-' + pseudoOffRules.length;
+        el.setAttribute(marker, '');
+        pseudoOffRules.push('[' + marker + ']' + slot.pseudo + ' { content: none !important; }');
+      }
       materialisedAny = true;
     }
     if (materialisedAny) {
       el.setAttribute('data-snapshot-pseudo-host', '');
     }
   }
+
+  // Switch off every in-flow pseudo that now has a layout stand-in. The rule
+  // lives in the snapshot's <head> style block, so it keeps guarding the
+  // stand-in against a double paint if the snapshot is re-rendered with the
+  // original stylesheet still attached.
+  if (pseudoOffRules.length > 0) {
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-snapshot-pseudo-off', '');
+    styleEl.textContent = pseudoOffRules.join('\n');
+    document.head.appendChild(styleEl);
+  }
+}
+
+/* eslint-enable no-undef, no-inner-declarations */
+
+/* eslint-disable no-undef, no-inner-declarations */
+
+// ===== Pre-snapshot pass: expand sticky scrollytelling blocks =====
+
+// "Scrollytelling" pages pin a viewport-sized `position: sticky` panel inside
+// a much taller scroll track and cross-fade between N stacked step layers as
+// `scrollY` advances (Flect's `.method-scroll` / `.method-sticky` is the
+// canonical case). A static snapshot freezes the page at scroll 0, so:
+//
+//   - the track keeps its full height (4545px) but only the top panel
+//     (766px) has content — the rest renders as blank space, and
+//   - the step layers the page's JS left at `opacity: 0` are dropped by
+//     `isVisible` (or worse, half-captured by the animation sampler whose
+//     state depends on the lazy-load warm-up sweep timing), losing steps 2..N
+//     entirely or leaving them as invisible alpha-0 layers.
+//
+// This pass rewrites the live DOM before the walker runs: the sticky panel is
+// cloned N times and the clones are tiled vertically down the track, one per
+// step, each showing exactly one layer of every stacked group. The exported
+// PAGX then reads top-to-bottom as "page 1, page 2, page 3" instead of "page
+// 1, blank, blank".
+//
+// Detection is heuristic and deliberately conservative — no class names, no
+// site-specific selectors:
+//
+//   1. a sticky element S whose parent track P is at least 2x S's height
+//      (the scroll-into interval must exist for scrollytelling to make
+//      sense), and
+//   2. inside S, a group of >= 2 sibling `position: absolute` layers that
+//      stack on top of each other (pairwise vertical overlap, similar size)
+//      with mutually exclusive opacities (one >= 0.9, one <= 0.1) — the
+//      cross-faded steps. Sticky headers, tab panels without a scroll track,
+//      carousels and parallax decorations all fail one of these checks.
+//
+// Layer handling per segment keeps the page's own geometry: the surviving
+// layer's computed `transform` is frozen inline (removing it could snap the
+// layer back to an entrance-state CSS rule such as `scale(.965)`), while
+// `opacity`/`filter`/`visibility` are forced visible. The track's height is
+// pinned inline in case it was content-driven and would collapse once the
+// sticky panel leaves the flow.
+//
+// Idempotent: expanded tracks carry `data-snapshot-sticky-expanded` and both
+// the detection loop and this guard skip anything inside such a track (which
+// also shields nested stickies inside the cloned panels).
+function expandStickyScrollytelling() {
+  // Self-contained on purpose: this function is shipped through
+  // `page.evaluate`, so only its own body crosses the boundary (same rule as
+  // materializeDecorativePseudoElements above).
+  function overlapRatio(a, b) {
+    const top = Math.max(a.top, b.top);
+    const bottom = Math.min(a.bottom, b.bottom);
+    if (bottom <= top) return 0;
+    const shared = bottom - top;
+    return Math.min(shared / Math.max(1, a.height), shared / Math.max(1, b.height));
+  }
+
+  function sizeSimilar(a, b) {
+    const w = Math.abs(a.width - b.width) / Math.max(1, Math.max(a.width, b.width));
+    const h = Math.abs(a.height - b.height) / Math.max(1, Math.max(a.height, b.height));
+    return w <= 0.25 && h <= 0.25;
+  }
+
+  // Group absolutely-positioned candidates by parent, then keep the buckets
+  // that look like a cross-fade step stack: >= 2 layers, pairwise stacked,
+  // similar size, mutually exclusive opacities.
+  function findLayerGroups(root) {
+    const buckets = new Map();
+    const all = root.querySelectorAll('*');
+    for (const el of all) {
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'absolute') continue;
+      if (cs.display === 'none') continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+      const parent = el.parentElement;
+      if (!parent) continue;
+      if (!buckets.has(parent)) buckets.set(parent, []);
+      buckets.get(parent).push({ el, cs, rect });
+    }
+    const groups = [];
+    for (const layers of buckets.values()) {
+      if (layers.length < 2) continue;
+      let stacked = true;
+      for (let i = 0; i < layers.length && stacked; i++) {
+        for (let j = i + 1; j < layers.length; j++) {
+          if (overlapRatio(layers[i].rect, layers[j].rect) < 0.6 ||
+              !sizeSimilar(layers[i].rect, layers[j].rect)) {
+            stacked = false;
+            break;
+          }
+        }
+      }
+      if (!stacked) continue;
+      const ops = layers.map((l) => parseFloat(l.cs.opacity) || 0);
+      if (Math.max.apply(null, ops) < 0.9) continue;
+      if (Math.min.apply(null, ops) > 0.1) continue;
+      groups.push(layers.map((l) => l.el));
+    }
+    return groups;
+  }
+
+  // Freeze one surviving layer into its visible resting state. `transform`
+  // keeps the *computed* value: the layer's CSS base rule may hold an
+  // entrance transform (e.g. `translateY(-50%)` centering or `scale(.965)`)
+  // that inline JS overrode at runtime, and removing the inline value would
+  // snap the geometry back. opacity/filter/visibility are forced so the
+  // walker's `isVisible` check never prunes the layer.
+  function keepLayer(el) {
+    const cs = getComputedStyle(el);
+    el.style.opacity = '1';
+    el.style.filter = 'none';
+    el.style.visibility = 'visible';
+    el.style.transform = cs.transform;
+    el.style.removeProperty('transition');
+    el.style.removeProperty('animation');
+  }
+
+  const results = [];
+  const candidates = Array.from(document.body ? document.body.querySelectorAll('*') : []);
+  for (const el of candidates) {
+    if (!el.parentElement) continue;
+    if (el.closest('[data-snapshot-sticky-expanded]')) continue;
+    let cs;
+    try {
+      cs = getComputedStyle(el);
+    } catch (_) {
+      continue;
+    }
+    if (cs.position !== 'sticky') continue;
+    if (cs.display === 'none') continue;
+    const track = el.parentElement;
+    const elRect = el.getBoundingClientRect();
+    const trackRect = track.getBoundingClientRect();
+    if (elRect.width <= 0 || elRect.height <= 0) continue;
+    if (trackRect.height < 2 * elRect.height) continue;
+    // The sticky panel must be the track's only in-flow visible child:
+    // switching it to absolute releases its layout slot, and any in-flow
+    // sibling — including another sticky one, which keeps its own flow slot —
+    // would shift up and corrupt the geometry of everything the walker
+    // measures afterwards. Scrollytelling tracks are dedicated
+    // height-creating wrappers, so this holds for the intended targets and
+    // rejects sticky headers living inside a normal content flow.
+    let hasFlowSibling = false;
+    for (const sibling of Array.from(track.children)) {
+      if (sibling === el) continue;
+      const sc = getComputedStyle(sibling);
+      if (sc.display === 'none') continue;
+      if (sc.position === 'absolute' || sc.position === 'fixed') {
+        continue;
+      }
+      if (sibling.getBoundingClientRect().height > 0) {
+        hasFlowSibling = true;
+        break;
+      }
+    }
+    if (hasFlowSibling) continue;
+    const groups = findLayerGroups(el);
+    if (groups.length === 0) continue;
+
+    const segments = Math.max.apply(null, groups.map((g) => g.length));
+    const segmentHeight = trackRect.height / segments;
+    const panelLeft = elRect.left - trackRect.left;
+    const panelWidth = elRect.width;
+
+    // Tag every layer with its group + index so the clones (fresh nodes the
+    // original references don't reach) can be re-queried per segment.
+    groups.forEach((layers, groupIndex) => {
+      layers.forEach((layer, layerIndex) => {
+        layer.setAttribute('data-snapshot-layer-group', String(groupIndex));
+        layer.setAttribute('data-snapshot-layer-index', String(layerIndex));
+      });
+    });
+
+    // The track must become the containing block for the absolutely
+    // positioned panels.
+    if (getComputedStyle(track).position === 'static') {
+      track.style.position = 'relative';
+    }
+
+    const panels = [el];
+    for (let i = 1; i < segments; i++) {
+      panels.push(el.cloneNode(true));
+    }
+    panels.forEach((panel, i) => {
+      if (i > 0) track.appendChild(panel);
+      panel.style.position = 'absolute';
+      panel.style.top = (i * segmentHeight + (segmentHeight - elRect.height) / 2) + 'px';
+      panel.style.left = panelLeft + 'px';
+      // `panelWidth` is a measured border-box width, so pin the sizing model before writing it:
+      // a content-box panel would otherwise grow by its own padding and border, shifting every
+      // measured child (the same hazard the track-height pin below handles).
+      panel.style.boxSizing = 'border-box';
+      panel.style.width = panelWidth + 'px';
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+      panel.style.removeProperty('margin-top');
+      panel.style.removeProperty('margin-bottom');
+      panel.style.removeProperty('margin-left');
+      panel.style.removeProperty('margin-right');
+      groups.forEach((layers, groupIndex) => {
+        const inPanel = panel.querySelectorAll(
+          '[data-snapshot-layer-group="' + groupIndex + '"]');
+        if (inPanel.length === 0) return;
+        const keepIndex = Math.min(i, inPanel.length - 1);
+        for (let li = 0; li < inPanel.length; li++) {
+          if (li === keepIndex) keepLayer(inPanel[li]);
+          else inPanel[li].remove();
+        }
+      });
+    });
+
+    // Only pin the height when the panel leaving the flow actually collapsed
+    // the track (a content-driven height). Writing getBoundingClientRect's
+    // border-box height into `style.height` unconditionally would inflate a
+    // `box-sizing: content-box` track by its padding and border.
+    if (Math.abs(track.getBoundingClientRect().height - trackRect.height) > 1) {
+      track.style.boxSizing = 'border-box';
+      track.style.height = trackRect.height + 'px';
+    }
+
+    track.setAttribute('data-snapshot-sticky-expanded', String(segments));
+    results.push({ segments });
+  }
+  return { blocks: results.length, expanded: results };
 }
 
 /* eslint-enable no-undef, no-inner-declarations */
@@ -4702,16 +6401,25 @@ export {
   imgAlt,
   inlineCanvases,
   materializeDecorativePseudoElements,
+  expandStickyScrollytelling,
   mergeRectsOnSameLine,
   bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
+  flexCharCarriesReveal,
+  pagxEvalLengthPx,
+  pagxParseClipShape,
+  pagxClipPathInnerMarkup,
   dashedBorderSideSvg,
   forwardDataAttrs,
   applyLayerName,
   normalizeBackgroundImage,
   canForwardFlexGrow,
   shouldPinFlexGrowItems,
+  isIntrinsicInlineContentWidth,
+  readRootScrollOffset,
+  resetRootScroll,
+  canvasRootRect,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };

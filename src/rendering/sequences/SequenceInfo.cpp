@@ -79,8 +79,8 @@ std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> f
   return reader;
 }
 
-std::shared_ptr<tgfx::Image> SequenceInfo::makeStaticImage(std::shared_ptr<File> file,
-                                                           bool useDiskCache) {
+std::shared_ptr<tgfx::Image> SequenceInfo::makeStaticImage(
+    std::shared_ptr<File> file, bool useDiskCache, std::shared_ptr<SequenceReadResult> result) {
   if (sequence == nullptr || file == nullptr || !staticContent()) {
     return nullptr;
   }
@@ -91,17 +91,19 @@ std::shared_ptr<tgfx::Image> SequenceInfo::makeStaticImage(std::shared_ptr<File>
     width = videoSequence->getVideoWidth();
     height = videoSequence->getVideoHeight();
   }
-  auto generator = std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(),
-                                                             width, height, useDiskCache);
+  auto generator = std::make_shared<StaticSequenceGenerator>(
+      std::move(file), weakThis.lock(), width, height, useDiskCache, std::move(result));
   return MakeSequenceImage(std::move(generator), sequence, useDiskCache);
 }
 
-std::shared_ptr<tgfx::Image> SequenceInfo::makeFrameImage(std::shared_ptr<SequenceReader> reader,
-                                                          Frame targetFrame, bool useDiskCache) {
+std::shared_ptr<tgfx::Image> SequenceInfo::makeFrameImage(
+    std::shared_ptr<SequenceReader> reader, Frame targetFrame, bool useDiskCache,
+    std::shared_ptr<SequenceReadResult> result) {
   if (reader == nullptr || sequence == nullptr) {
     return nullptr;
   }
-  auto generator = std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame);
+  auto generator =
+      std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame, std::move(result));
   return MakeSequenceImage(std::move(generator), sequence, useDiskCache);
 }
 

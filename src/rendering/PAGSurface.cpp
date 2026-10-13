@@ -211,7 +211,8 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   }
   cache->prepareLayers();
   auto surface = drawable->getSurface(context, true);
-  if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
+  if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion() &&
+      !cache->sequenceCacheInvalidated()) {
     unlockContext();
     return false;
   }
@@ -223,6 +224,7 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     return false;
   }
   contentVersion = cache->getContentVersion();
+  cache->clearSequenceCacheInvalidation();
   cache->attachToContext(context);
   auto canvas = surface->getCanvas();
   if (autoClear) {

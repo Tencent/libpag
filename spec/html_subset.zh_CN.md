@@ -164,24 +164,26 @@
 | `background-image: linear-gradient(angle, c1 [p], c2 [p], …)` | `<Fill>` 内嵌 `<LinearGradient>`（`startPoint`/`endPoint` 由角度推得） |
 | `background-image: radial-gradient(…)` | 内嵌 `<RadialGradient>` |
 | `background-image: conic-gradient(from angle, …)` | 内嵌 `<ConicGradient>`（CSS 0° = 顶，PAGX 0° = 右，自动 −90°） |
-| `background-clip: text`（别名 `-webkit-background-clip: text`） | 与 gradient `background-image` 同时设置时，渐变下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变），本元素的矩形背景被抑制。无 gradient `background-image` 时该属性为无操作。 |
+| `background-clip: text`（别名 `-webkit-background-clip: text`） | 元素背景下沉到后代文字节点（`<TextBox>` / `<Text>` 的 `<Fill>` 内嵌渐变；无渐变层时为纯色），本元素的矩形背景被抑制。这与 CSS 一致：继承下来的 `text-fill-color` 为透明，被裁剪的背景是字形唯一的着色来源，因此背景优先于 `color`。存在渐变 `background-image` 时渐变优先于纯色 `background-color`（CSS 中纯色层在图片层之下）。背景色完全透明时不产生任何着色，该属性对该元素为无操作。 |
 | `background-image: url(...)` | 还原为背景矩形上的 `<ImagePattern>` 填充；`background-size` / `background-repeat` / `background-position` 决定该 pattern 的 `scaleMode` / 平铺模式 / 矩阵 |
 | `background-blend-mode: <mode>` | 在渐变 / 图像填充上设置 `Fill.blendMode`，使其与 `background-color` 混合；此时会保留底部的纯色 `<Fill>` 作为混合所需的背景。`normal`（默认）为空操作，不透明的渐变 / 图像仍会覆盖底色 |
 | `mask-image: url(data:image/svg+xml,...)`（+ `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`） | 引用的 SVG 变成一层 PAGX mask；`mask-mode` 选择 Alpha 还是 Luminance，`mask-size` / `mask-position` 决定其缩放/偏移 |
-| `clip-path: url(#id)` | 解析引用的隐藏 `<clipPath>` 为一层轮廓 mask。几何形式（`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`）在 PAGX 无对应原语，告警丢弃 |
+| `clip-path: url(#id)` | 解析引用的隐藏 `<clipPath>` 为一层轮廓 mask。静态几何形式（`inset()`/`circle()`/`ellipse()`/`polygon()`/`path()`）在 PAGX 无对应原语，告警丢弃——但*动画*的几何 `clip-path` 作为轮廓 mask 变形受支持（见 §13.2） |
 | `border-radius: N`（px）、`N%`（按 `min(width, height)` 解析；固定 px 宽高且 `border-radius: 50%` 的元素会变成 `Ellipse`），或 1–4 值缩写（`T`、`T R`、`T R B`、`T R B L`） | `Rectangle.roundness = N`（`50%` 输出 `Ellipse`）。椭圆 `W / H` 双半径形式告警并忽略 |
 | `border: W <style> C` | `<Stroke color="C" width="W" align="inside"/>`（`solid`/`dashed`/`dotted` 一等公民；其它样式告警并降级为 `solid`） |
 | `box-shadow: X Y B C`（多重、可加 `inset`） | 每个阴影一份 `<DropShadowStyle>` 或 `<InnerShadowStyle>` |
 | `opacity: A` | `Layer.alpha = A` |
 | `mix-blend-mode: <mode>` | `Layer.blendMode = <mode>` |
-| `filter: blur(X) drop-shadow(X Y B C)` | `<BlurFilter>` / `<DropShadowFilter>` 链 |
+| `filter: blur(X) drop-shadow(X Y B C)` | `<BlurFilter>` / `<DropShadowFilter>` 链；静态颜色调整使用 `<ColorMatrixFilter>` |
 | `backdrop-filter: blur(X)` | `<BackgroundBlurStyle>` |
 | `transform: <fn>` | 映射到 `Layer.matrix`。支持单函数形式（`skewX`/`skewY`/`rotate`/`scale[X\|Y]`/`translate[X\|Y]`/`matrix(a,b,c,d,tx,ty)`）以及 `matrix3d(...)`（投影为其 2D 仿射分量）；复合链与其它 3D 变体（`rotate3d`/`perspective`）告警丢弃 |
 | `transform-origin` | 透传；当其等于盒子中心（`50% 50%`、`center`、`center center`，或等于盒心的 px 值）时被尊重，其它原点告警 |
 | Layer 上的 `overflow: hidden` | `Layer.clipToBounds = true` |
+| Layer 上的 `overflow: <x> <y>`（两值简写） | 任一轴不是 `visible`（`hidden` / `clip` / `scroll` / `auto` / `overlay`）时 `Layer.clipToBounds = true`，与 CSS「任一轴非 `visible` 即成为裁剪容器」的规则一致；`visible visible` 则不裁剪。`scroll` / `auto` / `overlay` 另外告警，因为 PAGX 无法表达它们隐含的滚动能力 |
 
-`background-clip: border-box` / `padding-box` / `content-box` 均为静默无操作（仅 `text` 关键字
-在 PAGX 有效,见上）。
+`background-clip: text` 用于字形填充（见上表）。`border-box`（默认）静默折叠。`padding-box` /
+`content-box` 会保留：携带该关键字的每个渐变层重建为内缩子层，即 CSS 绘制渐变边框的方式（纯色
+`background-color` 仍按 border box 绘制）。其它未知值告警丢弃。
 
 禁用（告警并跳过）：单边 `border-*`、单角 `border-*-radius`、`outline`、`perspective`、
 几何 `clip-path` 形式（`inset`/`circle`/`ellipse`/`polygon`/`path`），以及复合链与非
@@ -204,7 +206,7 @@
 | `text-decoration: underline | line-through` | 1px `<Rectangle>` 叠加（`bottom="0"` / `centerY="0"`），见 §6 |
 | `white-space: nowrap` | `TextBox.wordWrap = false` |
 | `writing-mode: vertical-rl | vertical-lr` | `TextBox.writingMode = "Vertical"`（水平模式为默认） |
-| 文本容器上的 `overflow: hidden` | `TextBox.overflow = "hidden"` |
+| 文本容器上的 `overflow: hidden`（或任一非 `visible` 轴） | `TextBox.overflow = "hidden"` |
 | `text-overflow: ellipsis` | 告警（PAGX 暂未实现） |
 
 禁用（告警并跳过）：`text-transform`、`text-indent`、`word-spacing`、`direction`、
@@ -343,7 +345,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 `HTMLImporter::Options::autoNormalize = false` 可以关闭（仅 API 层——`pagx import` 未暴露
 对应的 `--html-*` 命令行选项）。
 
-转换器按固定顺序执行八个核心 Pass，外加一个可选 Pass（可选的 `HTMLFlexInference`
+转换器按固定顺序执行九个核心 Pass，外加一个可选 Pass（可选的 `HTMLFlexInference`
 运行在 PropertyFilter 与 MarginToGapPromotion 之间），行为如下：
 
 | Pass | 静默改写 | 警告并丢弃 |
@@ -355,6 +357,7 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
 | HTMLFlexInference *（默认开启：`Options::inferFlexFromAbsolute`；`autoNormalize` 为 false 时无效）* | 当某容器的所有子元素都是 `position: absolute` 且能整齐拼成一行/一列时，把容器改写为 `display: flex` 并填入推断出的 `gap`、`padding`、`align-items`、`flex-direction`；当容器有显式主轴尺寸且内容两端留白（近似）相等时，用 `justify-content: center` 取代对称的主轴 padding；同时移除子元素的 `position` / `left` / `right` / `top` / `bottom`（`subset:flex-inferred`） | 子元素在两个轴向都重叠、跨轴对齐方式不一致、或主轴间距不均匀的容器一律保留绝对定位（`subset:flex-inference-skipped`） |
 | MarginToGapPromotion | 当 `display: flex` 容器的在流子元素带有统一的逐子主轴 margin（leading 或 trailing 模式）时，把该 margin 提升到容器的 `gap` 并清除逐子 margin（`subset:margin-promoted-to-gap`） | 容器换行、已有正 `gap`、参与子元素少于两个、子元素带 `flex` grow、或 margin 非 px 时跳过（margin 留给 `wrapForMargin` 折叠） |
 | SpaceJustifyOverflowCollapse | 当使用 `space-between` / `space-around` / `space-evenly` 的 `display: flex` 容器子元素在主轴溢出时，把 `justify-content` 改写为 `flex-start`，避免 PAGX flex 引擎重叠（`subset:space-justify-collapsed-on-overflow`） | 尺寸数据不全（无显式 px 主轴尺寸、padding/gap 非 px、子元素尺寸无法解析、或子元素带 `flex` grow）时保持原样 |
+| SpaceEvenlyPaddingCompensation | 当 `display: flex` 容器使用 `space-evenly` 时，把 `justify-content` 改写为 `space-between`，并把空出的步长 `g = R / (n + 1)`（`R` 为扣除子元素与 `n - 1` 个 gap 后的剩余空间）加到容器两端的主轴 padding 上，使每个子元素落在与 `space-evenly` 完全相同的位置（`subset:space-evenly-padding-compensated`） | 容器没有显式 px 主轴尺寸、gap 非 px、该行无剩余空间、padding 无法解析为 px 时保持原样；在流子元素的主轴尺寸无法解析为 px、声明了 `flex` grow、或带非零主轴 margin 时同样跳过 |
 | StructureNormalization | 把容器中的散落文本包进 `<p>`（`subset:text-wrapped`）；丢掉元素之间纯空白的文本节点；保持 `<svg>` 子树原样以供 SVG 解析器使用 | 未知标签（`<table>`、`<form>`、`<input>`、`<button>`、自定义元素等）被移除（`subset:unsupported-tag`）；启用 `HTMLImporter::Options::preserveUnknownElements` 时会被保留为 `<div data-html-unknown="<tag>">` |
 | InlineStyleEmitter | 把每个元素解析后的属性集合按字母顺序重新写回 `style="…"`（保证可重复输出）；同时丢掉已经被级联吸收的 `class` 属性（`Options::preserveClassAttribute` 为真时保留） | — |
 
@@ -410,3 +413,164 @@ CSS 圆角头像的常见写法是用 `border-radius` + `overflow: hidden` 的�
   </Layer>
 </pagx>
 ```
+
+## 13. 动画
+
+子集支持一种声明式动画形式：CSS `@keyframes` 规则配合元素上的 `animation` 简写。这是
+`tools/html-snapshot` 捕获层与导入器之间的规范契约：快照工具把来自多种来源（原生 CSS
+`@keyframes`、Web Animations API，以及 GSAP / anime.js 等 JS 动画库——参见
+`tools/html-snapshot/README.md`）的动画归一化为这一种形式，导入器再把它映射到 PAGX 动画模型
+（`<Animations>` + `Animation` / `Object` / `Channel` / `Key`）。
+
+### 13.1 接受的形式
+
+```html
+<head>
+  <style>
+    @keyframes fadeMove {
+      0%   { opacity: 0; transform: translateX(0px); }
+      100% { opacity: 1; transform: translateX(40px); }
+    }
+  </style>
+</head>
+<body style="width: 200px; height: 100px;">
+  <div id="card" style="animation: fadeMove 2s linear infinite;"></div>
+</body>
+```
+
+- `@keyframes <name> { <stop> { … } … }` 块定义一条命名时间线。停靠点是百分比（`0%` … `100%`）
+  或关键字 `from`（= `0%`）/ `to`（= `100%`）；单个停靠点可列出多个以逗号分隔的选择器。
+- `@keyframes` 块在 `<style>`-内联归一化中被保留（一个只承载幸存 `@keyframes` 的 `<style>`
+  元素会被保留，供导入器读取）。
+- `animation` 简写把一条 `@keyframes` 时间线附着到元素上。长写属性 `animation-name` /
+  `animation-duration` / `animation-timing-function` / `animation-iteration-count` /
+  `animation-direction` / `animation-delay` 也被接受，并在归一化时折叠进简写。
+- 每个元素一个动画。以逗号分隔的动画列表只保留第一项（`subset:animation-multiple` 警告）。
+
+### 13.2 通道映射
+
+只有能映射到 PAGX 运行时可实际回放的通道的属性才会被输出。`@keyframes` 停靠点里的其它一切都会
+被警告并丢弃（`subset:animation-unsupported-property`）。
+
+| CSS 动画属性 | PAGX 通道 | 目标节点 | 值类型 |
+|--------------|-----------|----------|--------|
+| `opacity` | `alpha` | 元素的 `Layer` | float |
+| `transform`（仅纯平移） | `x` / `y` | 元素的 `Layer` | float |
+| `transform`（scale / rotate / skew / 任意非纯平移） | `matrix` | 元素的 `Layer` | matrix |
+| `color` / `background-color` | `color` | 元素 `Fill` 内的 `SolidColor` | color |
+| `filter: drop-shadow(...)` | `offsetX` / `offsetY` / `blurX` / `blurY` / `color` | 元素 `Layer` 上的 `DropShadowFilter` | float / color |
+| `filter: blur(...)` | `blurX` / `blurY` | 元素 `Layer` 上的 `BlurFilter` | float |
+| `filter: brightness(...)` | `alpha`（钳制到 `[0,1]`） | 自动生成的嵌套 `Layer` | float |
+| `clip-path`（几何形式 `inset`/`circle`/`ellipse`/`polygon`/`path`） | `point{i}.x` / `point{i}.y` | 轮廓 mask `Layer` 内的 `Path` | float |
+
+`transform` 会逐关键帧解析为一个 2D 仿射矩阵（单函数与空格分隔的复合链——`translate[X|Y]` /
+`scale[X|Y]` / `rotate` / `skewX|Y|skew` / `matrix(...)`）。当*每一个*关键帧都是纯平移时，动画使用更
+廉价的 `x` / `y` 通道（它们叠加在布局分配的位置之上）。一旦任一关键帧带有 scale / rotate / skew
+（或一个非平移的 `matrix(...)`），整个仿射就被路由到单个 `matrix` 通道，并像静态 `transform` 路径一样
+围绕元素的 `transform-origin` 取轴（`T(cx,cy) · M · T(-cx,-cy)`），使静态与动画的变换一致。3D 形式
+（`matrix3d` / `rotate3d` / `perspective`）没有 2D 仿射表示，被丢弃并告警
+（`subset:animation-unsupported-property`）。影响布局的属性（`width`、`height`、`margin`、
+`padding`、`gap`、`flex` …）永远不可动画（见 §4.4），同样被丢弃。
+
+> matrix 通道插值会把每个关键帧分解为 平移 / 缩放 / 旋转 / 错切 并对这些分量插值
+> （`pagx/runtime/MatrixDecompose.h`）；它无法在相邻两个关键帧之间还原整圈或跨越 ±180° 的旋转，因此
+> 非常大的单段旋转会走近路。补充中间 `@keyframes` 停靠点（常见做法）可避免这个问题。
+
+当动画元素没有作者 `id` 时，其 `Layer` 会被赋予一个生成的 `id`（前缀 `anim`），使输出的
+`<Object target="…">` 能引用它。`color` 动画要求元素绘制了一个实色 `background-color`（对文本则是实色
+`color`）；当没有 `SolidColor` 填充时，`color` 通道被丢弃（`subset:animation-unsupported-property`）。
+
+**滤镜动画。** 在 `none` 与受支持滤镜函数之间做动画的 `filter` 链（或做动画的
+`box-shadow`，捕获层会把它折叠为等价的 `drop-shadow`）会被下沉到运行时可动画的滤镜节点。链中的每个
+`drop-shadow` 都按作者顺序保留——一组由多个纯偏移阴影组成的"色差"堆叠会变成每个槽一个可动画的
+`DropShadowFilter`，从而整叠一起合成，而非只取一个代表。某个停靠点若省略了某个阴影槽，会把该槽的
+`color` 透明度驱动为零，使残影淡入淡出而非突变。`blur(...)` 折叠到单个 `BlurFilter` 半径。元素上已有的
+静态滤镜节点会被复用作动画目标；否则会新建一个零值/透明的基线节点，以便 fill-mode 能恢复"关闭"状态。
+`brightness()` 使用独立嵌套 Layer 的 opacity 近似，因此可与作者声明的 `opacity` 正确相乘；大于 `1` 的值
+会钳制为 `1`，因为 opacity 无法增强 RGB。其它颜色调整动画会以
+`subset:animation-unsupported-property` 告警并丢弃。
+
+**clip-path 动画。** 在几何形状（`inset()` / `circle()` / `ellipse()` / `polygon()` / `path()`）之间做
+动画的 `clip-path` 会变成一个可动画的轮廓 mask——擦除 / 揭示 / 光圈效果。这比静态路径更宽泛：静态路径
+只接受 `clip-path: url(#id)` 并丢弃几何形式（§4.4）；捕获层会把每个关键帧的形状归一化为边框盒像素下的
+规范 `path("d")`，导入器再用逐点 `point{i}.x` / `.y` 通道驱动 mask 的 `Path`。所有关键帧必须解析为
+**相同**的形状结构（相同的 verb / 点数）；CSS 本身就拒绝对不匹配的形状插值，因此不匹配会丢弃 clip 通道
+并告警（`subset:animation-unsupported-property`）。只有在整条时间线上真正变化的点坐标才会输出通道。
+
+### 13.3 时间映射
+
+- 帧率固定为 60 fps。`@keyframes` 百分比换算为帧时间：
+  `time = round(percent / 100 * duration_seconds * 60)`。`animation-duration` 接受 `s` 和 `ms` 单位。
+- `animation-timing-function`：`linear` → `linear`；`ease` / `ease-in` / `ease-out` / `ease-in-out`
+  与 `cubic-bezier(x1, y1, x2, y2)` → `bezier`（缓动写到关键帧的 `bezier-out` / 下一关键帧的
+  `bezier-in` 手柄上）。`steps(n, <jump>)` / `step-start` / `step-end` 不是运行时插值类型；每个
+  `@keyframes` 段会被展开为 `n` 个 `hold` 子关键帧以复现 CSS 阶梯（四种 jump——`jump-start` /
+  `jump-end` / `jump-none` / `jump-both`——都被支持）。
+- `animation-iteration-count`：`infinite` → `Animation.loop="loop"`；任何有限次数 → `once`
+  （PAGX 没有有限重复次数——次数 > 1 会以 `subset:animation-finite-count` 告警）。非正次数会抑制
+  回放（以同一诊断丢弃）。
+- `animation-direction`：`alternate` → `Animation.loop="pingPong"`**仅当次数为 infinite 时**（有限
+  `alternate` 无法表达，被降级为 `once` 并告警 `subset:animation-finite-count`）；`reverse` /
+  `alternate-reverse` 会同时反转关键帧顺序与缓动（`ease-in` 变 `ease-out`，step 的 jump 互换）；
+  `normal` 保持原序。
+- `animation-delay`：正延迟把每个关键帧时间前移；负延迟告警并钳制为 0。对于循环动画，延迟只作用于
+  第一次迭代（不计入 `Animation.duration`，因此不会每个周期重放该间隙）。
+- `animation-fill-mode`：`none`（默认）在延迟结束前以及 `once` 动画结束后显示元素的非动画基线值；
+  `forwards` 在结束后保持最后一个关键帧；`backwards` 在延迟期间显示第一个关键帧；`both` 两者兼有。
+  通过在边界注入基线 `hold` 关键帧实现（`Loop` / `PingPong` 没有"结束之后"的区域，因此那里只有前导
+  基线生效）。
+
+### 13.4 结果 PAGX
+
+§13.1 的示例转换为：
+
+```xml
+<pagx width="200" height="100">
+  <Layer id="card" width="100%" height="100%"/>
+  <Animations>
+    <Animation id="card_anim" duration="120" frameRate="60" loop="loop">
+      <Object target="card">
+        <Channel name="alpha" type="float">
+          <Key time="0" value="0"/>
+          <Key time="120" value="1"/>
+        </Channel>
+        <Channel name="x" type="float">
+          <Key time="0" value="0"/>
+          <Key time="120" value="40"/>
+        </Channel>
+      </Object>
+    </Animation>
+  </Animations>
+</pagx>
+```
+
+### 13.5 内联 SVG 形状动画
+
+内联 `<svg>` 形状上的动画会被下沉到逐形状的绘制节点，而非元素 `Layer`，从而解锁图标与线条画动效：
+
+| SVG 动画属性 | PAGX 通道 | 目标节点 |
+|--------------|-----------|----------|
+| `opacity` | `alpha` | 形状的 `Layer` |
+| `transform`（仅纯平移） | `x` / `y` | 形状的 `Layer` |
+| `fill` | `color` | 形状的 `Fill` |
+| `fill-opacity` | `alpha` | 形状的 `Fill` |
+| `stroke` | `color` | 形状的 `Stroke` |
+| `stroke-opacity` | `alpha` | 形状的 `Stroke` |
+| `stroke-dashoffset` | `dashOffset` | 形状的 `Stroke` |
+
+`stroke-dashoffset` 驱动路径描摹的**线条绘制**惯用法（`stroke-dasharray: 1; stroke-dashoffset: 1 → 0`
+配合 `pathLength="1"`）；捕获到的作者空间值会像静态 dash 导入一样重新缩放到用户单位。SVG 形状上的
+非平移 `transform` 没有 `matrix` 通道（与普通 HTML 元素不同），会被丢弃并告警
+（`subset:animation-unsupported-property`）。与普通元素不同，一个内联 SVG 形状可携带**以逗号分隔的
+`animation` 列表**——每一项都成为独立的 `Animation`（线条绘制 + 淡入填充的惯用法
+`animation: draw 1s …, fill 0.4s …` 是常见场景）。
+
+### 13.6 诊断
+
+| 代码 | 含义 |
+|------|------|
+| `subset:animation-unsupported-property` | 某个 `@keyframes` 声明面向运行时无法回放的属性/通道；已丢弃 |
+| `subset:animation-filter-approximated` | 动画 `brightness()` 被映射为 opacity，大于 1 的值会被钳制 |
+| `subset:animation-unknown-keyframes` | `animation` 引用了未定义的 `@keyframes` 名称；该动画被丢弃 |
+| `subset:animation-finite-count` | `animation-iteration-count` 是有限值 > 1；被强制为 `once` |
+| `subset:animation-multiple` | 以逗号分隔的 `animation` 列表被截断为第一项 |

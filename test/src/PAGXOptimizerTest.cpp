@@ -1822,4 +1822,32 @@ CLI_TEST(PAGXOptimizerTest, CollapseKeepsNonFillingChild) {
   EXPECT_EQ(parent->children[0], child);
 }
 
+// A resolved import directive (an SVG icon) arrives as a child layer carrying its own Path + Fill.
+// A painter paints every geometry that precedes it inside the same element list, so absorbing that
+// child into a parent that already owns geometry would let the icon's Fill paint the parent's
+// shapes too — the host box's placeholder Rectangle used to swallow the icon and turn the whole
+// box into a solid block.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsPaintedChildWhenParentHasGeometry) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  auto* placeholder = doc->makeNode<Rectangle>();
+  placeholder->percentWidth = 100;
+  placeholder->percentHeight = 100;
+  parent->contents.push_back(placeholder);
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  ASSERT_EQ(parent->contents.size(), 1u);
+  EXPECT_EQ(parent->contents[0], placeholder);
+}
+
 }  // namespace pag

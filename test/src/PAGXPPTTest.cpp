@@ -23,6 +23,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <unordered_map>
 #include "pagx/LayoutContext.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXImporter.h"
@@ -42,6 +43,7 @@
 #include "pagx/nodes/Ellipse.h"
 #include "pagx/nodes/Fill.h"
 #include "pagx/nodes/Font.h"
+#include "pagx/nodes/GlassStyle.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Group.h"
 #include "pagx/nodes/Image.h"
@@ -66,12 +68,15 @@
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/ppt/PPTBoilerplate.h"
+#include "pagx/ppt/PPTFeatureProbe.h"
 #include "pagx/ppt/PPTWriter.h"
 #include "pagx/ppt/PPTWriterContext.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLBuilder.h"
+#include "utils/PAGXImageTestUtils.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
+#include "utils/ZipTestUtils.h"
 
 namespace pag {
 
@@ -2871,6 +2876,129 @@ PAGX_TEST(PAGXPPTTest, NativeTextWithShadow) {
   ASSERT_TRUE(ExportAndVerify(*doc, "native_text_shadow", options));
 }
 
+PAGX_TEST(PAGXPPTTest, ParentLayerEffectsDoNotLeakIntoChildTextRun) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+
+  auto* card = doc->makeNode<pagx::Layer>();
+  card->name = "Card";
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {260, 160};
+  auto* cardFill = doc->makeNode<pagx::Fill>();
+  auto* cardColor = doc->makeNode<pagx::SolidColor>();
+  cardColor->color = {1.0f, 1.0f, 1.0f, 1.0f};
+  cardFill->color = cardColor;
+  card->contents.push_back(rect);
+  card->contents.push_back(cardFill);
+
+  auto* shadow = doc->makeNode<pagx::DropShadowStyle>();
+  shadow->offsetY = 14;
+  shadow->blurX = 17;
+  shadow->blurY = 17;
+  shadow->color = {1.0f, 0.54f, 0.12f, 0.16f};
+  card->styles.push_back(shadow);
+
+  auto* blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 3;
+  blur->blurY = 3;
+  card->filters.push_back(blur);
+
+  auto* label = doc->makeNode<pagx::Layer>();
+  auto* text = doc->makeNode<pagx::Text>();
+  text->text = "Child Label";
+  text->position = {125, 155};
+  text->fontFamily = "Arial";
+  text->fontSize = 28;
+  auto* textFill = doc->makeNode<pagx::Fill>();
+  auto* textColor = doc->makeNode<pagx::SolidColor>();
+  textColor->color = {0.2f, 0.25f, 0.35f, 1.0f};
+  textFill->color = textColor;
+  label->contents.push_back(text);
+  label->contents.push_back(textFill);
+  card->children.push_back(label);
+  doc->layers.push_back(card);
+
+  pagx::PPTExportOptions options;
+  options.convertTextToPath = false;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+
+  std::unordered_map<std::string, std::string> entries;
+  std::string error;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  const auto& slide = entries.at("ppt/slides/slide1.xml");
+
+  auto shadowPos = slide.find("<a:outerShdw");
+  ASSERT_NE(shadowPos, std::string::npos);
+  EXPECT_EQ(slide.find("<a:outerShdw", shadowPos + 1), std::string::npos);
+  auto blurPos = slide.find("<a:blur");
+  ASSERT_NE(blurPos, std::string::npos);
+  EXPECT_EQ(slide.find("<a:blur", blurPos + 1), std::string::npos);
+
+  auto textPos = slide.find("<a:t>Child Label</a:t>");
+  ASSERT_NE(textPos, std::string::npos);
+  auto runStart = slide.rfind("<a:rPr", textPos);
+  auto runEnd = slide.find("</a:rPr>", runStart);
+  ASSERT_NE(runStart, std::string::npos);
+  ASSERT_NE(runEnd, std::string::npos);
+  auto runProperties = slide.substr(runStart, runEnd - runStart);
+  EXPECT_EQ(runProperties.find("outerShdw"), std::string::npos);
+  EXPECT_EQ(runProperties.find("<a:blur"), std::string::npos);
+
+  auto groupPropsStart = slide.rfind("<p:grpSpPr>", shadowPos);
+  auto groupPropsEnd = slide.find("</p:grpSpPr>", shadowPos);
+  ASSERT_NE(groupPropsStart, std::string::npos);
+  ASSERT_NE(groupPropsEnd, std::string::npos);
+  EXPECT_LT(groupPropsStart, shadowPos);
+  EXPECT_LT(shadowPos, groupPropsEnd);
+  EXPECT_LT(groupPropsStart, blurPos);
+  EXPECT_LT(blurPos, groupPropsEnd);
+}
+
+PAGX_TEST(PAGXPPTTest, NoOpEffectsDoNotCreateGroups) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* rect = doc->makeNode<pagx::Rectangle>();
+  rect->position = {200, 150};
+  rect->size = {200, 150};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  auto* color = doc->makeNode<pagx::SolidColor>();
+  color->color = {0.3f, 0.5f, 0.7f, 1.0f};
+  fill->color = color;
+  layer->contents = {rect, fill};
+  auto* blur = doc->makeNode<pagx::BlurFilter>();
+  blur->blurX = 0;
+  blur->blurY = 0;
+  auto* blend = doc->makeNode<pagx::BlendFilter>();
+  blend->blendMode = pagx::BlendMode::ColorBurn;
+  layer->filters = {blur, blend};
+  doc->layers.push_back(layer);
+
+  pagx::PPTExportOptions options;
+  options.bakeUnsupported = false;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  std::unordered_map<std::string, std::string> entries;
+  std::string error;
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  const auto& slide = entries.at("ppt/slides/slide1.xml");
+  EXPECT_NE(slide.find("<p:sp>"), std::string::npos);
+  EXPECT_EQ(slide.find("<p:grpSp>"), std::string::npos);
+  EXPECT_EQ(slide.find("<a:effectLst"), std::string::npos);
+
+  // A supported effect still creates its group when paired with a dropped effect.
+  blur->blurX = 3;
+  blur->blurY = 3;
+  data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  entries.clear();
+  ASSERT_TRUE(ExtractZipEntries(data.get(), &entries, &error)) << error;
+  const auto& blurredSlide = entries.at("ppt/slides/slide1.xml");
+  EXPECT_NE(blurredSlide.find("<p:grpSp>"), std::string::npos);
+  EXPECT_NE(blurredSlide.find("<a:blur"), std::string::npos);
+  EXPECT_EQ(blurredSlide.find("<a:fillOverlay"), std::string::npos);
+}
+
 PAGX_TEST(PAGXPPTTest, PathZeroBoundsSkipped) {
   auto doc = pagx::PAGXDocument::Make(400, 300);
   auto* layer = doc->makeNode<pagx::Layer>();
@@ -2915,92 +3043,6 @@ PAGX_TEST(PAGXPPTTest, BlurFilterIgnored) {
   doc->layers.push_back(layer);
 
   ASSERT_TRUE(ExportAndVerify(*doc, "blur_filter_ignored"));
-}
-
-static pagx::Image* MakeTestPNGImage(pagx::PAGXDocument* doc) {
-  // Minimal valid 2x2 RGBA PNG (8-bit, non-interlaced)
-  static const uint8_t kMinimalPNG[] = {
-      0x89,
-      0x50,
-      0x4E,
-      0x47,
-      0x0D,
-      0x0A,
-      0x1A,
-      0x0A,  // PNG signature
-      // IHDR
-      0x00,
-      0x00,
-      0x00,
-      0x0D,
-      0x49,
-      0x48,
-      0x44,
-      0x52,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0x02,
-      0x08,
-      0x02,
-      0x00,
-      0x00,
-      0x00,
-      0xFD,
-      0xD4,
-      0x9A,
-      0x73,
-      // IDAT (compressed pixel data)
-      0x00,
-      0x00,
-      0x00,
-      0x14,
-      0x49,
-      0x44,
-      0x41,
-      0x54,
-      0x78,
-      0x9C,
-      0x62,
-      0xF8,
-      0xCF,
-      0xC0,
-      0xF0,
-      0x1F,
-      0x01,
-      0x18,
-      0x18,
-      0x18,
-      0x00,
-      0x09,
-      0x04,
-      0x01,
-      0x01,
-      0xE2,
-      0x2D,
-      0x42,
-      0xA3,
-      // IEND
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x49,
-      0x45,
-      0x4E,
-      0x44,
-      0xAE,
-      0x42,
-      0x60,
-      0x82,
-  };
-  auto* image = doc->makeNode<pagx::Image>();
-  image->data = pagx::Data::MakeWithCopy(kMinimalPNG, sizeof(kMinimalPNG));
-  return image;
 }
 
 PAGX_TEST(PAGXPPTTest, ImagePatternFill_Stretch) {
@@ -4836,6 +4878,42 @@ PAGX_TEST(PAGXPPTTest, BackgroundBlurStyleEmitted) {
 
   doc->layers.push_back(layer);
   ASSERT_TRUE(ExportAndVerify(*doc, "bg_blur_style"));
+}
+
+PAGX_TEST(PAGXPPTTest, GlassStyleUsesBackdropRasterization) {
+  auto doc = pagx::PAGXDocument::Make(400, 300);
+  auto* background = doc->makeNode<pagx::Layer>();
+  auto* backgroundRect = doc->makeNode<pagx::Rectangle>();
+  backgroundRect->position = {200, 150};
+  backgroundRect->size = {400, 300};
+  background->contents.push_back(backgroundRect);
+  background->contents.push_back(MakeSolidFill(doc.get(), {0.2f, 0.4f, 0.8f, 1.0f}));
+  doc->layers.push_back(background);
+
+  auto* glassLayer = doc->makeNode<pagx::Layer>();
+  auto* glassRect = doc->makeNode<pagx::Rectangle>();
+  glassRect->position = {200, 150};
+  glassRect->size = {180, 120};
+  glassRect->roundness = 24;
+  glassLayer->contents.push_back(glassRect);
+  glassLayer->contents.push_back(MakeSolidFill(doc.get(), {1.0f, 1.0f, 1.0f, 0.35f}));
+  glassLayer->styles.push_back(doc->makeNode<pagx::GlassStyle>());
+  doc->layers.push_back(glassLayer);
+
+  auto features = pagx::ProbeLayerFeatures(glassLayer);
+  EXPECT_TRUE(features.hasBackdropStyle);
+  EXPECT_TRUE(features.needsRasterization(true));
+  EXPECT_TRUE(features.requiresBackdrop(true));
+  EXPECT_FALSE(features.needsRasterization(false));
+  EXPECT_FALSE(features.requiresBackdrop(false));
+
+  pagx::PPTExportOptions options;
+  options.bakeUnsupported = true;
+  auto data = pagx::PPTExporter::ToData({doc.get()}, options);
+  ASSERT_NE(data, nullptr);
+  std::string bytes(reinterpret_cast<const char*>(data->bytes()), data->size());
+  EXPECT_NE(bytes.find("ppt/media/image1.png"), std::string::npos);
+  ASSERT_TRUE(ExportAndVerify(*doc, "glass_style_with_backdrop", options));
 }
 
 PAGX_TEST(PAGXPPTTest, MultipleShadowStylesAndFilters) {
@@ -6876,7 +6954,9 @@ PAGX_TEST(PAGXPPTTest, MultiPage_EmptyListFails) {
   std::vector<pagx::PAGXDocument*> docs;
   auto path = PPTOutDir() + "/multi_page_empty.pptx";
   EXPECT_FALSE(pagx::PPTExporter::ToFile(docs, path));
-  EXPECT_EQ(pagx::PPTExporter::ToData(docs), nullptr);
+  std::string error;
+  EXPECT_EQ(pagx::PPTExporter::ToData(docs, {}, &error), nullptr);
+  EXPECT_FALSE(error.empty());
 }
 
 PAGX_TEST(PAGXPPTTest, MultiPage_NullEntryFails) {

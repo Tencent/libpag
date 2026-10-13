@@ -623,7 +623,7 @@ PAGWindow {
             openFileDialog.title = qsTr("Open PAG File");
             openFileDialog.nameFilters = ["PAG files(*.pag *.pagx)"];
             openFileDialog.currentAcceptHandler = function () {
-                let filePath = openFileDialog.selectedFile;
+                let filePath = openFileDialog.selectedFile.toString();
                 mainForm.loadFile(filePath);
             };
             openFileDialog.accepted.connect(openFileDialog.currentAcceptHandler);

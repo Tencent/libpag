@@ -36,7 +36,7 @@ std::vector<pag::Marker*> ExportMarkers(std::shared_ptr<PAGExportSession> sessio
 
 void ParseMarkers(pag::Layer* layer);
 
-std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemHandle);
+std::optional<TimeStretchInfo> GetTimeStretchInfo(const AEGP_ItemH& itemHandle, float frameRate);
 
 std::optional<std::string> GetMarkerComment(const AEGP_StreamRefH& markerStream, int index);
 

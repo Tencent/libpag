@@ -18,8 +18,13 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
+
+namespace tgfx {
+class Typeface;
+}
 
 namespace pagx {
 
@@ -77,6 +82,28 @@ class SystemFonts {
    * FontLocation (empty path) if no match is found.
    */
   static FontLocation FindFont(const std::string& family, const std::string& style);
+
+  /**
+   * Resolves a system typeface by family and style. If the requested style is unavailable, falls
+   * back to another style from the same family. Platform substitutions to a different family are
+   * rejected. Returns nullptr when the requested family cannot be resolved.
+   */
+  static std::shared_ptr<tgfx::Typeface> ResolveTypeface(const std::string& family,
+                                                         const std::string& style);
+
+  /**
+   * Normalises a font family or style name for comparison: lower-cased, leading/trailing
+   * whitespace trimmed, and internal whitespace runs collapsed to a single space. Whitespace stays
+   * significant (only its amount is not), so "SF Mono" does not fold into "SFMono".
+   */
+  static std::string NormalizeFontName(const std::string& name);
+
+  /**
+   * True when `resolved` names the same family or style as `requested` under
+   * NormalizeFontName(). Returns false when `resolved` is empty, so callers can use the
+   * comparison to detect a platform substitution to a different face.
+   */
+  static bool FontNamesMatch(const std::string& requested, const std::string& resolved);
 };
 
 }  // namespace pagx

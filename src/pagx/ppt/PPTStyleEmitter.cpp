@@ -499,9 +499,7 @@ void PPTWriter::writeShadowElement(XMLBuilder& out, const char* tag, float blurX
   out.closeElement();  // tag
 }
 
-void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& filters,
-                             const std::vector<LayerStyle*>& styles) {
-  auto sources = CollectEffectSources(filters, styles);
+void PPTWriter::writeEffects(XMLBuilder& out, const EffectSources& sources) {
   if (sources.empty()) {
     return;
   }
@@ -516,32 +514,29 @@ void PPTWriter::writeEffects(XMLBuilder& out, const std::vector<LayerFilter*>& f
   // shape bounds — required for solid-filled shapes, otherwise PowerPoint clips the
   // blurred edges back to the original bounds and the effect becomes invisible.
   //
-  // BackgroundBlurStyle is intentionally NOT mapped to a:blur. It is a frosted-glass
-  // / backdrop-filter effect that blurs the pixels behind the shape while leaving the
-  // shape's own fill and stroke crisp. OOXML has no native backdrop-blur primitive
-  // and using a:blur as a stand-in produces visibly wrong output: the card's stroke,
-  // rounded corners, and fill all become fuzzy. Authors who need a faithful render of
-  // BackgroundBlurStyle should enable `bakeUnsupported` so the layer is baked with
-  // its real backdrop via rasterizeLayerAsPicture (probed in PPTFeatureProbe).
+  // BackgroundBlurStyle and GlassStyle are intentionally NOT mapped to a:blur. They
+  // are backdrop-sampling effects that operate on the pixels behind the shape while
+  // leaving the shape's own fill and stroke crisp. OOXML has no native backdrop
+  // primitive and using a:blur as a stand-in produces visibly wrong output: the
+  // card's stroke, rounded corners, and fill all become fuzzy. Authors who need a
+  // faithful render of either style should enable `bakeUnsupported` so the layer is
+  // baked with its real backdrop via rasterizeLayerAsPicture (probed in
+  // PPTFeatureProbe).
   if (sources.blur) {
     float avgBlur = (sources.blur->blurX + sources.blur->blurY) / 2.0f;
-    if (avgBlur > 0) {
-      out.openElement("a:blur")
-          .addRequiredAttribute("rad", PxToEMU(avgBlur))
-          .addRequiredAttribute("grow", "true")
-          .closeElementSelfClosing();
-    }
+    out.openElement("a:blur")
+        .addRequiredAttribute("rad", PxToEMU(avgBlur))
+        .addRequiredAttribute("grow", "true")
+        .closeElementSelfClosing();
   }
 
   if (sources.blend) {
     const char* blendStr = BlendModeToPPT(sources.blend->blendMode);
-    if (blendStr) {
-      out.openElement("a:fillOverlay").addRequiredAttribute("blend", blendStr).closeElementStart();
-      out.openElement("a:solidFill").closeElementStart();
-      WriteSrgbClr(out, sources.blend->color, sources.blend->color.alpha);
-      out.closeElement();  // a:solidFill
-      out.closeElement();  // a:fillOverlay
-    }
+    out.openElement("a:fillOverlay").addRequiredAttribute("blend", blendStr).closeElementStart();
+    out.openElement("a:solidFill").closeElementStart();
+    WriteSrgbClr(out, sources.blend->color, sources.blend->color.alpha);
+    out.closeElement();  // a:solidFill
+    out.closeElement();  // a:fillOverlay
   }
 
   // OOXML §20.1.8.20 allows at most one <a:innerShdw> and one <a:outerShdw>

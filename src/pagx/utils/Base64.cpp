@@ -18,6 +18,7 @@
 
 #include "Base64.h"
 #include <array>
+#include <cctype>
 #include <memory>
 
 namespace pagx {
@@ -85,19 +86,61 @@ std::shared_ptr<Data> Base64Decode(const std::string& encodedString) {
   return Data::MakeAdopt(output.release(), outputLength);
 }
 
-std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI) {
-  if (dataURI.find("data:") != 0) {
-    return nullptr;
+// Returns the offset of the base64 payload inside a `data:` URI, or std::string::npos when the
+// URI is not a base64-encoded one. The scheme is compared case-insensitively because RFC 3986
+// makes URI schemes case-insensitive, and a hand-authored `DATA:` reaches the same callers.
+static size_t Base64PayloadOffset(const std::string& dataURI) {
+  static constexpr const char* DATA_SCHEME = "data:";
+  static constexpr size_t DATA_SCHEME_LENGTH = 5;
+  if (dataURI.size() < DATA_SCHEME_LENGTH) {
+    return std::string::npos;
+  }
+  for (size_t i = 0; i < DATA_SCHEME_LENGTH; i++) {
+    if (std::tolower(static_cast<unsigned char>(dataURI[i])) != DATA_SCHEME[i]) {
+      return std::string::npos;
+    }
   }
   auto commaPos = dataURI.find(',');
   if (commaPos == std::string::npos) {
-    return nullptr;
+    return std::string::npos;
   }
   auto base64Pos = dataURI.find(";base64");
   if (base64Pos == std::string::npos || base64Pos > commaPos) {
+    return std::string::npos;
+  }
+  return commaPos + 1;
+}
+
+std::shared_ptr<Data> DecodeBase64DataURI(const std::string& dataURI) {
+  auto payloadOffset = Base64PayloadOffset(dataURI);
+  if (payloadOffset == std::string::npos) {
     return nullptr;
   }
-  return Base64Decode(dataURI.substr(commaPos + 1));
+  return Base64Decode(dataURI.substr(payloadOffset));
+}
+
+std::shared_ptr<Data> DecodeBase64DataURIPrefix(const std::string& dataURI, size_t maxBytes) {
+  static constexpr size_t BASE64_CHARS_PER_GROUP = 4;
+  static constexpr size_t BYTES_PER_BASE64_GROUP = 3;
+  if (maxBytes == 0) {
+    return nullptr;
+  }
+  auto payloadOffset = Base64PayloadOffset(dataURI);
+  if (payloadOffset == std::string::npos) {
+    return nullptr;
+  }
+  auto payloadLength = dataURI.size() - payloadOffset;
+  // Cut on a group boundary so the prefix is a self-contained base64 sequence: a partial group
+  // would be rejected by Base64Decode() (the encoded length must be a multiple of four).
+  size_t groupCount = (maxBytes + BYTES_PER_BASE64_GROUP - 1) / BYTES_PER_BASE64_GROUP;
+  size_t prefixLength = groupCount * BASE64_CHARS_PER_GROUP;
+  if (prefixLength < payloadLength) {
+    payloadLength = prefixLength;
+  }
+  if (payloadLength == 0) {
+    return nullptr;
+  }
+  return Base64Decode(dataURI.substr(payloadOffset, payloadLength));
 }
 
 std::string Base64Encode(const uint8_t* data, size_t length) {

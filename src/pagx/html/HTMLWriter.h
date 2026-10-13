@@ -51,6 +51,7 @@
 namespace pagx {
 
 class Group;
+class HTMLZipWriter;
 class HTMLWriterContext;
 class LinearGradient;
 class RadialGradient;
@@ -96,7 +97,7 @@ std::string PaddingToCSS(const Padding& padding);
 bool TextStartsWithRTL(const std::string& utf8Text);
 
 std::string GetImageSrc(const Image* image, HTMLWriterContext* ctx);
-// DetectImageMime / DetectImageMimeOrPNG now live in pagx/utils/ImageMime.h.
+// DetectImageMime / IsSupportedImageMime now live in pagx/utils/ImageMime.h.
 // Include that header directly when sniffing image data.
 
 /**
@@ -183,9 +184,32 @@ class HTMLWriterContext {
   // resourceDir. `staticImgDir` is the absolute filesystem path where PNG assets are written;
   // `staticImgUrlPrefix` is the relative URL prefix that the generated HTML uses to reference
   // them (derived as the directory's basename + '/'). The resourceDir is mandatory at the
-  // public API boundary, so both fields are non-empty when HTMLWriter runs.
+  // public API boundary, so both fields are non-empty when HTMLWriter runs in ToHTML mode.
+  // In ToData mode staticImgDir is left empty (resources go to the ZIP writer instead) while
+  // staticImgUrlPrefix stays set so writeResource can prepend it to ZIP entry names.
   std::string staticImgDir = {};
   std::string staticImgUrlPrefix = {};
+
+  // ToData sets this ZIP writer; ToHTML leaves it null and writes resources to
+  // staticImgDir. HTML export currently supports no other resource writer.
+  HTMLZipWriter* zipWriter = nullptr;
+
+  // ToData only: first resource write failure, if any. An archive is all-or-nothing
+  // (design spec section 8), so any failed ZIP entry write fails the whole ToData call.
+  std::string zipWriteError = {};
+
+  bool hasResourceOutput() const {
+    return zipWriter != nullptr || !staticImgDir.empty();
+  }
+
+  // Writes a resource. relativePath is relative to the resource root (ToHTML:
+  // staticImgDir; ToData: the ZIP root) and may contain '/'-separated sub
+  // directories. In ToData mode the ZIP entry name is staticImgUrlPrefix +
+  // relativePath, keeping archive entries and HTML URLs in sync. Falls back
+  // to the original write-to-disk behavior when zipWriter is null.
+  bool writeResource(const std::string& relativePath, const void* bytes, size_t size,
+                     std::string* errorMsg);
+
   float rasterScale = 2.0f;
 
   // Cache: source absolute file path → assigned filename inside staticImgDir. Used by
@@ -194,6 +218,10 @@ class HTMLWriterContext {
   // basename receive disambiguated copies (e.g. "logo.png", "logo_1.png").
   std::unordered_map<std::string, std::string> externalImageCopies = {};
   std::unordered_set<std::string> externalImageClaimedNames = {};
+
+  // ToData only: Image* → assigned assets/ filename, so one Image is embedded
+  // at most once into the archive.
+  std::unordered_map<const Image*, std::string> externalImageAssets = {};
 
   // Per-plusDarker-Layer backdrop data registered by HTMLPlusDarkerRenderer before the writer
   // walks the tree. When a Layer pointer is present here, the writer emits an SVG filter that
@@ -232,6 +260,14 @@ class HTMLWriterContext {
   // embedded vector Font resource. writeEmbeddedShapeGlyphs checks this mapping to decide whether
   // to emit @font-face + PUA <span> (WOFF2 path) or fall back to the SVG <path> path.
   std::unordered_map<const Font*, Woff2FontResult> woff2Fonts = {};
+
+  // Text nodes whose data-pagx-text host metadata has already been emitted. The attribute marks
+  // "one restored Text" and must appear at most once per node, while writeLayerContents runs a
+  // Background and a Foreground pass over the same element list and both passes can paint the
+  // same Text (its Fill and Stroke may sit in different placements). A second host would be
+  // restored as a second Text, duplicating the content on round-trip, so later occurrences are
+  // marked as parts instead.
+  std::unordered_set<const Text*> textHostsEmitted = {};
 
   // Cache: path d-string → assigned ID in global <defs>. Used to deduplicate repeated SVG paths
   // (e.g. from Repeater nodes) by emitting <path id="p0" d="..."/> once and referencing via <use>.
@@ -501,6 +537,10 @@ class HTMLWriter {
   // WOFF2 fonts, using PUA Unicode characters.
   void writeEmbeddedShapeGlyphsAsFont(HTMLBuilder& out, const Text* text, const Fill* fill,
                                       const Stroke* stroke, float alpha);
+  // Marks `text` as the semantic host of its PUA glyph group, exactly once per Text node.
+  // Subsequent marks — a second glyph span of the same Text, or a second paint of the same Text
+  // in another placement pass — become part markers, which the importer skips.
+  void emitTextHostMarker(HTMLBuilder& out, const Text* text);
   // `parentMatrix` is the accumulated transform of any enclosing Groups that were flattened
   // into the current element stream (writeElements inlines flattened-Group geometry via
   // TransformPathDataToSVG but emits nested Groups by recursing into writeGroup). For Groups
@@ -536,9 +576,30 @@ class HTMLWriter {
   static bool NeedsMirrorTiling(const Layer* layer);
 
   // Mask/clip defs
-  std::string writeMaskCSS(const Layer* mask, MaskType type, Point maskedLayerPos = {});
+  std::string writeMaskCSS(const Layer* mask, MaskType type);
   std::string writeClipDef(const Layer* mask);
   void writeClipContent(HTMLBuilder& out, const Layer* layer, const Matrix& parent);
+
+  // Two-pass mask geometry walk. writeMaskCSS emits a self-contained SVG whose viewBox must
+  // start at the origin (the HTML importer folds a non-zero viewBox origin into a content
+  // matrix that is then cancelled when composed with the mask layer's own matrix), so the
+  // full bounds have to be known before the <svg> open tag is written. collectMaskBounds
+  // gathers those bounds; writeMaskGeometry then re-walks the tree with the origin shift
+  // folded into the root matrix.
+  void collectMaskBounds(const Layer* layer, const Matrix& parent, float& minX, float& minY,
+                         float& maxX, float& maxY);
+  void writeMaskGeometry(HTMLBuilder& out, const Layer* layer, const Matrix& parent, MaskType type,
+                         float inheritedAlpha, int& gradientIndex);
+  // Shared element walk for writeMaskGeometry: emits one SVG shape per geometry element and
+  // recurses into Group containers with their matrix folded in. `inheritedFillAttr` /
+  // `inheritedFillOpacity` describe the paint of the enclosing element list and cover shapes that
+  // no Fill in their own list provides.
+  void writeMaskElements(HTMLBuilder& out, const std::vector<Element*>& elements,
+                         const Matrix& combined, MaskType type, float inheritedAlpha,
+                         float inheritedFillOpacity, const std::string& inheritedFillAttr,
+                         int& gradientIndex, int depth);
+  static void ExpandElementBounds(const Element* element, const Matrix& combined, float& minX,
+                                  float& minY, float& maxX, float& maxY, int depth);
 
   // SVG fill/stroke attributes
   void applySVGFill(HTMLBuilder& out, const Fill* fill, float bboxX = 0, float bboxY = 0,

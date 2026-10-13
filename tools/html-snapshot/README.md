@@ -128,6 +128,7 @@ Options:
 | `--header <Key: Value>` | — | Extra HTTP request header (URL inputs only; repeatable) |
 | `--no-reduced-motion` | _reduced motion enabled_ | Request `prefers-reduced-motion: no-preference`; use when reduced-motion styles hide content |
 | `--no-inline-icon-fonts` | _enabled_ | Disable webfont-glyph → inline SVG conversion (see below) |
+| `--capture-animations` | _disabled_ | Capture the page's animations (CSS `@keyframes`, Web Animations, GSAP, anime.js) into the subset as `@keyframes` + `animation` so the importer can replay the motion; implies `--no-reduced-motion`; otherwise a single static frame is emitted |
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
 | `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |
@@ -137,7 +138,7 @@ Options:
 
 `snapshot.js` also supports `-o -` to write the snapshot HTML to stdout (used as the
 `pagx import` bridge). `--embed-fonts` is a `html2pagx`-only flag; `snapshot.js` exposes
-only `--download-fonts` (embedding happens in the `pagx font embed` step downstream).
+only `--download-fonts` (embedding happens in the `pagx embed` step downstream).
 
 ### Inline icon fonts
 
@@ -222,7 +223,7 @@ typeface — `--fallback` both registers the face (matching the document's
 subset files jointly cover the text:
 
 ```bash
-pagx font embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
+pagx embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
 pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
 ```
 
@@ -272,8 +273,9 @@ Options:
 | `--no-resolve` | Stop after `pagx import` |
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
+| `--capture-animations` | Forwarded to `snapshot.js`: capture the page's animations into the subset so the `.pagx` replays the motion (default: a single static frame) |
 | `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
-| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx font embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
+| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 |
 | `--image-dir <dir>` | Where downloaded images are written (default `<output>.images/`) |
@@ -526,12 +528,36 @@ Babel-compiled at runtime.
 
 ## Limitations
 
+- Animation capture is **off by default** — the snapshot emits a single static
+  frame. Pass `--capture-animations` (`snapshot.js` / `html2pagx` /
+  `pagx import`), set `captureAnimations: true` on the `runSnapshot` /
+  `runHtmlToPagx` APIs, or send `captureAnimations: true` in the HTTP service's
+  options to opt in. When enabled, animations are normalised into the canonical
+  `@keyframes` + `animation` subset (`spec/html_subset.md` §13) so the importer
+  can replay them. The capture pass (`lib/animation-capture.ts`) reads running
+  animations from CSS `@keyframes`, the Web Animations API, GSAP, and anime.js,
+  and rewrites them as `@keyframes pagxAnim<N>` rules plus an inline `animation`
+  shorthand. Only runtime-playable channels survive: `opacity` (→ `alpha`),
+  `transform: translate[X|Y]` (→ `x`/`y`), and `color` / `background-color`
+  (→ a fill's `SolidColor.color`). Other animated properties (`rotate`,
+  `scale`, `width`/`height`, `filter`, `box-shadow`, …) are dropped, and the
+  element holds whatever value it had when the snapshot was taken — use
+  `--wait-ms` or `--selector` to land on the desired frame for those.
+- Hover states and other dynamic effects that are not expressed as animations
+  are captured in whatever state the page is in when the snapshot is taken.
 - The browser requests `prefers-reduced-motion: reduce` before navigation so
   pages can expose a complete static presentation instead of an entrance-
   animation start frame. Dynamic effects that ignore that preference are
   captured in whatever state they are in; use `--wait-ms` or `--selector` to
   land on the desired frame. Some pages instead hide or remove animated content
   in their reduced-motion styles; use `--no-reduced-motion` for those pages.
+- `position: sticky` scrollytelling blocks — a pinned panel inside a tall
+  scroll track whose step layers cross-fade as the page scrolls — are expanded
+  before the snapshot: the panel is tiled once per step so the static output
+  shows every step instead of the frozen top frame plus blank track. The
+  detection is heuristic (a track at least twice the panel's height, stacked
+  same-size absolute layers with mutually exclusive opacities) and the
+  expansion is opt-out via `HTML_SNAPSHOT_NO_STICKY_EXPAND=1`.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
 - `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
@@ -542,6 +568,12 @@ Babel-compiled at runtime.
   and WebGL canvases created without `preserveDrawingBuffer: true` (the
   back buffer may be empty by the time we read it). Such canvases are
   dropped and render as empty boxes.
+- Images whose declared format is not PNG / JPEG / WebP / GIF — an AVIF or
+  HEIC served by a CDN, for instance — are re-encoded to WebP in the browser,
+  because PAGX consumers are only required to decode those four formats. An
+  animated source outside that set keeps only its first frame, a re-encode
+  failure keeps the original bytes and warns, and images saved by
+  `--download-images` are written to disk untouched.
 - Asymmetric borders are downgraded to overlay rectangles. Per-side `dashed` /
   `dotted` borders are coerced to `solid` (the closest visual approximation
   available in the subset).

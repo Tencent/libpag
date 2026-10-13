@@ -18,6 +18,7 @@
 
 #include "TextLayout.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include "LayoutContext.h"
 #include "TextLayoutParams.h"
@@ -68,6 +69,20 @@ static bool CompareByCluster(const ShapedGlyph& a, const ShapedGlyph& b) {
   return a.cluster < b.cluster;
 }
 
+// Returns true when the typeface's own style already provides an italic/oblique slant. fauxItalic
+// is a synthesis axis meant for upright faces only: applying it on top of a real italic design
+// double-slants the glyphs, both when embedding glyph paths and when rendering.
+static bool TypefaceHasItalicSlant(const std::shared_ptr<tgfx::Typeface>& typeface) {
+  if (typeface == nullptr) {
+    return false;
+  }
+  auto style = typeface->fontStyle();
+  for (auto& c : style) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return style.find("italic") != std::string::npos || style.find("oblique") != std::string::npos;
+}
+
 static size_t DecodeUTF8Char(const char* data, size_t remaining, int32_t* unichar) {
   const char* ptr = data;
   const char* end = data + remaining;
@@ -93,6 +108,11 @@ class TextLayoutContext {
     tgfx::GlyphID glyphID = 0;
     tgfx::Font font = {};
     float advance = 0;
+    // The advance the glyph actually occupies after CJK punctuation squash. Squash shrinks the
+    // space next to a punctuation glyph without changing `advance`, which line breaking and
+    // justification are computed from. Measured bounds have to use this one so that a text block
+    // measures exactly as wide as its squashed line.
+    float squashedAdvance = 0;
     float xPosition = 0;
     int32_t unichar = 0;
     float fontSize = 0;
@@ -390,12 +410,13 @@ class TextLayoutContext {
     }
 
     float effectiveFontSize = glyph.fontSize * textScale;
+    bool typefaceIsItalic = TypefaceHasItalicSlant(primaryTypeface);
     tgfx::Font primaryFont(primaryTypeface, effectiveFontSize);
     primaryFont.setFauxBold(glyph.fauxBold);
-    primaryFont.setFauxItalic(glyph.fauxItalic);
+    primaryFont.setFauxItalic(glyph.fauxItalic && !typefaceIsItalic);
     tgfx::Font metricsFont(metricsTypeface, effectiveFontSize);
     metricsFont.setFauxBold(glyph.fauxBold);
-    metricsFont.setFauxItalic(glyph.fauxItalic);
+    metricsFont.setFauxItalic(glyph.fauxItalic && !typefaceIsItalic);
     float currentX = 0;
     const std::string& content = glyph.text;
     float effectiveLetterSpacing = glyph.letterSpacing * textScale;
@@ -693,6 +714,7 @@ class TextLayoutContext {
       for (size_t i = 0; i < glyphCount; i++) {
         line.glyphs[i].xPosition = xPos - leadingSquash[i];
         float effectiveAdvance = line.glyphs[i].advance - leadingSquash[i] - trailingSquash[i];
+        line.glyphs[i].squashedAdvance = effectiveAdvance;
         float ls = line.glyphs[i].letterSpacing;
         xPos += effectiveAdvance + ls;
       }
@@ -1083,12 +1105,13 @@ class TextLayoutContext {
             }
           }
         }
-        // Recalculate xPosition after visual reordering.
+        // Recalculate xPosition after visual reordering. Uses the squashed advance so the
+        // reordered positions stay in step with the line width and with perTextBounds.
         float xPos = 0;
         for (auto& g : visualGlyphs) {
           g.xPosition = xPos;
           float letterSpacing = g.letterSpacing;
-          xPos += g.advance + letterSpacing;
+          xPos += g.squashedAdvance + letterSpacing;
         }
       }
       // Compute justify gap count on visual-order glyphs so that counting and application use
@@ -1120,14 +1143,15 @@ class TextLayoutContext {
         pg.x = g.xPosition + xOffset + justifyOffset + g.xOffset;
         pg.y = baselineY - g.yOffset;
         result.horizontalGlyphs[g.sourceText].push_back(pg);
-        // Update per-Text linebox bounds in layout coordinate system.
-        float glyphRight = pg.x + g.advance;
+        // Update per-Text linebox bounds in layout coordinate system. Uses the squashed advance
+        // so the bounds agree with the line width the TextBox was measured with.
+        float glyphRight = pg.x + g.squashedAdvance;
         float lineTop = relativeTop - line.maxLineHeight + yOffset;
         float lineBottom = relativeTop + yOffset;
         auto it = result.perTextBounds.find(g.sourceText);
         if (it == result.perTextBounds.end()) {
           result.perTextBounds[g.sourceText] =
-              Rect::MakeXYWH(pg.x, lineTop, g.advance, lineBottom - lineTop);
+              Rect::MakeXYWH(pg.x, lineTop, g.squashedAdvance, lineBottom - lineTop);
         } else {
           auto& tb = it->second;
           float left = std::min(tb.x, pg.x);

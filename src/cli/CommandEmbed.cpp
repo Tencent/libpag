@@ -114,28 +114,7 @@ int RunEmbed(int argc, char* argv[]) {
   }
 
   if (!options.skipFonts) {
-    FontConfig fontConfig = {};
-    if (!LoadFontConfig(&fontConfig, {}, options.fallbacks, "pagx embed")) {
-      return 1;
-    }
-    for (auto& node : document->nodes) {
-      if (node->nodeType() == NodeType::Font) {
-        auto* font = static_cast<Font*>(node.get());
-        if (!font->file.empty()) {
-          auto typeface = tgfx::Typeface::MakeFromPath(font->file);
-          if (typeface == nullptr) {
-            std::cerr << "pagx embed: failed to load font '" << font->file << "'\n";
-            return 1;
-          }
-          fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
-        }
-      }
-    }
-    FontEmbedder::ClearEmbeddedGlyphRuns(document.get());
-    document->applyLayout(&fontConfig);
-    FontEmbedder embedder = {};
-    if (!embedder.embed(document.get())) {
-      std::cerr << "pagx embed: font embedding failed\n";
+    if (!EmbedFonts(document.get(), options.fallbacks, "pagx embed")) {
       return 1;
     }
   }

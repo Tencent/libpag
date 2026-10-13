@@ -60,7 +60,7 @@ void GetBitmapSequence(std::shared_ptr<PAGExportSession> session,
   }
   AEGP_ItemH itemHandle = itemIter->second;
   float factor = compositionFactor;
-  float frameRate = std::min(session->configParam.frameRate, composition->frameRate);
+  float frameRate = std::min(session->configParam.frameRate, GetItemFrameRate(itemHandle));
   auto duration =
       static_cast<pag::Frame>(ceil(composition->duration * frameRate / composition->frameRate));
 

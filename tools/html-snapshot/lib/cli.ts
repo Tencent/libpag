@@ -34,6 +34,8 @@ export interface SnapshotCliOptions {
   headers: ParsedHeader[];
   reducedMotion: boolean;
   inlineIconFonts: boolean;
+  captureAnimations: boolean;
+  scrollReveal: boolean;
   downloadFonts: boolean;
   fontDir: string;
   fontManifest: string;
@@ -110,10 +112,31 @@ const FLAGS: FlagSpec[] = [
   // legacy font-named span path (faster, no font fetch, but the PAGX file
   // becomes non-portable).
   { names: ['--no-inline-icon-fonts'], takesArg: false, set: (o) => { o.inlineIconFonts = false; } },
+  // Capture the page's animations into the subset. Off by default: the snapshot
+  // emits a single static frame. Animation capture must observe the page's real
+  // motion, so it also opts out of the static snapshot's reduced-motion media
+  // emulation. Otherwise a common accessibility rule turns every duration into
+  // 0.01ms while leaving its delay intact, producing a one-frame jump instead of
+  // the authored timeline. The animation-capture pass
+  // (lib/animation-capture.ts) installs a virtual clock + transition recorder,
+  // then reads running CSS `@keyframes` / WAAPI / GSAP / anime.js animations and
+  // rewrites them as canonical `@keyframes pagxAnim<N>` + inline `animation`
+  // shorthands so the importer can replay the motion in PAGX.
+  { names: ['--capture-animations'], takesArg: false, set: (o) => {
+    o.captureAnimations = true;
+    o.reducedMotion = false;
+  } },
+  // Walk the page from top to bottom (then back to the top) before taking the
+  // snapshot. This fires scroll-triggered reveal animations (sections kept at
+  // `opacity: 0` until an IntersectionObserver flips them visible) and forces
+  // `loading="lazy"` media to load, so below-the-fold content is captured
+  // instead of dropped. Off by default — it adds a few seconds per page and is
+  // a no-op for pages whose content is already visible at scroll (0,0).
+  { names: ['--scroll-reveal'], takesArg: false, set: (o) => { o.scrollReveal = true; } },
   // Download every web font the page actually uses (each unicode-range
   // subset the browser fetched) and write it to disk as a plain SFNT
   // (TTF/OTF). Off by default. The files can then be handed to
-  // `pagx render --fallback` / `pagx font embed --fallback` so text styled
+  // `pagx render --fallback` / `pagx embed --fallback` so text styled
   // with an uninstalled web font renders with the correct typeface instead
   // of a system fallback. The destination defaults to a sibling
   // `<output>.fonts/` directory; override with `--font-dir`.
@@ -131,7 +154,7 @@ const FLAGS: FlagSpec[] = [
   // Write the list of font files this snapshot actually uses (one absolute
   // path per line) to <path>. With a shared --font-dir, the directory may hold
   // fonts from many pages; the manifest lets a caller (eval/run.js) hand only
-  // the fonts this page needs to `pagx render` / `pagx font embed`.
+  // the fonts this page needs to `pagx render` / `pagx embed`.
   { names: ['--font-manifest'], set: (o, v) => { o.fontManifest = v as string; } },
   // Pick the headless browser driver. Defaults to puppeteer; pass
   // `playwright` to drive Chromium through Playwright instead (requires
@@ -180,9 +203,19 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     // See lib/icon-font.ts for the pipeline; toggle via
     // `--no-inline-icon-fonts`.
     inlineIconFonts: true,
+    // Animation capture: off by default (static single frame). When enabled via
+    // `--capture-animations`, the page's motion is normalised into the subset as
+    // `@keyframes` + `animation` so the importer can replay it. See the FLAGS
+    // entry above and lib/animation-capture.ts.
+    captureAnimations: false,
+    // Scroll-reveal pre-pass: when true, the page is walked top-to-bottom
+    // (then scrolled back to the top) before the snapshot so scroll-triggered
+    // reveal animations fire and lazy media loads. Off by default; toggle via
+    // `--scroll-reveal`. See lib/snapshot-runner.ts's scrollThroughPage.
+    scrollReveal: false,
     // Web-font download: when true, every font file the browser fetched
     // while rendering is written to `fontDir` as a plain SFNT (TTF/OTF) so
-    // downstream `pagx render`/`pagx font embed` can use the real typeface
+    // downstream `pagx render`/`pagx embed` can use the real typeface
     // instead of a host system fallback. See lib/font-download.ts; toggle
     // via `--download-fonts`, redirect via `--font-dir`.
     downloadFonts: false,
@@ -330,11 +363,22 @@ Options:
                              self-contained and renders identically on any
                              machine, regardless of which icon fonts are
                              installed).
+  --capture-animations       Capture the page's animations (CSS @keyframes, Web
+                             Animations, GSAP, anime.js) into the subset as
+                             @keyframes + animation so the importer can replay
+                             the motion. Implies --no-reduced-motion. Default:
+                             disabled (a single static frame is emitted).
+  --scroll-reveal            Walk the page top-to-bottom (then back to the top)
+                             before snapshotting so scroll-triggered reveal
+                             animations fire and lazy-loaded media is fetched.
+                             Default: disabled. Use for pages that keep
+                             below-the-fold sections hidden (opacity:0) until
+                             scrolled into view.
   --download-fonts           Save every web font the page uses (each
                              unicode-range subset the browser fetched) to disk
                              as a plain SFNT (TTF/OTF). Default: disabled. Hand
                              the files to 'pagx render --fallback' or
-                             'pagx font embed --fallback' so text in an
+                             'pagx embed --fallback' so text in an
                              uninstalled web font renders with the right face.
   --font-dir <dir>           Destination for --download-fonts (default:
                              <output-without-ext>.fonts/). May be shared across
@@ -352,8 +396,8 @@ Options:
   --font-manifest <file>     Write the font files this page uses (one absolute
                              path per line) to <file>. Requires
                              --download-fonts. Lets callers pass only the fonts
-                             this page needs to 'pagx render' / 'pagx font
-                             embed' when --font-dir is shared.
+                             this page needs to 'pagx render' / 'pagx embed'
+                             when --font-dir is shared.
   --browser-engine <name>    Headless browser driver: one of
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);

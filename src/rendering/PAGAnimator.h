@@ -18,10 +18,13 @@
 
 #pragma once
 
+#include <thread>
 #include "pag/pag.h"
 #include "tgfx/core/Task.h"
 
 namespace pag {
+class AnimatorUpdateTask;
+
 /**
  * PAGAnimator provides a simple timing engine for running animations.
  */
@@ -63,15 +66,16 @@ class PAGAnimator {
     }
 
     /**
-     * Notifies another frame of the animation will occur. This will only be called from the UI
-     * thread. Note: onAnimationWillUpdate and onAnimationUpdate will always appear in pairs.
+     * Notifies another frame of the animation will occur. This may be called from an arbitrary
+     * thread when isSync is false. Note: onAnimationWillUpdate and onAnimationUpdate will always
+     * appear in pairs.
      */
     virtual void onAnimationWillUpdate(PAGAnimator*) {
     }
 
     /**
      * Notifies another frame of the animation has occurred. This may be called from an arbitrary
-     * thread if the animation is running asynchronously.
+     * thread when isSync is false.
      */
     virtual void onAnimationUpdate(PAGAnimator* animator) = 0;
 
@@ -146,8 +150,8 @@ class PAGAnimator {
 
   /**
    * Manually update the animation to the current progress without altering its playing status. If
-   * isSync is set to false, the calling thread won't be blocked. Please note that if the animation
-   * already has an ongoing asynchronous flushing task, this action won't have any effect.
+   * isSync is set to false, the calling thread won't be blocked. Updates requested while an
+   * asynchronous flush is running are merged into one additional flush using the latest progress.
    */
   void update();
 
@@ -156,6 +160,9 @@ class PAGAnimator {
   std::weak_ptr<PAGAnimator> weakThis;
   std::weak_ptr<Listener> weakListener;
   std::shared_ptr<tgfx::Task> task = nullptr;
+  std::thread::id asyncTaskThread = {};
+  bool asyncTaskRunning = false;
+  bool asyncUpdateRequested = false;
   int64_t _startTime = INT64_MIN;
   int64_t _duration = 0;
   int _repeatCount = 1;
@@ -163,21 +170,29 @@ class PAGAnimator {
   bool _isSync = false;
   bool _isRunning = false;
   bool isAnimating = false;
+  bool isEnding = false;
+  bool endingUpdatePending = false;
+  bool endingFlushSynchronously = false;
+  bool endingUpdateRequested = false;
+  bool startAfterEnd = false;
+  bool hasPendingProgress = false;
+  double pendingProgress = 0;
   bool isEnded = false;
   int playedCount = 0;
 
   explicit PAGAnimator(std::weak_ptr<Listener> listener);
   bool isTaskRunning() const;
   void extractAndWaitTask(std::unique_lock<std::mutex>& lock);
-  void flushAsync(bool setStartTime);
   void advance();
   std::vector<int> doAdvance();
   void doUpdate(bool setStartTime);
+  void onAsyncFlush(AnimatorUpdateTask* currentTask, bool setStartTime);
   void onFlush(bool setStartTime);
   void startAnimation();
   void cancelAnimation();
   void resetStartTime();
 
   friend class AnimationTicker;
+  friend class AnimatorUpdateTask;
 };
 }  // namespace pag

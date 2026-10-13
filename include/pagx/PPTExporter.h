@@ -147,12 +147,13 @@ class PPTExporter {
    *        because internal layout computation may cache intermediate results. Must not be empty
    *        or contain nullptr entries or unresolved imports.
    * @param options export options controlling text rendering and mask handling.
+   * @param errorMsg optional pointer to receive a human-readable error description on failure.
    * @return a Data object holding the complete PPTX (OOXML .zip) payload, or nullptr if the
    *         document list was invalid, layout reported an error, or the documents could not be
    *         serialized.
    */
   static std::shared_ptr<Data> ToData(const std::vector<PAGXDocument*>& documents,
-                                      const Options& options = {});
+                                      const Options& options = {}, std::string* errorMsg = nullptr);
 };
 
 }  // namespace pagx

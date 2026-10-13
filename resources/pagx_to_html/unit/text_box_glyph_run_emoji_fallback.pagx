@@ -1,0 +1,27 @@
+<pagx width="120" height="60">
+  <Resources>
+    <SolidColor id="black" color="#000000"/>
+    <SolidColor id="blue" color="#176DE6"/>
+    <Font id="font_text">
+      <Glyph path="M0 0L300 0L150 -700Z" advance="600"/>
+    </Font>
+    <Font id="font_emoji" unitsPerEm="160">
+      <Glyph image="emoji:1F517" offset="0,-160" advance="160"/>
+    </Font>
+  </Resources>
+  <Layer width="80" height="32" data-node-type="13">
+    <Group>
+      <Text text="A" fontFamily="PingFang SC" fontStyle="Medium" fontSize="20">
+        <GlyphRun font="@font_text" fontSize="20" glyphs="1" y="24" positions="0,0"/>
+      </Text>
+      <Fill color="@black"/>
+    </Group>
+    <Group>
+      <Text text="🔗" fontFamily="PingFang SC" fontStyle="Medium" fontSize="20">
+        <GlyphRun font="@font_emoji" fontSize="20" glyphs="1" y="24" positions="30,0"/>
+      </Text>
+      <Fill color="@blue"/>
+    </Group>
+    <TextBox lineHeight="32"/>
+  </Layer>
+</pagx>

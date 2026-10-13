@@ -135,6 +135,10 @@ HTMLSubsetTransformer::Builder& HTMLSubsetTransformer::Builder::addDefaultPasses
   // HTMLFlexInference (so newly-inferred flex containers are also covered), and before
   // InlineStyleEmitter (which reads the resolved map back out into the `style="…"` attribute).
   _impl->passes.push_back(std::make_unique<html::SpaceJustifyOverflowCollapsePass>());
+  // Rewrites `space-evenly` into the space-between + padding form that every PAGX consumer renders
+  // identically. Runs after SpaceJustifyOverflowCollapse so overflowing containers have already
+  // been pinned to `flex-start` and are skipped here.
+  _impl->passes.push_back(std::make_unique<html::SpaceEvenlyPaddingCompensationPass>());
   _impl->passes.push_back(std::make_unique<html::StructureNormalizationPass>());
   _impl->passes.push_back(std::make_unique<html::InlineStyleEmitterPass>());
   return *this;

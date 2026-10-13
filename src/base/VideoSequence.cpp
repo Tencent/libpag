@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/Verify.h"
+#include "codec/utils/H264SPSParser.h"
 #include "pag/file.h"
 
 namespace pag {
@@ -38,6 +39,25 @@ VideoSequence::~VideoSequence() {
 
 bool VideoSequence::verify() const {
   if (!Sequence::verify() || frames.empty()) {
+    VerifyFailed();
+    return false;
+  }
+  // alphaStartX and alphaStartY come straight from the file without any other check.
+  // getVideoWidth() and getVideoHeight() add them to width and height, and that size is used both to
+  // configure the decoder and to read the decoder's frame buffer, while the buffer is sized from the
+  // bitstream. A file that declares a larger video than the stream contains would make that read go
+  // out of bounds, so the declared size may not exceed the coded size in the sequence parameter set.
+  // The coded size is a little larger than the cropped size a decoder displays, so this bounds the
+  // height of the read but not the width of one row. The software decoder path additionally rejects
+  // a frame whose planes are narrower than the declared width, see
+  // SoftwareDecoderWrapper::onRenderFrame().
+  H264FrameSize frameSize = {};
+  if (headers.empty() || headers[0] == nullptr ||
+      !ParseH264SPSFrameSize(headers[0]->data(), headers[0]->length(), &frameSize)) {
+    VerifyFailed();
+    return false;
+  }
+  if (getVideoWidth() > frameSize.width || getVideoHeight() > frameSize.height) {
     VerifyFailed();
     return false;
   }

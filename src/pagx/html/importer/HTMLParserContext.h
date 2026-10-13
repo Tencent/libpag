@@ -28,6 +28,7 @@
 #include <vector>
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXDocument.h"
+#include "pagx/html/importer/HTMLAnimationBuilder.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLDetail.h"
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
@@ -104,6 +105,25 @@ class HTMLParserContext {
   // background geometry must already be present (added by `applyBackgroundVisuals`).
   bool applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer);
 
+  // Recovers a CSS `url(...)` background whose source is an SVG — an inline `data:image/svg+xml`
+  // URI (`svgContent` carries the decoded payload) or an external `.svg` reference
+  // (`svgContent` empty, `svgSource` the path) — as an inline-`<svg>` import directive instead of
+  // a raster `ImagePattern`. `<Image>` only carries the formats every renderer is required to
+  // decode (PNG/JPEG/WebP/GIF), so an SVG registered as an image would never paint anywhere;
+  // routing it through the directive keeps the icon as editable vector nodes after `pagx resolve`.
+  // `background-size` / `background-position` replay onto the directive host with the same CSS
+  // model as the raster path. A tiling `background-repeat` whose tile is smaller than the element
+  // box needs repeated copies that a single directive cannot express, and returns false so the
+  // caller falls back to the raster path. Returns true when the directive was emitted. The layer's
+  // background geometry must already be present (added by `applyBackgroundVisuals`).
+  bool applyVectorBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer,
+                                      const std::string& svgSource, const std::string& svgContent);
+
+  // Intrinsic size in CSS pixels of an SVG payload or local file, or {NaN, NaN} when the source
+  // does not parse or carries no resolvable size. `sourceIsFile` selects SVGImporter::Parse()
+  // instead of ParseString(); results are memoised by source kind and value.
+  std::pair<float, float> resolveSvgIntrinsicSize(const std::string& svgSource, bool sourceIsFile);
+
   // Folds the standard CSS rounded-image wrapper pattern (a container whose only role is
   // to round-clip a single <img> child via `border-radius` + `overflow: hidden`) into a
   // single Layer whose rounded Rectangle is filled directly by the image. PAGX's only
@@ -118,6 +138,20 @@ class HTMLParserContext {
   Layer* convertInlineSvg(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                           const HTMLInheritedStyle& inherited);
 
+  // Walks an inline `<svg>` subtree (before it is serialised into the layer's import directive) and
+  // records every shape descendant carrying an inline `style="animation:…"`. Each such shape is
+  // given a stable DOM `id` (minted when absent) so the SVG importer can derive its Fill / Stroke
+  // painter ids from it, and a `PendingSvgShapeAnimation` is queued targeting those derived ids.
+  // `stroke-dashoffset` scaling (real path length / author `pathLength`) is resolved here where the
+  // geometry `d` is available, mirroring the static dash scaling in the SVG importer.
+  void collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node);
+
+  // Reserves the element's `id` on the allocator, then records the element when it carries an
+  // `animation` declaration so the post-tree-build animation pass can emit a PAGX animation
+  // bound to this layer. All `<img>`, inline `<svg>`, and container conversion paths funnel
+  // their final outer Layer through this helper to ensure animation capture is exhaustive.
+  void assignElementId(Layer* layer, const std::shared_ptr<DOMNode>& element);
+
   // Rebuilds a PAGX mask layer from the element's CSS `mask-image` (alpha / luminance) or
   // `clip-path` (contour) — the latter from a `url(#id)` <clipPath> reference or a CSS basic
   // shape (`polygon()` / `path()` / `circle()` / `ellipse()` / `inset()`) synthesised into
@@ -129,6 +163,26 @@ class HTMLParserContext {
   // neither a mask nor a clip-path reference. `box` supplies the masked layer's resolved size used
   // to frame a contour clip-path SVG.
   void applyMaskOrClip(Layer* layer, const HTMLBoxAttributes& box);
+
+  // Rebuilds an alpha / luminance mask layer from a raster `mask-image: url(...)` (a PNG / JPEG /
+  // WebP referenced by file path, `http(s)` URL, or `data:image/<raster>` URI) and attaches it to
+  // `layer`. The image is loaded into an `ImagePattern` fill on a Rectangle sized to the image's
+  // native pixels, then `mask-size` / `mask-position` scale and offset it onto the masked box (via
+  // `applyMaskSizeAndPosition`), mirroring the SVG-mask path. Returns false when `url` is empty or
+  // the image cannot be loaded / decoded, so the caller can fall back to warning and dropping the
+  // mask. The complement of the SVG data-URI branch handled directly in `applyMaskOrClip`.
+  bool applyRasterImageMask(Layer* layer, const HTMLBoxAttributes& box, const std::string& url);
+
+  // Rebuilds an alpha / luminance mask layer from a `mask-image` that is a CSS gradient function
+  // (`linear-gradient(...)` / `radial-gradient(...)` / `conic-gradient(...)`, incl. `repeating-*`).
+  // The browser hands those over as the computed gradient itself rather than as a `url(...)`, so
+  // there is no payload to unpack: the gradient is resolved into the mask positioning area
+  // (`mask-size` / `mask-position` applied) and carried by a mask layer's own Fill, which is the
+  // form `HTMLWriter::writeMaskGeometry` emits back as an SVG gradient. `mask-repeat` is not
+  // modelled — PAGX gradients cannot tile, so an explicit `mask-size` smaller than the element
+  // paints one tile rather than repeating it. Returns false when the box is unsized or the value
+  // does not parse as a gradient, so the caller can fall back to its other mask sources.
+  bool applyGradientImageMask(Layer* layer, const HTMLBoxAttributes& box);
 
   // Replaces the rectangular `overflow: hidden` clip (`clipToBounds`) with a mask shaped like the
   // element's `border-radius` geometry, so descendants are clipped to the rounded outline rather
@@ -158,8 +212,18 @@ class HTMLParserContext {
   // while a bare length is the offset from the box's leading edge.
   float resolveMaskPositionAxis(const std::string& token, float boxAxis, float maskAxis);
 
-  // Image resource registration. Thin forwarder to `_imageResources->registerResource`.
+  // Image resource registration. Thin forwarder to `_imageResources->registerResource`, preceded
+  // by `warnIfUnsupportedImageSource`.
   Image* registerImageResource(const std::string& imageSource);
+
+  // Warns when a `data:` image source carries a format outside the `<Image>` supported set
+  // (PNG/JPEG/WebP/GIF), which the exported PAGX preserves verbatim and no renderer is required to
+  // decode. A `data:` source that declares no media type, or only a generic one, is named by the
+  // format sniffed from its magic bytes instead. Reporting it at import time — with the element
+  // context the diagnostics carry — is the earliest point the author can act on it; a renderer that
+  // cannot decode the payload simply paints nothing. Non-`data:` sources are left alone: a file
+  // path is read by the renderer.
+  void warnIfUnsupportedImageSource(const std::string& imageSource);
 
   // Decodes an `Image` node's native pixel size (from inline data, a `data:` URI, or a file
   // path). Returns {0, 0} when the bytes cannot be decoded. Used to recover the per-axis scale
@@ -173,6 +237,31 @@ class HTMLParserContext {
   // Serialises the given <svg> DOM node back into XML so that we can use it as a PAGX
   // import directive content.
   std::string serializeSvg(const std::shared_ptr<DOMNode>& svgNode);
+
+  // Post-tree cleanup: drops `BackgroundBlurStyle` (CSS `backdrop-filter: blur`) from any layer
+  // that sits under an ancestor (or is itself) whose opacity is animated below 1. PAGX renders an
+  // `opacity < 1` group into an isolated offscreen surface, so a descendant backdrop-filter samples
+  // that empty/self surface instead of the page behind and tints the box with its own colour.
+  // Chromium samples the real backdrop, so the blur is invisible when nothing sits behind the box;
+  // dropping it matches the baseline far better than the tint artifact. Runs after the animation
+  // pass so the fading layers are known. Static `opacity < 1` is handled separately by the
+  // box-shadow fallback path in the HTML writer.
+  void suppressBackdropBlurUnderOpacityFade();
+
+  // Post-tree animation coalescing: `HTMLAnimationBuilder` emits one `Animation` per animated
+  // element (each driving a single element's channels), so a page that animates many siblings
+  // (a staggered grid, a list of cards) produces a long run of separate `<Animation>` blocks.
+  // The runtime plays every top-level animation, so this is only a structural verbosity — but a
+  // single timeline is easier to read, edit, and drive. Merge animations that share the same
+  // `duration` / `frameRate` / `loop` into one `Animation` (their objects concatenated). Grouping
+  // by that triple keeps it general: animations with different lengths or loop behaviour (some
+  // `once`, some infinite) stay in separate `Animation` nodes so they are never forced onto a
+  // mismatched shared timeline. Runs after both animation build passes.
+  void coalesceAnimations();
+
+  // Wraps multiple independent top-level animations in one parallel StateMachine so hosts that
+  // drive only PAGScene::getDefaultTimeline() still play every imported HTML animation.
+  void buildAnimationStateMachine();
 
   // Diagnostics ------------------------------------------------------------------------
   // Short forwarders to `_diagnostics`; kept for the very common warn / hardError call
@@ -195,6 +284,32 @@ class HTMLParserContext {
   // Owns the CSS rule tables, the resolved-style cache, the inheritance walk, and the
   // box-attribute parser. Borrows `_diagnostics` and `_valueParser`.
   std::unique_ptr<HTMLStyleCascade> _styleCascade = nullptr;
+
+  // Maps the `@keyframes` + `animation` subset onto PAGX animations. Borrows `_diagnostics`,
+  // `_valueParser` and `_idAllocator`; document handle + keyframes registry bound in parseDOM.
+  std::unique_ptr<HTMLAnimationBuilder> _animationBuilder = nullptr;
+
+  // Elements carrying an `animation` declaration, paired with their finalised outer Layer.
+  // Recorded during `assignElementId` and processed after the whole tree is built (so background
+  // fills used by `color` channels already exist).
+  std::vector<std::pair<std::shared_ptr<DOMNode>, Layer*>> _pendingAnimations = {};
+
+  // Inline-SVG shape descendants (`<path>`, `<rect>`, …) that declare a CSS animation. The wrapping
+  // `<svg>` is serialised into a single import directive that is expanded (resolved) only after the
+  // layer tree is built, so these shapes have no PAGX painter node yet. `convertInlineSvg` assigns
+  // each such shape a stable DOM `id`; the SVG importer later derives its Fill / Stroke ids from it
+  // (`<id>__fill` / `<id>__stroke`). The animation is built after the tree exists, targeting those
+  // derived painter ids by string (the nodes materialise during resolve, before export).
+  struct PendingSvgShapeAnimation {
+    std::unordered_map<std::string, std::string> style = {};
+    std::string shapeTargetId = {};
+    // Optional Group created by the SVG resolver for fixed-origin rotation channels.
+    std::string rotationTargetId = {};
+    std::string fillTargetId = {};
+    std::string strokeTargetId = {};
+    float dashScale = 1.0f;
+  };
+  std::vector<PendingSvgShapeAnimation> _pendingSvgShapeAnimations = {};
 
   // Builds and mutates `Layer` instances from `HTMLBoxAttributes`. Borrows `_diagnostics`,
   // `_valueParser` and `_idAllocator`; document handle is bound after `PAGXDocument::Make`.
@@ -227,6 +342,14 @@ class HTMLParserContext {
   // probed against the font system at most once during traversal.
   std::unordered_map<std::string, bool> _fontAvailabilityCache = {};
 
+  // Memoises `resolveFontFaceNames` (family + '\n' + style -> the resolved pair) so each distinct
+  // authored pair pays for the platform font lookup at most once.
+  std::unordered_map<std::string, std::pair<std::string, std::string>> _fontFaceNameCache = {};
+
+  // Memoises `resolveSvgIntrinsicSize` so a payload or local file shared by many background layers
+  // is parsed once.
+  std::unordered_map<std::string, std::pair<float, float>> _svgIntrinsicSizeCache = {};
+
   float _canvasWidth = 0;
   float _canvasHeight = 0;
   // Records concrete family names from a font-family stack into the document-wide
@@ -248,6 +371,17 @@ class HTMLParserContext {
 
   // Static trampoline adapting the cascade's `FontAvailabilityThunk` to `isFontFamilyAvailable`.
   static bool IsFontFamilyAvailableThunk(void* userData, const std::string& family);
+
+  // Rewrites `family` / `style` in place to the names the platform resolves for the pair, so the
+  // exported PAGX carries names a host process can look up with an exact-matching font lookup
+  // (`pingfang SC` -> `PingFang SC`, an absent style -> the face the family actually ships).
+  // Families registered or embedded in the document's FontConfig keep their names verbatim,
+  // because `LayoutContext` resolves those through an exact key; a family the platform substitutes
+  // with a different one also keeps the authored name. Results are memoised in `_fontFaceNameCache`.
+  void resolveFontFaceNames(std::string& family, std::string& style);
+
+  // Static trampoline adapting the cascade's `FontFaceNameThunk` to `resolveFontFaceNames`.
+  static void ResolveFontFaceNamesThunk(void* userData, std::string& family, std::string& style);
 
   // Flushes `_fallbackFamilyNames` into `_document->fontConfig()` as deferred user
   // fallback fonts. Called once at the tail of `parseDOM` so every font-family stack

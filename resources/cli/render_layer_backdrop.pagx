@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Backdrop-dependent layer styles over a multicolor lower layer tree. -->
+<pagx width="320" height="180">
+  <Layer id="background-left">
+    <Rectangle position="80,90" size="160,180"/>
+    <Fill color="#E53935"/>
+  </Layer>
+  <Layer id="background-right">
+    <Rectangle position="240,90" size="160,180"/>
+    <Fill color="#1565C0"/>
+  </Layer>
+  <Layer id="background-band">
+    <Rectangle position="160,90" size="320,36"/>
+    <Fill color="#FDD835"/>
+  </Layer>
+  <Layer id="background-blur">
+    <Rectangle position="90,90" size="120,110" roundness="20"/>
+    <Fill color="#FFFFFF59"/>
+    <BackgroundBlurStyle blurX="12" blurY="12"/>
+  </Layer>
+  <Layer id="glass">
+    <Rectangle position="230,90" size="120,110" roundness="20"/>
+    <Fill color="#FFFFFF59"/>
+    <GlassStyle refraction="75" depth="25" frost="8" dispersion="45" splay="10"
+                lightAngle="35" lightIntensity="70"/>
+  </Layer>
+</pagx>

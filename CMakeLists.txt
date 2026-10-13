@@ -156,14 +156,19 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET})
     elseif (MACOS)
-        if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-        else ()
-            set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
-        endif ()
+        # Recent Apple toolchains reject the old 10.15 default: libc++ warns below 11.0
+        # (-Werror makes it fatal) and the SDK refuses below 12.0 with the Xcode generator.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
     elseif (IOS)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "9.0")
+        # libc++ and the SDK both reject a deployment target below 15.0.
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
     endif ()
+endif ()
+
+# iOS 15.0 is the lowest target both Xcode 26 (iOS 15-26) and Xcode 27 (iOS 15-27) accept. The
+# Ninja path never loads the toolchain, so this is the only thing guarding it there.
+if (IOS AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "15.0")
+    message(FATAL_ERROR "Building for iOS requires CMAKE_OSX_DEPLOYMENT_TARGET >= 15.0.")
 endif ()
 
 file(STRINGS "src/rendering/PAG.cpp" VERSION_FILE)
@@ -208,6 +213,7 @@ if (PAG_BUILD_PAGX)
     file(GLOB_RECURSE PAGX_RUNTIME_SOURCES CONFIGURE_DEPENDS src/pagx/runtime/*.cpp)
     list(APPEND PAGX_CORE_SOURCES ${PAGX_RUNTIME_SOURCES})
     file(GLOB_RECURSE PAGX_UTILS_SOURCES CONFIGURE_DEPENDS src/pagx/utils/*.*)
+    list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "src/pagx/utils/MemZip\\.cpp$")
     file(GLOB_RECURSE PAGX_XML_SOURCES CONFIGURE_DEPENDS src/pagx/xml/*.*)
     # SVGPathParser is part of pagx core (used by PAGXImporter/PAGXExporter for path data)
     list(APPEND PAGX_CORE_SOURCES src/pagx/svg/SVGPathParser.cpp)
@@ -223,6 +229,8 @@ if (PAG_BUILD_PAGX)
 
     if (PAG_BUILD_HTML)
         list(APPEND PAG_FILES
+            src/pagx/html/importer/HTMLAnimationBuilder.cpp
+            src/pagx/html/importer/HTMLAnimationBuilder.h
             src/pagx/html/importer/HTMLBoxAttributes.h
             src/pagx/html/importer/HTMLCssCascade.cpp
             src/pagx/html/importer/HTMLCssCascade.h
@@ -265,7 +273,10 @@ if (PAG_BUILD_PAGX)
     if (PAG_BUILD_PPT)
         file(GLOB_RECURSE PAGX_PPT_SOURCES CONFIGURE_DEPENDS src/pagx/ppt/*.*)
         list(APPEND PAG_FILES ${PAGX_PPT_SOURCES})
+    endif ()
+    if (PAG_BUILD_PPT OR PAG_BUILD_HTML)
         set(MINIZIP_DIR ${TGFX_DIR}/third_party/zlib/contrib/minizip)
+        list(APPEND PAG_FILES src/pagx/utils/MemZip.cpp)
         list(APPEND PAG_FILES ${MINIZIP_DIR}/zip.c ${MINIZIP_DIR}/ioapi.c)
         list(APPEND PAG_INCLUDES ${MINIZIP_DIR})
     endif ()
@@ -274,6 +285,9 @@ if (PAG_BUILD_PAGX)
     # it out of non-HTML builds)
     file(GLOB_RECURSE HTML_EXPORTER_SOURCES CONFIGURE_DEPENDS src/pagx/html/*.*)
     list(FILTER HTML_EXPORTER_SOURCES EXCLUDE REGEX "src/pagx/html/importer/")
+    if (NOT PAG_BUILD_PPT AND NOT PAG_BUILD_HTML)
+        list(FILTER HTML_EXPORTER_SOURCES EXCLUDE REGEX "src/pagx/html/HTMLZipWriter\\.cpp$")
+    endif ()
     list(APPEND PAG_FILES ${HTML_EXPORTER_SOURCES})
 
     # woff2 encoder + brotli (for embedded font → WOFF2 conversion in HTML/SVG exporters)
@@ -382,6 +396,7 @@ if (PAG_BUILD_PAGX)
     list(APPEND PAG_STATIC_VENDORS expat SheenBidi)
     list(APPEND PAG_INCLUDES third_party/SheenBidi/Headers
             third_party/expat/expat/lib)
+    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
     if (WIN32)
         list(APPEND PAG_DEFINES XML_STATIC)
     endif ()
@@ -397,7 +412,6 @@ endif ()
 
 if (PAG_BUILD_PPT)
     list(APPEND PAG_DEFINES PAG_BUILD_PPT)
-    list(APPEND PAG_INCLUDES ${TGFX_DIR}/third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_BUILD_CLI OR PAG_BUILD_TESTS)
@@ -459,6 +473,10 @@ elseif (IOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
@@ -498,6 +516,10 @@ elseif (MACOS)
 
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
+        # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
+        # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
+                PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
@@ -903,6 +925,21 @@ if (PAG_BUILD_CLI)
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             USES_TERMINAL
             COMMENT "Running HTML browser-fidelity eval over resources/html corpora")
+
+    # PPT visual-fidelity eval target. This is an end-to-end test rather than a
+    # gtest binary: PAGX files are rendered natively, exported to PPTX, opened
+    # by headless LibreOffice, rasterized, and compared against the native
+    # renders. Defaults to the seeded smoke corpus; PPT_EVAL_CORPORA overrides it.
+    # A matching renderer environment baseline is required. Build & run with:
+    #   cmake --build <build-dir> --target PPTTest
+    add_custom_target(PPTTest
+            COMMAND ${CMAKE_COMMAND} -E env PAGX_BIN=$<TARGET_FILE:pagx-cli>
+            PPT_EVAL_REQUIRE_BASELINE=1
+            bash ${CMAKE_CURRENT_SOURCE_DIR}/test/run_ppt_eval.sh
+            DEPENDS pagx-cli
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            USES_TERMINAL
+            COMMENT "Running PPT visual-fidelity eval over PAGX corpora")
 endif ()
 
 if (PAG_BUILD_TESTS)
@@ -924,7 +961,17 @@ if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
-    list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES})
+    # Build minizip's reader into test binaries only, so archive-producing tests
+    # validate the central directory, entry data, and CRCs by actually extracting.
+    list(APPEND PAG_TEST_FILES ${SRC_FILES} ${CLI_TEST_FILES} ${MINIZIP_DIR}/unzip.c)
+    # woff2 decoder + brotli dec, test-only: lets font-export tests decompress the generated
+    # WOFF2 data and validate the embedded CFF structure (the pag library only embeds the encoder).
+    if (PAG_BUILD_PAGX)
+        file(GLOB BROTLI_DEC_SOURCES ${BROTLI_DIR}/c/dec/*.c)
+        list(APPEND PAG_TEST_FILES ${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES})
+        set_source_files_properties(${WOFF2_DIR}/src/woff2_dec.cc ${BROTLI_DEC_SOURCES}
+                PROPERTIES COMPILE_OPTIONS "-w")
+    endif ()
     list(APPEND PAG_TEST_LIBS pag ${PAG_SHARED_LIBS})
     set(GOOGLE_TEST_DIR ${TGFX_DIR}/third_party/googletest/googletest)
     list(APPEND PAG_TEST_INCLUDES ${PAG_INCLUDES} test/src

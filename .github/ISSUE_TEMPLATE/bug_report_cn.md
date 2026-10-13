@@ -3,7 +3,7 @@ name: Bug 反馈
 about: 反馈一个 Bug 帮助 PAG 改进 (中文用户专用)
 title: ''
 labels: ''
-assignees: 'kevingpqi123'
+assignees: 'CodeJhF,leiyue123'
 
 ---
 

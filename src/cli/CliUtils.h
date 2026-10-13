@@ -34,68 +34,6 @@
 
 namespace pagx::cli {
 
-static inline bool FontFamilyMatch(const std::string& requested, const std::string& actual) {
-  if (requested.size() != actual.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < requested.size(); i++) {
-    if (std::tolower(static_cast<unsigned char>(requested[i])) !=
-        std::tolower(static_cast<unsigned char>(actual[i]))) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static inline bool FontStyleMatch(const std::string& requested, const std::string& actual) {
-  if (requested.empty()) {
-    return true;
-  }
-  if (requested.size() != actual.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < requested.size(); i++) {
-    if (std::tolower(static_cast<unsigned char>(requested[i])) !=
-        std::tolower(static_cast<unsigned char>(actual[i]))) {
-      return false;
-    }
-  }
-  return true;
-}
-
-/**
- * Resolves a system font by family and style with fallback. First attempts MakeFromName for an
- * exact match. If MakeFromName is unavailable (e.g. FreeType backend on macOS), falls back to
- * SystemFonts::FindFont to locate the font file path and loads via MakeFromPath.
- */
-static inline std::shared_ptr<tgfx::Typeface> ResolveSystemTypeface(const std::string& family,
-                                                                    const std::string& style) {
-  auto typeface = tgfx::Typeface::MakeFromName(family, style);
-  if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
-      FontStyleMatch(style, typeface->fontStyle())) {
-    return typeface;
-  }
-  if (!style.empty()) {
-    typeface = tgfx::Typeface::MakeFromName(family, "");
-    if (typeface != nullptr && FontFamilyMatch(family, typeface->fontFamily()) &&
-        FontStyleMatch(style, typeface->fontStyle())) {
-      return typeface;
-    }
-  }
-  // Fallback: locate the font file via platform APIs and load by path.
-  auto location = pagx::SystemFonts::FindFont(family, style);
-  if (!location.path.empty()) {
-    return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
-  }
-  if (!style.empty()) {
-    location = pagx::SystemFonts::FindFont(family, "");
-    if (!location.path.empty()) {
-      return tgfx::Typeface::MakeFromPath(location.path, location.ttcIndex);
-    }
-  }
-  return nullptr;
-}
-
 inline size_t FindLastPathSeparator(const std::string& path) {
   auto slash = path.rfind('/');
   auto backslash = path.rfind('\\');
@@ -128,7 +66,7 @@ inline std::shared_ptr<tgfx::Typeface> ResolveFallbackTypeface(const std::string
   auto commaPos = specifier.find(',');
   auto family = commaPos != std::string::npos ? specifier.substr(0, commaPos) : specifier;
   auto style = commaPos != std::string::npos ? specifier.substr(commaPos + 1) : std::string();
-  return ResolveSystemTypeface(family, style);
+  return SystemFonts::ResolveTypeface(family, style);
 }
 
 /**
@@ -168,6 +106,43 @@ inline std::string GetDirectory(const std::string& path) {
     return path.substr(0, slash + 1);
   }
   return "./";
+}
+
+/**
+ * True when `path` is already absolute (POSIX `/...`) or a Windows drive path
+ * (`C:/...` / `C:\...`), or carries an explicit scheme (`data:` / `http(s):`).
+ * Such paths must not be re-rooted against a base directory.
+ */
+inline bool IsAbsoluteOrSchemePath(const std::string& path) {
+  if (path.empty()) {
+    return false;
+  }
+  if (path[0] == '/' || path[0] == '\\') {
+    return true;  // POSIX absolute (or UNC).
+  }
+  if (path.size() >= 2 && path[1] == ':' &&
+      ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'))) {
+    return true;  // Windows drive-absolute, e.g. C:/dir.
+  }
+  // Explicit scheme such as data: or http(s):, which is self-contained.
+  if (path.rfind("data:", 0) == 0 || path.rfind("http://", 0) == 0 ||
+      path.rfind("https://", 0) == 0) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Joins a base directory (expected to end with a slash) and a referenced path.
+ * Absolute / scheme-qualified references are returned unchanged so they are not
+ * incorrectly re-rooted against the base directory (e.g. `./` + `/Users/x.svg`
+ * → `.//Users/x.svg`).
+ */
+inline std::string JoinPath(const std::string& baseDir, const std::string& path) {
+  if (IsAbsoluteOrSchemePath(path)) {
+    return path;
+  }
+  return baseDir + path;
 }
 
 /**
@@ -235,6 +210,18 @@ std::shared_ptr<PAGXDocument> LoadDocument(const std::string& filePath, const st
  */
 bool LoadFontConfig(FontConfig* fontConfig, const std::vector<std::string>& fontFiles,
                     const std::vector<std::string>& fallbacks, const std::string& command);
+
+/**
+ * Converts the document's text into pre-shaped glyph runs so that it renders without the original
+ * fonts. Registers the document's own <Font> resources plus the given fallback specifiers for
+ * shaping, runs layout, and writes the resulting glyph outlines back into the document.
+ *
+ * Prints messages to stderr using the given command name as prefix. Returns false when a font
+ * source cannot be loaded and the document still requires a font; a source that cannot be loaded
+ * while the document requires no font at all is reported and skipped, and the call continues.
+ */
+bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
+                const std::string& command);
 
 /**
  * Writes a string to a file. Prints errors to stderr using the given command name as prefix.

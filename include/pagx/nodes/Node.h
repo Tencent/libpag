@@ -147,6 +147,10 @@ enum class NodeType {
    * A noise layer style.
    */
   NoiseStyle,
+  /**
+   * A glass layer style that simulates light passing through a glass surface.
+   */
+  GlassStyle,
 
   // Layer Filters
   /**

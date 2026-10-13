@@ -37,12 +37,22 @@ class SequenceImageQueue {
   /**
    * Prepares the image of the specified frame.
    */
-  void prepare(Frame targetFrame);
+  void prepare(Frame targetFrame, std::shared_ptr<SequenceReadResult>* result = nullptr);
 
   /**
    * Returns the Image of the specified frame.
    */
-  std::shared_ptr<tgfx::Image> getImage(Frame targetFrame);
+  std::shared_ptr<tgfx::Image> getImage(Frame targetFrame,
+                                        std::shared_ptr<SequenceReadResult>* result = nullptr);
+
+  /**
+   * Returns the last cached Image without triggering any decoding. This is used while the sequence
+   * is in a retry cooldown, so the last decoded frame (which may be a fallback frame from a failed
+   * decode) can stay on screen instead of flashing a transparent frame.
+   */
+  std::shared_ptr<tgfx::Image> getCachedImage(Frame targetFrame);
+
+  void invalidateFailedRequest(uint64_t requestID, Frame targetFrame);
 
   /**
    * Reports the decoding performance data.
@@ -54,10 +64,14 @@ class SequenceImageQueue {
   std::shared_ptr<SequenceReader> reader = nullptr;
   Frame firstFrame = -1;
   Frame totalFrames = 0;
+  uint64_t nextRequestID = 0;
+  Frame lastRequestedFrame = -1;
   Frame currentFrame = -1;
   Frame preparedFrame = -1;
   std::shared_ptr<tgfx::Image> currentImage = nullptr;
   std::shared_ptr<tgfx::Image> preparedImage = nullptr;
+  std::shared_ptr<SequenceReadResult> currentResult = nullptr;
+  std::shared_ptr<SequenceReadResult> preparedResult = nullptr;
   bool useDiskCache = false;
 
   SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence, std::shared_ptr<SequenceReader> reader,

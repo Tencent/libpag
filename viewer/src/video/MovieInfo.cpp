@@ -79,12 +79,13 @@ std::shared_ptr<SequenceReader> MovieInfo::makeReader(std::shared_ptr<File>, PAG
   return std::make_shared<VideoReader>(std::move(demuxer));
 }
 
-std::shared_ptr<tgfx::Image> MovieInfo::makeStaticImage(std::shared_ptr<File> file, bool) {
+std::shared_ptr<tgfx::Image> MovieInfo::makeStaticImage(
+    std::shared_ptr<File> file, bool, std::shared_ptr<SequenceReadResult> result) {
   if (file == nullptr || !staticContent()) {
     return nullptr;
   }
-  auto generator = std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(),
-                                                             videoWidth, videoHeight, false);
+  auto generator = std::make_shared<StaticSequenceGenerator>(
+      std::move(file), weakThis.lock(), videoWidth, videoHeight, false, std::move(result));
   auto image = tgfx::Image::MakeFrom(std::move(generator));
   if (image != nullptr) {
     image = image->makeOriented(RotationToOrientation(rotation));
@@ -93,11 +94,13 @@ std::shared_ptr<tgfx::Image> MovieInfo::makeStaticImage(std::shared_ptr<File> fi
 }
 
 std::shared_ptr<tgfx::Image> MovieInfo::makeFrameImage(std::shared_ptr<SequenceReader> reader,
-                                                       Frame targetFrame, bool) {
+                                                       Frame targetFrame, bool,
+                                                       std::shared_ptr<SequenceReadResult> result) {
   if (reader == nullptr) {
     return nullptr;
   }
-  auto generator = std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame);
+  auto generator =
+      std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame, std::move(result));
   auto image = tgfx::Image::MakeFrom(std::move(generator));
   if (image != nullptr) {
     image = image->makeOriented(RotationToOrientation(rotation));

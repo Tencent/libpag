@@ -82,12 +82,13 @@ CLI_TEST(PAGXCSSFontStyleTest, ResolveName_WhitespaceAndCaseNormalised) {
   EXPECT_EQ(pagx::ResolveFontStyleName("  BOLD  ", "  ITALIC "), "Bold Italic");
 }
 
-// ResolveFontStyleSynthesis: splits the request into a real-face label plus a faux italic axis. The
-// weight axis is always a real-face keyword (never faux); only italic is synthesised.
+// ResolveFontStyleSynthesis: splits the request into a real-face label plus a faux italic axis.
+// Both the weight and slant axes are real-face keywords (never faux-bold); fauxItalic stays true
+// only as a synthesis fallback for when the styled italic face is unavailable at layout time.
 
-CLI_TEST(PAGXCSSFontStyleTest, Synthesis_BlackItalicKeepsRealWeightFauxItalic) {
+CLI_TEST(PAGXCSSFontStyleTest, Synthesis_BlackItalicKeepsRealFaceFauxItalic) {
   auto out = pagx::ResolveFontStyleSynthesis("900", "italic");
-  EXPECT_EQ(out.fontStyleName, "Black");
+  EXPECT_EQ(out.fontStyleName, "Black Italic");
   EXPECT_FALSE(out.fauxBold);
   EXPECT_TRUE(out.fauxItalic);
 }
@@ -99,16 +100,16 @@ CLI_TEST(PAGXCSSFontStyleTest, Synthesis_BoldKeepsRealWeight) {
   EXPECT_FALSE(out.fauxItalic);
 }
 
-CLI_TEST(PAGXCSSFontStyleTest, Synthesis_SemiBoldKeepsRealWeightFauxItalic) {
+CLI_TEST(PAGXCSSFontStyleTest, Synthesis_SemiBoldItalicKeepsRealFace) {
   auto out = pagx::ResolveFontStyleSynthesis("600", "italic");
-  EXPECT_EQ(out.fontStyleName, "SemiBold");
+  EXPECT_EQ(out.fontStyleName, "SemiBold Italic");
   EXPECT_FALSE(out.fauxBold);
   EXPECT_TRUE(out.fauxItalic);
 }
 
-CLI_TEST(PAGXCSSFontStyleTest, Synthesis_MediumKeepsRealFace) {
+CLI_TEST(PAGXCSSFontStyleTest, Synthesis_MediumItalicKeepsRealFace) {
   auto out = pagx::ResolveFontStyleSynthesis("500", "italic");
-  EXPECT_EQ(out.fontStyleName, "Medium");
+  EXPECT_EQ(out.fontStyleName, "Medium Italic");
   EXPECT_FALSE(out.fauxBold);
   EXPECT_TRUE(out.fauxItalic);
 }
@@ -122,7 +123,7 @@ CLI_TEST(PAGXCSSFontStyleTest, Synthesis_LightKeepsRealFaceNoFaux) {
 
 CLI_TEST(PAGXCSSFontStyleTest, Synthesis_RegularItalicOnly) {
   auto out = pagx::ResolveFontStyleSynthesis("400", "italic");
-  EXPECT_EQ(out.fontStyleName, "");
+  EXPECT_EQ(out.fontStyleName, "Italic");
   EXPECT_FALSE(out.fauxBold);
   EXPECT_TRUE(out.fauxItalic);
 }
