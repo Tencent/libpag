@@ -31,6 +31,7 @@
 
 class QQuickWindow;
 class QTimer;
+class QEvent;
 
 namespace pag {
 
@@ -108,7 +109,6 @@ class PAGXViewModel : public ContentViewModel {
    * before editorLoadFinished, so these queries are O(1) on the QML side.
    */
   Q_INVOKABLE qreal editorContentHeight() const;
-  Q_INVOKABLE int editorLineCount() const;
   Q_INVOKABLE qreal editorLineTopY(int line) const;
   Q_INVOKABLE int editorLineAtY(qreal y) const;
 
@@ -117,11 +117,21 @@ class PAGXViewModel : public ContentViewModel {
    * intersecting the current viewport. Works around the ItemObservesViewport defect where
    * rebuilding wipes every cached node but keeps the accumulated rendered-region extent, so
    * scrolling back into a previously covered band renders blank lines that only recover when
-   * something else dirties the nodes (e.g. a text selection drag). Invoked by the editor's
-   * debounced scroll hook; returns false when the internal slot is unavailable (a Qt upgrade
-   * removing it would only bring back the blank-band symptom, not a crash).
+   * something else dirties the nodes (e.g. a text selection drag). Invoked from the editor's
+   * scroll handler for horizontal and backward scrolls (forward vertical scrolling already
+   * rebuilds natively). Returns false when the internal slot is unavailable; the slot is probed
+   * once and the failure logged a single time, so a Qt upgrade removing it only brings back the
+   * blank-band symptom, not a per-frame warning flood.
    */
   Q_INVOKABLE bool refreshEditorRendering(QObject* textEditItem);
+
+  /**
+   * Installs a wheel-event axis lock on the given editor Flickable: when a scroll gesture
+   * clearly favors one axis, the orthogonal (noise) delta is zeroed before the Flickable sees
+   * it, so a vertical trackpad swipe cannot accumulate horizontal drift. Deliberate diagonal
+   * gestures (both axes comparable) are passed through untouched.
+   */
+  Q_INVOKABLE void lockWheelAxis(QObject* flickable);
 
   /**
    * Replaces the editor document's text. Large documents are appended in chunks driven by a
@@ -217,12 +227,6 @@ class PAGXViewModel : public ContentViewModel {
   // Emitted after the per-block height table was rebuilt and the geometry answers changed.
   Q_SIGNAL void editorGeometryChanged();
 
-  // Rebuilds the editor height table from the current block layout and notifies QML when the
-  // geometry answers change. All blocks are laid out by the load-time warmup, so each
-  // blockBoundingRect read hits the layout cache; blocks edited since (or freshly pasted ones)
-  // lay out on first read.
-  void rebuildEditorGeometry();
-
   /**
    * Called by PAGXView when the render thread completes a render.
    * This is used to defer documentXml updates until the first render is done.
@@ -231,14 +235,15 @@ class PAGXViewModel : public ContentViewModel {
 
  protected:
   void onViewTransformChanged() override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
  private:
   void clearContent();
   void clearDocumentXml();
   Q_SLOT void appendEditorChunk();
-  // Debounced rebuild driver after in-editor text edits; the chunked loader refreshes the
-  // table itself at load completion, so edits arriving while it is active are ignored.
   Q_SLOT void onEditorContentsChange();
+  void rebuildEditorGeometry();
+  int editorLineCount() const;
   void resolveDefaultAnimation(const std::shared_ptr<pagx::PAGXDocument>& document);
   void updateAnimationState();
 
@@ -283,6 +288,8 @@ class PAGXViewModel : public ContentViewModel {
   // top; the last element is the total content height. Empty when no document is attached.
   QVector<qreal> editorBlockTops = {};
   QTimer* editorGeometryTimer = nullptr;
+  // Guards eventFilter against re-entering on the axis-locked wheel event it redelivers itself.
+  bool forwardingLockedWheelEvent = false;
   // Chunked editor-loading state; loading lives here so it survives QML rebinding of the editor.
   QPointer<QTextDocument> loaderDocument = {};
   QString loaderText = {};

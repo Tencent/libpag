@@ -18,6 +18,7 @@
 
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QAbstractTextDocumentLayout>
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDebug>
 #include <QFile>
@@ -29,6 +30,7 @@
 #include <QTextCursor>
 #include <QTime>
 #include <QTimer>
+#include <QWheelEvent>
 #include <QXmlStreamReader>
 #include <algorithm>
 #include <cmath>
@@ -40,6 +42,15 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pag {
+
+// Delay before the editor height table is rebuilt after an edit, so a burst of keystrokes
+// triggers a single O(blocks) rebuild instead of one per character.
+constexpr int EDITOR_GEOMETRY_DEBOUNCE_MS = 300;
+
+// Axis lock for editor wheel scrolling: the minor-axis delta is treated as gesture noise and
+// zeroed only when the dominant axis is at least this many times larger, so deliberate diagonal
+// scrolling (comparable axes) still passes through.
+constexpr int WHEEL_AXIS_LOCK_RATIO = 2;
 
 static void EditorLog(const QString& message) {
   qDebug().noquote() << "[PAGXEditor]" << QTime::currentTime().toString("hh:mm:ss.zzz") << message;
@@ -413,9 +424,12 @@ static void RegisterDocumentFonts(pagx::PAGXDocument* document) {
 }
 
 bool PAGXViewModel::loadFile(const QString& filePath) {
-  auto strPath = std::string(filePath.toLocal8Bit());
+  // Keep paths UTF-8 end to end: XML resource paths are UTF-8, so basePath (derived here) and
+  // tgfx's ByteData::FromPath / Typeface::MakeFromPath must use the same encoding, otherwise a
+  // non-ASCII pagx directory or resource name produces a mixed-encoding path that fails to open.
+  auto strPath = std::string(filePath.toUtf8());
   if (filePath.startsWith("file://")) {
-    strPath = std::string(QUrl(filePath).toLocalFile().toLocal8Bit());
+    strPath = std::string(QUrl(filePath).toLocalFile().toUtf8());
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
@@ -698,7 +712,7 @@ void PAGXViewModel::onEditorContentsChange() {
   if (editorGeometryTimer == nullptr) {
     editorGeometryTimer = new QTimer(this);
     editorGeometryTimer->setSingleShot(true);
-    editorGeometryTimer->setInterval(300);
+    editorGeometryTimer->setInterval(EDITOR_GEOMETRY_DEBOUNCE_MS);
     connect(editorGeometryTimer, &QTimer::timeout, this, &PAGXViewModel::rebuildEditorGeometry);
   }
   editorGeometryTimer->start();
@@ -711,14 +725,9 @@ void PAGXViewModel::rebuildEditorGeometry() {
   QVector<qreal> tops = {};
   if (editorDocument != nullptr) {
     auto* layout = editorDocument->documentLayout();
-    const auto count = editorDocument->blockCount();
-    tops.reserve(count + 1);
+    tops.reserve(editorDocument->blockCount() + 1);
     qreal y = 0;
-    for (auto i = 0; i < count; ++i) {
-      const auto block = editorDocument->findBlockByNumber(i);
-      if (!block.isValid()) {
-        break;
-      }
+    for (auto block = editorDocument->begin(); block.isValid(); block = block.next()) {
       tops.append(y);
       y += layout->blockBoundingRect(block).height();
     }
@@ -768,10 +777,63 @@ bool PAGXViewModel::refreshEditorRendering(QObject* textEditItem) {
   if (item == nullptr) {
     return false;
   }
-  // QQuickTextEdit::updateWholeDocument() is a private slot, so it is reachable through the
-  // meta object by name but not through public Qt API. All cached text nodes are marked dirty
-  // and only the nodes intersecting the current viewport are rebuilt.
+  // QQuickTextEdit::updateWholeDocument() is a private slot reachable through the meta object by
+  // name but not through public Qt API; it marks all cached text nodes dirty and rebuilds only
+  // the ones intersecting the viewport. Probe the slot once and remember the result: a Qt upgrade
+  // that removes it would otherwise make invokeMethod log "No such method" on every scroll frame.
+  static int methodProbe = -1;  // -1 unprobed, 0 missing, 1 present
+  if (methodProbe < 0) {
+    methodProbe = item->metaObject()->indexOfMethod("updateWholeDocument()") >= 0 ? 1 : 0;
+    if (methodProbe == 0) {
+      EditorLog("updateWholeDocument is unavailable; editor blank-band recovery is disabled");
+    }
+  }
+  if (methodProbe == 0) {
+    return false;
+  }
   return QMetaObject::invokeMethod(item, "updateWholeDocument");
+}
+
+void PAGXViewModel::lockWheelAxis(QObject* flickable) {
+  if (flickable != nullptr) {
+    flickable->installEventFilter(this);
+  }
+}
+
+bool PAGXViewModel::eventFilter(QObject* watched, QEvent* event) {
+  if (event->type() != QEvent::Wheel || forwardingLockedWheelEvent) {
+    return ContentViewModel::eventFilter(watched, event);
+  }
+  auto* wheel = static_cast<QWheelEvent*>(event);
+  auto pixelDelta = wheel->pixelDelta();
+  auto angleDelta = wheel->angleDelta();
+  // Pick the dominant axis from whichever delta the device fills (trackpads use pixelDelta, mouse
+  // wheels use angleDelta). Only lock when the gesture is near-axis-aligned, so a deliberate
+  // diagonal scroll (comparable axes) keeps both components.
+  const QPoint reference = !pixelDelta.isNull() ? pixelDelta : angleDelta;
+  if (reference.x() == 0 || reference.y() == 0) {
+    return ContentViewModel::eventFilter(watched, event);
+  }
+  const bool verticalDominant = qAbs(reference.y()) >= qAbs(reference.x());
+  const int major = verticalDominant ? qAbs(reference.y()) : qAbs(reference.x());
+  const int minor = verticalDominant ? qAbs(reference.x()) : qAbs(reference.y());
+  if (minor * WHEEL_AXIS_LOCK_RATIO > major) {
+    return ContentViewModel::eventFilter(watched, event);
+  }
+  if (verticalDominant) {
+    pixelDelta.setX(0);
+    angleDelta.setX(0);
+  } else {
+    pixelDelta.setY(0);
+    angleDelta.setY(0);
+  }
+  QWheelEvent locked(wheel->position(), wheel->globalPosition(), pixelDelta, angleDelta,
+                     wheel->buttons(), wheel->modifiers(), wheel->phase(), wheel->isInverted(),
+                     wheel->source());
+  forwardingLockedWheelEvent = true;
+  QCoreApplication::sendEvent(watched, &locked);
+  forwardingLockedWheelEvent = false;
+  return true;
 }
 
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
