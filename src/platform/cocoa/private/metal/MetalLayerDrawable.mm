@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(TGFX_USE_METAL)
-
 #import "platform/cocoa/private/metal/MetalLayerDrawable.h"
 
 #include <cmath>
@@ -88,5 +86,3 @@ void MetalLayerDrawable::present(tgfx::Context*) {
 }
 
 }  // namespace pag
-
-#endif  // TGFX_USE_METAL

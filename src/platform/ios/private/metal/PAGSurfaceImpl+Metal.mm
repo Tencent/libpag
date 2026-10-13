@@ -18,8 +18,6 @@
 
 #import "platform/ios/private/metal/PAGSurfaceImpl+Metal.h"
 
-#if defined(TGFX_USE_METAL)
-
 #import <Metal/Metal.h>
 #include "platform/cocoa/private/PixelBufferUtil.h"
 #import "platform/cocoa/private/metal/MetalLayerDrawable.h"
@@ -55,5 +53,3 @@
 }
 
 @end
-
-#endif  // TGFX_USE_METAL

@@ -18,8 +18,6 @@
 
 #pragma once
 
-#if defined(TGFX_USE_METAL)
-
 #import <QuartzCore/QuartzCore.h>
 #include "rendering/drawables/Drawable.h"
 #include "tgfx/gpu/metal/MetalWindow.h"
@@ -64,5 +62,3 @@ class MetalLayerDrawable : public Drawable {
 };
 
 }  // namespace pag
-
-#endif  // TGFX_USE_METAL

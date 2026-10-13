@@ -18,8 +18,6 @@
 
 #import "platform/mac/private/opengl/PAGSurfaceImpl+OpenGL.h"
 
-#if defined(TGFX_USE_OPENGL)
-
 #import "platform/mac/private/PAGSurfaceImpl+Internal.h"
 #import "platform/mac/private/opengl/CGLDrawable.h"
 
@@ -35,5 +33,3 @@
 }
 
 @end
-
-#endif  // TGFX_USE_OPENGL

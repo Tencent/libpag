@@ -18,8 +18,6 @@
 
 #import "platform/mac/private/metal/PAGSurfaceImpl+Metal.h"
 
-#if defined(TGFX_USE_METAL)
-
 #import "platform/cocoa/private/metal/MetalLayerDrawable.h"
 #import "platform/mac/private/PAGSurfaceImpl+Internal.h"
 
@@ -35,5 +33,3 @@
 }
 
 @end
-
-#endif  // TGFX_USE_METAL

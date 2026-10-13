@@ -20,8 +20,6 @@
 
 #import "platform/mac/private/PAGSurfaceImpl.h"
 
-#if defined(TGFX_USE_METAL)
-
 #import <QuartzCore/QuartzCore.h>
 
 @interface PAGSurfaceImpl (Metal)
@@ -29,5 +27,3 @@
 + (PAGSurfaceImpl*)FromLayer:(CAMetalLayer*)layer;
 
 @end
-
-#endif  // TGFX_USE_METAL

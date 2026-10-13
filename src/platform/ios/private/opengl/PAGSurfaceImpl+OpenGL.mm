@@ -18,8 +18,6 @@
 
 #import "platform/ios/private/opengl/PAGSurfaceImpl+OpenGL.h"
 
-#if defined(TGFX_USE_OPENGL)
-
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
 #import "platform/ios/private/PAGSurfaceImpl+Internal.h"
@@ -59,5 +57,3 @@
 }
 
 @end
-
-#endif  // TGFX_USE_OPENGL

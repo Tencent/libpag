@@ -20,8 +20,6 @@
 
 #import "platform/mac/private/PAGSurfaceImpl.h"
 
-#if defined(TGFX_USE_OPENGL)
-
 #import <AppKit/AppKit.h>
 
 @interface PAGSurfaceImpl (OpenGL)
@@ -29,5 +27,3 @@
 + (PAGSurfaceImpl*)FromView:(NSView*)view;
 
 @end
-
-#endif  // TGFX_USE_OPENGL

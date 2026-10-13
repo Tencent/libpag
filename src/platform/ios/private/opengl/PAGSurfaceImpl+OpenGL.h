@@ -20,8 +20,6 @@
 
 #import "platform/ios/private/PAGSurfaceImpl.h"
 
-#if defined(TGFX_USE_OPENGL)
-
 #import <OpenGLES/EAGL.h>
 #import <QuartzCore/QuartzCore.h>
 
@@ -33,5 +31,3 @@
                              context:(EAGLContext*)eaglContext;
 
 @end
-
-#endif  // TGFX_USE_OPENGL

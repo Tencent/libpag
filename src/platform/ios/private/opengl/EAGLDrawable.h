@@ -18,8 +18,6 @@
 
 #pragma once
 
-#if defined(TGFX_USE_OPENGL)
-
 // The CAEAGLLayer declarations below are deprecated since iOS 12 but remain part of the published
 // GL-backend API surface. Silence the deprecation warnings locally: this header is included from
 // platform files compiled without libpag's GLES_SILENCE_DEPRECATION build define, and defining
@@ -68,5 +66,3 @@ class EAGLDrawable : public Drawable {
 }  // namespace pag
 
 #pragma clang diagnostic pop
-
-#endif  // TGFX_USE_OPENGL

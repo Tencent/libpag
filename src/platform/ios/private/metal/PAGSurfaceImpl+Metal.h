@@ -20,8 +20,6 @@
 
 #import "platform/ios/private/PAGSurfaceImpl.h"
 
-#if defined(TGFX_USE_METAL)
-
 #import <QuartzCore/QuartzCore.h>
 
 @protocol MTLDevice;
@@ -33,5 +31,3 @@
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer mtlDevice:(id<MTLDevice>)device;
 
 @end
-
-#endif  // TGFX_USE_METAL

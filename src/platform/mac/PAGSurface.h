@@ -67,18 +67,20 @@ PAG_API @interface PAGSurface : NSObject
 - (void)freeCache;
 
 /**
- * Returns the internal CVPixelBuffer object associated with this PAGSurface. Returns nil if this
- * PAGSurface is created by a layer-backed surface ([PAGSurface+OpenGL FromView:] or
- * [PAGSurface+Metal FromLayer:]), or if the surface was created by [PAGSurface MakeOffscreen].
+ * Returns the internal CVPixelBuffer object associated with this PAGSurface. Returns nil if the
+ * PAGSurface is created from a view or a layer — [PAGSurface FromView:] on the OpenGL backend
+ * or [PAGSurface FromLayer:] with a CAMetalLayer on the Metal backend.
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
- * the PAGSurface will not be captured. On Metal-layer surfaces ([PAGSurface+Metal FromLayer:]) the
- * CAMetalLayer is presented with framebufferOnly by default and the drawable is released right
- * after present, so a snapshot taken after the last present may read back a blank or stale frame
- * — capture right after a flush, before other frames get presented.
+ * the PAGSurface will not be captured.
+ * Limitation: on a PAGSurface created from a CAMetalLayer this method is unreliable — the
+ * underlying tgfx window presents and releases its CAMetalDrawable as part of every flush, so a
+ * later readback receives whichever drawable comes off the layer's rotation queue (often blank or
+ * stale). Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if you need reliable
+ * readback with Metal. The OpenGL backend is not affected.
  */
 - (CVPixelBufferRef)makeSnapshot;
 @end
