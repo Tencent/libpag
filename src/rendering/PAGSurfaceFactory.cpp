@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <thread>
+#include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "rendering/drawables/HardwareBufferDrawable.h"
@@ -35,6 +36,14 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
+  if (!Devices::SupportsBackend(ToTGFX(renderTarget).backend())) {
+    // Reject backend-mismatched descriptions up front instead of returning a surface that
+    // silently fails to draw later (the GPU context can never sample the foreign texture).
+    LOGE(
+        "The current libpag build does not support creating a PAGSurface from a render target "
+        "of a different backend.");
+    return nullptr;
+  }
   auto adopted = Devices::AdoptCurrent();
   auto device = std::move(adopted.device);
   bool externalContext = adopted.externalContext;
@@ -55,6 +64,14 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& rend
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                                  bool forAsyncThread) {
+  if (!Devices::SupportsBackend(ToTGFX(texture).backend())) {
+    // Reject backend-mismatched descriptions up front instead of returning a surface that
+    // silently fails to draw later (the GPU context can never sample the foreign texture).
+    LOGE(
+        "The current libpag build does not support creating a PAGSurface from a texture of a "
+        "different backend.");
+    return nullptr;
+  }
   std::shared_ptr<tgfx::Device> device = nullptr;
   bool externalContext = false;
   if (forAsyncThread) {

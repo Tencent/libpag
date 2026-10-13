@@ -52,6 +52,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
   return tgfx::MetalDevice::Make();
 }
 
+bool Devices::SupportsBackend(tgfx::Backend backend) {
+  return backend == tgfx::Backend::Metal;
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   // Metal has no "current context" concept. Command encoders are thread-safe by design, so an
   // async worker can just use a fresh default device. Any resource sharing with the caller must

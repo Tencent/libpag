@@ -118,6 +118,14 @@ class Devices {
   };
 
   /**
+   * Returns true if the given backend tag matches the backend this libpag build was compiled
+   * with. Resource factories use this to reject backend-mismatched descriptions up front (e.g. a
+   * GL BackendTexture handed to a Metal build) instead of returning objects that silently fail
+   * to render at draw time.
+   */
+  static bool SupportsBackend(tgfx::Backend backend);
+
+  /**
    * Adopts the host thread's "current" GPU context as a rendering device. Only meaningful on the
    * OpenGL backend, where {GLDevice::Current(), externalContext=true} is returned so the caller
    * keeps ownership of the GL context and libpag guards its global state. Other backends return

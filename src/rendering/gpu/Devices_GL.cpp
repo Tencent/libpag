@@ -47,6 +47,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeDefault() {
   return tgfx::GLDevice::MakeWithFallback();
 }
 
+bool Devices::SupportsBackend(tgfx::Backend backend) {
+  return backend == tgfx::Backend::OpenGL;
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
   if (sharedContext == nullptr) {

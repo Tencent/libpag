@@ -18,6 +18,7 @@
 
 #include "Picture.h"
 #include <unordered_set>
+#include "base/utils/Log.h"
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/gpu/Devices.h"
@@ -332,6 +333,15 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<ImageProx
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
                                            tgfx::ImageOrigin origin) {
   if (!texture.isValid()) {
+    return nullptr;
+  }
+  if (!Devices::SupportsBackend(texture.backend())) {
+    // Reject backend-mismatched descriptions up front: without this check the image is created
+    // but the GPU context can never sample the foreign texture, so it draws as a silent blank
+    // forever (PAGImage::FromTexture and the C API share this entry).
+    LOGE(
+        "The current libpag build does not support creating an image from a texture of a "
+        "different backend.");
     return nullptr;
   }
   // Capture the identity of the device that owns this external texture so BackendTextureProxy can
