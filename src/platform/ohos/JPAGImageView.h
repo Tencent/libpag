@@ -120,6 +120,7 @@ class JPAGImageView : public PAGAnimator::Listener, public XComponentListener {
   float _frameRate = 30.0f;
   int _scaleMode = PAGScaleMode::LetterBox;
   tgfx::Matrix _matrix = tgfx::Matrix::I();
+  bool _matrixDrivenByScaleMode = true;
   bool _cacheAllFramesInMemory = false;
   std::shared_ptr<PAGComposition> _composition = nullptr;
   std::shared_ptr<PAGAnimator> _animator = nullptr;

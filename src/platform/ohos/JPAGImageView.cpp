@@ -690,6 +690,7 @@ void JPAGImageView::setComposition(std::shared_ptr<PAGComposition> composition, 
 void JPAGImageView::setScaleMode(int scaleMode) {
   std::lock_guard lock_guard(locker);
   _scaleMode = scaleMode;
+  _matrixDrivenByScaleMode = true;
   refreshMatrixFromScaleMode();
 }
 
@@ -701,6 +702,7 @@ void JPAGImageView::setMatrix(const class Matrix& matrix) {
   std::lock_guard lock_guard(locker);
   _matrix = ToTGFX(matrix);
   _scaleMode = PAGScaleMode::None;
+  _matrixDrivenByScaleMode = false;
 }
 
 class Matrix JPAGImageView::matrix() {
@@ -749,7 +751,19 @@ bool JPAGImageView::flush() {
 }
 
 void JPAGImageView::refreshMatrixFromScaleMode() {
-  if (_decoder == nullptr) {
+  if (_scaleMode == PAGScaleMode::None && !_matrixDrivenByScaleMode) {
+    return;
+  }
+  if (_decoder == nullptr || _composition == nullptr) {
+    return;
+  }
+  if (_scaleMode == PAGScaleMode::None) {
+    // The decoder pre-scales frames to roughly the view size, so undo that scaling to display
+    // the composition at its original size, matching the PAGView None semantics.
+    _matrix = tgfx::Matrix::MakeScale(static_cast<float>(_composition->width()) * _renderScale /
+                                          static_cast<float>(_decoder->width()),
+                                      static_cast<float>(_composition->height()) * _renderScale /
+                                          static_cast<float>(_decoder->height()));
     return;
   }
   _matrix = ToTGFX(ApplyScaleMode(_scaleMode, _decoder->width() / _renderScale,
