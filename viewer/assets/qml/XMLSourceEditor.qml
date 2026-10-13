@@ -84,10 +84,15 @@ Rectangle {
     readonly property real layoutWidth: width > 0 ? width : (cachedWidth > 0 ? cachedWidth : 1)
     readonly property real layoutHeight: height > 0 ? height : (cachedHeight > 0 ? cachedHeight : 1)
 
-    // Single-line height in pixels; falls back to the Menlo 13px metric until the first
-    // cursor rectangle is available. Constant for the fixed-pitch NoWrap editor.
-    readonly property real lineHeight: textArea.cursorRectangle.height > 0
-                                           ? textArea.cursorRectangle.height : 17
+    // Single-line height in pixels, measured from the editor font metrics (not the caret
+    // rectangle, whose height follows the caret's line and would shrink visibleLineCount when
+    // the caret sits on a taller CJK line). Constant for the fixed-pitch NoWrap editor.
+    readonly property real lineHeight: editorFontMetrics.height > 0 ? editorFontMetrics.height : 17
+
+    FontMetrics {
+        id: editorFontMetrics
+        font: textArea.font
+    }
 
     // Cached line count. QQuickTextEdit::lineCount walks every document block on each read
     // (O(blockCount)), so it must never be referenced from per-line bindings: with the line
@@ -307,6 +312,11 @@ Rectangle {
         }
         connectedViewModel = viewModel;
         viewModel.attachHighlighter(textArea.textDocument);
+        // Install the wheel axis lock on the editor Flickable so a vertical trackpad swipe
+        // cannot accumulate horizontal drift (the C++ filter zeroes the noise axis at source).
+        if (typeof viewModel.lockWheelAxis === "function") {
+            viewModel.lockWheelAxis(flick);
+        }
         if (viewModel.documentXml !== "") {
             requestDocumentLoad();
         }
@@ -347,20 +357,25 @@ Rectangle {
             // The first line at the top of the viewport, mapped through the real per-block
             // height table: with fallback fonts some lines are taller, so the uniform
             // line-height estimate desyncs the numbers from the text while scrolling. Falls
-            // back to the estimate when the view model has no geometry helpers.
+            // back to the estimate when the view model has no geometry helpers. The leading
+            // `root.geometryRevision;` reference makes the binding re-evaluate when the C++
+            // block-height table changes without contentY moving (in-viewport edits), which QML
+            // cannot track through the editorLineAtY/editorLineTopY calls on its own.
             readonly property int firstLine: {
-                // Reference geometryRevision so this re-evaluates when the C++ block-height
-                // table changes without contentY moving (in-viewport edits); editorLineAtY
-                // reads that table, which QML cannot track on its own.
                 root.geometryRevision;
                 return root.hasEditorGeometry
                     ? Math.max(0, viewModel.editorLineAtY(flick.contentY) - 1)
                     : Math.max(0, Math.floor(flick.contentY / root.lineHeight) - 1);
             }
-            // cursorRectangle is in content coordinates, so it identifies the caret line.
-            readonly property int caretLine: root.hasEditorGeometry
-                ? viewModel.editorLineAtY(textArea.cursorRectangle.y)
-                : Math.round(textArea.cursorRectangle.y / root.lineHeight)
+            // cursorRectangle is in content coordinates, so it identifies the caret line; the
+            // geometryRevision reference keeps the active-line highlight correct after an edit
+            // above the caret reshapes the table (see firstLine).
+            readonly property int caretLine: {
+                root.geometryRevision;
+                return root.hasEditorGeometry
+                    ? viewModel.editorLineAtY(textArea.cursorRectangle.y)
+                    : Math.round(textArea.cursorRectangle.y / root.lineHeight);
+            }
 
             Repeater {
                 model: gutter.visibleLineCount
@@ -369,12 +384,10 @@ Rectangle {
                     x: 0
                     width: gutter.width - 10
                     height: root.lineHeight
-                    // Anchored to the line's real top from the height table, so numbers stay
-                    // aligned with the text even when line heights vary (CJK fallback fonts).
+                    // Anchored to the line's real top from the height table (see firstLine for
+                    // the geometryRevision dependency), so numbers stay aligned with the text
+                    // even when line heights vary under CJK fallback fonts.
                     y: {
-                        // Reference geometryRevision so this re-evaluates when the C++ block-
-                        // height table changes without contentY moving (in-viewport edits);
-                        // editorLineTopY reads that table, which QML cannot track on its own.
                         root.geometryRevision;
                         return (root.hasEditorGeometry
                             ? viewModel.editorLineTopY(gutter.firstLine + index)
@@ -413,30 +426,19 @@ Rectangle {
             // Scroll recovery: QQuickTextEdit's ItemObservesViewport optimization wipes every
             // cached text node on a viewport-triggered rebuild while keeping the accumulated
             // rendered-region extent, and the rebuild trigger only checks the vertical extents.
-            // Vertical scrolling into fresh territory gets a per-frame native rebuild, but
-            // horizontal scrolling and back-scrolling into covered bands have no native path,
-            // so wiped nodes stay blank until something else rebuilds them. Refresh on every
-            // scroll frame instead: the call is idempotent with the native per-frame rebuild
-            // (same-frame dirty marks collapse into one updatePaintNode pass) and only rebuilds
-            // the visible band, matching the cost of what vertical scrolling already pays.
-            onContentYChanged: refreshEditorNodes()
-            onContentXChanged: refreshEditorNodes()
-
-            // A vertical trackpad flick carries a small horizontal velocity from gesture noise,
-            // and Flickable's momentum amplifies it: successive vertical flicks accumulate a
-            // large contentX offset, which slices long lines and blanks the short indented ones
-            // until the user scrolls all the way back left. Browsers do not amplify gesture
-            // noise, so the web playground never drifts this way. Restart noise-level
-            // horizontal flicks with the horizontal momentum dropped; deliberate horizontal
-            // swipes are far faster and keep their momentum. The restarted flick reports
-            // horizontalVelocity 0, which also stops this handler from retriggering on it.
-            onFlickStarted: {
-                if (horizontalVelocity !== 0 && Math.abs(horizontalVelocity) < 150) {
-                    const vertical = verticalVelocity;
-                    cancelFlick();
-                    flick(0, vertical);
+            // Forward vertical scrolling into fresh territory gets a native per-frame rebuild,
+            // but horizontal scrolling and back-scrolling (contentY decreasing) into already
+            // covered bands have no native path, so only those need a manual refresh. Plain
+            // forward vertical scrolling is left to the native rebuild to avoid a redundant
+            // full-document dirty pass every frame.
+            property real lastRefreshedContentY: 0
+            onContentYChanged: {
+                if (flick.contentY < flick.lastRefreshedContentY) {
+                    refreshEditorNodes();
                 }
+                flick.lastRefreshedContentY = flick.contentY;
             }
+            onContentXChanged: refreshEditorNodes()
 
             // NOTE: the TextArea is a plain child of the Flickable's contentItem, NOT attached
             // via "TextArea.flickable". The attached property pipes the document's ideal width
