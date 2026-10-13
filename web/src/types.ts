@@ -20,8 +20,8 @@ import {VideoReader, VideoReaderManager} from "./interfaces";
 import type { ScalerContextConstructor, VideoDecoderConstructor } from './interfaces';
 
 import type { ArrayBufferImage } from '@tgfx/wechat/array-buffer-image';
-import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, ctor, Point, Vector, Rect, } from '@tgfx/types';
-export type { EmscriptenGL, ctor, Point, Vector, Rect };
+import type { TGFXPathFillType, TGFXLineCap, TGFXLineJoin, EmscriptenGL, EmscriptenWebGPU, ctor, Point, Vector, Rect, } from '@tgfx/types';
+export type { EmscriptenGL, EmscriptenWebGPU, ctor, Point, Vector, Rect };
 
 declare global {
   interface Window {
@@ -88,6 +88,8 @@ export interface PAG extends EmscriptenModule {
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   GL: EmscriptenGL;
+  // Required by tgfx's TGFX interface: the PAG module is passed to TGFXBind(module: TGFX).
+  WebGPU: EmscriptenWebGPU;
   TGFXPathFillType: TGFXPathFillType;
   TGFXLineCap: TGFXLineCap;
   TGFXLineJoin: TGFXLineJoin;
