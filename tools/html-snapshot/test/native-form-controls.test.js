@@ -12,7 +12,7 @@
 const {
   nativeControlKind, maskPasswordText,
   svgCheckbox, svgRadio, svgRange, svgProgress, svgMeter, svgColorSwatch,
-  formatDateControlValue,
+  formatDateControlValue, selectArrowMarkup,
 } = require('../dist/lib/browser-snapshot');
 
 function computed(overrides = {}) {
@@ -137,5 +137,34 @@ describe('formatDateControlValue', () => {
   test('passes through empty and unparseable values', () => {
     expect(formatDateControlValue('', 'date')).toBe('');
     expect(formatDateControlValue('nonsense', 'date')).toBe('nonsense');
+  });
+});
+
+describe('selectArrowMarkup', () => {
+  // The sample form's control: 469.5x36 box, `padding: 0 12px`, 1px border.
+  const controlComputed = computed({
+    color: 'rgb(29, 33, 41)',
+    'padding-left': '12px',
+    'padding-top': '0px',
+    'border-left-width': '1px',
+    'border-left-style': 'solid',
+    'border-top-width': '1px',
+    'border-top-style': 'solid',
+  });
+
+  test('lands the chevron inside the trailing edge, backing out border + padding', () => {
+    const svg = selectArrowMarkup(controlComputed, { width: 469.5, height: 36 });
+    // Target svg left edge: width - 10 (chevron) - 3 (trailing gap) = 456.5; the importer
+    // anchors the inset at the padded inner host's origin, so border + padding come off.
+    expect(svg).toContain('left:443.5px');
+    expect(svg).toContain('top:14px');
+    expect(svg).toContain('width="10" height="6"');
+    expect(svg).toContain('stroke="rgb(29, 33, 41)"');
+    expect(svg).toContain('d="M1 1 L5 5 L9 1"');
+  });
+
+  test('falls back to the control text colour when none is computed', () => {
+    const svg = selectArrowMarkup(computed(), { width: 100, height: 36 });
+    expect(svg).toContain('stroke="rgb(29, 33, 41)"');
   });
 });

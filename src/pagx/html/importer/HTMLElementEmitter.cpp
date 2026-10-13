@@ -242,20 +242,40 @@ ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
   return ScaleMode::Stretch;
 }
 
-// Extracts the source string from a CSS `url(...)` token, stripping the wrapper, surrounding
-// whitespace, and matching quotes. Returns empty when `value` is not a `url(...)` form.
+// Extracts the source string from the first CSS `url(...)` token, stripping the wrapper,
+// surrounding whitespace, and matching quotes. Returns empty when `value` has no `url(...)`.
+// A multi-layer value (`url(a), url(b)`) yields the first layer — the topmost in CSS paint
+// order. Reading to the *last* `)` of the declaration instead (the previous `rfind(')')`)
+// spliced every later layer into the first source, turning a data-URI stack into one
+// unresolvable `{dir}/data:...'), url('...` path.
 std::string ExtractCssUrl(const std::string& value) {
   std::string trimmed = Trim(value);
   std::string lower = ToLower(trimmed);
   auto open = lower.find("url(");
   if (open == std::string::npos) return {};
-  auto close = trimmed.rfind(')');
-  if (close == std::string::npos || close <= open + 4) return {};
-  std::string inner = Trim(trimmed.substr(open + 4, close - (open + 4)));
-  if (inner.size() >= 2 && (inner.front() == '"' || inner.front() == '\'') &&
-      inner.back() == inner.front()) {
-    inner = inner.substr(1, inner.size() - 2);
+  size_t p = open + 4;
+  while (p < trimmed.size() && std::isspace(static_cast<unsigned char>(trimmed[p]))) {
+    p++;
   }
+  if (p >= trimmed.size()) return {};
+  std::string inner;
+  if (trimmed[p] == '"' || trimmed[p] == '\'') {
+    // Quoted form: the matching quote closes the token; a `)` inside the URL (a data URI can
+    // legally carry one) must not end it early.
+    char quote = trimmed[p];
+    size_t q = p + 1;
+    while (q < trimmed.size() && trimmed[q] != quote) {
+      if (trimmed[q] == '\\' && q + 1 < trimmed.size()) q++;
+      q++;
+    }
+    if (q >= trimmed.size()) return {};
+    inner = trimmed.substr(p + 1, q - (p + 1));
+  } else {
+    auto close = trimmed.find(')', p);
+    if (close == std::string::npos) return {};
+    inner = trimmed.substr(p, close - p);
+  }
+  inner = Trim(inner);
   std::string unescaped;
   unescaped.reserve(inner.size());
   for (size_t i = 0; i < inner.size(); ++i) {
@@ -1266,10 +1286,14 @@ void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, Layer* contentHos
   auto* maskLayer = _document->makeNode<Layer>();
   maskLayer->includeInLayout = false;
   if (inset > 0.0f) {
-    // Land the mask on the padding box. `masked` anchors its children at its own padding box, and
-    // that inset already carries the border width plus any authored padding, so back it out.
-    maskLayer->left = inset - masked->padding.left;
-    maskLayer->top = inset - masked->padding.top;
+    // Land the mask on the padding box: the masked layer's own top-left plus the border width.
+    // The renderer anchors a mask layer at the masked layer's top-left corner (the same origin
+    // every `includeInLayout="false"` child uses), so the inset must *not* back out the masked
+    // layer's padding — doing that shifted the clip left/up by the authored padding on every
+    // padded rounded box (the form `<select>`, padding 0 12px, had its trailing chevron clipped
+    // to a sliver).
+    maskLayer->left = inset;
+    maskLayer->top = inset;
     maskLayer->width = maskBox.widthPx;
     maskLayer->height = maskBox.heightPx;
   } else {

@@ -3628,6 +3628,34 @@ function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
 // keep their positioning context. `white-space: nowrap` is mandatory so
 // PAGX's text engine doesn't re-wrap a single-line value to two lines when
 // its intrinsic width exceeds the wrapper by sub-pixel.
+// The `<select>` UA arrow: Chromium paints a small chevron near the control's
+// trailing edge through its internals, so the light-DOM walk sees nothing of it
+// and the imported PAGX showed a bare box where the reference render has the
+// indicator. Synthesise it as an inline <svg> chevron — the same family as the
+// other native-control stand-ins. Geometry is measured against the reference
+// render: a 10x6 chevron vertically centred on the box with its trailing edge
+// 3px inside the border, stroked in the control's own text colour (#1D2129 on
+// the sample form).
+//
+// The importer routes the control's children through a padded inner host and
+// resolves out-of-flow children against that host's content-box origin — one
+// border plus one padding further in than the browser's own anchor for the
+// same `left`/`top`. The inset below therefore backs the border and padding
+// out of the target position so the rendered chevron lands where the browser
+// paints it.
+function selectArrowMarkup(computed, rect) {
+  const color = (computed.getPropertyValue('color') || '').trim() || 'rgb(29, 33, 41)';
+  const pad = readPadding(computed);
+  const insetLeft = borderWidthOf(computed, 'left') + pad.left;
+  const insetTop = borderWidthOf(computed, 'top') + pad.top;
+  const left = Math.max(0, rect.width - 13 - insetLeft);
+  const top = Math.max(0, (rect.height - 6) / 2 - insetTop);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6" viewBox="0 0 10 6"`
+    + ` style="position:absolute;left:${px(left)};top:${px(top)}">`
+    + `<path d="M1 1 L5 5 L9 1" fill="none" stroke="${color}" stroke-width="2"`
+    + ` stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
   const text = syntheticText(el);
   const pad = readPadding(computed);
@@ -3662,6 +3690,16 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
   }
   const innerLayout = `display: flex; align-items: ${alignItems}` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
   const inner = `<span style="${textStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  if (String(el.tagName || '').toLowerCase() === 'select') {
+    // Place the chevron on the control's own (unpadded) box rather than inside the padded flex
+    // host — see selectArrowMarkup for why the host's padding would drift the two renderings
+    // apart. Mirrors renderBoxedReplaced, with the arrow spliced between the inner run and the
+    // border overlays.
+    const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, { box: true, ...opts });
+    const composed = joinStyles(boxStyle, innerLayout);
+    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+    return `<div style="${composed}">${inner}${selectArrowMarkup(computed, rect)}${overlays}</div>`;
+  }
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
 }
 
@@ -3839,13 +3877,17 @@ function formatDateControlValue(value, kind) {
   return value;
 }
 
+// Chromium paints the date picker indicator as a two-tone glyph — a dark-grey frame with a
+// solid black title bar — measured off the reference render (12x12 box, frame ~rgb(86,86,86),
+// bar rgb(0,0,0), two capped hangers above the bar). The previous single-grey 16px outline
+// read lighter and larger than the browser's icon.
 function svgCalendarGlyph() {
-  const c = 'rgb(95, 99, 104)';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" viewBox="0 0 16 16">`
-    + `<rect x="2.75" y="3.25" width="10.5" height="10" rx="1.75" fill="none" stroke="${c}" stroke-width="1.5"/>`
-    + `<line x1="2.75" y1="6.25" x2="13.25" y2="6.25" stroke="${c}" stroke-width="1.5"/>`
-    + `<line x1="5.5" y1="1.75" x2="5.5" y2="4" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`
-    + `<line x1="10.5" y1="1.75" x2="10.5" y2="4" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`
+  const frame = 'rgb(86, 86, 86)';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="12px" height="12px" viewBox="0 0 12 12">`
+    + `<rect x="0.75" y="1.9" width="10.5" height="9.35" rx="1.3" fill="none" stroke="${frame}" stroke-width="1.5"/>`
+    + `<rect x="1.5" y="1.9" width="9" height="2.6" fill="rgb(0, 0, 0)"/>`
+    + `<line x1="3.6" y1="0.6" x2="3.6" y2="2.2" stroke="${frame}" stroke-width="1.5" stroke-linecap="round"/>`
+    + `<line x1="8.4" y1="0.6" x2="8.4" y2="2.2" stroke="${frame}" stroke-width="1.5" stroke-linecap="round"/>`
     + `</svg>`;
 }
 
@@ -6023,6 +6065,7 @@ const HELPER_FNS = [
   renderImg,
   renderCanvas,
   renderTextInput,
+  selectArrowMarkup,
   nativeControlKind,
   controlNum,
   accentColorOf,
@@ -6478,14 +6521,101 @@ async function inlineExternalImages(cachedMap) {
   // that content, which the flattened subset has no way to express.
   function splitTintedBackgrounds() {
     for (const el of Array.from(document.querySelectorAll('*'))) {
-      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
       const computed = getComputedStyle(el);
-      // The wash child is positioned against the element, so the element has to be its own
-      // containing block; on a static box the inset would resolve against some distant ancestor.
-      if (computed.position === 'static') continue;
       const bg = (computed.getPropertyValue('background-image') || '').trim();
-      if (!hasGradientLayer(bg)) continue;
       const layers = splitTopLevelCommas(bg);
+      if (!hasGradientLayer(bg)) {
+        // A stack of two url() layers cannot be expressed as one PAGX background: the importer
+        // reads a single source per element, so the whole declaration would resolve to only its
+        // first layer. Keep the bottom layer on the element and peel the top one into a
+        // synthesized full-bleed child — the same shape as the wash split below. Only the exact
+        // two-layer, unblended, default-clip form is split; every other stack keeps the
+        // declaration, which the importer now resolves to its first layer.
+        //
+        // Unlike the wash split this branch also handles boxes with content of their own: the
+        // synthesized child is inserted *ahead* of the existing children, so the replay paints
+        // the element background, then the top image layer, then the content — exactly how CSS
+        // stacks every background layer beneath content. The one mismatch a full-bleed child
+        // would introduce is the corner clip, so it inherits the host's `border-radius`.
+        if (layers.length !== 2 || !/^url\(/i.test(layers[0]) || !/^url\(/i.test(layers[1])) {
+          continue;
+        }
+        const blendModes = splitTopLevelCommas(
+          computed.getPropertyValue('background-blend-mode') || 'normal');
+        if (blendModes.some((mode) => {
+          const m = mode.trim().toLowerCase();
+          return m !== '' && m !== 'normal';
+        })) {
+          continue;
+        }
+        const clips = splitTopLevelCommas(
+          computed.getPropertyValue('background-clip') || 'border-box');
+        if (clips.some((clip) => {
+          const c = clip.trim().toLowerCase();
+          return c !== '' && c !== 'border-box';
+        })) {
+          continue;
+        }
+        // The synthesized child's absolute inset resolves against the host, so a static host
+        // (the usual grid-tile shape — the markup carries only the background-image) must
+        // become positioned first. Promoting a static box to `relative` is otherwise a no-op
+        // for live layout, but it does re-anchor any absolutely-positioned descendant whose
+        // containing block currently sits further up the tree — bail on those instead of
+        // silently moving them.
+        if (computed.position === 'static') {
+          const reanchorsDescendant = Array.from(el.querySelectorAll('*')).some(
+            (descendant) => getComputedStyle(descendant).position === 'absolute');
+          if (reanchorsDescendant) continue;
+          el.style.position = 'relative';
+        }
+        // Each fitting property is a per-layer list; the element now carries a single layer, so
+        // it needs that layer's own entry rather than the list. A one-entry value is already
+        // shared by every layer and passes through unchanged. The synthesized top child needs
+        // the CSS-topmost layer's entry instead.
+        const pickLayer = (value, index, fallback) => {
+          const entries = splitTopLevelCommas(value || '');
+          const picked = entries.length > 1 ? entries[index] : entries[0];
+          return picked || fallback;
+        };
+        el.style.backgroundImage = layers[1];
+        el.style.backgroundSize = pickLayer(computed.getPropertyValue('background-size'), 1, 'auto');
+        el.style.backgroundPosition = pickLayer(
+          computed.getPropertyValue('background-position'), 1, '0% 0%');
+        el.style.backgroundRepeat = pickLayer(
+          computed.getPropertyValue('background-repeat'), 1, 'repeat');
+        const top = document.createElement('div');
+        top.setAttribute('data-pagx-tint', '');
+        top.setAttribute(
+          'style',
+          // The synthesized child matches the page's container rules (`.tile div { … }` shapes
+          // are common), so its own computed background/border/shadow would replay onto the
+          // layer and paint over the host's lower image. Pin those back to the no-op values.
+          // `z-index: -1` pins the layer into the walker's negative paint band so it replays
+          // ahead of the host's content — a plain `auto` z-index sorts it *after* the content
+          // (whose positioning comes from the authored CSS), painting the image over the very
+          // text the stack was supposed to sit behind.
+          'position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;border-radius:inherit;' +
+            'background-color:transparent;border:0;box-shadow:none;' +
+            'background-image:' +
+            layers[0] +
+            ';background-size:' +
+            pickLayer(computed.getPropertyValue('background-size'), 0, 'auto') +
+            ';background-position:' +
+            pickLayer(computed.getPropertyValue('background-position'), 0, '0% 0%') +
+            ';background-repeat:' +
+            pickLayer(computed.getPropertyValue('background-repeat'), 0, 'repeat') +
+            ';'
+        );
+        el.insertBefore(top, el.firstChild);
+        continue;
+      }
+      // The wash split stays backdrop-only: slotted between the host's background and its
+      // content it would also be sound, but no sample needs it and rebuilding the gradient
+      // list for grounded content risks double-painting pseudo stand-ins. The wash child is
+      // positioned against the element, so the element has to be its own containing block; on
+      // a static box the inset would resolve against some distant ancestor.
+      if (computed.position === 'static') continue;
+      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
       const urlIndex = layers.findIndex((layer) => /^url\(/i.test(layer));
       if (urlIndex < 0 || (bg.match(/url\(/gi) || []).length !== 1) continue;
       const wash = layers.filter((layer, index) => index !== urlIndex);
@@ -6612,6 +6742,91 @@ function dropCollapsedDetailsContent() {
     detailsPruned++;
   }
   return { details: detailsPruned, nodes: nodesRemoved };
+}
+
+// ===== Pre-snapshot pass: hoist table-row backgrounds beneath cell content =====
+
+// In CSS a table row's painted background sits under every cell of the table:
+// the paint order is all row backgrounds, then all cell backgrounds and
+// content (CSS 2.1 Appendix E). The snapshot's flattened box tree has no such
+// layer model — it wraps each row's background and its cells in one box
+// emitted in DOM order — so a `rowspan` cell that overflows its row (the
+// '华南' cell spanning three rows of the finance table in the forms sample)
+// ends up beneath the *following* rows' backgrounds: '华南' vanished entirely
+// and '华北' lost its lower half, while '华东' survived only because the row
+// below it carried no background. Hoisting each painted row background into a
+// standalone full-size box inserted ahead of every row in the same row group
+// replays the browser's order — all row backgrounds first, then all cells, so
+// a later row's background can no longer cover an earlier row's overflow.
+//
+// Only the plain `background-color` case is hoisted. A row whose sheet
+// carries a background image, a border, a shadow or a radius keeps its box
+// untouched: splitting such a sheet between two boxes would drop the other
+// visuals. Best-effort by design — the caller treats a failure as "keep the
+// old order", matching the pre-fix output.
+function hoistTableRowBackgrounds() {
+  // Alpha of the computed background-color, 0 when fully transparent.
+  function backgroundColorAlpha(value) {
+    const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i.exec(
+      String(value || '').trim()
+    );
+    if (!match) return 0;
+    return match[4] === undefined ? 1 : parseFloat(match[4]);
+  }
+
+  // True when any border side paints. border-collapse tables report the
+  // collapsed edge width on `tr` as well, so this doubles as the guard for
+  // authored row borders.
+  function hasVisibleBorder(computed) {
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+      const style = computed.getPropertyValue('border-' + side + '-style');
+      if (style === 'none' || style === 'hidden' || !style) continue;
+      if (parseFloat(computed.getPropertyValue('border-' + side + '-width')) > 0) return true;
+    }
+    return false;
+  }
+
+  const rows = Array.from(document.querySelectorAll('tr'));
+  let hoisted = 0;
+  for (const row of rows) {
+    const computed = getComputedStyle(row);
+    if (!computed) continue;
+    if ((computed.getPropertyValue('background-image') || 'none').trim() !== 'none') continue;
+    const background = (computed.getPropertyValue('background-color') || '').trim();
+    if (backgroundColorAlpha(background) <= 0) continue;
+    if ((computed.getPropertyValue('box-shadow') || 'none').trim() !== 'none') continue;
+    const hasRadius = ['border-top-left-radius', 'border-top-right-radius',
+                       'border-bottom-right-radius', 'border-bottom-left-radius']
+                        .some((name) => parseFloat(computed.getPropertyValue(name)) > 0);
+    if (hasRadius || hasVisibleBorder(computed)) continue;
+    const parent = row.parentElement;
+    if (!parent) continue;
+    const rowRect = row.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    if (!(rowRect.width > 0) || !(rowRect.height > 0)) continue;
+    // The hoisted box is absolutely positioned against the row group, which is
+    // usually static in the author's CSS; `relative` costs nothing for a table
+    // part and gives the box the intended containing block.
+    if (getComputedStyle(parent).position === 'static') {
+      parent.style.position = 'relative';
+    }
+    const hoist = document.createElement('div');
+    hoist.setAttribute('data-pagx-row-bg', '');
+    hoist.setAttribute(
+      'style',
+      // `z-index: -1` drops the box into the walker's negative paint band. Without it the
+      // absolutely-positioned box sorts *after* the static row boxes (positioned content
+      // paints in the top band), covering exactly the row content the hoist was meant to sit
+      // beneath.
+      'position:absolute;z-index:-1;left:' + (rowRect.left - parentRect.left) + 'px;top:' +
+        (rowRect.top - parentRect.top) + 'px;width:' + rowRect.width + 'px;height:' +
+        rowRect.height + 'px;background-color:' + background + ';'
+    );
+    parent.insertBefore(hoist, parent.firstChild);
+    row.style.backgroundColor = 'transparent';
+    hoisted++;
+  }
+  return { hoisted };
 }
 
 // ===== Pre-snapshot pass: materialise decorative ::before / ::after pseudo-elements =====
@@ -7962,6 +8177,7 @@ export {
   imgAlt,
   inlineCanvases,
   dropCollapsedDetailsContent,
+  hoistTableRowBackgrounds,
   materializeFirstLetter,
   materializeListMarkers,
   materializeDecorativePseudoElements,
@@ -7996,6 +8212,7 @@ export {
   nativeControlKind,
   syntheticText,
   maskPasswordText,
+  selectArrowMarkup,
   svgCheckbox,
   svgRadio,
   svgRange,

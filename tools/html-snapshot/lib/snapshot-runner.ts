@@ -15,6 +15,7 @@ import {
   normalizeEmptyImagePlaceholders,
   inlineCanvases,
   dropCollapsedDetailsContent,
+  hoistTableRowBackgrounds,
   materializeFirstLetter,
   materializeListMarkers,
   materializeDecorativePseudoElements,
@@ -808,6 +809,21 @@ export async function runSnapshot(
       // A measurement/resize hiccup should degrade to the previous behaviour,
       // not abort a snapshot we can still produce.
       if (log) log(`viewport resize to canvas skipped: ${errMessage(err)}`);
+    }
+
+    // Hoist painted table-row backgrounds ahead of the rows' own boxes so the
+    // flattened paint order keeps them beneath every cell — a `rowspan` cell
+    // that overflows its row otherwise loses its lower half to the following
+    // rows' backgrounds. Runs last, after the viewport settled to the body
+    // canvas, so the row rectangles measured here are the ones the walker
+    // emits. Best-effort: a failure keeps the previous order.
+    try {
+      const hoistStats = await page.evaluate(hoistTableRowBackgrounds);
+      if (log && hoistStats && hoistStats.hoisted > 0) {
+        log(`table row backgrounds: hoisted ${hoistStats.hoisted} row background(s)`);
+      }
+    } catch (err) {
+      if (log) log(`table row background hoist skipped: ${errMessage(err)}`);
     }
 
     // `takeSnapshot` lives on `window.__pagxSnapshot` thanks to
