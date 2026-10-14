@@ -269,6 +269,11 @@ libpag 基于 [Apache-2.0](./LICENSE.txt) 协议开源.
 
 使用 libpag SDK 时请遵守 [PAG SDK个人信息保护规则](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd).
 
+### 数据收集说明
+
+- **使用本仓库源码自行构建的二进制不收集任何数据**：不包含网络请求与使用数据上报，随附的隐私清单（`PrivacyInfo.xcprivacy`）声明不收集数据。
+- **官方预编译发布包**（通过 pag.io 与 CocoaPods 分发）在 iOS、Android 端额外包含一个匿名使用统计模块，会向腾讯 Beacon 分析服务（`otheve.beacon.qq.com`）上报以下数据，每个 SDK 版本每自然月至多一次：宿主 App 名称与包名、操作系统版本与设备型号、GPU 版本与厂商、libpag SDK 版本。该模块不收集用户 ID、广告标识符或其他个人数据，数据仅用于 SDK 使用量统计。官方发布包随附的隐私清单已对上述数据收集行为如实声明。
+
 ## 贡献
 
 我们欢迎开发人员为腾讯的开源做出贡献，如果您对改进 libpag

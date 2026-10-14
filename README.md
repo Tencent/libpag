@@ -284,6 +284,11 @@ libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)
 
 Please comply with [the personal information processing rules of PAG SDK](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd) while using libpag SDK
 
+### Data Collection
+
+- **Binaries built from this repository collect no data.** They contain no network requests or usage reporting, and the bundled privacy manifest (`PrivacyInfo.xcprivacy`) declares no data collection.
+- **Official prebuilt releases** distributed through pag.io and CocoaPods contain an additional anonymous usage statistics module on iOS and Android, which reports the following data to the Tencent Beacon analytics service (`otheve.beacon.qq.com`), at most once per SDK version per month: host app name and bundle identifier, operating system version and device model, GPU version and vendor, and the libpag SDK version. No user IDs, advertising identifiers, or other personal data are collected, and the data is used solely for SDK usage statistics. The privacy manifest bundled in the official releases declares this data collection accordingly.
+
 ## Contribution
 
 If you have any ideas or suggestions to improve libpag, welcome to submit

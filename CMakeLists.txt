@@ -537,9 +537,30 @@ if (PAG_BUILD_FRAMEWORK)
             MACOSX_FRAMEWORK_BUNDLE_VERSION ${PAG_VERSION}
             MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${PAG_VERSION})
     set(CMAKE_XCODE_ATTRIBUTE_DEFINES_MODULE YES)
+    if (IOS)
+        set(PAG_PRIVACY_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/ios/PrivacyInfo.xcprivacy)
+    elseif (MACOS)
+        set(PAG_PRIVACY_MANIFEST ${CMAKE_CURRENT_SOURCE_DIR}/mac/PrivacyInfo.xcprivacy)
+    endif ()
     set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${PAG_IDENTIFIER})
     if (HasParent)
         set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER} PARENT_SCOPE)
+    endif ()
+    set_source_files_properties(${PAG_PRIVACY_MANIFEST} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(pag PRIVATE ${PAG_PRIVACY_MANIFEST})
+    if (NOT CMAKE_GENERATOR MATCHES "Xcode")
+        if (MACOS)
+            add_custom_command(TARGET pag POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:pag>/Resources"
+                    COMMAND ${CMAKE_COMMAND} -E copy "${PAG_PRIVACY_MANIFEST}" "$<TARGET_FILE_DIR:pag>/Resources/PrivacyInfo.xcprivacy"
+                    COMMENT "Copying privacy manifest into framework/Versions/A/Resources"
+            )
+        else ()
+            add_custom_command(TARGET pag POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy "${PAG_PRIVACY_MANIFEST}" "$<TARGET_FILE_DIR:pag>/PrivacyInfo.xcprivacy"
+                    COMMENT "Copying privacy manifest into framework root"
+            )
+        endif ()
     endif ()
 endif ()
 
