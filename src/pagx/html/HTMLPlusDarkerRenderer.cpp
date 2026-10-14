@@ -26,13 +26,13 @@
 #include "pagx/html/HTMLWriter.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/RasterUtils.h"
 #include "renderer/LayerBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -189,7 +189,7 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     return;
   }
 
-  auto device = tgfx::GLDevice::Make();
+  auto device = MakeGPUDevice();
   if (!device) {
     return;
   }

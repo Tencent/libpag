@@ -33,6 +33,13 @@ namespace pagx {
 class ImagePattern;
 
 /**
+ * Creates an off-screen GPU device for the backend the current build was configured with:
+ * WebGPUDevice on WebGPU builds, GLDevice otherwise. Returns nullptr when the backend cannot
+ * provide a device, e.g. WebGPU builds that have no preinitialized GPUDevice on the main thread.
+ */
+std::shared_ptr<tgfx::Device> MakeGPUDevice();
+
+/**
  * Manages a lazily-created GPU device and context for off-screen rendering.
  * Reuse a single instance across multiple render calls to avoid repeated GL context creation.
  */

@@ -31,6 +31,7 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/Device.h"
 #if defined(TGFX_USE_WEBGPU)
 #include "tgfx/gpu/webgpu/WebGPUDevice.h"
 #else
@@ -214,17 +215,21 @@ struct TiledPatternDrawer {
 
 }  // namespace
 
+std::shared_ptr<tgfx::Device> MakeGPUDevice() {
+#if defined(TGFX_USE_WEBGPU)
+  return tgfx::WebGPUDevice::Make();
+#else
+  return tgfx::GLDevice::Make();
+#endif
+}
+
 GPUContext::~GPUContext() {
   _device = nullptr;
 }
 
 tgfx::Context* GPUContext::lockContext() {
   if (!_device) {
-#if defined(TGFX_USE_WEBGPU)
-    _device = tgfx::WebGPUDevice::Make();
-#else
-    _device = tgfx::GLDevice::Make();
-#endif
+    _device = MakeGPUDevice();
     if (!_device) {
       return nullptr;
     }
