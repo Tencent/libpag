@@ -22,13 +22,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
-#include "base/utils/MathUtil.h"
 #include "pagx/PAGXDocument.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
 #include "pagx/svg/SVGParserContext.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/svg/SVGTransformParser.h"
 #include "pagx/types/TextBaseline.h"
 #include "pagx/utils/CSSFontStyle.h"
 #include "pagx/utils/StringParser.h"
@@ -37,8 +37,6 @@
 #include "tgfx/core/PathMeasure.h"
 
 namespace pagx {
-
-using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 
@@ -2387,114 +2385,8 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
 
   return style;
 }
-static void SkipWhitespace(const char*& ptr, const char* end) {
-  while (ptr < end && (std::isspace(*ptr) || *ptr == ',')) {
-    ++ptr;
-  }
-}
-
-static float ReadNumber(const char*& ptr, const char* end) {
-  SkipWhitespace(ptr, end);
-  const char* start = ptr;
-  if (ptr < end && (*ptr == '-' || *ptr == '+')) {
-    ++ptr;
-  }
-  while (ptr < end && (std::isdigit(*ptr) || *ptr == '.')) {
-    ++ptr;
-  }
-  if (ptr < end && (*ptr == 'e' || *ptr == 'E')) {
-    ++ptr;
-    if (ptr < end && (*ptr == '-' || *ptr == '+')) {
-      ++ptr;
-    }
-    while (ptr < end && std::isdigit(*ptr)) {
-      ++ptr;
-    }
-  }
-  if (start == ptr) {
-    return 0.0f;
-  }
-  return strtof(start, nullptr);
-}
 Matrix SVGParserContext::parseTransform(const std::string& value) {
-  Matrix result = Matrix::Identity();
-  if (value.empty()) {
-    return result;
-  }
-
-  const char* ptr = value.c_str();
-  const char* end = ptr + value.length();
-
-  while (ptr < end) {
-    SkipWhitespace(ptr, end);
-    if (ptr >= end) {
-      break;
-    }
-
-    const char* funcStart = ptr;
-    while (ptr < end && std::isalpha(*ptr)) {
-      ++ptr;
-    }
-    size_t funcLen = static_cast<size_t>(ptr - funcStart);
-
-    SkipWhitespace(ptr, end);
-    if (ptr >= end || *ptr != '(') {
-      break;
-    }
-    ++ptr;
-
-    Matrix m = Matrix::Identity();
-
-    if (funcLen == 9 && memcmp(funcStart, "translate", 9) == 0) {
-      float tx = ReadNumber(ptr, end);
-      SkipWhitespace(ptr, end);
-      float ty = 0;
-      if (ptr < end && *ptr != ')') {
-        ty = ReadNumber(ptr, end);
-      }
-      m = Matrix::Translate(tx, ty);
-    } else if (funcLen == 5 && memcmp(funcStart, "scale", 5) == 0) {
-      float sx = ReadNumber(ptr, end);
-      SkipWhitespace(ptr, end);
-      float sy = sx;
-      if (ptr < end && *ptr != ')') {
-        sy = ReadNumber(ptr, end);
-      }
-      m = Matrix::Scale(sx, sy);
-    } else if (funcLen == 6 && memcmp(funcStart, "rotate", 6) == 0) {
-      float angle = ReadNumber(ptr, end);
-      SkipWhitespace(ptr, end);
-      if (ptr < end && *ptr != ')') {
-        float cx = ReadNumber(ptr, end);
-        float cy = ReadNumber(ptr, end);
-        m = Matrix::Translate(cx, cy) * Matrix::Rotate(angle) * Matrix::Translate(-cx, -cy);
-      } else {
-        m = Matrix::Rotate(angle);
-      }
-    } else if (funcLen == 5 && memcmp(funcStart, "skewX", 5) == 0) {
-      float angle = ReadNumber(ptr, end);
-      m.c = std::tan(DegreesToRadians(angle));
-    } else if (funcLen == 5 && memcmp(funcStart, "skewY", 5) == 0) {
-      float angle = ReadNumber(ptr, end);
-      m.b = std::tan(DegreesToRadians(angle));
-    } else if (funcLen == 6 && memcmp(funcStart, "matrix", 6) == 0) {
-      m.a = ReadNumber(ptr, end);
-      m.b = ReadNumber(ptr, end);
-      m.c = ReadNumber(ptr, end);
-      m.d = ReadNumber(ptr, end);
-      m.tx = ReadNumber(ptr, end);
-      m.ty = ReadNumber(ptr, end);
-    }
-
-    SkipWhitespace(ptr, end);
-    if (ptr < end && *ptr == ')') {
-      ++ptr;
-    }
-
-    result = result * m;
-  }
-
-  return result;
+  return MatrixFromSVGTransform(value);
 }
 // Parse CSS Color Level 4 color() function: color(display-p3 r g b) or color(display-p3 r g b / a).
 // Returns a Color with alpha=-1 on parse failure.

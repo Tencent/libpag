@@ -64,6 +64,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/runtime/MixUtils.h"
 #include "pagx/tgfx.h"
 #include "pagx/types/ColorSpace.h"
@@ -158,90 +159,253 @@ void RuntimeBinding::remove(const Node* node) {
 #define PAG_DISABLE_SHADOW_STYLES 0
 #define PAG_DISABLE_LAYER_FILTERS 0
 
-// Runtime target for a Layer's tgfx::Layer that keeps the layer transform decomposed into its
-// animatable sources (x, y translation and the 2D matrix). The final tgfx matrix is recomposed as
-// Translate(x, y) * matrix, mirroring applyLayerAttributes so x/y and matrix animations stack
-// correctly instead of overwriting each other's setMatrix. Channels other than the transform fall
-// through to the base RuntimeTarget writer table.
-struct LayerRuntimeTarget : RuntimeTarget {
-  float animX = 0;
-  float animY = 0;
-  tgfx::Matrix animMatrix = tgfx::Matrix::I();
+// Lifts a 2D affine transform into a column-major 4x4 matrix carrying the given Z translation.
+static Matrix3D LiftToMatrix3D(const tgfx::Matrix& matrix, float z) {
+  Matrix3D result = {};
+  result.setRowColumn(0, 0, matrix.getScaleX());
+  result.setRowColumn(0, 1, matrix.getSkewX());
+  result.setRowColumn(0, 3, matrix.getTranslateX());
+  result.setRowColumn(1, 0, matrix.getSkewY());
+  result.setRowColumn(1, 1, matrix.getScaleY());
+  result.setRowColumn(1, 3, matrix.getTranslateY());
+  result.setRowColumn(2, 3, z);
+  return result;
+}
 
-  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
-    if (channel == "x") {
-      const auto* v = std::get_if<float>(&value);
-      if (v == nullptr) {
-        return false;
-      }
-      animX = MixFloat(animX, *v, mix);
-      recompose();
-      return true;
-    }
-    if (channel == "y") {
-      const auto* v = std::get_if<float>(&value);
-      if (v == nullptr) {
-        return false;
-      }
-      animY = MixFloat(animY, *v, mix);
-      recompose();
-      return true;
+// Returns true if the matrix is a 2D affine transform plus an optional Z translation.
+static bool IsPlanarAffine(const Matrix3D& matrix) {
+  return matrix.getRowColumn(0, 2) == 0 && matrix.getRowColumn(1, 2) == 0 &&
+         matrix.getRowColumn(2, 0) == 0 && matrix.getRowColumn(2, 1) == 0 &&
+         matrix.getRowColumn(2, 2) == 1 && matrix.getRowColumn(3, 0) == 0 &&
+         matrix.getRowColumn(3, 1) == 0 && matrix.getRowColumn(3, 2) == 0 &&
+         matrix.getRowColumn(3, 3) == 1;
+}
+
+static tgfx::Matrix PlanarMatrix(const Matrix3D& matrix) {
+  return tgfx::Matrix::MakeAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
+                               matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),
+                               matrix.getRowColumn(1, 1), matrix.getRowColumn(1, 3));
+}
+
+// Returns Translate(x, y) * matrix.
+static Matrix3D ApplyLayoutPosition(const Matrix3D& matrix, float x, float y) {
+  if (x == 0 && y == 0) {
+    return matrix;
+  }
+  Matrix3D result = matrix;
+  for (int column = 0; column < 4; ++column) {
+    auto w = matrix.getRowColumn(3, column);
+    result.setRowColumn(0, column, matrix.getRowColumn(0, column) + x * w);
+    result.setRowColumn(1, column, matrix.getRowColumn(1, column) + y * w);
+  }
+  return result;
+}
+
+// Runtime target for a Layer's tgfx::Layer that keeps one local transform pose shared by the x / y
+// / z, matrix and matrix3D channels. Each write mixes only the part of the pose its channel drives
+// (current = Mix(current, target, mix)), so anything no source drives keeps its current value.
+// Continuous semantic Matrix3D DataBinds (rotation / scale / skew / perspective) are kept as an
+// overlay applied on top of the pose, while Once values are written into the pose so a later
+// transform write takes over. The layout-generated position is composed outside of everything.
+// Channels other than the transform fall through to the base RuntimeTarget writer table.
+struct LayerRuntimeTarget : RuntimeTarget {
+  bool apply(const std::string& channel, const KeyValue& value, float mix,
+             bool onceDataBind) override {
+    if (channel == "x" || channel == "y" || channel == "z") {
+      return applyTranslation(TranslationAxis(channel), value, mix);
     }
     if (channel == "matrix") {
-      const auto* v = std::get_if<Matrix>(&value);
-      if (v == nullptr) {
-        return false;
-      }
-      auto target = ToTGFX(*v);
-      animMatrix = MixTGFXMatrix(animMatrix, target, mix);
-      recompose();
-      return true;
+      return applyMatrix(value, mix);
     }
-    return RuntimeTarget::apply(channel, value, mix);
+    if (channel == "matrix3D") {
+      return applyMatrix3D(value, mix);
+    }
+    auto component = Matrix3DComponent::TranslateX;
+    if (Matrix3DComponentFromChannel(channel, &component)) {
+      return applyComponent(component, value, mix, onceDataBind);
+    }
+    return RuntimeTarget::apply(channel, value, mix, onceDataBind);
   }
 
   bool hasWriter(const std::string& channel) const override {
-    if (channel == "x" || channel == "y" || channel == "matrix") {
+    auto component = Matrix3DComponent::TranslateX;
+    if (channel == "matrix" || channel == "matrix3D" ||
+        Matrix3DComponentFromChannel(channel, &component)) {
       return true;
     }
     return RuntimeTarget::hasWriter(channel);
   }
 
-  // Reads x / y back from the decomposed animated translation (animX / animY), not the final
-  // composed layer matrix. The forward transform composes Translate(animX, animY) * animMatrix, so
-  // the composed matrix translate also folds in animMatrix's own translation; returning animX /
-  // animY gives the true x / y channel value the two-way binding should observe. Other channels
+  // Reads x / y / z back from the local pose translation, excluding the layout-generated position,
+  // and the semantic Matrix3D components from the decomposed effective transform. Other channels
   // fall through to the base reader table.
   bool read(const std::string& channel, KeyValue* out) const override {
-    if (channel == "x" || channel == "y") {
-      if (out == nullptr) {
+    if (out == nullptr) {
+      return false;
+    }
+    if (channel == "x" || channel == "y" || channel == "z") {
+      auto axis = TranslationAxis(channel);
+      if (isTranslationMasked(axis)) {
         return false;
       }
-      *out = KeyValue{channel == "x" ? animX : animY};
+      *out = KeyValue{pose.getRowColumn(axis, 3)};
+      return true;
+    }
+    auto component = Matrix3DComponent::TranslateX;
+    if (Matrix3DComponentFromChannel(channel, &component)) {
+      Matrix3D matrix = {};
+      DecomposedMatrix3D decomposed = {};
+      float result = 0;
+      if (!composeMatrix(&matrix) || !DecomposeMatrix3D(matrix, &decomposed) ||
+          !ReadMatrix3DComponent(decomposed, component, &result)) {
+        return false;
+      }
+      *out = KeyValue{result};
       return true;
     }
     return RuntimeTarget::read(channel, out);
   }
 
-  // Seeds the decomposed transform from the node's authored values so the first animated frame
-  // mixes against the static baseline rather than an identity.
-  void initTransform(float x, float y, const tgfx::Matrix& matrix) {
-    animX = x;
-    animY = y;
-    animMatrix = matrix;
+  // Seeds the pose from the node's authored transform and publishes it to the layer. A non-identity
+  // matrix3D is the complete local transform; otherwise a non-identity matrix (or else x / y) is
+  // lifted with z. The authored transform that takes precedence also masks the channels it
+  // overrides. Semantic overlays are kept so continuous bindings survive a document refresh.
+  void initTransform(const Layer* node) {
+    hasStaticMatrix3D = !node->matrix3D.isIdentity();
+    hasStaticMatrix = !node->matrix.isIdentity();
+    auto position = node->layoutPosition();
+    layoutX = std::isnan(position.x) ? 0 : position.x;
+    layoutY = std::isnan(position.y) ? 0 : position.y;
+    if (hasStaticMatrix3D) {
+      pose = node->matrix3D;
+    } else {
+      auto local =
+          hasStaticMatrix ? ToTGFX(node->matrix) : tgfx::Matrix::MakeTrans(node->x, node->y);
+      pose = LiftToMatrix3D(local, node->z);
+    }
+    publish();
   }
 
  private:
-  void recompose() {
+  Matrix3D pose = {};
+  Matrix3DComponentOverrides overrides = {};
+  float layoutX = 0;
+  float layoutY = 0;
+  bool hasStaticMatrix = false;
+  bool hasStaticMatrix3D = false;
+
+  static int TranslationAxis(const std::string& channel) {
+    return channel == "x" ? 0 : (channel == "y" ? 1 : 2);
+  }
+
+  bool isTranslationMasked(int axis) const {
+    return hasStaticMatrix3D || (axis < 2 && hasStaticMatrix);
+  }
+
+  bool applyTranslation(int axis, const KeyValue& value, float mix) {
+    const auto* v = std::get_if<float>(&value);
+    if (v == nullptr || !std::isfinite(*v) || isTranslationMasked(axis)) {
+      return false;
+    }
+    pose.setRowColumn(axis, 3, MixFloat(pose.getRowColumn(axis, 3), *v, mix));
+    publish();
+    return true;
+  }
+
+  // Replaces the planar part of the pose and keeps its Z translation. A planar pose mixes in 2D,
+  // matching the plain 2D matrix interpolation; a pose already carrying a 3D transform mixes in 3D.
+  bool applyMatrix(const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Matrix>(&value);
+    if (v == nullptr || hasStaticMatrix3D) {
+      return false;
+    }
+    auto target = ToTGFX(*v);
+    auto z = pose.getRowColumn(2, 3);
+    if (IsPlanarAffine(pose)) {
+      pose = LiftToMatrix3D(MixTGFXMatrix(PlanarMatrix(pose), target, mix), z);
+    } else {
+      pose = LerpMatrix3D(pose, LiftToMatrix3D(target, z), mix);
+    }
+    publish();
+    return true;
+  }
+
+  bool applyMatrix3D(const KeyValue& value, float mix) {
+    const auto* v = std::get_if<Matrix3D>(&value);
+    if (v == nullptr) {
+      return false;
+    }
+    auto mixed = LerpMatrix3D(pose, *v, mix);
+    if (!IsInvertibleMatrix3D(mixed)) {
+      LOGE("LayerRuntimeTarget: rejected a non-finite or singular matrix3D value.");
+      return false;
+    }
+    pose = mixed;
+    publish();
+    return true;
+  }
+
+  bool applyComponent(Matrix3DComponent component, const KeyValue& value, float mix, bool once) {
+    const auto* v = std::get_if<float>(&value);
+    DecomposedMatrix3D decomposed = {};
+    if (v == nullptr || !std::isfinite(*v) || !DecomposeMatrix3D(pose, &decomposed)) {
+      return false;
+    }
+    auto index = static_cast<size_t>(component);
+    auto bit = static_cast<uint16_t>(1u << index);
+    float current = 0;
+    if (!once && (overrides.mask & bit) != 0) {
+      current = static_cast<float>(overrides.values[index]);
+    } else if (!ReadMatrix3DComponent(decomposed, component, &current)) {
+      return false;
+    }
+    auto mixed = MixFloat(current, *v, mix);
+    if (once) {
+      DecomposedMatrix3D updated = {};
+      Matrix3D matrix = {};
+      if (!SetMatrix3DComponent(decomposed, component, mixed, &updated) ||
+          !RecomposeMatrix3D(updated, &matrix)) {
+        return false;
+      }
+      pose = matrix;
+    } else {
+      auto previous = overrides;
+      overrides.values[index] = mixed;
+      overrides.mask |= bit;
+      Matrix3D matrix = {};
+      if (!composeMatrix(&matrix)) {
+        overrides = previous;
+        return false;
+      }
+    }
+    publish();
+    return true;
+  }
+
+  // Returns the pose with the semantic overlay applied. Fails if the overlay cannot be represented
+  // on the current pose, in which case the raw pose is rendered.
+  bool composeMatrix(Matrix3D* matrix) const {
+    if (overrides.mask == 0) {
+      *matrix = pose;
+      return true;
+    }
+    DecomposedMatrix3D decomposed = {};
+    DecomposedMatrix3D updated = {};
+    return DecomposeMatrix3D(pose, &decomposed) &&
+           ApplyMatrix3DComponentOverrides(decomposed, overrides, &updated) &&
+           RecomposeMatrix3D(updated, matrix);
+  }
+
+  void publish() {
     auto* layer = static_cast<tgfx::Layer*>(const_cast<void*>(rawObject()));
     if (layer == nullptr) {
       return;
     }
-    auto result = animMatrix;
-    if (animX != 0 || animY != 0) {
-      result = tgfx::Matrix::MakeTrans(animX, animY) * animMatrix;
+    Matrix3D matrix = {};
+    if (!composeMatrix(&matrix)) {
+      matrix = pose;
     }
-    layer->setMatrix(result);
+    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(matrix, layoutX, layoutY)));
   }
 };
 
@@ -259,7 +423,8 @@ struct PathRuntimeTarget : RuntimeTarget {
   std::vector<tgfx::Point> points = {};
   float scale = 1.0f;
 
-  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+  bool apply(const std::string& channel, const KeyValue& value, float mix,
+             bool onceDataBind) override {
     size_t index = 0;
     bool isX = false;
     if (ParsePointChannel(channel, index, isX)) {
@@ -275,7 +440,7 @@ struct PathRuntimeTarget : RuntimeTarget {
       rebuild();
       return true;
     }
-    return RuntimeTarget::apply(channel, value, mix);
+    return RuntimeTarget::apply(channel, value, mix, onceDataBind);
   }
 
   bool hasWriter(const std::string& channel) const override {
@@ -372,12 +537,13 @@ struct TextRuntimeTarget : RuntimeTarget {
            channel == "fauxItalic";
   }
 
-  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
+  bool apply(const std::string& channel, const KeyValue& value, float mix,
+             bool onceDataBind) override {
     if (holder != nullptr && IsShapingChannel(channel)) {
       holder->apply(node, channel, value, mix);
       return true;
     }
-    return RuntimeTarget::apply(channel, value, mix);
+    return RuntimeTarget::apply(channel, value, mix, onceDataBind);
   }
 
   bool hasWriter(const std::string& channel) const override {
@@ -589,15 +755,14 @@ class LayerBuilderContext {
         _result.binding.remove(filterNode);
       }
     }
-    // Re-seed the decomposed transform baseline from the node's current authored values, mirroring
-    // the initial build (see convertLayer). The Layer's x / y / matrix channels are AnimLayout, so a
-    // document edit to them must update the LayerRuntimeTarget baseline; otherwise a concurrent
-    // transform animation would mix against the stale baseline. The target installed for a Layer
-    // node is always a LayerRuntimeTarget (convertLayer), so the static_cast is safe.
+    // Re-seed the transform pose from the node's current authored values, mirroring the initial
+    // build (see convertLayer). A document edit to the Layer transform must update the
+    // LayerRuntimeTarget pose; otherwise a concurrent transform animation would mix against the
+    // stale pose. The target installed for a Layer node is always a LayerRuntimeTarget
+    // (convertLayer), so the static_cast is safe.
     auto* layerTarget = static_cast<LayerRuntimeTarget*>(_result.binding.getTarget(node));
     if (layerTarget != nullptr) {
-      auto layerPos = node->renderPosition();
-      layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+      layerTarget->initTransform(node);
     }
     if (node->mask != nullptr) {
       _pendingMasks.emplace_back(layer, node->mask, ToTGFXMaskType(node->maskType));
@@ -929,8 +1094,8 @@ class LayerBuilderContext {
     }
 
     if (layer) {
-      // Install a transform-aware target so the Layer's x / y / matrix channels share one
-      // recomposed tgfx matrix. set() preserves any existing object, so install before set().
+      // Install a transform-aware target so the Layer's transform channels share one pose. set()
+      // preserves any existing object, so install before set().
       auto target = std::unique_ptr<RuntimeTarget>(new LayerRuntimeTarget());
       auto* layerTarget =
           static_cast<LayerRuntimeTarget*>(_result.binding.setTarget(node, std::move(target)));
@@ -942,11 +1107,10 @@ class LayerBuilderContext {
       bindLayerChannels(node);
 
       applyLayerAttributes(node, layer.get());
-      // Seed the decomposed transform from the authored values so the first animated frame mixes
-      // against the static baseline. applyLayerAttributes has already composed them into the layer.
+      // Seed the transform pose from the authored values and compose it into the layer, so the
+      // first animated frame mixes against the static transform.
       if (layerTarget != nullptr) {
-        auto layerPos = node->renderPosition();
-        layerTarget->initTransform(layerPos.x, layerPos.y, ToTGFX(node->matrix));
+        layerTarget->initTransform(node);
       }
 
       // Queue mask to be applied in second pass.
@@ -1010,8 +1174,8 @@ class LayerBuilderContext {
     return true;
   }
 
-  // x / y / matrix are handled by LayerRuntimeTarget::apply (they share one recomposed matrix), so
-  // they are not registered as plain writers here.
+  // The transform channels are handled by LayerRuntimeTarget::apply (they share one pose), so they
+  // are not registered as plain writers here.
   void bindLayerChannels(const Layer* node) {
     _result.binding.setAccessor(node, "alpha", WriteLayerAlpha,
                                 ReadScalar<tgfx::Layer, &tgfx::Layer::alpha>);
@@ -2493,20 +2657,7 @@ class LayerBuilderContext {
       layer->setBlendMode(ToTGFX(node->blendMode));
     }
 
-    // Apply transformation: combine x/y translation with matrix
-    auto matrix = ToTGFX(node->matrix);
-    auto layerPos = node->renderPosition();
-    if (layerPos.x != 0 || layerPos.y != 0) {
-      matrix = tgfx::Matrix::MakeTrans(layerPos.x, layerPos.y) * matrix;
-    }
-    if (!matrix.isIdentity()) {
-      layer->setMatrix(matrix);
-    }
-
-    // Apply 3D matrix if present (overrides 2D matrix)
-    if (!node->matrix3D.isIdentity()) {
-      layer->setMatrix3D(ToTGFX3D(node->matrix3D));
-    }
+    // The transform is composed by LayerRuntimeTarget::initTransform.
     if (node->preserve3D) {
       layer->setPreserve3D(true);
     }

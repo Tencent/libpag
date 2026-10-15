@@ -1236,6 +1236,13 @@ CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesMatrix3DNonIdentity) {
   EXPECT_TRUE(HasLayerOnlyFeatures(layer));
 }
 
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesZNonZero) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->z = 1;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
 CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesPreserve3D) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* layer = MakeDefaultLayer(doc.get());
@@ -1386,6 +1393,13 @@ CLI_TEST(VerifyUtilsTest, IsLayerShellYSet) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* layer = MakeDefaultLayer(doc.get());
   layer->y = 5.0f;
+  EXPECT_FALSE(IsLayerShell(layer));
+}
+
+CLI_TEST(VerifyUtilsTest, IsLayerShellZSet) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->z = 1;
   EXPECT_FALSE(IsLayerShell(layer));
 }
 
@@ -1642,6 +1656,28 @@ CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithAlpha) {
   child->width = 16;
   child->height = 16;
   child->alpha = 0.5f;
+  AddRectFill(doc.get(), child, 16, 16);
+  parent->children.push_back(child);
+
+  OptimizeWithOptions(doc.get(), CollapseOnly());
+
+  ASSERT_EQ(parent->children.size(), 1u);
+  EXPECT_EQ(parent->children[0], child);
+  EXPECT_TRUE(parent->contents.empty());
+}
+
+// A child's depth is a rendering transform and cannot be preserved by absorbing its content into
+// the parent.
+CLI_TEST(PAGXOptimizerTest, CollapseKeepsChildWithZ) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* parent = AddTopLayer(doc.get());
+  parent->width = 16;
+  parent->height = 16;
+  parent->clipToBounds = true;
+  auto* child = doc->makeNode<Layer>();
+  child->width = 16;
+  child->height = 16;
+  child->z = 1;
   AddRectFill(doc.get(), child, 16, 16);
   parent->children.push_back(child);
 

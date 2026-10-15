@@ -586,7 +586,7 @@ PAGX 文档采用层级结构组织内容：
 
 这些来源确保容器在布局计算时几乎总有尺寸可用。显式设置 `width`/`height` 只在需要特定设计尺寸（不等于内容自然尺寸）时才必要。
 
-布局尺寸本身不产生直接的渲染效果，仅向下传递尺寸信息供子元素的约束定位使用。布局尺寸和约束计算在元素的本地坐标系中完成。变换（`matrix`/`matrix3D`）在布局计算结果之上叠加——不参与布局计算，也不影响兄弟节点或父节点的位置。
+布局尺寸本身不产生直接的渲染效果，仅向下传递尺寸信息供子元素的约束定位使用。布局尺寸和约束计算在元素的本地坐标系中完成。变换（`matrix`/`matrix3D`/`z`）在布局计算结果之上叠加——不参与布局计算，也不影响兄弟节点或父节点的位置。
 
 ### 4.2 容器布局（Container Layout）
 
@@ -955,8 +955,9 @@ Layer 的子元素按类型自动归类为五个集合：
 | `blendMode` | BlendMode | normal | 混合模式 |
 | `x` | float | 0 | X 位置（推荐使用约束属性 `left`） |
 | `y` | float | 0 | Y 位置（推荐使用约束属性 `top`） |
+| `z` | float | 0 | Z 平移；仅影响渲染深度，不参与自动布局 |
 | `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
-| `matrix3D` | Matrix | - | 3D 变换（16 个值，列优先） |
+| `matrix3D` | Matrix3D | - | 3D 变换（16 个值，列优先） |
 | `preserve3D` | bool | false | 保持 3D 变换 |
 | `antiAlias` | bool | true | 边缘抗锯齿 |
 | `groupOpacity` | bool | true | 组透明度 |
@@ -976,10 +977,14 @@ Layer 的子元素按类型自动归类为五个集合：
 
 **preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
 
-**变换属性优先级**：`x`/`y`、`matrix`、`matrix3D` 三者存在覆盖关系：
-- 仅设置 `x`/`y`：使用 `x`/`y` 作为平移
-- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 的值
-- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix` 和 `x`/`y` 的值
+**变换属性优先级**：`x`/`y`/`z`、`matrix`、`matrix3D` 组成图层的局部变换，三者存在覆盖关系：
+- 仅设置 `x`/`y`/`z`：使用 `x`/`y`/`z` 作为平移
+- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 的值，`z` 仍然生效
+- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix` 和 `x`/`y`/`z` 的值
+
+约束或容器布局生成的位置在局部变换之外叠加：`T(layoutPosition) * local`。
+
+**变换动画**：Layer 维护一个由 `x`/`y`/`z`、`matrix`、`matrix3D` 通道共享的当前局部变换。每次动画或 DataBind 写入只把它驱动的部分混合进当前值（`current = mix(current, value, weight)`），没有被驱动的部分保持当前值不变。`x`/`y`/`z` 驱动平移，`matrix` 驱动 2D 部分并保留 Z 平移，`matrix3D` 驱动整个矩阵。同一个动画内，其包含的通道按上述优先级生效，与通道顺序无关。非单位的静态 `matrix` 会忽略 `x`/`y` 写入，非单位的静态 `matrix3D` 会忽略 `x`/`y`/`z` 和 `matrix` 写入。
 
 **MaskType（遮罩类型）**：
 
@@ -2318,8 +2323,9 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 | `image` | 图片资源引用 |
 | `color` | 颜色值（RGBA） |
 | `matrix` | 2D 变换矩阵 |
+| `matrix3D` | 4×4 变换矩阵（16 个值，列优先）；关键帧必须为有限且可逆的矩阵 |
 
-若省略 `type`，系统会根据第一个 `<Key>` 的 `value` 自动推断类型（color → bool → image → int → float → string）。
+若省略 `type`，系统会根据第一个 `<Key>` 的 `value` 自动推断类型（color → bool → image → 16 个数值的 `matrix3D` → int → float → string）。
 
 **示例**：驱动透明度的通道。
 
@@ -2332,7 +2338,7 @@ PAGX 动画系统由关键帧动画（Animation）和状态机（StateMachine）
 
 #### 8.1.4 关键帧（Key / Keyframe）
 
-关键帧保存特定时刻的属性值，以及如何过渡到下一个关键帧的插值方式和可选的贝塞尔控制柄。支持的值类型包括 `float`、`bool`、`int`、`string`、`image`、`color`、`matrix`。
+关键帧保存特定时刻的属性值，以及如何过渡到下一个关键帧的插值方式和可选的贝塞尔控制柄。支持的值类型包括 `float`、`bool`、`int`、`string`、`image`、`color`、`matrix` 和 `matrix3D`。
 
 **Frame**：`Frame` 是帧索引。`ZeroFrame = 0` 是动画的第一帧。
 
@@ -2948,7 +2954,7 @@ Layer / Group
 | 枚举 | 值 |
 |------|------|
 | **KeyframeInterpolationType** | `none`, `linear`, `bezier`, `hold` |
-| **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix` |
+| **ChannelValueType** | `float`, `bool`, `int`, `string`, `image`, `color`, `matrix`, `matrix3D` |
 | **TimelineType** | `animation`, `stateMachine` |
 
 ### 状态机相关
@@ -3020,8 +3026,17 @@ Layer / Group
 | `alpha` | number | 透明度 |
 | `visible` | boolean | 可见性开关 |
 | `blendMode` | enum | 混合模式 |
-| `x` ^Layout^ | float | 左上角 X 坐标 |
-| `y` ^Layout^ | float | 左上角 Y 坐标 |
+| `x` ^Layout^ | float | 局部 X 平移 |
+| `y` ^Layout^ | float | 局部 Y 平移 |
+| `z` | float | 局部 Z 平移 |
+| `matrix` | matrix | 2D 局部变换；仅用于动画 |
+| `matrix3D` | matrix3D | 4×4 局部变换；仅用于动画。通过矩阵分解和四元数球面插值进行插值，无法分解时逐项插值；奇异结果会被拒绝 |
+| `rotation.x` / `rotation.y` / `rotation.z` | number | 仅用于 DataBind 的欧拉旋转角，单位为度，按 `Rz * Ry * Rx` 组合 |
+| `scale.x` / `scale.y` / `scale.z` | number | 仅用于 DataBind 的缩放 |
+| `skew.xy` / `skew.xz` / `skew.yz` | number | 仅用于 DataBind 的剪切角，单位为度 |
+| `perspective` | number | 仅用于 DataBind 的透视距离；0 表示无透视，正数 `d` 对应投影行 `[0, 0, -1/d, 1]` |
+
+旋转/缩放/剪切/透视通道绑定 Number 类型的 ViewModel 属性，覆盖分解后局部变换中的对应分量。`ToTarget`/`TwoWay` 绑定在后续变换写入后仍持续覆盖；`Once` 绑定只把值写入局部变换一次，之后的变换写入会接管。局部变换无法分解时，按不带这些覆盖的局部变换渲染。
 
 ### D.2 几何节点（Rectangle / Ellipse / Polystar / Path）
 

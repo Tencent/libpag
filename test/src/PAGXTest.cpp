@@ -86,6 +86,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Alignment.h"
 #include "pagx/types/Arrangement.h"
@@ -9836,6 +9837,14 @@ PAGX_TEST(PAGXTest, NodeChannelScalarRoundTrip) {
   auto layer = doc->makeNode<pagx::Layer>("L");
   doc->layers.push_back(layer);
 
+  EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, "matrix"));
+  EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, "matrix"));
+  auto authoredMatrix = pagx::Matrix::Translate(3, 4) * pagx::Matrix::Scale(2, 3);
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "matrix", pagx::KeyValue(authoredMatrix)));
+  pagx::KeyValue matrixOut;
+  EXPECT_TRUE(pagx::GetNodeChannel(layer, "matrix", &matrixOut));
+  EXPECT_EQ(std::get<pagx::Matrix>(matrixOut), authoredMatrix);
+
   EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.4f)));
   EXPECT_FLOAT_EQ(layer->alpha, 0.4f);
   pagx::KeyValue out;
@@ -10215,8 +10224,8 @@ PAGX_TEST(PAGXTest, ChannelRectangleSize) {
 }
 
 /**
- * Test case: a Layer's matrix channel drives the tgfx layer transform via TRS-decomposed mixing,
- * and stacks with the layer's authored x/y translation.
+ * Test case: a Layer's matrix channel drives the full 2D local transform via TRS-decomposed mixing,
+ * so it replaces the layer's authored x/y translation.
  */
 PAGX_TEST(PAGXTest, ChannelLayerMatrix) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -10246,12 +10255,399 @@ PAGX_TEST(PAGXTest, ChannelLayerMatrix) {
 
   auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
   ASSERT_TRUE(timeline != nullptr);
-  // mix=1: matrix becomes 2x scale, composed with the authored x translation (10).
+  // mix=1: the matrix becomes 2x scale and replaces the authored x translation (10).
   timeline->apply(1.0f);
   auto m = tgfxLayer->matrix();
   EXPECT_FLOAT_EQ(m.getScaleX(), 2.0f);
   EXPECT_FLOAT_EQ(m.getScaleY(), 2.0f);
-  EXPECT_FLOAT_EQ(m.getTranslateX(), 10.0f);
+  EXPECT_FLOAT_EQ(m.getTranslateX(), 0.0f);
+}
+
+PAGX_TEST(PAGXTest, ChannelMatrix3DRoundTripAndSingularValidation) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto* animation = doc->makeNode<pagx::Animation>("anim");
+  doc->animations.push_back(animation);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+  auto* channel = doc->makeNode<pagx::TypedChannel<pagx::Matrix3D>>();
+  channel->name = "matrix3D";
+  pagx::Matrix3D matrix = {};
+  matrix.values[3] = 0.001f;
+  matrix.values[12] = 12;
+  channel->keyframes.push_back({0, matrix, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(channel);
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(loaded, nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  auto* loadedAnimation = static_cast<pagx::Animation*>(loaded->animations[0]);
+  auto* loadedChannel =
+      static_cast<pagx::TypedChannel<pagx::Matrix3D>*>(loadedAnimation->objects[0]->channels[0]);
+  EXPECT_EQ(loadedChannel->keyframes[0].value, matrix);
+
+  const std::string singularXml =
+      "<pagx width=\"100\" height=\"100\"><Layer id=\"L\"/><Animations>"
+      "<Animation id=\"a\"><Object target=\"L\"><Channel name=\"matrix3D\" "
+      "type=\"matrix3D\"><Key time=\"0\" value=\"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\"/>"
+      "</Channel></Object></Animation></Animations></pagx>";
+  auto invalid = pagx::PAGXImporter::FromXML(singularXml);
+  ASSERT_NE(invalid, nullptr);
+  EXPECT_FALSE(invalid->errors.empty());
+}
+
+PAGX_TEST(PAGXTest, Matrix3DSemanticUnitsAndGimbalLock) {
+  pagx::DecomposedMatrix3D base = {};
+  pagx::DecomposedMatrix3D updated = {};
+  ASSERT_TRUE(pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::PerspectiveDistance, 100,
+                                         &updated));
+  EXPECT_NEAR(updated.perspective[2], -0.01, 1.0e-6);
+  float distance = 0;
+  ASSERT_TRUE(pagx::ReadMatrix3DComponent(updated, pagx::Matrix3DComponent::PerspectiveDistance,
+                                          &distance));
+  EXPECT_FLOAT_EQ(distance, 100);
+  EXPECT_FALSE(
+      pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::PerspectiveDistance, -1, &updated));
+  ASSERT_TRUE(
+      pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::PerspectiveDistance, 0, &updated));
+  EXPECT_DOUBLE_EQ(updated.perspective[2], 0);
+
+  ASSERT_TRUE(pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::SkewXY, 45, &updated));
+  EXPECT_NEAR(updated.skew[0], 1, 1.0e-6);
+  float skew = 0;
+  ASSERT_TRUE(pagx::ReadMatrix3DComponent(updated, pagx::Matrix3DComponent::SkewXY, &skew));
+  EXPECT_FLOAT_EQ(skew, 45);
+  EXPECT_FALSE(pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::SkewXY, 90, &updated));
+
+  auto sourceRotation = pagx::QuaternionFromEulerXYZDegrees(30, 90, 20);
+  double euler[3] = {};
+  ASSERT_TRUE(pagx::EulerXYZDegreesFromQuaternion(sourceRotation, euler));
+  EXPECT_NEAR(euler[1], 90, 1.0e-6);
+  EXPECT_DOUBLE_EQ(euler[2], 0);
+  auto reconstructedRotation = pagx::QuaternionFromEulerXYZDegrees(euler[0], euler[1], euler[2]);
+  double dot =
+      sourceRotation.x * reconstructedRotation.x + sourceRotation.y * reconstructedRotation.y +
+      sourceRotation.z * reconstructedRotation.z + sourceRotation.w * reconstructedRotation.w;
+  EXPECT_NEAR(std::abs(dot), 1, 1.0e-6);
+}
+
+PAGX_TEST(PAGXTest, Matrix3DComponentChannelsAreDataBindOnly) {
+  const char* channels[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x", "scale.y",
+                            "scale.z",    "skew.xy",    "skew.xz",    "skew.yz", "perspective"};
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>();
+  for (const auto* channel : channels) {
+    EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
+    EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel));
+  }
+  EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::Layer, "perspective.distance"));
+  for (const auto* channel : {"x", "y", "z"}) {
+    EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
+    EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel));
+  }
+  ASSERT_TRUE(pagx::SetNodeChannel(layer, "x", pagx::KeyValue{25.0f}));
+  pagx::KeyValue translation{};
+  ASSERT_TRUE(pagx::GetNodeChannel(layer, "x", &translation));
+  EXPECT_FLOAT_EQ(std::get<float>(translation), 25.0f);
+  EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::Layer, "matrix3D.translateX"));
+  EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::Layer, "position.x"));
+  EXPECT_FLOAT_EQ(layer->y, 0.0f);
+  EXPECT_FLOAT_EQ(layer->z, 0.0f);
+
+  doc->layers.push_back(layer);
+  auto* animation = doc->makeNode<pagx::Animation>("componentAnimation");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  doc->animations.push_back(animation);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = layer->id;
+  animation->objects.push_back(object);
+  auto* rotation = doc->makeNode<pagx::TypedChannel<float>>();
+  rotation->name = "rotation.z";
+  rotation->keyframes.push_back({0, 90, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(rotation);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto runtimeLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_NE(runtimeLayer, nullptr);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_NE(timeline, nullptr);
+  timeline->apply(1.0f);
+  float values[16] = {};
+  runtimeLayer->matrix3D().getColumnMajor(values);
+  EXPECT_FLOAT_EQ(values[0], 1);
+  EXPECT_FLOAT_EQ(values[1], 0);
+  EXPECT_FLOAT_EQ(values[12], 25);
+}
+
+PAGX_TEST(PAGXTest, PositionXChannelRemainsAnimatableOnRectangle) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("host");
+  auto* rect = doc->makeNode<pagx::Rectangle>("geometry");
+  rect->size = {50, 50};
+  layer->contents.push_back(rect);
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto* animation = doc->makeNode<pagx::Animation>("geometryAnimation");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  doc->animations.push_back(animation);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = rect->id;
+  animation->objects.push_back(object);
+  auto* position = doc->makeNode<pagx::TypedChannel<float>>();
+  position->name = "position.x";
+  position->keyframes.push_back({0, 35, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(position);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto runtimeRect = scene->mutableBinding()->get<tgfx::Rectangle>(rect);
+  ASSERT_NE(runtimeRect, nullptr);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_NE(timeline, nullptr);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(runtimeRect->position().x, 35);
+}
+
+PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
+  pagx::DecomposedMatrix3D components = {};
+  components.perspective[0] = 0.002;
+  components.perspective[1] = -0.001;
+  components.perspective[2] = 0.003;
+  components.perspective[3] = 1.0 - components.perspective[0] * 10.0 -
+                              components.perspective[1] * 20.0 - components.perspective[2] * 30.0;
+  components.translate[0] = 10;
+  components.translate[1] = 20;
+  components.translate[2] = 30;
+  components.rotation = {0, 0.3826834323, 0, 0.9238795325};
+  components.scale[0] = 2;
+  components.scale[1] = 3;
+  components.scale[2] = 4;
+  components.skew[0] = 0.2;
+  components.skew[1] = -0.1;
+  components.skew[2] = 0.3;
+  pagx::Matrix3D source = {};
+  ASSERT_TRUE(pagx::RecomposeMatrix3D(components, &source));
+  pagx::DecomposedMatrix3D decomposed = {};
+  ASSERT_TRUE(pagx::DecomposeMatrix3D(source, &decomposed));
+  pagx::Matrix3D recomposed = {};
+  ASSERT_TRUE(pagx::RecomposeMatrix3D(decomposed, &recomposed));
+  for (int i = 0; i < 16; ++i) {
+    EXPECT_NEAR(recomposed.values[i], source.values[i], 0.001f);
+  }
+
+  auto midpoint = pagx::LerpMatrix3D(source, source, 0.5);
+  for (int i = 0; i < 16; ++i) {
+    EXPECT_FLOAT_EQ(midpoint.values[i], source.values[i]);
+  }
+  pagx::Matrix3D singular = {};
+  for (int column = 0; column < 4; ++column) {
+    singular.setRowColumn(3, column, singular.getRowColumn(2, column));
+  }
+  EXPECT_FALSE(pagx::IsInvertibleMatrix3D(singular));
+
+  pagx::Matrix3D nonStandard = {};
+  nonStandard.values[0] = 0;
+  nonStandard.values[12] = 1;
+  nonStandard.values[3] = 1;
+  EXPECT_TRUE(pagx::IsInvertibleMatrix3D(nonStandard));
+  EXPECT_FALSE(pagx::DecomposeMatrix3D(nonStandard, &decomposed));
+  auto fallback = pagx::LerpMatrix3D(nonStandard, pagx::Matrix3D{}, 0.5);
+  EXPECT_FLOAT_EQ(fallback.values[3], 0.5f);
+  EXPECT_FLOAT_EQ(fallback.values[12], 0.5f);
+}
+
+static pagx::Matrix3D ToPAGXMatrix3D(const tgfx::Matrix3D& matrix) {
+  pagx::Matrix3D result = {};
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      result.setRowColumn(row, column, matrix.getRowColumn(row, column));
+    }
+  }
+  return result;
+}
+
+template <typename T>
+static void AddHoldChannel(pagx::PAGXDocument* doc, pagx::Animation* animation,
+                           const std::string& target, const std::string& name, const T& value) {
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = target;
+  animation->objects.push_back(object);
+  auto* channel = doc->makeNode<pagx::TypedChannel<T>>();
+  channel->name = name;
+  channel->keyframes.push_back({0, value, pagx::KeyframeInterpolationType::Hold, {}, {}});
+  object->channels.push_back(channel);
+}
+
+/**
+ * Test case: every Layer transform write mixes only the part of the local pose its channel drives,
+ * so the components no source drives keep their current values. A matrix written by an earlier
+ * source does not mask a later x / y / z write.
+ */
+PAGX_TEST(PAGXTest, LayerTransformWritesKeepUndrivenComponents) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  layer->x = 10;
+  layer->y = 20;
+  doc->layers.push_back(layer);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+
+  ASSERT_TRUE(binding->apply(layer, "x", pagx::KeyValue{50.0f}, 0.5f));
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(0, 3), 30);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(1, 3), 20);
+
+  ASSERT_TRUE(binding->apply(layer, "z", pagx::KeyValue{40.0f}, 1.0f));
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(0, 3), 30);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(1, 3), 20);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(2, 3), 40);
+
+  ASSERT_TRUE(binding->apply(layer, "matrix", pagx::KeyValue{pagx::Matrix::Scale(2, 2)}, 1.0f));
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(0, 0), 2);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(0, 3), 0);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(1, 3), 0);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(2, 3), 40);
+
+  auto rotation = ToPAGXMatrix3D(tgfx::Matrix3D::MakeRotate({0, 0, 1}, 90));
+  ASSERT_TRUE(binding->apply(layer, "matrix3D", pagx::KeyValue{rotation}, 1.0f));
+  ASSERT_TRUE(binding->apply(layer, "x", pagx::KeyValue{5.0f}, 1.0f));
+  auto matrix = tgfxLayer->matrix3D();
+  EXPECT_NEAR(matrix.getRowColumn(0, 0), 0, 1.0e-6f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 1, 1.0e-6f);
+  EXPECT_FLOAT_EQ(matrix.getRowColumn(0, 3), 5);
+  EXPECT_FLOAT_EQ(matrix.getRowColumn(2, 3), 0);
+  pagx::KeyValue x;
+  ASSERT_TRUE(binding->read(layer, "x", &x));
+  EXPECT_FLOAT_EQ(std::get<float>(x), 5);
+}
+
+/**
+ * Test case: within one animation, matrix3D overrides matrix and x / y / z, and matrix overrides
+ * x / y, regardless of channel order or of the channels being split across objects.
+ */
+PAGX_TEST(PAGXTest, LayerTransformPrecedenceWithinAnimation) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer3D = doc->makeNode<pagx::Layer>("L3D");
+  auto* layer2D = doc->makeNode<pagx::Layer>("L2D");
+  doc->layers.push_back(layer3D);
+  doc->layers.push_back(layer2D);
+  auto* animation = doc->makeNode<pagx::Animation>("anim");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  doc->animations.push_back(animation);
+  AddHoldChannel(doc.get(), animation, "L3D", "x", 50.0f);
+  AddHoldChannel(doc.get(), animation, "L3D", "matrix", pagx::Matrix::Scale(3, 3));
+  AddHoldChannel(doc.get(), animation, "L3D", "matrix3D",
+                 ToPAGXMatrix3D(tgfx::Matrix3D::MakeTranslate(7, 8, 9)));
+  AddHoldChannel(doc.get(), animation, "L3D", "z", 30.0f);
+  AddHoldChannel(doc.get(), animation, "L2D", "x", 50.0f);
+  AddHoldChannel(doc.get(), animation, "L2D", "matrix", pagx::Matrix::Scale(2, 2));
+  AddHoldChannel(doc.get(), animation, "L2D", "y", 60.0f);
+  AddHoldChannel(doc.get(), animation, "L2D", "z", 30.0f);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_NE(timeline, nullptr);
+  timeline->apply(1.0f);
+  auto matrix3D = scene->mutableBinding()->get<tgfx::Layer>(layer3D)->matrix3D();
+  EXPECT_FLOAT_EQ(matrix3D.getRowColumn(0, 0), 1);
+  EXPECT_FLOAT_EQ(matrix3D.getRowColumn(0, 3), 7);
+  EXPECT_FLOAT_EQ(matrix3D.getRowColumn(1, 3), 8);
+  EXPECT_FLOAT_EQ(matrix3D.getRowColumn(2, 3), 9);
+  auto matrix2D = scene->mutableBinding()->get<tgfx::Layer>(layer2D)->matrix3D();
+  EXPECT_FLOAT_EQ(matrix2D.getRowColumn(0, 0), 2);
+  EXPECT_FLOAT_EQ(matrix2D.getRowColumn(0, 3), 0);
+  EXPECT_FLOAT_EQ(matrix2D.getRowColumn(1, 3), 0);
+  EXPECT_FLOAT_EQ(matrix2D.getRowColumn(2, 3), 30);
+}
+
+/**
+ * Test case: a static non-identity matrix3D rejects x / y / z / matrix writes, a static
+ * non-identity matrix rejects x / y writes, and a singular matrix3D write is rejected without
+ * changing the transform.
+ */
+PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer3D = doc->makeNode<pagx::Layer>("L3D");
+  layer3D->matrix3D = ToPAGXMatrix3D(tgfx::Matrix3D::MakeTranslate(0, 0, 10));
+  auto* layer2D = doc->makeNode<pagx::Layer>("L2D");
+  layer2D->x = 40;
+  layer2D->matrix = pagx::Matrix::Translate(5, 6);
+  doc->layers.push_back(layer3D);
+  doc->layers.push_back(layer2D);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+
+  EXPECT_FALSE(binding->apply(layer3D, "x", pagx::KeyValue{1.0f}, 1.0f));
+  EXPECT_FALSE(binding->apply(layer3D, "z", pagx::KeyValue{1.0f}, 1.0f));
+  EXPECT_FALSE(binding->apply(layer3D, "matrix", pagx::KeyValue{pagx::Matrix::Scale(2, 2)}, 1.0f));
+  EXPECT_FLOAT_EQ(binding->get<tgfx::Layer>(layer3D)->matrix3D().getRowColumn(2, 3), 10);
+
+  auto tgfxLayer2D = binding->get<tgfx::Layer>(layer2D);
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(0, 3), 5);
+  EXPECT_FALSE(binding->apply(layer2D, "x", pagx::KeyValue{1.0f}, 1.0f));
+  pagx::KeyValue x;
+  EXPECT_FALSE(binding->read(layer2D, "x", &x));
+  ASSERT_TRUE(binding->apply(layer2D, "z", pagx::KeyValue{20.0f}, 1.0f));
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(0, 3), 5);
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(1, 3), 6);
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(2, 3), 20);
+
+  pagx::Matrix3D singular = {};
+  singular.values[0] = 0;
+  EXPECT_FALSE(binding->apply(layer2D, "matrix3D", pagx::KeyValue{singular}, 1.0f));
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(0, 0), 1);
+  EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(2, 3), 20);
+}
+
+/**
+ * Test case: the constraint layout position stays outside the local transform. Authored x / y add
+ * to it, and a matrix3D write replaces only the local transform.
+ */
+PAGX_TEST(PAGXTest, LayerLayoutPositionStaysOutsideLocalTransform) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto* parent = doc->makeNode<pagx::Layer>("parent");
+  parent->width = 200;
+  parent->height = 100;
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  layer->x = 20;
+  layer->y = 10;
+  layer->width = 20;
+  layer->height = 20;
+  layer->left = 100;
+  layer->top = 30;
+  parent->children.push_back(layer);
+  doc->layers.push_back(parent);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(0, 3), 120);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(1, 3), 40);
+  pagx::KeyValue x;
+  ASSERT_TRUE(binding->read(layer, "x", &x));
+  EXPECT_FLOAT_EQ(std::get<float>(x), 20);
+
+  auto rotation = ToPAGXMatrix3D(tgfx::Matrix3D::MakeRotate({0, 0, 1}, 90));
+  ASSERT_TRUE(binding->apply(layer, "matrix3D", pagx::KeyValue{rotation}, 1.0f));
+  auto matrix = tgfxLayer->matrix3D();
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 1, 1.0e-6f);
+  EXPECT_FLOAT_EQ(matrix.getRowColumn(0, 3), 100);
+  EXPECT_FLOAT_EQ(matrix.getRowColumn(1, 3), 30);
 }
 
 /**
@@ -13766,6 +14162,81 @@ PAGX_TEST(PAGXTest, SMCrossfadeMixAdvancesOncePerFrame) {
   // Assert the crossfade takes the full ~10 frames, proving mix advances only once per frame.
   EXPECT_GE(frames, 9);
   EXPECT_EQ(smTimeline->getCurrentState("main"), "b");
+}
+
+/**
+ * Test case: a state machine crossfade from a state driving matrix3D to a state driving only x
+ * moves only the translation. The rotation written by the outgoing state is kept after the
+ * crossfade finishes because no source drives it anymore.
+ */
+PAGX_TEST(PAGXTest, SMCrossfadeKeepsTransformComponentsNotDrivenByTargetState) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("target");
+  doc->layers.push_back(layer);
+  auto* animA = doc->makeNode<pagx::Animation>("animA");
+  animA->duration = 30;
+  animA->frameRate = 60.0f;
+  doc->animations.push_back(animA);
+  AddHoldChannel(doc.get(), animA, "target", "matrix3D",
+                 ToPAGXMatrix3D(tgfx::Matrix3D::MakeRotate({0, 0, 1}, 90)));
+  auto* animB = doc->makeNode<pagx::Animation>("animB");
+  animB->duration = 30;
+  animB->frameRate = 60.0f;
+  doc->animations.push_back(animB);
+  AddHoldChannel(doc.get(), animB, "target", "x", 40.0f);
+
+  auto* sm = doc->makeNode<pagx::StateMachine>("crossSM");
+  doc->animations.push_back(sm);
+  auto* input = doc->makeNode<pagx::StateMachineInput>();
+  input->name = "go";
+  input->type = pagx::StateMachineInputType::Bool;
+  sm->inputs.push_back(input);
+  auto* region = doc->makeNode<pagx::StateRegion>();
+  region->name = "main";
+  region->initialState = "a";
+  auto* stateA = doc->makeNode<pagx::AnimationState>();
+  stateA->name = "a";
+  stateA->animationId = "animA";
+  region->states.push_back(stateA);
+  auto* stateB = doc->makeNode<pagx::AnimationState>();
+  stateB->name = "b";
+  stateB->animationId = "animB";
+  region->states.push_back(stateB);
+  auto* transition = doc->makeNode<pagx::StateTransition>();
+  transition->from = "a";
+  transition->to = "b";
+  transition->duration = 10;
+  auto* condition = doc->makeNode<pagx::TransitionCondition>();
+  condition->inputName = "go";
+  condition->op = pagx::TransitionConditionOp::Equal;
+  condition->valueBool = true;
+  transition->conditions.push_back(condition);
+  region->transitions.push_back(transition);
+  sm->regions.push_back(region);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto smTimeline = scene->getStateMachineTimeline("crossSM");
+  ASSERT_NE(smTimeline, nullptr);
+  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+  smTimeline->advanceAndApply(16667);
+  EXPECT_NEAR(tgfxLayer->matrix3D().getRowColumn(1, 0), 1, 1.0e-6f);
+
+  smTimeline->setBool("go", true);
+  smTimeline->advanceAndApply(5 * 16667);
+  auto matrix = tgfxLayer->matrix3D();
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 1, 1.0e-6f);
+  EXPECT_GT(matrix.getRowColumn(0, 3), 0);
+  EXPECT_LT(matrix.getRowColumn(0, 3), 40);
+
+  for (int i = 0; i < 10; ++i) {
+    smTimeline->advanceAndApply(16667);
+  }
+  EXPECT_EQ(smTimeline->getCurrentState("main"), "b");
+  matrix = tgfxLayer->matrix3D();
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 1, 1.0e-6f);
+  EXPECT_FLOAT_EQ(matrix.getRowColumn(0, 3), 40);
 }
 
 PAGX_TEST(PAGXTest, SMStableStateOutput) {

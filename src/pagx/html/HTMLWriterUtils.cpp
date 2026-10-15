@@ -560,9 +560,30 @@ std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
   }
-  // Layer position (x/y) is emitted as left/top by the caller. The matrix is applied on top of
-  // that position, following the tgfx rendering formula: Translate(renderPosition) * matrix.
+  // Generated layout is emitted as the outer left/top slot. Keep authored x/y in the local
+  // transform only on axes where layout supplied a separate position.
   Matrix m = layer->matrix;
+  if (layer->matrix.isIdentity()) {
+    auto layoutPosition = layer->layoutPosition();
+    float x = std::isnan(layoutPosition.x) ? 0 : layer->x;
+    float y = std::isnan(layoutPosition.y) ? 0 : layer->y;
+    if (x != 0 || y != 0) {
+      m = Matrix::Translate(x, y) * m;
+    }
+  }
+  if (layer->z != 0) {
+    Matrix3D matrix3D = {};
+    matrix3D.setRowColumn(0, 0, m.a);
+    matrix3D.setRowColumn(0, 1, m.c);
+    matrix3D.setRowColumn(0, 3, m.tx);
+    matrix3D.setRowColumn(1, 0, m.b);
+    matrix3D.setRowColumn(1, 1, m.d);
+    matrix3D.setRowColumn(1, 3, m.ty);
+    matrix3D.setRowColumn(2, 2, 1);
+    matrix3D.setRowColumn(2, 3, layer->z);
+    matrix3D.setRowColumn(3, 3, 1);
+    return Matrix3DToCSS(matrix3D);
+  }
   if (m.isIdentity()) {
     return {};
   }

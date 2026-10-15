@@ -58,6 +58,15 @@ static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
 // Chromium's default `line-height: normal` resolves to ≈1.17 × font-size for typical Latin
 // fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
 
+static Point LayerPositionForCSS(const Layer* layer) {
+  if (layer->matrix3D.isIdentity() && layer->matrix.isIdentity()) {
+    return layer->renderPosition();
+  }
+  auto layoutPosition = layer->layoutPosition();
+  return {std::isnan(layoutPosition.x) ? 0 : layoutPosition.x,
+          std::isnan(layoutPosition.y) ? 0 : layoutPosition.y};
+}
+
 static void EmitLeftTopCss(std::string& style, bool& positionSet, float x, float y) {
   style += ";left:" + CssFloatToString(x) + "px;top:" + CssFloatToString(y) + "px";
   positionSet = true;
@@ -1489,12 +1498,13 @@ static ContourMaskBox ContourMaskBorderRadius(const Layer* layer) {
   if (mask == nullptr || !mask->children.empty() || mask->composition != nullptr) {
     return {};
   }
-  // writeClipContent folds the mask layer's own transform into the clip geometry, so only an
-  // untransformed mask leaves the shape bounds directly comparable to the layer's border box.
-  Matrix maskMatrix = mask->matrix;
-  if (mask->x != 0 || mask->y != 0) {
-    maskMatrix = Matrix::Translate(mask->x, mask->y) * maskMatrix;
+  // writeClipContent folds the mask layer's local transform and generated layout slot into the
+  // clip geometry, so only an identity 2D mask transform leaves the shape bounds comparable to
+  // this box. A 2D border-radius cannot represent a full 3D transform.
+  if (!mask->matrix3D.isIdentity()) {
+    return {};
   }
+  Matrix maskMatrix = BuildLayerMatrix(mask);
   if (!maskMatrix.isIdentity()) {
     return {};
   }
@@ -2046,7 +2056,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     }
   } else {
     style += "position:absolute";
-    auto renderPos = layer->renderPosition();
+    auto renderPos = LayerPositionForCSS(layer);
     // If the parent layer's div was shifted to cover Repeater union bounds, child layers need
     // the inverse shift added to their own left/top so they still paint at the correct document
     // position. Consume and clear the offset so it is not applied to grandchild layers.

@@ -44,6 +44,7 @@
 #include "pagx/runtime/KeyframeEvaluator.h"
 #include "pagx/runtime/KeyframeEvaluatorImpl.h"
 #include "pagx/svg/SVGPathParser.h"
+#include "pagx/svg/SVGTransformParser.h"
 
 namespace pagx {
 
@@ -1271,17 +1272,19 @@ bool HTMLAnimationBuilder::buildForElement(
     }
   }
 
-  // Lower the collected transform matrices onto the playable channel(s). A pure-translation
-  // animation keeps the existing `x`/`y` path (it preserves the layout-assigned position through
-  // the inner-wrapper split below, and avoids matrix-decompose interpolation entirely). Any
-  // scale / rotate / skew (or a non-translation `matrix(...)`) routes the *full* affine through a
-  // single `matrix` channel, pivoted around the element's transform-origin exactly like the static
-  // `HTMLLayerBuilder::applyBoxTransform` path so the animated and static transforms agree.
+  // Lower transform keyframes onto the runtime channel matching their CSS composition. A pure
+  // translation uses x/y when there is no static transform; if a static transform exists, the
+  // animation replaces that transform property, so emit complete matrix samples instead of x/y
+  // channels that the matrix priority would suppress. Other affine transforms use a matrix channel.
   if (!transformStops.empty()) {
-    if (transformAllPureTranslate) {
+    if (transformAllPureTranslate && layer->matrix.isIdentity()) {
       for (const auto& ts : transformStops) {
         xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
         yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
+      }
+    } else if (transformAllPureTranslate) {
+      for (const auto& ts : transformStops) {
+        matrixKeys.push_back({ts.first, ts.second, interp, {}, {}});
       }
     } else {
       float cx = 0.0f;
@@ -1381,7 +1384,7 @@ bool HTMLAnimationBuilder::buildForElement(
   // ends (when fill-mode is `none` or `backwards`).
   //   alpha: the layer's resolved opacity, already populated from CSS by the layer importer.
   //   x / y: zero — translate-animated layers route their channels onto an inner wrapper whose
-  //          layoutBounds origin is (0, 0); the CSS keyframe values stack on top of that.
+  //          local position starts at (0, 0); the wrapper remains inside the outer layout slot.
   //   color: the SolidColor's current color, populated from CSS background-color/color before
   //          this method runs. The fill must be located before SplitForTransformAnimation moves
   //          contents to the inner wrapper, but the SolidColor pointer remains stable across the
@@ -1491,11 +1494,9 @@ bool HTMLAnimationBuilder::buildForElement(
         "[subset:animation-finite-count]");
   }
 
-  // CSS `transform: translate(...)` is an offset on top of the layout-assigned position, but
-  // the runtime `x` / `y` channels overwrite the matrix translation absolutely. To keep the
-  // CSS semantics under any positioning mode (absolute, flex child, padding-anchored child),
-  // wrap the layer once and route x/y onto a fully-visual inner layer whose layoutBounds are
-  // always (0, 0). Done lazily so layers without transform animations stay flat.
+  // Preserve the element's parent-facing layout slot while keeping CSS translate keyframes on a
+  // fully-visual inner layer. The outer layer retains absolute/flex positioning; the inner layer
+  // fills it and owns the local animated transform. Done lazily so static elements stay flat.
   Layer* xyTarget = nullptr;
   if (!xKeys.empty() || !yKeys.empty()) {
     xyTarget = SplitForTransformAnimation(layer, _document, _idAllocator);
@@ -1931,10 +1932,10 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     std::vector<Keyframe<Color>> strokeColorKeys;
     std::vector<Keyframe<float>> strokeAlphaKeys;
     std::vector<Keyframe<float>> dashKeys;
-    // Layer-space channels: `opacity` -> the shape Layer's `alpha`; a pure-translate `transform`
-    // -> `x` / `y`; scale / skew -> the full affine `matrix` channel. A pure rotation uses the
-    // scalar `rotation` channel on the resolver-created Group so its pivot stays fixed. The shape
-    // Layer sits at layout origin in SVG user (view-box) space, so captured values map verbatim.
+    // Layer-space channels: `opacity` -> the shape Layer's `alpha`; a pure translation -> `x`/`y`
+    // when no static transform is present, otherwise a complete `matrix` sample replaces it. Pure
+    // rotations may use the resolver-created Group's scalar `rotation` channel so their pivot stays
+    // fixed. The shape Layer sits at layout origin in SVG user (view-box) space.
     std::vector<Keyframe<float>> alphaKeys;
     std::vector<Keyframe<float>> xKeys;
     std::vector<Keyframe<float>> yKeys;
@@ -1994,21 +1995,31 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       }
     }
 
-    // Keep translations as x/y so they compose with SVG layout. Any other valid 2D affine routes
-    // through a single matrix channel, pivoted about the computed transform-origin captured on the
-    // shape. Invalid 3D / perspective values drop the complete transform track so a partial set of
-    // keyframes can never produce a discontinuous animation.
+    Matrix baselineShapeMatrix = Matrix::Identity();
+    auto staticTransform = style.find("transform");
+    if (staticTransform != style.end()) {
+      baselineShapeMatrix = MatrixFromSVGTransform(staticTransform->second);
+    }
+
+    // Lower a pure translation to x/y when no static transform owns the Layer matrix. Otherwise
+    // the animated CSS transform replaces the full transform property, so use matrix samples. The
+    // fill-mode baseline is the raw static SVG matrix; SVG static import does not apply CSS
+    // transform-origin to that matrix. Invalid 3D / perspective keyframes drop the complete track.
     if (transformInvalid) {
       transformStops.clear();
-    } else if (transformAllPureTranslate) {
+    } else if (!rotationTargetId.empty() && !transformAllPureTranslate &&
+               BuildPureRotationKeys(transformStops, interp, &rotationKeys)) {
+      // The SVG resolver has already applied the captured transform-origin as the Group's static
+      // anchor/position. Only the authored angle remains animated.
+    } else if (transformAllPureTranslate && baselineShapeMatrix.isIdentity()) {
       for (const auto& ts : transformStops) {
         xKeys.push_back({ts.first, ts.second.tx, interp, {}, {}});
         yKeys.push_back({ts.first, ts.second.ty, interp, {}, {}});
       }
-    } else if (!rotationTargetId.empty() &&
-               BuildPureRotationKeys(transformStops, interp, &rotationKeys)) {
-      // The SVG resolver has already applied the captured transform-origin as the Group's static
-      // anchor/position. Only the authored angle remains animated.
+    } else if (transformAllPureTranslate) {
+      for (const auto& ts : transformStops) {
+        matrixKeys.push_back({ts.first, ts.second, interp, {}, {}});
+      }
     } else if (!transformStops.empty()) {
       float cx = 0.0f;
       float cy = 0.0f;
@@ -2067,7 +2078,6 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
     bool loopOnce = (loopMode == LoopMode::Once);
     Frame activeEnd = static_cast<Frame>(delayFrames + durationFrames);
-
     // The shape's static painter value shows outside the active window. The capture bakes an
     // explicit 0% stop carrying the resting value, so the first keyframe is a faithful per-channel
     // baseline for `animation-fill-mode` forwards / backwards.
@@ -2091,10 +2101,6 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     if (!alphaKeys.empty()) {
       ApplyFillMode(alphaKeys, spec.fillMode, alphaKeys.front().value, loopOnce, activeEnd);
     }
-    // The shape Layer sits at layout origin, so its static (pre-animation) translate is (0, 0) —
-    // the same baseline `buildForElement` uses for translate-animated layers. The captured keyframe
-    // values stack on top of that origin, so `fill-mode: none` / `backwards` must revert to 0, not
-    // to the first keyframe (which is the off-screen start of the slide).
     if (!xKeys.empty()) {
       ApplyFillMode(xKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
     }
@@ -2105,7 +2111,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       ApplyFillMode(rotationKeys, spec.fillMode, 0.0f, loopOnce, activeEnd);
     }
     if (!matrixKeys.empty()) {
-      ApplyFillMode(matrixKeys, spec.fillMode, Matrix::Identity(), loopOnce, activeEnd);
+      ApplyFillMode(matrixKeys, spec.fillMode, baselineShapeMatrix, loopOnce, activeEnd);
     }
 
     bool needsTrailingBaseline =
@@ -2125,7 +2131,7 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     }
     animation->loop = loopMode;
 
-    // Layer-space channels (opacity / translate) target the shape's own `Layer`.
+    // Layer-space channels (opacity / transform) target the shape's own `Layer`.
     if (!alphaKeys.empty() || !xKeys.empty() || !yKeys.empty() || !matrixKeys.empty()) {
       if (shapeTargetId.empty()) {
         _diagnostics.warn(

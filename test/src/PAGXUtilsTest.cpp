@@ -126,19 +126,35 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_WithPosition) {
   EXPECT_FLOAT_EQ(m.ty, 20.0f);
 }
 
-PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_WithMatrixAndPosition) {
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_AddsAuthoredPositionToGeneratedLayout) {
+  auto doc = pagx::PAGXDocument::Make(200, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 20;
+  layer->y = 10;
+  layer->setLayoutPosition(nullptr, 100, 30);
+  auto m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.tx, 120);
+  EXPECT_FLOAT_EQ(m.ty, 40);
+}
+
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_MatrixOverridesAuthoredPositionButKeepsLayoutPosition) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
-  layer->matrix = pagx::Matrix::Scale(2.0f, 3.0f);
+  layer->matrix = pagx::Matrix::Translate(3.0f, 4.0f) * pagx::Matrix::Scale(2.0f, 3.0f);
   layer->x = 5.0f;
   layer->y = 7.0f;
-  layer->updateSize(nullptr);
-  auto m = pagx::BuildLayerMatrix(layer);
-  auto expected = pagx::Matrix::Translate(5.0f, 7.0f) * pagx::Matrix::Scale(2.0f, 3.0f);
-  EXPECT_FLOAT_EQ(m.a, expected.a);
-  EXPECT_FLOAT_EQ(m.d, expected.d);
-  EXPECT_FLOAT_EQ(m.tx, expected.tx);
-  EXPECT_FLOAT_EQ(m.ty, expected.ty);
+  auto authoredMatrix = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(authoredMatrix.a, 2.0f);
+  EXPECT_FLOAT_EQ(authoredMatrix.d, 3.0f);
+  EXPECT_FLOAT_EQ(authoredMatrix.tx, 3.0f);
+  EXPECT_FLOAT_EQ(authoredMatrix.ty, 4.0f);
+
+  layer->setLayoutPosition(nullptr, 11.0f, 13.0f);
+  auto generatedPositionMatrix = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.a, 2.0f);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.d, 3.0f);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.tx, 14.0f);
+  EXPECT_FLOAT_EQ(generatedPositionMatrix.ty, 17.0f);
 }
 
 PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_OnlyXNonZero) {
@@ -2035,10 +2051,14 @@ PAGX_TEST(PAGXUtilsTest, IterateUTF8Codepoints_TruncatedTrailingByteSkipped) {
 // BuildLayerMatrix — matrix3D path
 // ---------------------------------------------------------------------------
 
-PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_Matrix3DOverridesMatrix) {
+PAGX_TEST(PAGXUtilsTest,
+          BuildLayerMatrix_Matrix3DOverridesAuthoredTransformAndKeepsLayoutPosition) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
   layer->matrix = pagx::Matrix::Scale(10.0f, 10.0f);
+  layer->x = 50.0f;
+  layer->y = 60.0f;
+  layer->setLayoutPosition(nullptr, 11.0f, 13.0f);
   // 2x scale on x, 3x scale on y, +5/+7 translation. Column-major layout:
   // values[0..3] = column 0, [4..7] = column 1, [12..15] = column 3.
   layer->matrix3D.values[0] = 2.0f;
@@ -2048,8 +2068,8 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_Matrix3DOverridesMatrix) {
   auto m = pagx::BuildLayerMatrix(layer);
   EXPECT_FLOAT_EQ(m.a, 2.0f);
   EXPECT_FLOAT_EQ(m.d, 3.0f);
-  EXPECT_FLOAT_EQ(m.tx, 5.0f);
-  EXPECT_FLOAT_EQ(m.ty, 7.0f);
+  EXPECT_FLOAT_EQ(m.tx, 16.0f);
+  EXPECT_FLOAT_EQ(m.ty, 20.0f);
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@
 
 #include "pagx/PAGXExporter.h"
 #include <cmath>
+#include <cstdio>
 #include <set>
 #include "pagx/PAGXDefaults.h"
 #include "pagx/PAGXDocument.h"
@@ -266,6 +267,25 @@ std::string KeyframeValueToString<Matrix>(const Matrix& value) {
   return MatrixToString(value);
 }
 
+template <>
+std::string KeyframeValueToString<Matrix3D>(const Matrix3D& value) {
+  std::string result;
+  result.reserve(16 * 16);
+  char buffer[32] = {};
+  for (size_t i = 0; i < 16; ++i) {
+    if (i > 0) {
+      result += ",";
+    }
+    if (std::isfinite(value.values[i])) {
+      std::snprintf(buffer, sizeof(buffer), "%.9g", value.values[i]);
+      result += buffer;
+    } else {
+      result += "0";
+    }
+  }
+  return result;
+}
+
 template <typename T>
 static void WriteTypedChannel(XMLBuilder& xml, const TypedChannel<T>* channel,
                               const char* typeName) {
@@ -314,6 +334,9 @@ static void WriteChannel(XMLBuilder& xml, const Channel* channel) {
       break;
     case ChannelValueType::Matrix:
       WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix>*>(channel), "matrix");
+      break;
+    case ChannelValueType::Matrix3D:
+      WriteTypedChannel(xml, static_cast<const TypedChannel<Matrix3D>*>(channel), "matrix3D");
       break;
     case ChannelValueType::PAGImage:
       // PAGImage channels carry a runtime-only decoded bitmap with no serializable form, so they
@@ -1723,6 +1746,7 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   }
   xml.addAttribute("x", node->x, Default<Layer>().x);
   xml.addAttribute("y", node->y, Default<Layer>().y);
+  xml.addAttribute("z", node->z, Default<Layer>().z);
   xml.addDimensionAttribute("width", node->width, node->percentWidth);
   xml.addDimensionAttribute("height", node->height, node->percentHeight);
   if (node->layout != Default<Layer>().layout) {

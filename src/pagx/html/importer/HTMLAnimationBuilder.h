@@ -70,13 +70,12 @@ class HTMLAnimationBuilder {
    * (keyed by the shape's DOM `id`, passed here as `shapeTargetId`) whose `Fill` / `Stroke` painters
    * get the derived ids `<id>__fill` / `<id>__stroke`. Painter-space properties (`fill`,
    * `fill-opacity`, `stroke`, `stroke-opacity`, `stroke-dashoffset`) target those painter ids;
-   * layer-space properties (`opacity` -> `alpha`, a pure-translate `transform` -> `x` / `y`, and
-   * scale / skew transforms -> `matrix`) target the shape's `Layer` directly. A pure fixed-origin
-   * rotation targets `rotationTargetId`, a Group synthesised by the SVG resolver, through its
-   * scalar `rotation` channel so matrix interpolation cannot move the pivot. The shape layer sits
-   * at layout origin in SVG user (view-box) space, so translate keyframes — captured in that same
-   * space via `transform-box: view-box` — map onto `x` / `y` verbatim; remaining affine transforms
-   * are pivoted around the captured `transform-origin`. Honours the full comma-separated
+   * layer-space properties (`opacity` -> `alpha`, pure translations -> `x` / `y` when the static
+   * transform is identity, otherwise `matrix`) target the shape's `Layer` directly. A pure
+   * fixed-origin rotation targets `rotationTargetId`, a Group synthesised by the SVG resolver,
+   * through its scalar `rotation` channel so matrix interpolation cannot move the pivot. Captured
+   * transform matrices map in SVG user (view-box) space; animated non-rotation transforms apply the
+   * captured `transform-origin`, while fill-mode restores the raw static SVG transform. Honours the full comma-separated
    * `animation` list (each entry becomes its own `Animation`). `dashScale` (real path length /
    * author `pathLength`) rescales `stroke-dashoffset` keyframes into user units, mirroring the
    * static dash scaling the SVG importer applies. Returns true when at least one channel was

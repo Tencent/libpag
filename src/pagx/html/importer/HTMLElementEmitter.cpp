@@ -857,6 +857,13 @@ void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DO
     if (styleAttr != nullptr) {
       std::unordered_map<std::string, std::string> style;
       ParseStyleString(*styleAttr, style);
+      // The SVG transform attribute is the baseline when inline CSS does not override it.
+      if (style.find("transform") == style.end()) {
+        const std::string* transformAttr = child->findAttribute("transform");
+        if (transformAttr != nullptr) {
+          style["transform"] = *transformAttr;
+        }
+      }
       if (style.count("animation") > 0 || style.count("animation-name") > 0) {
         // A stable id must survive serialisation so the SVG importer can key the derived painter
         // ids off it. Reuse an authored id; otherwise mint a fresh non-colliding one.

@@ -215,8 +215,11 @@ if (PAG_BUILD_PAGX)
     file(GLOB_RECURSE PAGX_UTILS_SOURCES CONFIGURE_DEPENDS src/pagx/utils/*.*)
     list(FILTER PAGX_UTILS_SOURCES EXCLUDE REGEX "src/pagx/utils/MemZip\\.cpp$")
     file(GLOB_RECURSE PAGX_XML_SOURCES CONFIGURE_DEPENDS src/pagx/xml/*.*)
-    # SVGPathParser is part of pagx core (used by PAGXImporter/PAGXExporter for path data)
-    list(APPEND PAGX_CORE_SOURCES src/pagx/svg/SVGPathParser.cpp)
+    # SVG transform/path parsers are shared with pagx HTML import.
+    list(APPEND PAGX_CORE_SOURCES
+        src/pagx/svg/SVGPathParser.cpp
+        src/pagx/svg/SVGTransformParser.cpp
+    )
     list(APPEND PAG_FILES ${PAGX_CORE_SOURCES} ${PAGX_UTILS_SOURCES} ${PAGX_XML_SOURCES})
     # renderer module (text layout, font embedding, etc.)
     file(GLOB_RECURSE RENDERER_FILES CONFIGURE_DEPENDS src/renderer/*.*)

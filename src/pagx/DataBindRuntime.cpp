@@ -124,6 +124,12 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
       LOGE("DataBind skipped: target '%s' is outside this binding's scope.", db->target.c_str());
       continue;
     }
+    // Full Layer matrices are animation-only; bind x / y / z or the semantic Matrix3D components.
+    if (targetNode->nodeType() == NodeType::Layer &&
+        (db->channel == "matrix" || db->channel == "matrix3D")) {
+      LOGE("DataBind skipped: Layer channel '%s' is not data-bindable.", db->channel.c_str());
+      continue;
+    }
     sourceValue->addDependent(this);
 
     BindingEntry entry;
@@ -249,8 +255,9 @@ void DataBindRuntime::applyEntry(BindingEntry& entry, RuntimeBinding* binding, f
   if (entry.source->converter != nullptr) {
     keyValue = DataConverterRegistry::GetInstance().apply(entry.source->converter, keyValue);
   }
-  binding->apply(entry.targetNode, entry.channel, keyValue, mix);
-  if (entry.dataBind->direction == DataBindDirection::Once) {
+  bool once = entry.dataBind->direction == DataBindDirection::Once;
+  // A rejected Once value is not consumed, so a later valid ViewModel value can still apply.
+  if (binding->apply(entry.targetNode, entry.channel, keyValue, mix, once) && once) {
     entry.onceApplied = true;
   }
 }

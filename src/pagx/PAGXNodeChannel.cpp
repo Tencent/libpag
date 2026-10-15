@@ -60,6 +60,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -201,6 +202,94 @@ static bool AccessFillStrokeColor(Node* node, KeyValue* getOut, const KeyValue* 
     return false;
   }
   solid->color = *value;
+  return true;
+}
+
+template <typename T, auto Field>
+static bool AccessMatrix(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<Matrix>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  self->*Field = *value;
+  return true;
+}
+
+template <typename T, auto Field>
+static bool AccessMatrix3D(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<Matrix3D>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  self->*Field = *value;
+  return true;
+}
+
+template <typename T, auto Field, Matrix3DComponent Component>
+static bool AccessMatrix3DComponent(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  DecomposedMatrix3D decomposition = {};
+  if (!DecomposeMatrix3D(self->*Field, &decomposition)) {
+    return false;
+  }
+  if (getOut == nullptr && setIn == nullptr) {
+    DecomposedMatrix3D defaultDecomposition = {};
+    if (!DecomposeMatrix3D(Default<T>().*Field, &defaultDecomposition)) {
+      return false;
+    }
+    float defaultValue = 0;
+    if (!ReadMatrix3DComponent(defaultDecomposition, Component, &defaultValue)) {
+      return false;
+    }
+    if (!SetMatrix3DComponent(decomposition, Component, defaultValue, &defaultDecomposition)) {
+      return false;
+    }
+    Matrix3D updated = {};
+    if (!RecomposeMatrix3D(defaultDecomposition, &updated)) {
+      return false;
+    }
+    self->*Field = updated;
+    return true;
+  }
+  if (getOut != nullptr) {
+    float value = 0;
+    if (!ReadMatrix3DComponent(decomposition, Component, &value)) {
+      return false;
+    }
+    *getOut = value;
+    return true;
+  }
+  const auto* value = std::get_if<float>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  DecomposedMatrix3D updated = {};
+  if (!SetMatrix3DComponent(decomposition, Component, *value, &updated)) {
+    return false;
+  }
+  Matrix3D result = {};
+  if (!RecomposeMatrix3D(updated, &result)) {
+    return false;
+  }
+  self->*Field = result;
   return true;
 }
 
@@ -352,6 +441,12 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessString<T, &T::member> }
 #define FIELD_COLOR(T, name, member, cls) \
   { name, cls, &AccessColor<T, &T::member> }
+#define FIELD_MATRIX(T, name, member, cls) \
+  { name, cls, &AccessMatrix<T, &T::member> }
+#define FIELD_MATRIX3D(T, name, member, cls) \
+  { name, cls, &AccessMatrix3D<T, &T::member> }
+#define FIELD_MATRIX3D_COMPONENT(T, name, member, component, cls) \
+  { name, cls, &AccessMatrix3DComponent<T, &T::member, Matrix3DComponent::component> }
 #define FIELD_POINT_X(T, name, member, cls) \
   { name, cls, &AccessPointAxis<T, &T::member, true> }
 #define FIELD_POINT_Y(T, name, member, cls) \
@@ -402,6 +497,19 @@ static std::vector<ChannelDef> BuildLayerFields() {
       FIELD_ENUM(Layer, "blendMode", blendMode, Anim, BlendMode),
       FIELD_FLOAT(Layer, "x", x, AnimLayout),
       FIELD_FLOAT(Layer, "y", y, AnimLayout),
+      FIELD_FLOAT(Layer, "z", z, Anim),
+      FIELD_MATRIX(Layer, "matrix", matrix, Anim),
+      FIELD_MATRIX3D(Layer, "matrix3D", matrix3D, Anim),
+      FIELD_MATRIX3D_COMPONENT(Layer, "rotation.x", matrix3D, RotateX, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "rotation.y", matrix3D, RotateY, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "rotation.z", matrix3D, RotateZ, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "scale.x", matrix3D, ScaleX, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "scale.y", matrix3D, ScaleY, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "scale.z", matrix3D, ScaleZ, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "skew.xy", matrix3D, SkewXY, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "skew.xz", matrix3D, SkewXZ, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "skew.yz", matrix3D, SkewYZ, NoFlags),
+      FIELD_MATRIX3D_COMPONENT(Layer, "perspective", matrix3D, PerspectiveDistance, NoFlags),
       FIELD_BOOL(Layer, "preserve3D", preserve3D, NoFlags),
       FIELD_BOOL(Layer, "antiAlias", antiAlias, NoFlags),
       FIELD_BOOL(Layer, "groupOpacity", groupOpacity, NoFlags),

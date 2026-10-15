@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/PAGXImporter.h"
+#include <cctype>
 #include <cerrno>
 #include <climits>
 #include <cmath>
@@ -81,6 +82,7 @@
 #include "pagx/nodes/TrimPath.h"
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/Color.h"
 #include "pagx/utils/Base64.h"
@@ -479,6 +481,7 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->blendMode = GET_ENUM(node, "blendMode", "normal", doc, BlendMode);
   layer->x = GetFloatAttribute(node, "x", Default<Layer>().x, doc);
   layer->y = GetFloatAttribute(node, "y", Default<Layer>().y, doc);
+  layer->z = GetFloatAttribute(node, "z", Default<Layer>().z, doc);
   ReadDimension(node, "width", &layer->width, &layer->percentWidth, doc);
   ReadDimension(node, "height", &layer->height, &layer->percentHeight, doc);
   layer->layout = GET_ENUM(node, "layout", "none", doc, LayoutMode);
@@ -1623,6 +1626,8 @@ static bool LooksLikeFloat(const std::string& value) {
   return false;
 }
 
+static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values);
+
 // Parses a keyframe value string into the typed representation T. Numeric, bool and color
 // specializations are strict: any malformed or out-of-range input is reported via ReportError and
 // falls back to a zero/default value, so a typo never silently produces a misleading animation.
@@ -1701,6 +1706,25 @@ Matrix ParseTypedValue<Matrix>(const std::string& value, PAGXDocument*, const DO
   return MatrixFromString(value);
 }
 
+template <>
+Matrix3D ParseTypedValue<Matrix3D>(const std::string& value, PAGXDocument* doc,
+                                   const DOMNode* node) {
+  std::vector<float> values = {};
+  if (!ParseFiniteFloatList(value, &values) || values.size() != 16) {
+    ReportError(doc, node, "Invalid matrix3D keyframe value (expected 16 finite numbers).");
+    return {};
+  }
+  Matrix3D result = {};
+  for (size_t i = 0; i < 16; ++i) {
+    result.values[i] = values[i];
+  }
+  if (!IsInvertibleMatrix3D(result)) {
+    ReportError(doc, node, "matrix3D keyframe value must be invertible.");
+    return {};
+  }
+  return result;
+}
+
 template <typename T>
 static void ParseKeyframes(const DOMNode* channelNode, TypedChannel<T>* channel,
                            PAGXDocument* doc) {
@@ -1773,12 +1797,17 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
       type = "bool";
     } else if (!firstValue.empty() && firstValue[0] == '@') {
       type = "image";
-    } else if (LooksLikeInteger(firstValue)) {
-      type = "int";
-    } else if (LooksLikeFloat(firstValue)) {
-      type = "float";
     } else {
-      type = "string";
+      std::vector<float> matrix3DValues = {};
+      if (ParseFiniteFloatList(firstValue, &matrix3DValues) && matrix3DValues.size() == 16) {
+        type = "matrix3D";
+      } else if (LooksLikeInteger(firstValue)) {
+        type = "int";
+      } else if (LooksLikeFloat(firstValue)) {
+        type = "float";
+      } else {
+        type = "string";
+      }
     }
   }
 
@@ -1809,6 +1838,10 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     result = ch;
   } else if (type == "matrix") {
     auto ch = makeNodeFromXML<TypedChannel<Matrix>>(node, doc);
+    ParseKeyframes(node, ch, doc);
+    result = ch;
+  } else if (type == "matrix3D") {
+    auto ch = makeNodeFromXML<TypedChannel<Matrix3D>>(node, doc);
     ParseKeyframes(node, ch, doc);
     result = ch;
   } else {
@@ -3063,6 +3096,50 @@ static std::vector<std::string> SplitEnumOptions(const std::string& optionsStr) 
   }
   if (inList) options.push_back(current);
   return options;
+}
+
+static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values) {
+  if (values == nullptr || text.empty()) {
+    return false;
+  }
+  values->clear();
+  const char* current = text.c_str();
+  const char* end = current + text.size();
+  while (current < end) {
+    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+      ++current;
+    }
+    if (current == end) {
+      return false;
+    }
+    char* valueEnd = nullptr;
+    float value = std::strtof(current, &valueEnd);
+    if (valueEnd == current || !std::isfinite(value)) {
+      return false;
+    }
+    values->push_back(value);
+    current = valueEnd;
+    bool hadWhitespace = false;
+    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+      hadWhitespace = true;
+      ++current;
+    }
+    if (current == end) {
+      return true;
+    }
+    if (*current == ',') {
+      ++current;
+      while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+        ++current;
+      }
+      if (current == end || *current == ',') {
+        return false;
+      }
+    } else if (!hadWhitespace) {
+      return false;
+    }
+  }
+  return !values->empty();
 }
 
 static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {

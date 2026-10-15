@@ -7074,6 +7074,129 @@ PAG_TEST(PAGXHTMLImporterTest, AnimationTranslateProducesXYChannels) {
   EXPECT_FLOAT_EQ(yCh->keyframes.back().value, 20.0f);
 }
 
+PAG_TEST(PAGXHTMLImporterTest, AnimationTransformChannelMatchesRuntimeMatrixPriority) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes move {
+        0% { transform: translateX(0px); }
+        100% { transform: translateX(40px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <div id="box" style="position:absolute;left:10px;top:5px;width:50px;height:50px;
+        background-color:#000;transform:rotate(45deg);animation:move 1s linear forwards"></div>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* channel = FindChannel(animation, "matrix");
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix);
+  auto* matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+  EXPECT_EQ(FindChannel(animation, "x"), nullptr);
+  EXPECT_EQ(FindChannel(animation, "y"), nullptr);
+  ASSERT_EQ(matrixChannel->keyframes.size(), 2u);
+  EXPECT_FLOAT_EQ(matrixChannel->keyframes.back().value.tx, 40);
+
+  EXPECT_EQ(matrixChannel->keyframes.back().value.a, 1.0f);
+  EXPECT_EQ(matrixChannel->keyframes.back().value.d, 1.0f);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgTransformAnimationRestoresStaticTransform) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes move {
+        0% { transform: translateX(0px); }
+        100% { transform: translateX(40px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <rect id="shape" width="20" height="20"
+          style="width:20px;height:20px;transform:scale(2 3);transform-origin:10px 20px;animation:move 1s linear"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(doc->findNode("shape"), nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* channel = FindChannel(animation, "matrix");
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix);
+  auto* matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+  ASSERT_EQ(matrixChannel->keyframes.size(), 3u);
+  const auto& baseline = matrixChannel->keyframes.back().value;
+  EXPECT_FLOAT_EQ(baseline.a, 2);
+  EXPECT_FLOAT_EQ(baseline.d, 3);
+  EXPECT_FLOAT_EQ(baseline.tx, 0);
+  EXPECT_FLOAT_EQ(baseline.ty, 0);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgTransformAttributeAnimationRestoresStaticTransform) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes move {
+        0% { transform: translateX(0px); }
+        100% { transform: translateX(40px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <rect id="shape" width="20" height="20" transform="translate(10 20)"
+          style="animation:move 1s linear"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_EQ(doc->findNode("shape"), nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  auto* channel = FindChannel(animation, "matrix");
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix);
+  auto* matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+  ASSERT_EQ(matrixChannel->keyframes.size(), 3u);
+  const auto& baseline = matrixChannel->keyframes.back().value;
+  EXPECT_FLOAT_EQ(baseline.tx, 10);
+  EXPECT_FLOAT_EQ(baseline.ty, 20);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgTranslateWithoutStaticTransformUsesXYChannels) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes move {
+        0% { transform: translateX(0px); }
+        100% { transform: translateX(40px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <rect id="shape" width="20" height="20" style="animation:move 1s linear"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(FindChannel(animation, "matrix"), nullptr);
+  EXPECT_NE(FindChannel(animation, "x"), nullptr);
+  EXPECT_NE(FindChannel(animation, "y"), nullptr);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, AnimationBackgroundColorProducesColorChannel) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;

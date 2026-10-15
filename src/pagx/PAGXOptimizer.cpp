@@ -565,7 +565,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
       layer->matrix.d != 1.0f) {
     return false;
   }
-  if (!layer->matrix3D.isIdentity()) {
+  if (layer->z != 0.0f || !layer->matrix3D.isIdentity()) {
     return false;
   }
   if (LayoutNodeHasConstraints(layer)) {
@@ -1296,7 +1296,7 @@ bool AxisFills(float childSize, float parentSize, float childPercent) {
 }
 
 bool ChildFillsParent(const Layer* parent, const Layer* child) {
-  if (child->x != 0.0f || child->y != 0.0f) {
+  if (child->x != 0.0f || child->y != 0.0f || child->z != 0.0f) {
     return false;
   }
   if (!child->matrix.isIdentity() || !child->matrix3D.isIdentity()) {
@@ -1324,13 +1324,13 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
 // a container layout would reposition child layers, and the child keeps none after the merge.
 bool ChildHasNoPaintAffectingEffect(const Layer* child) {
   return child->visible && child->alpha == 1.0f && child->blendMode == BlendMode::Normal &&
-         child->matrix3D.isIdentity() && !child->preserve3D && child->antiAlias &&
-         child->groupOpacity && child->passThroughBackground && !child->hasScrollRect &&
-         !child->clipToBounds && child->mask == nullptr && child->composition == nullptr &&
-         child->compositionFilePath.empty() && child->externalDoc == nullptr &&
-         child->timelines.empty() && child->styles.empty() && child->filters.empty() &&
-         child->customData.empty() && child->vmContext.empty() && child->padding.isZero() &&
-         child->layout == LayoutMode::None;
+         child->z == 0.0f && child->matrix3D.isIdentity() && !child->preserve3D &&
+         child->antiAlias && child->groupOpacity && child->passThroughBackground &&
+         !child->hasScrollRect && !child->clipToBounds && child->mask == nullptr &&
+         child->composition == nullptr && child->compositionFilePath.empty() &&
+         child->externalDoc == nullptr && child->timelines.empty() && child->styles.empty() &&
+         child->filters.empty() && child->customData.empty() && child->vmContext.empty() &&
+         child->padding.isZero() && child->layout == LayoutMode::None;
 }
 
 bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,

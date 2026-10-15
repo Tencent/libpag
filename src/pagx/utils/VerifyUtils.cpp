@@ -88,6 +88,9 @@ bool HasLayerOnlyFeatures(const Layer* layer) {
   if (!layer->includeInLayout) {
     return true;
   }
+  if (layer->z != 0.0f) {
+    return true;
+  }
   return false;
 }
 

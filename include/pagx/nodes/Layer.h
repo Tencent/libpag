@@ -81,6 +81,13 @@ class Layer : public Node, public LayoutNode {
   float y = 0.0f;
 
   /**
+   * The z-coordinate of the layer position. It translates the layer along the Z axis and is ignored
+   * when a non-identity matrix3D is set. The value affects rendering depth but is not used by
+   * automatic layout. The default value is 0.
+   */
+  float z = 0.0f;
+
+  /**
    * The 2D transformation matrix of the layer.
    */
   Matrix matrix = {};
