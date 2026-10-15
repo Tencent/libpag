@@ -361,12 +361,13 @@ inline Quaternion SlerpQuaternion(const Quaternion& first, const Quaternion& sec
 inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output);
 
 // Decomposes a 4x4 transform into perspective, translation, rotation, scale and skew (see
-// DecomposedMatrix3D) following the CSS Transforms 3D matrix decomposition: the matrix is
-// normalized by its [3][3] value, the perspective row is extracted, and Gram-Schmidt
-// orthogonalization of the upper 3x3 yields scale and skew, with a negative determinant folded into
-// the Z scale. Returns false if the matrix is non-finite or singular, its [3][3] value is near
-// zero, a scale axis degenerates, or recomposing the result differs from the normalized source by
-// more than a relative 1e-5 in any value.
+// DecomposedMatrix3D), as the exact inverse of RecomposeMatrix3D. The perspective row q is solved
+// from M = P * A, where A is the matrix with its last row replaced by [0, 0, 0, 1]; the matrix is
+// then normalized by q[3] so the stored perspective row always ends in 1. Without perspective q[3]
+// is the [3][3] value. Gram-Schmidt orthogonalization of the upper 3x3 yields scale and skew, with
+// a negative determinant folded into the Z scale. Returns false if the matrix is non-finite or
+// singular, q[3] is near zero, a scale axis degenerates, or recomposing the result differs from
+// the normalized source by more than a relative 1e-5 in any value.
 inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output) {
   if (output == nullptr || !IsInvertibleMatrix3D(source)) {
     return false;
@@ -379,24 +380,11 @@ inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output
       magnitude = std::max(magnitude, std::abs(matrix[row][column]));
     }
   }
-  if (std::abs(matrix[3][3]) <= 1.0e-12 * magnitude) {
-    return false;
-  }
-  double normalization = matrix[3][3];
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
-      matrix[row][column] /= normalization;
-    }
-  }
-  double normalizedSource[4][4] = {};
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
-      normalizedSource[row][column] = matrix[row][column];
-    }
-  }
-  double perspective[4] = {0, 0, 0, 1};
-  if (std::abs(matrix[3][0]) > 1.0e-12 || std::abs(matrix[3][1]) > 1.0e-12 ||
-      std::abs(matrix[3][2]) > 1.0e-12) {
+  double perspective[4] = {0, 0, 0, matrix[3][3]};
+  bool hasPerspective = std::abs(matrix[3][0]) > 1.0e-12 * magnitude ||
+                        std::abs(matrix[3][1]) > 1.0e-12 * magnitude ||
+                        std::abs(matrix[3][2]) > 1.0e-12 * magnitude;
+  if (hasPerspective) {
     double affine[4][4] = {};
     for (int row = 0; row < 4; ++row) {
       for (int column = 0; column < 4; ++column) {
@@ -416,6 +404,27 @@ inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output
         perspective[row] += inverse[column * 4 + row] * lastRow[column];
       }
     }
+  }
+  // Normalize by the scalar of the perspective factor rather than by [3][3], so the result is the
+  // exact inverse of RecomposeMatrix3D, whose perspective row always ends in 1. The two differ when
+  // a perspective is combined with a Z translation.
+  double normalization = perspective[3];
+  if (std::abs(normalization) <= 1.0e-12 * magnitude) {
+    return false;
+  }
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      matrix[row][column] /= normalization;
+    }
+  }
+  perspective[3] = 1;
+  double normalizedSource[4][4] = {};
+  for (int row = 0; row < 4; ++row) {
+    for (int column = 0; column < 4; ++column) {
+      normalizedSource[row][column] = matrix[row][column];
+    }
+  }
+  if (hasPerspective) {
     for (int column = 0; column < 4; ++column) {
       matrix[3][column] = column == 3 ? 1.0 : 0.0;
     }
