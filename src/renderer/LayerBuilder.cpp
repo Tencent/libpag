@@ -347,8 +347,10 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return true;
   }
 
-  // Replaces the planar part of the pose and keeps its Z translation. A planar pose mixes in 2D,
-  // matching the plain 2D matrix interpolation; a pose already carrying a 3D transform mixes in 3D.
+  // Mixes the pose toward the 2D matrix lifted with the current Z translation, so at full mix the
+  // matrix replaces the whole local transform except the Z translation; any 3D rotation, scale or
+  // perspective in the pose is reset. A planar pose mixes in 2D, matching the plain 2D matrix
+  // interpolation; a pose already carrying a 3D transform mixes in 3D.
   bool applyMatrix(const KeyValue& value, float mix) {
     const auto* v = std::get_if<Matrix>(&value);
     if (v == nullptr || hasStaticMatrix3D) {
