@@ -1833,8 +1833,9 @@ static Channel* ParseChannel(const DOMNode* node, PAGXDocument* doc) {
     // run most-specific to least-specific so a value that is valid for several types resolves to
     // the narrowest interpretation: color (#RGB / named) is checked before bool/int because some
     // color tokens could otherwise be misread; bool ("true"/"false") before image; image ("@id")
-    // before the numeric probes; integer before float (every integer also parses as a float); and
-    // string is the final catch-all that always succeeds.
+    // before the numeric probes; a list of exactly 16 finite numbers as matrix3D before the scalar
+    // probes; integer before float (every integer also parses as a float); and string is the final
+    // catch-all that always succeeds.
     bool colorValid = false;
     if (!firstValue.empty()) {
       ParseColor(firstValue, &colorValid);
