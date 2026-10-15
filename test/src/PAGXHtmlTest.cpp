@@ -419,40 +419,40 @@ CLI_TEST(PAGXHtmlTest, FlexLayerAuthoredXYAddsToFlowSlotWithoutEncodingSlot) {
   EXPECT_NE(tag.find("transform:translate(5px,3px)"), std::string::npos);
 }
 
+static std::shared_ptr<pagx::PAGXDocument> MakeMatrix3DPositionDocument(bool constrained) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* parent = doc->makeNode<pagx::Layer>("parent");
+  parent->width = 200;
+  parent->height = 200;
+  auto* layer = doc->makeNode<pagx::Layer>("matrix3DLayer");
+  layer->x = 50;
+  layer->y = 60;
+  layer->width = 30;
+  layer->height = 40;
+  if (constrained) {
+    layer->left = 5;
+    layer->top = 7;
+    parent->children.push_back(layer);
+    doc->layers.push_back(parent);
+  } else {
+    doc->layers.push_back(layer);
+  }
+  layer->matrix3D.values[12] = 10;
+  layer->matrix3D.values[13] = 20;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  return doc;
+}
+
 CLI_TEST(PAGXHtmlTest, LayerMatrix3DOverridesAuthoredXYAndKeepsLayoutPosition) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
 
-  auto makeDocument = [](bool constrained) {
-    auto doc = pagx::PAGXDocument::Make(200, 200);
-    auto* parent = doc->makeNode<pagx::Layer>("parent");
-    parent->width = 200;
-    parent->height = 200;
-    auto* layer = doc->makeNode<pagx::Layer>("matrix3DLayer");
-    layer->x = 50;
-    layer->y = 60;
-    layer->width = 30;
-    layer->height = 40;
-    if (constrained) {
-      layer->left = 5;
-      layer->top = 7;
-      parent->children.push_back(layer);
-      doc->layers.push_back(parent);
-    } else {
-      doc->layers.push_back(layer);
-    }
-    layer->matrix3D.values[12] = 10;
-    layer->matrix3D.values[13] = 20;
-    auto* ellipse = doc->makeNode<pagx::Ellipse>();
-    ellipse->size = {20, 20};
-    auto* fill = doc->makeNode<pagx::Fill>();
-    fill->color = doc->makeNode<pagx::SolidColor>();
-    layer->contents.push_back(ellipse);
-    layer->contents.push_back(fill);
-    return doc;
-  };
-
-  auto authoredDoc = makeDocument(false);
+  auto authoredDoc = MakeMatrix3DPositionDocument(false);
   auto authoredHtml = ConvertToHTML(authoredDoc, options);
   auto authoredTag = FindTagContaining(authoredHtml, "matrix3d(");
   ASSERT_FALSE(authoredTag.empty());
@@ -463,7 +463,7 @@ CLI_TEST(PAGXHtmlTest, LayerMatrix3DOverridesAuthoredXYAndKeepsLayoutPosition) {
   EXPECT_EQ(authoredHtml.find("top:60px"), std::string::npos);
   EXPECT_EQ(authoredHtml.find("top: 60px"), std::string::npos);
 
-  auto constrainedDoc = makeDocument(true);
+  auto constrainedDoc = MakeMatrix3DPositionDocument(true);
   auto constrainedHtml = ConvertToHTML(constrainedDoc, options);
   auto constrainedTag = FindTagContaining(constrainedHtml, "matrix3d(");
   ASSERT_FALSE(constrainedTag.empty());
@@ -510,32 +510,32 @@ CLI_TEST(PAGXHtmlTest, FlexMatrix3DKeepsFlowSlotWithoutAddingSlotToTransform) {
   EXPECT_FLOAT_EQ(layoutPosition.y, 0);
 }
 
+static pagx::Layer* AddEllipseLayer(pagx::PAGXDocument* doc, const std::string& id) {
+  auto* layer = doc->makeNode<pagx::Layer>(id);
+  layer->width = 40;
+  layer->height = 40;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+  return layer;
+}
+
 CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;
   auto doc = pagx::PAGXDocument::Make(200, 200);
-  auto addLayer = [&](const std::string& id) {
-    auto* layer = doc->makeNode<pagx::Layer>(id);
-    layer->width = 40;
-    layer->height = 40;
-    auto* ellipse = doc->makeNode<pagx::Ellipse>();
-    ellipse->size = {20, 20};
-    auto* fill = doc->makeNode<pagx::Fill>();
-    fill->color = doc->makeNode<pagx::SolidColor>();
-    layer->contents.push_back(ellipse);
-    layer->contents.push_back(fill);
-    doc->layers.push_back(layer);
-    return layer;
-  };
-
-  auto* positionLayer = addLayer("positionLayer");
+  auto* positionLayer = AddEllipseLayer(doc.get(), "positionLayer");
   positionLayer->x = 10;
   positionLayer->y = 10;
-  auto* matrixLayer = addLayer("matrixLayer");
+  auto* matrixLayer = AddEllipseLayer(doc.get(), "matrixLayer");
   matrixLayer->x = 999;
   matrixLayer->y = 999;
   matrixLayer->matrix = pagx::Matrix::Translate(10, 10);
-  auto* matrix3DLayer = addLayer("matrix3DLayer");
+  auto* matrix3DLayer = AddEllipseLayer(doc.get(), "matrix3DLayer");
   matrix3DLayer->x = 999;
   matrix3DLayer->y = 999;
   matrix3DLayer->matrix = pagx::Matrix::Translate(40, 50);
