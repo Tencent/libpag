@@ -652,10 +652,9 @@ class LayerBuilderContext {
     _result.binding = std::move(*binding);
     // applyLayerAttributes only assigns the mutable attributes when they differ from the default,
     // and the mask is only re-applied when node->mask is set, so reset them first; otherwise an
-    // edit that cleared a matrix / blendMode / scrollRect / style / filter / mask would keep the
-    // previously built value instead of reverting to the default.
-    layer->setMatrix(tgfx::Matrix::I());
-    layer->setMatrix3D(tgfx::Matrix3D::I());
+    // edit that cleared a blendMode / scrollRect / style / filter / mask would keep the previously
+    // built value instead of reverting to the default. The transform needs no reset because
+    // initTransform below always publishes the complete matrix.
     layer->setPreserve3D(false);
     layer->setBlendMode(ToTGFX(BlendMode::Normal));
     layer->setAllowsEdgeAntialiasing(true);
