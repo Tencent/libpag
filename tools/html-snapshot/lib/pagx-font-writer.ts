@@ -106,7 +106,7 @@ function writeAtomic(outputPath: string, content: string): void {
 export function rewritePagxFonts(input: {
   inputPath: string;
   outputPath: string;
-  fontMap: FontMapRule[];
+  fontMap?: FontMapRule[];
 }): FontRewriteResult {
   const result = processPagxFonts(input);
   writeAtomic(input.outputPath, result.xml);
