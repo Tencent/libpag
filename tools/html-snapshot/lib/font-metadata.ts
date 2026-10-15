@@ -11,6 +11,14 @@ export interface HtmlFontRequest {
   lang?: string;
 }
 
+/** Source requests used by the converted text, before any editor-font replacements. */
+export interface HtmlFontMetadata {
+  version: 1;
+  fonts: HtmlFontRequest[];
+  /** Visible Text nodes without a captured HTML request (for example, inline SVG text). */
+  missingRequests: number;
+}
+
 export interface FontMapDescriptor {
   'font-family': string;
   'font-weight': number | string;
@@ -161,5 +169,32 @@ export function validateFontMap(value: unknown): string[] {
 export function validateFontRequest(value: unknown): value is HtmlFontRequest {
   return isObject(value) && Array.isArray(value.families) && value.families.length > 0 &&
     value.families.every(isText) && typeof value.weight === 'number' &&
-    fontWeightNumber(value.weight) !== null && ['normal', 'italic', 'oblique'].includes(String(value.style));
+    fontWeightNumber(value.weight) !== null && ['normal', 'italic', 'oblique'].includes(String(value.style)) &&
+    (value.lang === undefined || isText(value.lang)) &&
+    (value.variations === undefined || (isObject(value.variations) &&
+      Object.entries(value.variations).every(([axis, number]) =>
+        /^[A-Za-z0-9]{4}$/.test(axis) && typeof number === 'number' && Number.isFinite(number))));
+}
+
+/** Deduplicate without losing explicit axes or language, in first-use order. */
+export function collectFontMetadata(
+  requests: readonly HtmlFontRequest[], missingRequests = 0,
+): HtmlFontMetadata {
+  const fonts = new Map<string, HtmlFontRequest>();
+  for (const request of requests) {
+    if (!validateFontRequest(request)) {
+      throw new FontMappingError(FontMappingErrorCode.FontMetadataMismatch, 'invalid source font request');
+    }
+    const axes = Object.entries(request.variations || {}).sort(([a], [b]) => a.localeCompare(b));
+    const key = JSON.stringify([fontRequestKey(request), axes, request.lang || '']);
+    if (fonts.has(key)) continue;
+    fonts.set(key, {
+      families: [...request.families],
+      weight: request.weight,
+      style: request.style,
+      ...(axes.length ? { variations: Object.fromEntries(axes) } : {}),
+      ...(request.lang ? { lang: request.lang } : {}),
+    });
+  }
+  return { version: 1, fonts: [...fonts.values()], missingRequests };
 }

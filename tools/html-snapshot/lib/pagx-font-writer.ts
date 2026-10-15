@@ -1,12 +1,14 @@
 // Copyright (C) 2026 Tencent. All rights reserved.
 
 import * as fs from 'fs';
+import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import type { Document, Node } from '@xmldom/xmldom';
 import { FontMatcher } from './font-matcher';
 import {
-  FontMapRule, FontMappingError, FontMappingErrorCode, validateFontRequest,
+  FontMapRule, FontMappingError, FontMappingErrorCode, HtmlFontMetadata, HtmlFontRequest,
+  collectFontMetadata, validateFontRequest,
 } from './font-metadata';
 
 const REQUEST_ATTR = 'data-html-font-request';
@@ -44,16 +46,15 @@ function invariant(node: Node): unknown {
   return [node.nodeType, node.nodeName, node.nodeValue, attributes, children];
 }
 
-/** Rewrite each Text directly from its own source request after embedding, without Text IDs. */
-export function rewritePagxFonts(input: {
+function processPagxFonts(input: {
   inputPath: string;
-  outputPath: string;
-  fontMap: FontMapRule[];
-}): FontRewriteResult {
-  const matcher = new FontMatcher(input.fontMap);
+  fontMap?: FontMapRule[];
+}): { xml: string; metadata: HtmlFontMetadata; mapping: FontRewriteResult } {
+  const matcher = input.fontMap === undefined ? null : new FontMatcher(input.fontMap);
   const doc = parseDocument(fs.readFileSync(input.inputPath, 'utf8'));
   const originalInvariant = JSON.stringify(invariant(doc));
   const result = { replaced: 0, unmatched: 0, missingRequests: 0 };
+  const requests: HtmlFontRequest[] = [];
   const texts = doc.getElementsByTagName('Text');
   for (let i = 0; i < texts.length; i++) {
     const text = texts.item(i)!;
@@ -71,12 +72,13 @@ export function rewritePagxFonts(input: {
     if (!validateFontRequest(request)) {
       throw new FontMappingError(FontMappingErrorCode.FontMetadataMismatch, 'invalid source font request');
     }
-    const target = matcher.match(request);
+    requests.push(request);
+    const target = matcher?.match(request);
     if (target) {
       text.setAttribute('fontFamily', target.family);
       text.setAttribute('fontStyle', target.style);
       result.replaced++;
-    } else {
+    } else if (matcher) {
       result.unmatched++;
     }
     text.removeAttribute(REQUEST_ATTR);
@@ -86,13 +88,48 @@ export function rewritePagxFonts(input: {
   if (JSON.stringify(invariant(verified)) !== originalInvariant) {
     throw new FontMappingError(FontMappingErrorCode.PagxFontRewriteFailed, 'rewrite changed non-font PAGX content');
   }
-  const tempPath = `${input.outputPath}.tmp-${randomUUID()}`;
+  return { xml, metadata: collectFontMetadata(requests, result.missingRequests), mapping: result };
+}
+
+function writeAtomic(outputPath: string, content: string): void {
+  const tempPath = `${outputPath}.tmp-${randomUUID()}`;
   try {
-    fs.writeFileSync(tempPath, xml, 'utf8');
-    fs.renameSync(tempPath, input.outputPath);
+    fs.writeFileSync(tempPath, content, 'utf8');
+    fs.renameSync(tempPath, outputPath);
   } catch (error) {
     if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
     throw new FontMappingError(FontMappingErrorCode.PagxFontRewriteFailed, (error as Error).message);
   }
-  return result;
+}
+
+/** Rewrite each Text directly from its own source request after embedding, without Text IDs. */
+export function rewritePagxFonts(input: {
+  inputPath: string;
+  outputPath: string;
+  fontMap: FontMapRule[];
+}): FontRewriteResult {
+  const result = processPagxFonts(input);
+  writeAtomic(input.outputPath, result.xml);
+  return result.mapping;
+}
+
+/** Export source requests before removing their temporary attributes or applying target names. */
+export function finalizePagxFonts(input: {
+  inputPath: string;
+  outputPath: string;
+  metadataPath: string;
+  fontMap?: FontMapRule[];
+}): { metadata: HtmlFontMetadata; fontMapping?: FontRewriteResult } {
+  if ([input.inputPath, input.outputPath].some((file) => path.resolve(file) === path.resolve(input.metadataPath))) {
+    throw new FontMappingError(FontMappingErrorCode.PagxFontRewriteFailed, 'font metadata must have a separate output path');
+  }
+  const result = processPagxFonts(input);
+  // Validate and serialize everything before publishing either file. Publish the inventory first
+  // so a failed metadata write cannot remove the only source requests from the PAGX.
+  writeAtomic(input.metadataPath, JSON.stringify(result.metadata, null, 2) + '\n');
+  writeAtomic(input.outputPath, result.xml);
+  return {
+    metadata: result.metadata,
+    ...(input.fontMap !== undefined ? { fontMapping: result.mapping } : {}),
+  };
 }
