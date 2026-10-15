@@ -10714,6 +10714,35 @@ PAGX_TEST(PAGXTest, LayerLayoutPositionStaysOutsideLocalTransform) {
 }
 
 /**
+ * Test case: a translation written after a perspective distance leaves the pose with a projective
+ * w term other than 1. The decomposition must still read the authored translation and perspective
+ * back and accept further semantic component writes.
+ */
+PAGX_TEST(PAGXTest, LayerPerspectiveThenZKeepsComponentsReadable) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  layer->x = 100;
+  layer->y = 50;
+  doc->layers.push_back(layer);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+
+  ASSERT_TRUE(binding->apply(layer, "perspective", pagx::KeyValue{1000.0f}, 1.0f));
+  ASSERT_TRUE(binding->apply(layer, "z", pagx::KeyValue{500.0f}, 1.0f));
+  pagx::KeyValue value;
+  ASSERT_TRUE(binding->read(layer, "x", &value));
+  EXPECT_NEAR(std::get<float>(value), 100, 1.0e-3f);
+  ASSERT_TRUE(binding->read(layer, "y", &value));
+  EXPECT_NEAR(std::get<float>(value), 50, 1.0e-3f);
+  ASSERT_TRUE(binding->read(layer, "z", &value));
+  EXPECT_NEAR(std::get<float>(value), 500, 1.0e-3f);
+  ASSERT_TRUE(binding->read(layer, "perspective", &value));
+  EXPECT_NEAR(std::get<float>(value), 1000, 1.0e-2f);
+  EXPECT_TRUE(binding->apply(layer, "scale.x", pagx::KeyValue{2.0f}, 1.0f));
+}
+
+/**
  * Test case: a matrix tween between two rotations on opposite sides of +/-pi (170deg and 190deg,
  * which atan2 recovers as +2.967 rad and -2.967 rad) takes the shortest arc (a continuous 20deg
  * sweep through 180deg) instead of the long way (340deg in the opposite direction). Multi-turn
