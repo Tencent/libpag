@@ -487,6 +487,10 @@ PAGX_TEST(PAGXViewModelTest, DataBindPositionSyncVerified) {
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);
 }
 
+// Deleter for scenes over a document owned by the test, which must not be freed by the scene.
+static void KeepDocumentAlive(pagx::PAGXDocument*) {
+}
+
 // A transform component binding and transform animations write into the same Layer pose. Writes
 // that drive different parts combine, and the latest write to the same part wins.
 PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingCombinesWithAnimation) {
@@ -520,8 +524,8 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingCombinesWithAnimation) {
   dataBind->channel = "rotation.z";
   doc->dataBinds.push_back(dataBind);
 
-  auto scene = pagx::PAGScene::Make(
-      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  auto scene =
+      pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), KeepDocumentAlive));
   ASSERT_NE(scene, nullptr);
   auto* binding = scene->mutableBinding();
   auto tgfxLayer = binding->get<tgfx::Layer>(layer);
@@ -585,8 +589,8 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DOnceComponentYieldsToLaterTransformWrite) {
   dataBind->direction = pagx::DataBindDirection::Once;
   doc->dataBinds.push_back(dataBind);
 
-  auto scene = pagx::PAGScene::Make(
-      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  auto scene =
+      pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), KeepDocumentAlive));
   ASSERT_NE(scene, nullptr);
   auto* binding = scene->mutableBinding();
   auto tgfxLayer = binding->get<tgfx::Layer>(layer);
@@ -640,8 +644,8 @@ PAGX_TEST(PAGXViewModelTest, LayerFullMatrixDataBindIsRejected) {
     doc->dataBinds.push_back(dataBind);
   }
 
-  auto scene = pagx::PAGScene::Make(
-      std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
+  auto scene =
+      pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), KeepDocumentAlive));
   ASSERT_NE(scene, nullptr);
   auto rootComp = scene->rootComposition();
   ASSERT_NE(rootComp, nullptr);
