@@ -75,11 +75,11 @@ class HTMLAnimationBuilder {
    * fixed-origin rotation targets `rotationTargetId`, a Group synthesised by the SVG resolver,
    * through its scalar `rotation` channel so matrix interpolation cannot move the pivot. Captured
    * transform matrices map in SVG user (view-box) space; animated non-rotation transforms apply the
-   * captured `transform-origin`, while fill-mode restores the raw static SVG transform. Honours the full comma-separated
-   * `animation` list (each entry becomes its own `Animation`). `dashScale` (real path length /
-   * author `pathLength`) rescales `stroke-dashoffset` keyframes into user units, mirroring the
-   * static dash scaling the SVG importer applies. Returns true when at least one channel was
-   * emitted.
+   * captured `transform-origin`, while fill-mode restores the raw static SVG transform. Honours the
+   * full comma-separated `animation` list (each entry becomes its own `Animation`). `dashScale`
+   * (real path length / author `pathLength`) rescales `stroke-dashoffset` keyframes into user
+   * units, mirroring the static dash scaling the SVG importer applies. Returns true when at least
+   * one channel was emitted.
    */
   bool buildForInlineSvgShape(const std::unordered_map<std::string, std::string>& style,
                               const std::string& shapeTargetId, const std::string& rotationTargetId,
