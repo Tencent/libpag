@@ -599,12 +599,13 @@ inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output)
   return ComposeMatrix3D(value, output) && IsInvertibleMatrix3D(*output);
 }
 
-// Returns true if the decomposed perspective can be expressed by the single perspective distance
-// component, that is it has the form [0, 0, -1/d, 1] with d > 0, or is [0, 0, 0, 1] for none.
-inline bool IsMatrix3DSemanticallyRepresentable(const DecomposedMatrix3D& matrix) {
+// Returns true if the perspective of a DecomposeMatrix3D result, whose last perspective value is
+// always 1, can be expressed by the single perspective distance component, that is it has the form
+// [0, 0, -1/d, 1] with d > 0, or is [0, 0, 0, 1] for none.
+inline bool IsMatrix3DComponentRepresentable(const DecomposedMatrix3D& matrix) {
   constexpr double Tolerance = 1.0e-8;
   if (std::abs(matrix.perspective[0]) > Tolerance || std::abs(matrix.perspective[1]) > Tolerance ||
-      std::abs(matrix.perspective[3] - 1.0) > Tolerance || matrix.perspective[2] > 0) {
+      matrix.perspective[2] > 0) {
     return false;
   }
   if (std::abs(matrix.perspective[2]) > 1.0e-12) {
@@ -701,7 +702,7 @@ inline bool ComposeMatrix3DComponents(const Matrix3DComponents& components, Matr
 inline bool Matrix3DComponentsFromMatrix(const Matrix3D& matrix, Matrix3DComponents* output) {
   DecomposedMatrix3D value = {};
   if (output == nullptr || !DecomposeMatrix3D(matrix, &value) ||
-      !IsMatrix3DSemanticallyRepresentable(value) || std::abs(value.skew[1]) > 1.0e-6 ||
+      !IsMatrix3DComponentRepresentable(value) || std::abs(value.skew[1]) > 1.0e-6 ||
       std::abs(value.skew[2]) > 1.0e-6) {
     return false;
   }
