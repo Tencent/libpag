@@ -624,3 +624,48 @@ Babel-compiled at runtime.
   pixels to keep the output diff-friendly.
 - The page is force-scrolled to `(0, 0)` before measurement so that scroll
   position never leaks into the captured coordinates.
+
+### Explicit font replacement
+
+Pass a JSON array of `from` / `to` rules with `--font-map`:
+
+```sh
+./html2pagx page.html --embed-fonts --font-map font-map.json --no-render
+```
+
+```json
+[
+  {
+    "from": {
+      "font-family": "\"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font-weight": "600",
+      "font-style": "normal",
+      "font-weight-style": "Semi Bold"
+    },
+    "to": {
+      "font-family": "Source Han Sans CN",
+      "font-weight": "600",
+      "font-style": "normal",
+      "font-weight-style": "Bold"
+    }
+  }
+]
+```
+
+The matcher compares the original ordered family stack, numeric CSS weight and CSS style.
+Quoting, separator whitespace and family case do not affect the comparison. The source face
+label is descriptive; the target `font-weight-style` is copied verbatim, so 600 can explicitly
+map to Bold. Unmatched fonts remain unchanged; no default font is inferred. Conflicting rules
+are rejected before conversion. The caller supplies targets already available in its editor.
+
+Source requests travel with text fragments through import/resolve/embed, keeping distinct
+requests separate even when PAGX rounds them to the same face. After embedding, each Text is
+matched directly and only its family/style is replaced. Temporary requests are removed;
+no Text IDs, document IDs or per-Text JSON sidecars are generated. Glyph resources and the
+original conversion layout are preserved. Existing authored IDs remain untouched.
+
+Both single-file and batch runs support the flag. Module callers pass the same JSON array
+as `runHtmlToPagx({ fontMap, embedFonts: true, ... })` (or `runBatch`). Mapping requires resolve
+and embedding, and still runs when PNG rendering is disabled. The returned `fontMapping`
+counts replaced, unmatched and request-less texts. Request-less conversion paths are left
+unchanged and reported in the log; they are never matched by guessed Linux font names.
