@@ -487,7 +487,7 @@ PAGX_TEST(PAGXViewModelTest, DataBindPositionSyncVerified) {
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);
 }
 
-// A semantic component binding and transform animations write into the same Layer pose. Writes
+// A transform component binding and transform animations write into the same Layer pose. Writes
 // that drive different parts combine, and the latest write to the same part wins.
 PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingCombinesWithAnimation) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -564,8 +564,8 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingCombinesWithAnimation) {
   EXPECT_NEAR(std::get<float>(readBack), 60, 1.0e-4f);
 }
 
-// A Once semantic component is written into the transform a single time, and a later transform
-// write replaces it without the value being reapplied.
+// A Once transform component binding is written into the transform a single time, and a later
+// transform write replaces it without the value being reapplied.
 PAGX_TEST(PAGXViewModelTest, Matrix3DOnceComponentYieldsToLaterTransformWrite) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* schema = doc->makeNode<pagx::ViewModel>("MatrixVM");
