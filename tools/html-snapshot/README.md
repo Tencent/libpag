@@ -644,6 +644,7 @@ font downloading, embedding or a replacement map:
     {
       "families": ["PingFang SC", "Microsoft YaHei", "sans-serif"],
       "weight": 600,
+      "weightName": "SemiBold",
       "style": "normal"
     }
   ],
@@ -653,6 +654,10 @@ font downloading, embedding or a replacement map:
 
 `families` is the original ordered CSS family stack; `weight` is the numeric computed CSS
 weight before PAGX face bucketing (650 stays 650), and `style` is `normal`, `italic` or `oblique`.
+`weightName` is a display label: 100–900 in steps of 100 map to `Thin`, `ExtraLight`,
+`Light`, `Regular`, `Medium`, `SemiBold`, `Bold`, `ExtraBold`, and `Black`. Other weights
+use their exact numeric string (for example, 650 becomes `"650"`). It does not participate
+in matching and is not the editor's actual font face name.
 Explicit `variations` and inherited `lang` are included only when present. Requests are
 deduplicated in first-use order, comparing family names case-insensitively and variation axes
 independently of property order. Different axes or languages remain separate records.

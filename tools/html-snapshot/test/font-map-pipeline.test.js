@@ -37,7 +37,7 @@ if(command==='import') {
   expect(result.png).toBeNull();
   expect(result.fontMapping).toEqual({ replaced: 1, unmatched: 0, missingRequests: 0 });
   expect(JSON.parse(fs.readFileSync(result.fontMetadataPath, 'utf8'))).toEqual({
-    version: 1, fonts: [{ families: ['PingFang SC', 'sans-serif'], weight: 600, style: 'normal' }], missingRequests: 0,
+    version: 1, fonts: [{ families: ['PingFang SC', 'sans-serif'], weight: 600, weightName: 'SemiBold', style: 'normal' }], missingRequests: 0,
   });
   const output = fs.readFileSync(result.pagx, 'utf8');
   expect(output).toContain('fontFamily="Source Han Sans CN" fontStyle="Bold"');
@@ -85,8 +85,8 @@ if(command==='import') {
     } });
   expect(result.fontMetadataPath).toBe(path.join(dir, 'out', 'page.fonts.json'));
   expect(JSON.parse(fs.readFileSync(result.fontMetadataPath, 'utf8'))).toEqual({ version: 1, fonts: [
-    { families: ['Missing Source', 'sans-serif'], weight: 650, style: 'normal' },
-    { families: ['Missing Source', 'sans-serif'], weight: 700, style: 'normal' },
+    { families: ['Missing Source', 'sans-serif'], weight: 650, weightName: '650', style: 'normal' },
+    { families: ['Missing Source', 'sans-serif'], weight: 700, weightName: 'Bold', style: 'normal' },
   ], missingRequests: 0 });
   expect(result.fontMapping).toBeUndefined();
   const pagx = fs.readFileSync(result.pagx, 'utf8');

@@ -55,8 +55,8 @@ test.each([undefined, [rule]])('exports source fonts with and without replacemen
   const result = finalizePagxFonts({ inputPath: file, outputPath: file, metadataPath, fontMap });
   const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
   expect(metadata).toEqual({ version: 1, fonts: [
-    { families: ['PingFang SC', 'sans-serif'], weight: 600, style: 'normal' },
-    { families: ['PingFang SC', 'sans-serif'], weight: 700, style: 'normal' },
+    { families: ['PingFang SC', 'sans-serif'], weight: 600, weightName: 'SemiBold', style: 'normal' },
+    { families: ['PingFang SC', 'sans-serif'], weight: 700, weightName: 'Bold', style: 'normal' },
   ], missingRequests: 1 });
   expect(result.metadata).toEqual(metadata);
   expect(result.fontMapping).toEqual(fontMap
