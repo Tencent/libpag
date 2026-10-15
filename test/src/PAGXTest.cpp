@@ -10447,6 +10447,28 @@ PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
   for (int i = 0; i < 16; ++i) {
     EXPECT_FLOAT_EQ(midpoint.values[i], source.values[i]);
   }
+
+  pagx::DecomposedMatrix3D startComponents = {};
+  pagx::DecomposedMatrix3D endComponents = {};
+  endComponents.translate[0] = 20;
+  endComponents.translate[1] = 40;
+  endComponents.rotation = pagx::QuaternionFromEulerXYZDegrees(0, 0, 90);
+  pagx::Matrix3D start = {};
+  pagx::Matrix3D end = {};
+  ASSERT_TRUE(pagx::RecomposeMatrix3D(startComponents, &start));
+  ASSERT_TRUE(pagx::RecomposeMatrix3D(endComponents, &end));
+  auto interpolated = pagx::LerpMatrix3D(start, end, 0.5);
+  pagx::DecomposedMatrix3D interpolatedComponents = {};
+  ASSERT_TRUE(pagx::DecomposeMatrix3D(interpolated, &interpolatedComponents));
+  float rotationZ = 0;
+  ASSERT_TRUE(pagx::ReadMatrix3DComponent(interpolatedComponents,
+                                          pagx::Matrix3DComponent::RotateZ, &rotationZ));
+  EXPECT_NEAR(rotationZ, 45, 1.0e-3f);
+  EXPECT_NEAR(interpolatedComponents.translate[0], 10, 1.0e-4);
+  EXPECT_NEAR(interpolatedComponents.translate[1], 20, 1.0e-4);
+  EXPECT_NEAR(interpolatedComponents.scale[0], 1, 1.0e-5);
+  EXPECT_NEAR(interpolatedComponents.scale[1], 1, 1.0e-5);
+
   pagx::Matrix3D singular = {};
   for (int column = 0; column < 4; ++column) {
     singular.setRowColumn(3, column, singular.getRowColumn(2, column));
