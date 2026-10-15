@@ -554,11 +554,10 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   // tgfx's scrollRect uses (x,y) as a scroll offset (the rect's top-left maps to the layer's
   // local (0,0)). To preserve the original positioning we have to translate the layer by the
   // same (left, top) — which we can only do safely when the user layer has no rotation/scale
-  // (any 2x2 distortion would warp that compensation vector), no 3D matrix, and no
+  // (any 2x2 distortion would warp that compensation vector), no 3D matrix or z, and no
   // constraint-based positioning (where x/y are inputs to the layout solver rather than the
-  // final translation). A pure-translation matrix is fine: it commutes with the layer-local
-  // pre-translation the scrollRect introduces, so adding (left, top) to layer.x/y produces
-  // the same parent-space final transform whether the matrix translates first or not. This
+  // final translation). A pure-translation matrix is fine, but a non-identity matrix overrides
+  // the authored x/y, so the compensation goes into the matrix translation instead. This
   // matters after a PAGX -> SVG -> PAGX round trip, which re-imports the translation we
   // previously baked into x/y as a 2D matrix attribute.
   if (layer->matrix.a != 1.0f || layer->matrix.b != 0.0f || layer->matrix.c != 0.0f ||
@@ -578,10 +577,22 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   }
   float left = rect->position.x - rect->size.width * 0.5f;
   float top = rect->position.y - rect->size.height * 0.5f;
+  bool usesMatrix = !layer->matrix.isIdentity();
+  Matrix translated = layer->matrix;
+  translated.tx += left;
+  translated.ty += top;
+  // A matrix that cancels to identity would re-enable the authored x/y it used to override.
+  if (usesMatrix && translated.isIdentity() && (layer->x != 0.0f || layer->y != 0.0f)) {
+    return false;
+  }
   layer->scrollRect = {left, top, rect->size.width, rect->size.height};
   layer->hasScrollRect = true;
-  layer->x += left;
-  layer->y += top;
+  if (usesMatrix) {
+    layer->matrix = translated;
+  } else {
+    layer->x += left;
+    layer->y += top;
+  }
   // The displayed area collapses to exactly the scrollRect's size after this rewrite. Pin the
   // layer's frame to those dimensions so layoutBounds() reflects the visible region instead of
   // the (much larger) un-clipped child extent — otherwise verify's child-exceeds-parent check
