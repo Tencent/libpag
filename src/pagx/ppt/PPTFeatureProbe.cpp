@@ -37,6 +37,7 @@
 #include "pagx/types/BlendMode.h"
 #include "pagx/types/Color.h"
 #include "pagx/types/Matrix.h"
+#include "pagx/utils/ExporterUtils.h"
 
 namespace pagx {
 
@@ -200,7 +201,9 @@ PPTFeatureFlags ProbeLayerFeatures(const Layer* layer) {
   if (!IsSupportedPaintBlendMode(layer->blendMode)) {
     out.hasUnsupportedBlend = true;
   }
-  if (!layer->matrix.isIdentity() && MatrixHasShear(layer->matrix)) {
+  // Probe the complete Layer transform (matrix3D, matrix, or x / y / z with the rotation / scale /
+  // skew / perspective components) projected to 2D, which is what PPTExporter decomposes.
+  if (MatrixHasShear(BuildLayerMatrix(layer))) {
     out.hasShearTransform = true;
   }
   for (const auto* filter : layer->filters) {
