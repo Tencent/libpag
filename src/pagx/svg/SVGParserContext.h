@@ -164,7 +164,6 @@ class SVGParserContext {
   InheritedStyle computeInheritedStyle(const std::shared_ptr<DOMNode>& element,
                                        const InheritedStyle& parentStyle);
 
-  Matrix parseTransform(const std::string& value);
   Color parseColor(const std::string& value);
   float parseLength(const std::string& value, float containerSize);
   void parseGradientStops(const std::shared_ptr<DOMNode>& element,

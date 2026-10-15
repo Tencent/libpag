@@ -432,7 +432,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   std::string transform = getAttribute(element, "transform");
   if (!transform.empty()) {
-    layer->matrix = parseTransform(transform);
+    layer->matrix = MatrixFromSVGTransform(transform);
   }
 
   std::string opacity = getAttribute(element, "opacity");
@@ -1484,8 +1484,7 @@ LinearGradient* SVGParserContext::convertLinearGradient(const std::shared_ptr<DO
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
-  Matrix transformMatrix =
-      gradientTransform.empty() ? Matrix::Identity() : parseTransform(gradientTransform);
+  Matrix transformMatrix = MatrixFromSVGTransform(gradientTransform);
 
   Point start = useObjectBoundingBox ? Point{shapeBounds.x + x1 * shapeBounds.width,
                                              shapeBounds.y + y1 * shapeBounds.height}
@@ -1523,8 +1522,7 @@ RadialGradient* SVGParserContext::convertRadialGradient(const std::shared_ptr<DO
 
   // Parse gradientTransform.
   std::string gradientTransform = getAttribute(element, "gradientTransform");
-  Matrix transformMatrix =
-      gradientTransform.empty() ? Matrix::Identity() : parseTransform(gradientTransform);
+  Matrix transformMatrix = MatrixFromSVGTransform(gradientTransform);
 
   if (useObjectBoundingBox) {
     // For objectBoundingBox, convert normalized coordinates to actual coordinates.
@@ -1606,7 +1604,7 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
 
         // Parse transform on the use element.
         std::string useTransform = getAttribute(child, "transform");
-        Matrix useMatrix = useTransform.empty() ? Matrix::Identity() : parseTransform(useTransform);
+        Matrix useMatrix = MatrixFromSVGTransform(useTransform);
 
         // Construct the complete transformation matrix for the ImagePattern.
         // In SVG with patternContentUnits="objectBoundingBox", the transformation chain is:
@@ -1646,8 +1644,7 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
       pattern->image = imageNode;
 
       std::string imageTransform = getAttribute(child, "transform");
-      Matrix imageMatrix =
-          imageTransform.empty() ? Matrix::Identity() : parseTransform(imageTransform);
+      Matrix imageMatrix = MatrixFromSVGTransform(imageTransform);
 
       if (contentUnitsIsObjectBoundingBox) {
         // Image dimensions are 0-1 ratios, scale by shape bounds.
@@ -1692,7 +1689,7 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
       std::string transformStr = getAttribute(child, "transform");
       Matrix combinedMatrix = parentMatrix;
       if (!transformStr.empty()) {
-        combinedMatrix = combinedMatrix * parseTransform(transformStr);
+        combinedMatrix = combinedMatrix * MatrixFromSVGTransform(transformStr);
       }
       bool hasTransform = !combinedMatrix.isIdentity();
       if (hasTransform) {
@@ -1716,7 +1713,7 @@ void SVGParserContext::parseMaskChildren(const std::shared_ptr<DOMNode>& parent,
       std::string groupTransform = getAttribute(child, "transform");
       Matrix combinedMatrix = parentMatrix;
       if (!groupTransform.empty()) {
-        combinedMatrix = combinedMatrix * parseTransform(groupTransform);
+        combinedMatrix = combinedMatrix * MatrixFromSVGTransform(groupTransform);
       }
       parseMaskChildren(child, maskLayer, inheritedStyle, combinedMatrix);
     }
@@ -2384,9 +2381,6 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
   }
 
   return style;
-}
-Matrix SVGParserContext::parseTransform(const std::string& value) {
-  return MatrixFromSVGTransform(value);
 }
 // Parse CSS Color Level 4 color() function: color(display-p3 r g b) or color(display-p3 r g b / a).
 // Returns a Color with alpha=-1 on parse failure.
