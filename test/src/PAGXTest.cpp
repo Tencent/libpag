@@ -10613,6 +10613,45 @@ PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
 }
 
 /**
+ * Test case: on a pose with perspective, an x write replaces the decomposed translation and keeps
+ * the perspective and rotation, so the translation is applied inside the projection.
+ */
+PAGX_TEST(PAGXTest, LayerTranslationWriteUsesDecomposedTranslationUnderPerspective) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+
+  pagx::DecomposedMatrix3D components = {};
+  components.perspective[2] = -0.01;
+  components.translate[0] = 10;
+  components.translate[1] = 20;
+  components.rotation = pagx::QuaternionFromEulerXYZDegrees(0, 30, 0);
+  pagx::Matrix3D source = {};
+  ASSERT_TRUE(pagx::RecomposeMatrix3D(components, &source));
+  ASSERT_TRUE(binding->apply(layer, "matrix3D", pagx::KeyValue{source}, 1.0f));
+  pagx::KeyValue x;
+  ASSERT_TRUE(binding->read(layer, "x", &x));
+  EXPECT_NEAR(std::get<float>(x), 10, 1.0e-4f);
+
+  ASSERT_TRUE(binding->apply(layer, "x", pagx::KeyValue{50.0f}, 1.0f));
+  ASSERT_TRUE(binding->read(layer, "x", &x));
+  EXPECT_NEAR(std::get<float>(x), 50, 1.0e-4f);
+  auto result = ToPAGXMatrix3D(binding->get<tgfx::Layer>(layer)->matrix3D());
+  pagx::DecomposedMatrix3D decomposed = {};
+  ASSERT_TRUE(pagx::DecomposeMatrix3D(result, &decomposed));
+  EXPECT_NEAR(decomposed.translate[0], 50, 1.0e-4);
+  EXPECT_NEAR(decomposed.translate[1], 20, 1.0e-4);
+  EXPECT_NEAR(decomposed.perspective[2], -0.01, 1.0e-6);
+  float rotationY = 0;
+  ASSERT_TRUE(
+      pagx::ReadMatrix3DComponent(decomposed, pagx::Matrix3DComponent::RotateY, &rotationY));
+  EXPECT_NEAR(rotationY, 30, 1.0e-3f);
+}
+
+/**
  * Test case: the constraint layout position stays outside the local transform. Authored x / y add
  * to it, and a matrix3D write replaces only the local transform.
  */

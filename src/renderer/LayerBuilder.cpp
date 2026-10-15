@@ -181,6 +181,11 @@ static bool IsPlanarAffine(const Matrix3D& matrix) {
          matrix.getRowColumn(3, 3) == 1;
 }
 
+static bool HasPerspective(const Matrix3D& matrix) {
+  return matrix.getRowColumn(3, 0) != 0 || matrix.getRowColumn(3, 1) != 0 ||
+         matrix.getRowColumn(3, 2) != 0 || matrix.getRowColumn(3, 3) != 1;
+}
+
 static tgfx::Matrix PlanarMatrix(const Matrix3D& matrix) {
   return tgfx::Matrix::MakeAll(matrix.getRowColumn(0, 0), matrix.getRowColumn(0, 1),
                                matrix.getRowColumn(0, 3), matrix.getRowColumn(1, 0),
@@ -235,7 +240,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return RuntimeTarget::hasWriter(channel);
   }
 
-  // Reads x / y / z back from the local pose translation, excluding the layout-generated position,
+  // Reads x / y / z back from the decomposed pose translation, excluding the layout position,
   // and the semantic Matrix3D components from the decomposed pose. Other channels fall through to
   // the base reader table.
   bool read(const std::string& channel, KeyValue* out) const override {
@@ -244,10 +249,11 @@ struct LayerRuntimeTarget : RuntimeTarget {
     }
     if (channel == "x" || channel == "y" || channel == "z") {
       auto axis = TranslationAxis(channel);
-      if (isTranslationMasked(axis)) {
+      float result = 0;
+      if (isTranslationMasked(axis) || !readTranslation(axis, &result)) {
         return false;
       }
-      *out = KeyValue{pose.getRowColumn(axis, 3)};
+      *out = KeyValue{result};
       return true;
     }
     auto component = Matrix3DComponent::TranslateX;
@@ -299,12 +305,44 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return hasStaticMatrix3D || (axis < 2 && hasStaticMatrix);
   }
 
+  // Reads the translation component of the decomposed pose. Without perspective it is exactly the
+  // translation column, which is read directly to avoid decomposition round-off.
+  bool readTranslation(int axis, float* value) const {
+    if (!HasPerspective(pose)) {
+      *value = pose.getRowColumn(axis, 3);
+      return true;
+    }
+    DecomposedMatrix3D decomposed = {};
+    if (!DecomposeMatrix3D(pose, &decomposed)) {
+      return false;
+    }
+    *value = static_cast<float>(decomposed.translate[axis]);
+    return true;
+  }
+
+  // Replaces the translation component of the decomposed pose, so the translation is applied
+  // inside the perspective projection. A pose without perspective writes the translation column
+  // directly, which gives the same result without decomposition round-off.
   bool applyTranslation(int axis, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
     if (v == nullptr || !std::isfinite(*v) || isTranslationMasked(axis)) {
       return false;
     }
-    pose.setRowColumn(axis, 3, MixFloat(pose.getRowColumn(axis, 3), *v, mix));
+    if (!HasPerspective(pose)) {
+      pose.setRowColumn(axis, 3, MixFloat(pose.getRowColumn(axis, 3), *v, mix));
+      publish();
+      return true;
+    }
+    DecomposedMatrix3D decomposed = {};
+    Matrix3D matrix = {};
+    if (!DecomposeMatrix3D(pose, &decomposed)) {
+      return false;
+    }
+    decomposed.translate[axis] = MixFloat(static_cast<float>(decomposed.translate[axis]), *v, mix);
+    if (!RecomposeMatrix3D(decomposed, &matrix)) {
+      return false;
+    }
+    pose = matrix;
     publish();
     return true;
   }
