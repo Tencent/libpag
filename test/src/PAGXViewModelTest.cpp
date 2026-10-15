@@ -1421,6 +1421,7 @@ PAGX_TEST(PAGXViewModelTest, LayerPositionDataBindIsOverriddenByStaticMatrix) {
   layer->width = 100;
   layer->height = 100;
   // The static matrix overrides both the authored x and the animated x channel.
+  layer->x = 70;
   layer->matrix = pagx::Matrix::Translate(30.0f, 0.0f);
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size.width = 100;
