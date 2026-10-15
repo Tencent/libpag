@@ -10337,7 +10337,7 @@ PAGX_TEST(PAGXTest, Matrix3DComponentChannelsAreDataBindOnly) {
   const char* channels[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x", "scale.y",
                             "scale.z",    "skew.xy",    "skew.xz",    "skew.yz", "perspective"};
   auto doc = pagx::PAGXDocument::Make(100, 100);
-  auto* layer = doc->makeNode<pagx::Layer>();
+  auto* layer = doc->makeNode<pagx::Layer>("componentLayer");
   for (const auto* channel : channels) {
     EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
     EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel));
