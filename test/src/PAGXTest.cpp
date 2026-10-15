@@ -9845,6 +9845,17 @@ PAGX_TEST(PAGXTest, NodeChannelScalarRoundTrip) {
   EXPECT_TRUE(pagx::GetNodeChannel(layer, "matrix", &matrixOut));
   EXPECT_EQ(std::get<pagx::Matrix>(matrixOut), authoredMatrix);
 
+  pagx::Matrix3D authoredMatrix3D = {};
+  authoredMatrix3D.values[12] = 10;
+  authoredMatrix3D.values[13] = 20;
+  authoredMatrix3D.values[14] = 30;
+  EXPECT_TRUE(pagx::SetNodeChannel(layer, "matrix3D", pagx::KeyValue(authoredMatrix3D)));
+  EXPECT_EQ(layer->matrix3D, authoredMatrix3D);
+  pagx::Matrix3D singularMatrix3D = {};
+  singularMatrix3D.values[0] = 0;
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "matrix3D", pagx::KeyValue(singularMatrix3D)));
+  EXPECT_EQ(layer->matrix3D, authoredMatrix3D);
+
   EXPECT_TRUE(pagx::SetNodeChannel(layer, "alpha", pagx::KeyValue(0.4f)));
   EXPECT_FLOAT_EQ(layer->alpha, 0.4f);
   pagx::KeyValue out;
