@@ -14,6 +14,14 @@
 // `<details>` is pruned from the DOM by the `dropCollapsedDetailsContent`
 // pre-pass instead, where the closed/open state is actually visible.
 //
+// `form` is intentionally NOT in this list: a `<form>` is normally a
+// transparent layout container, and the snapshot pipeline already turns
+// `<input>` / `<textarea>` / `<select>` / `<button>` into plain div/text
+// leaves (see browser-snapshot.ts classify / renderTextInput). Dropping
+// the form outright would silently throw away every interactive child it
+// hosts — the email/captcha-style input groups common in landing pages
+// would render as a hole next to their button sibling.
+//
 // Lower-case canonical form. Both consumers serialise this constant into
 // the browser-side payload and rebuild a Set from it: the main pipeline
 // matches against `el.tagName.toLowerCase()`, the icon pass uppercases
@@ -27,7 +35,6 @@ export const DROP_TAG_NAMES: readonly string[] = [
   'head', 'title', 'base',
   'template', 'slot', 'dialog',
   'map', 'area', 'source', 'track', 'param',
-  'form',
 ];
 
 // Pre-serialised forms of `DROP_TAG_NAMES`. The browser-side payload of both

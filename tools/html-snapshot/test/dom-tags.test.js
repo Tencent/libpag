@@ -9,9 +9,17 @@ describe('DROP_TAG_NAMES', () => {
   });
 
   test('includes the structural / non-visual tags the pipeline drops', () => {
-    for (const tag of ['script', 'style', 'head', 'meta', 'br', 'form', 'iframe']) {
+    for (const tag of ['script', 'style', 'head', 'meta', 'br', 'iframe']) {
       expect(DROP_TAG_NAMES).toContain(tag);
     }
+  });
+
+  test('does not include <form> so interactive children get a chance to render', () => {
+    // `<form>` is a transparent layout container in modern pages; the
+    // snapshot pipeline already converts `<input>` / `<textarea>` / `<select>`
+    // / `<button>` into plain div / text leaves, so dropping the form host
+    // would silently throw away every interactive child it wraps.
+    expect(DROP_TAG_NAMES).not.toContain('form');
   });
 
   test('excludes tags whose box paints', () => {

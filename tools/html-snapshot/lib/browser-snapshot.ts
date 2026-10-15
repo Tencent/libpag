@@ -969,6 +969,26 @@ function resolveChildStacking(hostEl, child, childComputed, flexOrGridParent) {
   };
 }
 
+// Resolve one element child's effective stacking entry for paint-order
+// sorting: the child's own position / z-index, or — when a static wrapper
+// paints nothing of its own but holds only stackable children — the wrapper's
+// inherited z (resolveEscapingWrapperZIndex). Materialised pseudo stand-ins
+// are excluded: resolveChildStacking already read the pseudo's own stacking,
+// and their polluted computed style must not be re-read here. Shared by
+// renderChildrenInto and the body-root loop in snapshotMainImpl so both
+// replay the browser's paint order with the exact same rules.
+function resolveChildPaintEntry(hostEl, child, childComputed, flexOrGridParent) {
+  const stacking = resolveChildStacking(hostEl, child, childComputed, flexOrGridParent);
+  if (stacking.stackable) return stacking;
+  const pseudoAttr = typeof child.getAttribute === 'function'
+    ? child.getAttribute('data-snapshot-pseudo')
+    : null;
+  if (pseudoAttr) return stacking;
+  const wrapperZ = resolveEscapingWrapperZIndex(child, childComputed);
+  if (wrapperZ === null) return stacking;
+  return { stackable: true, zIndex: wrapperZ };
+}
+
 // A "pure stacking wrapper" paints nothing of its own — no background, border,
 // shadow, outline, transform, filter, mask or clip — so the only mark it leaves
 // is the paint of its children. When every element child is stackable
@@ -5010,27 +5030,11 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const childComputed = getComputedStyle(n);
-      const stacking = resolveChildStacking(el, n, childComputed, flexOrGridParent);
-      let stackable = stacking.stackable;
-      let zIndex = stacking.zIndex;
       // A static wrapper that paints nothing of its own but holds only
       // stackable children contributes those children's stacking, not its own
       // in-flow position — replay that by sorting the wrapper at their highest
-      // z-index (see resolveEscapingWrapperZIndex). Materialised pseudo
-      // stand-ins are excluded: resolveChildStacking already reads the pseudo's
-      // own stacking, and their polluted computed style must not be re-read here.
-      if (!stackable) {
-        const pseudoAttr = typeof n.getAttribute === 'function'
-          ? n.getAttribute('data-snapshot-pseudo')
-          : null;
-        if (!pseudoAttr) {
-          const wrapperZ = resolveEscapingWrapperZIndex(n, childComputed);
-          if (wrapperZ !== null) {
-            stackable = true;
-            zIndex = wrapperZ;
-          }
-        }
-      }
+      // z-index (see resolveEscapingWrapperZIndex).
+      const { stackable, zIndex } = resolveChildPaintEntry(el, n, childComputed, flexOrGridParent);
       items.push({
         stackable,
         zIndex,
@@ -5660,10 +5664,32 @@ function snapshotMainImpl(opts) {
   // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
   // here (block body, zeroed margin), so the horizontal axis is unaffected.
   const rootOrigin = canvasRootRect(canvasWidth, canvasHeight);
-  const parts = [];
+  // Replay the browser's paint order for the body's own children, exactly
+  // like renderChildrenInto does for every other element's children. The
+  // subset flattens every box to `position: absolute` with no z-index, so
+  // DOM order alone becomes the paint order — but the authored page may
+  // legitimately raise an earlier sibling (e.g. `position: fixed;
+  // z-index: 100` site navigation ordered before the page content). Without
+  // this sort the navigation would be painted underneath the opaque section
+  // that follows it in DOM order. Body lays out as a block container in the
+  // regular case; keep the flex/grid carve-out for the rare
+  // `body { display: flex }` layout so flex items with an explicit z-index
+  // sort identically here and inside renderChildrenInto.
+  const bodyDisplay = getComputedStyle(body).display;
+  const bodyFlexOrGridParent =
+    bodyDisplay === 'flex' ||
+    bodyDisplay === 'inline-flex' ||
+    bodyDisplay === 'grid' ||
+    bodyDisplay === 'inline-grid';
+  const bodyItems = [];
+  let bodyDomIndex = 0;
   for (const c of body.children) {
-    parts.push(render(c, rootOrigin));
+    const childComputed = getComputedStyle(c);
+    const { stackable, zIndex } = resolveChildPaintEntry(body, c, childComputed, bodyFlexOrGridParent);
+    bodyItems.push({ stackable, zIndex, domIndex: bodyDomIndex++, html: render(c, rootOrigin) });
   }
+  bodyItems.sort(paintOrder);
+  const parts = bodyItems.map((it) => it.html);
 
   const title = (document.title || '').trim();
   const bodyComputed = getComputedStyle(body);
@@ -6090,6 +6116,7 @@ const HELPER_FNS = [
   renderContainer,
   renderChildrenInto,
   resolveChildStacking,
+  resolveChildPaintEntry,
   resolveEscapingWrapperZIndex,
   stripNameAnchor,
   applyLayerAttributes,
