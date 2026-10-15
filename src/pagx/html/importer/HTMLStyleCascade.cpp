@@ -555,13 +555,6 @@ HTMLInheritedStyle HTMLStyleCascade::resolveInheritedStyle(const std::shared_ptr
                                                            const HTMLInheritedStyle& parent,
                                                            bool recordFontFallbacks) {
   HTMLInheritedStyle out = parent;
-  // The font-request handshake attribute (html-snapshot -> importer) is not a CSS property, but
-  // it rides the same traversal: the nearest annotated element stamps its request onto the
-  // resolved style and descendants inherit it verbatim. The value is opaque here — validation
-  // happens on the consuming side (`font-metadata` in tools/html-snapshot).
-  if (const std::string* request = element->findAttribute("data-pagx-font-request")) {
-    out.fontRequest = *request;
-  }
   const auto& props = getResolvedStyle(element);
   CopyProperty(props, "color", out.color);
   CopyProperty(props, "font-family", out.fontFamily);
