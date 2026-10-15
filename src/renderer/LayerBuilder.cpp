@@ -224,7 +224,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (channel == "matrix3D") {
       return applyMatrix3D(value, mix);
     }
-    auto component = Matrix3DComponent::TranslateX;
+    auto component = Matrix3DComponent::RotateX;
     if (Matrix3DComponentFromChannel(channel, &component)) {
       return applyComponent(component, value, mix);
     }
@@ -232,9 +232,9 @@ struct LayerRuntimeTarget : RuntimeTarget {
   }
 
   bool hasWriter(const std::string& channel) const override {
-    auto component = Matrix3DComponent::TranslateX;
-    if (channel == "matrix" || channel == "matrix3D" ||
-        Matrix3DComponentFromChannel(channel, &component)) {
+    auto component = Matrix3DComponent::RotateX;
+    if (channel == "x" || channel == "y" || channel == "z" || channel == "matrix" ||
+        channel == "matrix3D" || Matrix3DComponentFromChannel(channel, &component)) {
       return true;
     }
     return RuntimeTarget::hasWriter(channel);
@@ -256,7 +256,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
       *out = KeyValue{result};
       return true;
     }
-    auto component = Matrix3DComponent::TranslateX;
+    auto component = Matrix3DComponent::RotateX;
     if (Matrix3DComponentFromChannel(channel, &component)) {
       DecomposedMatrix3D decomposed = {};
       float result = 0;

@@ -43,9 +43,6 @@ struct DecomposedMatrix3D {
 };
 
 enum class Matrix3DComponent : uint8_t {
-  TranslateX,
-  TranslateY,
-  TranslateZ,
   RotateX,
   RotateY,
   RotateZ,
@@ -519,9 +516,9 @@ inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DCom
   if (component == nullptr) {
     return false;
   }
-  static const char* names[] = {"x",          "y",       "z",          "rotation.x", "rotation.y",
-                                "rotation.z", "scale.x", "scale.y",    "scale.z",    "skew.xy",
-                                "skew.xz",    "skew.yz", "perspective"};
+  static const char* names[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x",
+                                "scale.y",    "scale.z",    "skew.xy",    "skew.xz",
+                                "skew.yz",    "perspective"};
   for (size_t i = 0; i < Matrix3DComponentCount; ++i) {
     if (channel == names[i]) {
       *component = static_cast<Matrix3DComponent>(i);
@@ -532,9 +529,8 @@ inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DCom
 }
 
 inline bool IsMatrix3DDataBindOnlyChannel(const std::string& channel) {
-  Matrix3DComponent component = Matrix3DComponent::TranslateX;
-  return Matrix3DComponentFromChannel(channel, &component) &&
-         static_cast<size_t>(component) >= static_cast<size_t>(Matrix3DComponent::RotateX);
+  Matrix3DComponent component = Matrix3DComponent::RotateX;
+  return Matrix3DComponentFromChannel(channel, &component);
 }
 
 inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComponent component,
@@ -545,12 +541,6 @@ inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComp
   static constexpr double RadiansToDegrees = 57.295779513082320877;
   double value = 0;
   switch (component) {
-    case Matrix3DComponent::TranslateX:
-    case Matrix3DComponent::TranslateY:
-    case Matrix3DComponent::TranslateZ:
-      value = matrix.translate[static_cast<int>(component) -
-                               static_cast<int>(Matrix3DComponent::TranslateX)];
-      break;
     case Matrix3DComponent::RotateX:
     case Matrix3DComponent::RotateY:
     case Matrix3DComponent::RotateZ: {
@@ -624,11 +614,6 @@ inline bool ApplyMatrix3DComponentOverrides(const DecomposedMatrix3D& source,
       return false;
     }
     switch (static_cast<Matrix3DComponent>(i)) {
-      case Matrix3DComponent::TranslateX:
-      case Matrix3DComponent::TranslateY:
-      case Matrix3DComponent::TranslateZ:
-        updated.translate[i - static_cast<size_t>(Matrix3DComponent::TranslateX)] = value;
-        break;
       case Matrix3DComponent::RotateX:
       case Matrix3DComponent::RotateY:
       case Matrix3DComponent::RotateZ:
