@@ -20,9 +20,14 @@
 
 #include "pagx/nodes/Layer.h"
 #include "pagx/runtime/Matrix3DDecompose.h"
+#include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
 
 namespace pagx {
+
+// Lifts a 2D affine matrix into a column-major 4x4 matrix that also translates by z along the Z
+// axis, leaving the Z axis otherwise untouched.
+Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z);
 
 // Returns true if any Layer transform component (rotation, scale, skew or perspective) differs from
 // its default value.

@@ -20,6 +20,18 @@
 
 namespace pagx {
 
+Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z) {
+  Matrix3D result = {};
+  result.setRowColumn(0, 0, matrix.a);
+  result.setRowColumn(0, 1, matrix.c);
+  result.setRowColumn(0, 3, matrix.tx);
+  result.setRowColumn(1, 0, matrix.b);
+  result.setRowColumn(1, 1, matrix.d);
+  result.setRowColumn(1, 3, matrix.ty);
+  result.setRowColumn(2, 3, z);
+  return result;
+}
+
 bool HasLayerTransformComponents(const Layer* layer) {
   return layer->rotationX != 0.0f || layer->rotationY != 0.0f || layer->rotationZ != 0.0f ||
          layer->scaleX != 1.0f || layer->scaleY != 1.0f || layer->scaleZ != 1.0f ||
@@ -49,18 +61,10 @@ Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return layer->matrix3D;
   }
-  Matrix3D result = {};
   if (!layer->matrix.isIdentity()) {
-    const auto& m = layer->matrix;
-    result.setRowColumn(0, 0, m.a);
-    result.setRowColumn(0, 1, m.c);
-    result.setRowColumn(0, 3, m.tx);
-    result.setRowColumn(1, 0, m.b);
-    result.setRowColumn(1, 1, m.d);
-    result.setRowColumn(1, 3, m.ty);
-    result.setRowColumn(2, 3, layer->z);
-    return result;
+    return LiftMatrixToMatrix3D(layer->matrix, layer->z);
   }
+  Matrix3D result = {};
   ComposeMatrix3DComponents(LayerTransformComponents(layer), &result);
   return result;
 }

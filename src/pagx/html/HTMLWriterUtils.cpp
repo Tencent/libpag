@@ -578,17 +578,7 @@ std::string LayerTransformCSS(const Layer* layer) {
     }
   }
   if (layer->z != 0) {
-    Matrix3D matrix3D = {};
-    matrix3D.setRowColumn(0, 0, m.a);
-    matrix3D.setRowColumn(0, 1, m.c);
-    matrix3D.setRowColumn(0, 3, m.tx);
-    matrix3D.setRowColumn(1, 0, m.b);
-    matrix3D.setRowColumn(1, 1, m.d);
-    matrix3D.setRowColumn(1, 3, m.ty);
-    matrix3D.setRowColumn(2, 2, 1);
-    matrix3D.setRowColumn(2, 3, layer->z);
-    matrix3D.setRowColumn(3, 3, 1);
-    return Matrix3DToCSS(matrix3D);
+    return Matrix3DToCSS(LiftMatrixToMatrix3D(m, layer->z));
   }
   if (m.isIdentity()) {
     return {};
