@@ -325,7 +325,7 @@ inline Quaternion SlerpQuaternion(const Quaternion& first, const Quaternion& sec
 inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output);
 
 inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output) {
-  if (output == nullptr || !IsFiniteMatrix3D(source) || !IsInvertibleMatrix3D(source)) {
+  if (output == nullptr || !IsInvertibleMatrix3D(source)) {
     return false;
   }
   double matrix[4][4] = {};
@@ -489,7 +489,7 @@ inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output)
       output->setRowColumn(row, column, static_cast<float>(result[row][column]));
     }
   }
-  return IsFiniteMatrix3D(*output) && IsInvertibleMatrix3D(*output);
+  return IsInvertibleMatrix3D(*output);
 }
 
 inline bool IsMatrix3DSemanticallyRepresentable(const DecomposedMatrix3D& matrix) {
