@@ -10339,9 +10339,11 @@ PAGX_TEST(PAGXTest, Matrix3DComponentChannelsAreDataBindOnly) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>("componentLayer");
   for (const auto* channel : channels) {
-    EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
+    EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
     EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel));
   }
+  EXPECT_FALSE(pagx::SetNodeChannel(layer, "rotation.z", pagx::KeyValue{30.0f}));
+  EXPECT_TRUE(layer->matrix3D.isIdentity());
   EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::Layer, "perspective.distance"));
   for (const auto* channel : {"x", "y", "z"}) {
     EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
