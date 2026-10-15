@@ -10434,8 +10434,7 @@ PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
   components.perspective[0] = 0.002;
   components.perspective[1] = -0.001;
   components.perspective[2] = 0.003;
-  components.perspective[3] = 1.0 - components.perspective[0] * 10.0 -
-                              components.perspective[1] * 20.0 - components.perspective[2] * 30.0;
+  components.perspective[3] = 1.0;
   components.translate[0] = 10;
   components.translate[1] = 20;
   components.translate[2] = 30;
