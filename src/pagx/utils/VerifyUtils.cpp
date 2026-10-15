@@ -18,6 +18,7 @@
 
 #include "pagx/utils/VerifyUtils.h"
 #include <cmath>
+#include "pagx/utils/ExporterUtils.h"
 
 namespace pagx {
 
@@ -34,7 +35,7 @@ bool HasLayerOnlyFeatures(const Layer* layer) {
   if (layer->blendMode != BlendMode::Normal) {
     return true;
   }
-  if (!layer->matrix3D.isIdentity()) {
+  if (!layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
     return true;
   }
   if (layer->preserve3D) {

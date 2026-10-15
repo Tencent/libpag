@@ -964,6 +964,16 @@
     <xs:attribute name="x" type="xs:decimal" default="0"/>
     <xs:attribute name="y" type="xs:decimal" default="0"/>
     <xs:attribute name="z" type="xs:decimal" default="0"/>
+    <xs:attribute name="rotationX" type="xs:decimal" default="0"/>
+    <xs:attribute name="rotationY" type="xs:decimal" default="0"/>
+    <xs:attribute name="rotationZ" type="xs:decimal" default="0"/>
+    <xs:attribute name="scaleX" type="xs:decimal" default="1"/>
+    <xs:attribute name="scaleY" type="xs:decimal" default="1"/>
+    <xs:attribute name="scaleZ" type="xs:decimal" default="1"/>
+    <xs:attribute name="skewXY" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewXZ" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewYZ" type="xs:decimal" default="0"/>
+    <xs:attribute name="perspective" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="layout" type="LayoutModeType" default="none"/>
     <xs:attribute name="gap" type="xs:decimal" default="0"/>

@@ -98,8 +98,8 @@ struct RuntimeTarget {
   }
 
   // Applies an evaluated channel value. Virtual so a subclass (LayerRuntimeTarget) can intercept
-  // channels that need shared state across writers (the Layer transform: x / y / z, matrix,
-  // matrix3D and the semantic Matrix3D components).
+  // channels that need shared state across writers (the Layer transform: x / y / z, the rotation /
+  // scale / skew / perspective components, matrix and matrix3D).
   virtual bool apply(const std::string& channel, const KeyValue& value, float mix) {
     auto it = writers.find(channel);
     if (it == writers.end() || object == nullptr) {
@@ -111,8 +111,9 @@ struct RuntimeTarget {
 
   // Reads the current value of a channel back from the bound object. Virtual so a subclass
   // (LayerRuntimeTarget) can intercept channels that hold shared transform state (x / y / z and the
-  // semantic Matrix3D components). Returns false if no reader is registered for the channel, the
-  // object is null, or the reader reports the channel currently has no value to sync back.
+  // rotation / scale / skew / perspective components). Returns false if no reader is registered for
+  // the channel, the object is null, or the reader reports the channel currently has no value to
+  // sync back.
   virtual bool read(const std::string& channel, KeyValue* out) const {
     auto it = readers.find(channel);
     if (it == readers.end() || object == nullptr || out == nullptr) {

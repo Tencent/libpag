@@ -1747,6 +1747,16 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   xml.addAttribute("x", node->x, Default<Layer>().x);
   xml.addAttribute("y", node->y, Default<Layer>().y);
   xml.addAttribute("z", node->z, Default<Layer>().z);
+  xml.addAttribute("rotationX", node->rotationX, Default<Layer>().rotationX);
+  xml.addAttribute("rotationY", node->rotationY, Default<Layer>().rotationY);
+  xml.addAttribute("rotationZ", node->rotationZ, Default<Layer>().rotationZ);
+  xml.addAttribute("scaleX", node->scaleX, Default<Layer>().scaleX);
+  xml.addAttribute("scaleY", node->scaleY, Default<Layer>().scaleY);
+  xml.addAttribute("scaleZ", node->scaleZ, Default<Layer>().scaleZ);
+  xml.addAttribute("skewXY", node->skewXY, Default<Layer>().skewXY);
+  xml.addAttribute("skewXZ", node->skewXZ, Default<Layer>().skewXZ);
+  xml.addAttribute("skewYZ", node->skewYZ, Default<Layer>().skewYZ);
+  xml.addAttribute("perspective", node->perspective, Default<Layer>().perspective);
   xml.addDimensionAttribute("width", node->width, node->percentWidth);
   xml.addDimensionAttribute("height", node->height, node->percentHeight);
   if (node->layout != Default<Layer>().layout) {

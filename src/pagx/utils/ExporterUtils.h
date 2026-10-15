@@ -26,6 +26,7 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/TextBox.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/types/Matrix.h"
 
 namespace pagx {
@@ -74,6 +75,19 @@ std::string EscapeCssFontFamily(const std::string& family);
  */
 std::string EscapeCssFontFamily(const std::string& family);
 
+// Returns true if any Layer transform component (rotation, scale, skew or perspective) differs from
+// its default value.
+bool HasLayerTransformComponents(const Layer* layer);
+
+// Returns the Layer's x / y / z translation and transform components. When the components cannot be
+// composed (a skew of +/-90 degrees or a negative perspective), only the translation is kept.
+Matrix3DComponents LayerTransformComponents(const Layer* layer);
+
+// Returns the Layer's local transform without the layout position: the non-identity matrix3D, else
+// the non-identity matrix lifted with z, else the composition of x / y / z and the components.
+Matrix3D BuildLayerLocalMatrix3D(const Layer* layer);
+
+// Returns the Layer's transform projected to 2D, including the layout position.
 Matrix BuildLayerMatrix(const Layer* layer);
 
 Matrix BuildGroupMatrix(const Group* group);

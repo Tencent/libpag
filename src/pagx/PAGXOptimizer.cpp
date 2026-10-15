@@ -42,6 +42,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/PathVerb.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/VerifyUtils.h"
 
 namespace pagx {
@@ -494,7 +495,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   if (!m->matrix.isIdentity()) {
     return false;
   }
-  if (!m->matrix3D.isIdentity()) {
+  if (!m->matrix3D.isIdentity() || HasLayerTransformComponents(m)) {
     return false;
   }
   if (m->alpha != 1.0f) {
@@ -564,7 +565,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
       layer->matrix.d != 1.0f) {
     return false;
   }
-  if (layer->z != 0.0f || !layer->matrix3D.isIdentity()) {
+  if (layer->z != 0.0f || !layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
     return false;
   }
   if (LayoutNodeHasConstraints(layer)) {
@@ -1310,7 +1311,8 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
   if (child->x != 0.0f || child->y != 0.0f || child->z != 0.0f) {
     return false;
   }
-  if (!child->matrix.isIdentity() || !child->matrix3D.isIdentity()) {
+  if (!child->matrix.isIdentity() || !child->matrix3D.isIdentity() ||
+      HasLayerTransformComponents(child)) {
     return false;
   }
   if (!IsZeroOrUnset(child->left) || !IsZeroOrUnset(child->top)) {
@@ -1335,13 +1337,14 @@ bool ChildFillsParent(const Layer* parent, const Layer* child) {
 // a container layout would reposition child layers, and the child keeps none after the merge.
 bool ChildHasNoPaintAffectingEffect(const Layer* child) {
   return child->visible && child->alpha == 1.0f && child->blendMode == BlendMode::Normal &&
-         child->z == 0.0f && child->matrix3D.isIdentity() && !child->preserve3D &&
-         child->antiAlias && child->groupOpacity && child->passThroughBackground &&
-         !child->hasScrollRect && !child->clipToBounds && child->mask == nullptr &&
-         child->composition == nullptr && child->compositionFilePath.empty() &&
-         child->externalDoc == nullptr && child->timelines.empty() && child->styles.empty() &&
-         child->filters.empty() && child->customData.empty() && child->vmContext.empty() &&
-         child->padding.isZero() && child->layout == LayoutMode::None;
+         child->z == 0.0f && child->matrix3D.isIdentity() && !HasLayerTransformComponents(child) &&
+         !child->preserve3D && child->antiAlias && child->groupOpacity &&
+         child->passThroughBackground && !child->hasScrollRect && !child->clipToBounds &&
+         child->mask == nullptr && child->composition == nullptr &&
+         child->compositionFilePath.empty() && child->externalDoc == nullptr &&
+         child->timelines.empty() && child->styles.empty() && child->filters.empty() &&
+         child->customData.empty() && child->vmContext.empty() && child->padding.isZero() &&
+         child->layout == LayoutMode::None;
 }
 
 bool CanAbsorbFillingChild(const Layer* parent, const Layer* child,

@@ -39,7 +39,7 @@ struct Quaternion {
   double w = 1;
 };
 
-// Decomposed form of a 4x4 transform used for interpolation and semantic component access. The
+// Decomposed form of a 4x4 transform used for interpolation and component conversion. The
 // matrix is recomposed as P * T * R * K * S for column vectors: S scales by scale[], K is the upper
 // triangular shear whose factors skew[0] (xy), skew[1] (xz) and skew[2] (yz) are stored as the
 // tangent of the skew angle, R is the rotation quaternion, T translates by translate[], and P is
@@ -53,8 +53,8 @@ struct DecomposedMatrix3D {
   double skew[3] = {0, 0, 0};
 };
 
-// Semantic components of a decomposed Matrix3D that can be read or written individually. Each one
-// maps to a Layer channel name (see Matrix3DComponentFromChannel). Count is a sentinel.
+// Transform components of a Layer besides its x / y / z translation. Each one maps to a Layer
+// channel name (see Matrix3DComponentFromChannel). Count is a sentinel.
 enum class Matrix3DComponent : uint8_t {
   RotateX,
   RotateY,
@@ -71,6 +71,19 @@ enum class Matrix3DComponent : uint8_t {
 
 // Number of valid Matrix3DComponent values.
 static constexpr size_t Matrix3DComponentCount = static_cast<size_t>(Matrix3DComponent::Count);
+
+// A transform described by independent components, composed as P * T * R * K * S like
+// DecomposedMatrix3D. Rotation holds Euler angles in degrees composed as Rz * Ry * Rx, so authored
+// values such as 200 degrees are kept as written. Skew holds the xy, xz and yz skew angles in
+// degrees. Perspective is the viewing distance d of the [0, 0, -1/d, 1] projection row, with 0
+// meaning no perspective.
+struct Matrix3DComponents {
+  double translate[3] = {0, 0, 0};
+  double rotation[3] = {0, 0, 0};
+  double scale[3] = {1, 1, 1};
+  double skew[3] = {0, 0, 0};
+  double perspective = 0;
+};
 
 // Returns true if all 16 matrix values are finite.
 inline bool IsFiniteMatrix3D(const Matrix3D& matrix) {
@@ -305,14 +318,12 @@ inline double WrapDegrees(double degrees) {
 // QuaternionFromEulerXYZDegrees, from a quaternion, which is normalized first. Every rotation has
 // two solutions, (x, y, z) and (x + 180, 180 - y, z + 180); this returns the canonical one with the
 // smaller |x| + |z|, each angle within (-180, 180], so a pure Y rotation beyond 90 degrees reads
-// back as that Y angle instead of an equivalent set with X and Z at 180. Reads and writes of the
-// semantic rotation components share this branch, so a read-mix-write sequence stays continuous.
-// The result is stateless, which has three limitations: at gimbal lock (|cos y| <= 1e-3, wide
-// enough to absorb float round-off) the whole remaining rotation is assigned to X and Z is 0, so
-// the authored X / Z split is lost; when both solutions weigh the same (for example x = z = 90, or
-// X passing 180 while |y| > 90) the asin solution with Y in [-90, 90] is kept, so a following
-// write may jump once to the other solution; and the canonical choice may differ from the authored
-// angles. Returns false for a zero-length or non-finite quaternion.
+// back as that Y angle instead of an equivalent set with X and Z at 180. At gimbal lock
+// (|cos y| <= 1e-3, wide enough to absorb float round-off) the whole remaining rotation is
+// assigned to X and Z is 0. When both solutions weigh the same (for example x = z = 90) the asin
+// solution with Y in [-90, 90] is kept. Since a matrix keeps no winding, the result may differ from
+// the angles a rotation was authored with. Returns false for a zero-length or non-finite
+// quaternion.
 inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double output[3]) {
   if (output == nullptr) {
     return false;
@@ -525,10 +536,11 @@ inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output
   return true;
 }
 
-// Recomposes a 4x4 transform as P * T * R * K * S from decomposed components (see
-// DecomposedMatrix3D). Returns false if any resulting value is non-finite or exceeds the float
-// range, or if the result is not invertible; output may be partially written in that case.
-inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
+// Composes a 4x4 transform as P * T * R * K * S from decomposed components (see
+// DecomposedMatrix3D). Unlike RecomposeMatrix3D the result may be singular, such as for a zero
+// scale. Returns false if any resulting value is non-finite or exceeds the float range; output may
+// be partially written in that case.
+inline bool ComposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
   if (output == nullptr) return false;
   double rotation[3][3] = {};
   RotationFromQuaternion(value.rotation, rotation);
@@ -568,7 +580,13 @@ inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output)
       output->setRowColumn(row, column, static_cast<float>(result[row][column]));
     }
   }
-  return IsInvertibleMatrix3D(*output);
+  return true;
+}
+
+// Recomposes a 4x4 transform as P * T * R * K * S from decomposed components (see
+// DecomposedMatrix3D). Returns false if the composition fails or the result is not invertible.
+inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
+  return ComposeMatrix3D(value, output) && IsInvertibleMatrix3D(*output);
 }
 
 // Returns true if the decomposed perspective can be expressed by the single perspective distance
@@ -589,7 +607,7 @@ inline bool IsMatrix3DSemanticallyRepresentable(const DecomposedMatrix3D& matrix
 }
 
 // Maps a Layer channel name ("rotation.x", "scale.y", "skew.xz", "perspective", ...) to its
-// Matrix3DComponent. Returns false if the name is not a semantic Matrix3D component.
+// Matrix3DComponent. Returns false if the name is not a transform component channel.
 inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DComponent* component) {
   if (component == nullptr) {
     return false;
@@ -605,123 +623,81 @@ inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DCom
   return false;
 }
 
-// Returns true if the Layer channel is a semantic Matrix3D component. These channels can only be
-// driven by DataBind; animations drop them.
-inline bool IsMatrix3DDataBindOnlyChannel(const std::string& channel) {
-  Matrix3DComponent component = Matrix3DComponent::RotateX;
-  return Matrix3DComponentFromChannel(channel, &component);
-}
-
-// Reads one semantic component from a decomposed matrix. Rotation is returned as the canonical
-// Euler degrees (see EulerXYZDegreesFromQuaternion), scale as the raw factor, skew as the angle in
-// degrees whose tangent is the stored shear factor, and perspective as the distance d of the [0, 0,
-// -1/d, 1] row, with 0 meaning none. Returns false if the value cannot be represented, including a
-// perspective that is not semantically representable.
-inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComponent component,
-                                  float* output) {
-  if (output == nullptr) {
-    return false;
-  }
-  double value = 0;
+// Returns the field of components that stores the given component.
+inline double* Matrix3DComponentValue(Matrix3DComponents* components, Matrix3DComponent component) {
   switch (component) {
     case Matrix3DComponent::RotateX:
     case Matrix3DComponent::RotateY:
-    case Matrix3DComponent::RotateZ: {
-      double rotation[3] = {};
-      if (!EulerXYZDegreesFromQuaternion(matrix.rotation, rotation)) {
-        return false;
-      }
-      value = rotation[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::RotateX)];
-      break;
-    }
+    case Matrix3DComponent::RotateZ:
+      return &components->rotation[static_cast<int>(component) -
+                                   static_cast<int>(Matrix3DComponent::RotateX)];
     case Matrix3DComponent::ScaleX:
     case Matrix3DComponent::ScaleY:
     case Matrix3DComponent::ScaleZ:
-      value =
-          matrix.scale[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::ScaleX)];
-      break;
+      return &components->scale[static_cast<int>(component) -
+                                static_cast<int>(Matrix3DComponent::ScaleX)];
     case Matrix3DComponent::SkewXY:
     case Matrix3DComponent::SkewXZ:
     case Matrix3DComponent::SkewYZ:
-      value = std::atan(matrix.skew[static_cast<int>(component) -
-                                    static_cast<int>(Matrix3DComponent::SkewXY)]) *
-              RADIANS_TO_DEGREES;
-      break;
+      return &components
+                  ->skew[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::SkewXY)];
     case Matrix3DComponent::PerspectiveDistance:
-      if (!IsMatrix3DSemanticallyRepresentable(matrix)) {
-        return false;
-      }
-      value = std::abs(matrix.perspective[2]) <= 1.0e-12 ? 0 : -1.0 / matrix.perspective[2];
-      break;
+      return &components->perspective;
     case Matrix3DComponent::Count:
-      return false;
+      break;
   }
-  if (!std::isfinite(value) || std::abs(value) > 3.0e38) {
-    return false;
-  }
-  *output = static_cast<float>(value);
-  return true;
+  return nullptr;
 }
 
-// Replaces one semantic component of a decomposed matrix and keeps all other components. Input uses
-// the units of ReadMatrix3DComponent. A rotation write re-solves the current canonical Euler angles
-// (the same ones ReadMatrix3DComponent returns) and replaces one axis. Returns false if the source
-// perspective is not semantically representable, the input is non-finite, a skew is +/-90 degrees,
-// a perspective distance is negative, or the updated components do not recompose into a valid
-// matrix.
-inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DComponent component,
-                                 float input, DecomposedMatrix3D* output) {
-  if (output == nullptr || !std::isfinite(input) || !IsMatrix3DSemanticallyRepresentable(source)) {
-    return false;
-  }
-  DecomposedMatrix3D updated = source;
-  double value = input;
-  switch (component) {
-    case Matrix3DComponent::RotateX:
-    case Matrix3DComponent::RotateY:
-    case Matrix3DComponent::RotateZ: {
-      double rotation[3] = {};
-      if (!EulerXYZDegreesFromQuaternion(source.rotation, rotation)) {
-        return false;
-      }
-      rotation[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::RotateX)] = value;
-      updated.rotation = QuaternionFromEulerXYZDegrees(rotation[0], rotation[1], rotation[2]);
-      break;
-    }
-    case Matrix3DComponent::ScaleX:
-    case Matrix3DComponent::ScaleY:
-    case Matrix3DComponent::ScaleZ:
-      updated.scale[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::ScaleX)] =
-          value;
-      break;
-    case Matrix3DComponent::SkewXY:
-    case Matrix3DComponent::SkewXZ:
-    case Matrix3DComponent::SkewYZ: {
-      double radians = value * DEGREES_TO_RADIANS;
-      if (std::abs(std::cos(radians)) <= 1.0e-8) {
-        return false;
-      }
-      updated.skew[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::SkewXY)] =
-          std::tan(radians);
-      break;
-    }
-    case Matrix3DComponent::PerspectiveDistance:
-      if (value < 0) {
-        return false;
-      }
-      updated.perspective[0] = 0;
-      updated.perspective[1] = 0;
-      updated.perspective[2] = value == 0 ? 0 : -1.0 / value;
-      updated.perspective[3] = 1;
-      break;
-    case Matrix3DComponent::Count:
+// Composes a 4x4 transform as P * T * R * K * S from a component set (see Matrix3DComponents). The
+// result may be singular, such as for a zero scale. Returns false if a value is non-finite, a skew
+// is +/-90 degrees, the perspective distance is negative, or the result overflows.
+inline bool ComposeMatrix3DComponents(const Matrix3DComponents& components, Matrix3D* output) {
+  DecomposedMatrix3D value = {};
+  for (int i = 0; i < 3; ++i) {
+    if (!std::isfinite(components.translate[i]) || !std::isfinite(components.rotation[i]) ||
+        !std::isfinite(components.scale[i]) || !std::isfinite(components.skew[i])) {
       return false;
+    }
+    double radians = components.skew[i] * DEGREES_TO_RADIANS;
+    if (std::abs(std::cos(radians)) <= 1.0e-8) {
+      return false;
+    }
+    value.translate[i] = components.translate[i];
+    value.scale[i] = components.scale[i];
+    value.skew[i] = std::tan(radians);
   }
-  Matrix3D candidate = {};
-  if (!RecomposeMatrix3D(updated, &candidate)) {
+  if (!std::isfinite(components.perspective) || components.perspective < 0) {
     return false;
   }
-  *output = updated;
+  if (components.perspective > 0) {
+    value.perspective[2] = -1.0 / components.perspective;
+  }
+  value.rotation = QuaternionFromEulerXYZDegrees(components.rotation[0], components.rotation[1],
+                                                 components.rotation[2]);
+  return ComposeMatrix3D(value, output);
+}
+
+// Recovers a component set from a 4x4 transform. Rotation is the canonical Euler set returned by
+// EulerXYZDegreesFromQuaternion and skew is converted to degrees. Returns false if the matrix
+// cannot be decomposed or its perspective is not a single Z distance.
+inline bool Matrix3DComponentsFromMatrix(const Matrix3D& matrix, Matrix3DComponents* output) {
+  DecomposedMatrix3D value = {};
+  if (output == nullptr || !DecomposeMatrix3D(matrix, &value) ||
+      !IsMatrix3DSemanticallyRepresentable(value)) {
+    return false;
+  }
+  Matrix3DComponents result = {};
+  if (!EulerXYZDegreesFromQuaternion(value.rotation, result.rotation)) {
+    return false;
+  }
+  for (int i = 0; i < 3; ++i) {
+    result.translate[i] = value.translate[i];
+    result.scale[i] = value.scale[i];
+    result.skew[i] = std::atan(value.skew[i]) * RADIANS_TO_DEGREES;
+  }
+  result.perspective = std::abs(value.perspective[2]) <= 1.0e-12 ? 0 : -1.0 / value.perspective[2];
+  *output = result;
   return true;
 }
 

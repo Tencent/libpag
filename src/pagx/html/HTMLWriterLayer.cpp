@@ -59,7 +59,8 @@ static constexpr float BBOX_SENTINEL_LARGE = 1e9f;
 // fonts. When a span's natural line-height would exceed the TextBox's declared lineHeight we
 
 static Point LayerPositionForCSS(const Layer* layer) {
-  if (layer->matrix3D.isIdentity() && layer->matrix.isIdentity()) {
+  if (layer->matrix3D.isIdentity() && layer->matrix.isIdentity() &&
+      !HasLayerTransformComponents(layer)) {
     return layer->renderPosition();
   }
   auto layoutPosition = layer->layoutPosition();
@@ -1501,7 +1502,7 @@ static ContourMaskBox ContourMaskBorderRadius(const Layer* layer) {
   // writeClipContent folds the mask layer's local transform and generated layout slot into the
   // clip geometry, so only an identity 2D mask transform leaves the shape bounds comparable to
   // this box. A 2D border-radius cannot represent a full 3D transform.
-  if (!mask->matrix3D.isIdentity()) {
+  if (!mask->matrix3D.isIdentity() || HasLayerTransformComponents(mask)) {
     return {};
   }
   Matrix maskMatrix = BuildLayerMatrix(mask);

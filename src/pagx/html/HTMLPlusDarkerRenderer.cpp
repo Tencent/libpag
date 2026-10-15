@@ -71,7 +71,7 @@ bool CanHandle(const Layer* layer) {
   if (layer->hasScrollRect) {
     return false;
   }
-  if (!layer->matrix3D.isIdentity()) {
+  if (!layer->matrix3D.isIdentity() || HasLayerTransformComponents(layer)) {
     return false;
   }
   // Only pure translation is supported; rotation/scale/skew would require transforming the filter
@@ -105,7 +105,7 @@ bool ComputeScreenBounds(const Layer* target,
                             !FloatNearlyZero(m.b) || !FloatNearlyZero(m.c))) {
       return false;
     }
-    if (!cur->matrix3D.isIdentity()) {
+    if (!cur->matrix3D.isIdentity() || HasLayerTransformComponents(cur)) {
       return false;
     }
     auto parentMatrix = BuildLayerMatrix(cur);

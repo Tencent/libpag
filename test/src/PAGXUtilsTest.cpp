@@ -157,6 +157,28 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_MatrixOverridesAuthoredPositionButKeep
   EXPECT_FLOAT_EQ(generatedPositionMatrix.ty, 17.0f);
 }
 
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_TransformComponents) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 10;
+  layer->y = 20;
+  layer->rotationZ = 90;
+  layer->scaleX = 2;
+  layer->setLayoutPosition(nullptr, 30, 40);
+  auto m = pagx::BuildLayerMatrix(layer);
+  EXPECT_NEAR(m.a, 0, 1.0e-6f);
+  EXPECT_NEAR(m.b, 2, 1.0e-6f);
+  EXPECT_NEAR(m.c, -1, 1.0e-6f);
+  EXPECT_NEAR(m.d, 0, 1.0e-6f);
+  EXPECT_FLOAT_EQ(m.tx, 40);
+  EXPECT_FLOAT_EQ(m.ty, 60);
+  EXPECT_TRUE(pagx::HasLayerTransformComponents(layer));
+  layer->matrix = pagx::Matrix::Translate(5, 6);
+  m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.a, 1);
+  EXPECT_FLOAT_EQ(m.tx, 35);
+}
+
 PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_OnlyXNonZero) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();

@@ -586,7 +586,7 @@ PAGX 文档采用层级结构组织内容：
 
 这些来源确保容器在布局计算时几乎总有尺寸可用。显式设置 `width`/`height` 只在需要特定设计尺寸（不等于内容自然尺寸）时才必要。
 
-布局尺寸本身不产生直接的渲染效果，仅向下传递尺寸信息供子元素的约束定位使用。布局尺寸和约束计算在元素的本地坐标系中完成。变换（`matrix`/`matrix3D`/`z`）在布局计算结果之上叠加——不参与布局计算，也不影响兄弟节点或父节点的位置。Layer 显式设置的 `x`/`y` 同样属于其局部变换：当约束或容器布局为 Layer 生成位置时，该位置在局部变换之外叠加（`T(layoutPosition) * local`），因此 `x`/`y` 会与之相加，而不是被覆盖（见 §5.2 变换属性优先级）。
+布局尺寸本身不产生直接的渲染效果，仅向下传递尺寸信息供子元素的约束定位使用。布局尺寸和约束计算在元素的本地坐标系中完成。变换（`matrix`/`matrix3D`/`z` 以及旋转/缩放/剪切/透视分量）在布局计算结果之上叠加——不参与布局计算，也不影响兄弟节点或父节点的位置。Layer 显式设置的 `x`/`y` 同样属于其局部变换：当约束或容器布局为 Layer 生成位置时，该位置在局部变换之外叠加（`T(layoutPosition) * local`），因此 `x`/`y` 会与之相加，而不是被覆盖（见 §5.2 变换属性优先级）。
 
 ### 4.2 容器布局（Container Layout）
 
@@ -956,6 +956,16 @@ Layer 的子元素按类型自动归类为五个集合：
 | `x` | float | 0 | X 位置（推荐使用约束属性 `left`） |
 | `y` | float | 0 | Y 位置（推荐使用约束属性 `top`） |
 | `z` | float | 0 | Z 平移；仅影响渲染深度，不参与自动布局 |
+| `rotationX` | float | 0 | 绕 X 轴的旋转角，单位为度 |
+| `rotationY` | float | 0 | 绕 Y 轴的旋转角，单位为度 |
+| `rotationZ` | float | 0 | 绕 Z 轴的旋转角，单位为度 |
+| `scaleX` | float | 1 | X 方向缩放 |
+| `scaleY` | float | 1 | Y 方向缩放 |
+| `scaleZ` | float | 1 | Z 方向缩放 |
+| `skewXY` | float | 0 | X 随 Y 偏移的剪切角，单位为度，范围 (-90, 90) |
+| `skewXZ` | float | 0 | X 随 Z 偏移的剪切角，单位为度，范围 (-90, 90) |
+| `skewYZ` | float | 0 | Y 随 Z 偏移的剪切角，单位为度，范围 (-90, 90) |
+| `perspective` | float | 0 | 透视距离 `d`；0 表示无透视，负数无效 |
 | `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | - | 3D 变换（16 个值，列优先） |
 | `preserve3D` | bool | false | 保持 3D 变换 |
@@ -977,14 +987,16 @@ Layer 的子元素按类型自动归类为五个集合：
 
 **preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
 
-**变换属性优先级**：`x`/`y`/`z`、`matrix`、`matrix3D` 组成图层的局部变换，三者存在覆盖关系：
-- 仅设置 `x`/`y`/`z`：使用 `x`/`y`/`z` 作为平移
-- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 的值，`z` 仍然生效
-- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix` 和 `x`/`y`/`z` 的值
+**变换属性优先级**：`x`/`y`/`z`、变换分量（`rotationX`/`rotationY`/`rotationZ`、`scaleX`/`scaleY`/`scaleZ`、`skewXY`/`skewXZ`/`skewYZ`、`perspective`）、`matrix`、`matrix3D` 组成图层的局部变换，存在覆盖关系：
+- 未设置 `matrix`/`matrix3D`：局部变换按列向量约定组合为 `P * T * R * K * S`，其中透视 `P`（投影行 `[0, 0, -1/d, 1]`）、平移 `T(x, y, z)`、旋转 `R = Rz * Ry * Rx`、剪切 `K`、缩放 `S`
+- 设置 `matrix`：`matrix` 覆盖 `x`/`y` 和变换分量，`z` 仍然生效
+- 设置 `matrix3D`：`matrix3D` 覆盖 `matrix`、`x`/`y`/`z` 和变换分量
+
+剪切角为 ±90° 或 `perspective` 为负数时无法组合，此时忽略变换分量，只应用 `x`/`y`/`z`。
 
 约束或容器布局生成的位置在局部变换之外叠加：`T(layoutPosition) * local`。
 
-**变换动画**：Layer 维护一个由 `x`/`y`/`z`、`matrix`、`matrix3D` 通道共享的当前局部变换。每次动画或 DataBind 写入只把它驱动的部分混合进当前值（`current = mix(current, value, weight)`），没有被驱动的部分保持当前值不变。`x`/`y`/`z` 驱动平移，`matrix3D` 驱动整个矩阵。`matrix` 把整个局部变换向携带当前 Z 平移的 2D 矩阵混合，因此在完全权重下会替换 Z 平移以外的全部内容，之前写入的 3D 旋转、缩放、剪切或透视都会被重置。同一个动画内，其包含的通道按上述优先级生效，与通道顺序无关。非单位的静态 `matrix` 会忽略 `x`/`y` 写入，非单位的静态 `matrix3D` 会忽略 `x`/`y`/`z` 和 `matrix` 写入。局部变换带有透视时，`x`/`y`/`z` 写入会替换分解后的平移分量，使平移位于投影之内；局部变换无法分解时，该次写入会被拒绝。
+**变换动画**：Layer 维护一个由 `x`/`y`/`z`、变换分量、`matrix`、`matrix3D` 通道共享的当前局部变换。每次动画或 DataBind 写入只把它驱动的部分混合进当前值（`current = mix(current, value, weight)`），没有被驱动的部分保持当前值不变。`x`/`y`/`z` 驱动平移，各分量通道驱动各自的分量，`matrix3D` 驱动整个矩阵。在没有写入矩阵期间，分量按写入值保存，因此缩放可以从 0 开始动画，超过 180° 的旋转也会保持原值；写入 `matrix` 或 `matrix3D` 之后，下一次分量写入会先把矩阵分解为分量（旋转取 X、Z 旋转较小的等价欧拉角），矩阵无法分解或带有 Z 轴距离以外的透视时，该次写入会被拒绝。`matrix` 把整个局部变换向携带当前 Z 平移的 2D 矩阵混合，因此在完全权重下会替换 Z 平移以外的全部内容，之前写入的 3D 旋转、缩放、剪切或透视都会被重置。同一个动画内，其包含的通道按上述优先级生效，与通道顺序无关。非单位的静态 `matrix` 会忽略 `x`/`y` 和分量写入，非单位的静态 `matrix3D` 会忽略 `x`/`y`/`z`、分量和 `matrix` 写入。局部变换带有透视时，`x`/`y`/`z` 写入会替换分解后的平移分量，使平移位于投影之内；局部变换无法分解时，该次写入会被拒绝。
 
 **MaskType（遮罩类型）**：
 
@@ -3031,12 +3043,12 @@ Layer / Group
 | `z` | float | 局部 Z 平移 |
 | `matrix` | matrix | 2D 局部变换；仅用于动画 |
 | `matrix3D` | matrix3D | 4×4 局部变换；仅用于动画。通过矩阵分解和四元数球面插值进行插值，无法分解时逐项插值；奇异结果会被拒绝 |
-| `rotation.x` / `rotation.y` / `rotation.z` | number | 仅用于 DataBind 的欧拉旋转角，单位为度，按 `Rz * Ry * Rx` 组合 |
-| `scale.x` / `scale.y` / `scale.z` | number | 仅用于 DataBind 的缩放 |
-| `skew.xy` / `skew.xz` / `skew.yz` | number | 仅用于 DataBind 的剪切角，单位为度 |
-| `perspective` | number | 仅用于 DataBind 的透视距离；0 表示无透视，正数 `d` 对应投影行 `[0, 0, -1/d, 1]` |
+| `rotation.x` / `rotation.y` / `rotation.z` | float | 旋转角，单位为度（`rotationX`/`rotationY`/`rotationZ`） |
+| `scale.x` / `scale.y` / `scale.z` | float | 缩放（`scaleX`/`scaleY`/`scaleZ`） |
+| `skew.xy` / `skew.xz` / `skew.yz` | float | 剪切角，单位为度（`skewXY`/`skewXZ`/`skewYZ`） |
+| `perspective` | float | 透视距离（`perspective`）；0 表示无透视 |
 
-旋转/缩放/剪切/透视通道绑定 Number 类型的 ViewModel 属性。这些通道只能通过运行时 Layer 上的 `<DataBind>` 访问；它们不是节点属性，无法通过节点通道访问读写，以它们为目标的动画 `<Channel>` 会被忽略。旋转读回值的范围为 (-180, 180]；在等价的欧拉角组合中，读回 X、Z 旋转较小的一组（例如读回 `rotation.y` = 120，而不是 `rotation.x` = 180、`rotation.y` = 60、`rotation.z` = 180）。旋转写入从与读回相同的等价角度组合（X、Z 旋转较小的一组）出发，只替换被写入的轴。与其他变换通道一样，每次写入只替换分解后局部变换中的对应分量：同一分量以最后一次写入为准，不同分量的写入会叠加生效。局部变换无法分解，或带有 Z 轴 `perspective` 距离（`d` > 0 时的 `[0, 0, -1/d, 1]`）以外的透视时，该次写入会被拒绝。剪切角为 ±90° 或 `perspective` 为负数时，写入同样会被拒绝。
+旋转/缩放/剪切/透视通道驱动 §5.2 所述的 Layer 变换分量，可以像 `x`/`y`/`z` 一样做动画和数据绑定。组合后剪切角为 ±90° 或 `perspective` 为负数的写入会被拒绝。
 
 ### D.2 几何节点（Rectangle / Ellipse / Polystar / Path）
 

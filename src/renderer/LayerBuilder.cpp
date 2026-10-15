@@ -76,6 +76,7 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/TextHolder.h"
@@ -207,12 +208,14 @@ static Matrix3D ApplyLayoutPosition(const Matrix3D& matrix, float x, float y) {
 }
 
 // Runtime target for a Layer's tgfx::Layer that keeps one local transform pose shared by the x / y
-// / z, matrix and matrix3D channels. Each write mixes only the part of the pose its channel drives
-// (current = Mix(current, target, mix)), so anything no source drives keeps its current value. The
-// semantic Matrix3D DataBind components (rotation / scale / skew / perspective) are written into
-// the decomposed pose the same way, so the latest write wins. The layout-generated position is
-// composed outside of the pose. Channels other than the transform fall through to the base
-// RuntimeTarget writer table.
+// / z, transform component (rotation / scale / skew / perspective), matrix and matrix3D channels.
+// Each write mixes only the part of the pose its channel drives (current = Mix(current, target,
+// mix)), so anything no source drives keeps its current value and the latest write wins. While the
+// pose comes from components (authored or written ones), they are kept as values, so a zero scale
+// or a rotation beyond 180 degrees survives later writes; a matrix or matrix3D write replaces the
+// pose with a matrix, which is decomposed again by the next component write. The layout-generated
+// position is composed outside of the pose. Channels other than the transform fall through to the
+// base RuntimeTarget writer table.
 struct LayerRuntimeTarget : RuntimeTarget {
   bool apply(const std::string& channel, const KeyValue& value, float mix) override {
     if (channel == "x" || channel == "y" || channel == "z") {
@@ -240,9 +243,8 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return RuntimeTarget::hasWriter(channel);
   }
 
-  // Reads x / y / z back from the decomposed pose translation, excluding the layout position,
-  // and the semantic Matrix3D components from the decomposed pose. Other channels fall through to
-  // the base reader table.
+  // Reads x / y / z and the transform components back from the pose, excluding the layout position.
+  // Other channels fall through to the base reader table.
   bool read(const std::string& channel, KeyValue* out) const override {
     if (out == nullptr) {
       return false;
@@ -258,40 +260,40 @@ struct LayerRuntimeTarget : RuntimeTarget {
     }
     auto component = Matrix3DComponent::RotateX;
     if (Matrix3DComponentFromChannel(channel, &component)) {
-      DecomposedMatrix3D decomposed = {};
-      float result = 0;
-      if (!DecomposeMatrix3D(pose, &decomposed) ||
-          !ReadMatrix3DComponent(decomposed, component, &result)) {
+      Matrix3DComponents current = {};
+      if (hasStaticMatrix || hasStaticMatrix3D || !currentComponents(&current)) {
         return false;
       }
-      *out = KeyValue{result};
+      *out = KeyValue{static_cast<float>(*Matrix3DComponentValue(&current, component))};
       return true;
     }
     return RuntimeTarget::read(channel, out);
   }
 
   // Seeds the pose from the node's authored transform and publishes it to the layer. A non-identity
-  // matrix3D is the complete local transform; otherwise a non-identity matrix (or else x / y) is
-  // lifted with z. The authored transform that takes precedence also masks the channels it
-  // overrides.
+  // matrix3D is the complete local transform; otherwise a non-identity matrix is lifted with z;
+  // otherwise x / y / z and the transform components are composed. The authored transform that
+  // takes precedence also masks the channels it overrides.
   void initTransform(const Layer* node) {
     hasStaticMatrix3D = !node->matrix3D.isIdentity();
     hasStaticMatrix = !node->matrix.isIdentity();
     auto position = node->layoutPosition();
     layoutX = std::isnan(position.x) ? 0 : position.x;
     layoutY = std::isnan(position.y) ? 0 : position.y;
-    if (hasStaticMatrix3D) {
-      pose = node->matrix3D;
+    hasComponents = !hasStaticMatrix3D && !hasStaticMatrix;
+    if (hasComponents) {
+      components = LayerTransformComponents(node);
+      ComposeMatrix3DComponents(components, &pose);
     } else {
-      auto local =
-          hasStaticMatrix ? ToTGFX(node->matrix) : tgfx::Matrix::MakeTrans(node->x, node->y);
-      pose = LiftToMatrix3D(local, node->z);
+      pose = BuildLayerLocalMatrix3D(node);
     }
     publish();
   }
 
  private:
   Matrix3D pose = {};
+  Matrix3DComponents components = {};
+  bool hasComponents = false;
   float layoutX = 0;
   float layoutY = 0;
   bool hasStaticMatrix = false;
@@ -305,9 +307,22 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return hasStaticMatrix3D || (axis < 2 && hasStaticMatrix);
   }
 
-  // Reads the translation component of the decomposed pose. Without perspective it is exactly the
-  // translation column, which is read directly to avoid decomposition round-off.
+  // Returns the components the pose is made of, decomposing a matrix pose if necessary.
+  bool currentComponents(Matrix3DComponents* result) const {
+    if (hasComponents) {
+      *result = components;
+      return true;
+    }
+    return Matrix3DComponentsFromMatrix(pose, result);
+  }
+
+  // Reads the translation component of the pose. A matrix pose without perspective stores it in
+  // the translation column, which is read directly to avoid decomposition round-off.
   bool readTranslation(int axis, float* value) const {
+    if (hasComponents) {
+      *value = static_cast<float>(components.translate[axis]);
+      return true;
+    }
     if (!HasPerspective(pose)) {
       *value = pose.getRowColumn(axis, 3);
       return true;
@@ -320,13 +335,18 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return true;
   }
 
-  // Replaces the translation component of the decomposed pose, so the translation is applied
-  // inside the perspective projection. A pose without perspective writes the translation column
+  // Replaces the translation component of the pose, so the translation is applied inside the
+  // perspective projection. A matrix pose without perspective writes the translation column
   // directly, which gives the same result without decomposition round-off.
   bool applyTranslation(int axis, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
     if (v == nullptr || !std::isfinite(*v) || isTranslationMasked(axis)) {
       return false;
+    }
+    if (hasComponents) {
+      auto next = components;
+      next.translate[axis] = MixFloat(static_cast<float>(next.translate[axis]), *v, mix);
+      return commitComponents(next);
     }
     if (!HasPerspective(pose)) {
       pose.setRowColumn(axis, 3, MixFloat(pose.getRowColumn(axis, 3), *v, mix));
@@ -363,6 +383,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
     } else {
       pose = LerpMatrix3D(pose, LiftToMatrix3D(target, z), mix);
     }
+    hasComponents = false;
     publish();
     return true;
   }
@@ -378,25 +399,32 @@ struct LayerRuntimeTarget : RuntimeTarget {
       return false;
     }
     pose = mixed;
+    hasComponents = false;
     publish();
     return true;
   }
 
-  // Writes one semantic component into the decomposed pose, like any other transform write.
+  // Writes one transform component. A matrix pose is first decomposed into components, which fails
+  // if it cannot be decomposed or carries perspective other than a Z distance.
   bool applyComponent(Matrix3DComponent component, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
-    DecomposedMatrix3D decomposed = {};
-    float current = 0;
-    if (v == nullptr || !std::isfinite(*v) || !DecomposeMatrix3D(pose, &decomposed) ||
-        !ReadMatrix3DComponent(decomposed, component, &current)) {
+    Matrix3DComponents next = {};
+    if (v == nullptr || !std::isfinite(*v) || hasStaticMatrix || hasStaticMatrix3D ||
+        !currentComponents(&next)) {
       return false;
     }
-    DecomposedMatrix3D updated = {};
+    auto* field = Matrix3DComponentValue(&next, component);
+    *field = MixFloat(static_cast<float>(*field), *v, mix);
+    return commitComponents(next);
+  }
+
+  bool commitComponents(const Matrix3DComponents& next) {
     Matrix3D matrix = {};
-    if (!SetMatrix3DComponent(decomposed, component, MixFloat(current, *v, mix), &updated) ||
-        !RecomposeMatrix3D(updated, &matrix)) {
+    if (!ComposeMatrix3DComponents(next, &matrix)) {
       return false;
     }
+    components = next;
+    hasComponents = true;
     pose = matrix;
     publish();
     return true;

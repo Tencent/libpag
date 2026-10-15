@@ -56,9 +56,9 @@ static void ApplyResolved(
   }
 }
 
-// Drops Layer channels that an animation cannot drive. Semantic Matrix3D components are
-// DataBind-only. Within one animation, matrix3D takes precedence over matrix and x / y / z, and
-// matrix takes precedence over x / y, independent of the channel order.
+// Applies the Layer transform priority within one animation, independent of the channel order:
+// matrix3D overrides matrix, x / y / z and the transform components, and matrix overrides x / y
+// and the transform components.
 static void FilterLayerChannels(std::vector<Channel*>* channels) {
   bool hasMatrix = false;
   bool hasMatrix3D = false;
@@ -66,15 +66,17 @@ static void FilterLayerChannels(std::vector<Channel*>* channels) {
     hasMatrix = hasMatrix || channel->name == "matrix";
     hasMatrix3D = hasMatrix3D || channel->name == "matrix3D";
   }
+  if (!hasMatrix && !hasMatrix3D) {
+    return;
+  }
+  auto component = Matrix3DComponent::RotateX;
   auto end = channels->begin();
   for (auto* channel : *channels) {
     const auto& name = channel->name;
-    if (IsMatrix3DDataBindOnlyChannel(name)) {
-      LOGE("PAGAnimation: Layer channel '%s' is DataBind-only.", name.c_str());
-      continue;
+    bool overridden = name == "x" || name == "y" || Matrix3DComponentFromChannel(name, &component);
+    if (hasMatrix3D) {
+      overridden = overridden || name == "z" || name == "matrix";
     }
-    bool overridden = hasMatrix3D ? (name == "x" || name == "y" || name == "z" || name == "matrix")
-                                  : (hasMatrix && (name == "x" || name == "y"));
     if (!overridden) {
       *end++ = channel;
     }

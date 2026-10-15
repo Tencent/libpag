@@ -10309,28 +10309,31 @@ PAGX_TEST(PAGXTest, ChannelMatrix3DRoundTripAndSingularValidation) {
   EXPECT_FALSE(invalid->errors.empty());
 }
 
-PAGX_TEST(PAGXTest, Matrix3DSemanticUnitsAndGimbalLock) {
-  pagx::DecomposedMatrix3D base = {};
-  pagx::DecomposedMatrix3D updated = {};
-  ASSERT_TRUE(pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::PerspectiveDistance, 100,
-                                         &updated));
-  EXPECT_NEAR(updated.perspective[2], -0.01, 1.0e-6);
-  float distance = 0;
-  ASSERT_TRUE(pagx::ReadMatrix3DComponent(updated, pagx::Matrix3DComponent::PerspectiveDistance,
-                                          &distance));
-  EXPECT_FLOAT_EQ(distance, 100);
-  EXPECT_FALSE(
-      pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::PerspectiveDistance, -1, &updated));
-  ASSERT_TRUE(
-      pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::PerspectiveDistance, 0, &updated));
-  EXPECT_DOUBLE_EQ(updated.perspective[2], 0);
+PAGX_TEST(PAGXTest, Matrix3DComponentUnitsAndGimbalLock) {
+  pagx::Matrix3DComponents components = {};
+  components.perspective = 100;
+  pagx::Matrix3D matrix = {};
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  EXPECT_NEAR(matrix.getRowColumn(3, 2), -0.01, 1.0e-6);
+  pagx::Matrix3DComponents recovered = {};
+  ASSERT_TRUE(pagx::Matrix3DComponentsFromMatrix(matrix, &recovered));
+  EXPECT_NEAR(recovered.perspective, 100, 1.0e-3);
+  components.perspective = -1;
+  EXPECT_FALSE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  components.perspective = 0;
 
-  ASSERT_TRUE(pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::SkewXY, 45, &updated));
-  EXPECT_NEAR(updated.skew[0], 1, 1.0e-6);
-  float skew = 0;
-  ASSERT_TRUE(pagx::ReadMatrix3DComponent(updated, pagx::Matrix3DComponent::SkewXY, &skew));
-  EXPECT_FLOAT_EQ(skew, 45);
-  EXPECT_FALSE(pagx::SetMatrix3DComponent(base, pagx::Matrix3DComponent::SkewXY, 90, &updated));
+  components.skew[0] = 45;
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  EXPECT_NEAR(matrix.getRowColumn(0, 1), 1, 1.0e-6);
+  ASSERT_TRUE(pagx::Matrix3DComponentsFromMatrix(matrix, &recovered));
+  EXPECT_NEAR(recovered.skew[0], 45, 1.0e-4);
+  components.skew[0] = 90;
+  EXPECT_FALSE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  components.skew[0] = 0;
+
+  components.scale[0] = 0;
+  EXPECT_TRUE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  EXPECT_FLOAT_EQ(matrix.getRowColumn(0, 0), 0);
 
   auto sourceRotation = pagx::QuaternionFromEulerXYZDegrees(30, 90, 20);
   double euler[3] = {};
@@ -10344,17 +10347,19 @@ PAGX_TEST(PAGXTest, Matrix3DSemanticUnitsAndGimbalLock) {
   EXPECT_NEAR(std::abs(dot), 1, 1.0e-6);
 }
 
-PAGX_TEST(PAGXTest, Matrix3DComponentChannelsAreDataBindOnly) {
+PAGX_TEST(PAGXTest, Matrix3DComponentChannelsAreAnimatable) {
   const char* channels[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x", "scale.y",
                             "scale.z",    "skew.xy",    "skew.xz",    "skew.yz", "perspective"};
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>("componentLayer");
   for (const auto* channel : channels) {
-    EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
-    EXPECT_FALSE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel));
+    EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
+    EXPECT_TRUE(pagx::IsAnimatableChannel(pagx::NodeType::Layer, channel));
   }
-  EXPECT_FALSE(pagx::SetNodeChannel(layer, "rotation.z", pagx::KeyValue{30.0f}));
+  ASSERT_TRUE(pagx::SetNodeChannel(layer, "rotation.x", pagx::KeyValue{30.0f}));
+  EXPECT_FLOAT_EQ(layer->rotationX, 30.0f);
   EXPECT_TRUE(layer->matrix3D.isIdentity());
+  ASSERT_TRUE(pagx::SetNodeChannel(layer, "rotation.x", pagx::KeyValue{0.0f}));
   EXPECT_FALSE(pagx::ChannelExists(pagx::NodeType::Layer, "perspective.distance"));
   for (const auto* channel : {"x", "y", "z"}) {
     EXPECT_TRUE(pagx::ChannelExists(pagx::NodeType::Layer, channel));
@@ -10391,8 +10396,8 @@ PAGX_TEST(PAGXTest, Matrix3DComponentChannelsAreDataBindOnly) {
   timeline->apply(1.0f);
   float values[16] = {};
   runtimeLayer->matrix3D().getColumnMajor(values);
-  EXPECT_FLOAT_EQ(values[0], 1);
-  EXPECT_FLOAT_EQ(values[1], 0);
+  EXPECT_NEAR(values[0], 0, 1.0e-6f);
+  EXPECT_NEAR(values[1], 1, 1.0e-6f);
   EXPECT_FLOAT_EQ(values[12], 25);
 }
 
@@ -10472,10 +10477,9 @@ PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
   auto interpolated = pagx::LerpMatrix3D(start, end, 0.5);
   pagx::DecomposedMatrix3D interpolatedComponents = {};
   ASSERT_TRUE(pagx::DecomposeMatrix3D(interpolated, &interpolatedComponents));
-  float rotationZ = 0;
-  ASSERT_TRUE(pagx::ReadMatrix3DComponent(interpolatedComponents, pagx::Matrix3DComponent::RotateZ,
-                                          &rotationZ));
-  EXPECT_NEAR(rotationZ, 45, 1.0e-3f);
+  double euler[3] = {};
+  ASSERT_TRUE(pagx::EulerXYZDegreesFromQuaternion(interpolatedComponents.rotation, euler));
+  EXPECT_NEAR(euler[2], 45, 1.0e-3);
   EXPECT_NEAR(interpolatedComponents.translate[0], 10, 1.0e-4);
   EXPECT_NEAR(interpolatedComponents.translate[1], 20, 1.0e-4);
   EXPECT_NEAR(interpolatedComponents.scale[0], 1, 1.0e-5);
@@ -10679,10 +10683,9 @@ PAGX_TEST(PAGXTest, LayerTranslationWriteUsesDecomposedTranslationUnderPerspecti
   EXPECT_NEAR(decomposed.translate[0], 50, 1.0e-4);
   EXPECT_NEAR(decomposed.translate[1], 20, 1.0e-4);
   EXPECT_NEAR(decomposed.perspective[2], -0.01, 1.0e-6);
-  float rotationY = 0;
-  ASSERT_TRUE(
-      pagx::ReadMatrix3DComponent(decomposed, pagx::Matrix3DComponent::RotateY, &rotationY));
-  EXPECT_NEAR(rotationY, 30, 1.0e-3f);
+  double euler[3] = {};
+  ASSERT_TRUE(pagx::EulerXYZDegreesFromQuaternion(decomposed.rotation, euler));
+  EXPECT_NEAR(euler[1], 30, 1.0e-3);
 }
 
 /**
@@ -10790,6 +10793,104 @@ PAGX_TEST(PAGXTest, LayerRotationWritesKeepTheWrittenEulerBranch) {
   EXPECT_NEAR(std::get<float>(value), 10, 1.0e-3f);
   ASSERT_TRUE(binding->read(combined, "rotation.y", &value));
   EXPECT_NEAR(std::get<float>(value), 120, 1.0e-3f);
+}
+
+/**
+ * Test case: static Layer transform components round-trip through XML and compose with x / y as
+ * T * R * S, while a non-identity matrix overrides them and rejects component writes.
+ */
+PAGX_TEST(PAGXTest, LayerStaticTransformComponents) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  layer->x = 10;
+  layer->rotationZ = 90;
+  layer->scaleX = 2;
+  auto* overridden = doc->makeNode<pagx::Layer>("overridden");
+  overridden->matrix = pagx::Matrix::Translate(5, 6);
+  overridden->rotationZ = 90;
+  doc->layers.push_back(layer);
+  doc->layers.push_back(overridden);
+
+  auto xml = pagx::PAGXExporter::ToXML(*doc);
+  EXPECT_NE(xml.find("rotationZ=\"90\""), std::string::npos);
+  EXPECT_NE(xml.find("scaleX=\"2\""), std::string::npos);
+  auto loaded = pagx::PAGXImporter::FromXML(xml);
+  ASSERT_NE(loaded, nullptr);
+  ASSERT_TRUE(loaded->errors.empty());
+  auto* loadedLayer = static_cast<pagx::Layer*>(loaded->findNode("L"));
+  ASSERT_NE(loadedLayer, nullptr);
+  EXPECT_FLOAT_EQ(loadedLayer->rotationZ, 90);
+  EXPECT_FLOAT_EQ(loadedLayer->scaleX, 2);
+  EXPECT_FLOAT_EQ(loadedLayer->scaleY, 1);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto matrix = binding->get<tgfx::Layer>(layer)->matrix3D();
+  EXPECT_NEAR(matrix.getRowColumn(0, 0), 0, 1.0e-6f);
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 2, 1.0e-6f);
+  EXPECT_NEAR(matrix.getRowColumn(0, 1), -1, 1.0e-6f);
+  EXPECT_FLOAT_EQ(matrix.getRowColumn(0, 3), 10);
+  pagx::KeyValue value;
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 90);
+
+  auto overriddenMatrix = binding->get<tgfx::Layer>(overridden)->matrix3D();
+  EXPECT_FLOAT_EQ(overriddenMatrix.getRowColumn(0, 0), 1);
+  EXPECT_FLOAT_EQ(overriddenMatrix.getRowColumn(0, 3), 5);
+  EXPECT_FALSE(binding->apply(overridden, "rotation.z", pagx::KeyValue{45.0f}, 1.0f));
+  EXPECT_FALSE(binding->read(overridden, "rotation.z", &value));
+}
+
+/**
+ * Test case: component values are kept as written, so a scale animation can start from 0 and a
+ * rotation beyond 180 degrees reads back unchanged, while a matrix3D write replaces them.
+ */
+PAGX_TEST(PAGXTest, LayerComponentWritesKeepWrittenValues) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  doc->layers.push_back(layer);
+  auto* animation = doc->makeNode<pagx::Animation>("popIn");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  doc->animations.push_back(animation);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = "L";
+  animation->objects.push_back(object);
+  auto* scale = doc->makeNode<pagx::TypedChannel<float>>();
+  scale->name = "scale.x";
+  scale->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  scale->keyframes.push_back({60, 1.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(scale);
+
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_NE(timeline, nullptr);
+  timeline->setCurrentTime(0);
+  timeline->apply(1.0f);
+  EXPECT_FLOAT_EQ(tgfxLayer->matrix3D().getRowColumn(0, 0), 0);
+  timeline->setCurrentTime(500000);
+  timeline->apply(1.0f);
+  EXPECT_NEAR(tgfxLayer->matrix3D().getRowColumn(0, 0), 0.5f, 1.0e-4f);
+
+  ASSERT_TRUE(binding->apply(layer, "rotation.z", pagx::KeyValue{200.0f}, 1.0f));
+  pagx::KeyValue value;
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 200);
+  ASSERT_TRUE(binding->apply(layer, "rotation.z", pagx::KeyValue{300.0f}, 0.5f));
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 250);
+
+  ASSERT_TRUE(binding->apply(layer, "matrix3D",
+                             pagx::KeyValue{ToPAGXMatrix3D(tgfx::Matrix3D::MakeTranslate(7, 8, 9))},
+                             1.0f));
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &value));
+  EXPECT_NEAR(std::get<float>(value), 0, 1.0e-4f);
+  ASSERT_TRUE(binding->read(layer, "scale.x", &value));
+  EXPECT_NEAR(std::get<float>(value), 1, 1.0e-4f);
 }
 
 /**

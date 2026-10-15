@@ -354,6 +354,26 @@ CLI_TEST(PAGXHtmlTest, LayerStaticZUsesMatrix3DTransform) {
   EXPECT_NE(html.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,30,1)"), std::string::npos);
 }
 
+CLI_TEST(PAGXHtmlTest, LayerTransformComponentsUseMatrix3DTransform) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto* layer = doc->makeNode<pagx::Layer>("componentLayer");
+  layer->x = 10;
+  layer->scaleX = 2;
+  layer->scaleY = 3;
+  auto* ellipse = doc->makeNode<pagx::Ellipse>();
+  ellipse->size = {20, 20};
+  auto* fill = doc->makeNode<pagx::Fill>();
+  fill->color = doc->makeNode<pagx::SolidColor>();
+  layer->contents.push_back(ellipse);
+  layer->contents.push_back(fill);
+  doc->layers.push_back(layer);
+
+  auto html = ConvertToHTML(doc);
+  ASSERT_FALSE(html.empty());
+  EXPECT_NE(html.find("matrix3d(2,0,0,0,0,3,0,0,0,0,1,0,10,0,0,1)"), std::string::npos);
+  EXPECT_EQ(html.find("left:10px"), std::string::npos);
+}
+
 CLI_TEST(PAGXHtmlTest, LayerAuthoredXYAddsToConstraintPosition) {
   pagx::HTMLExportOptions options;
   options.extractStyleSheet = false;

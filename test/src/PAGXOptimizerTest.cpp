@@ -1236,6 +1236,13 @@ CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesMatrix3DNonIdentity) {
   EXPECT_TRUE(HasLayerOnlyFeatures(layer));
 }
 
+CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesTransformComponents) {
+  auto doc = PAGXDocument::Make(100, 100);
+  auto* layer = MakeDefaultLayer(doc.get());
+  layer->rotationY = 30;
+  EXPECT_TRUE(HasLayerOnlyFeatures(layer));
+}
+
 CLI_TEST(VerifyUtilsTest, HasLayerOnlyFeaturesZNonZero) {
   auto doc = PAGXDocument::Make(100, 100);
   auto* layer = MakeDefaultLayer(doc.get());

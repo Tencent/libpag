@@ -124,7 +124,7 @@ void DataBindRuntime::bind(const std::vector<DataBind*>& binds, DataContext* con
       LOGE("DataBind skipped: target '%s' is outside this binding's scope.", db->target.c_str());
       continue;
     }
-    // Full Layer matrices are animation-only; bind x / y / z or the semantic Matrix3D components.
+    // Full Layer matrices are animation-only; bind x / y / z or the transform components.
     if (targetNode->nodeType() == NodeType::Layer &&
         (db->channel == "matrix" || db->channel == "matrix3D")) {
       LOGE("DataBind skipped: Layer channel '%s' is not data-bindable.", db->channel.c_str());
