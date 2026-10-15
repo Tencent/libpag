@@ -76,10 +76,10 @@ static constexpr ChannelFlags NoFlags = ChannelFlags::None;
 
 // The access generators below turn a member pointer (and, for enums, the StringParser converters)
 // into a uniform ChannelAccessor. A read copies the field into *getOut; a write validates the KeyValue
-// alternative (or enum string) and copies into the field; a reset (both getOut and setIn null) copies
-// the corresponding field of a default-constructed node of type T back into the field. Routing all
-// three directions through one generated function keeps them symmetric and removes the per-field
-// if/else boilerplate.
+// alternative (or enum string, or that a Matrix3D is invertible) and copies into the field; a reset
+// (both getOut and setIn null) copies the corresponding field of a default-constructed node of type
+// T back into the field. Routing all three directions through one generated function keeps them
+// symmetric and removes the per-field if/else boilerplate.
 
 template <typename T, auto Field>
 static bool AccessFloat(Node* node, KeyValue* getOut, const KeyValue* setIn) {
@@ -236,7 +236,7 @@ static bool AccessMatrix3D(Node* node, KeyValue* getOut, const KeyValue* setIn) 
     return true;
   }
   const auto* value = std::get_if<Matrix3D>(setIn);
-  if (value == nullptr) {
+  if (value == nullptr || !IsInvertibleMatrix3D(*value)) {
     return false;
   }
   self->*Field = *value;
