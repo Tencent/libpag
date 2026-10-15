@@ -10734,22 +10734,27 @@ PAGX_TEST(PAGXTest, LayerLayoutPositionStaysOutsideLocalTransform) {
 }
 
 /**
- * Test case: a translation written after a perspective distance leaves the pose with a projective
- * w term other than 1. The decomposition must still read the authored translation and perspective
- * back and accept further semantic component writes.
+ * Test case: a matrix3D pose composed as P(1000) * T(100, 50, 500) has a projective w term other
+ * than 1. Decomposing it must still read the translation and perspective distance back and accept
+ * a further transform component write.
  */
-PAGX_TEST(PAGXTest, LayerPerspectiveThenZKeepsComponentsReadable) {
+PAGX_TEST(PAGXTest, LayerPerspectiveWithZMatrixPoseKeepsComponentsReadable) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>("L");
-  layer->x = 100;
-  layer->y = 50;
   doc->layers.push_back(layer);
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_NE(scene, nullptr);
   auto* binding = scene->mutableBinding();
 
-  ASSERT_TRUE(binding->apply(layer, "perspective", pagx::KeyValue{1000.0f}, 1.0f));
-  ASSERT_TRUE(binding->apply(layer, "z", pagx::KeyValue{500.0f}, 1.0f));
+  pagx::Matrix3DComponents components = {};
+  components.translate[0] = 100;
+  components.translate[1] = 50;
+  components.translate[2] = 500;
+  components.perspective = 1000;
+  pagx::Matrix3D pose = {};
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(components, &pose));
+  ASSERT_NE(pose.getRowColumn(3, 3), 1);
+  ASSERT_TRUE(binding->apply(layer, "matrix3D", pagx::KeyValue{pose}, 1.0f));
   pagx::KeyValue value;
   ASSERT_TRUE(binding->read(layer, "x", &value));
   EXPECT_NEAR(std::get<float>(value), 100, 1.0e-3f);
@@ -10759,7 +10764,11 @@ PAGX_TEST(PAGXTest, LayerPerspectiveThenZKeepsComponentsReadable) {
   EXPECT_NEAR(std::get<float>(value), 500, 1.0e-3f);
   ASSERT_TRUE(binding->read(layer, "perspective", &value));
   EXPECT_NEAR(std::get<float>(value), 1000, 1.0e-2f);
-  EXPECT_TRUE(binding->apply(layer, "scale.x", pagx::KeyValue{2.0f}, 1.0f));
+  ASSERT_TRUE(binding->apply(layer, "scale.x", pagx::KeyValue{2.0f}, 1.0f));
+  ASSERT_TRUE(binding->read(layer, "scale.x", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 2);
+  ASSERT_TRUE(binding->read(layer, "z", &value));
+  EXPECT_NEAR(std::get<float>(value), 500, 1.0e-3f);
 }
 
 /**
