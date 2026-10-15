@@ -46,7 +46,9 @@ struct PPTFeatureFlags {
   bool hasConicGradient = false;     // OOXML has no sweep/angular gradient primitive; any path
                                      // gradient approximation collapses the angular distribution
                                      // and must be rasterized for a faithful result.
-  bool hasShearTransform = false;    // A Group (or Layer matrix) carries a shear/skew that the
+  bool hasShearTransform = false;    // A Group transform, or the complete Layer transform
+                                     // (BuildLayerMatrix, including the transform components and
+                                     // matrix3D projected to 2D), carries a shear/skew that the
                                      // OOXML <a:xfrm> primitive cannot represent (it only supports
                                      // translation, rotation, and axis-aligned scale/flip). The
                                      // exporter's matrix decomposition silently drops the shear,
