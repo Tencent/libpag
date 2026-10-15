@@ -27,7 +27,8 @@ import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import type { CapturedFontRef } from './font-download';
 import { FontMappingError, FontMappingErrorCode, validateFontMap } from './font-metadata';
 import type { FontMapRule } from './font-metadata';
-import { finalizePagxFonts } from './pagx-font-writer';
+import { rewritePagxFonts } from './pagx-font-writer';
+import { collectSnapshotFontMetadata } from './snapshot-fonts';
 import type { FontRewriteResult } from './pagx-font-writer';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
@@ -510,6 +511,11 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     });
     assertStepOk('snapshot', snapshotResult);
 
+    const fontMetadata = collectSnapshotFontMetadata(fs.readFileSync(subsetHtml, 'utf8'));
+    fs.writeFileSync(fontMetadataPath, JSON.stringify(fontMetadata, null, 2) + '\n', 'utf8');
+    log(`[font-metadata] ${fontMetadata.fonts.length} source request(s), ` +
+      `${fontMetadata.missingRequests} without source requests -> ${fontMetadataPath}`);
+
     let fonts: CapturedFontRef[] = [];
     if (downloadFonts) {
       fonts = readFontManifest({ manifestPath: fontManifest });
@@ -535,16 +541,14 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     }
 
     const finishFonts = (): Pick<RunHtmlToPagxResult, 'fontMetadataPath' | 'fontMapping'> => {
-      const result = finalizePagxFonts({
-        inputPath: pagxFile, outputPath: pagxFile, metadataPath: fontMetadataPath, fontMap: opts.fontMap,
+      const mapping = rewritePagxFonts({
+        inputPath: pagxFile, outputPath: pagxFile, fontMap: opts.fontMap,
       });
-      log(`[font-metadata] ${result.metadata.fonts.length} source request(s), ` +
-        `${result.metadata.missingRequests} without source requests -> ${fontMetadataPath}`);
-      if (result.fontMapping) {
-        const { replaced, unmatched, missingRequests } = result.fontMapping;
+      if (opts.fontMap !== undefined) {
+        const { replaced, unmatched, missingRequests } = mapping;
         log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
       }
-      return { fontMetadataPath, ...(result.fontMapping ? { fontMapping: result.fontMapping } : {}) };
+      return { fontMetadataPath, ...(opts.fontMap !== undefined ? { fontMapping: mapping } : {}) };
     };
 
     if (!doResolve) {

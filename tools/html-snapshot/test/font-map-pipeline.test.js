@@ -16,6 +16,7 @@ const fs=require('fs'),args=process.argv.slice(2),command=args[0];
 fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(args)+'\\n');
 if(command==='import') {
   if(!args.includes('--font-request-metadata')) process.exit(2);
+  if(!fs.existsSync(args[args.indexOf('--output')+1].replace(/\\.pagx$/,'.fonts.json'))) process.exit(5);
   fs.writeFileSync(args[args.indexOf('--output')+1],${JSON.stringify(fixture)});
 } else if(command==='embed') {
   const content=fs.readFileSync(args[1],'utf8');
@@ -27,7 +28,7 @@ if(command==='import') {
   const result = await runHtmlToPagx({ input, scriptDir: dir, outputDir: path.join(dir, 'out'), pagxBin: bin,
     embedFonts: true, doRender: false, fontMap,
     snapshotImpl: async args => {
-      fs.writeFileSync(args.output, '<html/>');
+      fs.writeFileSync(args.output, `<html><body><span data-pagx-font-request='{"families":["PingFang SC","sans-serif"],"weight":600,"style":"normal"}'>A</span></body></html>`);
       fs.mkdirSync(args.fontDir, { recursive: true });
       fs.writeFileSync(args.fontManifest, '');
       expect(args.fontFaces).toBeUndefined();
@@ -69,6 +70,7 @@ const fs=require('fs'),args=process.argv.slice(2),command=args[0];
 fs.appendFileSync(${JSON.stringify(calls)},JSON.stringify(args)+'\\n');
 if(command==='import') {
   if(!args.includes('--font-request-metadata')) process.exit(2);
+  if(!fs.existsSync(args[args.indexOf('--output')+1].replace(/\\.pagx$/,'.fonts.json'))) process.exit(5);
   fs.writeFileSync(args[args.indexOf('--output')+1],${JSON.stringify(fixture)});
 } else if(command==='render') {
   if(fs.readFileSync(args[1],'utf8').includes('data-html-font-request')) process.exit(3);
@@ -79,7 +81,8 @@ if(command==='import') {
   fs.writeFileSync(input, '<html/>');
   const result = await runHtmlToPagx({ input, scriptDir: dir, outputDir: path.join(dir, 'out'),
     pagxBin: bin, ...options, snapshotImpl: async args => {
-      fs.writeFileSync(args.output, '<html/>');
+      fs.writeFileSync(args.output, '<html><body>' + [650, 700, 650].map(weight =>
+        `<span data-pagx-font-request="${request(weight)}">same</span>`).join('') + '</body></html>');
       if(args.fontManifest) fs.writeFileSync(args.fontManifest, '');
       return { code: 0, stdout: '', stderr: '', durationMs: 0 };
     } });
@@ -97,4 +100,21 @@ if(command==='import') {
   expect(commands).toEqual(options.doResolve === false ? ['import']
     : ['import', 'resolve', ...(options.embedFonts ? ['embed'] : []), ...(options.doRender === false ? [] : ['render'])]);
   if(options.keepSubsetHtml === false) expect(fs.existsSync(result.subsetHtml)).toBe(false);
+});
+
+test('publishes the snapshot inventory even when native import fails', async () => {
+  const input = path.join(dir, 'page.html');
+  fs.writeFileSync(input, '<html/>');
+  const bin = path.join(dir, 'failing-pagx');
+  fs.writeFileSync(bin, '#!/usr/bin/env node\nprocess.exit(1);', { mode: 0o755 });
+  const outputDir = path.join(dir, 'out');
+  await expect(runHtmlToPagx({ input, scriptDir: dir, outputDir, pagxBin: bin,
+    snapshotImpl: async args => {
+      fs.writeFileSync(args.output, `<body><span data-pagx-font-request='{"families":["Snapshot Only"],"weight":650,"style":"normal"}'>A</span></body>`);
+      return { code: 0, stdout: '', stderr: '', durationMs: 0 };
+    },
+  })).rejects.toMatchObject({ step: 'pagx import' });
+  expect(JSON.parse(fs.readFileSync(path.join(outputDir, 'page.fonts.json'), 'utf8'))).toEqual({
+    version: 1, fonts: [{ families: ['Snapshot Only'], weight: 650, weightName: '650', style: 'normal' }], missingRequests: 0,
+  });
 });

@@ -16,11 +16,11 @@ export interface HtmlFontMetadataEntry extends HtmlFontRequest {
   weightName: string;
 }
 
-/** Source requests used by the converted text, before any editor-font replacements. */
+/** Source requests captured from snapshot text before native conversion or font replacements. */
 export interface HtmlFontMetadata {
   version: 1;
   fonts: HtmlFontMetadataEntry[];
-  /** Visible Text nodes without a captured HTML request (for example, inline SVG text). */
+  /** Snapshot text runs without a captured HTML request (for example, inline SVG text). */
   missingRequests: number;
 }
 
