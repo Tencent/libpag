@@ -27,6 +27,9 @@
 
 namespace pagx {
 
+static constexpr double DEGREES_TO_RADIANS = 0.017453292519943295769;
+static constexpr double RADIANS_TO_DEGREES = 57.295779513082320877;
+
 struct Quaternion {
   double x = 0;
   double y = 0;
@@ -250,10 +253,9 @@ inline Quaternion MultiplyQuaternion(const Quaternion& a, const Quaternion& b) {
 }
 
 inline Quaternion QuaternionFromEulerXYZDegrees(double xDegrees, double yDegrees, double zDegrees) {
-  static constexpr double DegreesToRadians = 0.017453292519943295769;
-  double halfX = xDegrees * DegreesToRadians * 0.5;
-  double halfY = yDegrees * DegreesToRadians * 0.5;
-  double halfZ = zDegrees * DegreesToRadians * 0.5;
+  double halfX = xDegrees * DEGREES_TO_RADIANS * 0.5;
+  double halfY = yDegrees * DEGREES_TO_RADIANS * 0.5;
+  double halfZ = zDegrees * DEGREES_TO_RADIANS * 0.5;
   Quaternion qx = {std::sin(halfX), 0, 0, std::cos(halfX)};
   Quaternion qy = {0, std::sin(halfY), 0, std::cos(halfY)};
   Quaternion qz = {0, 0, std::sin(halfZ), std::cos(halfZ)};
@@ -273,7 +275,6 @@ inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double o
                            quaternion.w / length};
   double rotation[3][3] = {};
   RotationFromQuaternion(normalized, rotation);
-  static constexpr double RadiansToDegrees = 57.295779513082320877;
   double sinY = std::clamp(-rotation[2][0], -1.0, 1.0);
   double y = std::asin(sinY);
   double cosY = std::cos(y);
@@ -285,9 +286,9 @@ inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double o
   } else {
     x = std::atan2(sinY >= 0 ? rotation[0][1] : -rotation[0][1], rotation[1][1]);
   }
-  output[0] = x * RadiansToDegrees;
-  output[1] = y * RadiansToDegrees;
-  output[2] = z * RadiansToDegrees;
+  output[0] = x * RADIANS_TO_DEGREES;
+  output[1] = y * RADIANS_TO_DEGREES;
+  output[2] = z * RADIANS_TO_DEGREES;
   return std::isfinite(output[0]) && std::isfinite(output[1]) && std::isfinite(output[2]);
 }
 
@@ -533,7 +534,6 @@ inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComp
   if (output == nullptr) {
     return false;
   }
-  static constexpr double RadiansToDegrees = 57.295779513082320877;
   double value = 0;
   switch (component) {
     case Matrix3DComponent::RotateX:
@@ -557,7 +557,7 @@ inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComp
     case Matrix3DComponent::SkewYZ:
       value = std::atan(matrix.skew[static_cast<int>(component) -
                                     static_cast<int>(Matrix3DComponent::SkewXY)]) *
-              RadiansToDegrees;
+              RADIANS_TO_DEGREES;
       break;
     case Matrix3DComponent::PerspectiveDistance:
       if (!IsMatrix3DSemanticallyRepresentable(matrix)) {
@@ -580,7 +580,6 @@ inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DCompo
   if (output == nullptr || !std::isfinite(input) || !IsMatrix3DSemanticallyRepresentable(source)) {
     return false;
   }
-  static constexpr double DegreesToRadians = 0.017453292519943295769;
   DecomposedMatrix3D updated = source;
   double value = input;
   switch (component) {
@@ -604,7 +603,7 @@ inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DCompo
     case Matrix3DComponent::SkewXY:
     case Matrix3DComponent::SkewXZ:
     case Matrix3DComponent::SkewYZ: {
-      double radians = value * DegreesToRadians;
+      double radians = value * DEGREES_TO_RADIANS;
       if (std::abs(std::cos(radians)) <= 1.0e-8) {
         return false;
       }
