@@ -58,11 +58,6 @@ enum class Matrix3DComponent : uint8_t {
 
 static constexpr size_t Matrix3DComponentCount = static_cast<size_t>(Matrix3DComponent::Count);
 
-struct Matrix3DComponentOverrides {
-  double values[Matrix3DComponentCount] = {};
-  uint16_t mask = 0;
-};
-
 inline bool IsFiniteMatrix3D(const Matrix3D& matrix) {
   for (float value : matrix.values) {
     if (!std::isfinite(value)) {
@@ -580,74 +575,54 @@ inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComp
   return true;
 }
 
-inline bool ApplyMatrix3DComponentOverrides(const DecomposedMatrix3D& source,
-                                            const Matrix3DComponentOverrides& overrides,
-                                            DecomposedMatrix3D* output) {
-  if (output == nullptr || !IsMatrix3DSemanticallyRepresentable(source)) {
+inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DComponent component,
+                                 float input, DecomposedMatrix3D* output) {
+  if (output == nullptr || !std::isfinite(input) || !IsMatrix3DSemanticallyRepresentable(source)) {
     return false;
   }
   static constexpr double DegreesToRadians = 0.017453292519943295769;
   DecomposedMatrix3D updated = source;
-  double rotation[3] = {};
-  bool hasRotationOverride = false;
-  for (int i = 0; i < 3; ++i) {
-    size_t index = static_cast<size_t>(Matrix3DComponent::RotateX) + i;
-    uint16_t bit = static_cast<uint16_t>(1u << index);
-    if ((overrides.mask & bit) != 0) {
-      if (!std::isfinite(overrides.values[index])) {
+  double value = input;
+  switch (component) {
+    case Matrix3DComponent::RotateX:
+    case Matrix3DComponent::RotateY:
+    case Matrix3DComponent::RotateZ: {
+      double rotation[3] = {};
+      if (!EulerXYZDegreesFromQuaternion(source.rotation, rotation)) {
         return false;
       }
-      if (!hasRotationOverride && !EulerXYZDegreesFromQuaternion(source.rotation, rotation)) {
+      rotation[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::RotateX)] = value;
+      updated.rotation = QuaternionFromEulerXYZDegrees(rotation[0], rotation[1], rotation[2]);
+      break;
+    }
+    case Matrix3DComponent::ScaleX:
+    case Matrix3DComponent::ScaleY:
+    case Matrix3DComponent::ScaleZ:
+      updated.scale[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::ScaleX)] =
+          value;
+      break;
+    case Matrix3DComponent::SkewXY:
+    case Matrix3DComponent::SkewXZ:
+    case Matrix3DComponent::SkewYZ: {
+      double radians = value * DegreesToRadians;
+      if (std::abs(std::cos(radians)) <= 1.0e-8) {
         return false;
       }
-      rotation[i] = overrides.values[index];
-      hasRotationOverride = true;
+      updated.skew[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::SkewXY)] =
+          std::tan(radians);
+      break;
     }
-  }
-  for (size_t i = 0; i < Matrix3DComponentCount; ++i) {
-    uint16_t bit = static_cast<uint16_t>(1u << i);
-    if ((overrides.mask & bit) == 0) {
-      continue;
-    }
-    double value = overrides.values[i];
-    if (!std::isfinite(value)) {
+    case Matrix3DComponent::PerspectiveDistance:
+      if (value < 0) {
+        return false;
+      }
+      updated.perspective[0] = 0;
+      updated.perspective[1] = 0;
+      updated.perspective[2] = value == 0 ? 0 : -1.0 / value;
+      updated.perspective[3] = 1;
+      break;
+    case Matrix3DComponent::Count:
       return false;
-    }
-    switch (static_cast<Matrix3DComponent>(i)) {
-      case Matrix3DComponent::RotateX:
-      case Matrix3DComponent::RotateY:
-      case Matrix3DComponent::RotateZ:
-        break;
-      case Matrix3DComponent::ScaleX:
-      case Matrix3DComponent::ScaleY:
-      case Matrix3DComponent::ScaleZ:
-        updated.scale[i - static_cast<size_t>(Matrix3DComponent::ScaleX)] = value;
-        break;
-      case Matrix3DComponent::SkewXY:
-      case Matrix3DComponent::SkewXZ:
-      case Matrix3DComponent::SkewYZ: {
-        double radians = value * DegreesToRadians;
-        if (std::abs(std::cos(radians)) <= 1.0e-8) {
-          return false;
-        }
-        updated.skew[i - static_cast<size_t>(Matrix3DComponent::SkewXY)] = std::tan(radians);
-        break;
-      }
-      case Matrix3DComponent::PerspectiveDistance:
-        if (value < 0) {
-          return false;
-        }
-        updated.perspective[0] = 0;
-        updated.perspective[1] = 0;
-        updated.perspective[2] = value == 0 ? 0 : -1.0 / value;
-        updated.perspective[3] = 1;
-        break;
-      case Matrix3DComponent::Count:
-        return false;
-    }
-  }
-  if (hasRotationOverride) {
-    updated.rotation = QuaternionFromEulerXYZDegrees(rotation[0], rotation[1], rotation[2]);
   }
   Matrix3D candidate = {};
   if (!RecomposeMatrix3D(updated, &candidate)) {
@@ -655,18 +630,6 @@ inline bool ApplyMatrix3DComponentOverrides(const DecomposedMatrix3D& source,
   }
   *output = updated;
   return true;
-}
-
-inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DComponent component,
-                                 float input, DecomposedMatrix3D* output) {
-  if (component == Matrix3DComponent::Count || !std::isfinite(input)) {
-    return false;
-  }
-  Matrix3DComponentOverrides overrides = {};
-  size_t index = static_cast<size_t>(component);
-  overrides.values[index] = input;
-  overrides.mask = static_cast<uint16_t>(1u << index);
-  return ApplyMatrix3DComponentOverrides(source, overrides, output);
 }
 
 inline Matrix3D LerpMatrix3D(const Matrix3D& first, const Matrix3D& second, double t) {
