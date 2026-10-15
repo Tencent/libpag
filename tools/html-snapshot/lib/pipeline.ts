@@ -27,7 +27,7 @@ import { ChildProcessError, type ChildProcessErrorInit } from './errors';
 import type { CapturedFontRef } from './font-download';
 import { FontMappingError, FontMappingErrorCode, validateFontMap } from './font-metadata';
 import type { FontMapRule } from './font-metadata';
-import { rewritePagxFonts } from './pagx-font-writer';
+import { finalizePagxFonts } from './pagx-font-writer';
 import type { FontRewriteResult } from './pagx-font-writer';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
@@ -392,6 +392,8 @@ export interface RunHtmlToPagxResult {
   pagx: string;
   png: string | null;
   fonts: CapturedFontRef[];
+  /** Deduplicated original HTML font requests, written even without fontMap or embedding. */
+  fontMetadataPath: string;
   fontMapping?: FontRewriteResult;
 }
 
@@ -442,6 +444,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
   }
   const pagxFile = path.join(outputDir, `${baseName}.pagx`);
   const pngFile = path.join(outputDir, `${baseName}.png`);
+  const fontMetadataPath = path.join(outputDir, `${baseName}.fonts.json`);
 
   const doResolve = opts.doResolve !== false;
   const doRender = opts.doRender !== false && doResolve;
@@ -520,7 +523,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       pagxBin,
       subsetHtml,
       pagxFile,
-      fontRequestMetadata: opts.fontMap !== undefined,
+      fontRequestMetadata: true,
       log: (line: string) => process.stderr.write(line + '\n'),
     });
     if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {
@@ -531,9 +534,23 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       });
     }
 
+    const finishFonts = (): Pick<RunHtmlToPagxResult, 'fontMetadataPath' | 'fontMapping'> => {
+      const result = finalizePagxFonts({
+        inputPath: pagxFile, outputPath: pagxFile, metadataPath: fontMetadataPath, fontMap: opts.fontMap,
+      });
+      log(`[font-metadata] ${result.metadata.fonts.length} source request(s), ` +
+        `${result.metadata.missingRequests} without source requests -> ${fontMetadataPath}`);
+      if (result.fontMapping) {
+        const { replaced, unmatched, missingRequests } = result.fontMapping;
+        log(`[font-map] ${replaced} replaced, ${unmatched} unmatched, ${missingRequests} without source requests`);
+      }
+      return { fontMetadataPath, ...(result.fontMapping ? { fontMapping: result.fontMapping } : {}) };
+    };
+
     if (!doResolve) {
+      const fontResult = finishFonts();
       log(`[done] wrote ${pagxFile} (skipped resolve+render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts };
+      return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };
     }
 
     log(`[3/${totalSteps}] resolve   ${pagxFile}`);
@@ -560,16 +577,11 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       assertStepOk('pagx embed', embedResult);
     }
 
-    let fontMapping: FontRewriteResult | undefined;
-    if (opts.fontMap !== undefined) {
-      fontMapping = rewritePagxFonts({ inputPath: pagxFile, outputPath: pagxFile, fontMap: opts.fontMap });
-      log(`[font-map] ${fontMapping.replaced} replaced, ${fontMapping.unmatched} unmatched, ` +
-        `${fontMapping.missingRequests} without source requests`);
-    }
+    const fontResult = finishFonts();
 
     if (!doRender) {
       log(`[done] wrote ${pagxFile} (skipped render)`);
-      return { subsetHtml, pagx: pagxFile, png: null, fonts, ...(fontMapping ? { fontMapping } : {}) };
+      return { subsetHtml, pagx: pagxFile, png: null, fonts, ...fontResult };
     }
 
     log(`[4/${totalSteps}] render    ${pagxFile}  ->  ${pngFile} (scale=${opts.scale || 1})`);
@@ -583,7 +595,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     assertStepOk('pagx render', renderResult);
 
     log(`[done] ${pngFile}`);
-    return { subsetHtml, pagx: pagxFile, png: pngFile, fonts, ...(fontMapping ? { fontMapping } : {}) };
+    return { subsetHtml, pagx: pagxFile, png: pngFile, fonts, ...fontResult };
   } finally {
     if (tempDir) {
       try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_e) { /* ignore */ }

@@ -2,7 +2,7 @@
 'use strict';
 const fs = require('fs'), os = require('os'), path = require('path');
 const { DOMParser } = require('@xmldom/xmldom');
-const { rewritePagxFonts } = require('../dist/lib/pagx-font-writer');
+const { rewritePagxFonts, finalizePagxFonts } = require('../dist/lib/pagx-font-writer');
 let dir;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'font-rule-writer-')); });
 afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
@@ -46,5 +46,49 @@ test('leaves the file untouched on malformed requests or conflicting rules', () 
   const file = write(fixture());
   const conflict = { ...rule, to: { ...rule.to, 'font-weight-style': 'Other' } };
   expect(() => rewritePagxFonts({ inputPath: file, outputPath: file, fontMap: [rule, conflict] })).toThrow(/INVALID_FONT_MAP/);
+  expect(fs.readFileSync(file, 'utf8')).toBe(fixture());
+});
+
+test.each([undefined, [rule]])('exports source fonts with and without replacements: %j', fontMap => {
+  const file = write(fixture());
+  const metadataPath = path.join(dir, 'test.fonts.json');
+  const result = finalizePagxFonts({ inputPath: file, outputPath: file, metadataPath, fontMap });
+  const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+  expect(metadata).toEqual({ version: 1, fonts: [
+    { families: ['PingFang SC', 'sans-serif'], weight: 600, style: 'normal' },
+    { families: ['PingFang SC', 'sans-serif'], weight: 700, style: 'normal' },
+  ], missingRequests: 1 });
+  expect(result.metadata).toEqual(metadata);
+  expect(result.fontMapping).toEqual(fontMap
+    ? { replaced: 1, unmatched: 1, missingRequests: 1 } : undefined);
+  const out = fs.readFileSync(file, 'utf8');
+  expect(out).not.toContain('data-html-font-request');
+  expect(out).toContain('fontFamily="Linux Fallback"');
+  expect(out).toContain('<GlyphRun font="@f" glyphs="1" positions="1,2"/>');
+  expect(out).toContain('<Resources><Font id="f"><Glyph path="M0,0L1,1"/></Font></Resources>');
+  expect(out.includes('fontFamily="Target &amp; Name"')).toBe(!!fontMap);
+});
+
+test('a failed metadata write leaves source requests in the PAGX', () => {
+  const file = write(fixture());
+  expect(() => finalizePagxFonts({ inputPath: file, outputPath: file,
+    metadataPath: path.join(dir, 'missing-parent', 'fonts.json') })).toThrow();
+  expect(fs.readFileSync(file, 'utf8')).toBe(fixture());
+  expect(fs.readdirSync(dir)).toEqual(['test.pagx']);
+});
+
+test('invalid requests cannot overwrite an existing inventory or change the PAGX', () => {
+  const file = write(fixture().replace(request(600), '{}'));
+  const original = fs.readFileSync(file, 'utf8');
+  const metadataPath = path.join(dir, 'test.fonts.json');
+  fs.writeFileSync(metadataPath, 'previous inventory');
+  expect(() => finalizePagxFonts({ inputPath: file, outputPath: file, metadataPath })).toThrow(/FONT_METADATA_MISMATCH/);
+  expect(fs.readFileSync(file, 'utf8')).toBe(original);
+  expect(fs.readFileSync(metadataPath, 'utf8')).toBe('previous inventory');
+});
+
+test('inventory cannot overwrite the input or output PAGX', () => {
+  const file = write(fixture());
+  expect(() => finalizePagxFonts({ inputPath: file, outputPath: file, metadataPath: file })).toThrow(/separate output path/);
   expect(fs.readFileSync(file, 'utf8')).toBe(fixture());
 });
