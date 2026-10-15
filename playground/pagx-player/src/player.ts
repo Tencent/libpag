@@ -39,7 +39,7 @@ import type {
 } from './types';
 import { GestureManager, bindCanvasEvents } from './gesture-manager';
 import { PlaybackBar } from './playback-bar';
-import { SMBlueprint, PreviewChipBar } from './sm-blueprint';
+import { SMBlueprint, PreviewChipBar, type SMBlueprintHost } from './sm-blueprint';
 import { buildToolbar, setToolbarVisible } from './toolbar';
 import { EditorPanel, EDITOR_STATUS_DURATION_MS, type LineRange } from './editor/index';
 import type { DraftLineChange } from './editor/SourceEditor';
@@ -224,35 +224,20 @@ export class PAGXPlayer extends EventTarget {
             },
         });
 
-        // State-machine blueprint for default SM timelines: read-only state/transition graph
-        // with a live current-state highlight; double-clicking a state enters a solo preview of
-        // its bound animation. Hidden automatically when the document has no default SM. Host
-        // callbacks route through this player's public selectTimelineUnit so the playback bar
-        // switches to the preview instance's duration in the same call.
-        this.blueprint = new SMBlueprint({
-            getTimelineTree: () => this.view?.getTimelineTree() ?? [],
-            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
-            getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
-            selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
-            togglePlayback: () => this.toggleRawPlayback(),
-            isPlaying: () => this.view?.isPlaying() ?? false,
-            parkPreview: () => this.parkPreview(),
-            getParkedPreviewId: () => this.parkedPreviewId,
-        }, options.iconBaseUrl);
+        // State-machine blueprint for default SM timelines: the state/transition graph with a live
+        // current-state highlight, plus the input panel that drives it. Single-clicking a state
+        // drives the machine into it, double-clicking enters a solo preview of its animation.
+        // Hidden automatically when the document has no default SM. Host callbacks route through
+        // this player's public selectTimelineUnit so the playback bar switches to the preview
+        // instance's duration in the same call. Both SM-aware components consume one host object so
+        // a new capability cannot be wired into one and forgotten in the other.
+        const smHost = this.createSMHost();
+        this.blueprint = new SMBlueprint(smHost, options.iconBaseUrl);
         this.blueprint.attach(this.root);
 
         // Floating operations row above the playback bar. Sibling of the blueprint panel:
         // chips are not part of the SM graph, they are "preview history" / quick switches.
-        this.chipBar = new PreviewChipBar({
-            getTimelineTree: () => this.view?.getTimelineTree() ?? [],
-            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
-            getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
-            selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
-            togglePlayback: () => this.toggleRawPlayback(),
-            isPlaying: () => this.view?.isPlaying() ?? false,
-            parkPreview: () => this.parkPreview(),
-            getParkedPreviewId: () => this.parkedPreviewId,
-        });
+        this.chipBar = new PreviewChipBar(smHost);
         this.chipBar.attach(this.root);
         // Wire the chip strip's width to the playback bar's live width so the two rectangles
         // always line up (single visual control cluster).
@@ -391,6 +376,27 @@ export class PAGXPlayer extends EventTarget {
             });
             this.resizeObserver.observe(this.sizeContainer);
         }
+    }
+
+    /** Host capabilities shared by the state-machine blueprint panel and the preview chip bar.
+     *  Deliberately one factory rather than a literal per component: extending the interface then
+     *  cannot leave one consumer wired and the other not. Both components are stateless readers of
+     *  this object, so sharing an instance is safe. */
+    private createSMHost(): SMBlueprintHost {
+        return {
+            getTimelineTree: () => this.view?.getTimelineTree() ?? [],
+            getSMCurrentStates: () => this.view?.getSMCurrentStates() ?? {},
+            getSelectedTimelineUnit: () => this.view?.getSelectedTimelineUnit() ?? null,
+            selectTimelineUnit: (kind, id) => this.selectTimelineUnit(kind, id),
+            togglePlayback: () => this.toggleRawPlayback(),
+            isPlaying: () => this.view?.isPlaying() ?? false,
+            parkPreview: () => this.parkPreview(),
+            getParkedPreviewId: () => this.parkedPreviewId,
+            ensureSMDriving: () => this.ensureSMDriving(),
+            setSMInputBool: (name, value) => this.setSMInputBool(name, value),
+            setSMInputNumber: (name, value) => this.setSMInputNumber(name, value),
+            fireSMInputTrigger: (name) => this.fireSMInputTrigger(name),
+        };
     }
 
     /** Creates the built-in importer provider followed by host-provided providers. The importer
@@ -1251,6 +1257,32 @@ export class PAGXPlayer extends EventTarget {
         }
         view.selectTimelineUnit('', '');
         view.play();
+    }
+
+    /** Puts the default state machine back in charge of the render loop before an input is written
+     *  into it. A paused machine never advances (a written input would sit unused until the next
+     *  play), and a solo preview freezes it outright. Both recovery paths reset the machine to its
+     *  initial states - which also restores the declared input defaults - so callers must write
+     *  their input AFTER this returns, never before. */
+    public ensureSMDriving(): void {
+        const view = this.view;
+        if (!view) {
+            return;
+        }
+        const selection = view.getSelectedTimelineUnit();
+        if (selection != null && selection.kind === 'animation') {
+            // Preview on stage: parking it hands the render loop back to the SM, which is the same
+            // state the blueprint's own play button produces.
+            this.parkPreview();
+            return;
+        }
+        if (this.parkedPreviewId != null) {
+            // A parked preview already means the SM is the one running; nothing to resume.
+            return;
+        }
+        if (!view.isPlaying()) {
+            this.toggleRawPlayback();
+        }
     }
 
     /** Sets a bool input on the default state machine timeline (playground hook for testing

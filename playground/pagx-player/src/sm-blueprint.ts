@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import { TimelineTreeNode } from './pagx-view-types';
+import { LOOP_SEQUENCE_ICON_SVG, LOOP_SINGLE_ICON_SVG } from './icons';
 import { iconUrl } from './playback-bar';
 
 /** Player capabilities the blueprint + chip bar need. Injected by PAGXPlayer so the components
@@ -40,10 +41,24 @@ export interface SMBlueprintHost {
    *  bar as active). Null when no preview is parked. Used by PreviewChipBar to keep the chip
    *  active even though view.getSelectedTimelineUnit() returned to null. */
   getParkedPreviewId(): string | null;
+  /** Makes the state machine the thing driving the render loop, before the panel writes an input
+   *  into it. A paused SM never advances, so a written input would sit unused, and a solo preview
+   *  freezes the SM completely. Both cases restart the machine from its initial states, which is
+   *  why the caller has to write the input AFTER calling this - a write before it would be
+   *  cleared. */
+  ensureSMDriving(): void;
+  /** Writes one state-machine input. All three return false when the document's default timeline
+   *  is not a state machine or the name/type does not match. */
+  setSMInputBool(name: string, value: boolean): boolean;
+  setSMInputNumber(name: string, value: number): boolean;
+  fireSMInputTrigger(name: string): boolean;
 }
 
-const NODE_W = 128;
-const NODE_H = 50;
+// One uniform node height for every node in the graph (Rive / Unity Mecanim convention): a
+// single 36px row carrying the loop glyph and the node name. The animation id and duration that
+// used to fill a second line moved into the hover tooltip.
+const NODE_W = 118;
+const NODE_H = 36;
 // Horizontal graph layout: columns are transition depth (BFS from initial state), rows are
 // the vertical stacking within a column when several states share the same depth. GAP_X is
 // deliberately wide (about the size of a full node) so multi-line label backdrops fit
@@ -53,6 +68,15 @@ const GAP_Y = 20;
 const PADDING_X = 20;
 const PADDING_Y = 20;
 const POLL_INTERVAL_MS = 250;
+// A single click on a state drives the machine into it; a double click solo-previews its bound
+// animation. The drive is delayed by this much so a double click can cancel it - driving first and
+// previewing second would visibly flash the wrong state on the way into every preview.
+const SINGLE_CLICK_DELAY_MS = 220;
+// Lifetime of the "this row was just driven" highlight and of the edge-fire flash.
+const HIGHLIGHT_DURATION_MS = 1600;
+const EDGE_FIRE_DURATION_MS = 700;
+// Lifetime of a transient note in the panel header.
+const NOTE_DURATION_MS = 2400;
 
 // Module-level marker id sequence: SVG ids resolve document-wide, so two PAGXPlayer instances on
 // the same page must never mint the same "sm-arrow-N" (url(#...) would resolve to whichever
@@ -97,6 +121,17 @@ const TRACK_STEP = 22;
 // Corner radius for the orthogonal segments of a routed edge.
 const EDGE_CORNER = 8;
 
+// Geometry of the parallel-entry graph (see IsParallelEntryCase): a single Entry node on the
+// left fans out to one node per region, all of them the regular NODE_W x NODE_H box. The Entry
+// is narrower and vertically centred on the column it feeds, so the fan reads as one source
+// splitting into parallel branches rather than a chain.
+const ENTRY_NODE_W = 72;
+const PARALLEL_GAP_X = 72;
+const PARALLEL_GAP_Y = 24;
+// Fraction of the gap a fan branch's curve spends bending: the remaining run at each end is
+// straight, which is what makes the arrow head leave the Entry and meet its node horizontally.
+const ENTRY_EDGE_BEND = 0.45;
+
 /** Whether an edge has to be routed through a horizontal lane below the grid, i.e. leave its
  *  source's right edge, travel back leftwards under every node and climb into its target's left
  *  edge. True for back edges (target in an earlier column) and for same-column edges spanning
@@ -136,6 +171,39 @@ function IsStraightEdge(fromAny: boolean, fromCell: { col: number; row: number }
     return Math.abs(toCell.row - fromCell.row) === 1;
   }
   return false;
+}
+
+/** Midpoint of an orthogonal "run in -> run across -> run out" path, found by walking its
+ *  accumulated length so the point lands on whichever run holds the halfway mark; pinning it to
+ *  the first run (the obvious alternative) puts the mark a quarter along the path instead.
+ *  Shared by the Entry fan-out edges and the forward edges of the region graph, which are the
+ *  same shape. */
+function OrthogonalMidpoint(x1: number, y1: number, turnX: number, y2: number, x2: number,
+                            sweep: number): { x: number; y: number } {
+  const runIn = turnX - x1;
+  const runAcross = Math.abs(y2 - y1);
+  const runOut = x2 - turnX;
+  const half = (runIn + runAcross + runOut) / 2;
+  if (half <= runIn) {
+    return { x: x1 + half, y: y1 };
+  }
+  if (half <= runIn + runAcross) {
+    return { x: turnX, y: y1 + sweep * (half - runIn) };
+  }
+  return { x: turnX + (half - runIn - runAcross), y: y2 };
+}
+
+/** Whether the whole state machine is a set of independent one-state regions: every region holds
+ *  exactly one state and declares no transition, so no state can ever be left and the regions
+ *  differ only by which animation they play. Such a document has no graph to lay out - each
+ *  region would render as the same lone node - and reads far better as one Entry node fanning
+ *  out to one node per region. HTML-imported documents land here routinely: the importer emits
+ *  one region per CSS animation, each with a single state and no transitions. */
+function IsParallelEntryCase(regions: SMRegionData[]): boolean {
+  if (regions.length === 0) {
+    return false;
+  }
+  return regions.every((region) => region.states.length === 1 && region.transitions.length === 0);
 }
 
 /** The vertical tracks one transition uses. Forward/any edges turn once (`turnX`); a lane-routed
@@ -269,11 +337,139 @@ interface EdgeSlots {
   straight: boolean;
 }
 
+/** What drawEdge hands back, so the caller can wire interactions without the drawing code having
+ *  to know about them: the path (flashed when its transition fires) and the condition pill
+ *  (clickable to drive the transition). `label` is null for an unconditional edge, which has no
+ *  input to drive and therefore nothing to click. */
+interface DrawnEdge {
+  path: SVGPathElement;
+  label: SVGGElement | null;
+}
+
+/** One state of a region, as the blueprint renders it. `loop` is resolved from the bound
+ *  <Animation> definition (the state itself carries no loop mode) and drives the node's badge. */
+interface SMStateData {
+  name: string;
+  animationId: string;
+  durationUs: number;
+  previewSupported: boolean;
+  loop: string;
+}
+
+/** One transition of a region, as the blueprint draws and drives it. */
+interface SMTransitionData {
+  from: string;
+  to: string;
+  fromAny: boolean;
+  /** AND-joined condition summary produced by the C++ side ("speed > 0.5", or "always" when
+   *  unconditional). Kept as text because that is what the edge label shows; see ParseConditions
+   *  for the reverse trip. */
+  conditions: string;
+}
+
 interface SMRegionData {
   name: string;
   initial: string;
-  states: { name: string; animationId: string; durationUs: number; previewSupported: boolean }[];
-  transitions: { from: string; to: string; fromAny: boolean; conditions: string }[];
+  states: SMStateData[];
+  transitions: SMTransitionData[];
+}
+
+/** One parsed <Condition>. The view exports a transition's conditions only as the text summary it
+ *  builds for the edge label ("speed > 0.5", AND-joined with " && "), because that is all a
+ *  tooltip needs; driving the machine from the graph needs the parts back, so the blueprint parses
+ *  the summary. Doing it here rather than asking the view for a second, structured export keeps
+ *  the C++ side untouched - the coupling to that summary's exact formatting is confined to
+ *  ParseConditions. */
+interface ConditionClause {
+  input: string;
+  kind: 'bool' | 'number' | 'trigger';
+  op: string;
+  boolValue: boolean;
+  numberValue: number;
+}
+
+// "<input> <op> [value]", the shape DescribeConditions emits per condition. The trailing value is
+// absent for a trigger condition and present for bool ("true" / "false") and number (%g).
+const CONDITION_PATTERN = /^(\S+)\s+(==|!=|<=|>=|<|>|trigger)(?:\s+(.+))?$/;
+
+/** Splits a conditions summary back into clauses. A part that does not parse is dropped: an
+ *  unparsable clause must never be driven with a guessed value. The input's declared type decides
+ *  which control drives it, which is why the type map is threaded through. */
+function ParseConditions(text: string, inputTypes: Map<string, string>): ConditionClause[] {
+  const clauses: ConditionClause[] = [];
+  if (text.length === 0 || text === 'always') {
+    return clauses;
+  }
+  for (const part of text.split(' && ')) {
+    const match = CONDITION_PATTERN.exec(part.trim());
+    if (match == null) {
+      continue;
+    }
+    const type = inputTypes.get(match[1]);
+    const kind: ConditionClause['kind'] =
+      type === 'bool' ? 'bool' : type === 'trigger' ? 'trigger' : 'number';
+    const raw = match[3];
+    clauses.push({
+      input: match[1],
+      kind,
+      op: match[2],
+      boolValue: raw === 'true',
+      numberValue: raw != null ? parseFloat(raw) : 0,
+    });
+  }
+  return clauses;
+}
+
+/** A value satisfying every numeric condition on ONE input: thresholds are stepped just inside
+ *  the boundary, so "speed > 0" becomes 1 and "20 <= level < 80" becomes 20. Null when the
+ *  conditions cannot all hold at once, which the caller reports instead of writing a value that
+ *  would not move the machine. */
+function SampleNumberValue(clauses: ConditionClause[]): number | null {
+  let lower = Number.NEGATIVE_INFINITY;
+  let upper = Number.POSITIVE_INFINITY;
+  let exact: number | null = null;
+  const excluded: number[] = [];
+  for (const clause of clauses) {
+    switch (clause.op) {
+      case '==':
+        exact = clause.numberValue;
+        break;
+      case '!=':
+        excluded.push(clause.numberValue);
+        break;
+      case '>':
+        lower = Math.max(lower, clause.numberValue + 1);
+        break;
+      case '>=':
+        lower = Math.max(lower, clause.numberValue);
+        break;
+      case '<':
+        upper = Math.min(upper, clause.numberValue - 1);
+        break;
+      case '<=':
+        upper = Math.min(upper, clause.numberValue);
+        break;
+      default:
+        break;
+    }
+  }
+  if (exact != null) {
+    return exact >= lower && exact <= upper ? exact : null;
+  }
+  let candidate = lower !== Number.NEGATIVE_INFINITY ? lower
+    : upper !== Number.POSITIVE_INFINITY ? upper : 0;
+  if (candidate < lower || candidate > upper) {
+    return null;
+  }
+  while (excluded.includes(candidate)) {
+    candidate += 1;
+  }
+  return candidate;
+}
+
+/** Identifies one transition's path inside a region, for the transition-pulse highlight. */
+function EdgeKey(regionName: string, index: number): string {
+  return `${regionName}#${index}`;
 }
 
 /**
@@ -281,10 +477,14 @@ interface SMRegionData {
  * corner of the player. The panel header carries a play button that mirrors the playback bar's
  * primary button: while no solo preview is active it plays/pauses the whole SM; while previewing
  * it shows the play glyph and clicking it exits the preview (the SM resumes from its initial
- * states). The graph area stacks each region's states vertically in declaration order, and
- * multiple regions sit side-by-side. The graph never shows scrollbars; the mouse wheel pans
- * content. Double-clicking a state solo-previews that state's animation. Hovering a state shows
- * a tooltip with its details.
+ * states). Below the header sit two collapsible sections: the graph (one block per region, or a
+ * single Entry fan-out when every region is just one stateless step) and the inputs the machine
+ * can be driven by.
+ *
+ * The graph is a control, not just a picture: clicking an edge's condition pill writes the inputs
+ * that condition needs, clicking a state drives its region into that state, and an edge flashes
+ * while its region walks it. The graph never shows scrollbars; the mouse wheel pans content.
+ * Double-clicking a state solo-previews that state's animation; hovering one shows its details.
  *
  * Companion: {@link PreviewChipBar}. Chips are NOT part of this panel - they live in their own
  * bar that floats above the playback bar, by design (the chips are an operations row, not a
@@ -302,21 +502,29 @@ export class SMBlueprint {
   // pan range against this element (see the comment there for why not the viewport).
   private sectionBody: HTMLElement | null = null;
   private tooltip: HTMLElement;
-  // "Blueprint" collapsible section wrapping the graph viewport, and "Animations" section
-  // holding the flat animation list below it. Body elements toggle .sm-section-collapsed
-  // when the user clicks the header (which owns its own chevron via closure).
+  // "Blueprint" collapsible section wrapping the graph viewport, and "Inputs" section holding the
+  // controls that drive it (one row per declared <Input>). Body elements toggle
+  // .sm-section-collapsed when the user clicks the header (which owns its own chevron via
+  // closure).
   private blueprintSection: HTMLElement;
-  private animationsSection: HTMLElement;
-  private animationList: HTMLElement;
-  // Rows keyed by animation id so highlight refresh doesn't rebuild the DOM.
-  private animationRowEls = new Map<string, HTMLElement>();
-  // Ids of animations rendered as top-level list rows (declaration order).
-  private animationIds: string[] = [];
-  // Last highlight set applied to the animation list; used to diff on poll.
-  private lastAnimationHighlight: Set<string> = new Set();
+  private inputsSection: HTMLElement;
+  private inputList: HTMLElement;
+  // name -> declared type, which decides which control a condition drives.
+  private inputTypes = new Map<string, string>();
+  // Row elements and the per-row callback that re-reads an input's mirrored value, keyed by input
+  // name. Writes go through the sync callback rather than rebuilding the section.
+  private inputRowEls = new Map<string, HTMLElement>();
+  private inputSyncFns = new Map<string, () => void>();
+  // The panel's own mirror of each input's value. The view offers setters but no getter, so this
+  // is what the controls display; an input the panel never wrote reads as false / 0, which equals
+  // the declared default only when the document leaves it there.
+  private inputValues = new Map<string, boolean | number>();
+  // Transition paths per region (EdgeKey -> path), driving the pulse highlight.
+  private edgePaths = new Map<string, Map<string, SVGPathElement>>();
   private pollTimer: number | null = null;
   private regions: SMRegionData[] = [];
   private smTitle = '';
+  private noteTimer: number | null = null;
   private nodeEls = new Map<string, HTMLElement>();
   private animationEls = new Map<string, HTMLElement[]>();
   private currentStates: Record<string, string> = {};
@@ -380,9 +588,9 @@ export class SMBlueprint {
       this.applyContentOffset();
     }, { passive: false });
 
-    // Collapsible sections: Blueprint (the graph) and Animations (a flat list of top-level
-    // animation defs). Both default to expanded; clicking the header toggles collapse. State
-    // is not persisted across reloads (per product decision, keep it simple).
+    // Collapsible sections: Blueprint (the graph) and Inputs (the controls that drive it). Both
+    // default to expanded; clicking the header toggles collapse. State is not persisted across
+    // reloads (per product decision, keep it simple).
     const blueprint = this.buildSection('Blueprint');
     this.blueprintSection = blueprint.section;
     // Marks the graph section as the panel's flexible part: it absorbs the remaining panel
@@ -391,11 +599,11 @@ export class SMBlueprint {
     this.sectionBody = blueprint.body;
     blueprint.body.appendChild(this.viewport);
 
-    const animations = this.buildSection('Animations');
-    this.animationsSection = animations.section;
-    this.animationList = document.createElement('div');
-    this.animationList.className = 'sm-anim-list';
-    animations.body.appendChild(this.animationList);
+    const inputs = this.buildSection('Inputs');
+    this.inputsSection = inputs.section;
+    this.inputList = document.createElement('div');
+    this.inputList.className = 'sm-input-list';
+    inputs.body.appendChild(this.inputList);
 
     this.tooltip = document.createElement('div');
     this.tooltip.className = 'sm-tooltip';
@@ -403,7 +611,7 @@ export class SMBlueprint {
 
     this.root.appendChild(header);
     this.root.appendChild(this.blueprintSection);
-    this.root.appendChild(this.animationsSection);
+    this.root.appendChild(this.inputsSection);
     // this.tooltip is intentionally NOT appended here — attach() mounts it as a sibling of the
     // panel so the panel's overflow: hidden cannot clip it.
   }
@@ -463,24 +671,39 @@ export class SMBlueprint {
     const tree = this.host.getTimelineTree();
     const smNode = tree.find((node) => node.kind === 'stateMachine' && node.isDefault) ?? null;
     this.regions = [];
+    if (this.noteTimer != null) {
+      window.clearTimeout(this.noteTimer);
+      this.noteTimer = null;
+    }
     this.smTitle = '';
     this.nodeEls.clear();
     this.animationEls.clear();
-    this.animationRowEls.clear();
-    this.animationIds = [];
-    this.lastAnimationHighlight.clear();
+    this.inputRowEls.clear();
+    this.inputSyncFns.clear();
+    this.inputValues.clear();
+    this.inputTypes.clear();
+    this.edgePaths.clear();
     this.currentStates = {};
     this.contentX = 0;
     this.contentY = 0;
     this.applyContentOffset();
     this.content.innerHTML = '';
-    this.animationList.innerHTML = '';
+    this.inputList.innerHTML = '';
     if (smNode == null || smNode.regions == null || smNode.regions.length === 0) {
       this.updateVisibility();
       return false;
     }
     this.smTitle = smNode.name || smNode.id;
     this.titleEl.textContent = this.smTitle;
+    // Loop mode is declared on the <Animation> definition, not on the state that plays it, so
+    // resolve it from the tree's top-level animation nodes: the graph badges each state with how
+    // its animation repeats.
+    const loopByAnimationId = new Map<string, string>();
+    for (const node of tree) {
+      if (node.kind === 'animation' && node.loop != null) {
+        loopByAnimationId.set(node.id, node.loop);
+      }
+    }
     for (const region of smNode.regions) {
       this.regions.push({
         name: region.name,
@@ -490,6 +713,7 @@ export class SMBlueprint {
           animationId: state.animationId,
           durationUs: state.durationUs,
           previewSupported: state.previewSupported === true,
+          loop: loopByAnimationId.get(state.animationId) ?? '',
         })),
         transitions: (region.transitions ?? []).map((transition) => ({
           from: transition.from,
@@ -503,28 +727,25 @@ export class SMBlueprint {
     // is dominated by the widest region, so multiple regions read as separate subgraphs
     // stacked one on top of the other (Rive / Unity Mecanim / Stately convention).
     this.content.style.flexDirection = 'column';
-    this.regions.forEach((region, index) => {
-      const regionEl = this.buildRegionElement(region);
-      if (index > 0) {
-        regionEl.style.marginTop = `${GAP_Y}px`;
-      }
-      this.content.appendChild(regionEl);
-    });
-    // Populate the flat animation list from the top-level <Animations> definitions. Skip the
-    // SM node itself (kind == 'stateMachine') and any non-animation nodes like mount groups.
-    for (const node of tree) {
-      if (node.kind !== 'animation') {
-        continue;
-      }
-      this.animationIds.push(node.id);
-      const row = this.buildAnimationRow(node);
-      this.animationRowEls.set(node.id, row);
-      this.animationList.appendChild(row);
+    if (IsParallelEntryCase(this.regions)) {
+      // Nothing to route: the regions only differ by the animation they play, so the usual
+      // per-region boxes would repeat the same one-node graph N times - and when the regions
+      // reuse a state name (they routinely do), N identical-looking boxes. One Entry fan-out
+      // says "these all start together" instead.
+      this.content.appendChild(this.buildParallelEntryGraph(this.regions));
+    } else {
+      this.regions.forEach((region, index) => {
+        const regionEl = this.buildRegionElement(region);
+        if (index > 0) {
+          regionEl.style.marginTop = `${GAP_Y}px`;
+        }
+        this.content.appendChild(regionEl);
+      });
     }
+    this.buildInputsList(smNode.inputs ?? []);
     this.updateVisibility();
     this.lastPreviewId = this.refreshSelectionState();
     this.refreshHighlight(true);
-    this.refreshAnimationHighlight(true);
     this.updatePlayIcon();
     return true;
   }
@@ -593,10 +814,8 @@ export class SMBlueprint {
     if (previewId !== this.lastPreviewId) {
       this.lastPreviewId = previewId;
       this.refreshHighlight(true);
-      this.refreshAnimationHighlight(true);
     } else {
       this.refreshHighlight(false);
-      this.refreshAnimationHighlight(false);
     }
     this.updatePlayIcon();
   };
@@ -695,7 +914,7 @@ export class SMBlueprint {
       if (state == null) {
         continue;
       }
-      const stateEl = this.buildStateElement(region, state);
+      const stateEl = this.buildStateElement(region, state, state.name);
       stateEl.style.left = `${x}px`;
       stateEl.style.top = `${y}px`;
       canvas.appendChild(stateEl);
@@ -720,12 +939,119 @@ export class SMBlueprint {
     // corridor (an any-source descent, a forward edge's turn and a lane-routed edge's climb) can
     // never pick the same x and cross each other.
     const gutterTracks = AssignVerticalTracks(region.transitions, layout.cells, grid);
+    const edgePaths = new Map<string, SVGPathElement>();
+    this.edgePaths.set(region.name, edgePaths);
     region.transitions.forEach((transition, index) => {
-      this.drawEdge(svg, positions, transition, markerId, edgeSlots[index], grid,
+      const drawn = this.drawEdge(svg, positions, transition, markerId, edgeSlots[index], grid,
         gutterTracks[index]);
+      if (drawn == null) {
+        return;
+      }
+      edgePaths.set(EdgeKey(region.name, index), drawn.path);
+      const label = drawn.label;
+      if (label != null) {
+        // The pill drives the transition it belongs to; the edge itself stays click-through so
+        // dragging on the graph area is never swallowed.
+        label.addEventListener('click', () => this.onConditionClick(transition));
+        label.addEventListener('mouseenter', () => {
+          this.showTooltipAt(label, `${transition.conditions}\nclick to drive this input`);
+        });
+        label.addEventListener('mouseleave', () => {
+          this.tooltip.style.display = 'none';
+        });
+      }
     });
     wrapper.appendChild(canvas);
     return wrapper;
+  }
+
+  /** Renders the whole state machine as one Entry node fanning out to one node per region. Only
+   *  used for the IsParallelEntryCase shape, where every region holds a single state and declares
+   *  no transition: those regions all start together at the document's start and run in parallel,
+   *  which is exactly what one Entry feeding N branches expresses - and it avoids repeating the
+   *  same lone-node region box N times. Nodes are labelled by REGION name here, because in this
+   *  shape every region tends to reuse one state name ("playing") and the state name therefore
+   *  carries no information. */
+  private buildParallelEntryGraph(regions: SMRegionData[]): HTMLElement {
+    const canvas = document.createElement('div');
+    canvas.className = 'sm-region-canvas';
+    const columnHeight = regions.length * NODE_H +
+      Math.max(0, regions.length - 1) * PARALLEL_GAP_Y;
+    const canvasWidth = PADDING_X * 2 + ENTRY_NODE_W + PARALLEL_GAP_X + NODE_W;
+    const canvasHeight = PADDING_Y * 2 + columnHeight;
+    canvas.style.width = `${canvasWidth}px`;
+    canvas.style.height = `${canvasHeight}px`;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'sm-edges');
+    svg.setAttribute('width', String(canvasWidth));
+    svg.setAttribute('height', String(canvasHeight));
+    const markerId = `sm-arrow-${nextMarkerSeq++}`;
+    svg.appendChild(this.createArrowMarker(markerId));
+    canvas.appendChild(svg);
+
+    const entryX = PADDING_X;
+    // Centred on the column it feeds: the fan then reads as one source splitting into parallel
+    // branches instead of as the first row of a chain.
+    const entryY = PADDING_Y + (columnHeight - NODE_H) / 2;
+    const nodeX = PADDING_X + ENTRY_NODE_W + PARALLEL_GAP_X;
+    const entryEl = this.buildEntryNodeElement(regions.length);
+    entryEl.style.left = `${entryX}px`;
+    entryEl.style.top = `${entryY}px`;
+    canvas.appendChild(entryEl);
+
+    regions.forEach((region, index) => {
+      const state = region.states[0];
+      const y = PADDING_Y + index * (NODE_H + PARALLEL_GAP_Y);
+      const stateEl = this.buildStateElement(region, state, region.name);
+      stateEl.style.left = `${nodeX}px`;
+      stateEl.style.top = `${y}px`;
+      canvas.appendChild(stateEl);
+      // Keyed exactly like the per-region graph so refreshHighlight() and the solo-preview
+      // highlight keep working without knowing which shape rendered the node.
+      this.nodeEls.set(`${region.name}/${state.name}`, stateEl);
+      if (state.animationId) {
+        const list = this.animationEls.get(state.animationId) ?? [];
+        list.push(stateEl);
+        this.animationEls.set(state.animationId, list);
+      }
+      this.drawEntryEdge(svg, entryX + ENTRY_NODE_W, entryY + NODE_H / 2, nodeX, y + NODE_H / 2,
+        markerId);
+    });
+    return canvas;
+  }
+
+  /** The Entry node: where the state machine starts. It is an edge anchor rather than a state -
+   *  no preview affordance, and the tooltip only says what it starts. */
+  private buildEntryNodeElement(regionCount: number): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'sm-state sm-state-entry';
+    const nameEl = document.createElement('span');
+    nameEl.textContent = 'Entry';
+    el.appendChild(nameEl);
+    el.addEventListener('mouseenter', () => {
+      this.showTooltipAt(el, `Entry\n${regionCount} parallel regions start here`);
+    });
+    el.addEventListener('mouseleave', () => {
+      this.tooltip.style.display = 'none';
+    });
+    return el;
+  }
+
+  /** Draws one branch of the Entry fan-out: a smooth cubic from the Entry's right edge into the
+   *  target's left edge. Orthogonal routing would stack every branch's vertical inside the same
+   *  narrow gutter and read as a tangle; a curve spreads the branches apart on its own and is how
+   *  the reference editor draws a fan leaving one source. The straight head and tail also make the
+   *  arrow leave the Entry and meet its node horizontally, with no explicit corner handling. */
+  private drawEntryEdge(svg: SVGElement, x0: number, entryY: number, x1: number, targetY: number,
+                        markerId: string): void {
+    const bend = (x1 - x0) * ENTRY_EDGE_BEND;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('class', 'sm-edge');
+    path.setAttribute('marker-end', `url(#${markerId})`);
+    path.setAttribute('d',
+      `M ${x0} ${entryY} C ${x0 + bend} ${entryY} ${x1 - bend} ${targetY} ${x1} ${targetY}`);
+    svg.appendChild(path);
   }
 
   /** Assigns routing slots to every transition of a region: which fan position it takes among the
@@ -898,39 +1224,56 @@ export class SMBlueprint {
     el.className = 'sm-state sm-state-any';
     const nameEl = document.createElement('span');
     nameEl.className = 'sm-state-name';
-    nameEl.textContent = 'any';
+    nameEl.textContent = 'Any State';
     el.appendChild(nameEl);
-    const subEl = document.createElement('span');
-    subEl.className = 'sm-state-sub';
-    subEl.textContent = 'from any state';
-    el.appendChild(subEl);
     return el;
   }
 
-  private buildStateElement(region: SMRegionData,
-                            state: { name: string; animationId: string; durationUs: number;
-                                     previewSupported: boolean }): HTMLElement {
+  /** One state node. `label` is what the node shows, which is the state name everywhere except
+   *  the parallel-entry graph: there every region reuses one state name, so the region name is
+   *  what tells the rows apart. The tooltip always reports the real state name. */
+  private buildStateElement(region: SMRegionData, state: SMStateData, label: string): HTMLElement {
     const el = document.createElement('div');
     el.className = 'sm-state';
     if (!state.previewSupported) {
       el.classList.add('sm-state-disabled');
     }
+    const row = document.createElement('div');
+    row.className = 'sm-state-row';
+    // A state with no bound animation plays nothing, so it gets no repeat badge either.
+    if (state.animationId) {
+      const iconEl = document.createElement('span');
+      iconEl.className = 'sm-state-icon';
+      iconEl.innerHTML = state.loop === 'once' ? LOOP_SINGLE_ICON_SVG : LOOP_SEQUENCE_ICON_SVG;
+      row.appendChild(iconEl);
+    }
     const nameEl = document.createElement('span');
     nameEl.className = 'sm-state-name';
-    nameEl.textContent = state.name;
-    el.appendChild(nameEl);
-    const subEl = document.createElement('span');
-    subEl.className = 'sm-state-sub';
-    subEl.textContent = state.animationId || '(no animation)';
-    el.appendChild(subEl);
+    nameEl.textContent = label;
+    row.appendChild(nameEl);
+    el.appendChild(row);
     el.addEventListener('mouseenter', () => {
       this.showTooltip(el, state, region.name);
     });
     el.addEventListener('mouseleave', () => {
       this.tooltip.style.display = 'none';
     });
+    let clickTimer: number | null = null;
+    el.addEventListener('click', () => {
+      if (clickTimer != null) {
+        return;
+      }
+      clickTimer = window.setTimeout(() => {
+        clickTimer = null;
+        this.focusState(region, state.name);
+      }, SINGLE_CLICK_DELAY_MS);
+    });
     el.addEventListener('dblclick', (event) => {
       event.stopPropagation();
+      if (clickTimer != null) {
+        window.clearTimeout(clickTimer);
+        clickTimer = null;
+      }
       this.tooltip.style.display = 'none';
       if (!state.animationId || !state.previewSupported) {
         return;
@@ -946,9 +1289,9 @@ export class SMBlueprint {
     return el;
   }
 
-  private showTooltip(stateEl: HTMLElement,
-                      state: { name: string; animationId: string; durationUs: number },
-                      regionName: string): void {
+  /** Details of one state. The node itself is a single 36px row now, so everything beyond the
+   *  name - the bound animation, its duration and how it repeats - lives here instead. */
+  private showTooltip(stateEl: HTMLElement, state: SMStateData, regionName: string): void {
     const durationText = state.durationUs > 0 ? `${(state.durationUs / 1000000).toFixed(2)}s`
       : state.durationUs === 0 ? '0s' : 'unknown';
     const lines = [
@@ -957,31 +1300,39 @@ export class SMBlueprint {
       state.animationId ? `Animation: ${state.animationId}` : 'Animation: (none)',
       `Duration: ${durationText}`,
     ];
-    this.tooltip.textContent = lines.join('\n');
+    if (state.loop) {
+      lines.push(`Loop: ${state.loop}`);
+    }
+    this.showTooltipAt(stateEl, lines.join('\n'));
+  }
+
+  /** Shows `text` in the tooltip, anchored to the right of `anchor`. The tooltip is mounted as a
+   *  sibling of the panel (see attach), so it is positioned against its offsetParent - the player
+   *  root - rather than the panel, and can overhang onto the canvas. Falls back to the panel rect
+   *  when there is no positioned ancestor yet. */
+  private showTooltipAt(anchor: Element, text: string): void {
+    this.tooltip.textContent = text;
     this.tooltip.style.display = 'block';
-    // Positioned against the tooltip's offsetParent (the player root it is mounted into by
-    // attach), not the panel: the tooltip is a sibling of the panel so it can overhang onto the
-    // canvas. Falls back to the panel rect when there is no positioned ancestor yet.
     const hostRect = (this.tooltip.offsetParent as HTMLElement | null)?.getBoundingClientRect() ??
         this.root.getBoundingClientRect();
-    const stateRect = stateEl.getBoundingClientRect();
-    const tooltipLeft = Math.max(0, stateRect.right - hostRect.left + 6);
-    const tooltipTop = Math.max(0, stateRect.top - hostRect.top - 6);
+    const anchorRect = anchor.getBoundingClientRect();
+    const tooltipLeft = Math.max(0, anchorRect.right - hostRect.left + 6);
+    const tooltipTop = Math.max(0, anchorRect.top - hostRect.top - 6);
     this.tooltip.style.left = `${tooltipLeft}px`;
     this.tooltip.style.top = `${tooltipTop}px`;
   }
 
   private drawEdge(svg: SVGElement,
-                   positions: Map<string, { x: number; y: number }>,
-                   transition: { from: string; fromAny: boolean; to: string; conditions: string },
-                   markerId: string,
-                   slots: EdgeSlots,
-                   grid: GridMetrics,
-                   tracks: EdgeTracks): void {
+                  positions: Map<string, { x: number; y: number }>,
+                  transition: SMTransitionData,
+                  markerId: string,
+                  slots: EdgeSlots,
+                  grid: GridMetrics,
+                  tracks: EdgeTracks): DrawnEdge | null {
     const fromPos = positions.get(transition.fromAny ? ANY_NODE_KEY : transition.from);
     const toPos = positions.get(transition.to);
     if (fromPos == null || toPos == null) {
-      return;
+      return null;
     }
     // Vertical (or horizontal for back edges) offset applied to fan out multi-edges between
     // the same pair of nodes. The centered slot is 0; siblings step out symmetrically. Step
@@ -1127,20 +1478,9 @@ export class SMBlueprint {
         // it lands on whichever run holds the halfway point and the edge sticks out of the backdrop
         // by the same length on both ends. Pinning it to the source-side run (the previous shape)
         // put every label at the first quarter of its edge, next to the source node.
-        const runIn = turnX - x1;
-        const runAcross = Math.abs(y2 - y1);
-        const runOut = x2 - turnX;
-        const half = (runIn + runAcross + runOut) / 2;
-        if (half <= runIn) {
-          midX = x1 + half;
-          midY = y1;
-        } else if (half <= runIn + runAcross) {
-          midX = turnX;
-          midY = y1 + sweep * (half - runIn);
-        } else {
-          midX = turnX + (half - runIn - runAcross);
-          midY = y2;
-        }
+        const mid = OrthogonalMidpoint(x1, y1, turnX, y2, x2, sweep);
+        midX = mid.x;
+        midY = mid.y;
       }
     } else {
       // Same-column neighbours (adjacent rows): a straight vertical line between the facing
@@ -1157,19 +1497,25 @@ export class SMBlueprint {
       midY = (y1 + y2) / 2;
     }
     group.appendChild(path);
+    let labelGroup: SVGGElement | null = null;
     if (transition.conditions && transition.conditions !== 'always') {
       // Label sits on top of the edge path; without a solid backdrop the line would visually
       // slice through the glyphs. Measure the label with a canvas 2D context (not getBBox,
       // which returns zeros when the panel is still display:none during refresh()) so the
       // backdrop is exactly the width the rendered text will occupy.
-      let label = transition.conditions;
-      if (label.length > 18) {
-        label = `${label.slice(0, 17)}\u2026`;
+      let caption = transition.conditions;
+      if (caption.length > 18) {
+        caption = `${caption.slice(0, 17)}\u2026`;
       }
-      const textWidth = this.measureLabelWidth(label);
+      const textWidth = this.measureLabelWidth(caption);
       const textHeight = 12;
       const paddingX = 6;
       const paddingY = 3;
+      // The pill gets its own group so it can accept pointer events while the rest of the edge
+      // layer stays click-through, and so the caller can bind the "drive this condition" click to
+      // exactly the pill rather than to the whole edge.
+      labelGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      labelGroup.setAttribute('class', 'sm-edge-label-group');
       const backdrop = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       backdrop.setAttribute('class', 'sm-edge-label-bg');
       backdrop.setAttribute('x', String(midX - textWidth / 2 - paddingX));
@@ -1177,15 +1523,17 @@ export class SMBlueprint {
       backdrop.setAttribute('width', String(textWidth + paddingX * 2));
       backdrop.setAttribute('height', String(textHeight + paddingY * 2));
       backdrop.setAttribute('rx', '3');
-      group.appendChild(backdrop);
-      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      text.setAttribute('class', 'sm-edge-label');
-      text.setAttribute('x', String(midX));
-      text.setAttribute('y', String(midY));
-      text.textContent = label;
-      group.appendChild(text);
+      labelGroup.appendChild(backdrop);
+      const captionEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      captionEl.setAttribute('class', 'sm-edge-label');
+      captionEl.setAttribute('x', String(midX));
+      captionEl.setAttribute('y', String(midY));
+      captionEl.textContent = caption;
+      labelGroup.appendChild(captionEl);
+      group.appendChild(labelGroup);
     }
     svg.appendChild(group);
+    return { path, label: labelGroup };
   }
 
   private measureLabelWidth(label: string): number {
@@ -1262,9 +1610,14 @@ export class SMBlueprint {
     const next = this.host.getSMCurrentStates();
     let changed = force;
     for (const region of this.regions) {
+      const previousName = this.currentStates[region.name] ?? '';
       const nextName = next[region.name] ?? '';
-      if ((this.currentStates[region.name] ?? '') !== nextName) {
+      if (previousName !== nextName) {
         changed = true;
+        // The region just walked a transition, so flag that edge. The first observation of a
+        // region reads as a move from "" - that is the initial state being reported, not a
+        // transition, and pulseTransition skips it.
+        this.pulseTransition(region, previousName, nextName);
       }
       this.currentStates[region.name] = nextName;
     }
@@ -1298,85 +1651,280 @@ export class SMBlueprint {
     }
   }
 
-  /** Builds one row in the animations section. Double-clicking a row solo-previews that
-   *  animation - same host path used by state node double-click on the blueprint above. */
-  private buildAnimationRow(node: TimelineTreeNode): HTMLElement {
+  /** Builds the Inputs section from the declarations on the state machine. A document with no
+   *  <Inputs> says so plainly instead of showing an empty list: nothing outside the document can
+   *  move such a machine, and the graph alone cannot either. */
+  private buildInputsList(inputs: { name: string; type: string }[]): void {
+    for (const input of inputs) {
+      this.inputTypes.set(input.name, input.type);
+    }
+    if (inputs.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'sm-input-empty';
+      empty.textContent = 'This document declares no <Inputs>:\n' +
+        'the state machine cannot be driven from outside.';
+      this.inputList.appendChild(empty);
+      return;
+    }
+    for (const input of inputs) {
+      const row = this.buildInputRow(input);
+      this.inputRowEls.set(input.name, row);
+      this.inputList.appendChild(row);
+    }
+  }
+
+  /** One input row: the name (with its declared type) plus the control matching that type. */
+  private buildInputRow(input: { name: string; type: string }): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'sm-anim-row';
+    row.className = 'sm-input-row';
     const nameEl = document.createElement('span');
-    nameEl.className = 'sm-anim-name';
-    nameEl.textContent = node.name || node.id;
+    nameEl.className = 'sm-input-name';
+    nameEl.textContent = input.name;
+    const typeEl = document.createElement('span');
+    typeEl.className = 'sm-input-type';
+    typeEl.textContent = input.type;
+    nameEl.appendChild(typeEl);
     row.appendChild(nameEl);
-    const metaEl = document.createElement('span');
-    metaEl.className = 'sm-anim-meta';
-    metaEl.textContent = this.formatAnimationMeta(node);
-    row.appendChild(metaEl);
-    row.addEventListener('dblclick', (event) => {
-      event.stopPropagation();
-      const selection = this.host.getSelectedTimelineUnit();
-      if (selection != null && selection.kind === 'animation' && selection.id === node.id) {
-        // Second dbl-click on the same animation exits the preview - matches the blueprint
-        // state node behavior.
-        this.host.selectTimelineUnit('', '');
-        return;
-      }
-      this.host.selectTimelineUnit('animation', node.id);
-    });
+    if (input.type === 'bool') {
+      row.appendChild(this.buildBoolSwitch(input.name));
+    } else if (input.type === 'number') {
+      row.appendChild(this.buildNumberField(input.name));
+    } else {
+      row.appendChild(this.buildFireButton(input.name));
+    }
     return row;
   }
 
-  private formatAnimationMeta(node: TimelineTreeNode): string {
-    const parts: string[] = [];
-    if (node.durationUs != null && node.durationUs > 0) {
-      const seconds = node.durationUs / 1_000_000;
-      parts.push(`${seconds < 10 ? seconds.toFixed(2) : Math.round(seconds)}s`);
-    }
-    if (node.loop) {
-      parts.push(node.loop);
-    }
-    return parts.join(' \u00b7 ');
+  /** T/F segmented switch for a bool input. Both glyphs stay visible so the value reads as one of
+   *  two known states rather than as an on/off toggle's absence. */
+  private buildBoolSwitch(name: string): HTMLElement {
+    const sw = document.createElement('div');
+    sw.className = 'sm-switch';
+    const trueBtn = document.createElement('button');
+    trueBtn.type = 'button';
+    trueBtn.textContent = 'T';
+    const falseBtn = document.createElement('button');
+    falseBtn.type = 'button';
+    falseBtn.textContent = 'F';
+    const sync = (): void => {
+      const on = this.inputValues.get(name) === true;
+      trueBtn.classList.toggle('on', on);
+      falseBtn.classList.toggle('on', !on);
+    };
+    trueBtn.addEventListener('click', () => {
+      this.writeBoolInput(name, true);
+      sync();
+    });
+    falseBtn.addEventListener('click', () => {
+      this.writeBoolInput(name, false);
+      sync();
+    });
+    sync();
+    this.inputSyncFns.set(name, sync);
+    sw.appendChild(trueBtn);
+    sw.appendChild(falseBtn);
+    return sw;
   }
 
-  /** Highlights rows in the animations section that correspond to a currently-playing
-   *  animation: the active preview id, or the animations bound to each SM region's live
-   *  current state. Parked previews don't count - the SM is driving the render loop then. */
-  private refreshAnimationHighlight(force: boolean): void {
-    if (this.animationRowEls.size === 0) {
+  /** Plain number field. <Input> carries no min/max (only a ViewModel <Property> does), so a
+   *  slider would have to invent a range - and threshold conditions are verified by typing exact
+   *  boundaries (19 / 20 / 79 / 80), which a slider cannot express. */
+  private buildNumberField(name: string): HTMLInputElement {
+    const field = document.createElement('input');
+    field.className = 'sm-number';
+    field.type = 'number';
+    field.step = '1';
+    const sync = (): void => {
+      field.value = String(this.inputValues.get(name) ?? 0);
+    };
+    field.addEventListener('input', () => {
+      if (field.value === '') {
+        return;
+      }
+      const value = parseFloat(field.value);
+      if (Number.isFinite(value)) {
+        this.writeNumberInput(name, value);
+      }
+    });
+    sync();
+    this.inputSyncFns.set(name, sync);
+    return field;
+  }
+
+  private buildFireButton(name: string): HTMLElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sm-fire';
+    btn.textContent = 'Fire';
+    btn.addEventListener('click', () => {
+      this.fireInput(name);
+    });
+    return btn;
+  }
+
+  /** Writes one bool input, mirrors the value for the controls and lights the row up. */
+  private writeBoolInput(name: string, value: boolean): void {
+    this.host.ensureSMDriving();
+    if (!this.host.setSMInputBool(name, value)) {
       return;
     }
-    const active = new Set<string>();
-    const selection = this.host.getSelectedTimelineUnit();
-    if (selection != null && selection.kind === 'animation') {
-      active.add(selection.id);
-    } else {
-      for (const region of this.regions) {
-        const currentName = this.currentStates[region.name] ?? '';
-        if (!currentName) {
-          continue;
+    this.inputValues.set(name, value);
+    this.highlightInputRow(name);
+  }
+
+  /** Number counterpart of writeBoolInput. */
+  private writeNumberInput(name: string, value: number): void {
+    this.host.ensureSMDriving();
+    if (!this.host.setSMInputNumber(name, value)) {
+      return;
+    }
+    this.inputValues.set(name, value);
+    this.highlightInputRow(name);
+  }
+
+  /** Fires one trigger input. A trigger is consumed by the next advance, so the write itself is
+   *  the whole interaction - there is no value to mirror. */
+  private fireInput(name: string): void {
+    this.host.ensureSMDriving();
+    if (!this.host.fireSMInputTrigger(name)) {
+      return;
+    }
+    this.highlightInputRow(name);
+  }
+
+  /** Marks the row an input was just written through, so "which parameter did that" stays obvious
+   *  when the graph is what drove it. */
+  private highlightInputRow(name: string): void {
+    const row = this.inputRowEls.get(name);
+    if (row == null) {
+      return;
+    }
+    row.classList.remove('sm-row-flash');
+    // Reading a layout property flushes the class removal so the flash restarts when the same row
+    // is driven twice in a row.
+    void row.offsetWidth;
+    row.classList.add('sm-row-linked');
+    row.classList.add('sm-row-flash');
+    window.setTimeout(() => row.classList.remove('sm-row-linked'), HIGHLIGHT_DURATION_MS);
+  }
+
+  /** Drives every input named by a condition summary. Numeric groups are solved before anything
+   *  is written, so an unsatisfiable condition writes nothing at all rather than leaving the
+   *  machine in a state the user did not ask for. Returns whether anything was driven. */
+  private driveClauses(clauses: ConditionClause[]): boolean {
+    if (clauses.length === 0) {
+      return false;
+    }
+    const byInput = new Map<string, ConditionClause[]>();
+    for (const clause of clauses) {
+      const list = byInput.get(clause.input) ?? [];
+      list.push(clause);
+      byInput.set(clause.input, list);
+    }
+    const numbers = new Map<string, number>();
+    for (const [name, list] of byInput) {
+      if (list[0].kind !== 'number') {
+        continue;
+      }
+      const value = SampleNumberValue(list);
+      if (value == null) {
+        return false;
+      }
+      numbers.set(name, value);
+    }
+    // Resume the machine BEFORE writing: resuming restarts it from its initial states, which also
+    // restores the declared input defaults, so a write that came first would be discarded.
+    this.host.ensureSMDriving();
+    for (const [name, list] of byInput) {
+      const value = numbers.get(name);
+      if (value != null) {
+        if (!this.host.setSMInputNumber(name, value)) {
+          return false;
         }
-        const state = region.states.find((s) => s.name === currentName);
-        if (state != null && state.animationId) {
-          active.add(state.animationId);
+        this.inputValues.set(name, value);
+      } else if (list[0].kind === 'bool') {
+        if (!this.host.setSMInputBool(name, list[0].boolValue)) {
+          return false;
         }
+        this.inputValues.set(name, list[0].boolValue);
+      } else if (!this.host.fireSMInputTrigger(name)) {
+        return false;
+      }
+      const sync = this.inputSyncFns.get(name);
+      if (sync != null) {
+        sync();
+      }
+      this.highlightInputRow(name);
+    }
+    return true;
+  }
+
+  /** An edge's condition pill is a control, not a caption: clicking it writes the inputs that
+   *  condition needs, so the machine walks that transition and its target animation plays. */
+  private onConditionClick(transition: SMTransitionData): void {
+    const clauses = ParseConditions(transition.conditions, this.inputTypes);
+    if (clauses.length === 0) {
+      this.showNote('always: this transition fires on its own, nothing to drive');
+      return;
+    }
+    if (!this.driveClauses(clauses)) {
+      this.showNote('no input value can satisfy this condition');
+    }
+  }
+
+  /** Clicking a state drives its region into that state by writing the inputs its incoming
+   *  transition needs. The graph and the Inputs section are two views of one machine, and this is
+   *  what makes the graph itself a control. */
+  private focusState(region: SMRegionData, stateName: string): void {
+    if ((this.currentStates[region.name] ?? '') === stateName) {
+      return;
+    }
+    for (const transition of region.transitions) {
+      if (transition.to !== stateName) {
+        continue;
+      }
+      if (this.driveClauses(ParseConditions(transition.conditions, this.inputTypes))) {
+        return;
       }
     }
-    if (!force && setsEqual(active, this.lastAnimationHighlight)) {
+    this.showNote(`${stateName}: no input can drive into this state`);
+  }
+
+  /** Flags the edge a region just walked. The 250ms poll coalesces two fast hops into a single
+   *  observation, in which case only the last edge is flagged - the flash is a hint, not an audit
+   *  log. */
+  private pulseTransition(region: SMRegionData, previous: string, next: string): void {
+    if (previous === '' || next === '') {
       return;
     }
-    this.lastAnimationHighlight = active;
-    this.animationRowEls.forEach((row, id) => {
-      row.classList.toggle('sm-anim-row-current', active.has(id));
-    });
+    const index = region.transitions.findIndex((transition) =>
+      (transition.from === previous || transition.fromAny) && transition.to === next);
+    if (index < 0) {
+      return;
+    }
+    const path = this.edgePaths.get(region.name)?.get(EdgeKey(region.name, index));
+    if (path == null) {
+      return;
+    }
+    path.classList.remove('sm-edge-fire');
+    void path.getBoundingClientRect();
+    path.classList.add('sm-edge-fire');
+    window.setTimeout(() => path.classList.remove('sm-edge-fire'), EDGE_FIRE_DURATION_MS);
   }
-}
 
-/** Reference-independent equality check for the small string sets we use for highlight diff. */
-function setsEqual(a: Set<string>, b: Set<string>): boolean {
-  if (a.size !== b.size) return false;
-  for (const value of a) {
-    if (!b.has(value)) return false;
+  /** Transient message in the panel header, which is always visible and otherwise only shows the
+   *  machine's name. Used for the "nothing can drive this" cases, where a silent no-op would look
+   *  like a bug. */
+  private showNote(text: string): void {
+    this.titleEl.textContent = text;
+    if (this.noteTimer != null) {
+      window.clearTimeout(this.noteTimer);
+    }
+    this.noteTimer = window.setTimeout(() => {
+      this.noteTimer = null;
+      this.titleEl.textContent = this.smTitle;
+    }, NOTE_DURATION_MS);
   }
-  return true;
 }
 
 /**

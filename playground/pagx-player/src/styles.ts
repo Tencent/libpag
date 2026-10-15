@@ -546,14 +546,15 @@ const CSS = `
     display: none;
 }
 
-.sm-anim-list {
+/* Inputs section: one row per declared <Input>, carrying the control that matches its type. */
+.sm-input-list {
     display: flex;
     flex-direction: column;
     padding: 0 6px;
     min-width: 200px;
 }
 
-.sm-anim-row {
+.sm-input-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -562,20 +563,10 @@ const CSS = `
     border-radius: 4px;
     font-size: 12px;
     color: rgba(255, 255, 255, 0.75);
-    cursor: pointer;
     user-select: none;
 }
 
-.sm-anim-row:hover {
-    background: rgba(255, 255, 255, 0.06);
-}
-
-.sm-anim-row-current {
-    color: #7db8ff;
-    background: rgba(77, 159, 255, 0.16);
-}
-
-.sm-anim-name {
+.sm-input-name {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -584,14 +575,108 @@ const CSS = `
     font-weight: 600;
 }
 
-.sm-anim-meta {
-    flex-shrink: 0;
+.sm-input-type {
+    margin-left: 6px;
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.45);
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.4);
 }
 
-.sm-anim-row-current .sm-anim-meta {
-    color: rgba(125, 184, 255, 0.7);
+.sm-input-empty {
+    padding: 6px 12px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.4);
+    white-space: pre-line;
+}
+
+/* Applied to the row an input was written through, so it is visible which parameter a click on the
+   graph just moved. */
+.sm-row-linked {
+    color: #7db8ff;
+    background: rgba(77, 159, 255, 0.16);
+    box-shadow: inset 2px 0 0 #4d9fff;
+}
+
+.sm-row-flash {
+    animation: rowFlash 1.2s ease-out;
+}
+
+@keyframes rowFlash {
+    0% {
+        background: rgba(77, 159, 255, 0.5);
+    }
+    100% {
+        background: rgba(77, 159, 255, 0.16);
+    }
+}
+
+/* bool: T/F segmented switch. Both glyphs stay visible so the value reads as one of two known
+   states rather than as the absence of a toggle. */
+.sm-switch {
+    display: flex;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.sm-switch button {
+    padding: 2px 9px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.sm-switch button:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.sm-switch button.on {
+    background: rgba(77, 159, 255, 0.28);
+    color: #7db8ff;
+}
+
+/* trigger: one-shot fire button. */
+.sm-fire {
+    flex-shrink: 0;
+    padding: 2px 10px;
+    background: rgba(77, 159, 255, 0.22);
+    border: 1px solid rgba(77, 159, 255, 0.5);
+    border-radius: 4px;
+    color: #7db8ff;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.sm-fire:hover {
+    background: rgba(77, 159, 255, 0.36);
+}
+
+.sm-fire:active {
+    background: #4d9fff;
+    color: #fff;
+}
+
+/* number: a plain field, right-aligned so the digits line up across rows. No slider - <Input>
+   declares no range, and threshold boundaries are verified by typing them exactly. */
+.sm-number {
+    flex-shrink: 0;
+    width: 58px;
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    color: #eee;
+    font-size: 11px;
+    text-align: right;
+}
+
+.sm-number:focus {
+    outline: none;
+    border-color: #4d9fff;
 }
 
 .sm-viewport {
@@ -673,19 +758,57 @@ const CSS = `
     stroke-width: 1;
 }
 
+/* The condition pill is a control: clicking it writes the inputs its condition needs, so the
+   machine walks that transition. The edge layer as a whole is pointer-events: none, so only the
+   pill opts back in and dragging across the graph is never swallowed. */
+.sm-edge-label-group {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.sm-edge-label-group:hover .sm-edge-label {
+    fill: #7db8ff;
+}
+
+.sm-edge-label-group:hover .sm-edge-label-bg {
+    fill: #2a3242;
+    stroke: rgba(77, 159, 255, 0.6);
+}
+
+/* Flash on the edge whose transition just fired, driven by the state poll. */
+.sm-edge-fire {
+    stroke: #4d9fff;
+    stroke-width: 2.2;
+    animation: smEdgeFire 0.7s ease-out;
+}
+
+@keyframes smEdgeFire {
+    0% {
+        stroke: #fff;
+        stroke-width: 3.2;
+    }
+    100% {
+        stroke: #4d9fff;
+        stroke-width: 2.2;
+    }
+}
+
+
+
+/* Every node is the same 36px-tall box holding one row (repeat glyph + name), the convention
+   Rive and Unity Mecanim use. The bound animation's id / duration / loop moved to the hover
+   tooltip, so no node needs a second line. */
 .sm-state {
     position: absolute;
-    width: 128px;
-    height: 50px;
+    width: 118px;
+    height: 36px;
     box-sizing: border-box;
-    border: 1px solid rgba(255, 255, 255, 0.28);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+    background: #3a3d45;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
     cursor: default;
     user-select: none;
 }
@@ -694,9 +817,47 @@ const CSS = `
     cursor: pointer;
 }
 
-.sm-state:not(.sm-state-disabled):hover {
+.sm-state:not(.sm-state-disabled):not(.sm-state-entry):hover {
     border-color: rgba(77, 159, 255, 0.9);
     background: rgba(77, 159, 255, 0.1);
+}
+
+.sm-state-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 106px;
+}
+
+.sm-state-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.sm-state-icon svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* Where the state machine starts. An edge anchor rather than a state: solid accent fill so it
+   reads as "outside" the graph, and no hover affordance. */
+.sm-state.sm-state-entry {
+    width: 72px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: #4d9fff;
+    cursor: default;
+}
+
+.sm-state-entry span {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
 }
 
 /* The "any" pseudo-node anchoring from="any" transitions: visually distinct from real states
@@ -715,19 +876,10 @@ const CSS = `
 }
 
 .sm-state-name {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
-    color: #eee;
-    max-width: 116px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.sm-state-sub {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.45);
-    max-width: 116px;
+    color: #d7dade;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -736,10 +888,15 @@ const CSS = `
 .sm-state.sm-state-current {
     border-color: #4d9fff;
     border-width: 2px;
-    background: rgba(77, 159, 255, 0.2);
+    background: #33415a;
+    box-shadow: 0 0 10px rgba(77, 159, 255, 0.35);
 }
 
 .sm-state.sm-state-current .sm-state-name {
+    color: #7db8ff;
+}
+
+.sm-state.sm-state-current .sm-state-icon {
     color: #7db8ff;
 }
 
