@@ -33,7 +33,8 @@ namespace pagx {
  * data-driven CLI edits, where the caller holds a string channel name rather than a compile-time
  * field reference.
  *
- * Value encoding (KeyValue alternatives): scalars map directly (float/bool/int/string/Color);
+ * Value encoding (KeyValue alternatives): scalars map directly (float/bool/int/string/Color), as do
+ * whole transform matrices (a Layer's "matrix" as Matrix and "matrix3D" as Matrix3D);
  * enums are passed as their string name (e.g. blendMode = "multiply"); Point/Size fields are
  * addressed component-wise via suffixed channels ("position.x", "size.width"). Multi-component
  * fields without a component channel are not exposed. The set of channels available for each node
@@ -59,7 +60,8 @@ bool GetNodeChannel(const Node* node, const std::string& channel, KeyValue* out)
  * @param channel  the channel name (see the encoding notes above).
  * @param value  the value to write; its KeyValue alternative must match the field's type.
  * @return true on success; false if node is null, the channel is unknown for the node type, the
- * KeyValue type does not match the field, or an enum string is invalid.
+ * KeyValue type does not match the field, an enum string is invalid, or a Matrix3D value is not
+ * finite and invertible.
  */
 bool SetNodeChannel(Node* node, const std::string& channel, const KeyValue& value);
 
