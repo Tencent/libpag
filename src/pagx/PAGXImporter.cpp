@@ -1626,7 +1626,46 @@ static bool LooksLikeFloat(const std::string& value) {
   return false;
 }
 
-static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values);
+static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values) {
+  values->clear();
+  const char* current = text.c_str();
+  const char* end = current + text.size();
+  while (current < end) {
+    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+      ++current;
+    }
+    if (current == end) {
+      return false;
+    }
+    char* valueEnd = nullptr;
+    float value = std::strtof(current, &valueEnd);
+    if (valueEnd == current || !std::isfinite(value)) {
+      return false;
+    }
+    values->push_back(value);
+    current = valueEnd;
+    bool hadWhitespace = false;
+    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+      hadWhitespace = true;
+      ++current;
+    }
+    if (current == end) {
+      return true;
+    }
+    if (*current == ',') {
+      ++current;
+      while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
+        ++current;
+      }
+      if (current == end || *current == ',') {
+        return false;
+      }
+    } else if (!hadWhitespace) {
+      return false;
+    }
+  }
+  return false;
+}
 
 // Parses a keyframe value string into the typed representation T. Numeric, bool and color
 // specializations are strict: any malformed or out-of-range input is reported via ReportError and
@@ -3096,50 +3135,6 @@ static std::vector<std::string> SplitEnumOptions(const std::string& optionsStr) 
   }
   if (inList) options.push_back(current);
   return options;
-}
-
-static bool ParseFiniteFloatList(const std::string& text, std::vector<float>* values) {
-  if (values == nullptr || text.empty()) {
-    return false;
-  }
-  values->clear();
-  const char* current = text.c_str();
-  const char* end = current + text.size();
-  while (current < end) {
-    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
-      ++current;
-    }
-    if (current == end) {
-      return false;
-    }
-    char* valueEnd = nullptr;
-    float value = std::strtof(current, &valueEnd);
-    if (valueEnd == current || !std::isfinite(value)) {
-      return false;
-    }
-    values->push_back(value);
-    current = valueEnd;
-    bool hadWhitespace = false;
-    while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
-      hadWhitespace = true;
-      ++current;
-    }
-    if (current == end) {
-      return true;
-    }
-    if (*current == ',') {
-      ++current;
-      while (current < end && std::isspace(static_cast<unsigned char>(*current))) {
-        ++current;
-      }
-      if (current == end || *current == ',') {
-        return false;
-      }
-    } else if (!hadWhitespace) {
-      return false;
-    }
-  }
-  return !values->empty();
 }
 
 static ViewModel* ParseViewModel(const DOMNode* node, PAGXDocument* doc) {
