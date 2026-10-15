@@ -27,9 +27,10 @@ const {
   runHtmlToPagx,
   isHttpUrl,
 } = require('./dist/lib/pipeline');
-const { runBatch } = require('./dist/lib/batch');
+const { runBatch, collectHtmlInputs } = require('./dist/lib/batch');
 const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./dist/lib/browser-engine');
 const { parseNumber } = require('./dist/lib/common');
+const { validateFontMap } = require('./dist/lib/font-metadata');
 
 const SCRIPT_DIR = __dirname;
 const TOOL_NAME = 'html2pagx';
@@ -45,6 +46,9 @@ rendered PAGX. Wraps four steps:
 Usage:
   html2pagx <input.html | http(s)://url> [options]
   html2pagx --batch <input-dir> [options]
+
+Every successful conversion also writes <output-name>.fonts.json containing the
+deduplicated original HTML font requests for preparing --font-map rules.
 
 Options (any unknown flag is forwarded to snapshot.js):
   -o, --output-dir <dir>     Write outputs to <dir> (default: same dir as input)
@@ -105,6 +109,10 @@ Options (any unknown flag is forwarded to snapshot.js):
                              contained file)
   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
+  --font-map <file>          JSON array of explicit from/to font replacement rules.
+                             Matches original CSS family stack, weight and style;
+                             writes the exact target family/face after embedding.
+                             Unmatched fonts stay unchanged. Requires --embed-fonts.
   --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
                              or 'playwright'. Forwarded to snapshot.js.
                              Honours $HTML_SNAPSHOT_BROWSER.
@@ -119,6 +127,47 @@ function failArg(msg) {
   process.stderr.write(`${TOOL_NAME}: ${msg}\n`);
   process.stderr.write(`Run with --help for usage.\n`);
   process.exit(2);
+}
+
+// Validate explicit replacement rules before starting the browser or converter.
+function loadFontMap(filePath) {
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (err) {
+    fail(`--font-map: cannot read '${filePath}': ${err && err.message ? err.message : err}`);
+  }
+  const problems = validateFontMap(parsed);
+  if (problems.length > 0) {
+    fail(`--font-map: invalid font map: ${problems.join('; ')}`);
+  }
+  return parsed;
+}
+
+// The inventory is an output, while --font-map is an input. A caller must not lose its rules
+// by accidentally naming that input after an inventory the conversion is about to write.
+function checkFontMapOutputCollision(opts) {
+  if (!opts.fontMapPath) return;
+  const mapPath = path.resolve(opts.fontMapPath);
+  const check = (input, outputDir, outputName) => {
+    let stem = outputName || path.basename(input, path.extname(input));
+    if (!outputName && stem.endsWith('.htm')) stem = stem.slice(0, -4);
+    const metadataPath = path.resolve(outputDir, `${stem}.fonts.json`);
+    if (metadataPath === mapPath) {
+      failArg(`--font-map input would be overwritten by '${metadataPath}'; save replacement rules in a separate font-map.json`);
+    }
+  };
+  if (opts.batchDir) {
+    const inputRoot = path.resolve(opts.batchDir);
+    for (const input of collectHtmlInputs(inputRoot)) {
+      const outputDir = opts.outputRoot
+        ? path.join(path.resolve(opts.outputRoot), path.dirname(path.relative(inputRoot, input)))
+        : path.dirname(input);
+      check(input, outputDir, '');
+    }
+  } else if (!isHttpUrl(opts.input) || opts.outputName) {
+    check(opts.input, opts.outputDir || (isHttpUrl(opts.input) ? process.cwd() : path.dirname(path.resolve(opts.input))), opts.outputName);
+  }
 }
 
 // Parse argv into a normalised options object. Unknown flags abort with exit
@@ -143,6 +192,8 @@ function parseArgs(argv) {
     downloadFonts: false,
     embedFonts: false,
     fontDir: '',
+    // Explicit replacement rules; never interpreted as an available-font catalog.
+    fontMapPath: '',
     downloadImages: false,
     imageDir: '',
     pagxImages: 'external',
@@ -230,6 +281,9 @@ function parseArgs(argv) {
         break;
       case '--font-dir':
         opts.fontDir = requireValue(a, argv[++i]);
+        break;
+      case '--font-map':
+        opts.fontMapPath = requireValue(a, argv[++i]);
         break;
       case '--download-images':
         opts.downloadImages = true;
@@ -385,6 +439,10 @@ function preflightPagxBin(opts) {
 
 async function main() {
   const opts = parseArgs(process.argv);
+  const fontMap = opts.fontMapPath
+    ? loadFontMap(opts.fontMapPath)
+    : undefined;
+  checkFontMapOutputCollision(opts);
 
   // Batch mode forks the control flow early: lib/batch.js owns directory
   // walking, browser lifecycle, and progress prints. The single-file path
@@ -421,6 +479,7 @@ async function main() {
         viewportHeight: opts.viewportHeight,
         waitMs: opts.waitMs,
         selector: opts.selector,
+        fontMap,
       });
     } catch (err) {
       fail(err && err.message ? err.message : String(err), 1);
@@ -467,6 +526,7 @@ async function main() {
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
       selector: opts.selector,
+      fontMap,
       log: (line) => process.stdout.write(line + '\n'),
     });
   } catch (err) {

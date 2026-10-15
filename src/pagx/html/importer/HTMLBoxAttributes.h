@@ -128,6 +128,16 @@ struct HTMLInheritedStyle {
   // fallback in LayoutContext can pick them up.
   std::string primaryFontFamily = {};
   std::vector<std::string> fontFamilyChain = {};
+
+  // Raw font request JSON copied verbatim from the element's
+  // `data-pagx-font-request` attribute (written by `tools/html-snapshot`). This is NOT a CSS
+  // property: it does not cascade through CSS rules, but it does flow down the importer's
+  // element traversal the way `primaryFontFamily` does — a leaf that carries the attribute
+  // stamps its own resolved value, and descendants inherit whatever their nearest annotated
+  // ancestor set. The string is opaque to the importer (no JSON parsing here); it rides
+  // through to `Text::customData["html-font-request"]` so the external font-mapping step can
+  // rewrite the editor font names. Empty when the element tree carries no request.
+  std::string fontRequest = {};
 };
 
 /**
