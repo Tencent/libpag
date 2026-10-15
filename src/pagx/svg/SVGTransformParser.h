@@ -24,6 +24,12 @@
 
 namespace pagx {
 
+/**
+ * Parses an SVG transform list (translate, scale, rotate with an optional pivot, skewX, skewY and
+ * matrix functions) into a single 2D affine matrix, composing the functions left to right as SVG
+ * does. Missing numbers read as zero and parsing stops at the first malformed function; an empty
+ * string yields the identity matrix.
+ */
 Matrix MatrixFromSVGTransform(const std::string& value);
 
 }  // namespace pagx
