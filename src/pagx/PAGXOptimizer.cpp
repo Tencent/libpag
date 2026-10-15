@@ -42,7 +42,7 @@
 #include "pagx/nodes/Stroke.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/types/PathVerb.h"
-#include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/VerifyUtils.h"
 
 namespace pagx {

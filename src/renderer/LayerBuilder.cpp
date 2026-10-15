@@ -76,7 +76,7 @@
 #include "pagx/types/SelectorTypes.h"
 #include "pagx/types/TileMode.h"
 #include "pagx/utils/Base64.h"
-#include "pagx/utils/ExporterUtils.h"
+#include "pagx/utils/LayerTransformUtils.h"
 #include "pagx/utils/TextUtils.h"
 #include "renderer/GlyphRunRenderer.h"
 #include "renderer/TextHolder.h"
