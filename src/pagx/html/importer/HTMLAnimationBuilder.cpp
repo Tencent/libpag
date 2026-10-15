@@ -1934,8 +1934,9 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
     std::vector<Keyframe<float>> dashKeys;
     // Layer-space channels: `opacity` -> the shape Layer's `alpha`; a pure translation -> `x`/`y`
     // when no static transform is present, otherwise a complete `matrix` sample replaces it. Pure
-    // rotations may use the resolver-created Group's scalar `rotation` channel so their pivot stays
-    // fixed. The shape Layer sits at layout origin in SVG user (view-box) space.
+    // rotations without a static transform may use the resolver-created Group's scalar `rotation`
+    // channel so their pivot stays fixed. The shape Layer sits at layout origin in SVG user
+    // (view-box) space.
     std::vector<Keyframe<float>> alphaKeys;
     std::vector<Keyframe<float>> xKeys;
     std::vector<Keyframe<float>> yKeys;
@@ -2001,13 +2002,15 @@ bool HTMLAnimationBuilder::buildForInlineSvgShape(
       baselineShapeMatrix = MatrixFromSVGTransform(staticTransform->second);
     }
 
-    // Lower a pure translation to x/y when no static transform owns the Layer matrix. Otherwise
-    // the animated CSS transform replaces the full transform property, so use matrix samples. The
-    // fill-mode baseline is the raw static SVG matrix; SVG static import does not apply CSS
-    // transform-origin to that matrix. Invalid 3D / perspective keyframes drop the complete track.
+    // Lower a pure translation to x/y, and a pure rotation to the Group rotation channel, only
+    // when no static transform owns the Layer matrix. Otherwise the animated CSS transform
+    // replaces the full transform property, so use matrix samples. The fill-mode baseline is the
+    // raw static SVG matrix; SVG static import does not apply CSS transform-origin to that matrix.
+    // Invalid 3D / perspective keyframes drop the complete track.
     if (transformInvalid) {
       transformStops.clear();
     } else if (!rotationTargetId.empty() && !transformAllPureTranslate &&
+               baselineShapeMatrix.isIdentity() &&
                BuildPureRotationKeys(transformStops, interp, &rotationKeys)) {
       // The SVG resolver has already applied the captured transform-origin as the Group's static
       // anchor/position. Only the authored angle remains animated.
