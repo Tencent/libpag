@@ -586,7 +586,7 @@ PAGX 文档采用层级结构组织内容：
 
 这些来源确保容器在布局计算时几乎总有尺寸可用。显式设置 `width`/`height` 只在需要特定设计尺寸（不等于内容自然尺寸）时才必要。
 
-布局尺寸本身不产生直接的渲染效果，仅向下传递尺寸信息供子元素的约束定位使用。布局尺寸和约束计算在元素的本地坐标系中完成。变换（`matrix`/`matrix3D`/`z`）在布局计算结果之上叠加——不参与布局计算，也不影响兄弟节点或父节点的位置。
+布局尺寸本身不产生直接的渲染效果，仅向下传递尺寸信息供子元素的约束定位使用。布局尺寸和约束计算在元素的本地坐标系中完成。变换（`matrix`/`matrix3D`/`z`）在布局计算结果之上叠加——不参与布局计算，也不影响兄弟节点或父节点的位置。Layer 显式设置的 `x`/`y` 同样属于其局部变换：当约束或容器布局为 Layer 生成位置时，该位置在局部变换之外叠加（`T(layoutPosition) * local`），因此 `x`/`y` 会与之相加，而不是被覆盖（见 §5.2 变换属性优先级）。
 
 ### 4.2 容器布局（Container Layout）
 
@@ -681,7 +681,7 @@ PAGX 文档采用层级结构组织内容：
 
 #### 脱离布局流
 
-设了容器布局（`layout="horizontal"` 或 `"vertical"`）的 Layer，默认所有子 Layer 的位置由布局引擎决定。设置 `includeInLayout="false"` 的子 Layer 脱离布局流——不参与排列、不占用空间、不影响容器测量，但仍然可见，可使用约束属性（`left`/`top`）定位。适用于在布局容器内放置装饰层、背景层或角标等不应参与排列的元素。脱离布局流的子 Layer 始终可以使用约束属性（`left`/`right`/`top`/`bottom`/`centerX`/`centerY`），不受父容器 `layout` 模式的限制。
+设了容器布局（`layout="horizontal"` 或 `"vertical"`）的 Layer，默认所有子 Layer 的位置由布局引擎决定；子 Layer 显式设置的 `x`/`y` 叠加在布局引擎分配的位置之上。设置 `includeInLayout="false"` 的子 Layer 脱离布局流——不参与排列、不占用空间、不影响容器测量，但仍然可见，可使用约束属性（`left`/`top`）定位。适用于在布局容器内放置装饰层、背景层或角标等不应参与排列的元素。脱离布局流的子 Layer 始终可以使用约束属性（`left`/`right`/`top`/`bottom`/`centerX`/`centerY`），不受父容器 `layout` 模式的限制。
 
 ```xml
 <Layer width="400" height="300" layout="vertical" gap="12">
@@ -846,7 +846,7 @@ left=L, right=R:  position.x = L, width = W - L - R
 
 #### 子 Layer 约束定位
 
-子 Layer 的约束属性覆盖其 `x`/`y`。生效条件：
+子 Layer 的约束属性决定其布局位置。该位置在子 Layer 的局部变换之外叠加（`T(layoutPosition) * local`），因此子 Layer 显式设置的 `x`/`y` 会与之相加，而不是被覆盖。生效条件：
 
 1. **父 Layer 无容器布局**：`layout` 为 `none`（默认值），或
 2. **子 Layer 脱离布局流**：`includeInLayout="false"`

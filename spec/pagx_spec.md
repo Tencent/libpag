@@ -586,7 +586,7 @@ For child Layers, container layout and constraint positioning are **mutually exc
 
 These sources ensure that containers nearly always have a size available during layout calculations. Explicitly setting `width`/`height` is only necessary when a specific design size (different from the natural content size) is needed.
 
-Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (`matrix`/`matrix3D`/`z`) are applied on top of the computed layout results — they do not participate in layout calculations and do not affect sibling or parent node positions.
+Layout size itself has no direct rendering effect; it only passes size information downward for constraint positioning of child elements. Layout size and constraint calculations are performed in the element's local coordinate system. Transforms (`matrix`/`matrix3D`/`z`) are applied on top of the computed layout results — they do not participate in layout calculations and do not affect sibling or parent node positions. A Layer's authored `x`/`y` are also part of its local transform: when constraint or container layout generates a position for the Layer, that position is applied outside the local transform (`T(layoutPosition) * local`), so the authored `x`/`y` add to it instead of being replaced (see §5.2 Transform Attribute Priority).
 
 ### 4.2 Container Layout
 
@@ -681,7 +681,7 @@ Child Layers with `visible="false"` are not rendered but still participate in la
 
 #### Leaving the Layout Flow
 
-When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all child Layer positions are determined by the layout engine by default. Setting `includeInLayout="false"` on a child Layer removes it from the layout flow — it does not participate in arrangement, occupies no space, and does not affect container measurement, but remains visible and can use constraint attributes (`left`/`top`) for positioning. This is useful for placing decorations, backgrounds, or badges inside a layout container without affecting the arrangement of other children. Child Layers that have left the layout flow can always use constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`), regardless of the parent container's `layout` mode.
+When a Layer has container layout (`layout="horizontal"` or `"vertical"`), all child Layer positions are determined by the layout engine by default; a child's authored `x`/`y` are added on top of the position the layout engine assigns. Setting `includeInLayout="false"` on a child Layer removes it from the layout flow — it does not participate in arrangement, occupies no space, and does not affect container measurement, but remains visible and can use constraint attributes (`left`/`top`) for positioning. This is useful for placing decorations, backgrounds, or badges inside a layout container without affecting the arrangement of other children. Child Layers that have left the layout flow can always use constraint attributes (`left`/`right`/`top`/`bottom`/`centerX`/`centerY`), regardless of the parent container's `layout` mode.
 
 ```xml
 <Layer width="400" height="300" layout="vertical" gap="12">
@@ -846,7 +846,7 @@ The vertical axis follows the same pattern.
 
 #### Child Layer Constraint Positioning
 
-Child Layer constraint attributes override the child Layer's `x`/`y`. Activation conditions:
+Child Layer constraint attributes determine the child Layer's layout position. The position is applied outside the child's local transform (`T(layoutPosition) * local`), so the child's authored `x`/`y` add to it rather than being replaced. Activation conditions:
 
 1. **Parent Layer has no container layout**: `layout` is `none` (default), or
 2. **Child Layer leaves the layout flow**: `includeInLayout="false"`
