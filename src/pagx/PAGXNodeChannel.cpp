@@ -259,14 +259,15 @@ static bool AccessMatrix3DComponent(Node* node, KeyValue* getOut, const KeyValue
     if (!ReadMatrix3DComponent(defaultDecomposition, Component, &defaultValue)) {
       return false;
     }
-    if (!SetMatrix3DComponent(decomposition, Component, defaultValue, &defaultDecomposition)) {
+    DecomposedMatrix3D updated = {};
+    if (!SetMatrix3DComponent(decomposition, Component, defaultValue, &updated)) {
       return false;
     }
-    Matrix3D updated = {};
-    if (!RecomposeMatrix3D(defaultDecomposition, &updated)) {
+    Matrix3D result = {};
+    if (!RecomposeMatrix3D(updated, &result)) {
       return false;
     }
-    self->*Field = updated;
+    self->*Field = result;
     return true;
   }
   if (getOut != nullptr) {
