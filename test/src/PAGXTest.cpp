@@ -10461,8 +10461,8 @@ PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
   pagx::DecomposedMatrix3D interpolatedComponents = {};
   ASSERT_TRUE(pagx::DecomposeMatrix3D(interpolated, &interpolatedComponents));
   float rotationZ = 0;
-  ASSERT_TRUE(pagx::ReadMatrix3DComponent(interpolatedComponents,
-                                          pagx::Matrix3DComponent::RotateZ, &rotationZ));
+  ASSERT_TRUE(pagx::ReadMatrix3DComponent(interpolatedComponents, pagx::Matrix3DComponent::RotateZ,
+                                          &rotationZ));
   EXPECT_NEAR(rotationZ, 45, 1.0e-3f);
   EXPECT_NEAR(interpolatedComponents.translate[0], 10, 1.0e-4);
   EXPECT_NEAR(interpolatedComponents.translate[1], 20, 1.0e-4);
