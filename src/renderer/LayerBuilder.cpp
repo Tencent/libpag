@@ -282,8 +282,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
     layoutY = std::isnan(position.y) ? 0 : position.y;
     hasComponents = !hasStaticMatrix3D && !hasStaticMatrix;
     if (hasComponents) {
-      components = LayerTransformComponents(node);
-      ComposeMatrix3DComponents(components, &pose);
+      LayerTransformComponents(node, &components, &pose);
     } else {
       pose = BuildLayerLocalMatrix3D(node);
     }

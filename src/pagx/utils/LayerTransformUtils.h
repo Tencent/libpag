@@ -19,11 +19,12 @@
 #pragma once
 
 #include "pagx/nodes/Layer.h"
-#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/types/Matrix.h"
 #include "pagx/types/Matrix3D.h"
 
 namespace pagx {
+
+struct Matrix3DComponents;
 
 // Lifts a 2D affine matrix into a column-major 4x4 matrix that also translates by z along the Z
 // axis, leaving the Z axis otherwise untouched.
@@ -33,9 +34,10 @@ Matrix3D LiftMatrixToMatrix3D(const Matrix& matrix, float z);
 // its default value.
 bool HasLayerTransformComponents(const Layer* layer);
 
-// Returns the Layer's x / y / z translation and transform components. When the components cannot be
-// composed (a skew of +/-90 degrees or a negative perspective), only the translation is kept.
-Matrix3DComponents LayerTransformComponents(const Layer* layer);
+// Writes the Layer's x / y / z translation and transform components to components and their
+// composition to matrix. When the components cannot be composed (a skew of +/-90 degrees or a
+// negative perspective), only the translation is kept; matrix is the identity if even that fails.
+void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components, Matrix3D* matrix);
 
 // Returns the Layer's local transform without the layout position: the non-identity matrix3D, else
 // the non-identity matrix lifted with z, else the composition of x / y / z and the components.

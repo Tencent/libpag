@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/utils/LayerTransformUtils.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 
 namespace pagx {
 
@@ -38,23 +39,31 @@ bool HasLayerTransformComponents(const Layer* layer) {
          layer->skewX != 0.0f || layer->skewY != 0.0f || layer->perspective != 0.0f;
 }
 
-Matrix3DComponents LayerTransformComponents(const Layer* layer) {
-  Matrix3DComponents components = {};
-  components.translate[0] = layer->x;
-  components.translate[1] = layer->y;
-  components.translate[2] = layer->z;
-  Matrix3DComponents translation = components;
-  components.rotation[0] = layer->rotationX;
-  components.rotation[1] = layer->rotationY;
-  components.rotation[2] = layer->rotationZ;
-  components.scale[0] = layer->scaleX;
-  components.scale[1] = layer->scaleY;
-  components.scale[2] = layer->scaleZ;
-  components.skew[0] = layer->skewX;
-  components.skew[1] = layer->skewY;
-  components.perspective = layer->perspective;
-  Matrix3D matrix = {};
-  return ComposeMatrix3DComponents(components, &matrix) ? components : translation;
+void LayerTransformComponents(const Layer* layer, Matrix3DComponents* components,
+                              Matrix3D* matrix) {
+  components->translate[0] = layer->x;
+  components->translate[1] = layer->y;
+  components->translate[2] = layer->z;
+  components->rotation[0] = layer->rotationX;
+  components->rotation[1] = layer->rotationY;
+  components->rotation[2] = layer->rotationZ;
+  components->scale[0] = layer->scaleX;
+  components->scale[1] = layer->scaleY;
+  components->scale[2] = layer->scaleZ;
+  components->skew[0] = layer->skewX;
+  components->skew[1] = layer->skewY;
+  components->perspective = layer->perspective;
+  *matrix = {};
+  if (ComposeMatrix3DComponents(*components, matrix)) {
+    return;
+  }
+  Matrix3DComponents translation = {};
+  for (int i = 0; i < 3; ++i) {
+    translation.translate[i] = components->translate[i];
+  }
+  *components = translation;
+  *matrix = {};
+  ComposeMatrix3DComponents(*components, matrix);
 }
 
 Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
@@ -64,8 +73,9 @@ Matrix3D BuildLayerLocalMatrix3D(const Layer* layer) {
   if (!layer->matrix.isIdentity()) {
     return LiftMatrixToMatrix3D(layer->matrix, layer->z);
   }
+  Matrix3DComponents components = {};
   Matrix3D result = {};
-  ComposeMatrix3DComponents(LayerTransformComponents(layer), &result);
+  LayerTransformComponents(layer, &components, &result);
   return result;
 }
 
