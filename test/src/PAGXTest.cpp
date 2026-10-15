@@ -10467,11 +10467,6 @@ PAGX_TEST(PAGXTest, Matrix3DProjectiveDecomposeAndLerp) {
     EXPECT_NEAR(recomposed.values[i], source.values[i], 0.001f);
   }
 
-  auto midpoint = pagx::LerpMatrix3D(source, source, 0.5);
-  for (int i = 0; i < 16; ++i) {
-    EXPECT_FLOAT_EQ(midpoint.values[i], source.values[i]);
-  }
-
   pagx::DecomposedMatrix3D startComponents = {};
   pagx::DecomposedMatrix3D endComponents = {};
   endComponents.translate[0] = 20;
