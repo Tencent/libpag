@@ -3036,7 +3036,7 @@ Layer / Group
 | `skew.xy` / `skew.xz` / `skew.yz` | number | 仅用于 DataBind 的剪切角，单位为度 |
 | `perspective` | number | 仅用于 DataBind 的透视距离；0 表示无透视，正数 `d` 对应投影行 `[0, 0, -1/d, 1]` |
 
-旋转/缩放/剪切/透视通道绑定 Number 类型的 ViewModel 属性，覆盖分解后局部变换中的对应分量。`ToTarget`/`TwoWay` 绑定在后续变换写入后仍持续覆盖；`Once` 绑定只把值写入局部变换一次，之后的变换写入会接管。局部变换无法分解时，按不带这些覆盖的局部变换渲染。
+旋转/缩放/剪切/透视通道绑定 Number 类型的 ViewModel 属性。与其他变换通道一样，每次写入只替换分解后局部变换中的对应分量：同一分量以最后一次写入为准，不同分量的写入会叠加生效。局部变换无法分解时，该次写入会被拒绝。
 
 ### D.2 几何节点（Rectangle / Ellipse / Polystar / Path）
 

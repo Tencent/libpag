@@ -3044,7 +3044,7 @@ The following lists all node channels that can be driven via `<Channel>` (animat
 | `skew.xy` / `skew.xz` / `skew.yz` | number | DataBind-only skew angle in degrees |
 | `perspective` | number | DataBind-only perspective distance; 0 means none, a positive `d` maps to projection row `[0, 0, -1/d, 1]` |
 
-The rotation/scale/skew/perspective channels are bound to Number ViewModel properties and override the named components of the decomposed local transform. `ToTarget`/`TwoWay` bindings keep overriding them after later transform writes; a `Once` binding writes its value into the local transform once, so later transform writes take over. If the local transform cannot be decomposed, it is rendered without these overrides.
+The rotation/scale/skew/perspective channels are bound to Number ViewModel properties. Like the other transform channels, each write replaces only the named component of the decomposed local transform, so the latest write to a component wins while writes to different components combine. A write is rejected if the local transform cannot be decomposed.
 
 ### D.2 Geometry Nodes (Rectangle / Ellipse / Polystar / Path)
 

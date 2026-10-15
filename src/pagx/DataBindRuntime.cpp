@@ -255,9 +255,8 @@ void DataBindRuntime::applyEntry(BindingEntry& entry, RuntimeBinding* binding, f
   if (entry.source->converter != nullptr) {
     keyValue = DataConverterRegistry::GetInstance().apply(entry.source->converter, keyValue);
   }
-  bool once = entry.dataBind->direction == DataBindDirection::Once;
-  // A rejected Once value is not consumed, so a later valid ViewModel value can still apply.
-  if (binding->apply(entry.targetNode, entry.channel, keyValue, mix, once) && once) {
+  binding->apply(entry.targetNode, entry.channel, keyValue, mix);
+  if (entry.dataBind->direction == DataBindDirection::Once) {
     entry.onceApplied = true;
   }
 }

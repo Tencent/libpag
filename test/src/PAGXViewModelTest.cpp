@@ -490,7 +490,9 @@ PAGX_TEST(PAGXViewModelTest, DataBindPositionSyncVerified) {
 // Repro/guard: after a layer is refreshed in place (e.g. a late loadFileData edit on that layer),
 // a ToTarget DataBind must re-apply the ViewModel's current value to the rebuilt target. Otherwise
 // the refresh resets the channel to the node's authored default and the VM-pushed value is lost.
-PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingOverridesAnimationBase) {
+// A semantic component binding and transform animations write into the same Layer pose. Writes
+// that drive different parts combine, and the latest write to the same part wins.
+PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingCombinesWithAnimation) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* schema = doc->makeNode<pagx::ViewModel>("MatrixVM");
   auto* property = doc->makeNode<pagx::ViewModelProperty>();
@@ -502,22 +504,18 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingOverridesAnimationBase) {
 
   auto* layer = doc->makeNode<pagx::Layer>("matrixLayer");
   doc->layers.push_back(layer);
-  auto* animation = doc->makeNode<pagx::Animation>("matrixAnimation");
+  auto* animation = doc->makeNode<pagx::Animation>("moveAnimation");
   animation->duration = 60;
   animation->frameRate = 60;
   doc->animations.push_back(animation);
   auto* object = doc->makeNode<pagx::AnimationObject>();
   object->target = layer->id;
   animation->objects.push_back(object);
-  auto* matrixChannel = doc->makeNode<pagx::TypedChannel<pagx::Matrix3D>>();
-  matrixChannel->name = "matrix3D";
-  pagx::Matrix3D target = {};
-  target.values[12] = 20;
-  target.values[13] = 40;
-  matrixChannel->keyframes.push_back(
-      {0, pagx::Matrix3D{}, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  matrixChannel->keyframes.push_back({60, target, pagx::KeyframeInterpolationType::Linear, {}, {}});
-  object->channels.push_back(matrixChannel);
+  auto* xChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  xChannel->name = "x";
+  xChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  xChannel->keyframes.push_back({60, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(xChannel);
 
   auto* dataBind = doc->makeNode<pagx::DataBind>();
   dataBind->source = "$vm.rotateZ";
@@ -528,7 +526,8 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingOverridesAnimationBase) {
   auto scene = pagx::PAGScene::Make(
       std::shared_ptr<pagx::PAGXDocument>(doc.get(), [](pagx::PAGXDocument*) {}));
   ASSERT_NE(scene, nullptr);
-  auto tgfxLayer = scene->mutableBinding()->get<tgfx::Layer>(layer);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
   ASSERT_NE(tgfxLayer, nullptr);
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
@@ -542,8 +541,16 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingOverridesAnimationBase) {
   tgfxLayer->matrix3D().getColumnMajor(values);
   EXPECT_NEAR(values[0], std::cos(50.0f * 3.14159265f / 180.0f), 1.0e-5f);
   EXPECT_NEAR(values[1], std::sin(50.0f * 3.14159265f / 180.0f), 1.0e-5f);
-  EXPECT_FLOAT_EQ(values[12], 10);
-  EXPECT_FLOAT_EQ(values[13], 20);
+  EXPECT_FLOAT_EQ(values[12], 50);
+
+  pagx::Matrix3D translation = {};
+  translation.values[12] = 20;
+  translation.values[13] = 40;
+  ASSERT_TRUE(binding->apply(layer, "matrix3D", pagx::KeyValue{translation}, 1.0f));
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_FLOAT_EQ(values[0], 1);
+  EXPECT_FLOAT_EQ(values[1], 0);
+  EXPECT_FLOAT_EQ(values[12], 20);
 
   auto vm = scene->viewModel();
   ASSERT_NE(vm, nullptr);
@@ -553,18 +560,15 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingOverridesAnimationBase) {
   tgfxLayer->matrix3D().getColumnMajor(values);
   EXPECT_NEAR(values[0], std::cos(60.0f * 3.14159265f / 180.0f), 1.0e-5f);
   EXPECT_NEAR(values[1], std::sin(60.0f * 3.14159265f / 180.0f), 1.0e-5f);
-
-  timeline->setCurrentTime(1000000);
-  timeline->apply(1.0f);
-  tgfxLayer->matrix3D().getColumnMajor(values);
-  EXPECT_NEAR(values[0], std::cos(60.0f * 3.14159265f / 180.0f), 1.0e-5f);
-  EXPECT_NEAR(values[1], std::sin(60.0f * 3.14159265f / 180.0f), 1.0e-5f);
   EXPECT_FLOAT_EQ(values[12], 20);
   EXPECT_FLOAT_EQ(values[13], 40);
+  pagx::KeyValue readBack;
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &readBack));
+  EXPECT_NEAR(std::get<float>(readBack), 60, 1.0e-4f);
 }
 
-// A Once semantic component is written into the transform a single time, and the next transform
-// write takes over instead of the value being reapplied.
+// A Once semantic component is written into the transform a single time, and a later transform
+// write replaces it without the value being reapplied.
 PAGX_TEST(PAGXViewModelTest, Matrix3DOnceComponentYieldsToLaterTransformWrite) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* schema = doc->makeNode<pagx::ViewModel>("MatrixVM");

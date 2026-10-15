@@ -91,18 +91,15 @@ struct RuntimeTarget {
   }
 
   // Returns true if this target can apply the given channel. Virtual so a subclass that intercepts
-  // channels in apply() (LayerRuntimeTarget's transform channels) reports them as handled even
-  // though they are not in the writers map.
+  // channels in apply() (LayerRuntimeTarget's x / y / matrix) reports them as handled even though
+  // they are not in the writers map.
   virtual bool hasWriter(const std::string& channel) const {
     return writers.find(channel) != writers.end();
   }
 
   // Applies an evaluated channel value. Virtual so a subclass (LayerRuntimeTarget) can intercept
-  // channels that need shared state across writers (the Layer transform channels). onceDataBind is
-  // true when the value comes from a Once DataBind, which a target may apply differently from a
-  // continuous source. Returns false if the value was not applied.
-  virtual bool apply(const std::string& channel, const KeyValue& value, float mix,
-                     bool /*onceDataBind*/ = false) {
+  // channels that need shared state across writers (the Layer transform: x / y / matrix).
+  virtual bool apply(const std::string& channel, const KeyValue& value, float mix) {
     auto it = writers.find(channel);
     if (it == writers.end() || object == nullptr) {
       return false;
@@ -112,7 +109,7 @@ struct RuntimeTarget {
   }
 
   // Reads the current value of a channel back from the bound object. Virtual so a subclass
-  // (LayerRuntimeTarget) can intercept channels that hold shared transform state. Returns
+  // (LayerRuntimeTarget) can intercept channels that hold shared transform state (x / y). Returns
   // false if no reader is registered for the channel, the object is null, or the reader reports the
   // channel currently has no value to sync back.
   virtual bool read(const std::string& channel, KeyValue* out) const {
@@ -262,8 +259,7 @@ struct RuntimeBinding {
     return false;
   }
 
-  bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix,
-             bool onceDataBind = false) const {
+  bool apply(const Node* node, const std::string& channel, const KeyValue& value, float mix) const {
     auto it = targets.find(node);
     if (it == targets.end()) {
       // A miss is legitimate when a cached target was removed from the binding after cache
@@ -271,7 +267,7 @@ struct RuntimeBinding {
       // timeline's resolved cache). Fail gracefully.
       return false;
     }
-    return it->second->apply(channel, value, mix, onceDataBind);
+    return it->second->apply(channel, value, mix);
   }
 
   // Reads the current value of a node's channel back into out. Returns false if the node has no

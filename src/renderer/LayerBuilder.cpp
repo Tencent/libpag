@@ -203,14 +203,13 @@ static Matrix3D ApplyLayoutPosition(const Matrix3D& matrix, float x, float y) {
 
 // Runtime target for a Layer's tgfx::Layer that keeps one local transform pose shared by the x / y
 // / z, matrix and matrix3D channels. Each write mixes only the part of the pose its channel drives
-// (current = Mix(current, target, mix)), so anything no source drives keeps its current value.
-// Continuous semantic Matrix3D DataBinds (rotation / scale / skew / perspective) are kept as an
-// overlay applied on top of the pose, while Once values are written into the pose so a later
-// transform write takes over. The layout-generated position is composed outside of everything.
-// Channels other than the transform fall through to the base RuntimeTarget writer table.
+// (current = Mix(current, target, mix)), so anything no source drives keeps its current value. The
+// semantic Matrix3D DataBind components (rotation / scale / skew / perspective) are written into
+// the decomposed pose the same way, so the latest write wins. The layout-generated position is
+// composed outside of the pose. Channels other than the transform fall through to the base
+// RuntimeTarget writer table.
 struct LayerRuntimeTarget : RuntimeTarget {
-  bool apply(const std::string& channel, const KeyValue& value, float mix,
-             bool onceDataBind) override {
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
     if (channel == "x" || channel == "y" || channel == "z") {
       return applyTranslation(TranslationAxis(channel), value, mix);
     }
@@ -222,9 +221,9 @@ struct LayerRuntimeTarget : RuntimeTarget {
     }
     auto component = Matrix3DComponent::TranslateX;
     if (Matrix3DComponentFromChannel(channel, &component)) {
-      return applyComponent(component, value, mix, onceDataBind);
+      return applyComponent(component, value, mix);
     }
-    return RuntimeTarget::apply(channel, value, mix, onceDataBind);
+    return RuntimeTarget::apply(channel, value, mix);
   }
 
   bool hasWriter(const std::string& channel) const override {
@@ -237,8 +236,8 @@ struct LayerRuntimeTarget : RuntimeTarget {
   }
 
   // Reads x / y / z back from the local pose translation, excluding the layout-generated position,
-  // and the semantic Matrix3D components from the decomposed effective transform. Other channels
-  // fall through to the base reader table.
+  // and the semantic Matrix3D components from the decomposed pose. Other channels fall through to
+  // the base reader table.
   bool read(const std::string& channel, KeyValue* out) const override {
     if (out == nullptr) {
       return false;
@@ -253,10 +252,9 @@ struct LayerRuntimeTarget : RuntimeTarget {
     }
     auto component = Matrix3DComponent::TranslateX;
     if (Matrix3DComponentFromChannel(channel, &component)) {
-      Matrix3D matrix = {};
       DecomposedMatrix3D decomposed = {};
       float result = 0;
-      if (!composeMatrix(&matrix) || !DecomposeMatrix3D(matrix, &decomposed) ||
+      if (!DecomposeMatrix3D(pose, &decomposed) ||
           !ReadMatrix3DComponent(decomposed, component, &result)) {
         return false;
       }
@@ -269,7 +267,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
   // Seeds the pose from the node's authored transform and publishes it to the layer. A non-identity
   // matrix3D is the complete local transform; otherwise a non-identity matrix (or else x / y) is
   // lifted with z. The authored transform that takes precedence also masks the channels it
-  // overrides. Semantic overlays are kept so continuous bindings survive a document refresh.
+  // overrides.
   void initTransform(const Layer* node) {
     hasStaticMatrix3D = !node->matrix3D.isIdentity();
     hasStaticMatrix = !node->matrix.isIdentity();
@@ -288,7 +286,6 @@ struct LayerRuntimeTarget : RuntimeTarget {
 
  private:
   Matrix3D pose = {};
-  Matrix3DComponentOverrides overrides = {};
   float layoutX = 0;
   float layoutY = 0;
   bool hasStaticMatrix = false;
@@ -345,55 +342,24 @@ struct LayerRuntimeTarget : RuntimeTarget {
     return true;
   }
 
-  bool applyComponent(Matrix3DComponent component, const KeyValue& value, float mix, bool once) {
+  // Writes one semantic component into the decomposed pose, like any other transform write.
+  bool applyComponent(Matrix3DComponent component, const KeyValue& value, float mix) {
     const auto* v = std::get_if<float>(&value);
     DecomposedMatrix3D decomposed = {};
-    if (v == nullptr || !std::isfinite(*v) || !DecomposeMatrix3D(pose, &decomposed)) {
-      return false;
-    }
-    auto index = static_cast<size_t>(component);
-    auto bit = static_cast<uint16_t>(1u << index);
     float current = 0;
-    if (!once && (overrides.mask & bit) != 0) {
-      current = static_cast<float>(overrides.values[index]);
-    } else if (!ReadMatrix3DComponent(decomposed, component, &current)) {
+    if (v == nullptr || !std::isfinite(*v) || !DecomposeMatrix3D(pose, &decomposed) ||
+        !ReadMatrix3DComponent(decomposed, component, &current)) {
       return false;
     }
-    auto mixed = MixFloat(current, *v, mix);
-    if (once) {
-      DecomposedMatrix3D updated = {};
-      Matrix3D matrix = {};
-      if (!SetMatrix3DComponent(decomposed, component, mixed, &updated) ||
-          !RecomposeMatrix3D(updated, &matrix)) {
-        return false;
-      }
-      pose = matrix;
-    } else {
-      auto previous = overrides;
-      overrides.values[index] = mixed;
-      overrides.mask |= bit;
-      Matrix3D matrix = {};
-      if (!composeMatrix(&matrix)) {
-        overrides = previous;
-        return false;
-      }
+    DecomposedMatrix3D updated = {};
+    Matrix3D matrix = {};
+    if (!SetMatrix3DComponent(decomposed, component, MixFloat(current, *v, mix), &updated) ||
+        !RecomposeMatrix3D(updated, &matrix)) {
+      return false;
     }
+    pose = matrix;
     publish();
     return true;
-  }
-
-  // Returns the pose with the semantic overlay applied. Fails if the overlay cannot be represented
-  // on the current pose, in which case the raw pose is rendered.
-  bool composeMatrix(Matrix3D* matrix) const {
-    if (overrides.mask == 0) {
-      *matrix = pose;
-      return true;
-    }
-    DecomposedMatrix3D decomposed = {};
-    DecomposedMatrix3D updated = {};
-    return DecomposeMatrix3D(pose, &decomposed) &&
-           ApplyMatrix3DComponentOverrides(decomposed, overrides, &updated) &&
-           RecomposeMatrix3D(updated, matrix);
   }
 
   void publish() {
@@ -401,11 +367,7 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (layer == nullptr) {
       return;
     }
-    Matrix3D matrix = {};
-    if (!composeMatrix(&matrix)) {
-      matrix = pose;
-    }
-    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(matrix, layoutX, layoutY)));
+    layer->setMatrix3D(ToTGFX3D(ApplyLayoutPosition(pose, layoutX, layoutY)));
   }
 };
 
@@ -423,8 +385,7 @@ struct PathRuntimeTarget : RuntimeTarget {
   std::vector<tgfx::Point> points = {};
   float scale = 1.0f;
 
-  bool apply(const std::string& channel, const KeyValue& value, float mix,
-             bool onceDataBind) override {
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
     size_t index = 0;
     bool isX = false;
     if (ParsePointChannel(channel, index, isX)) {
@@ -440,7 +401,7 @@ struct PathRuntimeTarget : RuntimeTarget {
       rebuild();
       return true;
     }
-    return RuntimeTarget::apply(channel, value, mix, onceDataBind);
+    return RuntimeTarget::apply(channel, value, mix);
   }
 
   bool hasWriter(const std::string& channel) const override {
@@ -537,13 +498,12 @@ struct TextRuntimeTarget : RuntimeTarget {
            channel == "fauxItalic";
   }
 
-  bool apply(const std::string& channel, const KeyValue& value, float mix,
-             bool onceDataBind) override {
+  bool apply(const std::string& channel, const KeyValue& value, float mix) override {
     if (holder != nullptr && IsShapingChannel(channel)) {
       holder->apply(node, channel, value, mix);
       return true;
     }
-    return RuntimeTarget::apply(channel, value, mix, onceDataBind);
+    return RuntimeTarget::apply(channel, value, mix);
   }
 
   bool hasWriter(const std::string& channel) const override {

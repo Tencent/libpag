@@ -84,8 +84,7 @@ class StateMachineInputTarget : public RuntimeTarget {
     return inputTypes.find(channel) != inputTypes.end();
   }
 
-  bool apply(const std::string& channel, const KeyValue& value, float /*mix*/,
-             bool /*onceDataBind*/) override {
+  bool apply(const std::string& channel, const KeyValue& value, float /*mix*/) override {
     auto it = inputTypes.find(channel);
     if (it == inputTypes.end()) {
       return false;
