@@ -30,6 +30,8 @@ namespace pagx {
 static constexpr double DEGREES_TO_RADIANS = 0.017453292519943295769;
 static constexpr double RADIANS_TO_DEGREES = 57.295779513082320877;
 
+// Rotation quaternion (x, y, z, w) with w as the scalar part. The default is the identity
+// rotation. Helpers below expect unit quaternions unless stated otherwise.
 struct Quaternion {
   double x = 0;
   double y = 0;
@@ -37,6 +39,12 @@ struct Quaternion {
   double w = 1;
 };
 
+// Decomposed form of a 4x4 transform used for interpolation and semantic component access. The
+// matrix is recomposed as P * T * R * K * S for column vectors: S scales by scale[], K is the upper
+// triangular shear whose factors skew[0] (xy), skew[1] (xz) and skew[2] (yz) are stored as the
+// tangent of the skew angle, R is the rotation quaternion, T translates by translate[], and P is
+// the identity with its last row replaced by perspective[]. Matrix3D stores its values
+// column-major, while the double[4][4] helpers in this file index [row][column].
 struct DecomposedMatrix3D {
   double perspective[4] = {0, 0, 0, 1};
   double translate[3] = {0, 0, 0};
@@ -45,6 +53,8 @@ struct DecomposedMatrix3D {
   double skew[3] = {0, 0, 0};
 };
 
+// Semantic components of a decomposed Matrix3D that can be read or written individually. Each one
+// maps to a Layer channel name (see Matrix3DComponentFromChannel). Count is a sentinel.
 enum class Matrix3DComponent : uint8_t {
   RotateX,
   RotateY,
@@ -59,8 +69,10 @@ enum class Matrix3DComponent : uint8_t {
   Count
 };
 
+// Number of valid Matrix3DComponent values.
 static constexpr size_t Matrix3DComponentCount = static_cast<size_t>(Matrix3DComponent::Count);
 
+// Returns true if all 16 matrix values are finite.
 inline bool IsFiniteMatrix3D(const Matrix3D& matrix) {
   for (float value : matrix.values) {
     if (!std::isfinite(value)) {
@@ -70,6 +82,8 @@ inline bool IsFiniteMatrix3D(const Matrix3D& matrix) {
   return true;
 }
 
+// Returns the determinant of a [row][column] 4x4 matrix using Gaussian elimination with partial
+// pivoting. Returns 0 as soon as a pivot magnitude falls to 1e-12 or below.
 inline double Determinant4(const double source[4][4]) {
   double matrix[4][4] = {};
   for (int row = 0; row < 4; ++row) {
@@ -106,6 +120,8 @@ inline double Determinant4(const double source[4][4]) {
   return determinant;
 }
 
+// Returns true if the matrix is finite and invertible. The values are first divided by their
+// largest magnitude so the determinant threshold does not depend on the overall matrix scale.
 inline bool IsInvertibleMatrix3D(const Matrix3D& matrix) {
   if (!IsFiniteMatrix3D(matrix)) {
     return false;
@@ -129,6 +145,8 @@ inline bool IsInvertibleMatrix3D(const Matrix3D& matrix) {
   return std::abs(Determinant4(values)) > 1.0e-12;
 }
 
+// Inverts a [row][column] 4x4 matrix with Gauss-Jordan elimination and writes the result to
+// inverse as 16 values in row-major order. Returns false if the matrix is singular.
 inline bool Invert4(const double source[4][4], double* inverse) {
   double rows[4][8] = {};
   for (int row = 0; row < 4; ++row) {
@@ -174,26 +192,32 @@ inline bool Invert4(const double source[4][4], double* inverse) {
   return true;
 }
 
+// Returns the dot product of two 3-component vectors.
 inline double Dot3(const double a[3], const double b[3]) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+// Returns the Euclidean length of a 3-component vector.
 inline double Length3(const double value[3]) {
   return std::sqrt(Dot3(value, value));
 }
 
+// Multiplies a 3-component vector by scale in place.
 inline void Scale3(double value[3], double scale) {
   for (int i = 0; i < 3; ++i) {
     value[i] *= scale;
   }
 }
 
+// Subtracts basis * scale from a 3-component vector in place.
 inline void SubtractScaled3(double value[3], const double basis[3], double scale) {
   for (int i = 0; i < 3; ++i) {
     value[i] -= basis[i] * scale;
   }
 }
 
+// Converts an orthonormal [row][column] 3x3 rotation matrix to a quaternion, branching on the
+// largest diagonal term for numerical stability.
 inline Quaternion QuaternionFromRotation(const double rotation[3][3]) {
   Quaternion q = {};
   double trace = rotation[0][0] + rotation[1][1] + rotation[2][2];
@@ -225,6 +249,7 @@ inline Quaternion QuaternionFromRotation(const double rotation[3][3]) {
   return q;
 }
 
+// Converts a unit quaternion to a [row][column] 3x3 rotation matrix.
 inline void RotationFromQuaternion(const Quaternion& q, double rotation[3][3]) {
   double xx = q.x * q.x;
   double yy = q.y * q.y;
@@ -246,12 +271,15 @@ inline void RotationFromQuaternion(const Quaternion& q, double rotation[3][3]) {
   rotation[2][2] = 1.0 - 2.0 * (xx + yy);
 }
 
+// Returns the Hamilton product a * b, which applies b first and then a to column vectors.
 inline Quaternion MultiplyQuaternion(const Quaternion& a, const Quaternion& b) {
   return {
       a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y, a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
       a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w, a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};
 }
 
+// Builds a rotation from Euler angles in degrees composed as Rz * Ry * Rx for column vectors, so
+// the X rotation is applied first.
 inline Quaternion QuaternionFromEulerXYZDegrees(double xDegrees, double yDegrees, double zDegrees) {
   double halfX = xDegrees * DEGREES_TO_RADIANS * 0.5;
   double halfY = yDegrees * DEGREES_TO_RADIANS * 0.5;
@@ -262,6 +290,11 @@ inline Quaternion QuaternionFromEulerXYZDegrees(double xDegrees, double yDegrees
   return MultiplyQuaternion(MultiplyQuaternion(qz, qy), qx);
 }
 
+// Recovers Euler angles in degrees, in the Rz * Ry * Rx convention of
+// QuaternionFromEulerXYZDegrees, from a quaternion, which is normalized first. The Y angle is
+// confined to [-90, 90] degrees, so the result is one equivalent set of angles rather than
+// necessarily the authored one; at gimbal lock the whole remaining rotation is assigned to X and Z
+// is 0. Returns false for a zero-length or non-finite quaternion.
 inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double output[3]) {
   if (output == nullptr) {
     return false;
@@ -292,6 +325,8 @@ inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double o
   return std::isfinite(output[0]) && std::isfinite(output[1]) && std::isfinite(output[2]);
 }
 
+// Spherically interpolates between two unit quaternions along the shortest arc. Nearly parallel
+// inputs use a normalized linear interpolation to avoid dividing by a vanishing sine.
 inline Quaternion SlerpQuaternion(const Quaternion& first, const Quaternion& second, double t) {
   Quaternion a = first;
   Quaternion b = second;
@@ -325,6 +360,13 @@ inline Quaternion SlerpQuaternion(const Quaternion& first, const Quaternion& sec
 
 inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output);
 
+// Decomposes a 4x4 transform into perspective, translation, rotation, scale and skew (see
+// DecomposedMatrix3D) following the CSS Transforms 3D matrix decomposition: the matrix is
+// normalized by its [3][3] value, the perspective row is extracted, and Gram-Schmidt
+// orthogonalization of the upper 3x3 yields scale and skew, with a negative determinant folded into
+// the Z scale. Returns false if the matrix is non-finite or singular, its [3][3] value is near
+// zero, a scale axis degenerates, or recomposing the result differs from the normalized source by
+// more than a relative 1e-5 in any value.
 inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output) {
   if (output == nullptr || !IsInvertibleMatrix3D(source)) {
     return false;
@@ -450,6 +492,9 @@ inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output
   return true;
 }
 
+// Recomposes a 4x4 transform as P * T * R * K * S from decomposed components (see
+// DecomposedMatrix3D). Returns false if any resulting value is non-finite or exceeds the float
+// range, or if the result is not invertible; output may be partially written in that case.
 inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
   if (output == nullptr) return false;
   double rotation[3][3] = {};
@@ -493,6 +538,8 @@ inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output)
   return IsInvertibleMatrix3D(*output);
 }
 
+// Returns true if the decomposed perspective can be expressed by the single perspective distance
+// component, that is it has the form [0, 0, -1/d, 1] with d > 0, or is [0, 0, 0, 1] for none.
 inline bool IsMatrix3DSemanticallyRepresentable(const DecomposedMatrix3D& matrix) {
   constexpr double Tolerance = 1.0e-8;
   if (std::abs(matrix.perspective[0]) > Tolerance || std::abs(matrix.perspective[1]) > Tolerance ||
@@ -508,13 +555,14 @@ inline bool IsMatrix3DSemanticallyRepresentable(const DecomposedMatrix3D& matrix
   return true;
 }
 
+// Maps a Layer channel name ("rotation.x", "scale.y", "skew.xz", "perspective", ...) to its
+// Matrix3DComponent. Returns false if the name is not a semantic Matrix3D component.
 inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DComponent* component) {
   if (component == nullptr) {
     return false;
   }
-  static const char* names[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x",
-                                "scale.y",    "scale.z",    "skew.xy",    "skew.xz",
-                                "skew.yz",    "perspective"};
+  static const char* names[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x", "scale.y",
+                                "scale.z",    "skew.xy",    "skew.xz",    "skew.yz", "perspective"};
   for (size_t i = 0; i < Matrix3DComponentCount; ++i) {
     if (channel == names[i]) {
       *component = static_cast<Matrix3DComponent>(i);
@@ -524,11 +572,18 @@ inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DCom
   return false;
 }
 
+// Returns true if the Layer channel is a semantic Matrix3D component. These channels can only be
+// driven by DataBind; animations drop them.
 inline bool IsMatrix3DDataBindOnlyChannel(const std::string& channel) {
   Matrix3DComponent component = Matrix3DComponent::RotateX;
   return Matrix3DComponentFromChannel(channel, &component);
 }
 
+// Reads one semantic component from a decomposed matrix. Rotation is returned as Euler degrees (see
+// EulerXYZDegreesFromQuaternion), scale as the raw factor, skew as the angle in degrees whose
+// tangent is the stored shear factor, and perspective as the distance d of the [0, 0, -1/d, 1] row,
+// with 0 meaning none. Returns false if the value cannot be represented, including a perspective
+// that is not semantically representable.
 inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComponent component,
                                   float* output) {
   if (output == nullptr) {
@@ -575,6 +630,11 @@ inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComp
   return true;
 }
 
+// Replaces one semantic component of a decomposed matrix and keeps all other components. Input uses
+// the units of ReadMatrix3DComponent. A rotation write re-solves the current Euler angles and
+// replaces one axis. Returns false if the source perspective is not semantically representable, the
+// input is non-finite, a skew is +/-90 degrees, a perspective distance is negative, or the updated
+// components do not recompose into a valid matrix.
 inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DComponent component,
                                  float input, DecomposedMatrix3D* output) {
   if (output == nullptr || !std::isfinite(input) || !IsMatrix3DSemanticallyRepresentable(source)) {
@@ -631,6 +691,9 @@ inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DCompo
   return true;
 }
 
+// Interpolates two 4x4 transforms. t <= 0 returns first and t >= 1 returns second. Otherwise both
+// are decomposed and their components are interpolated, using slerp for rotation; if either
+// decomposition or the recomposition fails, the matrices are interpolated element-wise instead.
 inline Matrix3D LerpMatrix3D(const Matrix3D& first, const Matrix3D& second, double t) {
   if (first == second || t <= 0) return first;
   if (t >= 1) return second;
