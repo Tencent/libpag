@@ -10931,6 +10931,45 @@ PAGX_TEST(PAGXTest, LayerComponentWritesKeepWrittenValues) {
 }
 
 /**
+ * Test case: component writes that would compose a skew of 90 degrees or a negative perspective
+ * are rejected without changing the transform. A matrix pose with a CSS skewY(30) shear decomposes
+ * into a 30 degree rotation with skew.x 30 and skew.y 0.
+ */
+PAGX_TEST(PAGXTest, LayerComponentWritesRejectUncomposableValuesAndSkewYDecomposesToSkewX) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  auto* sheared = doc->makeNode<pagx::Layer>("sheared");
+  doc->layers.push_back(layer);
+  doc->layers.push_back(sheared);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+
+  EXPECT_FALSE(binding->apply(layer, "skew.x", pagx::KeyValue{90.0f}, 1.0f));
+  EXPECT_FALSE(binding->apply(layer, "perspective", pagx::KeyValue{-1.0f}, 1.0f));
+  EXPECT_TRUE(tgfxLayer->matrix3D().isIdentity());
+  pagx::KeyValue value;
+  ASSERT_TRUE(binding->read(layer, "skew.x", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 0);
+  ASSERT_TRUE(binding->read(layer, "perspective", &value));
+  EXPECT_FLOAT_EQ(std::get<float>(value), 0);
+
+  pagx::Matrix3DComponents components = {};
+  components.skew[1] = 30;
+  pagx::Matrix3D shear = {};
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(components, &shear));
+  ASSERT_TRUE(binding->apply(sheared, "matrix3D", pagx::KeyValue{shear}, 1.0f));
+  ASSERT_TRUE(binding->read(sheared, "skew.y", &value));
+  EXPECT_NEAR(std::get<float>(value), 0, 1.0e-4f);
+  ASSERT_TRUE(binding->read(sheared, "skew.x", &value));
+  EXPECT_NEAR(std::get<float>(value), 30, 1.0e-3f);
+  ASSERT_TRUE(binding->read(sheared, "rotation.z", &value));
+  EXPECT_NEAR(std::get<float>(value), 30, 1.0e-3f);
+}
+
+/**
  * Test case: a matrix tween between two rotations on opposite sides of +/-pi (170deg and 190deg,
  * which atan2 recovers as +2.967 rad and -2.967 rad) takes the shortest arc (a continuous 20deg
  * sweep through 180deg) instead of the long way (340deg in the opposite direction). Multi-turn
