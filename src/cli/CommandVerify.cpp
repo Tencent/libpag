@@ -79,6 +79,7 @@
 #include "pagx/nodes/ViewModel.h"
 #include "pagx/nodes/ViewModelProperty.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx_xsd.h"
 #include "tgfx/core/ImageCodec.h"
@@ -209,6 +210,10 @@ static void DetectFullCanvasClipMask(const Layer* layer, float canvasWidth, floa
     return;
   }
   if (!maskLayer->matrix.isIdentity()) {
+    return;
+  }
+  if (maskLayer->z != 0 || !maskLayer->matrix3D.isIdentity() ||
+      HasLayerTransformComponents(maskLayer)) {
     return;
   }
   if (maskLayer->contents.size() != 1) {
@@ -1687,6 +1692,10 @@ static void DetectRectangularMask(const Layer* layer, std::vector<VerifyDiagnost
     return;
   }
   if (!maskLayer->matrix.isIdentity()) {
+    return;
+  }
+  if (maskLayer->z != 0 || !maskLayer->matrix3D.isIdentity() ||
+      HasLayerTransformComponents(maskLayer)) {
     return;
   }
   AddDiagnostic(diagnostics, layer->sourceLine,
