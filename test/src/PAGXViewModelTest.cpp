@@ -487,9 +487,6 @@ PAGX_TEST(PAGXViewModelTest, DataBindPositionSyncVerified) {
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);
 }
 
-// Repro/guard: after a layer is refreshed in place (e.g. a late loadFileData edit on that layer),
-// a ToTarget DataBind must re-apply the ViewModel's current value to the rebuilt target. Otherwise
-// the refresh resets the channel to the node's authored default and the VM-pushed value is lost.
 // A semantic component binding and transform animations write into the same Layer pose. Writes
 // that drive different parts combine, and the latest write to the same part wins.
 PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingCombinesWithAnimation) {
@@ -652,6 +649,9 @@ PAGX_TEST(PAGXViewModelTest, LayerFullMatrixDataBindIsRejected) {
   EXPECT_TRUE(rootComp->dataBindRuntime->entries.empty());
 }
 
+// Repro/guard: after a layer is refreshed in place (e.g. a late loadFileData edit on that layer),
+// a ToTarget DataBind must re-apply the ViewModel's current value to the rebuilt target. Otherwise
+// the refresh resets the channel to the node's authored default and the VM-pushed value is lost.
 PAGX_TEST(PAGXViewModelTest, DataBindReappliesAfterLayerRefresh) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
