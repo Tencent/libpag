@@ -10623,9 +10623,9 @@ PAGX_TEST(PAGXTest, LayerTransformPrecedenceWithinAnimation) {
 }
 
 /**
- * Test case: a static non-identity matrix3D rejects x / y / z / matrix writes, a static
- * non-identity matrix rejects x / y writes, and a singular matrix3D write is rejected without
- * changing the transform.
+ * Test case: a static non-identity matrix3D rejects x / y / z / matrix and transform component
+ * writes, a static non-identity matrix rejects x / y writes, and a singular matrix3D write is
+ * rejected without changing the transform.
  */
 PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -10641,13 +10641,21 @@ PAGX_TEST(PAGXTest, LayerStaticMatrixRejectsOverriddenChannels) {
   auto* binding = scene->mutableBinding();
 
   EXPECT_FALSE(binding->apply(layer3D, "x", pagx::KeyValue{1.0f}, 1.0f));
+  EXPECT_FALSE(binding->apply(layer3D, "y", pagx::KeyValue{1.0f}, 1.0f));
   EXPECT_FALSE(binding->apply(layer3D, "z", pagx::KeyValue{1.0f}, 1.0f));
   EXPECT_FALSE(binding->apply(layer3D, "matrix", pagx::KeyValue{pagx::Matrix::Scale(2, 2)}, 1.0f));
-  EXPECT_FLOAT_EQ(binding->get<tgfx::Layer>(layer3D)->matrix3D().getRowColumn(2, 3), 10);
+  EXPECT_FALSE(binding->apply(layer3D, "rotation.z", pagx::KeyValue{45.0f}, 1.0f));
+  auto tgfxMatrix3D = binding->get<tgfx::Layer>(layer3D)->matrix3D();
+  EXPECT_FLOAT_EQ(tgfxMatrix3D.getRowColumn(0, 0), 1);
+  EXPECT_FLOAT_EQ(tgfxMatrix3D.getRowColumn(1, 0), 0);
+  EXPECT_FLOAT_EQ(tgfxMatrix3D.getRowColumn(0, 3), 0);
+  EXPECT_FLOAT_EQ(tgfxMatrix3D.getRowColumn(1, 3), 0);
+  EXPECT_FLOAT_EQ(tgfxMatrix3D.getRowColumn(2, 3), 10);
 
   auto tgfxLayer2D = binding->get<tgfx::Layer>(layer2D);
   EXPECT_FLOAT_EQ(tgfxLayer2D->matrix3D().getRowColumn(0, 3), 5);
   EXPECT_FALSE(binding->apply(layer2D, "x", pagx::KeyValue{1.0f}, 1.0f));
+  EXPECT_FALSE(binding->apply(layer2D, "y", pagx::KeyValue{1.0f}, 1.0f));
   pagx::KeyValue x;
   EXPECT_FALSE(binding->read(layer2D, "x", &x));
   ASSERT_TRUE(binding->apply(layer2D, "z", pagx::KeyValue{20.0f}, 1.0f));
