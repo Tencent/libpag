@@ -610,6 +610,17 @@ PAGX_TEST(PAGXViewModelTest, Matrix3DOnceComponentYieldsToLaterTransformWrite) {
   EXPECT_FLOAT_EQ(values[0], 1);
   EXPECT_FLOAT_EQ(values[1], 0);
   EXPECT_FLOAT_EQ(values[12], 0);
+
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto rotateZ = vm->propertyNumber("rotateZ");
+  ASSERT_NE(rotateZ, nullptr);
+  rotateZ->value(60);
+  ASSERT_TRUE(scene->draw(surface));
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_FLOAT_EQ(values[0], 1);
+  EXPECT_FLOAT_EQ(values[1], 0);
+  EXPECT_FLOAT_EQ(values[12], 0);
 }
 
 // Full Layer matrices are animation-only, so a DataBind targeting them is skipped.
