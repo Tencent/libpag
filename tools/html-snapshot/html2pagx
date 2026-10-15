@@ -30,6 +30,7 @@ const {
 const { runBatch } = require('./dist/lib/batch');
 const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./dist/lib/browser-engine');
 const { parseNumber } = require('./dist/lib/common');
+const { validateFontMap } = require('./dist/lib/font-metadata');
 
 const SCRIPT_DIR = __dirname;
 const TOOL_NAME = 'html2pagx';
@@ -105,6 +106,10 @@ Options (any unknown flag is forwarded to snapshot.js):
                              contained file)
   --cookie <name=value>      Forwarded to snapshot.js (URL inputs only; repeatable)
   --header <Key: Value>      Forwarded to snapshot.js (URL inputs only; repeatable)
+  --font-map <file>          JSON array of explicit from/to font replacement rules.
+                             Matches original CSS family stack, weight and style;
+                             writes the exact target family/face after embedding.
+                             Unmatched fonts stay unchanged. Requires --embed-fonts.
   --browser-engine <name>    Headless browser driver: 'puppeteer' (default)
                              or 'playwright'. Forwarded to snapshot.js.
                              Honours $HTML_SNAPSHOT_BROWSER.
@@ -119,6 +124,21 @@ function failArg(msg) {
   process.stderr.write(`${TOOL_NAME}: ${msg}\n`);
   process.stderr.write(`Run with --help for usage.\n`);
   process.exit(2);
+}
+
+// Validate explicit replacement rules before starting the browser or converter.
+function loadFontMap(filePath) {
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (err) {
+    fail(`--font-map: cannot read '${filePath}': ${err && err.message ? err.message : err}`);
+  }
+  const problems = validateFontMap(parsed);
+  if (problems.length > 0) {
+    fail(`--font-map: invalid font map: ${problems.join('; ')}`);
+  }
+  return parsed;
 }
 
 // Parse argv into a normalised options object. Unknown flags abort with exit
@@ -143,6 +163,8 @@ function parseArgs(argv) {
     downloadFonts: false,
     embedFonts: false,
     fontDir: '',
+    // Explicit replacement rules; never interpreted as an available-font catalog.
+    fontMapPath: '',
     downloadImages: false,
     imageDir: '',
     pagxImages: 'external',
@@ -230,6 +252,9 @@ function parseArgs(argv) {
         break;
       case '--font-dir':
         opts.fontDir = requireValue(a, argv[++i]);
+        break;
+      case '--font-map':
+        opts.fontMapPath = requireValue(a, argv[++i]);
         break;
       case '--download-images':
         opts.downloadImages = true;
@@ -385,6 +410,9 @@ function preflightPagxBin(opts) {
 
 async function main() {
   const opts = parseArgs(process.argv);
+  const fontMap = opts.fontMapPath
+    ? loadFontMap(opts.fontMapPath)
+    : undefined;
 
   // Batch mode forks the control flow early: lib/batch.js owns directory
   // walking, browser lifecycle, and progress prints. The single-file path
@@ -421,6 +449,7 @@ async function main() {
         viewportHeight: opts.viewportHeight,
         waitMs: opts.waitMs,
         selector: opts.selector,
+        fontMap,
       });
     } catch (err) {
       fail(err && err.message ? err.message : String(err), 1);
@@ -467,6 +496,7 @@ async function main() {
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
       selector: opts.selector,
+      fontMap,
       log: (line) => process.stdout.write(line + '\n'),
     });
   } catch (err) {
