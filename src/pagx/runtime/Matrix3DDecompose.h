@@ -290,11 +290,29 @@ inline Quaternion QuaternionFromEulerXYZDegrees(double xDegrees, double yDegrees
   return MultiplyQuaternion(MultiplyQuaternion(qz, qy), qx);
 }
 
+// Wraps an angle in degrees into (-180, 180].
+inline double WrapDegrees(double degrees) {
+  double wrapped = std::fmod(degrees, 360.0);
+  if (wrapped > 180) {
+    wrapped -= 360;
+  } else if (wrapped <= -180) {
+    wrapped += 360;
+  }
+  return wrapped;
+}
+
 // Recovers Euler angles in degrees, in the Rz * Ry * Rx convention of
-// QuaternionFromEulerXYZDegrees, from a quaternion, which is normalized first. The Y angle is
-// confined to [-90, 90] degrees, so the result is one equivalent set of angles rather than
-// necessarily the authored one; at gimbal lock the whole remaining rotation is assigned to X and Z
-// is 0. Returns false for a zero-length or non-finite quaternion.
+// QuaternionFromEulerXYZDegrees, from a quaternion, which is normalized first. Every rotation has
+// two solutions, (x, y, z) and (x + 180, 180 - y, z + 180); this returns the canonical one with the
+// smaller |x| + |z|, each angle within (-180, 180], so a pure Y rotation beyond 90 degrees reads
+// back as that Y angle instead of an equivalent set with X and Z at 180. Reads and writes of the
+// semantic rotation components share this branch, so a read-mix-write sequence stays continuous.
+// The result is stateless, which has three limitations: at gimbal lock (|cos y| <= 1e-3, wide
+// enough to absorb float round-off) the whole remaining rotation is assigned to X and Z is 0, so
+// the authored X / Z split is lost; when both solutions weigh the same (for example x = z = 90, or
+// X passing 180 while |y| > 90) the asin solution with Y in [-90, 90] is kept, so a following
+// write may jump once to the other solution; and the canonical choice may differ from the authored
+// angles. Returns false for a zero-length or non-finite quaternion.
 inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double output[3]) {
   if (output == nullptr) {
     return false;
@@ -313,15 +331,21 @@ inline bool EulerXYZDegreesFromQuaternion(const Quaternion& quaternion, double o
   double cosY = std::cos(y);
   double x = 0;
   double z = 0;
-  if (std::abs(cosY) > 1.0e-8) {
+  if (std::abs(cosY) > 1.0e-3) {
     x = std::atan2(rotation[2][1], rotation[2][2]);
     z = std::atan2(rotation[1][0], rotation[0][0]);
   } else {
     x = std::atan2(sinY >= 0 ? rotation[0][1] : -rotation[0][1], rotation[1][1]);
   }
-  output[0] = x * RADIANS_TO_DEGREES;
-  output[1] = y * RADIANS_TO_DEGREES;
-  output[2] = z * RADIANS_TO_DEGREES;
+  double first[3] = {x * RADIANS_TO_DEGREES, y * RADIANS_TO_DEGREES, z * RADIANS_TO_DEGREES};
+  double second[3] = {WrapDegrees(first[0] + 180), WrapDegrees(180 - first[1]),
+                      WrapDegrees(first[2] + 180)};
+  double firstWeight = std::abs(first[0]) + std::abs(first[2]);
+  double secondWeight = std::abs(second[0]) + std::abs(second[2]);
+  const double* chosen = secondWeight < firstWeight - 1.0e-6 ? second : first;
+  for (int i = 0; i < 3; ++i) {
+    output[i] = chosen[i];
+  }
   return std::isfinite(output[0]) && std::isfinite(output[1]) && std::isfinite(output[2]);
 }
 
@@ -588,11 +612,11 @@ inline bool IsMatrix3DDataBindOnlyChannel(const std::string& channel) {
   return Matrix3DComponentFromChannel(channel, &component);
 }
 
-// Reads one semantic component from a decomposed matrix. Rotation is returned as Euler degrees (see
-// EulerXYZDegreesFromQuaternion), scale as the raw factor, skew as the angle in degrees whose
-// tangent is the stored shear factor, and perspective as the distance d of the [0, 0, -1/d, 1] row,
-// with 0 meaning none. Returns false if the value cannot be represented, including a perspective
-// that is not semantically representable.
+// Reads one semantic component from a decomposed matrix. Rotation is returned as the canonical
+// Euler degrees (see EulerXYZDegreesFromQuaternion), scale as the raw factor, skew as the angle in
+// degrees whose tangent is the stored shear factor, and perspective as the distance d of the [0, 0,
+// -1/d, 1] row, with 0 meaning none. Returns false if the value cannot be represented, including a
+// perspective that is not semantically representable.
 inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComponent component,
                                   float* output) {
   if (output == nullptr) {
@@ -640,10 +664,11 @@ inline bool ReadMatrix3DComponent(const DecomposedMatrix3D& matrix, Matrix3DComp
 }
 
 // Replaces one semantic component of a decomposed matrix and keeps all other components. Input uses
-// the units of ReadMatrix3DComponent. A rotation write re-solves the current Euler angles and
-// replaces one axis. Returns false if the source perspective is not semantically representable, the
-// input is non-finite, a skew is +/-90 degrees, a perspective distance is negative, or the updated
-// components do not recompose into a valid matrix.
+// the units of ReadMatrix3DComponent. A rotation write re-solves the current canonical Euler angles
+// (the same ones ReadMatrix3DComponent returns) and replaces one axis. Returns false if the source
+// perspective is not semantically representable, the input is non-finite, a skew is +/-90 degrees,
+// a perspective distance is negative, or the updated components do not recompose into a valid
+// matrix.
 inline bool SetMatrix3DComponent(const DecomposedMatrix3D& source, Matrix3DComponent component,
                                  float input, DecomposedMatrix3D* output) {
   if (output == nullptr || !std::isfinite(input) || !IsMatrix3DSemanticallyRepresentable(source)) {
