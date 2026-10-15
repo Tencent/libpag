@@ -10743,6 +10743,46 @@ PAGX_TEST(PAGXTest, LayerPerspectiveThenZKeepsComponentsReadable) {
 }
 
 /**
+ * Test case: rotation.y writes past 90 degrees keep the written angle instead of flipping to the
+ * equivalent Euler branch, and a later rotation.x write keeps the existing rotation.y.
+ */
+PAGX_TEST(PAGXTest, LayerRotationWritesKeepTheWrittenEulerBranch) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* layer = doc->makeNode<pagx::Layer>("L");
+  auto* combined = doc->makeNode<pagx::Layer>("combined");
+  doc->layers.push_back(layer);
+  doc->layers.push_back(combined);
+  auto scene = pagx::PAGScene::Make(doc);
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+
+  const float angles[] = {80, 100, 110, 150, 180};
+  pagx::KeyValue value;
+  for (float angle : angles) {
+    ASSERT_TRUE(binding->apply(layer, "rotation.y", pagx::KeyValue{angle}, 1.0f));
+    double radians = angle * 3.14159265358979323846 / 180.0;
+    auto matrix = tgfxLayer->matrix3D();
+    EXPECT_NEAR(matrix.getRowColumn(0, 0), std::cos(radians), 1.0e-5) << "angle " << angle;
+    EXPECT_NEAR(matrix.getRowColumn(2, 0), -std::sin(radians), 1.0e-5) << "angle " << angle;
+    ASSERT_TRUE(binding->read(layer, "rotation.y", &value));
+    if (angle == 180) {
+      EXPECT_NEAR(std::abs(std::get<float>(value)), 180, 1.0e-3f);
+    } else {
+      EXPECT_NEAR(std::get<float>(value), angle, 1.0e-3f);
+    }
+  }
+
+  ASSERT_TRUE(binding->apply(combined, "rotation.y", pagx::KeyValue{120.0f}, 1.0f));
+  ASSERT_TRUE(binding->apply(combined, "rotation.x", pagx::KeyValue{10.0f}, 1.0f));
+  ASSERT_TRUE(binding->read(combined, "rotation.x", &value));
+  EXPECT_NEAR(std::get<float>(value), 10, 1.0e-3f);
+  ASSERT_TRUE(binding->read(combined, "rotation.y", &value));
+  EXPECT_NEAR(std::get<float>(value), 120, 1.0e-3f);
+}
+
+/**
  * Test case: a matrix tween between two rotations on opposite sides of +/-pi (170deg and 190deg,
  * which atan2 recovers as +2.967 rad and -2.967 rad) takes the shortest arc (a continuous 20deg
  * sweep through 180deg) instead of the long way (340deg in the opposite direction). Multi-turn
