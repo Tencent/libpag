@@ -624,3 +624,107 @@ Babel-compiled at runtime.
   pixels to keep the output diff-friendly.
 - The page is force-scrolled to `(0, 0)` before measurement so that scroll
   position never leaks into the captured coordinates.
+
+### Original HTML font inventory
+
+`html2pagx` writes the inventory immediately after the browser snapshot, before native import.
+It writes `<output-name>.fonts.json` next to the PAGX,
+including single-file, URL and batch conversions. No additional flag is needed. The inventory
+is also written with `--no-render`, `--no-resolve`, or `--no-subset-html`, and does not require
+font downloading, embedding or a replacement map:
+
+```sh
+./html2pagx page.html --no-render
+# page.pagx + page.fonts.json
+```
+
+```json
+{
+  "version": 1,
+  "fonts": [
+    {
+      "families": ["PingFang SC", "Microsoft YaHei", "sans-serif"],
+      "weight": 600,
+      "weightName": "SemiBold",
+      "style": "normal"
+    }
+  ],
+  "missingRequests": 0
+}
+```
+
+`families` is the original ordered CSS family stack; `weight` is the numeric computed CSS
+weight before PAGX face bucketing (650 stays 650), and `style` is `normal`, `italic` or `oblique`.
+`weightName` is a display label: 100–900 in steps of 100 map to `Thin`, `ExtraLight`,
+`Light`, `Regular`, `Medium`, `SemiBold`, `Bold`, `ExtraBold`, and `Black`. Other weights
+use their exact numeric string (for example, 650 becomes `"650"`). It does not participate
+in matching and is not the editor's actual font face name.
+Explicit `variations` and inherited `lang` are included only when present. Requests are
+deduplicated in first-use order, comparing family names case-insensitively and variation axes
+independently of property order. Different axes or languages remain separate records.
+
+The inventory describes text requests in the captured HTML, including inline runs, line splits
+and materialized pseudo/first-letter text. Native conversion failures do not prevent an already
+captured inventory from being available. It never substitutes Linux fallback or
+mapped editor font names for the source request. Snapshot text runs without an HTML request (for example,
+some inline SVG text) are counted in `missingRequests`; their fonts are not guessed. Original text,
+coordinates, glyph data and Text IDs are not copied into this file.
+
+Use the inventory to prepare the explicit `from` / `to` rules below: serialize `families` as
+the `from.font-family` CSS stack, copy `weight` and `style` to `from.font-weight` and
+`from.font-style`, and choose the exact `to` family/face from the editor's available fonts.
+The inventory contains no inferred target. Ardot still imports the final PAGX directly.
+Module callers receive the absolute JSON path as `runHtmlToPagx(...).fontMetadataPath`.
+An old PAGX without source requests cannot recover this information; convert the original HTML.
+Service integrations can call `collectSnapshotFontMetadata(snapshotHtml)` from `lib/snapshot-fonts`
+to return this JSON before conversion, persist the same snapshot and its inlined resources, then
+accept an external `from` / `to` map to resume conversion. `validateSnapshotFontMap` rejects map
+sources that are absent from that snapshot. The CLI continues directly through the pipeline.
+
+### Explicit font replacement
+
+Pass a JSON array of `from` / `to` rules with `--font-map`:
+
+```sh
+./html2pagx page.html --embed-fonts --font-map font-map.json --no-render
+```
+
+```json
+[
+  {
+    "from": {
+      "font-family": "\"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font-weight": "600",
+      "font-style": "normal",
+      "font-weight-style": "Semi Bold"
+    },
+    "to": {
+      "font-family": "Source Han Sans CN",
+      "font-weight": "600",
+      "font-style": "normal",
+      "font-weight-style": "Bold"
+    }
+  }
+]
+```
+
+The matcher compares the original ordered family stack, numeric CSS weight and CSS style.
+Quoting, separator whitespace and family case do not affect the comparison. The source face
+label is descriptive; the target `font-weight-style` is copied verbatim, so 600 can explicitly
+map to Bold. Unmatched fonts remain unchanged; no default font is inferred. Conflicting rules
+are rejected before conversion. The caller supplies targets already available in its editor.
+
+Source requests travel with text fragments through import/resolve/embed, keeping distinct
+requests separate even when PAGX rounds them to the same face. After embedding, each Text is
+matched directly and only its family/style is replaced. Temporary requests are removed;
+no Text IDs, document IDs or per-Text JSON sidecars are generated. Glyph resources and the
+original conversion layout are preserved. Existing authored IDs remain untouched.
+The snapshot inventory is produced independently before import; mapping never overwrites it.
+The deduplicated `.fonts.json` inventory above always keeps the source requests, including
+when a replacement map changes the final PAGX font names.
+
+Both single-file and batch runs support the flag. Module callers pass the same JSON array
+as `runHtmlToPagx({ fontMap, embedFonts: true, ... })` (or `runBatch`). Mapping requires resolve
+and embedding, and still runs when PNG rendering is disabled. The returned `fontMapping`
+counts replaced, unmatched and request-less texts. Request-less conversion paths are left
+unchanged and reported in the log; they are never matched by guessed Linux font names.

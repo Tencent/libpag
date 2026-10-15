@@ -101,6 +101,13 @@ class HTMLTextFragmentBuilder {
     // no explicit line-height — `convertTextLeaf` then leaves `TextBox.lineHeight` at its
     // auto default.
     float lineHeight = NAN;
+    // Raw font request JSON copied from the leaf's `data-pagx-font-request` attribute (or the
+    // nearest annotated ancestor's, via the inherited style). Opaque to this builder — it rides
+    // through to `Text::customData["html-font-request"]` so the external font-mapping step can
+    // rewrite the editor font names. Two runs whose requests differ must never merge even when
+    // their resolved CSS fingerprints coincide (e.g. font-weight 650 and 700 both resolving to
+    // the "Bold" face label), because the original numeric requests would be lost.
+    std::string fontRequest = {};
     // Derived from the run's CSS `white-space`. `collapseWhitespace` folds runs of
     // spaces / tabs into a single space (normal / nowrap / pre-line); when false
     // (pre / pre-wrap) the source spaces are emitted verbatim. `preserveNewlines` keeps a
@@ -135,6 +142,15 @@ class HTMLTextFragmentBuilder {
    *  path in `HTMLParserContext` can reuse it. */
   Text* buildTextElement(const TextFragment& fragment);
 
+  /** Enables the font-request metadata handshake (`HTMLImporter::Options::
+   *  emitFontRequestMetadata`). When on, every text element materialised by this builder gets a
+   *  `customData["html-font-request"]` carrying the fragment's raw request JSON,
+   *  so the external font-mapping step can rewrite the editor font names and clean up. When off
+   *  (default), output stays byte-identical to the legacy conversion. */
+  void setEmitFontRequestMetadata(bool emit) {
+    _emitFontRequestMetadata = emit;
+  }
+
   /** Builds a Fill from a fragment: emits a gradient Fill when `fragment.fillImage` is set,
    *  otherwise falls back to `_layerBuilder.buildSolidFill(fragment.color)`. */
   Fill* buildTextFill(const TextFragment& fragment);
@@ -152,6 +168,12 @@ class HTMLTextFragmentBuilder {
                                    const HTMLInheritedStyle& inherited);
 
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);
+
+  /** Stamps `text` with the fragment's raw font request
+   *  (`customData["html-font-request"]`). No-op unless `setEmitFontRequestMetadata(true)` and
+   *  the fragment carries a non-empty request. The JSON string is written verbatim — the
+   *  importer does not validate it; the consuming `font-metadata` module does. */
+  void applyFontRequestMetadata(Text* text, const TextFragment& fragment);
 
   /** Overlays the data-pagx-* round-trip metadata (original text / font family / font style /
    *  letter spacing / faux styles) from `element` onto `frag`. Attributes are honoured whenever
@@ -179,7 +201,7 @@ class HTMLTextFragmentBuilder {
 
   /** Fast fingerprint check used by `appendFragment` to skip the full `makeFragment`
    *  materialisation when the new run shares style with the previous fragment. */
-  static bool fragmentMatchesInherited(const TextFragment& a, const HTMLInheritedStyle& inherited);
+  bool fragmentMatchesInherited(const TextFragment& a, const HTMLInheritedStyle& inherited);
 
   /** Appends `text` to the fragment list, merging into the previous fragment when their style
    *  fingerprints match. */
@@ -224,6 +246,7 @@ class HTMLTextFragmentBuilder {
   HTMLLayerBuilder& _layerBuilder;
   HTMLStyleCascade& _styleCascade;
   HTMLIdAllocator& _idAllocator;
+  bool _emitFontRequestMetadata = false;
   PAGXDocument* _document = nullptr;
   std::unordered_map<std::string, std::string> _fontFiles = {};
   std::unordered_map<std::string, Font*> _fontResources = {};

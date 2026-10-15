@@ -1,0 +1,58 @@
+[
+  {
+    "from": {
+      "font-family": "\"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font-weight": "400",
+      "font-weight-style": "Regular",
+      "font-style": "normal"
+    },
+    "to": {
+      "font-family": "Source Han Sans CN",
+      "font-weight": "400",
+      "font-weight-style": "Regular",
+      "font-style": "normal"
+    }
+  },
+  {
+    "from": {
+      "font-family": "\"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font-weight": "500",
+      "font-weight-style": "Medium",
+      "font-style": "normal"
+    },
+    "to": {
+      "font-family": "Source Han Sans CN",
+      "font-weight": "500",
+      "font-weight-style": "Medium",
+      "font-style": "normal"
+    }
+  },
+  {
+    "from": {
+      "font-family": "\"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font-weight": "600",
+      "font-weight-style": "Semi Bold",
+      "font-style": "normal"
+    },
+    "to": {
+      "font-family": "Source Han Sans CN",
+      "font-weight": "600",
+      "font-weight-style": "Bold",
+      "font-style": "normal"
+    }
+  },
+  {
+    "from": {
+      "font-family": "\"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font-weight": "700",
+      "font-weight-style": "Bold",
+      "font-style": "normal"
+    },
+    "to": {
+      "font-family": "Source Han Sans CN",
+      "font-weight": "700",
+      "font-weight-style": "Bold",
+      "font-style": "normal"
+    }
+  }
+]
