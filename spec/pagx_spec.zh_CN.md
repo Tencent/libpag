@@ -984,7 +984,7 @@ Layer 的子元素按类型自动归类为五个集合：
 
 约束或容器布局生成的位置在局部变换之外叠加：`T(layoutPosition) * local`。
 
-**变换动画**：Layer 维护一个由 `x`/`y`/`z`、`matrix`、`matrix3D` 通道共享的当前局部变换。每次动画或 DataBind 写入只把它驱动的部分混合进当前值（`current = mix(current, value, weight)`），没有被驱动的部分保持当前值不变。`x`/`y`/`z` 驱动平移，`matrix` 驱动 2D 部分并保留 Z 平移，`matrix3D` 驱动整个矩阵。同一个动画内，其包含的通道按上述优先级生效，与通道顺序无关。非单位的静态 `matrix` 会忽略 `x`/`y` 写入，非单位的静态 `matrix3D` 会忽略 `x`/`y`/`z` 和 `matrix` 写入。
+**变换动画**：Layer 维护一个由 `x`/`y`/`z`、`matrix`、`matrix3D` 通道共享的当前局部变换。每次动画或 DataBind 写入只把它驱动的部分混合进当前值（`current = mix(current, value, weight)`），没有被驱动的部分保持当前值不变。`x`/`y`/`z` 驱动平移，`matrix3D` 驱动整个矩阵。`matrix` 把整个局部变换向携带当前 Z 平移的 2D 矩阵混合，因此在完全权重下会替换 Z 平移以外的全部内容，之前写入的 3D 旋转、缩放、剪切或透视都会被重置。同一个动画内，其包含的通道按上述优先级生效，与通道顺序无关。非单位的静态 `matrix` 会忽略 `x`/`y` 写入，非单位的静态 `matrix3D` 会忽略 `x`/`y`/`z` 和 `matrix` 写入。
 
 **MaskType（遮罩类型）**：
 
