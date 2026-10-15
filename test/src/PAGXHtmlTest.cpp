@@ -351,7 +351,7 @@ CLI_TEST(PAGXHtmlTest, LayerStaticZUsesMatrix3DTransform) {
 
   auto html = ConvertToHTML(doc);
   ASSERT_FALSE(html.empty());
-  EXPECT_NE(html.find("matrix3d("), std::string::npos);
+  EXPECT_NE(html.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,0,0,30,1)"), std::string::npos);
 }
 
 CLI_TEST(PAGXHtmlTest, LayerAuthoredXYAddsToConstraintPosition) {
@@ -456,6 +456,8 @@ CLI_TEST(PAGXHtmlTest, LayerMatrix3DOverridesAuthoredXYAndKeepsLayoutPosition) {
   auto authoredHtml = ConvertToHTML(authoredDoc, options);
   auto authoredTag = FindTagContaining(authoredHtml, "matrix3d(");
   ASSERT_FALSE(authoredTag.empty());
+  EXPECT_NE(authoredTag.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,10,20,0,1)"), std::string::npos);
+  EXPECT_EQ(authoredTag.find("translate("), std::string::npos);
   EXPECT_EQ(authoredHtml.find("left:50px"), std::string::npos);
   EXPECT_EQ(authoredHtml.find("left: 50px"), std::string::npos);
   EXPECT_EQ(authoredHtml.find("top:60px"), std::string::npos);
@@ -555,7 +557,8 @@ CLI_TEST(PAGXHtmlTest, LayerTransformPriority) {
   EXPECT_EQ(html.find("top:999px"), std::string::npos);
   EXPECT_EQ(html.find("top: 999px"), std::string::npos);
   EXPECT_NE(matrixTag.find("translate(10px,10px)"), std::string::npos);
-  EXPECT_NE(matrix3DTag.find("matrix3d("), std::string::npos);
+  EXPECT_NE(matrix3DTag.find("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,30,40,0,1)"), std::string::npos);
+  EXPECT_EQ(html.find("translate(40px,50px)"), std::string::npos);
   EXPECT_EQ(matrix3DTag.find("left:999px"), std::string::npos);
   EXPECT_EQ(matrix3DTag.find("top:999px"), std::string::npos);
 }
