@@ -11,10 +11,15 @@ export interface HtmlFontRequest {
   lang?: string;
 }
 
+export interface HtmlFontMetadataEntry extends HtmlFontRequest {
+  /** Display label only; matching still uses the exact numeric weight. */
+  weightName: string;
+}
+
 /** Source requests used by the converted text, before any editor-font replacements. */
 export interface HtmlFontMetadata {
   version: 1;
-  fonts: HtmlFontRequest[];
+  fonts: HtmlFontMetadataEntry[];
   /** Visible Text nodes without a captured HTML request (for example, inline SVG text). */
   missingRequests: number;
 }
@@ -176,11 +181,23 @@ export function validateFontRequest(value: unknown): value is HtmlFontRequest {
         /^[A-Za-z0-9]{4}$/.test(axis) && typeof number === 'number' && Number.isFinite(number))));
 }
 
+const FONT_WEIGHT_NAMES: Readonly<Record<number, string>> = {
+  100: 'Thin',
+  200: 'ExtraLight',
+  300: 'Light',
+  400: 'Regular',
+  500: 'Medium',
+  600: 'SemiBold',
+  700: 'Bold',
+  800: 'ExtraBold',
+  900: 'Black',
+};
+
 /** Deduplicate without losing explicit axes or language, in first-use order. */
 export function collectFontMetadata(
   requests: readonly HtmlFontRequest[], missingRequests = 0,
 ): HtmlFontMetadata {
-  const fonts = new Map<string, HtmlFontRequest>();
+  const fonts = new Map<string, HtmlFontMetadataEntry>();
   for (const request of requests) {
     if (!validateFontRequest(request)) {
       throw new FontMappingError(FontMappingErrorCode.FontMetadataMismatch, 'invalid source font request');
@@ -191,6 +208,7 @@ export function collectFontMetadata(
     fonts.set(key, {
       families: [...request.families],
       weight: request.weight,
+      weightName: FONT_WEIGHT_NAMES[request.weight] || String(request.weight),
       style: request.style,
       ...(axes.length ? { variations: Object.fromEntries(axes) } : {}),
       ...(request.lang ? { lang: request.lang } : {}),
