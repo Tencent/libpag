@@ -45,8 +45,6 @@ struct ImportFormatOptions {
   // snapshot.js) so the importer can replay the motion. Off by default: the
   // snapshot emits a single static frame.
   bool captureAnimations = false;
-  // Preserve HTML source requests for post-embedding replacement without generated ids.
-  bool fontRequestMetadata = false;
 };
 
 /**

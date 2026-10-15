@@ -849,17 +849,8 @@ void HTMLLayerBuilder::applyLayerAttributes(Layer* layer, const std::shared_ptr<
 // data-pagx-version and every other data-* attribute are still forwarded.
 static bool IsInternalPagxTextProtocolKey(const std::string& key) {
   static const char* const kProtocolKeys[] = {
-      "pagx-text",
-      "pagx-text-part",
-      "pagx-font-family",
-      "pagx-font-style",
-      "pagx-letter-spacing",
-      "pagx-faux-bold",
-      "pagx-faux-italic",
-      // html-snapshot font request: consumed by HTMLStyleCascade::resolveInheritedStyle and
-      // carried onto Text::customData only when the font-mapping handshake is enabled — it must
-      // never leak onto the surrounding Layer as generic custom data.
-      "pagx-font-request",
+      "pagx-text",           "pagx-text-part", "pagx-font-family", "pagx-font-style",
+      "pagx-letter-spacing", "pagx-faux-bold", "pagx-faux-italic",
   };
   for (const char* protocolKey : kProtocolKeys) {
     if (key == protocolKey) {

@@ -425,7 +425,7 @@ describe('runHtmlToPagx — orchestrator', () => {
       'done',
       'case "$cmd" in',
       // import writes the .pagx file to --output
-      '  import) printf "%s" "<pagx/>" > "$out" ;;',
+      '  import) echo -n "<pag/>" > "$out" ;;',
       // resolve takes the pagx path positionally; touch it to record the call
       '  resolve) : ;;',
       // render writes a "PNG" to --output (file content shape doesn\'t matter)
@@ -496,7 +496,7 @@ describe('runHtmlToPagx — orchestrator', () => {
       '  case "$1" in --output) out="$2"; shift;; esac',
       '  shift',
       'done',
-      'if [ "$cmd" = "import" ]; then printf "%s" "<pagx/>" > "$out"; fi',
+      'if [ "$cmd" = "import" ]; then echo -n "<pag/>" > "$out"; fi',
       // For `resolve`/`render` we deliberately exit non-zero so a regression
       // that re-enables those steps would surface immediately.
       'if [ "$cmd" != "import" ]; then exit 99; fi',
@@ -694,7 +694,7 @@ function makeFakePagx({ allowRender = true } = {}) {
     '  shift',
     'done',
     'case "$cmd" in',
-    '  import) [ -n "$out" ] && printf "%s" "<pagx/>" > "$out" ;;',
+    '  import) [ -n "$out" ] && echo -n "<pag/>" > "$out" ;;',
     '  resolve) : ;;',
     '  embed) : ;;',                         // font-embed: subcommand is `embed`
     `  render) ${allowRender ? '[ -n "$out" ] && echo -n "PNG" > "$out"' : 'exit 99'} ;;`,

@@ -401,12 +401,10 @@ static SVGImporter::Options ToSVGOptions(const ImportFormatOptions& formatOption
 // HTML import behaviour is fixed in code (no longer exposed via CLI/ImportFormatOptions): the
 // importer always normalizes the subset, prefers the <body> intrinsic size, recovers flex from
 // absolute layout, and downgrades unsupported constructs to warnings rather than hard errors.
-static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOptions,
-                                           float targetWidth = NAN, float targetHeight = NAN) {
+static HTMLImporter::Options ToHTMLOptions(float targetWidth = NAN, float targetHeight = NAN) {
   HTMLImporter::Options options = {};
   options.targetWidth = targetWidth;
   options.targetHeight = targetHeight;
-  options.emitFontRequestMetadata = formatOptions.fontRequestMetadata;
   return options;
 }
 
@@ -440,7 +438,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
     result.document =
         SVGImporter::Parse(filePath, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    auto htmlOptions = ToHTMLOptions(formatOptions, targetWidth, targetHeight);
+    auto htmlOptions = ToHTMLOptions(targetWidth, targetHeight);
     if (snapshotEnabled) {
       // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
       // subset HTML) straight to the importer. No temp file touches the disk; the HTML
@@ -478,8 +476,7 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.document =
         SVGImporter::ParseString(content, ToSVGOptions(formatOptions, targetWidth, targetHeight));
   } else if (effectiveFormat == "html") {
-    result.document =
-        HTMLImporter::ParseString(content, ToHTMLOptions(formatOptions, targetWidth, targetHeight));
+    result.document = HTMLImporter::ParseString(content, ToHTMLOptions(targetWidth, targetHeight));
   } else {
     result.error = "unsupported inline import format '" + effectiveFormat + "'";
     return result;
@@ -534,9 +531,6 @@ static void PrintUsage() {
       << "  --capture-animations           HTML/URL only: capture the page's animations (CSS\n"
       << "                                 @keyframes, Web Animations, GSAP, anime.js) into the\n"
       << "                                 output so they replay in PAGX. Default: a static frame\n"
-      << "  --font-request-metadata        HTML only: preserve source font requests on Text\n"
-      << "                                 nodes for post-embedding replacement. No ids are\n"
-      << "                                 generated. Default: off\n"
       << "  --images <mode>                How image resources are stored: 'external' (default;\n"
       << "                                 write image files next to the output PAGX and keep the\n"
       << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
@@ -573,8 +567,6 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->resolve = false;
     } else if (arg == "--capture-animations") {
       options->formatOptions.captureAnimations = true;
-    } else if (arg == "--font-request-metadata") {
-      options->formatOptions.fontRequestMetadata = true;
     } else if (arg == "--images" && i + 1 < argc) {
       std::string mode = argv[++i];
       if (!ParseImageStorageMode(mode, &options->imageStorage)) {

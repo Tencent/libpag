@@ -120,13 +120,6 @@ class HTMLImporter {
      */
     std::string basePath = {};
 
-    /**
-     * Preserves each source font request on its Text as data-html-font-request for direct
-     * post-embedding from/to replacement. No Text or document ids are generated.
-     * Default false: source requests do not affect legacy fragment merging or output.
-     */
-    bool emitFontRequestMetadata = false;
-
     Options() {
     }
   };

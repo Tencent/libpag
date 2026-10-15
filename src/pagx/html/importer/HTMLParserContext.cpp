@@ -132,10 +132,6 @@ HTMLParserContext::HTMLParserContext(const HTMLImporter::Options& options) : _op
   _layerBuilder = std::make_unique<HTMLLayerBuilder>(*_diagnostics, *_valueParser, *_svgEmitter);
   _textFragmentBuilder = std::make_unique<HTMLTextFragmentBuilder>(
       *_diagnostics, *_valueParser, *_layerBuilder, *_styleCascade, *_idAllocator);
-  // Font-request metadata handshake: preserve the raw font request on Text nodes from the
-  // `data-pagx-font-request` payload when the caller opts in (see
-  // HTMLImporter::Options::emitFontRequestMetadata).
-  _textFragmentBuilder->setEmitFontRequestMetadata(_options.emitFontRequestMetadata);
   // Forward cascade-discovered font-family chains into the document-wide fallback pool.
   _styleCascade->setFontFallbackSink(&HTMLParserContext::RecordFontFallbacksThunk, this);
   // Let the cascade pick the first *resolvable* family from each font-family stack, so a leading
