@@ -10763,15 +10763,24 @@ PAGX_TEST(PAGXTest, LayerPerspectiveThenZKeepsComponentsReadable) {
 }
 
 /**
- * Test case: rotation.y writes past 90 degrees keep the written angle instead of flipping to the
- * equivalent Euler branch, and a later rotation.x write keeps the existing rotation.y.
+ * Test case: rotation.y writes on a component pose keep the written angle. A rotation decomposed
+ * from a matrix pose reads back as the canonical Euler set with the smaller X and Z rotation, so a
+ * matrix3D Y rotation of 120 degrees reads back as (0, 120, 0) instead of the equivalent
+ * (180, 60, 180), and a later rotation.x write decomposes the matrix and keeps that rotation.y.
  */
-PAGX_TEST(PAGXTest, LayerRotationWritesKeepTheWrittenEulerBranch) {
+PAGX_TEST(PAGXTest, LayerRotationKeepsWrittenAnglesAndReadsCanonicalEulerBranch) {
+  double euler[3] = {};
+  ASSERT_TRUE(
+      pagx::EulerXYZDegreesFromQuaternion(pagx::QuaternionFromEulerXYZDegrees(0, 120, 0), euler));
+  EXPECT_NEAR(euler[0], 0, 1.0e-6);
+  EXPECT_NEAR(euler[1], 120, 1.0e-6);
+  EXPECT_NEAR(euler[2], 0, 1.0e-6);
+
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* layer = doc->makeNode<pagx::Layer>("L");
-  auto* combined = doc->makeNode<pagx::Layer>("combined");
+  auto* matrixPose = doc->makeNode<pagx::Layer>("matrixPose");
   doc->layers.push_back(layer);
-  doc->layers.push_back(combined);
+  doc->layers.push_back(matrixPose);
   auto scene = pagx::PAGScene::Make(doc);
   ASSERT_NE(scene, nullptr);
   auto* binding = scene->mutableBinding();
@@ -10787,18 +10796,22 @@ PAGX_TEST(PAGXTest, LayerRotationWritesKeepTheWrittenEulerBranch) {
     EXPECT_NEAR(matrix.getRowColumn(0, 0), std::cos(radians), 1.0e-5) << "angle " << angle;
     EXPECT_NEAR(matrix.getRowColumn(2, 0), -std::sin(radians), 1.0e-5) << "angle " << angle;
     ASSERT_TRUE(binding->read(layer, "rotation.y", &value));
-    if (angle == 180) {
-      EXPECT_NEAR(std::abs(std::get<float>(value)), 180, 1.0e-3f);
-    } else {
-      EXPECT_NEAR(std::get<float>(value), angle, 1.0e-3f);
-    }
+    EXPECT_FLOAT_EQ(std::get<float>(value), angle) << "angle " << angle;
   }
 
-  ASSERT_TRUE(binding->apply(combined, "rotation.y", pagx::KeyValue{120.0f}, 1.0f));
-  ASSERT_TRUE(binding->apply(combined, "rotation.x", pagx::KeyValue{10.0f}, 1.0f));
-  ASSERT_TRUE(binding->read(combined, "rotation.x", &value));
+  auto rotation = ToPAGXMatrix3D(tgfx::Matrix3D::MakeRotate({0, 1, 0}, 120));
+  ASSERT_TRUE(binding->apply(matrixPose, "matrix3D", pagx::KeyValue{rotation}, 1.0f));
+  ASSERT_TRUE(binding->read(matrixPose, "rotation.x", &value));
+  EXPECT_NEAR(std::get<float>(value), 0, 1.0e-3f);
+  ASSERT_TRUE(binding->read(matrixPose, "rotation.y", &value));
+  EXPECT_NEAR(std::get<float>(value), 120, 1.0e-3f);
+  ASSERT_TRUE(binding->read(matrixPose, "rotation.z", &value));
+  EXPECT_NEAR(std::get<float>(value), 0, 1.0e-3f);
+
+  ASSERT_TRUE(binding->apply(matrixPose, "rotation.x", pagx::KeyValue{10.0f}, 1.0f));
+  ASSERT_TRUE(binding->read(matrixPose, "rotation.x", &value));
   EXPECT_NEAR(std::get<float>(value), 10, 1.0e-3f);
-  ASSERT_TRUE(binding->read(combined, "rotation.y", &value));
+  ASSERT_TRUE(binding->read(matrixPose, "rotation.y", &value));
   EXPECT_NEAR(std::get<float>(value), 120, 1.0e-3f);
 }
 
