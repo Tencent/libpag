@@ -10577,8 +10577,9 @@ PAGX_TEST(PAGXTest, LayerTransformWritesKeepUndrivenComponents) {
 }
 
 /**
- * Test case: within one animation, matrix3D overrides matrix and x / y / z, and matrix overrides
- * x / y, regardless of channel order or of the channels being split across objects.
+ * Test case: within one animation, matrix3D overrides matrix, x / y / z and the transform
+ * components, and matrix overrides x / y and the transform components, even when the overridden
+ * channels come after the overriding one and are split across objects.
  */
 PAGX_TEST(PAGXTest, LayerTransformPrecedenceWithinAnimation) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
@@ -10590,14 +10591,16 @@ PAGX_TEST(PAGXTest, LayerTransformPrecedenceWithinAnimation) {
   animation->duration = 60;
   animation->frameRate = 60;
   doc->animations.push_back(animation);
-  AddHoldChannel(doc.get(), animation, "L3D", "x", 50.0f);
-  AddHoldChannel(doc.get(), animation, "L3D", "matrix", pagx::Matrix::Scale(3, 3));
   AddHoldChannel(doc.get(), animation, "L3D", "matrix3D",
                  ToPAGXMatrix3D(tgfx::Matrix3D::MakeTranslate(7, 8, 9)));
+  AddHoldChannel(doc.get(), animation, "L3D", "matrix", pagx::Matrix::Scale(3, 3));
+  AddHoldChannel(doc.get(), animation, "L3D", "x", 50.0f);
   AddHoldChannel(doc.get(), animation, "L3D", "z", 30.0f);
-  AddHoldChannel(doc.get(), animation, "L2D", "x", 50.0f);
+  AddHoldChannel(doc.get(), animation, "L3D", "rotation.z", 45.0f);
   AddHoldChannel(doc.get(), animation, "L2D", "matrix", pagx::Matrix::Scale(2, 2));
+  AddHoldChannel(doc.get(), animation, "L2D", "x", 50.0f);
   AddHoldChannel(doc.get(), animation, "L2D", "y", 60.0f);
+  AddHoldChannel(doc.get(), animation, "L2D", "rotation.z", 45.0f);
   AddHoldChannel(doc.get(), animation, "L2D", "z", 30.0f);
 
   auto scene = pagx::PAGScene::Make(doc);
@@ -10607,11 +10610,13 @@ PAGX_TEST(PAGXTest, LayerTransformPrecedenceWithinAnimation) {
   timeline->apply(1.0f);
   auto matrix3D = scene->mutableBinding()->get<tgfx::Layer>(layer3D)->matrix3D();
   EXPECT_FLOAT_EQ(matrix3D.getRowColumn(0, 0), 1);
+  EXPECT_FLOAT_EQ(matrix3D.getRowColumn(1, 0), 0);
   EXPECT_FLOAT_EQ(matrix3D.getRowColumn(0, 3), 7);
   EXPECT_FLOAT_EQ(matrix3D.getRowColumn(1, 3), 8);
   EXPECT_FLOAT_EQ(matrix3D.getRowColumn(2, 3), 9);
   auto matrix2D = scene->mutableBinding()->get<tgfx::Layer>(layer2D)->matrix3D();
   EXPECT_FLOAT_EQ(matrix2D.getRowColumn(0, 0), 2);
+  EXPECT_FLOAT_EQ(matrix2D.getRowColumn(1, 0), 0);
   EXPECT_FLOAT_EQ(matrix2D.getRowColumn(0, 3), 0);
   EXPECT_FLOAT_EQ(matrix2D.getRowColumn(1, 3), 0);
   EXPECT_FLOAT_EQ(matrix2D.getRowColumn(2, 3), 30);
