@@ -132,29 +132,30 @@ inline double Determinant4(const double source[4][4]) {
   return determinant;
 }
 
-// Returns true if the matrix is finite and invertible. The values are first divided by their
-// largest magnitude so the determinant threshold does not depend on the overall matrix scale.
+// Returns true if the matrix is finite and invertible. Each column is first divided by its
+// Euclidean norm, so the determinant becomes the Hadamard ratio |det(M)| / (product of the column
+// norms) in [0, 1]. The threshold then depends neither on the overall scale nor on how large the
+// translation is relative to the linear part.
 inline bool IsInvertibleMatrix3D(const Matrix3D& matrix) {
   if (!IsFiniteMatrix3D(matrix)) {
     return false;
   }
   double values[4][4] = {};
-  double scale = 0;
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
+  for (int column = 0; column < 4; ++column) {
+    double norm = 0;
+    for (int row = 0; row < 4; ++row) {
       values[row][column] = matrix.getRowColumn(row, column);
-      scale = std::max(scale, std::abs(values[row][column]));
+      norm += values[row][column] * values[row][column];
+    }
+    norm = std::sqrt(norm);
+    if (!std::isfinite(norm) || norm == 0) {
+      return false;
+    }
+    for (int row = 0; row < 4; ++row) {
+      values[row][column] /= norm;
     }
   }
-  if (scale == 0) {
-    return false;
-  }
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
-      values[row][column] /= scale;
-    }
-  }
-  return std::abs(Determinant4(values)) > 1.0e-12;
+  return std::abs(Determinant4(values)) > 1.0e-9;
 }
 
 // Inverts a [row][column] 4x4 matrix with Gauss-Jordan elimination and writes the result to
