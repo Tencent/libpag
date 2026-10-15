@@ -1753,9 +1753,8 @@ static void WriteLayer(XMLBuilder& xml, const Layer* node, const Options& option
   xml.addAttribute("scaleX", node->scaleX, Default<Layer>().scaleX);
   xml.addAttribute("scaleY", node->scaleY, Default<Layer>().scaleY);
   xml.addAttribute("scaleZ", node->scaleZ, Default<Layer>().scaleZ);
-  xml.addAttribute("skewXY", node->skewXY, Default<Layer>().skewXY);
-  xml.addAttribute("skewXZ", node->skewXZ, Default<Layer>().skewXZ);
-  xml.addAttribute("skewYZ", node->skewYZ, Default<Layer>().skewYZ);
+  xml.addAttribute("skewX", node->skewX, Default<Layer>().skewX);
+  xml.addAttribute("skewY", node->skewY, Default<Layer>().skewY);
   xml.addAttribute("perspective", node->perspective, Default<Layer>().perspective);
   xml.addDimensionAttribute("width", node->width, node->percentWidth);
   xml.addDimensionAttribute("height", node->height, node->percentHeight);

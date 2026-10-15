@@ -132,22 +132,19 @@ class Layer : public Node, public LayoutNode {
   float scaleZ = 1.0f;
 
   /**
-   * The skew angle in degrees that shifts X proportionally to Y. It must be within (-90, 90). See
-   * rotationX for how the components compose. The default value is 0.
+   * The horizontal skew angle in degrees, like CSS skewX(): X is shifted by tan(skewX) * Y. It must
+   * be within (-90, 90). Together with skewY it forms the CSS skew(skewX, skewY) shear
+   * [[1, tan(skewX)], [tan(skewY), 1]]. See rotationX for how the components compose. The default
+   * value is 0.
    */
-  float skewXY = 0.0f;
+  float skewX = 0.0f;
 
   /**
-   * The skew angle in degrees that shifts X proportionally to Z. It must be within (-90, 90). See
-   * rotationX for how the components compose. The default value is 0.
+   * The vertical skew angle in degrees, like CSS skewY(): Y is shifted by tan(skewY) * X. It must
+   * be within (-90, 90). See skewX and rotationX for how the components compose. The default value
+   * is 0.
    */
-  float skewXZ = 0.0f;
-
-  /**
-   * The skew angle in degrees that shifts Y proportionally to Z. It must be within (-90, 90). See
-   * rotationX for how the components compose. The default value is 0.
-   */
-  float skewYZ = 0.0f;
+  float skewY = 0.0f;
 
   /**
    * The perspective viewing distance d, applied outside the translation as the projection row

@@ -962,9 +962,8 @@ Layer 的子元素按类型自动归类为五个集合：
 | `scaleX` | float | 1 | X 方向缩放 |
 | `scaleY` | float | 1 | Y 方向缩放 |
 | `scaleZ` | float | 1 | Z 方向缩放 |
-| `skewXY` | float | 0 | X 随 Y 偏移的剪切角，单位为度，范围 (-90, 90) |
-| `skewXZ` | float | 0 | X 随 Z 偏移的剪切角，单位为度，范围 (-90, 90) |
-| `skewYZ` | float | 0 | Y 随 Z 偏移的剪切角，单位为度，范围 (-90, 90) |
+| `skewX` | float | 0 | 水平剪切角，单位为度，同 CSS `skewX()`，范围 (-90, 90) |
+| `skewY` | float | 0 | 垂直剪切角，单位为度，同 CSS `skewY()`，范围 (-90, 90) |
 | `perspective` | float | 0 | 透视距离 `d`；0 表示无透视，负数无效 |
 | `matrix` | Matrix | 单位矩阵 | 2D 变换 "a,b,c,d,tx,ty" |
 | `matrix3D` | Matrix3D | - | 3D 变换（16 个值，列优先） |
@@ -987,8 +986,8 @@ Layer 的子元素按类型自动归类为五个集合：
 
 **preserve3D**：当值为 `false`（默认）时，具有 3D 变换的子图层在合成前会被压平到父级的 2D 平面。当值为 `true` 时，子图层保留其 3D 位置，在共享的 3D 空间中渲染，实现基于深度的交叉和正确的兄弟层 Z 排序。类似于 CSS 的 `transform-style: preserve-3d`。
 
-**变换属性优先级**：`x`/`y`/`z`、变换分量（`rotationX`/`rotationY`/`rotationZ`、`scaleX`/`scaleY`/`scaleZ`、`skewXY`/`skewXZ`/`skewYZ`、`perspective`）、`matrix`、`matrix3D` 组成图层的局部变换，存在覆盖关系：
-- 未设置 `matrix`/`matrix3D`：局部变换按列向量约定组合为 `P * T * R * K * S`，其中透视 `P`（投影行 `[0, 0, -1/d, 1]`）、平移 `T(x, y, z)`、旋转 `R = Rz * Ry * Rx`、剪切 `K`、缩放 `S`
+**变换属性优先级**：`x`/`y`/`z`、变换分量（`rotationX`/`rotationY`/`rotationZ`、`scaleX`/`scaleY`/`scaleZ`、`skewX`/`skewY`、`perspective`）、`matrix`、`matrix3D` 组成图层的局部变换，存在覆盖关系：
+- 未设置 `matrix`/`matrix3D`：局部变换按列向量约定组合为 `P * T * R * K * S`，其中透视 `P`（投影行 `[0, 0, -1/d, 1]`）、平移 `T(x, y, z)`、旋转 `R = Rz * Ry * Rx`、剪切 `K`（即 CSS `skew(skewX, skewY)` 的剪切矩阵 `[[1, tan(skewX)], [tan(skewY), 1]]`）、缩放 `S`
 - 设置 `matrix`：`matrix` 覆盖 `x`/`y` 和变换分量，`z` 仍然生效
 - 设置 `matrix3D`：`matrix3D` 覆盖 `matrix`、`x`/`y`/`z` 和变换分量
 
@@ -996,7 +995,7 @@ Layer 的子元素按类型自动归类为五个集合：
 
 约束或容器布局生成的位置在局部变换之外叠加：`T(layoutPosition) * local`。
 
-**变换动画**：Layer 维护一个由 `x`/`y`/`z`、变换分量、`matrix`、`matrix3D` 通道共享的当前局部变换。每次动画或 DataBind 写入只把它驱动的部分混合进当前值（`current = mix(current, value, weight)`），没有被驱动的部分保持当前值不变。`x`/`y`/`z` 驱动平移，各分量通道驱动各自的分量，`matrix3D` 驱动整个矩阵。在没有写入矩阵期间，分量按写入值保存，因此缩放可以从 0 开始动画，超过 180° 的旋转也会保持原值；写入 `matrix` 或 `matrix3D` 之后，下一次分量写入会先把矩阵分解为分量（旋转取 X、Z 旋转较小的等价欧拉角），矩阵无法分解或带有 Z 轴距离以外的透视时，该次写入会被拒绝。`matrix` 把整个局部变换向携带当前 Z 平移的 2D 矩阵混合，因此在完全权重下会替换 Z 平移以外的全部内容，之前写入的 3D 旋转、缩放、剪切或透视都会被重置。同一个动画内，其包含的通道按上述优先级生效，与通道顺序无关。非单位的静态 `matrix` 会忽略 `x`/`y` 和分量写入，非单位的静态 `matrix3D` 会忽略 `x`/`y`/`z`、分量和 `matrix` 写入。局部变换带有透视时，`x`/`y`/`z` 写入会替换分解后的平移分量，使平移位于投影之内；局部变换无法分解时，该次写入会被拒绝。
+**变换动画**：Layer 维护一个由 `x`/`y`/`z`、变换分量、`matrix`、`matrix3D` 通道共享的当前局部变换。每次动画或 DataBind 写入只把它驱动的部分混合进当前值（`current = mix(current, value, weight)`），没有被驱动的部分保持当前值不变。`x`/`y`/`z` 驱动平移，各分量通道驱动各自的分量，`matrix3D` 驱动整个矩阵。在没有写入矩阵期间，分量按写入值保存，因此缩放可以从 0 开始动画，超过 180° 的旋转也会保持原值；写入 `matrix` 或 `matrix3D` 之后，下一次分量写入会先把矩阵分解为分量（旋转取 X、Z 旋转较小的等价欧拉角，剪切变为 `skewX`，`skewY` 为 0），矩阵无法分解、带有 Z 轴距离以外的透视或带有涉及 Z 轴的剪切时，该次写入会被拒绝。`matrix` 把整个局部变换向携带当前 Z 平移的 2D 矩阵混合，因此在完全权重下会替换 Z 平移以外的全部内容，之前写入的 3D 旋转、缩放、剪切或透视都会被重置。同一个动画内，其包含的通道按上述优先级生效，与通道顺序无关。非单位的静态 `matrix` 会忽略 `x`/`y` 和分量写入，非单位的静态 `matrix3D` 会忽略 `x`/`y`/`z`、分量和 `matrix` 写入。局部变换带有透视时，`x`/`y`/`z` 写入会替换分解后的平移分量，使平移位于投影之内；局部变换无法分解时，该次写入会被拒绝。
 
 **MaskType（遮罩类型）**：
 
@@ -3045,7 +3044,7 @@ Layer / Group
 | `matrix3D` | matrix3D | 4×4 局部变换；仅用于动画。通过矩阵分解和四元数球面插值进行插值，无法分解时逐项插值；奇异结果会被拒绝 |
 | `rotation.x` / `rotation.y` / `rotation.z` | float | 旋转角，单位为度（`rotationX`/`rotationY`/`rotationZ`） |
 | `scale.x` / `scale.y` / `scale.z` | float | 缩放（`scaleX`/`scaleY`/`scaleZ`） |
-| `skew.xy` / `skew.xz` / `skew.yz` | float | 剪切角，单位为度（`skewXY`/`skewXZ`/`skewYZ`） |
+| `skew.x` / `skew.y` | float | 剪切角，单位为度（`skewX`/`skewY`） |
 | `perspective` | float | 透视距离（`perspective`）；0 表示无透视 |
 
 旋转/缩放/剪切/透视通道驱动 §5.2 所述的 Layer 变换分量，可以像 `x`/`y`/`z` 一样做动画和数据绑定。组合后剪切角为 ±90° 或 `perspective` 为负数的写入会被拒绝。

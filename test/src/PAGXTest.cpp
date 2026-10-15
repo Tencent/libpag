@@ -10325,11 +10325,18 @@ PAGX_TEST(PAGXTest, Matrix3DComponentUnitsAndGimbalLock) {
   components.skew[0] = 45;
   ASSERT_TRUE(pagx::ComposeMatrix3DComponents(components, &matrix));
   EXPECT_NEAR(matrix.getRowColumn(0, 1), 1, 1.0e-6);
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 0, 1.0e-6);
   ASSERT_TRUE(pagx::Matrix3DComponentsFromMatrix(matrix, &recovered));
   EXPECT_NEAR(recovered.skew[0], 45, 1.0e-4);
-  components.skew[0] = 90;
-  EXPECT_FALSE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  EXPECT_NEAR(recovered.skew[1], 0, 1.0e-4);
   components.skew[0] = 0;
+  components.skew[1] = 45;
+  ASSERT_TRUE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  EXPECT_NEAR(matrix.getRowColumn(0, 1), 0, 1.0e-6);
+  EXPECT_NEAR(matrix.getRowColumn(1, 0), 1, 1.0e-6);
+  components.skew[1] = 90;
+  EXPECT_FALSE(pagx::ComposeMatrix3DComponents(components, &matrix));
+  components.skew[1] = 0;
 
   components.scale[0] = 0;
   EXPECT_TRUE(pagx::ComposeMatrix3DComponents(components, &matrix));
@@ -10348,8 +10355,8 @@ PAGX_TEST(PAGXTest, Matrix3DComponentUnitsAndGimbalLock) {
 }
 
 PAGX_TEST(PAGXTest, Matrix3DComponentChannelsAreAnimatable) {
-  const char* channels[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x", "scale.y",
-                            "scale.z",    "skew.xy",    "skew.xz",    "skew.yz", "perspective"};
+  const char* channels[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x",    "scale.y",
+                            "scale.z",    "skew.x",     "skew.y",     "perspective"};
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto* layer = doc->makeNode<pagx::Layer>("componentLayer");
   for (const auto* channel : channels) {

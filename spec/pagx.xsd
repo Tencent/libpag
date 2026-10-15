@@ -970,9 +970,8 @@
     <xs:attribute name="scaleX" type="xs:decimal" default="1"/>
     <xs:attribute name="scaleY" type="xs:decimal" default="1"/>
     <xs:attribute name="scaleZ" type="xs:decimal" default="1"/>
-    <xs:attribute name="skewXY" type="xs:decimal" default="0"/>
-    <xs:attribute name="skewXZ" type="xs:decimal" default="0"/>
-    <xs:attribute name="skewYZ" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewX" type="xs:decimal" default="0"/>
+    <xs:attribute name="skewY" type="xs:decimal" default="0"/>
     <xs:attribute name="perspective" type="xs:decimal" default="0"/>
     <xs:attribute name="flex" type="xs:decimal" default="0"/>
     <xs:attribute name="layout" type="LayoutModeType" default="none"/>

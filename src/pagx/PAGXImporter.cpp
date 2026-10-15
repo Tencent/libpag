@@ -488,9 +488,8 @@ static Layer* ParseLayer(const DOMNode* node, PAGXDocument* doc) {
   layer->scaleX = GetFloatAttribute(node, "scaleX", Default<Layer>().scaleX, doc);
   layer->scaleY = GetFloatAttribute(node, "scaleY", Default<Layer>().scaleY, doc);
   layer->scaleZ = GetFloatAttribute(node, "scaleZ", Default<Layer>().scaleZ, doc);
-  layer->skewXY = GetFloatAttribute(node, "skewXY", Default<Layer>().skewXY, doc);
-  layer->skewXZ = GetFloatAttribute(node, "skewXZ", Default<Layer>().skewXZ, doc);
-  layer->skewYZ = GetFloatAttribute(node, "skewYZ", Default<Layer>().skewYZ, doc);
+  layer->skewX = GetFloatAttribute(node, "skewX", Default<Layer>().skewX, doc);
+  layer->skewY = GetFloatAttribute(node, "skewY", Default<Layer>().skewY, doc);
   layer->perspective = GetFloatAttribute(node, "perspective", Default<Layer>().perspective, doc);
   ReadDimension(node, "width", &layer->width, &layer->percentWidth, doc);
   ReadDimension(node, "height", &layer->height, &layer->percentHeight, doc);

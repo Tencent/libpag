@@ -62,9 +62,8 @@ enum class Matrix3DComponent : uint8_t {
   ScaleX,
   ScaleY,
   ScaleZ,
-  SkewXY,
-  SkewXZ,
-  SkewYZ,
+  SkewX,
+  SkewY,
   PerspectiveDistance,
   Count
 };
@@ -74,14 +73,14 @@ static constexpr size_t Matrix3DComponentCount = static_cast<size_t>(Matrix3DCom
 
 // A transform described by independent components, composed as P * T * R * K * S like
 // DecomposedMatrix3D. Rotation holds Euler angles in degrees composed as Rz * Ry * Rx, so authored
-// values such as 200 degrees are kept as written. Skew holds the xy, xz and yz skew angles in
-// degrees. Perspective is the viewing distance d of the [0, 0, -1/d, 1] projection row, with 0
-// meaning no perspective.
+// values such as 200 degrees are kept as written. Skew holds the CSS skew(x, y) angles in degrees,
+// giving the 2D shear [[1, tan(x)], [tan(y), 1]]. Perspective is the viewing distance d of the
+// [0, 0, -1/d, 1] projection row, with 0 meaning no perspective.
 struct Matrix3DComponents {
   double translate[3] = {0, 0, 0};
   double rotation[3] = {0, 0, 0};
   double scale[3] = {1, 1, 1};
-  double skew[3] = {0, 0, 0};
+  double skew[2] = {0, 0};
   double perspective = 0;
 };
 
@@ -536,24 +535,19 @@ inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output
   return true;
 }
 
-// Composes a 4x4 transform as P * T * R * K * S from decomposed components (see
-// DecomposedMatrix3D). Unlike RecomposeMatrix3D the result may be singular, such as for a zero
-// scale. Returns false if any resulting value is non-finite or exceeds the float range; output may
-// be partially written in that case.
-inline bool ComposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
+// Composes a 4x4 transform as P * T * R * (K * S) for column vectors, where shearScale is the
+// [row][column] product of the shear K and the scale S, translate is T and perspective is the last
+// row of P. Returns false if any resulting value is non-finite or exceeds the float range; output
+// may be partially written in that case.
+inline bool ComposeMatrix3DFromParts(const Quaternion& rotationQuaternion,
+                                     const double shearScale[3][3], const double translate[3],
+                                     const double perspectiveRow[4], Matrix3D* output) {
   if (output == nullptr) return false;
   double rotation[3][3] = {};
-  RotationFromQuaternion(value.rotation, rotation);
-  double shearScale[3][3] = {};
-  shearScale[0][0] = value.scale[0];
-  shearScale[0][1] = value.skew[0] * value.scale[1];
-  shearScale[1][1] = value.scale[1];
-  shearScale[0][2] = value.skew[1] * value.scale[2];
-  shearScale[1][2] = value.skew[2] * value.scale[2];
-  shearScale[2][2] = value.scale[2];
+  RotationFromQuaternion(rotationQuaternion, rotation);
   double affine[4][4] = {};
   for (int row = 0; row < 3; ++row) {
-    affine[row][3] = value.translate[row];
+    affine[row][3] = translate[row];
     for (int column = 0; column < 3; ++column) {
       for (int k = 0; k < 3; ++k) {
         affine[row][column] += rotation[row][k] * shearScale[k][column];
@@ -566,7 +560,7 @@ inline bool ComposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
     perspective[row][row] = 1;
   }
   for (int column = 0; column < 4; ++column) {
-    perspective[3][column] = value.perspective[column];
+    perspective[3][column] = perspectiveRow[column];
   }
   double result[4][4] = {};
   for (int row = 0; row < 4; ++row) {
@@ -581,6 +575,21 @@ inline bool ComposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
     }
   }
   return true;
+}
+
+// Composes a 4x4 transform as P * T * R * K * S from decomposed components (see
+// DecomposedMatrix3D). Unlike RecomposeMatrix3D the result may be singular, such as for a zero
+// scale. Returns false if any resulting value is non-finite or exceeds the float range.
+inline bool ComposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output) {
+  double shearScale[3][3] = {};
+  shearScale[0][0] = value.scale[0];
+  shearScale[0][1] = value.skew[0] * value.scale[1];
+  shearScale[1][1] = value.scale[1];
+  shearScale[0][2] = value.skew[1] * value.scale[2];
+  shearScale[1][2] = value.skew[2] * value.scale[2];
+  shearScale[2][2] = value.scale[2];
+  return ComposeMatrix3DFromParts(value.rotation, shearScale, value.translate, value.perspective,
+                                  output);
 }
 
 // Recomposes a 4x4 transform as P * T * R * K * S from decomposed components (see
@@ -606,14 +615,14 @@ inline bool IsMatrix3DSemanticallyRepresentable(const DecomposedMatrix3D& matrix
   return true;
 }
 
-// Maps a Layer channel name ("rotation.x", "scale.y", "skew.xz", "perspective", ...) to its
+// Maps a Layer channel name ("rotation.x", "scale.y", "skew.x", "perspective", ...) to its
 // Matrix3DComponent. Returns false if the name is not a transform component channel.
 inline bool Matrix3DComponentFromChannel(const std::string& channel, Matrix3DComponent* component) {
   if (component == nullptr) {
     return false;
   }
-  static const char* names[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x", "scale.y",
-                                "scale.z",    "skew.xy",    "skew.xz",    "skew.yz", "perspective"};
+  static const char* names[] = {"rotation.x", "rotation.y", "rotation.z", "scale.x",    "scale.y",
+                                "scale.z",    "skew.x",     "skew.y",     "perspective"};
   for (size_t i = 0; i < Matrix3DComponentCount; ++i) {
     if (channel == names[i]) {
       *component = static_cast<Matrix3DComponent>(i);
@@ -636,11 +645,10 @@ inline double* Matrix3DComponentValue(Matrix3DComponents* components, Matrix3DCo
     case Matrix3DComponent::ScaleZ:
       return &components->scale[static_cast<int>(component) -
                                 static_cast<int>(Matrix3DComponent::ScaleX)];
-    case Matrix3DComponent::SkewXY:
-    case Matrix3DComponent::SkewXZ:
-    case Matrix3DComponent::SkewYZ:
+    case Matrix3DComponent::SkewX:
+    case Matrix3DComponent::SkewY:
       return &components
-                  ->skew[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::SkewXY)];
+                  ->skew[static_cast<int>(component) - static_cast<int>(Matrix3DComponent::SkewX)];
     case Matrix3DComponent::PerspectiveDistance:
       return &components->perspective;
     case Matrix3DComponent::Count:
@@ -653,38 +661,47 @@ inline double* Matrix3DComponentValue(Matrix3DComponents* components, Matrix3DCo
 // result may be singular, such as for a zero scale. Returns false if a value is non-finite, a skew
 // is +/-90 degrees, the perspective distance is negative, or the result overflows.
 inline bool ComposeMatrix3DComponents(const Matrix3DComponents& components, Matrix3D* output) {
-  DecomposedMatrix3D value = {};
+  double shear[2] = {};
+  for (int i = 0; i < 2; ++i) {
+    double radians = components.skew[i] * DEGREES_TO_RADIANS;
+    if (!std::isfinite(radians) || std::abs(std::cos(radians)) <= 1.0e-8) {
+      return false;
+    }
+    shear[i] = std::tan(radians);
+  }
   for (int i = 0; i < 3; ++i) {
     if (!std::isfinite(components.translate[i]) || !std::isfinite(components.rotation[i]) ||
-        !std::isfinite(components.scale[i]) || !std::isfinite(components.skew[i])) {
+        !std::isfinite(components.scale[i])) {
       return false;
     }
-    double radians = components.skew[i] * DEGREES_TO_RADIANS;
-    if (std::abs(std::cos(radians)) <= 1.0e-8) {
-      return false;
-    }
-    value.translate[i] = components.translate[i];
-    value.scale[i] = components.scale[i];
-    value.skew[i] = std::tan(radians);
   }
   if (!std::isfinite(components.perspective) || components.perspective < 0) {
     return false;
   }
+  double shearScale[3][3] = {};
+  shearScale[0][0] = components.scale[0];
+  shearScale[0][1] = shear[0] * components.scale[1];
+  shearScale[1][0] = shear[1] * components.scale[0];
+  shearScale[1][1] = components.scale[1];
+  shearScale[2][2] = components.scale[2];
+  double perspective[4] = {0, 0, 0, 1};
   if (components.perspective > 0) {
-    value.perspective[2] = -1.0 / components.perspective;
+    perspective[2] = -1.0 / components.perspective;
   }
-  value.rotation = QuaternionFromEulerXYZDegrees(components.rotation[0], components.rotation[1],
-                                                 components.rotation[2]);
-  return ComposeMatrix3D(value, output);
+  auto rotation = QuaternionFromEulerXYZDegrees(components.rotation[0], components.rotation[1],
+                                                components.rotation[2]);
+  return ComposeMatrix3DFromParts(rotation, shearScale, components.translate, perspective, output);
 }
 
 // Recovers a component set from a 4x4 transform. Rotation is the canonical Euler set returned by
-// EulerXYZDegreesFromQuaternion and skew is converted to degrees. Returns false if the matrix
-// cannot be decomposed or its perspective is not a single Z distance.
+// EulerXYZDegreesFromQuaternion. The decomposition only yields an X skew, so skew y is 0. Returns
+// false if the matrix cannot be decomposed, its perspective is not a single Z distance, or it
+// carries a shear involving Z, which the components cannot express.
 inline bool Matrix3DComponentsFromMatrix(const Matrix3D& matrix, Matrix3DComponents* output) {
   DecomposedMatrix3D value = {};
   if (output == nullptr || !DecomposeMatrix3D(matrix, &value) ||
-      !IsMatrix3DSemanticallyRepresentable(value)) {
+      !IsMatrix3DSemanticallyRepresentable(value) || std::abs(value.skew[1]) > 1.0e-6 ||
+      std::abs(value.skew[2]) > 1.0e-6) {
     return false;
   }
   Matrix3DComponents result = {};
@@ -694,8 +711,8 @@ inline bool Matrix3DComponentsFromMatrix(const Matrix3D& matrix, Matrix3DCompone
   for (int i = 0; i < 3; ++i) {
     result.translate[i] = value.translate[i];
     result.scale[i] = value.scale[i];
-    result.skew[i] = std::atan(value.skew[i]) * RADIANS_TO_DEGREES;
   }
+  result.skew[0] = std::atan(value.skew[0]) * RADIANS_TO_DEGREES;
   result.perspective = std::abs(value.perspective[2]) <= 1.0e-12 ? 0 : -1.0 / value.perspective[2];
   *output = result;
   return true;

@@ -90,8 +90,7 @@ std::string EscapeCssFontFamily(const std::string& family) {
 bool HasLayerTransformComponents(const Layer* layer) {
   return layer->rotationX != 0.0f || layer->rotationY != 0.0f || layer->rotationZ != 0.0f ||
          layer->scaleX != 1.0f || layer->scaleY != 1.0f || layer->scaleZ != 1.0f ||
-         layer->skewXY != 0.0f || layer->skewXZ != 0.0f || layer->skewYZ != 0.0f ||
-         layer->perspective != 0.0f;
+         layer->skewX != 0.0f || layer->skewY != 0.0f || layer->perspective != 0.0f;
 }
 
 Matrix3DComponents LayerTransformComponents(const Layer* layer) {
@@ -106,9 +105,8 @@ Matrix3DComponents LayerTransformComponents(const Layer* layer) {
   components.scale[0] = layer->scaleX;
   components.scale[1] = layer->scaleY;
   components.scale[2] = layer->scaleZ;
-  components.skew[0] = layer->skewXY;
-  components.skew[1] = layer->skewXZ;
-  components.skew[2] = layer->skewYZ;
+  components.skew[0] = layer->skewX;
+  components.skew[1] = layer->skewY;
   components.perspective = layer->perspective;
   Matrix3D matrix = {};
   return ComposeMatrix3DComponents(components, &matrix) ? components : translation;
