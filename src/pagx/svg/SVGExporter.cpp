@@ -3488,8 +3488,9 @@ std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
 
 std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
                                std::vector<std::string>* warnings) {
-  // Mirror PPTExporter: resolve renderPosition() for every layer/group so authored x/y/position
-  // attributes flow into the matrix helpers (BuildLayerMatrix / BuildGroupMatrix).
+  // Mirror PPTExporter: resolve layout before reading the matrix helpers. BuildLayerMatrix composes
+  // each Layer's generated layout position outside its authored x / y and transform, and
+  // BuildGroupMatrix reads each Group's renderPosition().
   if (!doc.isLayoutApplied()) {
     doc.applyLayout(options.fontConfig);
   }
