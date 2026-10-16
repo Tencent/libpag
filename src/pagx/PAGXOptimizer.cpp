@@ -495,7 +495,7 @@ bool TryConvertRectMaskToScrollRect(Layer* layer) {
   if (!m->matrix.isIdentity()) {
     return false;
   }
-  if (!m->matrix3D.isIdentity() || HasLayerTransformComponents(m)) {
+  if (m->z != 0.0f || !m->matrix3D.isIdentity() || HasLayerTransformComponents(m)) {
     return false;
   }
   if (m->alpha != 1.0f) {
