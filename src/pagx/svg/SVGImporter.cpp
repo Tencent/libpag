@@ -1125,6 +1125,35 @@ Element* SVGParserContext::convertPath(const std::shared_ptr<DOMNode>& element) 
   }
   return path;
 }
+// SVG default whitespace handling: newlines and tabs become spaces, consecutive spaces collapse
+// to one, and leading/trailing spaces are trimmed.
+static std::string NormalizeTextWhitespace(const std::string& text) {
+  std::string collapsed = text;
+  for (auto& ch : collapsed) {
+    if (ch == '\n' || ch == '\r' || ch == '\t') {
+      ch = ' ';
+    }
+  }
+  std::string normalized;
+  normalized.reserve(collapsed.size());
+  bool previousWasSpace = true;
+  for (char ch : collapsed) {
+    if (ch == ' ') {
+      if (!previousWasSpace) {
+        normalized += ch;
+      }
+      previousWasSpace = true;
+    } else {
+      normalized += ch;
+      previousWasSpace = false;
+    }
+  }
+  if (!normalized.empty() && normalized.back() == ' ') {
+    normalized.pop_back();
+  }
+  return normalized;
+}
+
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
                                      const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
@@ -1151,93 +1180,40 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     anchor = inheritedStyle.textAnchor;
   }
 
-  // Get text content from child text nodes and tspan elements.
-  std::string textContent;
-  std::shared_ptr<DOMNode> textPathElement = nullptr;
-  auto child = element->getFirstChild();
-  while (child) {
-    if (child->type == DOMNodeType::Text) {
-      textContent += child->name;
-    } else if (child->name == "tspan") {
-      // Handle tspan element: parse dx/dy offsets for positioning.
-      x += parseLengthEm(getAttribute(child, "dx"), _viewBoxWidth, currentFontSize);
-      y += parseLengthEm(getAttribute(child, "dy"), _viewBoxHeight, currentFontSize);
-      // Extract text content from tspan children.
-      auto tspanChild = child->getFirstChild();
-      while (tspanChild) {
-        if (tspanChild->type == DOMNodeType::Text) {
-          textContent += tspanChild->name;
-        }
-        tspanChild = tspanChild->getNextSibling();
-      }
-    } else if (child->name == "textPath") {
-      // <textPath> places the run along a referenced path. Funnel its (possibly tspan-wrapped)
-      // text into the same content buffer the Text node consumes; the path geometry and offset
-      // descriptors are converted separately into a TextPath modifier sibling below.
-      textPathElement = child;
-      auto pathChild = child->getFirstChild();
-      while (pathChild) {
-        if (pathChild->type == DOMNodeType::Text) {
-          textContent += pathChild->name;
-        } else if (pathChild->name == "tspan") {
-          auto tspanChild = pathChild->getFirstChild();
-          while (tspanChild) {
-            if (tspanChild->type == DOMNodeType::Text) {
-              textContent += tspanChild->name;
-            }
-            tspanChild = tspanChild->getNextSibling();
-          }
-        }
-        pathChild = pathChild->getNextSibling();
+  // Illustrator-style exports position glyphs with explicit x/y on every <tspan> and encode line
+  // breaks as a jump to a new baseline y. Walk children with a pen position and split the content
+  // into lines whenever the baseline moves by more than half the font size, so each line keeps
+  // its own explicit origin. Concatenating everything into a single run instead would lay
+  // following lines out horizontally and overflow the text bounds.
+  TextWalkState state;
+  state.currentX = x;
+  state.currentY = y;
+  state.fontSize = currentFontSize;
+  collectTextRuns(element, &state);
+
+  // Collect the emitted runs: one per detected line, or a single combined run when a
+  // <textPath> child turns the text into path-following text.
+  std::vector<TextLine> emittedRuns;
+  if (state.textPathElement) {
+    auto normalized = NormalizeTextWhitespace(state.textContent);
+    if (!normalized.empty()) {
+      emittedRuns.push_back(TextLine{x, y, normalized});
+    }
+  } else {
+    for (const auto& line : state.lines) {
+      auto normalized = NormalizeTextWhitespace(line.text);
+      if (!normalized.empty()) {
+        emittedRuns.push_back(TextLine{line.startX, line.baseline, normalized});
       }
     }
-    child = child->getNextSibling();
   }
 
-  // SVG whitespace normalization: replace newlines and tabs with spaces,
-  // collapse consecutive spaces, and trim leading/trailing spaces.
-  for (auto& ch : textContent) {
-    if (ch == '\n' || ch == '\r' || ch == '\t') {
-      ch = ' ';
-    }
-  }
-  std::string normalized;
-  normalized.reserve(textContent.size());
-  bool previousWasSpace = true;
-  for (char ch : textContent) {
-    if (ch == ' ') {
-      if (!previousWasSpace) {
-        normalized += ch;
-      }
-      previousWasSpace = true;
-    } else {
-      normalized += ch;
-      previousWasSpace = false;
-    }
-  }
-  if (!normalized.empty() && normalized.back() == ' ') {
-    normalized.pop_back();
-  }
-  textContent = std::move(normalized);
-
-  if (!textContent.empty()) {
-    auto text = _document->makeNode<Text>();
-    text->position = {x, y};
-    text->text = textContent;
-
+  if (!emittedRuns.empty()) {
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
     if (fontFamily.empty()) {
       fontFamily = inheritedStyle.fontFamily;
     }
-    if (!fontFamily.empty()) {
-      text->fontFamily = fontFamily;
-    }
-
-    // Font size already resolved above.
-    text->fontSize = currentFontSize;
-    // SVG <text> y attribute specifies the alphabetic baseline position.
-    text->baseline = TextBaseline::Alphabetic;
 
     // Font weight: element attribute > inherited style.
     // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light", "Black").
@@ -1254,32 +1230,47 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     // weights are rounded to the nearest 100 and mapped to OpenType keywords (Thin,
     // Light, Medium, SemiBold, Bold, ExtraBold, Black) so that 900 does not collapse
     // to 700.
-    text->fontStyle = ResolveFontStyleName(fontWeight, fontStyleAttr);
+    auto fontStyleName = ResolveFontStyleName(fontWeight, fontStyleAttr);
 
     // Letter spacing: element attribute > inherited style.
     std::string letterSpacing = getAttribute(element, "letter-spacing");
     if (letterSpacing.empty()) {
       letterSpacing = inheritedStyle.letterSpacing;
     }
-    if (!letterSpacing.empty()) {
-      text->letterSpacing = parseLength(letterSpacing, _viewBoxWidth);
+    float letterSpacingValue =
+        letterSpacing.empty() ? 0.0f : parseLength(letterSpacing, _viewBoxWidth);
+
+    // Map SVG text-anchor to PAGX TextAnchor. SVG values: start (default), middle, end.
+    auto textAnchorValue = TextAnchor::Start;
+    if (anchor == "middle") {
+      textAnchorValue = TextAnchor::Center;
+    } else if (anchor == "end") {
+      textAnchorValue = TextAnchor::End;
     }
 
-    group->elements.push_back(text);
-
-    // Map SVG text-anchor to PAGX TextAnchor on the Text node directly.
-    // SVG text-anchor: start (default), middle, end.
-    if (anchor == "middle") {
-      text->textAnchor = TextAnchor::Center;
-    } else if (anchor == "end") {
-      text->textAnchor = TextAnchor::End;
+    for (const auto& run : emittedRuns) {
+      auto text = _document->makeNode<Text>();
+      text->position = {run.startX, run.baseline};
+      text->text = run.text;
+      if (!fontFamily.empty()) {
+        text->fontFamily = fontFamily;
+      }
+      text->fontSize = currentFontSize;
+      // SVG <text> y attribute specifies the alphabetic baseline position.
+      text->baseline = TextBaseline::Alphabetic;
+      text->fontStyle = fontStyleName;
+      if (!letterSpacing.empty()) {
+        text->letterSpacing = letterSpacingValue;
+      }
+      text->textAnchor = textAnchorValue;
+      group->elements.push_back(text);
     }
 
     // A <textPath> child turns this run into path-following text. Emit the TextPath modifier
     // right after the Text so the resulting [Text, TextPath, Fill] ordering matches what the
     // PAGX renderer and HTML exporter expect for path text.
-    if (textPathElement) {
-      auto textPath = convertTextPath(textPathElement, element);
+    if (state.textPathElement) {
+      auto textPath = convertTextPath(state.textPathElement, element);
       if (textPath) {
         group->elements.push_back(textPath);
       }
@@ -1289,6 +1280,65 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   addFillStroke(element, group->elements, inheritedStyle);
   return group;
 }
+
+void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
+                                       TextWalkState* state) {
+  auto child = element->getFirstChild();
+  while (child) {
+    if (child->type == DOMNodeType::Text) {
+      // Bare text flows at the current pen position: it joins the line of the previous run,
+      // or opens the first line at the <text> element origin.
+      if (state->currentLineIndex < 0 ||
+          fabs(state->currentY - state->lines[state->currentLineIndex].baseline) >
+              state->fontSize * 0.5f) {
+        state->lines.push_back(TextLine{state->currentX, state->currentY, ""});
+        state->currentLineIndex = static_cast<int>(state->lines.size()) - 1;
+      }
+      state->lines[state->currentLineIndex].text += child->name;
+      state->textContent += child->name;
+    } else if (child->name == "tspan") {
+      // A tspan's explicit x/y replace the pen position (absolute in the <text> element's
+      // coordinate space); dx/dy shift it. Nested tspans continue the walk: Illustrator wraps
+      // whole lines in an outer tspan while the inner ones carry the actual positions.
+      auto xAttribute = getAttribute(child, "x");
+      auto yAttribute = getAttribute(child, "y");
+      if (!xAttribute.empty()) {
+        state->currentX = parseLength(xAttribute, _viewBoxWidth);
+      } else {
+        state->currentX += parseLengthEm(getAttribute(child, "dx"), _viewBoxWidth, state->fontSize);
+      }
+      if (!yAttribute.empty()) {
+        state->currentY = parseLength(yAttribute, _viewBoxHeight);
+      } else {
+        state->currentY +=
+            parseLengthEm(getAttribute(child, "dy"), _viewBoxHeight, state->fontSize);
+      }
+      collectTextRuns(child, state);
+    } else if (child->name == "textPath") {
+      // <textPath> places the run along a referenced path. Funnel its (possibly tspan-wrapped)
+      // text into the combined content buffer; the path geometry and offset descriptors are
+      // converted separately into a TextPath modifier sibling below.
+      state->textPathElement = child;
+      auto pathChild = child->getFirstChild();
+      while (pathChild) {
+        if (pathChild->type == DOMNodeType::Text) {
+          state->textContent += pathChild->name;
+        } else if (pathChild->name == "tspan") {
+          auto tspanChild = pathChild->getFirstChild();
+          while (tspanChild) {
+            if (tspanChild->type == DOMNodeType::Text) {
+              state->textContent += tspanChild->name;
+            }
+            tspanChild = tspanChild->getNextSibling();
+          }
+        }
+        pathChild = pathChild->getNextSibling();
+      }
+    }
+    child = child->getNextSibling();
+  }
+}
+
 TextPath* SVGParserContext::convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                                             const std::shared_ptr<DOMNode>& textElement) {
   std::string refId = resolveUrl(getHrefAttribute(textPathElement));
