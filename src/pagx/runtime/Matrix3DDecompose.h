@@ -442,9 +442,15 @@ inline bool DecomposeMatrix3D(const Matrix3D& source, DecomposedMatrix3D* output
   }
   // Normalize by the scalar of the perspective factor rather than by [3][3], so the result is the
   // exact inverse of RecomposeMatrix3D, whose perspective row always ends in 1. The two differ when
-  // a perspective is combined with a Z translation.
+  // a perspective is combined with a Z translation. The relative-zero guard measures the scalar
+  // against the last row it was solved from, not the whole matrix: the translation column plays no
+  // part in the solve, and including it would reject invertible matrices with a huge translation.
   double normalization = perspective[3];
-  if (std::abs(normalization) <= 1.0e-12 * magnitude) {
+  double lastRowMagnitude = 0;
+  for (int column = 0; column < 4; ++column) {
+    lastRowMagnitude = std::max(lastRowMagnitude, std::abs(matrix[3][column]));
+  }
+  if (std::abs(normalization) <= 1.0e-12 * lastRowMagnitude) {
     return false;
   }
   for (int row = 0; row < 4; ++row) {
