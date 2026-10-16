@@ -179,6 +179,24 @@ PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_TransformComponents) {
   EXPECT_FLOAT_EQ(m.tx, 35);
 }
 
+// P(500) * T(50, 0, -500) has the w row [0, 0, -1/500, 2], so points on the z=0 plane are divided
+// by the constant w = 2 before the layout position is added.
+PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_PerspectiveWithZDividesByW) {
+  auto doc = pagx::PAGXDocument::Make(100, 100);
+  auto layer = doc->makeNode<pagx::Layer>();
+  layer->x = 50;
+  layer->z = -500;
+  layer->perspective = 500;
+  layer->setLayoutPosition(nullptr, 10, 20);
+  auto m = pagx::BuildLayerMatrix(layer);
+  EXPECT_FLOAT_EQ(m.a, 0.5f);
+  EXPECT_FLOAT_EQ(m.b, 0);
+  EXPECT_FLOAT_EQ(m.c, 0);
+  EXPECT_FLOAT_EQ(m.d, 0.5f);
+  EXPECT_FLOAT_EQ(m.tx, 35);
+  EXPECT_FLOAT_EQ(m.ty, 20);
+}
+
 PAGX_TEST(PAGXUtilsTest, BuildLayerMatrix_OnlyXNonZero) {
   auto doc = pagx::PAGXDocument::Make(100, 100);
   auto layer = doc->makeNode<pagx::Layer>();
