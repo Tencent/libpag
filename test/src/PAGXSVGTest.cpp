@@ -886,6 +886,69 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TspanNestedLineWrap) {
 }
 
 /**
+ * Test SVG import: <textPath> content follows the referenced path, and SVG ignores x/y on
+ * tspans inside <textPath>, so baseline-jumping tspans must NOT split into per-line Text
+ * nodes the way plain <text> content does. The runs concatenate into a single
+ * path-following Text plus one TextPath modifier.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPathTspanBaselineJumpsStaySingleRun) {
+  std::string svg =
+      "<svg width=\"300\" height=\"200\" viewBox=\"0 0 300 200\">"
+      "<defs><path id=\"line\" d=\"M10 50L280 50\"/></defs>"
+      "<text font-family=\"Arial\" font-size=\"16\" fill=\"#000000\">"
+      "<textPath href=\"#line\">"
+      "<tspan x=\"0\" y=\"0\">First</tspan>"
+      "<tspan x=\"0\" y=\"40\">Second</tspan>"
+      "</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->text, "FirstSecond");
+  ASSERT_EQ(textPaths.size(), 1u);
+  EXPECT_NE(static_cast<pagx::TextPath*>(textPaths[0])->path, nullptr);
+}
+
+/**
+ * Test SVG import: tspans nested inside <textPath> (Illustrator-style wrappers around
+ * positioned runs) contribute their full descendant text content to the path-following run
+ * instead of being dropped.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TextPathNestedTspanContent) {
+  std::string svg =
+      "<svg width=\"300\" height=\"200\" viewBox=\"0 0 300 200\">"
+      "<defs><path id=\"line\" d=\"M10 50L280 50\"/></defs>"
+      "<text font-family=\"Arial\" font-size=\"16\" fill=\"#000000\">"
+      "<textPath href=\"#line\">"
+      "<tspan><tspan>Deep</tspan> text</tspan>"
+      "</textPath>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  std::vector<pagx::Element*> textPaths;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+    CollectElementsByType(layer, pagx::NodeType::TextPath, textPaths);
+  }
+
+  ASSERT_EQ(texts.size(), 1u);
+  EXPECT_EQ(static_cast<pagx::Text*>(texts[0])->text, "Deep text");
+  ASSERT_EQ(textPaths.size(), 1u);
+}
+
+/**
  * Test SVG import: `marker-start` / `marker-mid` / `marker-end` on a multi-segment path expand into
  * additional child layers wrapped alongside the shape. The polyline has two interior vertices so
  * the mid marker is instanced twice; every marker triangle contributes its own Path node.
