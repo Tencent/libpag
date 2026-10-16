@@ -487,6 +487,172 @@ PAGX_TEST(PAGXViewModelTest, DataBindPositionSyncVerified) {
   EXPECT_FLOAT_EQ(tgfxLayer->matrix().getTranslateX(), 50.0f);
 }
 
+// Deleter for scenes over a document owned by the test, which must not be freed by the scene.
+static void KeepDocumentAlive(pagx::PAGXDocument*) {
+}
+
+// A transform component binding and transform animations write into the same Layer pose. Writes
+// that drive different parts combine, and the latest write to the same part wins.
+PAGX_TEST(PAGXViewModelTest, Matrix3DComponentBindingCombinesWithAnimation) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MatrixVM");
+  auto* property = doc->makeNode<pagx::ViewModelProperty>();
+  property->name = "rotateZ";
+  property->propertyType = pagx::ViewModelPropertyType::Number;
+  property->defaultNumber = 50;
+  schema->properties.push_back(property);
+  doc->viewModel = schema;
+
+  auto* layer = doc->makeNode<pagx::Layer>("matrixLayer");
+  doc->layers.push_back(layer);
+  auto* animation = doc->makeNode<pagx::Animation>("moveAnimation");
+  animation->duration = 60;
+  animation->frameRate = 60;
+  doc->animations.push_back(animation);
+  auto* object = doc->makeNode<pagx::AnimationObject>();
+  object->target = layer->id;
+  animation->objects.push_back(object);
+  auto* xChannel = doc->makeNode<pagx::TypedChannel<float>>();
+  xChannel->name = "x";
+  xChannel->keyframes.push_back({0, 0.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  xChannel->keyframes.push_back({60, 100.0f, pagx::KeyframeInterpolationType::Linear, {}, {}});
+  object->channels.push_back(xChannel);
+
+  auto* dataBind = doc->makeNode<pagx::DataBind>();
+  dataBind->source = "$vm.rotateZ";
+  dataBind->target = "@matrixLayer";
+  dataBind->channel = "rotation.z";
+  doc->dataBinds.push_back(dataBind);
+
+  auto scene =
+      pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), KeepDocumentAlive));
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+
+  auto timeline = std::static_pointer_cast<pagx::PAGAnimation>(scene->getDefaultTimeline());
+  ASSERT_NE(timeline, nullptr);
+  timeline->setCurrentTime(500000);
+  timeline->apply(1.0f);
+  float values[16] = {};
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_NEAR(values[0], std::cos(50.0f * 3.14159265f / 180.0f), 1.0e-5f);
+  EXPECT_NEAR(values[1], std::sin(50.0f * 3.14159265f / 180.0f), 1.0e-5f);
+  EXPECT_FLOAT_EQ(values[12], 50);
+
+  pagx::Matrix3D translation = {};
+  translation.values[12] = 20;
+  translation.values[13] = 40;
+  ASSERT_TRUE(binding->apply(layer, "matrix3D", pagx::KeyValue{translation}, 1.0f));
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_FLOAT_EQ(values[0], 1);
+  EXPECT_FLOAT_EQ(values[1], 0);
+  EXPECT_FLOAT_EQ(values[12], 20);
+
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto rotateZ = vm->propertyNumber("rotateZ");
+  ASSERT_NE(rotateZ, nullptr);
+  rotateZ->value(60);
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_NEAR(values[0], std::cos(60.0f * 3.14159265f / 180.0f), 1.0e-5f);
+  EXPECT_NEAR(values[1], std::sin(60.0f * 3.14159265f / 180.0f), 1.0e-5f);
+  EXPECT_FLOAT_EQ(values[12], 20);
+  EXPECT_FLOAT_EQ(values[13], 40);
+  pagx::KeyValue readBack;
+  ASSERT_TRUE(binding->read(layer, "rotation.z", &readBack));
+  EXPECT_NEAR(std::get<float>(readBack), 60, 1.0e-4f);
+}
+
+// A Once transform component binding is written into the transform a single time, and a later
+// transform write replaces it without the value being reapplied.
+PAGX_TEST(PAGXViewModelTest, Matrix3DOnceComponentYieldsToLaterTransformWrite) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MatrixVM");
+  auto* property = doc->makeNode<pagx::ViewModelProperty>();
+  property->name = "rotateZ";
+  property->propertyType = pagx::ViewModelPropertyType::Number;
+  property->defaultNumber = 30;
+  schema->properties.push_back(property);
+  doc->viewModel = schema;
+  auto* layer = doc->makeNode<pagx::Layer>("matrixLayer");
+  layer->x = 100;
+  doc->layers.push_back(layer);
+  auto* dataBind = doc->makeNode<pagx::DataBind>();
+  dataBind->source = "$vm.rotateZ";
+  dataBind->target = "@matrixLayer";
+  dataBind->channel = "rotation.z";
+  dataBind->direction = pagx::DataBindDirection::Once;
+  doc->dataBinds.push_back(dataBind);
+
+  auto scene =
+      pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), KeepDocumentAlive));
+  ASSERT_NE(scene, nullptr);
+  auto* binding = scene->mutableBinding();
+  auto tgfxLayer = binding->get<tgfx::Layer>(layer);
+  ASSERT_NE(tgfxLayer, nullptr);
+  auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
+  ASSERT_NE(surface, nullptr);
+  ASSERT_TRUE(scene->draw(surface));
+  float values[16] = {};
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_NEAR(values[0], std::cos(30.0f * 3.14159265f / 180.0f), 1.0e-5f);
+  EXPECT_NEAR(values[1], std::sin(30.0f * 3.14159265f / 180.0f), 1.0e-5f);
+  EXPECT_FLOAT_EQ(values[12], 100);
+
+  pagx::Matrix3D identity = {};
+  ASSERT_TRUE(binding->apply(layer, "matrix3D", pagx::KeyValue{identity}, 1.0f));
+  ASSERT_TRUE(scene->draw(surface));
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_FLOAT_EQ(values[0], 1);
+  EXPECT_FLOAT_EQ(values[1], 0);
+  EXPECT_FLOAT_EQ(values[12], 0);
+
+  auto vm = scene->viewModel();
+  ASSERT_NE(vm, nullptr);
+  auto rotateZ = vm->propertyNumber("rotateZ");
+  ASSERT_NE(rotateZ, nullptr);
+  rotateZ->value(60);
+  ASSERT_TRUE(scene->draw(surface));
+  tgfxLayer->matrix3D().getColumnMajor(values);
+  EXPECT_FLOAT_EQ(values[0], 1);
+  EXPECT_FLOAT_EQ(values[1], 0);
+  EXPECT_FLOAT_EQ(values[12], 0);
+}
+
+// Full Layer matrices are animation-only, so a DataBind targeting them is skipped.
+PAGX_TEST(PAGXViewModelTest, LayerFullMatrixDataBindIsRejected) {
+  auto doc = pagx::PAGXDocument::Make(200, 200);
+  auto* schema = doc->makeNode<pagx::ViewModel>("MatrixVM");
+  auto* property = doc->makeNode<pagx::ViewModelProperty>();
+  property->name = "value";
+  property->propertyType = pagx::ViewModelPropertyType::Number;
+  property->defaultNumber = 30;
+  schema->properties.push_back(property);
+  doc->viewModel = schema;
+  auto* layer = doc->makeNode<pagx::Layer>("matrixLayer");
+  doc->layers.push_back(layer);
+  for (const auto* channel : {"matrix", "matrix3D"}) {
+    auto* dataBind = doc->makeNode<pagx::DataBind>();
+    dataBind->source = "$vm.value";
+    dataBind->target = "@matrixLayer";
+    dataBind->channel = channel;
+    doc->dataBinds.push_back(dataBind);
+  }
+
+  auto scene =
+      pagx::PAGScene::Make(std::shared_ptr<pagx::PAGXDocument>(doc.get(), KeepDocumentAlive));
+  ASSERT_NE(scene, nullptr);
+  auto rootComp = scene->rootComposition();
+  ASSERT_NE(rootComp, nullptr);
+  ASSERT_NE(rootComp->dataBindRuntime, nullptr);
+  EXPECT_TRUE(rootComp->dataBindRuntime->entries.empty());
+}
+
 // Repro/guard: after a layer is refreshed in place (e.g. a late loadFileData edit on that layer),
 // a ToTarget DataBind must re-apply the ViewModel's current value to the rebuilt target. Otherwise
 // the refresh resets the channel to the node's authored default and the VM-pushed value is lost.
@@ -1245,10 +1411,8 @@ PAGX_TEST(PAGXViewModelTest, BooleanSyncBackToViewModel) {
   EXPECT_EQ(visProp->value(), true);
 }
 
-// Regression: a TwoWay x binding must sync back the animated x channel value (animX), not the
-// composed layer-matrix translate. With a non-zero authored matrix translation the old read()
-// returned animX + matrix.tx, polluting the ViewModel.
-PAGX_TEST(PAGXViewModelTest, PositionSyncBackIgnoresAuthoredMatrixTranslate) {
+// A static Layer matrix overrides its authored and animated x position, including TwoWay readback.
+PAGX_TEST(PAGXViewModelTest, LayerPositionDataBindIsOverriddenByStaticMatrix) {
   auto doc = pagx::PAGXDocument::Make(200, 200);
   auto* schema = doc->makeNode<pagx::ViewModel>("TestVM");
   auto* prop = doc->makeNode<pagx::ViewModelProperty>();
@@ -1260,8 +1424,8 @@ PAGX_TEST(PAGXViewModelTest, PositionSyncBackIgnoresAuthoredMatrixTranslate) {
   auto layer = doc->makeNode<pagx::Layer>("rect");
   layer->width = 100;
   layer->height = 100;
-  // Authored matrix carries a non-zero translation; the x channel value must round-trip
-  // independently of it.
+  // The static matrix overrides both the authored x and the animated x channel.
+  layer->x = 70;
   layer->matrix = pagx::Matrix::Translate(30.0f, 0.0f);
   auto rect = doc->makeNode<pagx::Rectangle>();
   rect->size.width = 100;
@@ -1305,14 +1469,13 @@ PAGX_TEST(PAGXViewModelTest, PositionSyncBackIgnoresAuthoredMatrixTranslate) {
   timeline->apply();
   auto surface = pagx::PAGSurface::MakeOffscreen(200, 200);
   ASSERT_NE(surface, nullptr);
-  // First frame: the ViewModel default (0) takes priority and is pushed to the target.
-  EXPECT_TRUE(scene->draw(surface));
+  // TwoWay readback skips x because the static matrix overrides that position channel.
+  ASSERT_TRUE(scene->draw(surface));
   EXPECT_FLOAT_EQ(xProp->value(), 0.0f);
-  // Second frame: syncBack writes the animated x channel value (~50) back, NOT 50 + 30 authored
-  // translate.
   timeline->apply();
-  EXPECT_TRUE(scene->draw(surface));
-  EXPECT_NEAR(xProp->value(), 50.0f, 0.01f);
+  ASSERT_TRUE(scene->draw(surface));
+  EXPECT_FLOAT_EQ(xProp->value(), 0.0f);
+  EXPECT_FLOAT_EQ(scene->mutableBinding()->get<tgfx::Layer>(layer)->matrix().getTranslateX(), 30);
 }
 
 // Regression: image syncBack must use tgfx::Image comparison, not PAGImage wrapper identity. An

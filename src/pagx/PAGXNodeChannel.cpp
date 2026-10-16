@@ -60,6 +60,7 @@
 #include "pagx/nodes/TextModifier.h"
 #include "pagx/nodes/TextPath.h"
 #include "pagx/nodes/TrimPath.h"
+#include "pagx/runtime/Matrix3DDecompose.h"
 #include "pagx/utils/StringParser.h"
 
 namespace pagx {
@@ -75,10 +76,10 @@ static constexpr ChannelFlags NoFlags = ChannelFlags::None;
 
 // The access generators below turn a member pointer (and, for enums, the StringParser converters)
 // into a uniform ChannelAccessor. A read copies the field into *getOut; a write validates the KeyValue
-// alternative (or enum string) and copies into the field; a reset (both getOut and setIn null) copies
-// the corresponding field of a default-constructed node of type T back into the field. Routing all
-// three directions through one generated function keeps them symmetric and removes the per-field
-// if/else boilerplate.
+// alternative (or enum string, or that a Matrix3D is invertible) and copies into the field; a reset
+// (both getOut and setIn null) copies the corresponding field of a default-constructed node of type
+// T back into the field. Routing all three directions through one generated function keeps them
+// symmetric and removes the per-field if/else boilerplate.
 
 template <typename T, auto Field>
 static bool AccessFloat(Node* node, KeyValue* getOut, const KeyValue* setIn) {
@@ -201,6 +202,44 @@ static bool AccessFillStrokeColor(Node* node, KeyValue* getOut, const KeyValue* 
     return false;
   }
   solid->color = *value;
+  return true;
+}
+
+template <typename T, auto Field>
+static bool AccessMatrix(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<Matrix>(setIn);
+  if (value == nullptr) {
+    return false;
+  }
+  self->*Field = *value;
+  return true;
+}
+
+template <typename T, auto Field>
+static bool AccessMatrix3D(Node* node, KeyValue* getOut, const KeyValue* setIn) {
+  auto* self = static_cast<T*>(node);
+  if (getOut == nullptr && setIn == nullptr) {
+    self->*Field = Default<T>().*Field;
+    return true;
+  }
+  if (getOut != nullptr) {
+    *getOut = self->*Field;
+    return true;
+  }
+  const auto* value = std::get_if<Matrix3D>(setIn);
+  if (value == nullptr || !IsInvertibleMatrix3D(*value)) {
+    return false;
+  }
+  self->*Field = *value;
   return true;
 }
 
@@ -352,6 +391,10 @@ static bool AccessEnum(Node* node, KeyValue* getOut, const KeyValue* setIn) {
   { name, cls, &AccessString<T, &T::member> }
 #define FIELD_COLOR(T, name, member, cls) \
   { name, cls, &AccessColor<T, &T::member> }
+#define FIELD_MATRIX(T, name, member, cls) \
+  { name, cls, &AccessMatrix<T, &T::member> }
+#define FIELD_MATRIX3D(T, name, member, cls) \
+  { name, cls, &AccessMatrix3D<T, &T::member> }
 #define FIELD_POINT_X(T, name, member, cls) \
   { name, cls, &AccessPointAxis<T, &T::member, true> }
 #define FIELD_POINT_Y(T, name, member, cls) \
@@ -402,6 +445,18 @@ static std::vector<ChannelDef> BuildLayerFields() {
       FIELD_ENUM(Layer, "blendMode", blendMode, Anim, BlendMode),
       FIELD_FLOAT(Layer, "x", x, AnimLayout),
       FIELD_FLOAT(Layer, "y", y, AnimLayout),
+      FIELD_FLOAT(Layer, "z", z, Anim),
+      FIELD_FLOAT(Layer, "rotation.x", rotationX, Anim),
+      FIELD_FLOAT(Layer, "rotation.y", rotationY, Anim),
+      FIELD_FLOAT(Layer, "rotation.z", rotationZ, Anim),
+      FIELD_FLOAT(Layer, "scale.x", scaleX, Anim),
+      FIELD_FLOAT(Layer, "scale.y", scaleY, Anim),
+      FIELD_FLOAT(Layer, "scale.z", scaleZ, Anim),
+      FIELD_FLOAT(Layer, "skew.x", skewX, Anim),
+      FIELD_FLOAT(Layer, "skew.y", skewY, Anim),
+      FIELD_FLOAT(Layer, "perspective", perspective, Anim),
+      FIELD_MATRIX(Layer, "matrix", matrix, Anim),
+      FIELD_MATRIX3D(Layer, "matrix3D", matrix3D, Anim),
       FIELD_BOOL(Layer, "preserve3D", preserve3D, NoFlags),
       FIELD_BOOL(Layer, "antiAlias", antiAlias, NoFlags),
       FIELD_BOOL(Layer, "groupOpacity", groupOpacity, NoFlags),

@@ -103,10 +103,10 @@ class TypedChannel : public Channel {
 
  private:
   // Defined in src/pagx/animation/Channel.cpp with explicit instantiations for the interpolatable
-  // KeyValue alternatives (float, bool, int, std::string, ImageRef, Color, Matrix). The PAGImage
-  // alternative is excluded since it is not interpolated. The implementation runs through the
-  // runtime KeyframeEvaluator helper so that bezier easing and Color/float lerp logic stay out of
-  // this public header.
+  // KeyValue alternatives (float, bool, int, std::string, ImageRef, Color, Matrix, Matrix3D). The
+  // PAGImage alternative is excluded since it is not interpolated. The implementation runs through
+  // the runtime KeyframeEvaluator helper so that bezier easing and Color/float lerp logic stay out
+  // of this public header.
   KeyValue onEvaluateAtFrame(Frame frame) const override;
   KeyValue onEvaluateAtMicros(int64_t microseconds, float frameRate) const override;
 
