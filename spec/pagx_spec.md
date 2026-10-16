@@ -511,12 +511,15 @@ Font defines embedded font resources containing subsetted glyph data (vector out
   <Glyph advance="136" image="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA..."/>
   <Glyph advance="136" image="emoji/heart.png" offset="0,-5"/>
 </Font>
+
+<!-- External font file, used by Text whose fontFamily matches the family inside the file -->
+<Font id="brandFont" file="fonts/Brand-Regular.woff2"/>
 ```
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `unitsPerEm` | int | 1000 | Font design space units. Rendering scale = `fontSize / unitsPerEm` |
-| `file` | string | — | External font file path. When set, the Font node references an external TTF/OTF file. Relative paths resolve against the PAGX file's directory. `pagx embed` discovers Font nodes with `file`, loads the fonts, and registers them for text shaping. After embed, `file` is preserved for source traceability while embedded glyph data lives in separate Font nodes. |
+| `file` | string | — | External font file path (TTF, OTF, TTC or WOFF2). Relative paths resolve against the PAGX file's directory. Layout registers every face of the file under the family and style names stored inside it, so Text whose `fontFamily` / `fontStyle` match those names is shaped and rendered with the file and needs no embedded glyph data; Text does not reference this node by id. A file that cannot be loaded is skipped, and such Text falls back to other fonts. Hosts without file system access (e.g. the web) fetch the path the same way as an external image and supply the bytes at runtime. `pagx embed` also shapes with these files; after embed, `file` is preserved for source traceability while embedded glyph data lives in separate Font nodes. |
 
 **Consistency Constraint**: All Glyphs within the same Font must be of the same type—either all `path` or all `image`. Mixing is not allowed.
 

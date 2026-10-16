@@ -19,17 +19,23 @@
 
 const {
   materializeDecorativePseudoElements,
+  resolveChildStacking,
 } = require('../dist/lib/browser-snapshot');
 
 // A live CSSStyleDeclaration-shaped stub. `props` may hold getter functions
 // (read at call time) or plain strings, so a test can flip a value after the
 // pseudo's animation is cancelled.
 function makeCs(props) {
+  const read = (k) => {
+    const v = props[k];
+    return (typeof v === 'function' ? v() : v) || '';
+  };
   return {
-    getPropertyValue(k) {
-      const v = props[k];
-      return (typeof v === 'function' ? v() : v) || '';
-    },
+    getPropertyValue: read,
+    // CSSStyleDeclaration also exposes camelCase accessors; `resolveChildStacking`
+    // reads `.position` directly rather than going through `getPropertyValue`.
+    get position() { return read('position'); },
+    get zIndex() { return read('z-index'); },
   };
 }
 
@@ -164,6 +170,55 @@ describe('materializeDecorativePseudoElements — animated decorative pseudo', (
     expect(style).not.toContain('animation-name');
     // No animation to cancel.
     expect(state.cancelled).toBe(false);
+  });
+});
+
+describe('materializeDecorativePseudoElements — masked decorative pseudo', () => {
+  // Mirrors MDN's `.menu__tab-button::after` chevron: an icon pseudo paints
+  // `background-color: currentColor` clipped by `mask-image`. Copying the colour
+  // without the mask would leave the stand-in painting its raw fill — a solid
+  // white rectangle where the page shows a chevron.
+  function makeHostWithMaskedAfter() {
+    const host = new FakeElement('button');
+    host.__cs = {
+      '::before': makeCs({ content: 'none' }),
+      '::after': makeCs({
+        content: '""',
+        position: 'absolute',
+        width: '20px',
+        height: '20px',
+        'background-color': 'rgb(255, 255, 255)',
+        'mask-image': 'url("https://developer.mozilla.org/static/client/chevron-down.svg")',
+        'mask-size': '100% 100%',
+        'mask-repeat': 'no-repeat',
+      }),
+    };
+    return host;
+  }
+
+  test('forwards the mask so the stand-in does not paint a solid rectangle', async () => {
+    const host = makeHostWithMaskedAfter();
+    await runOn(host);
+
+    expect(host.children).toHaveLength(1);
+    const style = host.children[0].getAttribute('style');
+    expect(style).toContain('background-color: rgb(255, 255, 255)');
+    // `emitInlineStyle` rewrites embedded double quotes to single quotes so the
+    // value survives the double-quoted style="…" attribute.
+    expect(style).toContain(
+      "mask-image: url('https://developer.mozilla.org/static/client/chevron-down.svg')",
+    );
+    expect(style).toContain('mask-size: 100% 100%');
+    expect(style).toContain('mask-repeat: no-repeat');
+  });
+
+  test('does not emit mask descriptors on an unmasked pseudo', async () => {
+    const { host } = makeHostWithAfter({ animated: false });
+    await runOn(host);
+
+    const style = host.children[0].getAttribute('style');
+    expect(style).not.toContain('mask-image');
+    expect(style).not.toContain('mask-size');
   });
 });
 
@@ -355,5 +410,50 @@ describe('materializeDecorativePseudoElements — out-of-flow text pseudo', () =
     // pseudo box would paint the raw glyph next to it.
     expect(host.children).toHaveLength(0);
     expect(host.hasAttribute('data-snapshot-pseudo-host')).toBe(false);
+  });
+});
+
+describe('resolveChildStacking — materialised stand-in stacking', () => {
+  // A materialised decorative pseudo is a real <div> inside the host, so an author
+  // rule keyed on the host's element children — e.g. the hero pattern
+  // `.hero div { position: relative; z-index: 1 }` — also matches the stand-in and
+  // leaks onto its computed style. Sorting by that value would tie the stand-in with
+  // the hero's real content and let document order (the stand-in is appended last)
+  // paint the `::after` gradient on top of the title it should sit under. The stand-in
+  // must be ordered by the pseudo's own stacking instead.
+
+  test("orders a stand-in by the pseudo's z-index, not the author rule that matches it", () => {
+    const host = new FakeElement('div');
+    // `.hero::after` — an absolutely positioned 0 z-index overlay.
+    host.__cs['::after'] = makeCs({ content: '""', position: 'absolute', 'z-index': 'auto' });
+
+    const standIn = new FakeElement('div');
+    standIn.setAttribute('data-snapshot-pseudo', '::after');
+    // The polluted computed style the stand-in picks up from `.hero div`.
+    const polluted = makeCs({ position: 'relative', 'z-index': '1' });
+
+    const stacking = resolveChildStacking(host, standIn, polluted, true);
+    expect(stacking).toEqual({ stackable: true, zIndex: 0 });
+  });
+
+  test("a stand-in whose pseudo is unpositioned does not participate in stacking", () => {
+    const host = new FakeElement('div');
+    host.__cs['::before'] = makeCs({ content: '""', position: 'static' });
+
+    const standIn = new FakeElement('div');
+    standIn.setAttribute('data-snapshot-pseudo', '::before');
+    const polluted = makeCs({ position: 'relative', 'z-index': '5' });
+
+    expect(resolveChildStacking(host, standIn, polluted, false))
+      .toEqual({ stackable: false, zIndex: 0 });
+  });
+
+  test('a plain child is still ordered by its own computed style', () => {
+    const host = new FakeElement('div');
+    const child = new FakeElement('div');
+    const childComputed = makeCs({ position: 'relative', 'z-index': '3' });
+
+    expect(resolveChildStacking(host, child, childComputed, false))
+      .toEqual({ stackable: true, zIndex: 3 });
   });
 });

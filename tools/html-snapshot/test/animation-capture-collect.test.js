@@ -55,6 +55,39 @@ function makeEl(attrs) {
   };
 }
 
+// A minimal parent-node fake for the checkpoint/restore cases: it reuses the
+// element fake above (the checkpoint reads every element's attributes) and adds
+// child management, so insertBefore / appendChild / removeChild keep sibling
+// order the way a real DOM would and `isConnected` flips as nodes move in and out.
+function makeParent(children) {
+  const kids = children.slice();
+  const parent = makeEl({});
+  parent.children = kids;
+  parent.insertBefore = function insertBefore(child, ref) {
+    const i = kids.indexOf(ref);
+    kids.splice(i < 0 ? kids.length : i, 0, child);
+    child.parentNode = parent;
+    child.isConnected = true;
+    return child;
+  };
+  parent.appendChild = function appendChild(child) {
+    kids.push(child);
+    child.parentNode = parent;
+    child.isConnected = true;
+    return child;
+  };
+  parent.removeChild = function removeChild(child) {
+    const i = kids.indexOf(child);
+    if (i >= 0) kids.splice(i, 1);
+    child.parentNode = null;
+    return child;
+  };
+  for (const k of kids) {
+    k.parentNode = parent;
+  }
+  return parent;
+}
+
 describe('pagxCandidateElements', () => {
   test('returns every element document.body.querySelectorAll reports', () => {
     const a = { nodeType: 1 };
@@ -133,6 +166,81 @@ describe('pagxDomCheckpoint / pagxDomRestore', () => {
 
   test('pagxDomRestore(null) is a no-op', () => {
     expect(() => pagxDomRestore(null)).not.toThrow();
+  });
+
+  // `container.innerHTML = …` builds fresh nodes and detaches the originals. The
+  // replacements (not in the checkpoint) get dropped; without the recorded
+  // parents the originals would stay stranded off-document and the container
+  // would serialise empty — the bug this reattachment exists to prevent.
+  test('restore puts back the originals a rebuilt container detached', () => {
+    const li1 = makeEl({ class: 'row' });
+    const li2 = makeEl({ class: 'row' });
+    const ul = makeParent([li1, li2]);
+    let nodes = [ul, li1, li2];
+    global.document = { body: { querySelectorAll: () => nodes.slice() } };
+
+    const cp = pagxDomCheckpoint();
+
+    // innerHTML swap: the old child list goes away wholesale.
+    li1.isConnected = false;
+    li2.isConnected = false;
+    ul.children.length = 0;
+    const fresh1 = makeEl({ class: 'row' });
+    const fresh2 = makeEl({ class: 'row' });
+    ul.appendChild(fresh1);
+    ul.appendChild(fresh2);
+    nodes = [ul, fresh1, fresh2];
+
+    pagxDomRestore(cp);
+
+    expect(ul.children).toEqual([li1, li2]);
+    expect(li1.parentNode).toBe(ul);
+    expect(li2.parentNode).toBe(ul);
+    expect(li1.isConnected).toBe(true);
+  });
+
+  test('restore keeps reattached originals in order around a surviving sibling', () => {
+    const a = makeEl({});
+    const b = makeEl({});
+    const c = makeEl({});
+    const box = makeParent([a, b, c]);
+    let nodes = [box, a, b, c];
+    global.document = { body: { querySelectorAll: () => nodes.slice() } };
+
+    const cp = pagxDomCheckpoint();
+
+    // Only the first and last children are rebuilt; `b` never leaves the DOM.
+    a.isConnected = false;
+    c.isConnected = false;
+    box.removeChild(a);
+    box.removeChild(c);
+    const freshA = makeEl({});
+    const freshC = makeEl({});
+    box.insertBefore(freshA, b);
+    box.appendChild(freshC);
+    nodes = [box, freshA, b, freshC];
+
+    pagxDomRestore(cp);
+
+    expect(box.children).toEqual([a, b, c]);
+  });
+
+  // A parent the timeline detached gives the restore nowhere to put the children
+  // back, so they stay off-document instead of being appended to a dead node.
+  test('restore leaves originals detached when their parent is gone too', () => {
+    const child = makeEl({ class: 'row' });
+    const box = makeParent([child]);
+    const nodes = [box, child];
+    global.document = { body: { querySelectorAll: () => nodes.slice() } };
+
+    const cp = pagxDomCheckpoint();
+
+    box.isConnected = false;
+    child.isConnected = false;
+    box.children.length = 0;
+
+    expect(() => pagxDomRestore(cp)).not.toThrow();
+    expect(box.children).toEqual([]);
   });
 });
 

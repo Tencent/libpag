@@ -97,11 +97,25 @@ async function main() {
     }
 
     // Emit the per-page font manifest so a caller with a shared --font-dir can
-    // feed only this page's fonts to pagx. Written unconditionally when
-    // requested (even with zero fonts) so the caller can distinguish "no fonts"
-    // from "snapshot never ran".
+    // feed only this page's fonts to pagx. Each line is `<path>` or
+    // `<path>\t<css-family>` — the family is the name the page's `@font-face`
+    // rule declares, which need not match the name inside the file, and callers
+    // forward the pair as `pagx embed/render --font-alias "<family>=<path>"`.
+    // Written unconditionally when requested (even with zero fonts) so the
+    // caller can distinguish "no fonts" from "snapshot never ran".
     if (opts.fontManifest) {
-      const lines = (result.fonts || []).map((f) => f.path).filter(Boolean);
+      const lines = [];
+      for (const font of result.fonts || []) {
+        if (!font.path) continue;
+        const families = font.cssFamilies || [];
+        if (families.length === 0) {
+          lines.push(font.path);
+        } else {
+          for (const family of families) {
+            lines.push(`${font.path}\t${family}`);
+          }
+        }
+      }
       fs.writeFileSync(opts.fontManifest, lines.length ? lines.join('\n') + '\n' : '', 'utf8');
     }
   } finally {

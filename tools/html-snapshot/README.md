@@ -131,7 +131,7 @@ Options:
 | `--capture-animations` | _disabled_ | Capture the page's animations (CSS `@keyframes`, Web Animations, GSAP, anime.js) into the subset as `@keyframes` + `animation` so the importer can replay the motion; implies `--no-reduced-motion`; otherwise a single static frame is emitted |
 | `--download-fonts` | _disabled_ | Save the page's web fonts to disk as TTF/OTF (see [Download web fonts](#download-web-fonts)) |
 | `--font-dir <dir>` | `<output>.fonts/` | Destination for `--download-fonts` (content-addressed; safe to share across runs) |
-| `--font-manifest <file>` | _none_ | Write this page's font files (one path per line) for callers sharing a `--font-dir` |
+| `--font-manifest <file>` | _none_ | Write this page's font files for callers sharing a `--font-dir`: one `<path>` or `<path>\t<css-family>` line per entry |
 | `--download-images` | _disabled_ | Save external images to disk instead of inlining them as base64 data URIs |
 | `--image-dir <dir>` | `<output>.images/` | Destination for `--download-images` |
 | `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
@@ -181,22 +181,37 @@ pre-flag behaviour. Use this when:
 - network egress is undesirable (the pass fetches each unique font URL
   once via Node's `fetch`).
 
+### Local web fonts
+
+A page whose `@font-face` rules point at font files on **local disk** (a saved
+page, or a design-tool HTML export with an `assets/fonts/` folder) needs no
+extra flag: the snapshot carries every such rule over into its `<style>` block
+as `@font-face{font-family:"…";src:url("<absolute path>")}` — the same absolute
+path form local images take — and the importer turns each font file a
+`font-family` stack uses into a PAGX `<Font file>` resource. PAGX layout loads
+those files (TTF/OTF/TTC/WOFF2) directly, so the text renders with its web font
+without embedded glyphs. Remote and `data:` sources are not carried over this
+way; use `--download-fonts` below for them.
+
 ### Download web fonts
 
 The snapshot bakes each text node's computed `font-family` **name** into its
-inline style, but it cannot embed the font itself: the HTML subset disallows
-`@font-face`, so the importer drops it. At render time PAGX resolves a family
-by name via `tgfx::Typeface::MakeFromName`, which only finds fonts **installed
-on the rendering host**. A page styled with a Google-Fonts / self-hosted web
-font that isn't installed locally therefore renders with a wrong fallback face
-(e.g. the `font-[900] italic` `Noto Sans SC` heading falls back to a default
+inline style, but only `@font-face` rules backed by a local file (see above)
+reach the importer. At render time PAGX resolves any other family by name via
+`tgfx::Typeface::MakeFromName`, which only finds fonts **installed on the
+rendering host**. A page styled with a Google-Fonts / remote web font that
+isn't installed locally therefore renders with a wrong fallback face (e.g. the
+`font-[900] italic` `Noto Sans SC` heading falls back to a default
 sans-serif).
 
-Pass `--download-fonts` to capture the actual font files. Rather than
-re-deriving the `@font-face` set from CSS, the pass saves the font files
-**Chromium already fetched** while rendering — which for CJK families means
-only the unicode-range subset files the page's text actually falls into, not
-the hundreds of subsets a `Noto Sans SC` stylesheet declares. Each WOFF2/WOFF
+Pass `--download-fonts` to capture the actual font files. Two sources are
+captured: the font files **Chromium already fetched** while rendering — which
+for CJK families means only the unicode-range subset files the page's text
+actually falls into, not the hundreds of subsets a `Noto Sans SC` stylesheet
+declares — plus fonts inlined as `data:` URIs in `@font-face`. An inline font
+issues no request, so it can only be found by reading the page's stylesheets;
+without that pass a self-contained page (a generated report, a design
+showcase) would render every one of its fonts as a system substitute. Each WOFF2/WOFF
 payload is decompressed to a plain SFNT (TTF/OTF) — the only container
 `tgfx::Typeface::MakeFromPath` reads — and written to `--font-dir` (default
 `<output>.fonts/`) under a content-addressed name
@@ -213,19 +228,34 @@ node snapshot.js page.html --download-fonts
 ```
 
 When a single `--font-dir` is shared across many pages, pass `--font-manifest
-<file>` so the snapshot also records just *this* page's font files (one
-absolute path per line); feed that list — not the whole shared directory — to
-`pagx`.
+<file>` so the snapshot also records just *this* page's font files; feed that
+list — not the whole shared directory — to `pagx`. Each manifest line is
+`<path>` or `<path>\t<css-family>`: the family is the name the page's
+`@font-face` rule declares, which is **not** necessarily the name inside the
+file.
 
 Hand the files to `pagx` so the document renders (or embeds) with the correct
-typeface — `--fallback` both registers the face (matching the document's
-`font-family`) and adds it to the per-glyph fallback chain, so multiple CJK
-subset files jointly cover the text:
+typeface. A file the page declared in `@font-face` goes through
+`--font-alias "<family>=<path>"`, which registers it under the authored name;
+a file without a recorded family uses `--fallback <path>`. Both also add the
+face to the per-glyph fallback chain, so multiple CJK subset files jointly
+cover the text:
 
 ```bash
-pagx embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
-pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
+pagx embed page.pagx \
+  --font-alias "MaShanZheng=page.fonts/Ma-Shan-Zheng-Regular-2acc02a2.ttf" \
+  --fallback page.fonts/Extra.ttf                 # self-contained .pagx
+pagx render page.pagx -o page.png --font-alias "MaShanZheng=…/Ma-Shan-Zheng….ttf"
 ```
+
+Why the alias is needed: the document stores the name the page **used**
+(`font-family: MaShanZheng`), and PAGX resolves it by exact string match, but
+the file may answer to a different name in its own `name` table — a page can
+alias any file under any name (`MaShanZheng` → "Ma Shan Zheng",
+`QingKeHuangYou` → "ZCOOL QingKe HuangYou"), and a font whose typographic name
+(nameID 16/17) exists only in a non-English record is reported by the platform
+font reader as `?????` because that reader can only produce ASCII. Registering
+the file under the authored name sidesteps the file's name table entirely.
 
 `html2pagx --download-fonts` wires all of this up automatically (see below).
 
@@ -274,7 +304,7 @@ Options:
 | `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
 | `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
 | `--capture-animations` | Forwarded to `snapshot.js`: capture the page's animations into the subset so the `.pagx` replays the motion (default: a single static frame) |
-| `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
+| `--download-fonts` | Download the page's web fonts and register them with `pagx render` (`--font-alias` for `@font-face` families, `--fallback` otherwise) **without** embedding them into the `.pagx` |
 | `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
 | `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
 | `--download-images` | Save external images to disk and reference them by path instead of inlining base64 |
@@ -312,6 +342,9 @@ document and require no other globals:
   (async () => {
     await HtmlSnapshot.inlineExternalImages();           // optional
     await HtmlSnapshot.inlineCanvases();                 // optional
+    // Optional: prune the collapsed content of closed <details> so it does
+    // not leak into the walk as boxes painted over the summary rows.
+    HtmlSnapshot.dropCollapsedDetailsContent();
     // Optional: inline icon-font glyphs as <svg>. The browser bundle only
     // exposes the collect/apply hooks (font parsing requires opentype.js
     // + a WOFF2 decoder, which we don't bundle). A typical setup posts
@@ -338,6 +371,7 @@ import {
   takeSnapshot,
   inlineExternalImages,
   inlineCanvases,
+  dropCollapsedDetailsContent,
   collectIconFontTargets,
   applyIconFontSvgs,
 } from './html-snapshot.esm.js';
@@ -560,9 +594,15 @@ Babel-compiled at runtime.
   expansion is opt-out via `HTML_SNAPSHOT_NO_STICKY_EXPAND=1`.
 - Elements with `display: none`, `visibility: hidden`, or `opacity: 0` are
   dropped, which is intentional: PAGX cannot represent hidden DOM nodes.
-- `<video>`, `<audio>`, `<iframe>`, `<dialog>`, `<details>`,
+- `<video>`, `<audio>`, `<iframe>`, `<dialog>`,
   `<template>`, `<slot>`, `<map>`/`<area>`, `<source>`/`<track>`, etc. are
   dropped — they have no static visual representation.
+- `<details>` is kept: the summary row paints, so an accordion/FAQ list comes
+  through as its first item expanded plus the remaining titles. The collapsed
+  content of a closed `<details>` is pruned from the DOM before the walk,
+  because Chromium hides it through a UA pseudo-element the snapshot cannot
+  observe (the content reports normal visibility and a full-size rect, and
+  only the element's own `overflow: hidden` keeps it off screen).
 - `<canvas>` is captured via `toDataURL`, which fails silently in two
   cases: tainted 2D canvases (cross-origin `drawImage` source without CORS),
   and WebGL canvases created without `preserveDrawingBuffer: true` (the

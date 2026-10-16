@@ -44,6 +44,7 @@ Legend: [x] covered in this phase (P1) · [ ] reserved for a later phase.
 | Property | Behavior | Case |
 |----------|----------|------|
 | `font-family` | fallback chain | `15-typography__font-family-fallback` |
+| `@font-face` (inline `data:` URI) | captured by the snapshot and registered under the authored family name | `15-typography__inline-webfont-alias` |
 | `font-size` | px | `15-typography__font-size-px` |
 | `font-weight` | bold / numeric>=600 | `15-typography__font-weight-bold`, `...font-weight-numeric` |
 | `font-style` | italic | `15-typography__font-style-italic` |

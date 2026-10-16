@@ -77,21 +77,35 @@ struct CssKeyframesRule {
 };
 
 /**
+ * A parsed `@font-face { … }` rule, reduced to what PAGX consumes: the family it declares and the
+ * URLs of its `url()` sources in declaration order. CSS escapes are resolved, but the URLs are not
+ * resolved against any base. `local()` sources and descriptors other than `font-family` / `src`
+ * are ignored.
+ */
+struct CssFontFaceRule {
+  std::string family = {};
+  std::vector<std::string> sources = {};
+};
+
+/**
  * Tokenises CSS text into top-level `(selectors, declarations)` rules. Most `@`-rules (`@media`,
- * `@font-face`, ...) are skipped: the matching brace is tracked so parsing stays synchronised,
- * but their body is not emitted (a single record describing the dropped at-rule is appended to
+ * `@import`, ...) are skipped: the matching brace is tracked so parsing stays synchronised, but
+ * their body is not emitted (a single record describing the dropped at-rule is appended to
  * `droppedAtRules` so callers can surface diagnostics).
  *
  * `@keyframes` / `@-webkit-keyframes` rules are parsed into `keyframesRules` instead of being
  * dropped, so the HTML animation subset (see `spec/html_subset.md` §13) can map them onto PAGX
- * animations. Pass the no-keyframes overload when keyframes are not relevant.
+ * animations. `@font-face` rules that declare a family and at least one `url()` source are parsed
+ * into `fontFaceRules` so their font files can become PAGX Font resources; any other
+ * `@font-face` (e.g. `local()`-only) is dropped like an unsupported at-rule.
  *
  * Block comments are stripped. The tokeniser is intentionally permissive: malformed
  * input causes the offending block to be skipped rather than raising an error.
  */
 std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
                                            std::vector<std::string>& droppedAtRules,
-                                           std::vector<CssKeyframesRule>& keyframesRules);
+                                           std::vector<CssKeyframesRule>& keyframesRules,
+                                           std::vector<CssFontFaceRule>& fontFaceRules);
 
 /**
  * Serialises a list of `@keyframes` rules back into canonical CSS text (one rule per line). Used
@@ -99,5 +113,12 @@ std::vector<RawCssRule> TokenizeStyleSheet(const std::string& css,
  * keyframes so the importer can re-read them after the cascade has been inlined.
  */
 std::string SerializeKeyframes(const std::vector<CssKeyframesRule>& keyframesRules);
+
+/**
+ * Serialises a list of `@font-face` rules back into CSS text (one rule per line) that
+ * TokenizeStyleSheet parses into the same rules. Used by the subset transformer to carry the
+ * font faces past the cascade-inlining pass, the same way it carries `@keyframes`.
+ */
+std::string SerializeFontFaces(const std::vector<CssFontFaceRule>& fontFaceRules);
 
 }  // namespace pagx::html

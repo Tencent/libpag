@@ -72,7 +72,7 @@ class HTMLStyleCascade {
   void setFontFallbackSink(FontFallbackThunk thunk, void* userData);
 
   /** Wires the predicate that reports whether a concrete family resolves to a matching typeface.
-   *  When unset, `resolveInheritedStyle` keeps the stack's first concrete family verbatim. */
+   *  When unset, `resolveInheritedStyle` keeps the stack's first entry verbatim. */
   void setFontAvailabilitySink(FontAvailabilityThunk thunk, void* userData);
 
   /** Wires the in-place normaliser mapping a resolved pair to the platform's own spelling.
@@ -110,6 +110,12 @@ class HTMLStyleCascade {
     return _keyframes;
   }
 
+  /** Returns the `@font-face` rules collected from `<style>` blocks in source order. Populated by
+   *  `collectStyles`; the parser context loads their font files into Font resources. */
+  const std::vector<html::CssFontFaceRule>& fontFaces() const {
+    return _fontFaces;
+  }
+
  private:
   void parseStyleBlock(const std::shared_ptr<DOMNode>& styleNode);
   void mergeClassRules(const std::string& classAttribute, PropertyMap& out);
@@ -143,6 +149,14 @@ class HTMLStyleCascade {
   // call per distinct pair instead of one per element.
   void applyFontFaceNames(HTMLInheritedStyle& out, const HTMLInheritedStyle& parent);
 
+  // Picks the family to write to `Text::fontFamily`: the first entry of `authoredFamilies` the
+  // renderer can resolve, then the first of `genericFamilies`, and `fallback` when neither group
+  // yields one. Splitting the two groups keeps an authored family ahead of a generic keyword, so
+  // the written name does not depend on which platform ran the import.
+  std::string selectPrimaryFontFamily(const std::vector<std::string>& authoredFamilies,
+                                      const std::vector<std::string>& genericFamilies,
+                                      const std::string& fallback);
+
   HTMLDiagnosticSink& _diagnostics;
   HTMLValueParser& _valueParser;
   FontFallbackThunk _fontFallbackThunk = nullptr;
@@ -173,6 +187,9 @@ class HTMLStyleCascade {
   // `@keyframes` rules collected from `<style>` blocks, keyed by keyframes name. The last
   // definition of a given name wins, matching CSS cascade order.
   std::unordered_map<std::string, html::CssKeyframesRule> _keyframes = {};
+
+  // `@font-face` rules collected from `<style>` blocks, in source order.
+  std::vector<html::CssFontFaceRule> _fontFaces = {};
 };
 
 }  // namespace pagx

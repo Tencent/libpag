@@ -1694,19 +1694,37 @@ export function pagxCandidateElements(maxElements: number): HTMLElement[] {
   return list;
 }
 
-// Record the initial DOM state (every element's `class` + inline `style`, and
-// the set of live nodes) so it can be restored after the global sampler has
-// advanced the virtual clock through the timeline. Advancing the clock fires
-// the page's timer-driven state machine, which mutates the DOM (toggles scene
-// classes, sometimes appends transient nodes like countdown digits); the
-// snapshot that follows capture must serialise the *initial* scene (menu
-// visible, later panels at opacity 0 with a pagxAnim that fades them in), not
-// whatever end state the timeline left behind.
-export function pagxDomCheckpoint(): {
-  records: Array<{ el: Element; className: string | null; style: string | null }>;
+// Shape of a DOM checkpoint. `records` is in document order, which the restore
+// relies on to put siblings back in their original sequence.
+type PagxDomRecord = {
+  el: Element;
+  className: string | null;
+  style: string | null;
+  parent: Node | null;
+};
+
+export type PagxDomCheckpoint = {
+  records: PagxDomRecord[];
   set: Set<Element>;
-} {
-  const records: Array<{ el: Element; className: string | null; style: string | null }> = [];
+};
+
+// Record the initial DOM state (every element's `class` + inline `style`, the
+// parent it hangs off, and the set of live nodes) so it can be restored after
+// the global sampler has advanced the virtual clock through the timeline.
+// Advancing the clock fires the page's timer-driven state machine, which
+// mutates the DOM (toggles scene classes, appends transient nodes like countdown
+// digits, and — for the `container.innerHTML = …` idiom — swaps a container's
+// entire child list for freshly built nodes); the snapshot that follows capture
+// must serialise the *initial* scene (menu visible, later panels at opacity 0
+// with a pagxAnim that fades them in), not whatever end state the timeline left
+// behind.
+//
+// `parent` is what makes the reverse direction of that restore possible: the
+// replacement nodes are dropped (they are not in `set`), and without the
+// recorded parent the originals they displaced would stay stranded
+// off-document, leaving the container empty in the snapshot.
+export function pagxDomCheckpoint(): PagxDomCheckpoint {
+  const records: PagxDomRecord[] = [];
   const set = new Set<Element>();
   let list: Element[] = [];
   try {
@@ -1720,22 +1738,20 @@ export function pagxDomCheckpoint(): {
       el,
       className: el.getAttribute('class'),
       style: el.getAttribute('style'),
+      parent: el.parentNode,
     });
   }
   return { records, set };
 }
 
 // Restore the DOM to a checkpoint taken by pagxDomCheckpoint: drop any node the
-// timeline appended after the checkpoint, then restore each original element's
-// `class` + inline `style`. This reverts the scene-switching class flips (and
-// the inline `animation-delay` a demo sequence may have written on perks, etc.)
-// so `pagxEmitCaptured` and the snapshot walker see the initial scene. Nodes
-// that were detached by the timeline (rare for the class-toggle idiom) are left
-// alone — there is nothing to reattach them to.
-export function pagxDomRestore(cp: {
-  records: Array<{ el: Element; className: string | null; style: string | null }>;
-  set: Set<Element>;
-} | null): void {
+// timeline appended after the checkpoint, put back the originals it detached,
+// then restore each element's `class` + inline `style`. This reverts the
+// scene-switching class flips (and the inline `animation-delay` a demo sequence
+// may have written on perks, etc.) so `pagxEmitCaptured` and the snapshot walker
+// see the initial scene — in both directions, so a container rebuilt by
+// `innerHTML` comes back with its original children instead of being left empty.
+export function pagxDomRestore(cp: PagxDomCheckpoint | null): void {
   if (!cp) return;
   try {
     let now: Element[] = [];
@@ -1751,6 +1767,41 @@ export function pagxDomRestore(cp: {
     }
   } catch (_) {
     /* ignore */
+  }
+  // Reattach the originals. Grouping the document-ordered records by parent
+  // keeps each container's children in their original sequence; a node goes back
+  // in front of the nearest following sibling still under that parent, or at the
+  // end when none of its followers survived. Ancestor groups are visited before
+  // their descendants' (document order), so reattaching a subtree makes its
+  // interior nodes connected again and the inner groups then skip themselves.
+  const byParent = new Map<Node, Element[]>();
+  for (const r of cp.records) {
+    if (!r.parent) continue;
+    const siblings = byParent.get(r.parent);
+    if (siblings) siblings.push(r.el);
+    else byParent.set(r.parent, [r.el]);
+  }
+  for (const [parent, siblings] of byParent) {
+    // A parent that is itself off-document (or an element the timeline replaced)
+    // gives us nowhere to put the children back.
+    if ((parent as { isConnected?: boolean }).isConnected === false) continue;
+    for (let i = 0; i < siblings.length; i++) {
+      const el = siblings[i];
+      if ((el as { isConnected?: boolean }).isConnected !== false) continue;
+      let anchor: Element | null = null;
+      for (let j = i + 1; j < siblings.length; j++) {
+        if (siblings[j].parentNode === parent) {
+          anchor = siblings[j];
+          break;
+        }
+      }
+      try {
+        if (anchor) parent.insertBefore(el, anchor);
+        else parent.appendChild(el);
+      } catch (_) {
+        /* ignore this element */
+      }
+    }
   }
   for (const r of cp.records) {
     try {
@@ -2266,13 +2317,43 @@ export function pagxSampleTimeline(
     }
     void document.body.offsetHeight; // force reflow
     for (const el of candidates) {
-      const cs = getComputedStyle(el);
-      const snap = pagxReadAnimChannels(el, cs);
       let arr = series.get(el);
       if (!arr) {
         arr = [];
         series.set(el, arr);
       }
+      // A `container.innerHTML = …` swap detaches the nodes it replaces, and
+      // Chrome reports an empty string for every channel of an element that is no
+      // longer in the document. Reading one here would (a) look like a change
+      // from the live value one sample ago — turning a rebuilt list into a bogus
+      // animation — and (b) write `opacity: ;` and friends into the emitted
+      // @keyframes, which blanks the element out at playback. Repeat the last
+      // in-document reading instead: every per-sample series stays index-aligned
+      // with the sample grid, the element's own channels stay flat (dropped by
+      // pagxWhichVary), and any motion it did capture before leaving is kept on
+      // its real offsets. No previous reading means the element was gone before
+      // the sweep started; fall through and let the normal path record it.
+      if ((el as { isConnected?: boolean }).isConnected === false && arr.length > 0) {
+        arr.push(Object.assign({}, arr[arr.length - 1]));
+        const trec = textLeaf ? textLeaf.get(el) : undefined;
+        if (trec && trec.texts.length > 0) {
+          const k = trec.texts.length - 1;
+          trec.texts.push(trec.texts[k]);
+          trec.fontSizes.push(trec.fontSizes[k]);
+          trec.colors.push(trec.colors[k]);
+          trec.fills.push(trec.fills[k]);
+          trec.opacities.push(trec.opacities[k]);
+        }
+        const hrec = useLeaf ? useLeaf.get(el) : undefined;
+        if (hrec && hrec.hrefs.length > 0) {
+          const k = hrec.hrefs.length - 1;
+          hrec.hrefs.push(hrec.hrefs[k]);
+          hrec.opacities.push(hrec.opacities[k]);
+        }
+        continue;
+      }
+      const cs = getComputedStyle(el);
+      const snap = pagxReadAnimChannels(el, cs);
       arr.push(snap);
       // Only HTML text leaves: an SVG `<text>` (namespace svg) whose glyph the
       // timeline swaps (e.g. a `<text>`-based 3-2-1-GO countdown) cannot be

@@ -119,12 +119,13 @@ struct HTMLInheritedStyle {
   Color resolvedTextColor = {0, 0, 0, 1, ColorSpace::SRGB};
 
   // Pre-resolved CSS font-family stack. Kept in lock-step with `fontFamily` by
-  // `resolveInheritedStyle`. `primaryFontFamily` is the first concrete name (after surrounding
-  // quotes are stripped and generic keywords are mapped to platform fonts) and gets
-  // written to `Text::fontFamily`. `fontFamilyChain` holds the same first name followed by
-  // every additional concrete name from the stack, in CSS order; the importer unions all
-  // chains across the document and registers the union as user fallback fonts on the
-  // document's FontConfig so per-glyph fallback in LayoutContext can pick them up.
+  // `resolveInheritedStyle`. `primaryFontFamily` is the first family the page authored that the
+  // renderer can resolve — the face a generic keyword maps to is only used when no authored
+  // family is installed, so the name written to `Text::fontFamily` does not depend on the
+  // platform that ran the import. `fontFamilyChain` holds every resolved name of the stack in
+  // CSS order, generics included; the importer unions all chains across the document and
+  // registers the union as user fallback fonts on the document's FontConfig so per-glyph
+  // fallback in LayoutContext can pick them up.
   std::string primaryFontFamily = {};
   std::vector<std::string> fontFamilyChain = {};
 };
@@ -240,6 +241,10 @@ struct HTMLBoxAttributes {
   Color backgroundColor = {0, 0, 0, 0, ColorSpace::SRGB};
   bool backgroundColorSet = false;
   std::string backgroundImage = {};
+  // `border-image-source` when it is a gradient: CSS paints the border with this gradient instead
+  // of `border-color`. The layer builder rebuilds it as a gradient Stroke. Sliced bitmap
+  // border-images are not supported and never reach here (the snapshot drops non-gradient values).
+  std::string borderImageSource = {};
   // True when computed style had `background-clip: text`. Only meaningful with a gradient
   // `background-image`; the gradient is then routed onto descendant text fills instead of
   // painting a rectangle on this element.

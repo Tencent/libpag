@@ -33,6 +33,7 @@
 #include "cli/CliUtils.h"
 #include "cli/CommandResolve.h"
 #include "cli/ImageStorage.h"
+#include "cli/ZipArchive.h"
 #include "pagx/HTMLImporter.h"
 #include "pagx/PAGXExporter.h"
 #include "pagx/PAGXOptimizer.h"
@@ -521,7 +522,8 @@ static void PrintUsage() {
       << "Import a file from another format and convert it to PAGX.\n"
       << "\n"
       << "Options:\n"
-      << "  --input <file|url>             Input file or URL to import (required)\n"
+      << "  --input <file|url>             Input file or URL to import (required). A .zip HTML\n"
+      << "                                 export is extracted and its index.html imported\n"
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
       << "  --format <format>              Force input format (svg, html)\n"
       << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
@@ -547,6 +549,7 @@ static void PrintUsage() {
       << "  pagx import --input page.html --output card.pagx  # HTML to card.pagx\n"
       << "  pagx import --input page.html --no-resolve        # keep import directives\n"
       << "  pagx import --input page.html --capture-animations # replay page animations in PAGX\n"
+      << "  pagx import --input export.zip                    # zipped HTML export to export.pagx\n"
       << "  pagx import --input https://example.com/demo --output demo.pagx  # URL input\n";
 }
 
@@ -615,7 +618,29 @@ int RunImport(int argc, char* argv[]) {
     return parseResult == -1 ? 0 : parseResult;
   }
 
-  auto result = ImportFile(options.inputFile, options.format, options.formatOptions);
+  // A zipped HTML export (the page plus its images and fonts) is extracted to a temporary
+  // directory and imported from its entry page; the extracted resources are copied next to the
+  // output below, and the directory is removed when `archive` goes out of scope.
+  std::string importPath = options.inputFile;
+  std::string importFormat = options.format;
+  ExtractedArchive archive = {};
+  if (!IsHttpUrl(options.inputFile) && GetFileExtension(options.inputFile) == "zip") {
+    std::string error = {};
+    if (!archive.extract(options.inputFile, &error)) {
+      std::cerr << "pagx import: error: " << error << "\n";
+      return 1;
+    }
+    importPath = archive.findEntryHTML(&error);
+    if (importPath.empty()) {
+      std::cerr << "pagx import: error: " << error << " in '" << options.inputFile << "'\n";
+      return 1;
+    }
+    if (importFormat.empty()) {
+      importFormat = "html";
+    }
+  }
+
+  auto result = ImportFile(importPath, importFormat, options.formatOptions);
   if (!result.error.empty()) {
     std::cerr << "pagx import: error: " << result.error << "\n";
     return 1;
@@ -655,21 +680,24 @@ int RunImport(int argc, char* argv[]) {
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
   }
 
-  // Normalise image resources to the requested storage mode. Relative image paths recorded by the
-  // importer are anchored at the input document's directory, so that is the default base; copied
-  // files land next to the output PAGX. URL inputs have no local base, so image relocation is
-  // skipped for them.
+  // Normalise image resources to the requested storage mode and copy the font files next to the
+  // output. Relative paths recorded by the importer are anchored at the input document's
+  // directory, so that is the default base; copied files land next to the output PAGX. URL inputs
+  // have no local base, so relocation is skipped for them.
   {
     ImageStorageOptions imageOptions = {};
     imageOptions.mode = options.imageStorage;
-    std::string inputDir =
-        IsHttpUrl(options.inputFile) ? std::string() : GetDirectory(options.inputFile);
+    std::string inputDir = IsHttpUrl(importPath) ? std::string() : GetDirectory(importPath);
     imageOptions.baseDir = !options.imageBaseDir.empty() ? options.imageBaseDir : inputDir;
     // The importer anchors relative `<img>` paths at the input file's directory, so that is the
     // prefix to strip back off when recovering the authored `source`.
     imageOptions.documentDir = inputDir;
+    if (!archive.directory().empty()) {
+      imageOptions.archiveDir = archive.directory() + "/";
+    }
     imageOptions.outputDir = GetDirectory(options.outputFile);
     ApplyImageStorage(result.document.get(), imageOptions, "pagx import");
+    ApplyFontStorage(result.document.get(), imageOptions, "pagx import");
   }
 
   auto xml = PAGXExporter::ToXML(*result.document);

@@ -428,6 +428,9 @@ const PropertyEntry SubsetPropertyEntries[] = {
     // border-radius accepts 1-4 lengths or percentages; ResolveLengthShorthand handles both.
     {"border-radius", PropAction::Transform, &ResolveLengthShorthand, nullptr},
     {"box-shadow", PropAction::Keep, nullptr, nullptr},
+    // `border-image-source` (gradient form) paints the border with the gradient; the layer builder
+    // rebuilds it as a gradient Stroke. Non-gradient sources never reach the subset.
+    {"border-image-source", PropAction::Keep, nullptr, nullptr},
     {"filter", PropAction::Keep, nullptr, nullptr},
     {"backdrop-filter", PropAction::Keep, nullptr, nullptr},
     {"opacity", PropAction::Transform, &TransformOpacity, nullptr},

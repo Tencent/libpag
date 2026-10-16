@@ -138,6 +138,39 @@ const AUTO_SCROLL_FINALIZE_SCRIPT = `(async (cfg) => {
   } catch (_) { /* non-fatal */ }
   pagxResetRootScroll();
   if (document.body) { void document.body.offsetHeight; }
+  // The warm-up sweep just triggered every entrance transition the page
+  // defers to scroll (reveal-up / word-fade / block-fade and friends), and
+  // those play out with per-element delays AFTER the class flip. Sampling
+  // immediately would freeze them mid-flight: steps still at opacity 0 get
+  // pruned by the visibility check (lost content) and half-faded steps ship
+  // as blur ghosts (frozen entrance frames). Let the finite animations the
+  // sweep started reach their resting state first. Infinite loops (spinners,
+  // marquees) are excluded — they would never finish and must not stall the
+  // wait — and the whole hold is bounded by animWaitMs (see AUTO_SCROLL_CONFIG).
+  try {
+    if (typeof document.getAnimations === 'function') {
+      const deadline = Date.now() + cfg.animWaitMs;
+      // One beat for just-flipped classes to actually start their transitions
+      // (a transition added this frame only shows up in getAnimations() once
+      // the style change has been flushed).
+      await sleep(50);
+      while (Date.now() < deadline) {
+        const running = document.getAnimations().filter((a) => {
+          if (a.playState !== 'running') return false;
+          try {
+            const timing = a.effect && a.effect.getComputedTiming
+              ? a.effect.getComputedTiming() : null;
+            return timing ? timing.iterations !== Infinity : true;
+          } catch (_) { return true; }
+        });
+        if (running.length === 0) break;
+        await Promise.race([
+          Promise.all(running.map((a) => a.finished.catch(() => {}))),
+          sleep(Math.max(1, deadline - Date.now())),
+        ]);
+      }
+    }
+  } catch (_) { /* best-effort: proceed with whatever state the page reached */ }
   // A layout flush can engage scroll anchoring; pin the root once more immediately
   // before returning control to the snapshot/baseline caller.
   pagxResetRootScroll();
@@ -229,6 +262,13 @@ const AUTO_SCROLL_CONFIG = {
   stableRounds: 2,
   // Bounded wait for in-flight image decode in the finalize step.
   imageWaitMs: 5000,
+  // Bounded wait for the finite entrance transitions the sweep triggered
+  // (reveal-up / word-fade / block-fade …) to reach their resting state
+  // before we sample. Without it a step that is still at opacity 0 when the
+  // walker runs is pruned as invisible (content lost) and a half-faded step
+  // ships as a frozen blur ghost. Infinite animations are filtered out of
+  // the wait itself — this is only the ceiling for the finite ones.
+  animWaitMs: 4000,
 };
 
 // Realise lazy content by alternating an in-page top-to-bottom sweep with a

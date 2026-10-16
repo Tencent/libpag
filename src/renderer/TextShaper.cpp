@@ -24,6 +24,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include "EmojiPresentation.h"
 #include "UTF8Utils.h"
 #include "hb.h"
 #include "pagx/LayoutContext.h"
@@ -244,6 +245,25 @@ static hb_script_t ResolveScript(int32_t codepoint, hb_script_t lastScript) {
   return script;
 }
 
+// Returns the shaping font for `typeface`, reusing the entry cached for it. Fallback faces take
+// over the synthetic bold/italic axes of the primary font so a borrowed glyph is embossed the same
+// way the text asked for.
+static const tgfx::Font* CachedFontForTypeface(
+    std::unordered_map<const tgfx::Typeface*, tgfx::Font>& cache, const tgfx::Font& primaryFont,
+    const std::shared_ptr<tgfx::Typeface>& typeface) {
+  if (typeface == nullptr) {
+    return nullptr;
+  }
+  auto it = cache.find(typeface.get());
+  if (it == cache.end()) {
+    tgfx::Font font(typeface, primaryFont.getSize());
+    font.setFauxBold(primaryFont.isFauxBold());
+    font.setFauxItalic(primaryFont.isFauxItalic());
+    it = cache.emplace(typeface.get(), std::move(font)).first;
+  }
+  return &it->second;
+}
+
 // Performs combined font + script itemization. Each character is assigned the best available font
 // and an effective script. Adjacent characters sharing both font and script are merged into runs.
 static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::Font& primaryFont,
@@ -253,7 +273,16 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
   const tgfx::Font* lastFont = nullptr;
   hb_script_t lastScript = HB_SCRIPT_COMMON;
   auto primaryTypeface = primaryFont.getTypeface();
+  // The face the primary font resolved to carries the weight the text asked for (the platform's
+  // spelling of it), which the fallback lookup reuses so borrowed glyphs keep that weight.
+  std::string requestedStyle =
+      primaryTypeface != nullptr ? primaryTypeface->fontStyle() : std::string();
   std::unordered_map<const tgfx::Typeface*, tgfx::Font> fallbackFontCache = {};
+  // The font that opened the emoji sequence being scanned, or nullptr outside one. Every codepoint
+  // of a ZWJ sequence, a skin-tone modified emoji, a flag or a keycap sequence has to be shaped by
+  // a single font: handed to one font per codepoint, HarfBuzz never sees the sequence and renders
+  // its components instead (a family of four people rather than one glyph).
+  const tgfx::Font* emojiFont = nullptr;
 
   while (pos < text.size()) {
     int32_t codepoint = 0;
@@ -262,27 +291,53 @@ static std::vector<ShapingRun> ItemizeRuns(const std::string& text, const tgfx::
       pos++;
       continue;
     }
+    int32_t nextCodepoint = 0;
+    if (pos + charLen < text.size()) {
+      DecodeUTF8(text.data() + pos + charLen, text.size() - pos - charLen, &nextCodepoint);
+    }
+    bool emojiBase = EmojiPresentation::IsEmojiBase(codepoint, nextCodepoint);
 
     // Find the best font for this codepoint.
     const tgfx::Font* bestFont = nullptr;
-    if (primaryFont.getGlyphID(codepoint) != 0) {
-      bestFont = &primaryFont;
-    } else {
-      auto fallbackTypeface = layoutContext.fallbackTypeface(codepoint, primaryTypeface.get());
-      if (fallbackTypeface != nullptr) {
-        auto it = fallbackFontCache.find(fallbackTypeface.get());
-        if (it == fallbackFontCache.end()) {
-          tgfx::Font f(fallbackTypeface, primaryFont.getSize());
-          f.setFauxBold(primaryFont.isFauxBold());
-          f.setFauxItalic(primaryFont.isFauxItalic());
-          it = fallbackFontCache.emplace(fallbackTypeface.get(), std::move(f)).first;
-        }
-        bestFont = &it->second;
+    if (emojiFont != nullptr) {
+      // Keep a mark with the font that opened the sequence — it has no glyph of its own, so it
+      // must not trigger a lookup — and accept a further base joined to the sequence only when
+      // that font can draw it.
+      if (EmojiPresentation::IsEmojiSequenceMark(codepoint) ||
+          (emojiBase && emojiFont->getGlyphID(codepoint) != 0)) {
+        bestFont = emojiFont;
+      } else {
+        emojiFont = nullptr;
       }
     }
-
     if (bestFont == nullptr) {
-      bestFont = &primaryFont;
+      // A codepoint that asks for emoji presentation looks for a colour face first. The ordinary
+      // search below stops at the primary face or at the first fallback that merely contains the
+      // codepoint, and the CJK faces a text font cascades into carry monochrome glyphs for symbols
+      // such as U+2764, U+2600 and U+2B50 — the emoji would come out black and white even though a
+      // colour face is installed.
+      if (emojiBase) {
+        bestFont = CachedFontForTypeface(
+            fallbackFontCache, primaryFont,
+            layoutContext.findColorTypeface(codepoint, primaryTypeface.get()));
+      }
+      if (bestFont == nullptr) {
+        if (primaryFont.getGlyphID(codepoint) != 0) {
+          bestFont = &primaryFont;
+        } else {
+          bestFont = CachedFontForTypeface(
+              fallbackFontCache, primaryFont,
+              layoutContext.fallbackTypeface(codepoint, primaryTypeface.get(), requestedStyle));
+        }
+      }
+      if (bestFont == nullptr) {
+        bestFont = &primaryFont;
+      }
+      // Only a colour face can carry the rest of a sequence; without one the codepoints stay
+      // ordinary glyphs drawn from wherever the fallback chain put them.
+      if (emojiBase && bestFont->getTypeface() != nullptr && bestFont->getTypeface()->hasColor()) {
+        emojiFont = bestFont;
+      }
     }
 
     auto script = ResolveScript(codepoint, lastScript);

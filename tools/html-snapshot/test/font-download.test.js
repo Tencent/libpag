@@ -4,10 +4,14 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const {
+  dataUrlBytes,
   toSfnt,
   readFontMeta,
   makeFontCaptureListener,
+  resolveFontFamilies,
   saveDownloadedFonts,
+  injectInlineFontFaces,
+  isInlineFontUrl,
 } = require('../dist/lib/font-download');
 
 // A throwaway buffer that is neither WOFF nor WOFF2 (so toSfnt returns it
@@ -192,6 +196,48 @@ describe('saveDownloadedFonts', () => {
       fs.chmodSync(outDir, 0o700);
     }
   });
+
+  test('attaches the CSS faces and merges them across duplicate payloads', async () => {
+    const { woff2Fixture } = require('./font-fixtures');
+    const bytes = await woff2Fixture('Shared Family');
+    const map = new Map([
+      ['https://x/a.woff2', bytes],
+      // Identical bytes served from a second URL under another family.
+      ['https://x/b.woff2', Buffer.from(bytes)],
+    ]);
+    const facesByKey = new Map([
+      ['https://x/a.woff2', [{ family: 'Family One', style: '', weight: '', url: 'https://x/a.woff2' }]],
+      ['https://x/b.woff2', [{ family: 'Family Two', style: 'italic', weight: '700', url: 'https://x/b.woff2' }]],
+    ]);
+
+    const saved = await saveDownloadedFonts(map, outDir, undefined, facesByKey);
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].cssFamilies).toEqual(['Family One', 'Family Two']);
+    expect(saved[0].cssFaces).toEqual([
+      { family: 'Family One', style: '', weight: '', url: 'https://x/a.woff2' },
+      { family: 'Family Two', style: 'italic', weight: '700', url: 'https://x/b.woff2' },
+    ]);
+  });
+
+  test('writes every WOFF2 of a multi-font page intact', async () => {
+    // Regression: the decode pass used to run under one `Promise.all`, and
+    // wawoff2 resolves with a view into its shared WASM heap — every font but
+    // the last was written as corrupted bytes (unparseable name table, garbage
+    // signature) and later failed to register as a fallback face.
+    const { woff2Fixture } = require('./font-fixtures');
+    const families = ['Alpha Family', 'Beta Family', 'Gamma Family'];
+    const map = new Map();
+    for (const family of families) {
+      map.set(`https://x/${family.replace(/ /g, '-')}.woff2`, await woff2Fixture(family));
+    }
+
+    const saved = await saveDownloadedFonts(map, outDir);
+
+    expect(saved).toHaveLength(families.length);
+    const onDisk = saved.map((entry) => readFontMeta(fs.readFileSync(entry.path)).family).sort();
+    expect(onDisk).toEqual([...families].sort());
+  });
 });
 
 describe('toSfnt — short / non-magic buffers', () => {
@@ -298,3 +344,230 @@ function walkForExt(dir, ext, depth = 0) {
   }
   return null;
 }
+
+describe('dataUrlBytes', () => {
+  test('decodes a base64 payload', () => {
+    const bytes = dataUrlBytes('data:font/woff2;base64,' + Buffer.from('hello').toString('base64'));
+    expect(bytes.toString()).toBe('hello');
+  });
+
+  test('decodes a percent-encoded payload', () => {
+    expect(dataUrlBytes('data:font/woff2,%77%6f%66%66').toString()).toBe('woff');
+  });
+
+  test('returns null for non-data URLs and malformed payloads', () => {
+    expect(dataUrlBytes('https://x/a.woff2')).toBeNull();
+    expect(dataUrlBytes('data:font/woff2;base64')).toBeNull();
+    // An incomplete percent escape makes decodeURIComponent throw.
+    expect(dataUrlBytes('data:font/woff2,%E4%B8')).toBeNull();
+  });
+});
+
+describe('resolveFontFamilies', () => {
+  // Project the returned face map down to family names. These tests pin the
+  // family grouping; the face-level detail (style/weight) has its own test
+  // below.
+  function familyNames(map) {
+    return Array.from(map.values()).map((faces) => faces.map((face) => face.family));
+  }
+
+  test('registers an inline font and keeps the CSS family it was declared under', async () => {
+    const { woff2DataUrl } = require('./font-fixtures');
+    const cache = new Map();
+
+    const families = await resolveFontFamilies(
+      [{ family: 'MaShanZheng', style: 'normal', weight: '400', url: await woff2DataUrl('Ma Shan Zheng') }],
+      cache,
+    );
+
+    // The family is the authored one, not the one inside the file — that mismatch is exactly why
+    // the caller forwards the pair to `pagx embed/render --font-alias`.
+    expect(familyNames(families)).toEqual([['MaShanZheng']]);
+    expect(cache.size).toBe(1);
+    const cached = Array.from(cache.values())[0];
+    // The cache is normalised to SFNT so the save step skips a second decode.
+    expect(cached.slice(0, 4).toString('binary')).not.toBe('wOF2');
+    expect(readFontMeta(cached).family).toBe('Ma Shan Zheng');
+  });
+
+  test('maps an already-captured network font by URL', async () => {
+    const { woff2Fixture } = require('./font-fixtures');
+    const cache = new Map([['https://x/xiaowei.woff2', await woff2Fixture('ZCOOL XiaoWei')]]);
+
+    const families = await resolveFontFamilies(
+      [{ family: 'XiaoWei', style: 'normal', weight: '400', url: 'https://x/xiaowei.woff2' }],
+      cache,
+    );
+
+    expect(familyNames(families)).toEqual([['XiaoWei']]);
+  });
+
+  test('groups several CSS families serving one payload under a single entry', async () => {
+    const { woff2DataUrl } = require('./font-fixtures');
+    const url = await woff2DataUrl('Shared Family');
+
+    const families = await resolveFontFamilies(
+      [
+        { family: 'AliasA', style: 'normal', weight: '400', url },
+        { family: 'AliasB', style: 'normal', weight: '400', url },
+        { family: 'AliasA', style: 'normal', weight: '400', url },
+      ],
+      new Map(),
+    );
+
+    expect(familyNames(families)).toEqual([['AliasA', 'AliasB']]);
+  });
+
+  test('keeps one entry per authored face so roman and italic cuts stay distinct', async () => {
+    const { woff2DataUrl } = require('./font-fixtures');
+    const roman = await woff2DataUrl('Roman Cut');
+    const italic = await woff2DataUrl('Italic Cut');
+    const family = 'Playfair';
+    const faces = await resolveFontFamilies(
+      [
+        { family, style: 'normal', weight: '400 900', url: roman },
+        { family, style: 'italic', weight: '400 900', url: italic },
+        // The same face declared twice must not duplicate the entry.
+        { family, style: 'italic', weight: '400 900', url: italic },
+      ],
+      new Map(),
+    );
+    const entries = Array.from(faces.values());
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual([{ family, style: 'normal', weight: '400 900', url: roman }]);
+    expect(entries[1]).toEqual([{ family, style: 'italic', weight: '400 900', url: italic }]);
+  });
+
+  test('skips a family whose file was neither inlined nor captured', async () => {
+    const families = await resolveFontFamilies(
+      [{ family: 'Absent', style: 'normal', weight: '400', url: 'https://x/absent.woff2' }],
+      new Map(),
+    );
+    expect(families.size).toBe(0);
+  });
+
+  test('logs and continues when a payload cannot be decoded', async () => {
+    const { woff2DataUrl } = require('./font-fixtures');
+    const logs = [];
+
+    const families = await resolveFontFamilies(
+      [
+        { family: 'Broken', style: 'normal', weight: '400', url: 'data:font/woff2;base64,d09GMgABAAAAAA==' },
+        { family: 'Good', style: 'normal', weight: '400', url: await woff2DataUrl('Good Family') },
+      ],
+      new Map(),
+      (message) => logs.push(message),
+    );
+
+    expect(familyNames(families)).toEqual([['Good']]);
+    expect(logs.join('\n')).toMatch(/font decode skipped for 'Broken'/);
+  });
+});
+
+describe('injectInlineFontFaces', () => {
+  const PAGE = '<!DOCTYPE html><html><head><title>x</title></head><body>hi</body></html>';
+
+  function face(family, overrides) {
+    return Object.assign({ family, style: '', weight: '', url: 'inline-font:0:' + family }, overrides);
+  }
+
+  function inlineFont(overrides) {
+    return Object.assign({
+      url: 'inline-font:0:Material Icons',
+      path: '/out/case.fonts/Material-Icons-Regular-abc.ttf',
+      family: 'Material Icons',
+      style: 'Regular',
+      cssFamilies: ['Material Icons'],
+      cssFaces: [face('Material Icons')],
+    }, overrides);
+  }
+
+  test('re-declares a saved inline face before </head>', () => {
+    const out = injectInlineFontFaces(PAGE, [inlineFont()]);
+    expect(out).toContain(
+      '<style id="__pagx_web_fonts">' +
+        '@font-face{font-family:"Material Icons";src:url("/out/case.fonts/Material-Icons-Regular-abc.ttf")}' +
+        '</style>',
+    );
+    expect(out.indexOf('__pagx_web_fonts')).toBeLessThan(out.indexOf('</head>'));
+    expect(out).toContain('<body>hi</body>');
+  });
+
+  test('leaves network fonts to the font manifest', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ url: 'https://cdn.example/font.woff2', cssFamilies: ['WebFont'], cssFaces: [face('WebFont')] }),
+    ]);
+    expect(out).toBe(PAGE);
+  });
+
+  test('skips a face whose CSS name only matches through an alias', () => {
+    // A `<Font file>` resource registers under the file's own family, so an
+    // aliased face (CSS "Playfair" → file family "Playfair Display") could
+    // never resolve through this route — it must reach the renderer through
+    // the manifest's --font-alias instead.
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ family: 'Playfair Display', cssFamilies: ['Playfair'], cssFaces: [face('Playfair')] }),
+    ]);
+    expect(out).toBe(PAGE);
+  });
+
+  test('accepts a CSS name that differs only in case or spacing', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ family: 'Material  ICONS', cssFamilies: ['material icons'], cssFaces: [face('material icons')] }),
+    ]);
+    expect(out).toContain('font-family:"material icons"');
+  });
+
+  test('emits every cut of a family, carrying its style and weight', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({
+        cssFamilies: ['Material Icons'],
+        cssFaces: [
+          face('Material Icons'),
+          face('Material Icons', { style: 'italic' }),
+          face('Material Icons', { style: 'italic', weight: '700' }),
+          face('Material Icons', { style: 'normal', weight: '400 900', url: 'inline-font:1:Material Icons' }),
+        ],
+      }),
+    ]);
+    expect(out).toContain('@font-face{font-family:"Material Icons";src:url("/out/case.fonts/Material-Icons-Regular-abc.ttf")}');
+    expect(out).toContain('@font-face{font-family:"Material Icons";font-style:"italic";src:url(');
+    expect(out).toContain('@font-face{font-family:"Material Icons";font-style:"italic";font-weight:700;src:url(');
+    expect(out).toContain('@font-face{font-family:"Material Icons";font-weight:400 900;src:url(');
+  });
+
+  test('de-duplicates identical faces across entries', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont(),
+      inlineFont({ url: 'inline-font:1:Material Icons' }),
+    ]);
+    expect(out.match(/@font-face\{/g)).toHaveLength(1);
+  });
+
+  test('quotes families and paths that need escaping', () => {
+    const out = injectInlineFontFaces(PAGE, [
+      inlineFont({ family: 'Weird "Family"', cssFamilies: ['Weird "Family"'], cssFaces: [face('Weird "Family"')], path: '/out/a b/f.otf' }),
+    ]);
+    expect(out).toContain('font-family:"Weird \\22 Family\\22 "');
+    expect(out).toContain('src:url("/out/a b/f.otf")');
+  });
+
+  test('returns the html unchanged when nothing qualifies', () => {
+    expect(injectInlineFontFaces(PAGE, [])).toBe(PAGE);
+    expect(injectInlineFontFaces(PAGE, [inlineFont({ cssFaces: [] })])).toBe(PAGE);
+    expect(injectInlineFontFaces(PAGE, [inlineFont({ path: '' })])).toBe(PAGE);
+  });
+
+  test('returns the html unchanged when there is no head to inject into', () => {
+    const bare = '<body>hi</body>';
+    expect(injectInlineFontFaces(bare, [inlineFont()])).toBe(bare);
+  });
+});
+
+describe('isInlineFontUrl', () => {
+  test('matches the keys resolveFontFamilies mints for data: sources', () => {
+    expect(isInlineFontUrl('inline-font:0:Material Icons')).toBe(true);
+    expect(isInlineFontUrl('https://cdn.example/f.woff2')).toBe(false);
+    expect(isInlineFontUrl('')).toBe(false);
+  });
+});

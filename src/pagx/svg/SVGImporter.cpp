@@ -260,13 +260,22 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   // mapping covers the whole subtree without introducing an extra wrapper. Otherwise wrap all
   // layers in a fresh root layer that carries the transform.
   if (needsContentTransform) {
+    // The content transform maps the viewBox coordinate space onto the target pixel box, so the
+    // layer that carries it sizes to that target box — not the unscaled content extent. Without
+    // this the layer measures to its children's viewBox-space size, and a parent that sizes to
+    // content (an inline SVG's flex wrapper, a `width:100%` host) then lays it out a scale factor
+    // too wide and clips the result.
     if (convertedLayers.size() == 1) {
       auto* singleLayer = convertedLayers[0];
       singleLayer->matrix = contentMatrix * singleLayer->matrix;
+      singleLayer->width = targetW;
+      singleLayer->height = targetH;
       _document->layers.push_back(singleLayer);
     } else {
       auto rootLayer = _document->makeNode<Layer>();
       rootLayer->matrix = contentMatrix;
+      rootLayer->width = targetW;
+      rootLayer->height = targetH;
       for (auto& layer : convertedLayers) {
         rootLayer->children.push_back(layer);
       }
@@ -606,10 +615,15 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
     }
   }
 
-  // Expand SVG marker references into additional child layers.
+  // Expand SVG marker references into additional child layers. Markers are inherited presentation
+  // attributes, so a shape that declares none of its own uses the marker set on the nearest
+  // ancestor `<g>`; fall back to the inherited values before deciding whether to expand.
   std::string markerStart = getAttribute(element, "marker-start");
+  if (markerStart.empty()) markerStart = inheritedStyle.markerStart;
   std::string markerMid = getAttribute(element, "marker-mid");
+  if (markerMid.empty()) markerMid = inheritedStyle.markerMid;
   std::string markerEnd = getAttribute(element, "marker-end");
+  if (markerEnd.empty()) markerEnd = inheritedStyle.markerEnd;
   if (!markerStart.empty() || !markerMid.empty() || !markerEnd.empty()) {
     auto markerLayers = expandMarkers(element, inheritedStyle);
     if (!markerLayers.empty()) {
@@ -748,10 +762,16 @@ std::vector<Layer*> SVGParserContext::expandMarkers(const std::shared_ptr<DOMNod
                                                     const InheritedStyle& inheritedStyle) {
   std::vector<Layer*> markerLayers = {};
 
-  // Resolve marker references.
-  std::string markerStartRef = resolveUrl(getAttribute(element, "marker-start"));
-  std::string markerMidRef = resolveUrl(getAttribute(element, "marker-mid"));
-  std::string markerEndRef = resolveUrl(getAttribute(element, "marker-end"));
+  // Resolve marker references. Each is inherited when the shape carries none of its own.
+  std::string markerStart = getAttribute(element, "marker-start");
+  if (markerStart.empty()) markerStart = inheritedStyle.markerStart;
+  std::string markerMid = getAttribute(element, "marker-mid");
+  if (markerMid.empty()) markerMid = inheritedStyle.markerMid;
+  std::string markerEnd = getAttribute(element, "marker-end");
+  if (markerEnd.empty()) markerEnd = inheritedStyle.markerEnd;
+  std::string markerStartRef = resolveUrl(markerStart);
+  std::string markerMidRef = resolveUrl(markerMid);
+  std::string markerEndRef = resolveUrl(markerEnd);
 
   // Get the path data from the element to extract endpoint positions.
   auto shapeElement = convertElement(element);
@@ -858,6 +878,13 @@ Layer* SVGParserContext::createMarkerLayer(const std::string& markerId, const Ma
   markerStyle.strokeLinejoin = {};
   markerStyle.strokeMiterlimit = {};
   markerStyle.strokeOpacity = {};
+
+  // Marker references must not apply to the marker's own content — SVG excludes elements inside a
+  // <marker> from marker placement. Clearing them here also stops a marker that inherited its
+  // reference from an ancestor <g> from re-expanding itself recursively.
+  markerStyle.markerStart = {};
+  markerStyle.markerMid = {};
+  markerStyle.markerEnd = {};
 
   // Convert the marker's children as layers.
   auto child = markerDef->getFirstChild();
@@ -1128,6 +1155,16 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       }
     }
     child = child->getNextSibling();
+  }
+
+  // SVG also permits text-anchor on the <textPath> element, where it is inherited by the
+  // referenced run. When present there it governs how the run is anchored along the path, so it
+  // takes precedence over the <text> element's anchor for path text.
+  if (textPathElement) {
+    std::string pathAnchor = getAttribute(textPathElement, "text-anchor");
+    if (!pathAnchor.empty()) {
+      anchor = pathAnchor;
+    }
   }
 
   // SVG whitespace normalization: replace newlines and tabs with spaces,
@@ -2370,6 +2407,9 @@ InheritedStyle SVGParserContext::computeInheritedStyle(const std::shared_ptr<DOM
       {"stroke-linecap", &InheritedStyle::strokeLinecap},
       {"stroke-linejoin", &InheritedStyle::strokeLinejoin},
       {"stroke-miterlimit", &InheritedStyle::strokeMiterlimit},
+      {"marker-start", &InheritedStyle::markerStart},
+      {"marker-mid", &InheritedStyle::markerMid},
+      {"marker-end", &InheritedStyle::markerEnd},
       {"font-family", &InheritedStyle::fontFamily},
       {"font-size", &InheritedStyle::fontSize},
       {"font-weight", &InheritedStyle::fontWeight},

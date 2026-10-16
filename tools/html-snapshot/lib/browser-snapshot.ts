@@ -49,7 +49,7 @@ import { DROP_TAG_NAMES_JSON } from './dom-tags';
 import { MAX_CAPTURE_HEIGHT_PX as MAX_CAPTURE_HEIGHT_PX_NODE } from './common';
 
 // Marker a renderer stamps on the box that must carry the author `name` when the element's
-// own outer box is not the first emitted tag (see `applyLayerName`). Declared as a plain
+// own outer box is not the first emitted tag (see `applyLayerAttributes`). Declared as a plain
 // module-level `const` (not an import) so tsc leaves the bare identifier untouched when it
 // stringifies the helper functions into the browser payload; the same value is re-declared in
 // PAYLOAD_CONSTANTS_SRC via interpolation so the shipped helpers resolve it in-page, while the
@@ -89,7 +89,14 @@ const COLLAPSIBLE_WS = /[^\S\u00a0]+/g;
 // like `"PingFang SC", -apple-system, sans-serif` round-trips: the
 // importer's first concrete family lands on `Text::fontFamily` and the
 // remaining concrete entries are registered as document-level fallbacks.
-function normalizeFontFamily(value) {
+//
+// The authored names are kept verbatim. A page may serve a font under a name
+// the file itself does not carry (`font-family: MaShanZheng` for a file whose
+// family is "Ma Shan Zheng"), so the snapshot pipeline records the (CSS family
+// → file) pairing and hands it to `pagx embed` / `pagx render` as
+// `--font-alias`, which resolves the authored name without renaming anything
+// here.
+function normalizeFontFamily(value: string): string {
   if (!value) return '';
   return value.replace(/"/g, "'");
 }
@@ -107,6 +114,17 @@ function normalizeOverflow(value) {
 // 0px`) pollutes the diff. Collapse `T R B L` → single value when all four
 // lengths agree, and drop entirely when they all collapse to zero. Mixed values
 // are passed through verbatim and left to the importer to handle.
+// `border-image-source` round-trips only when it is a gradient — the importer rebuilds it as a
+// gradient Stroke (the inverse of a CSS gradient border). `none` and `url(...)` sources collapse
+// to '' so the defaults filter drops them; sliced bitmap border-images are unsupported.
+function normalizeBorderImage(value) {
+  if (!value) return '';
+  const v = value.trim();
+  if (!v || v === 'none') return '';
+  if (/(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(v)) return v;
+  return '';
+}
+
 function normalizeBorderRadius(value) {
   if (!value) return '';
   const tokens = value.split(/\s+/).filter(Boolean);
@@ -848,6 +866,20 @@ function paddingBoxOrigin(rect, computed) {
   };
 }
 
+// Resolve the origin used for an element's children's `left`/`top`. The
+// padding-box shift above is only sound while the border itself rides on the
+// emitted wrapper: a *uniform* border round-trips as the wrapper's `border`
+// shorthand, and both a browser re-layout and the importer re-apply it as an
+// inset for the absolutely-positioned children (verified end-to-end). An
+// *asymmetric* border is emitted as overlay rectangles inside the wrapper and
+// never reaches the wrapper's own style, so a padding-box-relative child
+// would silently lose the border inset — a `border-top: 8px` parent shifted
+// its text 8 px up (footer of 12-grid-magazine). Anchor children to the
+// border box in that case, matching the wrapper's own origin.
+function childContentOrigin(rect, computed) {
+  return isUniformBorder(computed) ? paddingBoxOrigin(rect, computed) : rect;
+}
+
 // True iff all four borders have the same non-zero width, the same supported
 // style (`solid`, `dashed`, or `dotted`), and the same color — i.e. cases the
 // subset's single `border` shorthand can losslessly express. Compares the raw
@@ -916,6 +948,120 @@ function paintOrder(a, b) {
   return a.domIndex - b.domIndex;
 }
 
+// Resolve a child box's participation in its parent's paint order. A
+// materialised ::before / ::after stand-in is a real <div> in the DOM, so a
+// document rule that matches it (e.g. `.hero div { position: relative; z-index:
+// 1 }`) leaks onto its computed style and would sort it by that unrelated author
+// rule instead of by the pseudo's own stacking — which paints the stand-in on
+// top of a sibling the pseudo should sit under. Read position / z-index from the
+// pseudo's computed style when the child is a stand-in so the replayed order
+// matches the browser.
+function resolveChildStacking(hostEl, child, childComputed, flexOrGridParent) {
+  const pseudo = child && typeof child.getAttribute === 'function'
+    ? child.getAttribute('data-snapshot-pseudo')
+    : null;
+  const stackComputed = pseudo ? getComputedStyle(hostEl, pseudo) : childComputed;
+  const isPositioned = stackComputed.position !== 'static';
+  const isStackable = isPositioned || flexOrGridParent;
+  return {
+    stackable: isStackable,
+    zIndex: isStackable ? resolveZIndex(stackComputed) : 0,
+  };
+}
+
+// Resolve one element child's effective stacking entry for paint-order
+// sorting: the child's own position / z-index, or — when a static wrapper
+// paints nothing of its own but holds only stackable children — the wrapper's
+// inherited z (resolveEscapingWrapperZIndex). Materialised pseudo stand-ins
+// are excluded: resolveChildStacking already read the pseudo's own stacking,
+// and their polluted computed style must not be re-read here. Shared by
+// renderChildrenInto and the body-root loop in snapshotMainImpl so both
+// replay the browser's paint order with the exact same rules.
+function resolveChildPaintEntry(hostEl, child, childComputed, flexOrGridParent) {
+  const stacking = resolveChildStacking(hostEl, child, childComputed, flexOrGridParent);
+  if (stacking.stackable) return stacking;
+  const pseudoAttr = typeof child.getAttribute === 'function'
+    ? child.getAttribute('data-snapshot-pseudo')
+    : null;
+  if (pseudoAttr) return stacking;
+  const wrapperZ = resolveEscapingWrapperZIndex(child, childComputed);
+  if (wrapperZ === null) return stacking;
+  return { stackable: true, zIndex: wrapperZ };
+}
+
+// A "pure stacking wrapper" paints nothing of its own — no background, border,
+// shadow, outline, transform, filter, mask or clip — so the only mark it leaves
+// is the paint of its children. When every element child is stackable
+// (positioned, or a flex/grid item) at the same non-negative z-index,
+// those children participate directly in the wrapper's
+// enclosing stacking context: a static wrapper holding `z-index: 10` children
+// paints at their z, i.e. above a later `position: absolute` sibling the browser
+// still draws the wrapper underneath. Because the subset flattens every box to
+// `position: absolute` and replays paint order per parent, such a wrapper would
+// otherwise sort by its own (static, in-flow) position and lose the children's
+// stacking entirely — the negative-margin pull-card pattern where a stack of
+// `z-index` photos must cover the later `z-index: auto` card that slides up
+// under them. The wrapper's own paint collapses to nothing, so stepping it to
+// a shared child z-index preserves their order. Returns that z-index, or
+// null when the box is not such a wrapper (it paints itself, clips, or holds
+// non-stackable / negative-z content), leaving the caller to use the wrapper's
+// own stacking.
+function resolveEscapingWrapperZIndex(el, computed) {
+  if (computed.position !== 'static') return null;
+  if (computed.display === 'contents') return null;
+  const opacity = parseFloat(computed.getPropertyValue('opacity'));
+  if (isFinite(opacity) && opacity < 1) return null;
+  if ((computed.getPropertyValue('transform') || 'none').trim() !== 'none') return null;
+  if ((computed.getPropertyValue('filter') || 'none').trim() !== 'none') return null;
+  if ((computed.getPropertyValue('clip-path') || 'none').trim() !== 'none') return null;
+  if ((computed.getPropertyValue('mix-blend-mode') || 'normal').trim() !== 'normal') return null;
+  if ((computed.getPropertyValue('isolation') || 'auto').trim() === 'isolate') return null;
+  const maskImage = (computed.getPropertyValue('mask-image') || 'none').trim();
+  const webkitMaskImage = (computed.getPropertyValue('-webkit-mask-image') || 'none').trim();
+  if ((maskImage && maskImage !== 'none') || (webkitMaskImage && webkitMaskImage !== 'none')) return null;
+  if (colorAlpha(computed.getPropertyValue('background-color')) > 0) return null;
+  const backgroundImage = (computed.getPropertyValue('background-image') || 'none').trim();
+  if (backgroundImage && backgroundImage !== 'none') return null;
+  // Any painted border side means the wrapper has a box of its own. Checked
+  // inline (rather than via hasAnyBorder) so the helper only closes over
+  // module-scope consts, not the browser-payload-only `SIDES`.
+  if (borderWidthOf(computed, 'top') > 0 || borderWidthOf(computed, 'right') > 0 ||
+      borderWidthOf(computed, 'bottom') > 0 || borderWidthOf(computed, 'left') > 0) {
+    return null;
+  }
+  const boxShadow = (computed.getPropertyValue('box-shadow') || 'none').trim();
+  if (boxShadow && boxShadow !== 'none') return null;
+  const outlineStyle = (computed.getPropertyValue('outline-style') || 'none').trim();
+  if (outlineStyle && outlineStyle !== 'none') return null;
+  const overflowX = (computed.getPropertyValue('overflow-x') || 'visible').trim();
+  const overflowY = (computed.getPropertyValue('overflow-y') || 'visible').trim();
+  if (overflowX !== 'visible' || overflowY !== 'visible') return null;
+  if (gatherDirectText(el)) return null;
+  const display = computed.display;
+  const childFlexOrGrid =
+    display === 'flex' || display === 'inline-flex' ||
+    display === 'grid' || display === 'inline-grid';
+  let childCount = 0;
+  let maxZ = 0;
+  let childZ = null;
+  for (const child of el.children) {
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    childCount++;
+    const stacking = resolveChildStacking(el, child, getComputedStyle(child), childFlexOrGrid);
+    // A non-stackable child would paint in the flow band, which collapsing the
+    // whole wrapper onto one z-index cannot represent — bail and stay static.
+    if (!stacking.stackable) return null;
+    // Different child levels can straddle a sibling outside this wrapper.
+    if (childZ !== null && stacking.zIndex !== childZ) return null;
+    childZ = stacking.zIndex;
+    if (stacking.zIndex > maxZ) maxZ = stacking.zIndex;
+  }
+  // No element children, or a child pulled behind the flow (negative z) that a
+  // single raised z-index would lift out of place.
+  if (childCount === 0 || childZ < 0) return null;
+  return maxZ;
+}
+
 // ===== DOM-node helpers =====
 
 function gatherDirectText(el) {
@@ -961,31 +1107,214 @@ function firstTextNodeChild(el) {
   return null;
 }
 
+// ===== CSS counter resolution for pseudo `content` =====
+//
+// `getComputedStyle(el, pseudo).content` reports `counter(name[, style])`
+// verbatim — the browser resolves counter values at layout time and never
+// writes them back into the style. The walker and the decorative-pseudo
+// materialiser still need the resolved glyphs, otherwise a plain
+// `.list div::before { content: counter(s, decimal-leading-zero) }` numbering
+// renders as a text-less (stand-in) box and the digits are silently dropped.
+//
+// The value is evaluated the way the common authoring patterns lay it out:
+// the nearest ancestor-or-self `counter-reset` for the name opens the counter
+// scope with its base value, and every element in tree order between that
+// scope root and the host (inclusive) adds its `counter-increment` delta; a
+// deeper reset on the host's own ancestor chain restarts the count. The
+// remaining CSS counter subtleties (sibling-scoped restarts, `counters()`)
+// keep the historical "contributes nothing" contract.
+function parseCssCounterList(value, defaultDelta) {
+  const out = [];
+  const re = /([A-Za-z_][\w-]*)\s*(-?\d+)?/g;
+  let m;
+  while ((m = re.exec(value || '')) !== null) {
+    if (m[1].toLowerCase() === 'none') continue;
+    out.push([m[1], m[2] !== undefined ? parseInt(m[2], 10) : defaultDelta]);
+  }
+  return out;
+}
+
+function cssRomanCounter(value) {
+  const ROMAN = [
+    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
+    [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+  ];
+  let s = '';
+  let n = value;
+  for (let i = 0; i < ROMAN.length; i++) {
+    while (n >= ROMAN[i][0]) {
+      s += ROMAN[i][1];
+      n -= ROMAN[i][0];
+    }
+  }
+  return s;
+}
+
+function cssAlphaCounter(value) {
+  let s = '';
+  let n = value;
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(97 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function formatCssCounterValue(value, style) {
+  const n = Math.trunc(value);
+  switch ((style || 'decimal').trim().toLowerCase()) {
+    case 'decimal-leading-zero':
+      return (n < 0 ? '-' : '') + String(Math.abs(n)).padStart(2, '0');
+    case 'lower-alpha': case 'lower-latin': return n > 0 ? cssAlphaCounter(n) : String(n);
+    case 'upper-alpha': case 'upper-latin': return n > 0 ? cssAlphaCounter(n).toUpperCase() : String(n);
+    case 'lower-roman': return n > 0 && n < 4000 ? cssRomanCounter(n) : String(n);
+    case 'upper-roman': return n > 0 && n < 4000 ? cssRomanCounter(n).toUpperCase() : String(n);
+    case 'none': return '';
+    case 'decimal': default: return String(n);
+  }
+}
+
+function resolveCssCounterValue(el, name) {
+  let scope = null;
+  let value = 0;
+  for (let node = el; node; node = node.parentElement) {
+    const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+    let hit = null;
+    for (let i = 0; i < resets.length; i++) {
+      if (resets[i][0] === name) hit = resets[i][1];
+    }
+    if (hit !== null) {
+      scope = node;
+      value = hit;
+      break;
+    }
+  }
+  const root = scope || el.ownerDocument.documentElement;
+  if (!root) return null;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  let node = root;
+  while (node) {
+    if (node !== scope) {
+      // A reset restarts this counter only when it scopes the host (its own
+      // subtree contains the host); a reset on a sibling subtree opens a
+      // different counter instance and must not leak in.
+      const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+      for (let i = 0; i < resets.length; i++) {
+        if (resets[i][0] === name && (node === el || node.contains(el))) value = resets[i][1];
+      }
+    }
+    const incs = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-increment'), 1);
+    for (let i = 0; i < incs.length; i++) {
+      if (incs[i][0] === name) value += incs[i][1];
+    }
+    if (node === el) break;
+    node = walker.nextNode();
+  }
+  return value;
+}
+
+// Resolve a pseudo `content` value into the text a browser would paint.
+// Quoted strings concatenate in place; `counter(...)` receives its evaluated
+// value; every other form (`attr()` / `url()` / `counters()` / the quote
+// keywords) still contributes nothing, preserving the historical contract of
+// the quoted-run scan this replaces. Returns null when the pseudo is not
+// generated (`content: none` / `normal`).
+//
+// `pseudoComputed` (the pseudo's own computed style, when the caller has it)
+// contributes the pseudo's own counter operations — the classic
+// `::before { counter-increment: s; content: counter(s) }` self-increment
+// pattern, which never shows up on the host's computed style.
+function resolvePseudoContentText(el, raw, pseudoComputed) {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  if (trimmed === 'none' || trimmed === 'normal') return null;
+  if (trimmed.indexOf('counter(') === -1) {
+    // Identical to the legacy scan: concatenate every quoted run.
+    let out = '';
+    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+    let m;
+    while ((m = re.exec(trimmed)) !== null) {
+      out += (m[1] !== undefined ? m[1] : m[2]);
+    }
+    return out;
+  }
+  // Positional scan so `"a" counter(x) "b"` keeps its authored order.
+  let out = '';
+  let i = 0;
+  while (i < trimmed.length) {
+    const ch = trimmed[i];
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      let s = '';
+      while (j < trimmed.length && trimmed[j] !== ch) {
+        if (trimmed[j] === '\\' && j + 1 < trimmed.length) {
+          s += trimmed[j] + trimmed[j + 1];
+          j += 2;
+        } else {
+          s += trimmed[j];
+          j += 1;
+        }
+      }
+      out += s;
+      i = j + 1;
+      continue;
+    }
+    const fn = /^(counter|counters|attr|url)\(/i.exec(trimmed.slice(i, i + 9));
+    if (fn) {
+      const open = i + fn[0].length;
+      const close = trimmed.indexOf(')', open);
+      const inner = close === -1 ? trimmed.slice(open) : trimmed.slice(open, close);
+      if (fn[1].toLowerCase() === 'counter') {
+        const parts = inner.split(',');
+        const name = (parts[0] || '').trim();
+        const style = (parts[1] || 'decimal').trim();
+        if (name) {
+          const value = resolveCssCounterValue(el, name);
+          if (value !== null) out += formatCssCounterValue(applyPseudoCounterOps(value, name, pseudoComputed), style);
+        }
+      }
+      i = close === -1 ? trimmed.length : close + 1;
+      continue;
+    }
+    i += 1;
+  }
+  return out;
+}
+
+// Fold the pseudo's own `counter-reset` / `counter-increment` into the host
+// value resolved by `resolveCssCounterValue`.
+function applyPseudoCounterOps(value, name, pseudoComputed) {
+  if (!pseudoComputed) return value;
+  let v = value;
+  const resets = parseCssCounterList(pseudoComputed.getPropertyValue('counter-reset'), 0);
+  for (let i = 0; i < resets.length; i++) {
+    if (resets[i][0] === name) v = resets[i][1];
+  }
+  const incs = parseCssCounterList(pseudoComputed.getPropertyValue('counter-increment'), 1);
+  for (let i = 0; i < incs.length; i++) {
+    if (incs[i][0] === name) v += incs[i][1];
+  }
+  return v;
+}
+
 // Resolve the text content of `el`'s ::before / ::after pseudo-element. Used
 // to surface icon-font glyphs (Phosphor, Font Awesome, Material Icons, ...)
 // whose visible character is composed by the stylesheet via
-// `content: "\e123"`. Without this hook the host element renders as an
-// empty box in the snapshot because the glyph lives in a pseudo node that
-// has no DOM presence.
+// `content: "\e123"`, and CSS counters (`content: counter(s)`) whose value
+// only exists in the layout tree. Without this hook the host element renders
+// as an empty box in the snapshot because the glyphs live in a pseudo node
+// that has no DOM presence.
 //
-// Returns '' when the pseudo has no content (the CSS defaults `none` /
-// `normal`) or when the value can't be expressed as a plain string —
-// `url(...)`, `attr(...)`, `counter(...)` and the quote keywords are not
-// supported because we have no clean way to render them inside a `<span>`.
-// Chromium's getComputedStyle returns the value with escapes already
-// resolved into actual characters and string tokens wrapped in double
-// quotes, so the parser only needs to extract quoted runs.
+// Returns '' when the pseudo has no content or produces no plain text —
+// `url(...)`, `attr(...)`, `counters(...)` and the quote keywords contribute
+// nothing (see `resolvePseudoContentText`). Chromium's getComputedStyle
+// returns the value with escapes already resolved into actual characters and
+// string tokens wrapped in double quotes.
 function pseudoText(el, pseudo) {
   const cs = getComputedStyle(el, pseudo);
-  const raw = (cs.getPropertyValue('content') || '').trim();
-  if (!raw || raw === 'none' || raw === 'normal') return '';
-  let out = '';
-  const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
-  let m;
-  while ((m = re.exec(raw)) !== null) {
-    out += (m[1] !== undefined ? m[1] : m[2]);
-  }
-  return out;
+  const text = resolvePseudoContentText(el, (cs.getPropertyValue('content') || '').trim(), cs);
+  return text === null ? '' : text;
 }
 
 // True when `el` has a non-empty ::before and/or ::after pseudo content.
@@ -1130,6 +1459,13 @@ function imgAlt(el) {
 // metadata (`"on"`, hidden file path, ISO date) that would only confuse
 // downstream rendering, so we return empty and let `classify` drop the
 // element.
+// The masked echo a browser paints for a password field: one bullet per
+// character. Emitting the raw `value` would leak the password into the snapshot
+// as plain text (and render it verbatim in PAGX).
+function maskPasswordText(value) {
+  return value ? '\u2022'.repeat(value.length) : '';
+}
+
 function syntheticText(el) {
   const tag = el.tagName.toLowerCase();
   if (tag === 'textarea') {
@@ -1138,6 +1474,11 @@ function syntheticText(el) {
   if (tag === 'input') {
     const type = (el.getAttribute('type') || 'text').toLowerCase();
     if (NON_TEXT_INPUT_TYPES.has(type)) return '';
+    if (type === 'password') {
+      const value = el.value || '';
+      if (value) return maskPasswordText(value);
+      return (el.getAttribute('placeholder') || '').trim();
+    }
     return (el.value || el.getAttribute('placeholder') || '').trim();
   }
   if (tag === 'select') {
@@ -1593,8 +1934,12 @@ function buildStyle(left, top, width, height, computed, opts) {
     }
   } else if (opts.colorOnly) {
     // Icon wrappers (host of an inline <svg>) only need `color` so that any
-    // currentColor stroke/fill picks up the right tint.
+    // currentColor stroke/fill picks up the right tint, plus `font-family` so a
+    // `<text>` inside the inline SVG inherits the document's face. The SVG is
+    // serialized standalone and re-imported without the HTML cascade, so the
+    // family must ride along on the wrapper for the importer to see it.
     appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('color'));
+    appendStyleProp(parts, computed, STYLE_SCHEMA_BY_PROP.get('font-family'));
   }
 
   // Forward the host's resolved CSS `transform` (and `transform-origin`) when
@@ -2585,6 +2930,68 @@ const BOUNDARY_SPACE = '\u00a0';
 //
 // The per-line stride (top-to-top) is line-height in both branches, so
 // consecutive spans tile cleanly without overlap.
+//
+// `-webkit-line-clamp`: the browser keeps the clamped box at N line-heights
+// and its `overflow: hidden` cuts the text at that height, appending "…" to
+// the last visible line. The DOM still holds every character, so without a
+// pass here the walker materialises the overflowing lines into spans as well
+// — PAGX then paints the clamped box with the extra lines cut mid-glyph and
+// no ellipsis, which reads differently from the browser's "…" ending. The
+// helpers below rebuild the browser's decision: only `clampCount` lines are
+// emitted, and the last visible line's tail is replaced by the longest
+// prefix that still leaves room for an ellipsis.
+function readLineClamp(computed) {
+  const raw = String(computed.getPropertyValue('-webkit-line-clamp') || '').trim();
+  if (!raw || raw === 'none') return 0;
+  const count = parseInt(raw, 10);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+// Fit `text` + "…" into the line's remaining width and return the result.
+// Widths come from a scratch canvas rather than a live Range so the DOM stays
+// untouched — every later node still measures the original layout. The
+// remaining width is the container's content width minus the line's own
+// indent (a wrapped line after an inline marker starts further right).
+function ellipsizeClampedLine(text, lineRect, computed, parentRect) {
+  const ELLIPSIS = '\u2026';
+  const contentWidth = readNum(computed, 'width');
+  if (!(contentWidth > 0)) {
+    return text;
+  }
+  const contentLeft = parentRect.left + readNum(computed, 'padding-left');
+  const indent = Math.max(0, lineRect.left - contentLeft);
+  const available = contentWidth - indent;
+  if (!(available > 0)) {
+    return text;
+  }
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) {
+    return text;
+  }
+  const fontParts = ['font-style', 'font-variant', 'font-weight', 'font-size', 'font-family']
+    .map((prop) => String(computed.getPropertyValue(prop) || '').trim())
+    .filter(Boolean);
+  ctx.font = fontParts.join(' ');
+  const chars = Array.from(text);
+  const ellipsisWidth = ctx.measureText(ELLIPSIS).width;
+  // The widest prefix whose width plus the ellipsis stays within the line box
+  // is monotonic in the prefix length, so a binary search finds Chromium's
+  // cut position. The epsilon absorbs sub-pixel canvas/layout divergence.
+  let lo = 0;
+  let hi = chars.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const width = ctx.measureText(chars.slice(0, mid).join('')).width + ellipsisWidth;
+    if (width <= available + 0.05) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  const prefix = chars.slice(0, lo).join('').replace(/\s+$/, '');
+  return prefix + ELLIPSIS;
+}
+
 function emitTextSpans(textNode, parentRect, computed, opts) {
   const preserve = boundarySpacePreservation(textNode, computed);
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
@@ -2594,8 +3001,14 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
   const ws = computed.getPropertyValue('white-space');
   const lines = splitTextNodeIntoLines(textNode, ws, 'y');
   const lineHeightPx = readNum(computed, 'line-height');
+  // A clamped box hides everything past its Nth line; drop those lines and
+  // let the line below close the visible text with an ellipsis.
+  const clampCount = readLineClamp(computed);
+  const visibleLines = clampCount > 0 && lines.length > clampCount
+    ? clampCount : lines.length;
+  const clamped = visibleLines < lines.length;
   const out = [];
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < visibleLines; i++) {
     const line = lines[i];
     let lt = line.rect.top;
     let lh = line.rect.height;
@@ -2615,6 +3028,11 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     });
     // Force nowrap on every line span so PAGX's text engine never re-breaks.
     let transformed = applyTextTransform(line.text, computed);
+    // Close a clamped run the way the browser does: the last visible line's
+    // overflow is replaced by an ellipsis instead of being painted/cut.
+    if (clamped && i === visibleLines - 1) {
+      transformed = ellipsizeClampedLine(transformed, line.rect, computed, parentRect);
+    }
     // Re-materialise the seam whitespace the browser rendered against an
     // inline sibling: leading on the first line, trailing on the last.
     if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
@@ -3232,6 +3650,34 @@ function renderCanvas(el, parentRect, rect, left, top, computed, opts) {
 // keep their positioning context. `white-space: nowrap` is mandatory so
 // PAGX's text engine doesn't re-wrap a single-line value to two lines when
 // its intrinsic width exceeds the wrapper by sub-pixel.
+// The `<select>` UA arrow: Chromium paints a small chevron near the control's
+// trailing edge through its internals, so the light-DOM walk sees nothing of it
+// and the imported PAGX showed a bare box where the reference render has the
+// indicator. Synthesise it as an inline <svg> chevron — the same family as the
+// other native-control stand-ins. Geometry is measured against the reference
+// render: a 10x6 chevron vertically centred on the box with its trailing edge
+// 3px inside the border, stroked in the control's own text colour (#1D2129 on
+// the sample form).
+//
+// The importer routes the control's children through a padded inner host and
+// resolves out-of-flow children against that host's content-box origin — one
+// border plus one padding further in than the browser's own anchor for the
+// same `left`/`top`. The inset below therefore backs the border and padding
+// out of the target position so the rendered chevron lands where the browser
+// paints it.
+function selectArrowMarkup(computed, rect) {
+  const color = (computed.getPropertyValue('color') || '').trim() || 'rgb(29, 33, 41)';
+  const pad = readPadding(computed);
+  const insetLeft = borderWidthOf(computed, 'left') + pad.left;
+  const insetTop = borderWidthOf(computed, 'top') + pad.top;
+  const left = Math.max(0, rect.width - 13 - insetLeft);
+  const top = Math.max(0, (rect.height - 6) / 2 - insetTop);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6" viewBox="0 0 10 6"`
+    + ` style="position:absolute;left:${px(left)};top:${px(top)}">`
+    + `<path d="M1 1 L5 5 L9 1" fill="none" stroke="${color}" stroke-width="2"`
+    + ` stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
   const text = syntheticText(el);
   const pad = readPadding(computed);
@@ -3239,14 +3685,268 @@ function renderTextInput(el, parentRect, rect, left, top, computed, opts) {
     ? getComputedStyle(el, '::placeholder').getPropertyValue('color').trim()
     : '';
   const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
-  const textStyle = buildStyle(0, 0, 0, 0, computed, {
+  let textStyle = buildStyle(0, 0, 0, 0, computed, {
     box: false, text: true, positioned: false,
     textColorOverride: placeholderColor || undefined,
   });
-  const finalTextStyle = withNowrap(textStyle);
-  const innerLayout = `display: flex; align-items: center` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
-  const inner = `<span style="${finalTextStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  // A <textarea> soft-wraps its value to the box width (and keeps embedded
+  // newlines), unlike <input>/<select> which never wrap. The default path forces
+  // `white-space: nowrap`, but even with the textarea's own `pre-wrap` a bare
+  // <Text> never wraps — the importer only synthesises a wrapping TextBox when
+  // the text leaf hands it a box to wrap against. Pinning the span to the
+  // content-box width and adding `overflow: hidden` (a textarea clips its
+  // content) gives it that box, so the value wraps instead of running off as one
+  // long line. The content is top-aligned, as a textarea's is.
+  const isTextarea = String(el.tagName || '').toLowerCase() === 'textarea';
+  let alignItems = 'center';
+  if (isTextarea) {
+    const contentWidth = Math.max(0, rect.width
+      - borderWidthOf(computed, 'left') - borderWidthOf(computed, 'right')
+      - pad.left - pad.right);
+    const wrap = /white-space:/.test(textStyle) ? '' : '; white-space: pre-wrap';
+    const extra = `width: ${px(contentWidth)}; overflow: hidden${wrap}`;
+    textStyle = textStyle ? `${textStyle}; ${extra}` : extra;
+    alignItems = 'flex-start';
+  } else {
+    textStyle = withNowrap(textStyle);
+  }
+  const innerLayout = `display: flex; align-items: ${alignItems}` + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  const inner = `<span style="${textStyle}">${escapeHtml(applyTextTransform(text, computed))}</span>`;
+  if (String(el.tagName || '').toLowerCase() === 'select') {
+    // Place the chevron on the control's own (unpadded) box rather than inside the padded flex
+    // host — see selectArrowMarkup for why the host's padding would drift the two renderings
+    // apart. Mirrors renderBoxedReplaced, with the arrow spliced between the inner run and the
+    // border overlays.
+    const boxStyle = buildStyle(left, top, rect.width, rect.height, computed, { box: true, ...opts });
+    const composed = joinStyles(boxStyle, innerLayout);
+    const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
+    return `<div style="${composed}">${inner}${selectArrowMarkup(computed, rect)}${overlays}</div>`;
+  }
   return renderBoxedReplaced(rect, left, top, computed, opts, inner, innerLayout);
+}
+
+// ===== Native form controls (checkbox / radio / range / progress / meter /
+// color / date) =====
+//
+// The browser paints these through its UA shadow DOM — the check tick, the
+// radio dot, the range track/thumb/fill, the progress/meter bar, the colour
+// swatch, the date field's value text + calendar glyph. The snapshot walks the
+// *light* DOM only, so none of that internal paint is reachable: `classify`
+// used to drop the element entirely (checkbox / radio / range — no text, no
+// authored box visuals) or keep a bare box (color / date / progress / meter),
+// leaving a visible hole where the browser drew a real control.
+//
+// We instead synthesise the control's *static appearance* as an inline <svg>
+// so the imported PAGX shows a form that looks like a form. Interactivity is
+// deliberately not modelled — PAGX is a static format — but the visual *is*
+// design content. Geometry comes from the element's measured rect plus the
+// authored/computed styles; the UA's own paint constants (tick geometry, track
+// thickness, swatch inset, bar colours) are approximated from the reference
+// rendering, which clears the pixel diff that the missing controls produced.
+
+const NATIVE_INPUT_CONTROL_TYPES = new Set([
+  'checkbox', 'radio', 'range', 'color',
+  'date', 'datetime-local', 'month', 'time', 'week',
+]);
+
+function nativeControlKind(el) {
+  if (!el || !el.tagName) return null;
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'progress' || tag === 'meter') return tag;
+  if (tag === 'input') {
+    const type = (el.getAttribute('type') || 'text').toLowerCase();
+    if (NATIVE_INPUT_CONTROL_TYPES.has(type)) return type;
+  }
+  return null;
+}
+
+function controlNum(value, fallback) {
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  return isFinite(n) ? n : fallback;
+}
+
+function accentColorOf(computed) {
+  const raw = (computed.getPropertyValue('accent-color') || '').trim();
+  return (!raw || raw === 'auto') ? '' : raw;
+}
+
+function svgDoc(w, h, inner) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px(w)}" height="${px(h)}"`
+    + ` viewBox="0 0 ${roundPx(w)} ${roundPx(h)}">${inner}</svg>`;
+}
+
+function svgCheckbox(el, computed, w, h) {
+  const accent = accentColorOf(computed) || 'rgb(22, 93, 255)';
+  const unit = Math.min(w, h);
+  const r = roundPx(unit * 0.18);
+  if (el.checked) {
+    const d = `M${roundPx(w * 0.25)} ${roundPx(h * 0.52)}`
+      + ` L${roundPx(w * 0.44)} ${roundPx(h * 0.72)}`
+      + ` L${roundPx(w * 0.76)} ${roundPx(h * 0.31)}`;
+    return svgDoc(w, h,
+      `<rect x="0" y="0" width="${roundPx(w)}" height="${roundPx(h)}" rx="${r}" fill="${accent}"/>`
+      + `<path d="${d}" fill="none" stroke="#FFFFFF" stroke-width="${roundPx(unit * 0.125)}"`
+      + ` stroke-linecap="round" stroke-linejoin="round"/>`);
+  }
+  return svgDoc(w, h,
+    `<rect x="0.5" y="0.5" width="${roundPx(w - 1)}" height="${roundPx(h - 1)}" rx="${r}"`
+    + ` fill="#FFFFFF" stroke="#767676" stroke-width="1"/>`);
+}
+
+function svgRadio(el, computed, w, h) {
+  const accent = accentColorOf(computed) || 'rgb(22, 93, 255)';
+  const cx = roundPx(w / 2);
+  const cy = roundPx(h / 2);
+  const unit = Math.min(w, h);
+  const outer = roundPx(unit / 2 - unit * 0.09);
+  const sw = roundPx(unit * 0.11);
+  if (el.checked) {
+    return svgDoc(w, h,
+      `<circle cx="${cx}" cy="${cy}" r="${outer}" fill="none" stroke="${accent}" stroke-width="${sw}"/>`
+      + `<circle cx="${cx}" cy="${cy}" r="${roundPx(unit * 0.25)}" fill="${accent}"/>`);
+  }
+  return svgDoc(w, h,
+    `<circle cx="${cx}" cy="${cy}" r="${outer}" fill="#FFFFFF" stroke="#767676" stroke-width="${sw}"/>`);
+}
+
+function svgRange(el, computed, w, h) {
+  const accent = accentColorOf(computed) || 'rgb(22, 93, 255)';
+  const min = controlNum(el.min, 0);
+  const maxRaw = controlNum(el.max, 100);
+  const max = maxRaw > min ? maxRaw : min + 1;
+  const val = controlNum(el.value, min);
+  const frac = Math.max(0, Math.min(1, (val - min) / (max - min)));
+  const unit = Math.min(w, h);
+  const thumbR = unit / 2;
+  const trackH = Math.max(4, Math.round(unit * 0.375));
+  const ty = (h - trackH) / 2;
+  const rr = trackH / 2;
+  const cx = thumbR + (w - 2 * thumbR) * frac;
+  return svgDoc(w, h,
+    `<rect x="0" y="${roundPx(ty)}" width="${roundPx(w)}" height="${roundPx(trackH)}" rx="${roundPx(rr)}" fill="#EFEFEF"/>`
+    + `<rect x="0" y="${roundPx(ty)}" width="${roundPx(cx)}" height="${roundPx(trackH)}" rx="${roundPx(rr)}" fill="${accent}"/>`
+    + `<circle cx="${roundPx(cx)}" cy="${roundPx(h / 2)}" r="${roundPx(thumbR)}" fill="${accent}"/>`);
+}
+
+function svgBar(w, h, frac, fill) {
+  const rr = roundPx(Math.min(h / 2, 3));
+  let s = `<rect x="0" y="0" width="${roundPx(w)}" height="${roundPx(h)}" rx="${rr}" fill="#EFEFEF"/>`;
+  if (frac > 0) {
+    s += `<rect x="0" y="0" width="${roundPx(w * frac)}" height="${roundPx(h)}" rx="${rr}" fill="${fill}"/>`;
+  }
+  return svgDoc(w, h, s);
+}
+
+function svgProgress(el, computed, w, h) {
+  const min = controlNum(el.min, 0);
+  const max = controlNum(el.max, 1);
+  const val = controlNum(el.value, 0);
+  const frac = max > min ? Math.max(0, Math.min(1, (val - min) / (max - min))) : 0;
+  return svgBar(w, h, frac, accentColorOf(computed) || 'rgb(0, 117, 255)');
+}
+
+function svgMeter(el, computed, w, h) {
+  const min = controlNum(el.min, 0);
+  const maxRaw = controlNum(el.max, 1);
+  const max = maxRaw > min ? maxRaw : min + 1;
+  const val = controlNum(el.value, min);
+  const low = controlNum(el.low, min);
+  const high = controlNum(el.high, max);
+  const opt = controlNum(el.optimum, (min + max) / 2);
+  const frac = Math.max(0, Math.min(1, (val - min) / (max - min)));
+  const belowLow = val < low;
+  const aboveHigh = val > high;
+  let color;
+  if (opt > high) {
+    color = aboveHigh ? '#00B34A' : (!belowLow ? 'rgb(255, 185, 0)' : '#F53F3F');
+  } else if (opt < low) {
+    color = belowLow ? '#00B34A' : (!aboveHigh ? 'rgb(255, 185, 0)' : '#F53F3F');
+  } else {
+    color = (!belowLow && !aboveHigh) ? '#00B34A' : 'rgb(255, 185, 0)';
+  }
+  return svgBar(w, h, frac, color);
+}
+
+// Chrome insets the colour swatch inside the (author-padded) input box rather
+// than filling it; the reference rendering lands the swatch 6px in horizontally
+// and 8px in vertically for the canonical 44×32 colour input.
+function svgColorSwatch(el, w, h) {
+  const value = (el.value || '').trim() || '#000000';
+  const sw = Math.max(0, w - 12);
+  const sh = Math.max(0, h - 16);
+  return svgDoc(sw, sh,
+    `<rect x="0.5" y="0.5" width="${roundPx(Math.max(0, sw - 1))}" height="${roundPx(Math.max(0, sh - 1))}"`
+    + ` rx="2" fill="${value}" stroke="#767676" stroke-width="1"/>`);
+}
+
+// `value` on a date-family input is always ISO; render the locale-formatted
+// form the browser would paint (the snapshot browser and `pagx render` share a
+// locale, so `toLocaleDateString` matches the reference). Non-date pickers fall
+// back to the raw ISO string rather than risk a locale-specific layout.
+function formatDateControlValue(value, kind) {
+  if (!value) return '';
+  if (kind === 'date') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      try {
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
+      } catch (err) {
+        return `${m[2]}/${m[3]}/${m[1]}`;
+      }
+    }
+  }
+  return value;
+}
+
+// Chromium paints the date picker indicator as a two-tone glyph — a dark-grey frame with a
+// solid black title bar — measured off the reference render (12x12 box, frame ~rgb(86,86,86),
+// bar rgb(0,0,0), two capped hangers above the bar). The previous single-grey 16px outline
+// read lighter and larger than the browser's icon.
+function svgCalendarGlyph() {
+  const frame = 'rgb(86, 86, 86)';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="12px" height="12px" viewBox="0 0 12 12">`
+    + `<rect x="0.75" y="1.9" width="10.5" height="9.35" rx="1.3" fill="none" stroke="${frame}" stroke-width="1.5"/>`
+    + `<rect x="1.5" y="1.9" width="9" height="2.6" fill="rgb(0, 0, 0)"/>`
+    + `<line x1="3.6" y1="0.6" x2="3.6" y2="2.2" stroke="${frame}" stroke-width="1.5" stroke-linecap="round"/>`
+    + `<line x1="8.4" y1="0.6" x2="8.4" y2="2.2" stroke="${frame}" stroke-width="1.5" stroke-linecap="round"/>`
+    + `</svg>`;
+}
+
+function renderDateControl(el, kind, rect, left, top, computed, opts) {
+  const text = formatDateControlValue((el.value || '').trim(), kind);
+  const pad = readPadding(computed);
+  const padShort = paddingShorthand(pad.top, pad.right, pad.bottom, pad.left);
+  const textStyle = withNowrap(buildStyle(0, 0, 0, 0, computed, {
+    box: false, text: true, positioned: false,
+  }));
+  let inner = text ? `<span style="${textStyle}">${escapeHtml(text)}</span>` : '';
+  inner += svgCalendarGlyph();
+  const layout = 'display: flex; align-items: center; justify-content: space-between'
+    + (padShort === '0px' ? '' : `; padding: ${padShort}`);
+  return renderBoxedReplaced(rect, left, top, computed, opts, inner, layout);
+}
+
+function renderNativeControl(el, kind, rect, left, top, computed, opts) {
+  const w = rect.width;
+  const h = rect.height;
+  const center = 'display: flex; align-items: center; justify-content: center';
+  switch (kind) {
+    case 'checkbox':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgCheckbox(el, computed, w, h), center);
+    case 'radio':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgRadio(el, computed, w, h), center);
+    case 'range':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgRange(el, computed, w, h), center);
+    case 'progress':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgProgress(el, computed, w, h), center);
+    case 'meter':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgMeter(el, computed, w, h), center);
+    case 'color':
+      return renderBoxedReplaced(rect, left, top, computed, opts, svgColorSwatch(el, w, h), center);
+    default:
+      return renderDateControl(el, kind, rect, left, top, computed, opts);
+  }
 }
 
 // True when an element child of a flex container can be safely rendered as a
@@ -3904,7 +4604,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     if (flexCharCarriesReveal(computed)) {
       const textNode = firstTextNodeChild(el);
       const revealSpans = textNode
-        ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed)
+        ? emitTextSpans(textNode, childContentOrigin(rect, computed), computed)
         : [];
       return `<div style="${boxStyle}">${revealSpans.join('')}${overlays}</div>`;
     }
@@ -4011,7 +4711,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
     withStrippedTransform(el, () => {
       preRect = el.getBoundingClientRect();
       const tn = firstTextNodeChild(el);
-      preSpans = tn ? emitTextSpans(tn, paddingBoxOrigin(preRect, computed), computed) : [];
+      preSpans = tn ? emitTextSpans(tn, childContentOrigin(preRect, computed), computed) : [];
     });
     const preLeft = preRect.left - parentRect.left;
     const preTop = preRect.top - parentRect.top;
@@ -4062,7 +4762,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   const inlineLevelDisplay = display.startsWith('inline') && display !== 'inline-block';
   const intrinsicWidth = (textAlign === 'center' && !inlineLevelDisplay) ? 'center' : false;
   const lineSpans = textNode
-    ? emitTextSpans(textNode, paddingBoxOrigin(rect, computed), computed, { intrinsicWidth })
+    ? emitTextSpans(textNode, childContentOrigin(rect, computed), computed, { intrinsicWidth })
     : [];
   // Wrapped inline box (e.g. a `<mark>` spanning two lines): paint the box
   // visuals once per line fragment behind a transparent positioning wrapper so
@@ -4073,7 +4773,7 @@ function renderTextLeaf(el, parentRect, rect, left, top, computed, directText, o
   if (fragments) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, {});
     // The leading tag here is a visuals-only line fragment, not this element's box; mark the
-    // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
+    // child-bearing wrapper so `applyLayerAttributes` forwards `name` onto it (see NAME_ANCHOR_ATTR).
     return `${fragments}<div ${NAME_ANCHOR_ATTR} style="${wrapperStyle}">${lineSpans.join('')}</div>`;
   }
   return `<div style="${boxStyle}">${lineSpans.join('')}${overlays}</div>`;
@@ -4288,7 +4988,7 @@ function isIntrinsicInlineContentWidth(el, computed, rect, opts) {
 // CSS, which renders borders after content.
 function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   const intrinsicWidth = isIntrinsicInlineContentWidth(el, computed, rect, opts);
-  const childHTML = renderChildrenInto(el, paddingBoxOrigin(rect, computed), computed, {
+  const childHTML = renderChildrenInto(el, childContentOrigin(rect, computed), computed, {
     intrinsicWidth,
   });
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
@@ -4301,7 +5001,7 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
   if (fragments) {
     const wrapperStyle = buildStyle(left, top, rect.width, rect.height, computed, { ...opts });
     // The leading tag here is a visuals-only line fragment, not this element's box; mark the
-    // child-bearing wrapper so `applyLayerName` forwards `name` onto it (see NAME_ANCHOR_ATTR).
+    // child-bearing wrapper so `applyLayerAttributes` forwards `name` onto it (see NAME_ANCHOR_ATTR).
     return `${fragments}<div ${NAME_ANCHOR_ATTR}${intrinsicAttr} style="${wrapperStyle}">${childHTML}</div>`;
   }
   const style = buildStyle(left, top, rect.width, rect.height, computed, {
@@ -4332,11 +5032,14 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
   for (const n of el.childNodes) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const childComputed = getComputedStyle(n);
-      const isPositioned = childComputed.position !== 'static';
-      const isStackable = isPositioned || flexOrGridParent;
+      // A static wrapper that paints nothing of its own but holds only
+      // stackable children contributes those children's stacking, not its own
+      // in-flow position — replay that by sorting the wrapper at their highest
+      // z-index (see resolveEscapingWrapperZIndex).
+      const { stackable, zIndex } = resolveChildPaintEntry(el, n, childComputed, flexOrGridParent);
       items.push({
-        stackable: isStackable,
-        zIndex: isStackable ? resolveZIndex(childComputed) : 0,
+        stackable,
+        zIndex,
         domIndex: domIndex++,
         // Forward childComputed so render() can skip its own
         // getComputedStyle call on this node.
@@ -4362,7 +5065,7 @@ function renderChildrenInto(el, parentRect, hostComputed, opts) {
 // element's own outer box is NOT the first tag in the emitted markup. A wrapped inline box
 // emits `${fragments}<div>…children…</div>`, whose leading tag is a visuals-only line
 // fragment — naming that fragment would strand `layer->name` on a box with no children. The
-// renderer marks the child-bearing wrapper with this attribute so `applyLayerName` targets it
+// renderer marks the child-bearing wrapper with this attribute so `applyLayerAttributes` targets it
 // instead of the first tag, then removes the marker so it never reaches the output.
 // NOTE: `NAME_ANCHOR_ATTR` is declared once near the top of this module (Node scope) and
 // re-declared in PAYLOAD_CONSTANTS_SRC (browser scope); the helpers below resolve it in both.
@@ -4381,54 +5084,38 @@ function stripNameAnchor(html) {
 // bounding rect (used to compute relative left/top). `precomputed`, when
 // supplied, is the result of a prior `getComputedStyle(el)` call upstream;
 // reusing it avoids a redundant style query on every visited element.
-// Forward an author `name` attribute onto the outer box the element emits so the PAGX
-// importer can surface it as `layer->name` (mirroring how `id` maps to `layer->id`). The
-// snapshot rebuilds every element from computed style rather than cloning the live tree, so
-// the attribute has to be re-emitted here or it never reaches the importer. `html` is the
-// markup an element renderer produced; its first tag is normally that element's own outer box,
-// except in the wrapped-inline-box path where a renderer marks the real wrapper with
-// `NAME_ANCHOR_ATTR` (see below). No-op when the element carries no `name`, when `html` is
-// empty, when the box already has a `name`, or for `display: contents` hosts (which emit their
-// children's markup, not a box of their own).
-function applyLayerName(el, html, opts, precomputed) {
+// Forward the author name and original text onto the element's emitted box. Other
+// data-pagx-* attributes remain internal and are not forwarded. Inline fragments use the
+// name anchor to identify the real box, and transform re-entry defers to the outer call.
+function applyLayerAttributes(el, html, opts, precomputed) {
   if (!html || !el || typeof el.getAttribute !== 'function') return html;
-  // `_strippedTransform` marks the recursive re-entry that re-renders this same element with
-  // its transform cleared; let the outer (non-stripped) call own the name so it is added once.
-  // Still strip any anchor marker so it never leaks into the re-entry's output.
   if (opts && opts._strippedTransform) return stripNameAnchor(html);
   const name = el.getAttribute('name');
-  // A renderer may have stamped the anchor marker on the child-bearing wrapper (it is emitted
-  // unconditionally in the fragment path). When there is no name to forward, strip it so the
-  // marker never leaks into the snapshot output.
-  if (!name) return stripNameAnchor(html);
+  const text = el.getAttribute('data-pagx-text');
+  let attrs = name ? ` name="${escapeHtml(name)}"` : '';
+  if (text !== null) attrs += ` data-pagx-text="${escapeHtml(text)}"`;
+  if (!attrs) return stripNameAnchor(html);
   const computed = precomputed || getComputedStyle(el);
   if (computed.display === 'contents') return stripNameAnchor(html);
-  // Wrapped inline box: the child-bearing wrapper is not the first tag, so its renderer marked
-  // it with NAME_ANCHOR_ATTR. Replace the marker with the name attribute so `layer->name` lands
-  // on the box that actually carries the element's children rather than a leading line fragment.
+  // Inline fragments precede their child-bearing box. Keep the original text and name on
+  // that box, and let the outer call own both attributes during transform re-entry.
   const anchor = ` ${NAME_ANCHOR_ATTR}`;
   const anchorAt = html.indexOf(anchor);
   if (anchorAt !== -1) {
-    return html.slice(0, anchorAt) + ` name="${escapeHtml(name)}"` +
-           html.slice(anchorAt + anchor.length);
+    return html.slice(0, anchorAt) + attrs + html.slice(anchorAt + anchor.length);
   }
-  // Insert the attribute immediately after the opening tag's NAME, never scanning the
-  // attribute list: an outer box `style` can legitimately contain a raw '>' (e.g. an
-  // inline-SVG `data:` URI in `background-image`), which an attribute-aware splice would
-  // mistake for the end of the tag and corrupt. No renderer emits `name`, and the
-  // stripped-transform re-entry is guarded above, so a single element box is never named twice.
+  // Match only the tag name: a style may contain a raw '>' inside an SVG data URI.
   const match = html.match(/^<([a-zA-Z][\w-]*)/);
   if (!match) return html;
-  return `<${match[1]} name="${escapeHtml(name)}"` + html.slice(match[0].length);
+  return `<${match[1]}${attrs}` + html.slice(match[0].length);
 }
 
 // Thin dispatcher wrapper: delegates to `renderElementBox` for the actual markup, then folds
-// the author `name` attribute onto the emitted box. Kept separate so every render path (flex
-// children, absolute children, body roots, stripped-transform re-entry) picks up name
-// forwarding through the single entry point they all already call.
+// the author name and original text onto the emitted box. Every render path (flex children,
+// absolute children, body roots, transform re-entry) forwards them through this entry point.
 function render(el, parentRect, opts, precomputed) {
   const html = renderElementBox(el, parentRect, opts, precomputed);
-  return applyLayerName(el, html, opts, precomputed);
+  return applyLayerAttributes(el, html, opts, precomputed);
 }
 
 function renderElementBox(el, parentRect, opts, precomputed) {
@@ -4489,6 +5176,23 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   const flexChildren = classifyFlexContainer(el, computed);
   if (flexChildren) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
+  }
+
+  // Native form controls have no light-DOM paint for `classify` to keep (their
+  // check tick / radio dot / range thumb / bar / swatch / date text all live in
+  // the UA shadow DOM), so synthesise their static appearance inline before the
+  // kind dispatch can drop them. Handled here — ahead of `classify` and outside
+  // the flex branch above — so a control that is itself a flex item (the common
+  // `<label style="display:flex"><input type=checkbox>…`) is covered too.
+  const nativeKind = nativeControlKind(el);
+  if (nativeKind) {
+    const controlRect = el.getBoundingClientRect();
+    if (opts.flexItem || nonZero(controlRect)) {
+      const controlLeft = controlRect.left - parentRect.left;
+      const controlTop = controlRect.top - parentRect.top;
+      return renderNativeControl(el, nativeKind, controlRect, controlLeft, controlTop, computed, opts);
+    }
+    return '';
   }
 
   const kind = classify(el, computed);
@@ -4847,6 +5551,91 @@ function visibleContentExtent() {
   return { right, bottom };
 }
 
+// Write `value` as a double-quoted CSS string that also survives the importer's
+// XML parse of the `<style>` text. `<`, `>` and `&` would be read as markup or
+// entities there, so they are written as CSS hex escapes like the quote,
+// backslash and control characters; the browser and the importer's CSS reader
+// both decode them back to the original character.
+function cssQuotedString(value) {
+  let out = '"';
+  for (const ch of String(value)) {
+    if (ch === '"' || ch === '\\' || ch === '<' || ch === '>' || ch === '&' || ch < ' ') {
+      out += '\\' + ch.codePointAt(0).toString(16) + ' ';
+    } else {
+      out += ch;
+    }
+  }
+  return out + '"';
+}
+
+// Collect the page's `@font-face` rules whose font file is on local disk, as
+// `{ family, path }` pairs in stylesheet order. The importer turns each into a
+// PAGX `<Font file>` resource, so text keeps its web font without embedding
+// glyph outlines. Only local files qualify because PAGX layout opens the file
+// directly; remote and `data:` sources are left out. Each rule contributes its
+// first local `url()` source, ignoring `local()` names and `format()` hints.
+// Rules nested in grouping rules (`@media`, `@supports`) and imported sheets
+// are visited too. A sheet whose rules are inaccessible (cross-origin) is
+// skipped, which loses nothing: its fonts cannot be local files anyway.
+function collectLocalFontFaces(sheets, baseURI) {
+  const faces = [];
+  const seen = new Set();
+  const URL_RE = /url\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^)\s]*))\s*\)/gi;
+  const unescape = (text) => text.replace(/\\(.)/g, '$1');
+  const toLocalPath = (raw, base) => {
+    try {
+      const u = new URL(raw, base);
+      if (u.protocol !== 'file:') return '';
+      let p = decodeURIComponent(u.pathname);
+      if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+      return p;
+    } catch (_) {
+      return '';
+    }
+  };
+  const visitRules = (rules, base, depth) => {
+    if (!rules || depth > 8) return;
+    for (const rule of Array.from(rules)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r = rule as any;
+      if (r.styleSheet) {
+        visitSheet(r.styleSheet, depth + 1);
+        continue;
+      }
+      if (r.type !== 5) {
+        if (r.cssRules) visitRules(r.cssRules, base, depth + 1);
+        continue;
+      }
+      const family = unescape((r.style.getPropertyValue('font-family') || '').trim()
+        .replace(/^(["'])([\s\S]*)\1$/, '$2'));
+      const src = r.style.getPropertyValue('src') || '';
+      if (!family || !src) continue;
+      URL_RE.lastIndex = 0;
+      let m;
+      while ((m = URL_RE.exec(src)) !== null) {
+        const raw = unescape(m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]));
+        const path = raw ? toLocalPath(raw, base) : '';
+        if (!path) continue;
+        const key = family + '\n' + path;
+        if (!seen.has(key)) {
+          seen.add(key);
+          faces.push({ family, path });
+        }
+        break;
+      }
+    }
+  };
+  const visitSheet = (sheet, depth) => {
+    let rules;
+    try { rules = sheet.cssRules; } catch (_) { return; }
+    visitRules(rules, sheet.href || baseURI, depth);
+  };
+  for (const sheet of Array.from(sheets || [])) {
+    visitSheet(sheet, 0);
+  }
+  return faces;
+}
+
 function snapshotMainImpl(opts) {
   opts = opts || {};
   // Neutralise the page and measure the canvas. When the runner has already
@@ -4877,10 +5666,32 @@ function snapshotMainImpl(opts) {
   // keeps the subset aligned with the baseline. `bodyRect.left` is always 0
   // here (block body, zeroed margin), so the horizontal axis is unaffected.
   const rootOrigin = canvasRootRect(canvasWidth, canvasHeight);
-  const parts = [];
+  // Replay the browser's paint order for the body's own children, exactly
+  // like renderChildrenInto does for every other element's children. The
+  // subset flattens every box to `position: absolute` with no z-index, so
+  // DOM order alone becomes the paint order — but the authored page may
+  // legitimately raise an earlier sibling (e.g. `position: fixed;
+  // z-index: 100` site navigation ordered before the page content). Without
+  // this sort the navigation would be painted underneath the opaque section
+  // that follows it in DOM order. Body lays out as a block container in the
+  // regular case; keep the flex/grid carve-out for the rare
+  // `body { display: flex }` layout so flex items with an explicit z-index
+  // sort identically here and inside renderChildrenInto.
+  const bodyDisplay = getComputedStyle(body).display;
+  const bodyFlexOrGridParent =
+    bodyDisplay === 'flex' ||
+    bodyDisplay === 'inline-flex' ||
+    bodyDisplay === 'grid' ||
+    bodyDisplay === 'inline-grid';
+  const bodyItems = [];
+  let bodyDomIndex = 0;
   for (const c of body.children) {
-    parts.push(render(c, rootOrigin));
+    const childComputed = getComputedStyle(c);
+    const { stackable, zIndex } = resolveChildPaintEntry(body, c, childComputed, bodyFlexOrGridParent);
+    bodyItems.push({ stackable, zIndex, domIndex: bodyDomIndex++, html: render(c, rootOrigin) });
   }
+  bodyItems.sort(paintOrder);
+  const parts = bodyItems.map((it) => it.html);
 
   const title = (document.title || '').trim();
   const bodyComputed = getComputedStyle(body);
@@ -4888,17 +5699,31 @@ function snapshotMainImpl(opts) {
   const bodyBgImage = normalizeBackgroundImage(
     bodyComputed.getPropertyValue('background-image').trim(),
   );
+  // The canvas backdrop does not always live on <body>: CSS propagates the root element's
+  // background to the canvas whenever the body's own is transparent — the shape of the common
+  // `html { background: #fff }` reset — while a page that declares the backdrop on <body>
+  // (or on both) keeps its own. The subset's <body> *is* the canvas for PAGX, so without the
+  // fallback such a page snapshots with no background at all and every layer paints onto
+  // nothing, which `pagx render` composites as black.
+  const rootComputed = getComputedStyle(document.documentElement);
+  const bodyPaintsNothing = colorAlpha(bodyBg) === 0 && !bodyBgImage;
+  const effectiveBg = !bodyPaintsNothing
+    ? bodyBg
+    : rootComputed.getPropertyValue('background-color').trim();
+  const effectiveBgImage = !bodyPaintsNothing
+    ? bodyBgImage
+    : normalizeBackgroundImage(rootComputed.getPropertyValue('background-image').trim());
   const bodyStyle = [
     `width: ${canvasWidth}px`,
     `height: ${canvasHeight}px`,
   ];
-  if (bodyBg && !['rgba(0, 0, 0, 0)', 'transparent'].includes(bodyBg)) {
-    bodyStyle.push(`background-color: ${bodyBg}`);
+  if (effectiveBg && colorAlpha(effectiveBg) > 0) {
+    bodyStyle.push(`background-color: ${effectiveBg}`);
   }
-  // Body-level gradient (e.g. a full-page hero backdrop) would otherwise be
+  // A page-level gradient (e.g. a full-page hero backdrop) would otherwise be
   // lost because the snapshot's <body> only emits sizing + background-color.
-  if (bodyBgImage) {
-    bodyStyle.push(`background-image: ${bodyBgImage}`);
+  if (effectiveBgImage) {
+    bodyStyle.push(`background-image: ${effectiveBgImage}`);
   }
 
   // The <style> block centralises four rendering invariants that the
@@ -4946,6 +5771,14 @@ function snapshotMainImpl(opts) {
   const animKeyframes = document.getElementById('__pagx_anim_keyframes');
   if (animKeyframes && animKeyframes.textContent) {
     styleBlock += animKeyframes.textContent.trim();
+  }
+
+  // Carry the page's local web fonts over as `@font-face` rules pointing at the
+  // absolute file path (the same form local images take), so the importer can
+  // reference each font file from PAGX instead of losing it with the cascade.
+  for (const face of collectLocalFontFaces(document.styleSheets, document.baseURI)) {
+    styleBlock += '@font-face{font-family:' + cssQuotedString(face.family) +
+      ';src:url(' + cssQuotedString(face.path) + ')}';
   }
 
   // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
@@ -5018,6 +5851,7 @@ const INTRINSIC_WIDTH_ATTR = '${INTRINSIC_WIDTH_ATTR}';
 // const rather than the TS module one.
 const COLLAPSIBLE_WS = /[^\\S\\u00a0]+/g;
 
+
 const INLINE_RUN_TAGS = new Set(['span', 'a']);
 
 const INLINE_BY_DEFAULT_TAGS = new Set([
@@ -5028,6 +5862,11 @@ const INLINE_BY_DEFAULT_TAGS = new Set([
 
 const NON_TEXT_INPUT_TYPES = new Set([
   'checkbox', 'radio', 'file', 'range', 'color', 'image', 'hidden',
+  'date', 'datetime-local', 'month', 'time', 'week',
+]);
+
+const NATIVE_INPUT_CONTROL_TYPES = new Set([
+  'checkbox', 'radio', 'range', 'color',
   'date', 'datetime-local', 'month', 'time', 'week',
 ]);
 
@@ -5069,6 +5908,10 @@ const STYLE_SCHEMA = [
   // gradient/image Fill's blendMode and keeps the background-color Fill underneath so the
   // blend has a backdrop (the inverse of a plain opaque gradient that would hide the colour).
   { prop: 'background-blend-mode', scope: 'box', defaults: ['normal'] },
+  // border-image-source: a linear-gradient(...) paints the border with a gradient instead of
+  // border-color. Only gradients round-trip (the importer rebuilds them as a gradient Stroke);
+  // the normalizer drops none and url(...) sources, whose sliced bitmap form is unsupported.
+  { prop: 'border-image-source', scope: 'box', defaults: ['none'], normalize: normalizeBorderImage },
   { prop: 'border-radius',    scope: 'box',  defaults: ['0px', '0px 0px 0px 0px'], normalize: normalizeBorderRadius },
   { prop: 'overflow',         scope: 'box',  defaults: ['visible'], normalize: normalizeOverflow },
   { prop: 'opacity',          scope: 'box',  defaults: ['1'] },
@@ -5122,6 +5965,7 @@ const HELPER_FNS = [
   normalizeOverflow,
   normalizeBorderRadius,
   normalizeBackgroundImage,
+  normalizeBorderImage,
   normalizeMaskImage,
   normalizeBackgroundClip,
   normalizeClipPath,
@@ -5155,6 +5999,7 @@ const HELPER_FNS = [
   borderWidthOf,
   readBorderSide,
   paddingBoxOrigin,
+  childContentOrigin,
   isUniformBorder,
   hasAnyBorder,
   resolveZIndex,
@@ -5164,12 +6009,20 @@ const HELPER_FNS = [
   elementHasChildren,
   scanChildNodes,
   firstTextNodeChild,
+  parseCssCounterList,
+  cssRomanCounter,
+  cssAlphaCounter,
+  formatCssCounterValue,
+  resolveCssCounterValue,
+  applyPseudoCounterOps,
+  resolvePseudoContentText,
   pseudoText,
   hasPseudoContent,
   imgSrc,
   normalizeEmptyImagePlaceholders,
   restoreEmptyImagePlaceholders,
   imgAlt,
+  maskPasswordText,
   syntheticText,
   applyTextTransform,
   classify,
@@ -5202,6 +6055,8 @@ const HELPER_FNS = [
   splitTextNodeIntoLines,
   isInlineLevelSibling,
   boundarySpacePreservation,
+  readLineClamp,
+  ellipsizeClampedLine,
   emitTextSpans,
   emitVerticalTextSpans,
   hasBoxVisualsForInline,
@@ -5238,6 +6093,22 @@ const HELPER_FNS = [
   renderImg,
   renderCanvas,
   renderTextInput,
+  selectArrowMarkup,
+  nativeControlKind,
+  controlNum,
+  accentColorOf,
+  svgDoc,
+  svgCheckbox,
+  svgRadio,
+  svgRange,
+  svgBar,
+  svgProgress,
+  svgMeter,
+  svgColorSwatch,
+  formatDateControlValue,
+  svgCalendarGlyph,
+  renderDateControl,
+  renderNativeControl,
   textLeafInnerLayout,
   renderTextLeaf,
   renderPseudoTextLeaf,
@@ -5246,8 +6117,11 @@ const HELPER_FNS = [
   isIntrinsicInlineContentWidth,
   renderContainer,
   renderChildrenInto,
+  resolveChildStacking,
+  resolveChildPaintEntry,
+  resolveEscapingWrapperZIndex,
   stripNameAnchor,
-  applyLayerName,
+  applyLayerAttributes,
   renderElementBox,
   render,
   readRootScrollOffset,
@@ -5256,6 +6130,8 @@ const HELPER_FNS = [
   prepareBodyForSnapshot,
   visibleContentExtent,
   measureCanvas,
+  cssQuotedString,
+  collectLocalFontFaces,
   snapshotMainImpl,
   snapshotMain,
 ];
@@ -5674,14 +6550,101 @@ async function inlineExternalImages(cachedMap) {
   // that content, which the flattened subset has no way to express.
   function splitTintedBackgrounds() {
     for (const el of Array.from(document.querySelectorAll('*'))) {
-      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
       const computed = getComputedStyle(el);
-      // The wash child is positioned against the element, so the element has to be its own
-      // containing block; on a static box the inset would resolve against some distant ancestor.
-      if (computed.position === 'static') continue;
       const bg = (computed.getPropertyValue('background-image') || '').trim();
-      if (!hasGradientLayer(bg)) continue;
       const layers = splitTopLevelCommas(bg);
+      if (!hasGradientLayer(bg)) {
+        // A stack of two url() layers cannot be expressed as one PAGX background: the importer
+        // reads a single source per element, so the whole declaration would resolve to only its
+        // first layer. Keep the bottom layer on the element and peel the top one into a
+        // synthesized full-bleed child — the same shape as the wash split below. Only the exact
+        // two-layer, unblended, default-clip form is split; every other stack keeps the
+        // declaration, which the importer now resolves to its first layer.
+        //
+        // Unlike the wash split this branch also handles boxes with content of their own: the
+        // synthesized child is inserted *ahead* of the existing children, so the replay paints
+        // the element background, then the top image layer, then the content — exactly how CSS
+        // stacks every background layer beneath content. The one mismatch a full-bleed child
+        // would introduce is the corner clip, so it inherits the host's `border-radius`.
+        if (layers.length !== 2 || !/^url\(/i.test(layers[0]) || !/^url\(/i.test(layers[1])) {
+          continue;
+        }
+        const blendModes = splitTopLevelCommas(
+          computed.getPropertyValue('background-blend-mode') || 'normal');
+        if (blendModes.some((mode) => {
+          const m = mode.trim().toLowerCase();
+          return m !== '' && m !== 'normal';
+        })) {
+          continue;
+        }
+        const clips = splitTopLevelCommas(
+          computed.getPropertyValue('background-clip') || 'border-box');
+        if (clips.some((clip) => {
+          const c = clip.trim().toLowerCase();
+          return c !== '' && c !== 'border-box';
+        })) {
+          continue;
+        }
+        // The synthesized child's absolute inset resolves against the host, so a static host
+        // (the usual grid-tile shape — the markup carries only the background-image) must
+        // become positioned first. Promoting a static box to `relative` is otherwise a no-op
+        // for live layout, but it does re-anchor any absolutely-positioned descendant whose
+        // containing block currently sits further up the tree — bail on those instead of
+        // silently moving them.
+        if (computed.position === 'static') {
+          const reanchorsDescendant = Array.from(el.querySelectorAll('*')).some(
+            (descendant) => getComputedStyle(descendant).position === 'absolute');
+          if (reanchorsDescendant) continue;
+          el.style.position = 'relative';
+        }
+        // Each fitting property is a per-layer list; the element now carries a single layer, so
+        // it needs that layer's own entry rather than the list. A one-entry value is already
+        // shared by every layer and passes through unchanged. The synthesized top child needs
+        // the CSS-topmost layer's entry instead.
+        const pickLayer = (value, index, fallback) => {
+          const entries = splitTopLevelCommas(value || '');
+          const picked = entries.length > 1 ? entries[index] : entries[0];
+          return picked || fallback;
+        };
+        el.style.backgroundImage = layers[1];
+        el.style.backgroundSize = pickLayer(computed.getPropertyValue('background-size'), 1, 'auto');
+        el.style.backgroundPosition = pickLayer(
+          computed.getPropertyValue('background-position'), 1, '0% 0%');
+        el.style.backgroundRepeat = pickLayer(
+          computed.getPropertyValue('background-repeat'), 1, 'repeat');
+        const top = document.createElement('div');
+        top.setAttribute('data-pagx-tint', '');
+        top.setAttribute(
+          'style',
+          // The synthesized child matches the page's container rules (`.tile div { … }` shapes
+          // are common), so its own computed background/border/shadow would replay onto the
+          // layer and paint over the host's lower image. Pin those back to the no-op values.
+          // `z-index: -1` pins the layer into the walker's negative paint band so it replays
+          // ahead of the host's content — a plain `auto` z-index sorts it *after* the content
+          // (whose positioning comes from the authored CSS), painting the image over the very
+          // text the stack was supposed to sit behind.
+          'position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;border-radius:inherit;' +
+            'background-color:transparent;border:0;box-shadow:none;' +
+            'background-image:' +
+            layers[0] +
+            ';background-size:' +
+            pickLayer(computed.getPropertyValue('background-size'), 0, 'auto') +
+            ';background-position:' +
+            pickLayer(computed.getPropertyValue('background-position'), 0, '0% 0%') +
+            ';background-repeat:' +
+            pickLayer(computed.getPropertyValue('background-repeat'), 0, 'repeat') +
+            ';'
+        );
+        el.insertBefore(top, el.firstChild);
+        continue;
+      }
+      // The wash split stays backdrop-only: slotted between the host's background and its
+      // content it would also be sound, but no sample needs it and rebuilding the gradient
+      // list for grounded content risks double-painting pseudo stand-ins. The wash child is
+      // positioned against the element, so the element has to be its own containing block; on
+      // a static box the inset would resolve against some distant ancestor.
+      if (computed.position === 'static') continue;
+      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
       const urlIndex = layers.findIndex((layer) => /^url\(/i.test(layer));
       if (urlIndex < 0 || (bg.match(/url\(/gi) || []).length !== 1) continue;
       const wash = layers.filter((layer, index) => index !== urlIndex);
@@ -5750,6 +6713,151 @@ async function inlineCanvases() {
   }
 }
 
+// ===== Pre-snapshot pass: prune the collapsed content of <details> =====
+
+// A closed `<details>` paints only its first `<summary>` child. Everything
+// else is hidden by the UA `::details-content` pseudo-element, and that
+// hiding is invisible to the snapshot: measured inside a closed `<details>`,
+// the content still reports `display: block`, `visibility: visible`,
+// `opacity: 1` and `content-visibility: visible`, and
+// `getBoundingClientRect()` hands back its full expanded-size rect (a
+// 742x67 answer box, in the accordion that motivated this pass).
+//
+// The content is unpainted only because the collapsed `::details-content`
+// box contributes zero height and the element's own `overflow: hidden`
+// clips whatever spills past it. Nothing in the walker can test for that,
+// and when the author leaves the `<details>` unclipped (`overflow: visible`,
+// so a box-shadow can escape) every collapsed answer leaked into the
+// snapshot as a full-size box painted across the summary rows below it.
+//
+// So don't test — remove. Detaching the non-summary children up front makes
+// every downstream traversal skip them for free: the block walker
+// (`renderChildrenInto`), the flex walker (`flexItemChildren`), the
+// inline-run emitters (`emitInlineRunMarkup` and its six `emitTextSpans`
+// call sites), bare text nodes, and any traversal added later. Guarding each
+// traversal separately was the alternative; there are five of them today and
+// a sixth would silently reintroduce the leak.
+//
+// Geometrically the removal is a no-op — the hidden content already
+// contributes zero height, so the `<details>` box, its siblings and the
+// document scroll size all measure identically before and after.
+//
+// Two spec details the loop encodes, both verified against Chromium:
+//   - Only the *first* `summary` child is the disclosure control; a second
+//     `summary` is content and is hidden along with everything else.
+//   - Content *before* the summary is hidden too, so "everything except the
+//     first summary" is the right cut, not "everything after it".
+// A `<details>` with no summary child therefore keeps nothing. Chromium
+// paints a UA-supplied "Details" label there; that string is not in the DOM
+// and is not reproduced.
+function dropCollapsedDetailsContent() {
+  const detailsList = Array.from(document.querySelectorAll('details'));
+  let detailsPruned = 0;
+  let nodesRemoved = 0;
+  for (const element of detailsList) {
+    if (element.open) continue;
+    let summary = null;
+    for (const child of element.children) {
+      if (child.tagName === 'SUMMARY') {
+        summary = child;
+        break;
+      }
+    }
+    for (const child of Array.from(element.childNodes)) {
+      if (child === summary) continue;
+      element.removeChild(child);
+      nodesRemoved++;
+    }
+    detailsPruned++;
+  }
+  return { details: detailsPruned, nodes: nodesRemoved };
+}
+
+// ===== Pre-snapshot pass: hoist table-row backgrounds beneath cell content =====
+
+// In CSS a table row's painted background sits under every cell of the table:
+// the paint order is all row backgrounds, then all cell backgrounds and
+// content (CSS 2.1 Appendix E). The snapshot's flattened box tree has no such
+// layer model — it wraps each row's background and its cells in one box
+// emitted in DOM order — so a `rowspan` cell that overflows its row (the
+// '华南' cell spanning three rows of the finance table in the forms sample)
+// ends up beneath the *following* rows' backgrounds: '华南' vanished entirely
+// and '华北' lost its lower half, while '华东' survived only because the row
+// below it carried no background. Hoisting each painted row background into a
+// standalone full-size box inserted ahead of every row in the same row group
+// replays the browser's order — all row backgrounds first, then all cells, so
+// a later row's background can no longer cover an earlier row's overflow.
+//
+// Only the plain `background-color` case is hoisted. A row whose sheet
+// carries a background image, a border, a shadow or a radius keeps its box
+// untouched: splitting such a sheet between two boxes would drop the other
+// visuals. Best-effort by design — the caller treats a failure as "keep the
+// old order", matching the pre-fix output.
+function hoistTableRowBackgrounds() {
+  // Alpha of the computed background-color, 0 when fully transparent.
+  function backgroundColorAlpha(value) {
+    const match = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i.exec(
+      String(value || '').trim()
+    );
+    if (!match) return 0;
+    return match[4] === undefined ? 1 : parseFloat(match[4]);
+  }
+
+  // True when any border side paints. border-collapse tables report the
+  // collapsed edge width on `tr` as well, so this doubles as the guard for
+  // authored row borders.
+  function hasVisibleBorder(computed) {
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+      const style = computed.getPropertyValue('border-' + side + '-style');
+      if (style === 'none' || style === 'hidden' || !style) continue;
+      if (parseFloat(computed.getPropertyValue('border-' + side + '-width')) > 0) return true;
+    }
+    return false;
+  }
+
+  const rows = Array.from(document.querySelectorAll('tr'));
+  let hoisted = 0;
+  for (const row of rows) {
+    const computed = getComputedStyle(row);
+    if (!computed) continue;
+    if ((computed.getPropertyValue('background-image') || 'none').trim() !== 'none') continue;
+    const background = (computed.getPropertyValue('background-color') || '').trim();
+    if (backgroundColorAlpha(background) <= 0) continue;
+    if ((computed.getPropertyValue('box-shadow') || 'none').trim() !== 'none') continue;
+    const hasRadius = ['border-top-left-radius', 'border-top-right-radius',
+                       'border-bottom-right-radius', 'border-bottom-left-radius']
+                        .some((name) => parseFloat(computed.getPropertyValue(name)) > 0);
+    if (hasRadius || hasVisibleBorder(computed)) continue;
+    const parent = row.parentElement;
+    if (!parent) continue;
+    const rowRect = row.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    if (!(rowRect.width > 0) || !(rowRect.height > 0)) continue;
+    // The hoisted box is absolutely positioned against the row group, which is
+    // usually static in the author's CSS; `relative` costs nothing for a table
+    // part and gives the box the intended containing block.
+    if (getComputedStyle(parent).position === 'static') {
+      parent.style.position = 'relative';
+    }
+    const hoist = document.createElement('div');
+    hoist.setAttribute('data-pagx-row-bg', '');
+    hoist.setAttribute(
+      'style',
+      // `z-index: -1` drops the box into the walker's negative paint band. Without it the
+      // absolutely-positioned box sorts *after* the static row boxes (positioned content
+      // paints in the top band), covering exactly the row content the hoist was meant to sit
+      // beneath.
+      'position:absolute;z-index:-1;left:' + (rowRect.left - parentRect.left) + 'px;top:' +
+        (rowRect.top - parentRect.top) + 'px;width:' + rowRect.width + 'px;height:' +
+        rowRect.height + 'px;background-color:' + background + ';'
+    );
+    parent.insertBefore(hoist, parent.firstChild);
+    row.style.backgroundColor = 'transparent';
+    hoisted++;
+  }
+  return { hoisted };
+}
+
 // ===== Pre-snapshot pass: materialise decorative ::before / ::after pseudo-elements =====
 
 // CSS pseudo-elements have no DOM presence, so the snapshot walker (which
@@ -5802,6 +6910,11 @@ async function materializeDecorativePseudoElements() {
     return parseFloat(computed.getPropertyValue(prop)) || 0;
   }
   const PSEUDO_TYPES = ['::before', '::after'];
+  // Tag for the synthetic stand-in box. Deliberately NOT `div`: the stand-in
+  // must not be re-matched by the author's element selectors (see its
+  // creation site). The walker re-emits every box as a `<div>` anyway, so the
+  // custom tag never reaches the subset or the importer.
+  const STANDIN_TAG = 'snapshot-pseudo';
   // Properties whose computed value the snapshot walker reads from the
   // element. Listing them explicitly keeps the synthetic style attribute
   // bounded and deterministic. Border longhands are expanded so asymmetric
@@ -5820,6 +6933,11 @@ async function materializeDecorativePseudoElements() {
     'background-color', 'background-image', 'background-clip',
     'background-blend-mode',
     'background-size', 'background-repeat', 'background-position',
+    // A decorative pseudo usually draws its shape with a mask rather than a background image: the
+    // stand-in paints `background-color: currentColor` clipped by `mask-image`. Copying the colour
+    // but not the mask leaves the stand-in painting the raw fill — a chevron icon, an
+    // external-link glyph or a gradient fade over clamped text all collapse to a solid rectangle.
+    'mask-image', 'mask-mode', 'mask-size', 'mask-position', 'mask-repeat',
     'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
     'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
     'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
@@ -5832,6 +6950,10 @@ async function materializeDecorativePseudoElements() {
     'box-sizing',
     'color', 'font-family', 'font-size', 'font-weight', 'font-style',
     'line-height', 'letter-spacing', 'text-align',
+    // An inline text pseudo can sit off the baseline (`.q::before { content:
+    // "“"; vertical-align: -24px }`). The stand-in is an inline box of its own,
+    // so it needs the same offset or the glyph lands ~24 px above the paint.
+    'vertical-align',
     // Animation longhands are forwarded so an *animated* decorative pseudo
     // (e.g. an underline that draws in with `animation: nbLine ... scaleX(0)
     // -> scaleX(1)`) keeps its motion on the synthetic node. The animation is
@@ -5872,6 +6994,8 @@ async function materializeDecorativePseudoElements() {
     ['background-size', 'auto'],
     ['background-repeat', 'repeat'],
     ['background-position', '0% 0%'],
+    ['mask-image', 'none'], ['mask-mode', 'match-source'],
+    ['mask-size', 'auto'], ['mask-position', '0% 0%'], ['mask-repeat', 'repeat'],
     ['border-top-width', '0px'], ['border-right-width', '0px'],
     ['border-bottom-width', '0px'], ['border-left-width', '0px'],
     ['border-top-style', 'none'], ['border-right-style', 'none'],
@@ -5882,29 +7006,185 @@ async function materializeDecorativePseudoElements() {
     ['filter', 'none'], ['backdrop-filter', 'none'], ['overflow', 'visible'],
     ['transform', 'none'],
     ['z-index', 'auto'],
-    ['box-sizing', 'content-box'],
+    ['vertical-align', 'baseline'],
+    // `box-sizing` is deliberately NOT defaulted away. The stand-in is a real
+    // element, so a page-level `* { box-sizing: border-box }` (or the subset's
+    // own global rule for div/span) reinterprets every copied `width` /
+    // `height` — and a pseudo's computed size is a *content-box* value. Emitting
+    // the pseudo's own box-sizing keeps those numbers meaning what they meant
+    // on the live page; skipping it collapsed a `content: counter(…)` badge to
+    // its padding box and clipped the digits to "0".
     ['animation-name', 'none'], ['animation-duration', '0s'],
     ['animation-timing-function', 'ease'], ['animation-delay', '0s'],
     ['animation-iteration-count', '1'], ['animation-direction', 'normal'],
     ['animation-fill-mode', 'none'],
   ]);
 
-  // A pseudo's `content` value reaches us with quotes preserved
-  // ("\"\"" for content: ""). Strip surrounding ASCII quotes so the
-  // empty-vs-text branch can be decided on the inner string.
-  function unquoteContent(raw) {
+  // Resolve a pseudo's `content` value into the text a browser would paint —
+  // a local copy of the Node-side `resolvePseudoContentText` / counter
+  // helpers (see the file's top section); they must be duplicated here because
+  // this function ships to the page through `page.evaluate` on its own source
+  // and can only reference its own lexical body. Quoted strings concatenate in
+  // place, `counter(...)` is evaluated against the live counter tree, and
+  // every other form (`attr()` / `url()` / `counters()`) contributes nothing —
+  // the historical contract of the quoted-run scan this replaces.
+  function parseCssCounterList(value, defaultDelta) {
+    const out = [];
+    const re = /([A-Za-z_][\w-]*)\s*(-?\d+)?/g;
+    let m;
+    while ((m = re.exec(value || '')) !== null) {
+      if (m[1].toLowerCase() === 'none') continue;
+      out.push([m[1], m[2] !== undefined ? parseInt(m[2], 10) : defaultDelta]);
+    }
+    return out;
+  }
+
+  function cssRomanCounter(value) {
+    const ROMAN = [
+      [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
+      [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+    ];
+    let s = '';
+    let n = value;
+    for (let r = 0; r < ROMAN.length; r++) {
+      while (n >= ROMAN[r][0]) {
+        s += ROMAN[r][1];
+        n -= ROMAN[r][0];
+      }
+    }
+    return s;
+  }
+
+  function cssAlphaCounter(value) {
+    let s = '';
+    let n = value;
+    while (n > 0) {
+      const m = (n - 1) % 26;
+      s = String.fromCharCode(97 + m) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+
+  function formatCssCounterValue(value, style) {
+    const n = Math.trunc(value);
+    switch ((style || 'decimal').trim().toLowerCase()) {
+      case 'decimal-leading-zero':
+        return (n < 0 ? '-' : '') + String(Math.abs(n)).padStart(2, '0');
+      case 'lower-alpha': case 'lower-latin': return n > 0 ? cssAlphaCounter(n) : String(n);
+      case 'upper-alpha': case 'upper-latin': return n > 0 ? cssAlphaCounter(n).toUpperCase() : String(n);
+      case 'lower-roman': return n > 0 && n < 4000 ? cssRomanCounter(n) : String(n);
+      case 'upper-roman': return n > 0 && n < 4000 ? cssRomanCounter(n).toUpperCase() : String(n);
+      case 'none': return '';
+      case 'decimal': default: return String(n);
+    }
+  }
+
+  function resolveCssCounterValue(el, name) {
+    let scope = null;
+    let value = 0;
+    for (let node = el; node; node = node.parentElement) {
+      const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+      let hit = null;
+      for (let r = 0; r < resets.length; r++) {
+        if (resets[r][0] === name) hit = resets[r][1];
+      }
+      if (hit !== null) {
+        scope = node;
+        value = hit;
+        break;
+      }
+    }
+    const root = scope || el.ownerDocument.documentElement;
+    if (!root) return null;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    let node = root;
+    while (node) {
+      if (node !== scope) {
+        const resets = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-reset'), 0);
+        for (let r = 0; r < resets.length; r++) {
+          if (resets[r][0] === name && (node === el || node.contains(el))) value = resets[r][1];
+        }
+      }
+      const incs = parseCssCounterList(getComputedStyle(node).getPropertyValue('counter-increment'), 1);
+      for (let r = 0; r < incs.length; r++) {
+        if (incs[r][0] === name) value += incs[r][1];
+      }
+      if (node === el) break;
+      node = walker.nextNode();
+    }
+    return value;
+  }
+
+  // Fold the pseudo's own `counter-reset` / `counter-increment` into the host
+  // value (the `::before { counter-increment: s; content: counter(s) }`
+  // self-increment pattern never shows up on the host's computed style).
+  function applyPseudoCounterOps(value, name, pseudoComputed) {
+    if (!pseudoComputed) return value;
+    let v = value;
+    const resets = parseCssCounterList(pseudoComputed.getPropertyValue('counter-reset'), 0);
+    for (let r = 0; r < resets.length; r++) {
+      if (resets[r][0] === name) v = resets[r][1];
+    }
+    const incs = parseCssCounterList(pseudoComputed.getPropertyValue('counter-increment'), 1);
+    for (let r = 0; r < incs.length; r++) {
+      if (incs[r][0] === name) v += incs[r][1];
+    }
+    return v;
+  }
+
+  function resolvePseudoContentText(el, raw, pseudoComputed) {
     const trimmed = (raw || '').trim();
     if (!trimmed) return '';
     if (trimmed === 'none' || trimmed === 'normal') return null;
-    // Concatenate every quoted run; ignore counter() / attr() / url() forms
-    // (they don't contribute a stable visible string, and a non-empty
-    // catch-all `out` still routes through the `renderPseudoTextLeaf` path
-    // for any glyph contribution).
-    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+    if (trimmed.indexOf('counter(') === -1) {
+      const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+      let out = '';
+      let m;
+      while ((m = re.exec(trimmed)) !== null) {
+        out += (m[1] !== undefined ? m[1] : m[2]);
+      }
+      return out;
+    }
+    // Slow path: positional scan so `"a" counter(x) "b"` keeps its authored order.
     let out = '';
-    let m;
-    while ((m = re.exec(trimmed)) !== null) {
-      out += (m[1] !== undefined ? m[1] : m[2]);
+    let i = 0;
+    while (i < trimmed.length) {
+      const ch = trimmed[i];
+      if (ch === '"' || ch === "'") {
+        let j = i + 1;
+        let s = '';
+        while (j < trimmed.length && trimmed[j] !== ch) {
+          if (trimmed[j] === '\\' && j + 1 < trimmed.length) {
+            s += trimmed[j] + trimmed[j + 1];
+            j += 2;
+          } else {
+            s += trimmed[j];
+            j += 1;
+          }
+        }
+        out += s;
+        i = j + 1;
+        continue;
+      }
+      const fn = /^(counter|counters|attr|url)\(/i.exec(trimmed.slice(i, i + 9));
+      if (fn) {
+        const open = i + fn[0].length;
+        const close = trimmed.indexOf(')', open);
+        const inner = close === -1 ? trimmed.slice(open) : trimmed.slice(open, close);
+        if (fn[1].toLowerCase() === 'counter') {
+          const parts = inner.split(',');
+          const name = (parts[0] || '').trim();
+          const style = (parts[1] || 'decimal').trim();
+          if (name) {
+            const value = resolveCssCounterValue(el, name);
+            if (value !== null) out += formatCssCounterValue(applyPseudoCounterOps(value, name, pseudoComputed), style);
+          }
+        }
+        i = close === -1 ? trimmed.length : close + 1;
+        continue;
+      }
+      i += 1;
     }
     return out;
   }
@@ -5944,19 +7224,28 @@ async function materializeDecorativePseudoElements() {
   // height:22px;background:rgba(73,83,102,.1);content:"本机"`, which would land flush with the
   // host's leading edge — no band, wrong axis — instead of sitting on the circle's bottom edge.
   // Such a pseudo materialises like any other box, with its text carried on the stand-in.
-  function shouldMaterialise(cs, pseudoText) {
+  function shouldMaterialise(cs, pseudoText, textLeafAvailable) {
     const position = (cs.getPropertyValue('position') || '').trim();
     if (position !== 'absolute' && position !== 'fixed' &&
         position !== 'static' && position !== 'relative') {
       return { ok: false, reason: 'position-' + (position || 'unknown') };
     }
     const outOfFlow = position === 'absolute' || position === 'fixed';
-    if (pseudoText !== '' && !outOfFlow) {
+    // An in-flow text-bearing pseudo normally stays on the walker's
+    // `renderPseudoTextLeaf` path, which re-emits the glyphs inside the host's
+    // own flow. That path only fires for a host with no element children and
+    // no direct text; on any other host the glyphs would be silently dropped,
+    // so the stand-in has to carry them instead (see the caller).
+    if (pseudoText !== '' && !outOfFlow && textLeafAvailable) {
       return { ok: false, reason: 'text-content' };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
-    if (widthPx <= 0 && heightPx <= 0) {
+    // A text-bearing pseudo is never "zero-size": an auto-sized inline box such
+    // as `.q::before { content: "“" }` resolves both longhands to `auto`
+    // (readNum -> 0) yet is fully sized by its own glyphs on the live page.
+    // Only a text-less box has nothing to paint at zero size.
+    if (widthPx <= 0 && heightPx <= 0 && pseudoText === '') {
       return { ok: false, reason: 'zero-size' };
     }
     return { ok: true, inFlow: !outOfFlow };
@@ -6053,12 +7342,30 @@ async function materializeDecorativePseudoElements() {
     // A stand-in therefore has to carry every text-bearing pseudo of that host, or the ones left
     // behind silently lose their glyphs; a host whose text pseudos do not all materialise keeps
     // the text-leaf path untouched.
+    // Whether the walker's pseudo-text leaf can still carry this host's
+    // pseudo glyphs: `renderPseudoTextLeaf` fires only for a host with no
+    // element children and no direct text. On any other host a refused
+    // materialisation loses the glyphs outright, so in-flow text pseudos are
+    // materialised with their text on the stand-in instead.
+    let hostHasElementChild = false;
+    let hostHasDirectText = false;
+    const hostChildren = el.childNodes || [];
+    for (let c = 0; c < hostChildren.length; c++) {
+      const child = hostChildren[c];
+      if (child.nodeType === 1) {                       // Node.ELEMENT_NODE
+        hostHasElementChild = true;
+      } else if (child.nodeType === 3 && child.nodeValue && child.nodeValue.trim()) {
+        hostHasDirectText = true;                       // Node.TEXT_NODE
+      }
+    }
+    const textLeafAvailable = !hostHasElementChild && !hostHasDirectText;
+
     const pseudoData = [];
     let hasTextPseudo = false;
     for (const pseudo of PSEUDO_TYPES) {
       const cs = getComputedStyle(el, pseudo);
       const contentRaw = (cs.getPropertyValue('content') || '').trim();
-      const pseudoText = unquoteContent(contentRaw);
+      const pseudoText = resolvePseudoContentText(el, contentRaw, cs);
       if (pseudoText === null) {
         // content: none / normal — pseudo not generated.
         pseudoData.push(null);
@@ -6069,7 +7376,7 @@ async function materializeDecorativePseudoElements() {
     }
     const decisions = pseudoData.map((slot) => {
       if (!slot) return null;
-      return shouldMaterialise(slot.cs, slot.pseudoText);
+      return shouldMaterialise(slot.cs, slot.pseudoText, textLeafAvailable);
     });
     if (hasTextPseudo) {
       let textLeftBehind = false;
@@ -6077,7 +7384,12 @@ async function materializeDecorativePseudoElements() {
         const slot = pseudoData[i];
         if (slot && slot.pseudoText !== '' && !decisions[i].ok) textLeftBehind = true;
       }
-      if (textLeftBehind) continue;
+      // Only a host that can still reach the pseudo-text leaf needs the
+      // all-or-nothing veto (a stand-in suppresses that path for the whole
+      // host). On a container host the leaf path never fires, so a pseudo that
+      // cannot materialise (zero-size inline box, sticky) must not veto the
+      // siblings that can.
+      if (textLeftBehind && textLeafAvailable) continue;
     }
 
     let materialisedAny = false;
@@ -6092,7 +7404,14 @@ async function materializeDecorativePseudoElements() {
         continue;
       }
 
-      const div = document.createElement('div');
+      // Custom tag, NOT `div`: the stand-in must not be re-matched by the
+      // author's element selectors — a `.list div { … }` rule would otherwise
+      // inject padding / a `border-bottom` (recoloured through the copied
+      // `border-color: currentColor` and visible as a stray red 1px line) /
+      // `counter-increment` (double-counting the numbering) onto the synthetic
+      // box. The tag never reaches the subset (the walker re-emits every box
+      // as a `<div>`); it only shields the live-page measurement.
+      const div = document.createElement(STANDIN_TAG);
       div.setAttribute('data-snapshot-pseudo', slot.pseudo);
       // Read the pseudo's resting style (cancelling its own animation) so an
       // entrance-animated pseudo isn't baked at its invisible 0% keyframe; the
@@ -6155,9 +7474,495 @@ async function materializeDecorativePseudoElements() {
   }
 }
 
+// ===== Pre-snapshot pass: materialise `::first-letter` drop caps =====
+//
+// A drop cap — `.body p.first::first-letter { float: left; font-size: 96px; ... }` —
+// is painted by the browser from a pseudo-element the walker cannot see. Worse, the
+// cap's tall float box (96px) overlaps the first three line rects of the paragraph's
+// own text node, so the line splitter (which groups rects by vertical overlap) folds
+// the cap and those three lines into a single span: the paragraph then emits one
+// run-together "line" that overflows its column.
+//
+// Fix: replace the pseudo with a real floated <span> carrying the matched character
+// and the pseudo's own box/text styles, then drop that character from the paragraph's
+// text node. The browser reflows the paragraph around the real float (same geometry as
+// the pseudo produced) and the text node now reports clean per-line rects, which is
+// exactly what the walker needs.
+function materializeFirstLetter() {
+  // Properties that decide a cap's box and glyphs. Everything else keeps inheriting
+  // from the host paragraph, exactly as the pseudo did.
+  const COPY_PROPS = [
+    'float',
+    'width', 'height',
+    'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
+    'line-height', 'letter-spacing',
+    'color', 'text-align', 'text-transform',
+    'text-decoration-line', 'text-decoration-color', 'text-decoration-style',
+    'text-shadow', '-webkit-text-stroke-width', '-webkit-text-stroke-color',
+    'background-color', 'background-image', 'background-clip',
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+    'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+    'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+    'border-top-left-radius', 'border-top-right-radius',
+    'border-bottom-left-radius', 'border-bottom-right-radius',
+    'box-sizing', 'opacity', 'transform', 'transform-origin', 'z-index',
+  ];
+  const DEFAULTS = {
+    'float': 'none',
+    'padding-top': '0px', 'padding-right': '0px', 'padding-bottom': '0px', 'padding-left': '0px',
+    'margin-top': '0px', 'margin-right': '0px', 'margin-bottom': '0px', 'margin-left': '0px',
+    'text-decoration-line': 'none', 'text-decoration-color': 'currentcolor',
+    'text-decoration-style': 'solid',
+    'text-shadow': 'none', '-webkit-text-stroke-width': '0px',
+    'background-color': 'rgba(0, 0, 0, 0)', 'background-image': 'none',
+    'background-clip': 'border-box',
+    'border-top-width': '0px', 'border-right-width': '0px',
+    'border-bottom-width': '0px', 'border-left-width': '0px',
+    'border-top-style': 'none', 'border-right-style': 'none',
+    'border-bottom-style': 'none', 'border-left-style': 'none',
+    'border-top-left-radius': '0px', 'border-top-right-radius': '0px',
+    'border-bottom-left-radius': '0px', 'border-bottom-right-radius': '0px',
+    'box-sizing': 'content-box', 'opacity': '1', 'transform': 'none', 'z-index': 'auto',
+  };
+  // Properties compared against the host's own style to decide whether a
+  // `::first-letter` rule is present at all (Chromium returns an inherited computed
+  // style for the pseudo even when no rule targets it).
+  const PROBE_PROPS = ['float', 'font-size', 'font-family', 'font-weight', 'font-style', 'color'];
+  // CSS folds any leading punctuation into `::first-letter` (`"Hello` → `"H`).
+  const LEADING_PUNCT = '([{"\'“‘（【《〔';
+  function firstLetterText(str) {
+    let i = 0;
+    while (i < str.length && /\s/.test(str.charAt(i))) i++;
+    while (i < str.length && LEADING_PUNCT.indexOf(str.charAt(i)) !== -1) i++;
+    if (i >= str.length) return '';
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+      const it = seg.segment(str.slice(i))[Symbol.iterator]();
+      const firstSeg = it.next();
+      if (!firstSeg.done) return str.slice(0, i + firstSeg.value.segment.length);
+    }
+    const cp = str.codePointAt(i);
+    return str.slice(0, i + (cp > 0xFFFF ? 2 : 1));
+  }
+
+  const all = document.querySelectorAll('*');
+  let materialisedAny = false;
+  for (let i = 0; i < all.length; i++) {
+    const el = all[i];
+    if (!(el instanceof Element)) continue;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'script' || tag === 'style' || tag === 'meta' || tag === 'link' ||
+        tag === 'title' || tag === 'head' || tag === 'html') continue;
+    if (el.closest('svg') && tag !== 'svg') continue;
+    if (el.hasAttribute('data-snapshot-first-letter')) continue;
+    // The cap is the host's first formatted character, so it only exists when the
+    // first child is a non-empty text node.
+    const first = el.firstChild;
+    if (!first || first.nodeType !== 3 || !first.nodeValue || !first.nodeValue.trim()) continue;
+
+    const fl = getComputedStyle(el, '::first-letter');
+    const own = getComputedStyle(el);
+    let differs = false;
+    for (const prop of PROBE_PROPS) {
+      if ((fl.getPropertyValue(prop) || '').trim() !== (own.getPropertyValue(prop) || '').trim()) {
+        differs = true;
+        break;
+      }
+    }
+    if (!differs) continue;
+
+    const letter = firstLetterText(first.nodeValue);
+    if (!letter) continue;
+
+    const span = document.createElement('span');
+    span.setAttribute('data-snapshot-first-letter', '');
+    const parts = [];
+    for (const prop of COPY_PROPS) {
+      const raw = (fl.getPropertyValue(prop) || '').trim();
+      if (!raw) continue;
+      if (DEFAULTS[prop] !== undefined && raw === DEFAULTS[prop]) continue;
+      // Single-quote embedded double quotes so the value survives the style="…" attribute.
+      parts.push(prop + ': ' + raw.replace(/"/g, "'"));
+    }
+    if (parts.length) span.setAttribute('style', parts.join('; '));
+    span.textContent = letter;
+    el.insertBefore(span, first);
+    first.nodeValue = first.nodeValue.slice(letter.length);
+    materialisedAny = true;
+  }
+
+  // The original `::first-letter` rule still matches — and now matches *our* float,
+  // which has become the host's first content, so Chromium styles it a second time
+  // (an extra float box that shoves the paragraph text right, or a 96px inline letter
+  // that inflates the first line box). The stand-in carries the same font/colour/box
+  // values, so the rule has nothing left to contribute: drop every `::first-letter`
+  // rule from the page's stylesheets now that the caps are real elements.
+  if (materialisedAny) {
+    const stripFirstLetterRules = (group) => {
+      let rules;
+      try {
+        rules = group.cssRules;
+      } catch (err) {
+        return; // cross-origin sheet — skip
+      }
+      if (!rules) return;
+      for (let i = rules.length - 1; i >= 0; i--) {
+        let rule;
+        try {
+          rule = rules[i];
+        } catch (err) {
+          continue;
+        }
+        const selector = rule.selectorText;
+        if (typeof selector === 'string' && /::?first-letter/i.test(selector)) {
+          try {
+            group.deleteRule(i);
+          } catch (err) { /* ignore */ }
+          continue;
+        }
+        // Recurse into grouping rules (@media, @supports) — and into nested rules,
+        // which every CSSStyleRule now carries an (often empty) `cssRules` for.
+        if (rule.cssRules && rule.cssRules.length) stripFirstLetterRules(rule);
+      }
+    };
+    const sheets = document.styleSheets;
+    for (let s = 0; s < sheets.length; s++) stripFirstLetterRules(sheets[s]);
+  }
+}
+
+// ===== Pre-snapshot pass: materialise list markers (`::marker`) =====
+//
+// `<ol>` / `<ul>` numbers and bullets are painted from the `::marker` pseudo-element,
+// which has no DOM node, so the snapshot drops every list marker — a table of contents
+// loses its "1. 2. 3.", a footnote list its numbers. Chromium does not expose the
+// marker's text either (`content` computes to `normal`), so it is derived here from
+// `list-style-type` plus the item's index in its list, then re-emitted as an
+// absolutely-positioned box pinned to the item's start edge (`right: 100%`), which is
+// where an outside marker is drawn. `::marker` *does* report its resolved width/height,
+// so the marker box matches what the browser laid out.
+function materializeListMarkers() {
+  const ROMAN = [
+    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
+    [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+  ];
+  function toRoman(n) {
+    let s = '';
+    for (let i = 0; i < ROMAN.length; i++) {
+      while (n >= ROMAN[i][0]) {
+        s += ROMAN[i][1];
+        n -= ROMAN[i][0];
+      }
+    }
+    return s;
+  }
+  function toAlpha(n) {
+    let s = '';
+    while (n > 0) {
+      const m = (n - 1) % 26;
+      s = String.fromCharCode(97 + m) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+  function markerText(type, n) {
+    switch (type) {
+      case 'none': return '';
+      case 'disc': return '\u2022';
+      case 'circle': return '\u25E6';
+      case 'square': return '\u25AA';
+      case 'decimal-leading-zero': return (n < 10 ? '0' + n : String(n)) + '.';
+      case 'lower-alpha': case 'lower-latin': return toAlpha(n) + '.';
+      case 'upper-alpha': case 'upper-latin': return toAlpha(n).toUpperCase() + '.';
+      case 'lower-roman': return toRoman(n) + '.';
+      case 'upper-roman': return toRoman(n).toUpperCase() + '.';
+      case 'decimal': default: return n + '.';
+    }
+  }
+  // Text of an authored `::marker { content: … }`. Chromium reports the quoted
+  // runs verbatim, and a custom string replaces the UA marker entirely — it
+  // also overrides a `list-style-type: none`. `counter()` / `counters()` /
+  // `attr()` / `url()` contribute nothing here, so those forms keep falling
+  // back to the type-based `markerText` (the pre-existing behaviour).
+  function markerContentText(raw) {
+    const trimmed = (raw || '').trim();
+    if (!trimmed || trimmed === 'none' || trimmed === 'normal') return '';
+    let out = '';
+    const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+    let m;
+    while ((m = re.exec(trimmed)) !== null) {
+      out += (m[1] !== undefined ? m[1] : m[2]);
+    }
+    return out;
+  }
+  // 1-based index the browser would give this item, honouring `<ol start>` and
+  // per-item `value`.
+  function itemIndex(li) {
+    const list = li.parentElement;
+    if (!list) return 1;
+    let idx = 1;
+    if (list.tagName.toLowerCase() === 'ol') {
+      const start = parseInt(list.getAttribute('start'), 10);
+      if (isFinite(start)) idx = start;
+    }
+    const kids = list.children;
+    for (let k = 0; k < kids.length; k++) {
+      if (kids[k].tagName.toLowerCase() !== 'li') continue;
+      const value = parseInt(kids[k].getAttribute('value'), 10);
+      if (isFinite(value)) idx = value;
+      if (kids[k] === li) return idx;
+      idx++;
+    }
+    return idx;
+  }
+  const COPY_PROPS = [
+    'font-family', 'font-size', 'font-weight', 'font-style',
+    'font-variant-numeric', 'line-height', 'letter-spacing',
+    'color', 'text-transform',
+  ];
+
+  const items = document.querySelectorAll('li');
+  for (let i = 0; i < items.length; i++) {
+    const li = items[i];
+    if (!(li instanceof Element)) continue;
+    if (li.hasAttribute('data-snapshot-marker')) continue;
+    const cs = getComputedStyle(li);
+    const type = (cs.getPropertyValue('list-style-type') || '').trim();
+    const mk = getComputedStyle(li, '::marker');
+    // An authored `::marker { content: "➤ " }` wins over the fabricated
+    // `list-style-type` glyphs — and over a `none` type, which `content` is
+    // allowed to override.
+    const custom = markerContentText(mk.getPropertyValue('content'));
+    const text = custom !== ''
+      ? custom
+      : (type && type !== 'none' ? markerText(type, itemIndex(li)) : '');
+    if (!text) continue;
+    const width = parseFloat(mk.getPropertyValue('width')) || 0;
+    const height = parseFloat(mk.getPropertyValue('height')) || 0;
+
+    // The marker box is positioned against the item, so a static item has to become
+    // the containing block (`position: relative` changes no layout of its own).
+    if ((cs.getPropertyValue('position') || 'static').trim() === 'static') {
+      li.style.position = 'relative';
+    }
+    const span = document.createElement('span');
+    span.setAttribute('data-snapshot-marker', '');
+    const parts = [];
+    for (const prop of COPY_PROPS) {
+      const raw = (mk.getPropertyValue(prop) || '').trim();
+      if (raw) parts.push(prop + ': ' + raw.replace(/"/g, "'"));
+    }
+    parts.push('position: absolute');
+    parts.push('right: 100%');
+    parts.push('top: 0');
+    // Chromium's `decimal` marker carries a trailing space after the dot, which it
+    // trims from the box when the text is right-aligned but which still shows up as
+    // the gap before the item text. Re-create that gap (a trailing space in our own
+    // text would just be trimmed again).
+    parts.push('margin-right: 0.4em');
+    if (width > 0) parts.push('width: ' + width + 'px');
+    if (height > 0) parts.push('height: ' + height + 'px');
+    parts.push('text-align: right');
+    parts.push('white-space: nowrap');
+    span.setAttribute('style', parts.join('; '));
+    span.textContent = text;
+    li.insertBefore(span, li.firstChild);
+  }
+}
+
 /* eslint-enable no-undef, no-inner-declarations */
 
 /* eslint-disable no-undef, no-inner-declarations */
+
+// ===== Pre-snapshot pass: inline remote mask-image urls =====
+
+// Unlike `background-image`, whose remote layers `inlineExternalImages` has already replaced with
+// `data:` URIs, a `mask-image: url(https://…)` reaches the walker verbatim. A browser resolves
+// such a url over the network, so the subset still renders correctly when opened directly, but the
+// importer hands the url to `ImageCodec::MakeFrom`, which cannot fetch: the mask layer is dropped
+// and the masked element paints its unmasked fill instead. Fetch every remote mask url and rewrite
+// it to a `data:` URI so both consumers see the same self-contained value.
+//
+// Must run after `materializeDecorativePseudoElements`: a decorative `::before` / `::after` icon
+// lives on a synthetic stand-in div that pass creates, and the mask it copies from the pseudo's
+// computed style is what this pass has to resolve.
+//
+// Gradients (the importer rebuilds them into a contour mask), `data:` urls (already
+// self-contained) and `file:` urls (`normalizeMaskImage` strips those to a plain path the importer
+// loads directly) are left untouched.
+async function inlineMaskImages() {
+  // Standalone on purpose: `page.evaluate` serialises this function into the page, so it cannot
+  // share a closure with `inlineExternalImages`' own helpers.
+  function blobToDataUri(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // One entry per element: a decorative pseudo that materialised onto its host, a plain element
+  // masked by an icon, and a clamped-text fade overlay all take the same path.
+  const pending = [];
+  for (const el of Array.from(document.querySelectorAll('*'))) {
+    const value = (getComputedStyle(el).getPropertyValue('mask-image') || '').trim();
+    if (!value || value === 'none') continue;
+    const match = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value);
+    if (!match) continue;
+    const url = match[2];
+    if (!/^https?:/i.test(url)) continue;
+    pending.push({ el, url, value });
+  }
+  if (pending.length === 0) return;
+
+  // Icons repeat across a page (one chevron asset on every nav item), so the same url is fetched
+  // and encoded once.
+  const cache = new Map();
+  async function resolveUrl(url) {
+    if (cache.has(url)) return cache.get(url);
+    const promise = (async () => {
+      const res = await fetch(url, { credentials: 'omit' });
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      return await blobToDataUri(await res.blob());
+    })();
+    cache.set(url, promise);
+    return promise;
+  }
+
+  // The data URI is emitted single-quoted: the value lands inside the double-quoted `style="…"`
+  // attribute the walker writes, where a double-quoted url() would close the attribute early.
+  async function inlineOne(entry) {
+    try {
+      const dataUri = await resolveUrl(entry.url);
+      entry.el.style.maskImage = entry.value.replace(
+        /url\(\s*(['"]?)([^'")]+)\1\s*\)/i,
+        () => `url('${dataUri}')`,
+      );
+    } catch (err) {
+      console.warn(`html-snapshot: failed to inline mask ${entry.url}: ${err && err.message}`);
+    }
+  }
+
+  const FETCH_CHUNK_SIZE = 8;
+  for (let i = 0; i < pending.length; i += FETCH_CHUNK_SIZE) {
+    const slice = pending.slice(i, i + FETCH_CHUNK_SIZE);
+    await Promise.all(slice.map(inlineOne));
+  }
+}
+
+/* eslint-enable no-undef, no-inner-declarations */
+
+/* eslint-disable no-undef, no-inner-declarations */
+
+// ===== Pre-snapshot pass: rasterize vector <pattern> tiles =====
+//
+// PAGX can only express a `<pattern>` fill as an `ImagePattern` (a tiled bitmap). A pattern whose
+// content is vector geometry (a stroked wave, a dotted hatch, ...) has no image to tile, so the
+// importer drops it and the painted shape loses its texture. The importer cannot rasterize the
+// tile itself — the translation stage has no render context — but the browser can: each vector
+// pattern's tile is drawn to a canvas here and its content replaced with a single `<image>`
+// carrying the tile PNG, which the importer's existing image-pattern path then tiles as usual.
+//
+// Only `patternUnits="userSpaceOnUse"` tiles with an explicit pixel size are handled: an
+// `objectBoundingBox` tile's pixel size depends on the referencing shape's bounds, which this
+// pass does not have. Those patterns are left untouched (and dropped, exactly as before).
+async function inlineSvgVectorPatterns() {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const svgs = Array.from(document.querySelectorAll('svg'));
+  if (svgs.length === 0) return;
+
+  const loadImage = (src) =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('tile image load failed'));
+      img.src = src;
+    });
+
+  // A pattern whose content is already an `<image>` needs no rasterization — the importer handles
+  // it directly and re-encoding would only lose resolution.
+  const isImageOnly = (pattern) => {
+    let sawAny = false;
+    for (const child of Array.from(pattern.children)) {
+      const name = child.tagName.toLowerCase();
+      if (name === 'title' || name === 'desc') continue;
+      sawAny = true;
+      if (name !== 'image') return false;
+    }
+    return sawAny;
+  };
+
+  const pending = [];
+  for (const svg of svgs) {
+    // Only patterns that resolve inside their own SVG are considered; a pattern inherited from
+    // another SVG would not resolve once this SVG is serialised standalone either.
+    const defs = svg.querySelector('defs');
+    for (const pattern of Array.from(svg.querySelectorAll('pattern'))) {
+      if ((pattern.getAttribute('patternUnits') || 'objectBoundingBox').toLowerCase() !==
+          'userspaceonuse') {
+        continue;
+      }
+      const contentUnits =
+        (pattern.getAttribute('patternContentUnits') || 'userSpaceOnUse').toLowerCase();
+      if (contentUnits !== 'userspaceonuse') continue;
+      const w = parseFloat(pattern.getAttribute('width') || '');
+      const h = parseFloat(pattern.getAttribute('height') || '');
+      if (!(w > 0) || !(h > 0)) continue;
+      if (isImageOnly(pattern)) continue;
+      pending.push({
+        pattern,
+        defs,
+        w,
+        h,
+        x: parseFloat(pattern.getAttribute('x') || '0') || 0,
+        y: parseFloat(pattern.getAttribute('y') || '0') || 0,
+      });
+    }
+  }
+  if (pending.length === 0) return;
+
+  async function rasterizeOne(entry) {
+    const { pattern, defs, w, h, x, y } = entry;
+    try {
+      const inner = Array.from(pattern.children).map((c) => c.outerHTML).join('');
+      const defsMarkup = defs ? defs.outerHTML : '';
+      const markup =
+        '<svg xmlns="' + SVG_NS + '" width="' + w + '" height="' + h + '" viewBox="' + x + ' ' + y +
+        ' ' + w + ' ' + h + '">' + defsMarkup + inner + '</svg>';
+      const dataUri =
+        'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(markup)));
+      const img = await loadImage(dataUri);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(w));
+      canvas.height = Math.max(1, Math.round(h));
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const png = canvas.toDataURL('image/png');
+      while (pattern.firstChild) pattern.removeChild(pattern.firstChild);
+      const image = document.createElementNS(SVG_NS, 'image');
+      image.setAttribute('href', png);
+      image.setAttribute('x', String(x));
+      image.setAttribute('y', String(y));
+      image.setAttribute('width', String(w));
+      image.setAttribute('height', String(h));
+      pattern.appendChild(image);
+    } catch (err) {
+      console.warn(
+        'html-snapshot: failed to rasterize vector <pattern>: ' + (err && err.message),
+      );
+    }
+  }
+
+  // Decoding the tile image is async; rasterize a few at a time to bound the work.
+  const CHUNK = 8;
+  for (let i = 0; i < pending.length; i += CHUNK) {
+    await Promise.all(pending.slice(i, i + CHUNK).map(rasterizeOne));
+  }
+}
+
+/* eslint-enable no-undef, no-inner-declarations */
 
 // ===== Pre-snapshot pass: expand sticky scrollytelling blocks =====
 
@@ -6400,26 +8205,50 @@ export {
   restoreEmptyImagePlaceholders,
   imgAlt,
   inlineCanvases,
+  dropCollapsedDetailsContent,
+  hoistTableRowBackgrounds,
+  materializeFirstLetter,
+  materializeListMarkers,
   materializeDecorativePseudoElements,
+  inlineMaskImages,
+  inlineSvgVectorPatterns,
   expandStickyScrollytelling,
   mergeRectsOnSameLine,
   bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
+  resolveChildStacking,
+  resolveEscapingWrapperZIndex,
   flexCharCarriesReveal,
   pagxEvalLengthPx,
   pagxParseClipShape,
   pagxClipPathInnerMarkup,
   dashedBorderSideSvg,
   forwardDataAttrs,
-  applyLayerName,
+  applyLayerAttributes,
   normalizeBackgroundImage,
+  normalizeBorderImage,
   canForwardFlexGrow,
   shouldPinFlexGrowItems,
   isIntrinsicInlineContentWidth,
   readRootScrollOffset,
   resetRootScroll,
   canvasRootRect,
+  cssQuotedString,
+  collectLocalFontFaces,
+  readLineClamp,
+  ellipsizeClampedLine,
+  nativeControlKind,
+  syntheticText,
+  maskPasswordText,
+  selectArrowMarkup,
+  svgCheckbox,
+  svgRadio,
+  svgRange,
+  svgProgress,
+  svgMeter,
+  svgColorSwatch,
+  formatDateControlValue,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 };

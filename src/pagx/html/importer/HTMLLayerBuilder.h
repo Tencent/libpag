@@ -115,11 +115,15 @@ class HTMLLayerBuilder {
   static bool hasLayoutHostAttributes(const HTMLBoxAttributes& box);
 
   /** Returns true when the final layout host has a non-zero content inset, requiring the outer
-   *  Layer to carry border-box paint and an inner Layer to carry padding / layout. */
-  static bool requiresInnerHost(const HTMLBoxAttributes& box);
+   *  Layer to carry border-box paint and an inner Layer to carry padding / layout.
+   *  `hasContentBoxDependentChild` reports whether any child resolves its size or position against
+   *  this box's content box — a flow child, or one sized by percentage. A CSS border insets the
+   *  content box exactly like padding does, so such a child must not be laid out on the border
+   *  box itself (the outer Layer's box) where it would cover the border stroke. */
+  static bool requiresInnerHost(const HTMLBoxAttributes& box, bool hasContentBoxDependentChild);
 
   /** Creates the inner host Layer for the standard "outer background + inner padded
-   *  container" double-layer pattern, including the border inset of flex containers. */
+   *  container" double-layer pattern, including the border inset of the content box. */
   Layer* createInnerHost(Layer* outer, const HTMLBoxAttributes& box);
 
   /** Hoists `DropShadowStyle` entries off `inner` onto a fresh outer wrapper Layer when

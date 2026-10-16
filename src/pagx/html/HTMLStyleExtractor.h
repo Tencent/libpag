@@ -56,8 +56,15 @@ class HTMLStyleExtractor {
    * The input must be well-formed HTML produced by HTMLWriter. Behaviour on
    * malformed input is best-effort: the extractor will not crash but the
    * output is not guaranteed to be semantically identical.
+   *
+   * `namePrefix` is prepended to every generated class name (both the class
+   * attribute values and the selectors in the emitted stylesheet). Left empty
+   * for single-document exports; multi-document deck export passes the same
+   * page prefix used for element ids ("s{pageIndex}-") so that class names
+   * stay unique when several page fragments are combined into one HTML
+   * document.
    */
-  static std::string Extract(const std::string& html);
+  static std::string Extract(const std::string& html, const std::string& namePrefix = {});
 };
 
 }  // namespace pagx

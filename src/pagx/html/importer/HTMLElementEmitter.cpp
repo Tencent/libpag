@@ -242,20 +242,40 @@ ScaleMode ResolveImageScaleMode(const std::string& objectFit) {
   return ScaleMode::Stretch;
 }
 
-// Extracts the source string from a CSS `url(...)` token, stripping the wrapper, surrounding
-// whitespace, and matching quotes. Returns empty when `value` is not a `url(...)` form.
+// Extracts the source string from the first CSS `url(...)` token, stripping the wrapper,
+// surrounding whitespace, and matching quotes. Returns empty when `value` has no `url(...)`.
+// A multi-layer value (`url(a), url(b)`) yields the first layer — the topmost in CSS paint
+// order. Reading to the *last* `)` of the declaration instead (the previous `rfind(')')`)
+// spliced every later layer into the first source, turning a data-URI stack into one
+// unresolvable `{dir}/data:...'), url('...` path.
 std::string ExtractCssUrl(const std::string& value) {
   std::string trimmed = Trim(value);
   std::string lower = ToLower(trimmed);
   auto open = lower.find("url(");
   if (open == std::string::npos) return {};
-  auto close = trimmed.rfind(')');
-  if (close == std::string::npos || close <= open + 4) return {};
-  std::string inner = Trim(trimmed.substr(open + 4, close - (open + 4)));
-  if (inner.size() >= 2 && (inner.front() == '"' || inner.front() == '\'') &&
-      inner.back() == inner.front()) {
-    inner = inner.substr(1, inner.size() - 2);
+  size_t p = open + 4;
+  while (p < trimmed.size() && std::isspace(static_cast<unsigned char>(trimmed[p]))) {
+    p++;
   }
+  if (p >= trimmed.size()) return {};
+  std::string inner;
+  if (trimmed[p] == '"' || trimmed[p] == '\'') {
+    // Quoted form: the matching quote closes the token; a `)` inside the URL (a data URI can
+    // legally carry one) must not end it early.
+    char quote = trimmed[p];
+    size_t q = p + 1;
+    while (q < trimmed.size() && trimmed[q] != quote) {
+      if (trimmed[q] == '\\' && q + 1 < trimmed.size()) q++;
+      q++;
+    }
+    if (q >= trimmed.size()) return {};
+    inner = trimmed.substr(p + 1, q - (p + 1));
+  } else {
+    auto close = trimmed.find(')', p);
+    if (close == std::string::npos) return {};
+    inner = trimmed.substr(p, close - p);
+  }
+  inner = Trim(inner);
   std::string unescaped;
   unescaped.reserve(inner.size());
   for (size_t i = 0; i < inner.size(); ++i) {
@@ -638,6 +658,11 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
                                                 const HTMLBoxAttributes& box, Layer* layer) {
   if (!box.borderRadiusSet || !box.clipOverflow) return false;
   if (HTMLLayerBuilder::hasLayoutHostAttributes(box)) return false;
+  // The fold bakes the image straight onto the wrapper's rounded Rectangle, whose geometry is the
+  // border box — a bordered wrapper would lose its border ring to the image fill. Keep those on
+  // the container path, where the inner host insets the image into the content box and the mask
+  // clips it to the padding box.
+  if (box.borderSet && box.borderWidthPx > 0.0f) return false;
 
   // Walk down through up to `HTML_ROUND_IMAGE_MAX_WRAPPER_DEPTH` intermediate
   // layout-only `<div>` wrappers that share `element`'s content box. The
@@ -767,9 +792,41 @@ Layer* HTMLParserContext::convertImage(const std::shared_ptr<DOMNode>& element,
   pattern->image = imageNode;
   pattern->scaleMode = ResolveImageScaleMode(box.objectFit);
   fill->color = pattern;
+
+  // CSS insets a replaced element's content by the border width: the image fills the content box,
+  // not the border box, and `object-fit` resolves against that same box. Emit the image on an
+  // inset child Layer when the box carries a border so it neither stretches across the border ring
+  // nor inflates relative to the browser. The inset needs concrete px geometry (a percent-sized
+  // box has no resolvable padding box), so an unsized box keeps the single-Layer form.
+  Fill* foregroundFill = fill;
+  if (box.borderSet && box.borderWidthPx > 0.0f && !std::isnan(box.widthPx) &&
+      !std::isnan(box.heightPx) && box.widthPx > 2 * box.borderWidthPx &&
+      box.heightPx > 2 * box.borderWidthPx) {
+    // The content box keeps the border box's shape, inset by the border with the corner radii
+    // shrunk by the same amount (the inner curve of a rounded border).
+    HTMLBoxAttributes imageBox = box;
+    imageBox.widthPx = box.widthPx - 2 * box.borderWidthPx;
+    imageBox.heightPx = box.heightPx - 2 * box.borderWidthPx;
+    imageBox.borderRadiusTLPx = std::max(0.0f, box.borderRadiusTLPx - box.borderWidthPx);
+    imageBox.borderRadiusTRPx = std::max(0.0f, box.borderRadiusTRPx - box.borderWidthPx);
+    imageBox.borderRadiusBRPx = std::max(0.0f, box.borderRadiusBRPx - box.borderWidthPx);
+    imageBox.borderRadiusBLPx = std::max(0.0f, box.borderRadiusBLPx - box.borderWidthPx);
+
+    auto* imageHost = _document->makeNode<Layer>();
+    imageHost->includeInLayout = false;
+    imageHost->left = box.borderWidthPx;
+    imageHost->top = box.borderWidthPx;
+    imageHost->width = imageBox.widthPx;
+    imageHost->height = imageBox.heightPx;
+    imageHost->contents.push_back(_layerBuilder->buildBackgroundGeometry(imageBox));
+    imageHost->contents.push_back(fill);
+    layer->children.push_back(imageHost);
+    foregroundFill = nullptr;
+  }
+
   // The image is the foreground paint: CSS backgrounds sit behind it, while border and box
   // effects remain visible around it. The shared geometry also preserves border-radius.
-  _layerBuilder->applyBackgroundVisuals(layer, box, fill);
+  _layerBuilder->applyBackgroundVisuals(layer, box, foregroundFill);
   _layerBuilder->applyBoxTransform(layer, box, element);
   auto* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
   assignElementId(wrapper, element);
@@ -791,6 +848,11 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   HTMLInheritedStyle svgStyle = _styleCascade->resolveInheritedStyle(element, inherited);
   std::string rootColor = HTMLInlineSvgEmitter::formatColorForAttribute(svgStyle.resolvedTextColor);
   _svgEmitter->resolveCurrentColor(element, rootColor);
+
+  // The serialized SVG loses the HTML cascade, so carry the document's resolved font onto the
+  // root `font-family` attribute. `computeInheritedStyle` in the SVG importer then seeds every
+  // `<text>` with it, matching the browser instead of falling back to the default face.
+  _svgEmitter->applyRootFontFamily(element, svgStyle.primaryFontFamily);
 
   // Rewrite the exporter's conic-gradient-stroke workaround (`<mask>` + `<foreignObject>` with a
   // CSS-gradient `<div>`) back into native stroked shapes. The downstream SVG importer does not
@@ -1163,7 +1225,8 @@ bool HTMLParserContext::applyGradientImageMask(Layer* layer, const HTMLBoxAttrib
   return true;
 }
 
-void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttributes& box) {
+void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, Layer* contentHost,
+                                                 const HTMLBoxAttributes& box) {
   if (layer == nullptr) return;
   // Only a container that both rounds its corners and clips overflow needs a shaped clip; a plain
   // `overflow: hidden` (no radius) keeps the cheaper rectangular `clipToBounds` untouched.
@@ -1188,29 +1251,71 @@ void HTMLParserContext::applyRoundedOverflowClip(Layer* layer, const HTMLBoxAttr
     return;
   }
 
-  // Build a mask shaped like the border-radius geometry (Ellipse for `50%`, a uniform rounded
-  // Rectangle, or a per-corner Path) filled opaque white. Both the mask layer and the geometry
-  // size to 100% of the masked layer, so the clip follows the laid-out box even when its size is
-  // resolved by layout. A Contour mask reads only the shape's coverage, clipping descendants to
-  // the rounded outline instead of the layer's rectangle.
+  // CSS clips `overflow: hidden` descendants to the padding box, whose corners are the border
+  // box's radius shrunk by the border width. Shaping a border-box mask instead would let
+  // descendants cover the inner half of the border ring at the rounded corners, so a bordered box
+  // insets the mask geometry onto its padding box.
+  // A contour mask also clips the masked Layer's own contents, so the inset mask must be attached
+  // to the layer that owns the clipped content — the inner host of the double-layer pattern. On
+  // the outer Layer it would erase the border stroke that lives there. Without a host the mask
+  // stays on the border box: the ring has to stay visible, and the outer Layer's own contents are
+  // not the content `overflow` clips.
+  const bool hasHost = contentHost != nullptr && contentHost != layer;
+  HTMLBoxAttributes maskBox = box;
+  float inset = 0.0f;
+  if (hasHost && box.borderSet && box.borderWidthPx > 0.0f) {
+    // The inset rectangle needs concrete px geometry. A box left unsized (percent layout) has no
+    // padding box to measure, so it keeps the border-box mask.
+    if (std::isnan(box.widthPx) || std::isnan(box.heightPx) ||
+        box.widthPx <= 2 * box.borderWidthPx || box.heightPx <= 2 * box.borderWidthPx) {
+      warn(
+          "html: border-radius overflow clip on a bordered box without fixed px width/height; "
+          "clipping to the border box");
+    } else {
+      inset = box.borderWidthPx;
+      maskBox.widthPx = box.widthPx - 2 * inset;
+      maskBox.heightPx = box.heightPx - 2 * inset;
+      maskBox.borderRadiusTLPx = std::max(0.0f, box.borderRadiusTLPx - inset);
+      maskBox.borderRadiusTRPx = std::max(0.0f, box.borderRadiusTRPx - inset);
+      maskBox.borderRadiusBRPx = std::max(0.0f, box.borderRadiusBRPx - inset);
+      maskBox.borderRadiusBLPx = std::max(0.0f, box.borderRadiusBLPx - inset);
+    }
+  }
+
+  Layer* masked = (inset > 0.0f) ? contentHost : layer;
   auto* maskLayer = _document->makeNode<Layer>();
   maskLayer->includeInLayout = false;
-  maskLayer->percentWidth = 100.0f;
-  maskLayer->percentHeight = 100.0f;
-  maskLayer->contents.push_back(_layerBuilder->buildBackgroundGeometry(box));
+  if (inset > 0.0f) {
+    // Land the mask on the padding box: the masked layer's own top-left plus the border width.
+    // The renderer anchors a mask layer at the masked layer's top-left corner (the same origin
+    // every `includeInLayout="false"` child uses), so the inset must *not* back out the masked
+    // layer's padding — doing that shifted the clip left/up by the authored padding on every
+    // padded rounded box (the form `<select>`, padding 0 12px, had its trailing chevron clipped
+    // to a sliver).
+    maskLayer->left = inset;
+    maskLayer->top = inset;
+    maskLayer->width = maskBox.widthPx;
+    maskLayer->height = maskBox.heightPx;
+  } else {
+    // The mask layer and its geometry size to 100% of the masked layer, so the clip follows the
+    // laid-out box even when its size is resolved by layout.
+    maskLayer->percentWidth = 100.0f;
+    maskLayer->percentHeight = 100.0f;
+  }
+  maskLayer->contents.push_back(_layerBuilder->buildBackgroundGeometry(maskBox));
   maskLayer->contents.push_back(_layerBuilder->buildSolidFill(Color{1.0f, 1.0f, 1.0f, 1.0f}));
   if (maskLayer->id.empty()) {
     maskLayer->id = _idAllocator->generateUnique("mask");
   }
 
-  layer->mask = maskLayer;
-  layer->maskType = MaskType::Contour;
+  masked->mask = maskLayer;
+  masked->maskType = MaskType::Contour;
   // The rounded mask now performs the clip; drop the rectangular scrollRect so it does not also
   // square off the corners the mask just rounded.
   layer->clipToBounds = false;
   // Layout-excluded child so it shares the masked layer's local coordinate origin and stays
   // reachable by the renderer's mask lookup (mirrors `applyMaskOrClip`).
-  layer->children.push_back(maskLayer);
+  masked->children.push_back(maskLayer);
 }
 
 float HTMLParserContext::resolveMaskPositionAxis(const std::string& token, float boxAxis,

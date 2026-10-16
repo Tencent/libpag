@@ -18,6 +18,7 @@
 
 #include "FontEmbedder.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <unordered_map>
 #include <unordered_set>
@@ -32,6 +33,8 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/types/Data.h"
+#include "renderer/GlyphRunRenderer.h"
+#include "renderer/ToTGFX.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
@@ -40,33 +43,6 @@ namespace pagx {
 
 static constexpr int VectorFontUnitsPerEm = 1000;
 static constexpr float MinFontSize = 0.001f;
-
-static void PathToPathData(const tgfx::Path& path, PathData* pathData) {
-  for (const auto& segment : path) {
-    switch (segment.verb) {
-      case tgfx::PathVerb::Move:
-        pathData->moveTo(std::round(segment.points[0].x), std::round(segment.points[0].y));
-        break;
-      case tgfx::PathVerb::Line:
-        pathData->lineTo(std::round(segment.points[1].x), std::round(segment.points[1].y));
-        break;
-      case tgfx::PathVerb::Quad:
-        pathData->quadTo(std::round(segment.points[1].x), std::round(segment.points[1].y),
-                         std::round(segment.points[2].x), std::round(segment.points[2].y));
-        break;
-      case tgfx::PathVerb::Cubic:
-        pathData->cubicTo(std::round(segment.points[1].x), std::round(segment.points[1].y),
-                          std::round(segment.points[2].x), std::round(segment.points[2].y),
-                          std::round(segment.points[3].x), std::round(segment.points[3].y));
-        break;
-      case tgfx::PathVerb::Close:
-        pathData->close();
-        break;
-      default:
-        break;
-    }
-  }
-}
 
 struct GlyphKey {
   const tgfx::Typeface* typeface = nullptr;
@@ -135,14 +111,14 @@ static void CollectVectorGlyph(PAGXDocument* document, const tgfx::Font& font,
     // Re-collect at a larger font size: replace the existing glyph's path data.
     auto existingGlyph = builder.font->glyphs[mappingIt->second - 1];
     existingGlyph->path = document->makeNode<PathData>();
-    PathToPathData(glyphPath, existingGlyph->path);
+    FromTGFX(glyphPath, existingGlyph->path, true);
     existingGlyph->advance = font.getAdvance(glyphID) * scale;
     return;
   }
 
   auto glyph = document->makeNode<Glyph>();
   glyph->path = document->makeNode<PathData>();
-  PathToPathData(glyphPath, glyph->path);
+  FromTGFX(glyphPath, glyph->path, true);
   glyph->advance = font.getAdvance(glyphID) * scale;
 
   builder.font->glyphs.push_back(glyph);
@@ -295,6 +271,38 @@ static std::vector<Text*> CollectAllText(PAGXDocument* document) {
   return allText;
 }
 
+// True when a text carries at least one character that must be drawn. A text of only spaces or
+// newlines shapes to no glyphs by design, so it must not be reported as a missing-font failure.
+static bool HasVisibleCharacters(const std::string& text) {
+  for (auto ch : text) {
+    if (std::isspace(static_cast<unsigned char>(ch)) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static std::string DescribeUnembeddedText(const Text* text) {
+  std::string preview = text->text;
+  if (preview.size() > 32) {
+    preview.resize(32);
+    // Never cut a UTF-8 sequence in half: a preview that ends mid-character would print as
+    // replacement glyphs in the error message.
+    while (!preview.empty() && (static_cast<unsigned char>(preview.back()) & 0xC0) == 0x80) {
+      preview.pop_back();
+    }
+    preview += "...";
+  }
+  std::string label = text->fontFamily.empty() ? "(default family)" : text->fontFamily;
+  if (!text->fontStyle.empty()) {
+    label += "/" + text->fontStyle;
+  }
+  if (!text->id.empty()) {
+    label += " id=" + text->id;
+  }
+  return label + ": " + preview;
+}
+
 static GlyphRun* CreateGlyphRunFromLayoutRun(
     PAGXDocument* document, const TextLayoutGlyphRun& tlRun, const tgfx::Typeface* typeface,
     const std::vector<size_t>& indices, Font* embeddedFont, float fontSize,
@@ -396,13 +404,58 @@ static std::string NextEmbedFontId(PAGXDocument* document, int& fontIndex) {
   return id;
 }
 
+static bool IsReferencedRun(const GlyphRun* run) {
+  return run->font != nullptr && !run->font->file.empty() && run->font->glyphs.empty();
+}
+
+template <typename T>
+static std::vector<T> SelectRunValues(const std::vector<T>& values,
+                                      const std::vector<size_t>& indices, const T& fallback) {
+  if (values.empty()) return {};
+  std::vector<T> result;
+  for (auto index : indices) result.push_back(index < values.size() ? values[index] : fallback);
+  return result;
+}
+
+static GlyphRun* CopyReferencedRun(
+    PAGXDocument* document, const GlyphRun* source, const TextLayoutGlyphRun& layout, Font* font,
+    const std::vector<size_t>& indices,
+    const std::unordered_map<GlyphKey, tgfx::GlyphID, GlyphKeyHash>& mapping) {
+  auto* run = document->makeNode<GlyphRun>();
+  *run = *source;
+  run->id.clear();
+  run->font = font;
+  run->glyphs.clear();
+  run->positions.clear();
+  run->x = 0;
+  run->y = 0;
+  run->xOffsets.clear();
+  for (auto index : indices) {
+    run->glyphs.push_back(mapping.at({layout.font.getTypeface().get(), layout.glyphs[index]}));
+    run->positions.push_back({layout.positions[index].x, layout.positions[index].y});
+  }
+  run->anchors = SelectRunValues(source->anchors, indices, Point{});
+  run->scales = SelectRunValues(source->scales, indices, Point{1, 1});
+  run->rotations = SelectRunValues(source->rotations, indices, 0.0f);
+  run->skews = SelectRunValues(source->skews, indices, 0.0f);
+  return run;
+}
+
 void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
   if (document == nullptr) {
     return;
   }
   auto textOrder = CollectAllText(document);
+  std::unordered_set<Node*> referencedRuns = {};
   for (auto* text : textOrder) {
-    text->glyphRuns.clear();
+    std::vector<GlyphRun*> retained;
+    for (auto* run : text->glyphRuns) {
+      if (IsReferencedRun(run)) {
+        retained.push_back(run);
+        referencedRuns.insert(run);
+      }
+    }
+    text->glyphRuns = std::move(retained);
   }
 
   std::unordered_set<Node*> toRemove = {};
@@ -424,7 +477,7 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
       } else {
         toRemove.insert(node.get());
       }
-    } else if (type == NodeType::GlyphRun) {
+    } else if (type == NodeType::GlyphRun && referencedRuns.count(node.get()) == 0) {
       toRemove.insert(node.get());
     }
   }
@@ -433,6 +486,7 @@ void FontEmbedder::ClearEmbeddedGlyphRuns(PAGXDocument* document) {
 }
 
 bool FontEmbedder::embed(PAGXDocument* document) {
+  unembedded.clear();
   if (document == nullptr) {
     return false;
   }
@@ -442,6 +496,42 @@ bool FontEmbedder::embed(PAGXDocument* document) {
     return false;
   }
   auto textOrder = CollectAllText(document);
+
+  std::unordered_map<Text*, std::vector<GlyphRun*>> referencedRuns;
+  std::unordered_map<Text*, std::vector<GlyphRun*>> originalRuns;
+  std::unordered_map<GlyphRun*, std::vector<GlyphRun*>> replacements;
+  for (auto* text : textOrder) {
+    for (auto* run : text->glyphRuns) {
+      if (!IsReferencedRun(run)) continue;
+      auto typeface = GlyphRunRenderer::BuildTypefaceFromFont(run->font);
+      if (typeface == nullptr) return false;
+      if (referencedRuns[text].empty()) {
+        originalRuns[text] = text->glyphRuns;
+        text->glyphData->layoutRuns.clear();
+      }
+      referencedRuns[text].push_back(run);
+      TextLayoutGlyphRun layout;
+      layout.font = tgfx::Font(typeface, run->fontSize);
+      layout.font.setFauxBold(text->fauxBold);
+      layout.font.setFauxItalic(text->fauxItalic);
+      layout.glyphs = run->glyphs;
+      float currentX = run->x;
+      for (size_t i = 0; i < run->glyphs.size(); i++) {
+        float x = currentX;
+        float y = run->y;
+        if (i < run->positions.size()) {
+          x = run->x + run->positions[i].x;
+          y += run->positions[i].y;
+        } else if (i < run->xOffsets.size()) {
+          x = run->x;
+        }
+        if (i < run->xOffsets.size()) x += run->xOffsets[i];
+        layout.positions.push_back(tgfx::Point::Make(x, y));
+        currentX += layout.font.getAdvance(run->glyphs[i]);
+      }
+      text->glyphData->layoutRuns.push_back(std::move(layout));
+    }
+  }
 
   std::unordered_map<GlyphKey, GlyphType, GlyphKeyHash> glyphTypes = {};
   std::unordered_map<GlyphKey, float, GlyphKeyHash> maxFontSizes = {};
@@ -563,10 +653,13 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   // Second pass: create pagx::GlyphRuns for each Text.
   // Uses TextLayoutGlyphRun (direct mapping). Text nodes without layoutRuns produce no GlyphRuns.
   for (auto* text : textOrder) {
-    text->glyphRuns.clear();
     auto textBounds = text->textBounds;
     auto& layoutRuns = text->glyphData->layoutRuns;
 
+    if (layoutRuns.empty() && !text->glyphRuns.empty()) {
+      continue;
+    }
+    text->glyphRuns.clear();
     if (!layoutRuns.empty()) {
       // New path: create GlyphRuns directly from TextLayoutGlyphRun.
       for (auto& tlRun : layoutRuns) {
@@ -596,18 +689,37 @@ bool FontEmbedder::embed(PAGXDocument* document) {
         }
 
         if (!vectorIndices.empty() && vectorBuilder.font != nullptr) {
+          auto refs = referencedRuns.find(text);
+          size_t runIndex = static_cast<size_t>(&tlRun - layoutRuns.data());
           auto glyphRun =
-              CreateGlyphRunFromLayoutRun(document, tlRun, typeface, vectorIndices,
-                                          vectorBuilder.font, fontSize, vectorBuilder.glyphMapping);
+              refs != referencedRuns.end()
+                  ? CopyReferencedRun(document, refs->second[runIndex], tlRun, vectorBuilder.font,
+                                      vectorIndices, vectorBuilder.glyphMapping)
+                  : CreateGlyphRunFromLayoutRun(document, tlRun, typeface, vectorIndices,
+                                                vectorBuilder.font, fontSize,
+                                                vectorBuilder.glyphMapping);
           text->glyphRuns.push_back(glyphRun);
+          if (refs != referencedRuns.end()) {
+            replacements[refs->second[runIndex]].push_back(glyphRun);
+          }
         }
         if (!bitmapIndices.empty()) {
           auto builderIt = bitmapBuilders.find(typeface);
           if (builderIt != bitmapBuilders.end() && builderIt->second.font != nullptr) {
-            auto glyphRun = CreateGlyphRunFromLayoutRun(document, tlRun, typeface, bitmapIndices,
-                                                        builderIt->second.font, fontSize,
-                                                        builderIt->second.glyphMapping);
+            auto refs = referencedRuns.find(text);
+            size_t runIndex = static_cast<size_t>(&tlRun - layoutRuns.data());
+            auto glyphRun =
+                refs != referencedRuns.end()
+                    ? CopyReferencedRun(document, refs->second[runIndex], tlRun,
+                                        builderIt->second.font, bitmapIndices,
+                                        builderIt->second.glyphMapping)
+                    : CreateGlyphRunFromLayoutRun(document, tlRun, typeface, bitmapIndices,
+                                                  builderIt->second.font, fontSize,
+                                                  builderIt->second.glyphMapping);
             text->glyphRuns.push_back(glyphRun);
+            if (refs != referencedRuns.end()) {
+              replacements[refs->second[runIndex]].push_back(glyphRun);
+            }
           }
         }
       }
@@ -615,6 +727,34 @@ bool FontEmbedder::embed(PAGXDocument* document) {
 
     if (!text->glyphRuns.empty() && (textBounds.width > 0 || textBounds.height > 0)) {
       text->glyphRuns.front()->bounds = textBounds;
+    }
+  }
+
+  std::unordered_set<Node*> oldReferencedRuns;
+  for (auto& entry : referencedRuns) {
+    entry.first->glyphRuns.clear();
+    for (auto* run : originalRuns[entry.first]) {
+      if (IsReferencedRun(run)) {
+        const auto& converted = replacements[run];
+        entry.first->glyphRuns.insert(entry.first->glyphRuns.end(), converted.begin(),
+                                      converted.end());
+      } else {
+        entry.first->glyphRuns.push_back(run);
+      }
+    }
+    entry.first->glyphData->layoutRuns.clear();
+    entry.first->glyphData->textBlob = nullptr;
+    for (auto* run : entry.second) oldReferencedRuns.insert(run);
+  }
+  document->removeNodes(oldReferencedRuns);
+
+  // A text with visible characters but no glyph run means no typeface on this machine covered
+  // them: the run's font was never resolved, so nothing was baked. Recording these lets a caller
+  // fail instead of silently shipping a document whose text renders as blank (or as a substituted
+  // face) on every host that also lacks the authored font.
+  for (auto* text : textOrder) {
+    if (text->glyphRuns.empty() && HasVisibleCharacters(text->text)) {
+      unembedded.push_back(DescribeUnembeddedText(text));
     }
   }
 

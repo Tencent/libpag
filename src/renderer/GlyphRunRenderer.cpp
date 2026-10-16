@@ -19,13 +19,16 @@
 #include "GlyphRunRenderer.h"
 #include <cmath>
 #include "base/utils/MathUtil.h"
+#include "pagx/PAGXDocument.h"
 #include "pagx/TextLayout.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/FontRenderCache.h"
 #include "pagx/nodes/GlyphRun.h"
 #include "pagx/nodes/Image.h"
+#include "pagx/nodes/PathData.h"
 #include "pagx/nodes/Text.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "renderer/ToTGFX.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
@@ -107,6 +110,12 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
     fontNode->renderCache = std::make_unique<FontRenderCache>();
   }
   auto& cache = *fontNode->renderCache;
+  if (fontNode->glyphs.empty() &&
+      (cache.sourceFile != fontNode->file || cache.sourceData != fontNode->fileData.get())) {
+    cache = FontRenderCache{};
+    cache.sourceFile = fontNode->file;
+    cache.sourceData = fontNode->fileData.get();
+  }
   if (cache.built) {
     return cache.typeface;
   }
@@ -116,7 +125,11 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
   cache.built = true;
 
   if (fontNode->glyphs.empty()) {
-    return nullptr;
+    cache.typeface =
+        fontNode->fileData != nullptr
+            ? MakeTypefaceFromBytes(fontNode->fileData->data(), fontNode->fileData->size())
+            : MakeTypefaceFromFile(fontNode->file);
+    return cache.typeface;
   }
 
   bool hasPath = false;
@@ -177,6 +190,29 @@ std::shared_ptr<tgfx::Typeface> GlyphRunRenderer::BuildTypefaceFromFont(Font* fo
   return typeface;
 }
 
+Glyph* GlyphRunRenderer::GetGlyph(Font* fontNode, uint16_t glyphID) {
+  if (fontNode == nullptr || glyphID == 0) return nullptr;
+  if (!fontNode->glyphs.empty()) {
+    return glyphID <= fontNode->glyphs.size() ? fontNode->glyphs[glyphID - 1] : nullptr;
+  }
+  auto typeface = BuildTypefaceFromFont(fontNode);
+  if (typeface == nullptr || glyphID >= typeface->glyphsCount()) return nullptr;
+  auto& cache = *fontNode->renderCache;
+  auto found = cache.glyphs.find(glyphID);
+  if (found != cache.glyphs.end()) return found->second;
+  if (cache.glyphDocument == nullptr) cache.glyphDocument = PAGXDocument::Make(0, 0);
+  auto* glyph = cache.glyphDocument->makeNode<Glyph>();
+  tgfx::Font font(typeface, static_cast<float>(fontNode->unitsPerEm));
+  glyph->advance = font.getAdvance(glyphID);
+  tgfx::Path path;
+  if (font.getPath(glyphID, &path)) {
+    glyph->path = cache.glyphDocument->makeNode<PathData>();
+    FromTGFX(path, glyph->path);
+  }
+  cache.glyphs[glyphID] = glyph;
+  return glyph;
+}
+
 void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatrix) {
   tgfx::TextBlobBuilder builder = {};
   std::vector<tgfx::Point> anchors;
@@ -195,7 +231,8 @@ void GlyphRunRenderer::BuildTextBlob(Text* text, const tgfx::Matrix& inverseMatr
     if (unitsPerEm <= 0) {
       unitsPerEm = 1;
     }
-    float fontSizeForTypeface = run->fontSize / static_cast<float>(unitsPerEm);
+    float fontSizeForTypeface =
+        run->font->glyphs.empty() ? run->fontSize : run->fontSize / static_cast<float>(unitsPerEm);
     tgfx::Font font(typeface, fontSizeForTypeface);
     font.setFauxBold(text->fauxBold);
     font.setFauxItalic(text->fauxItalic);

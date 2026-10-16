@@ -49,3 +49,30 @@ export function loadFontCodec(): FontCodecBundle {
   if (!wawoff2) wawoff2 = require('wawoff2') as Wawoff2Module;
   return { opentype, wawoff2 };
 }
+
+// Serialises every WOFF2 decode in this process. See `decompressWoff2`.
+let woff2Queue: Promise<unknown> = Promise.resolve();
+
+// Decode a WOFF2 payload into raw SFNT bytes.
+//
+// `wawoff2.decompress` resolves with a `Uint8Array` that aliases the decoder's
+// module-owned WASM heap: the next decode overwrites those bytes in place.
+// The wrapping async function yields between the resolve and the caller's
+// copy, so two decodes started under one `Promise.all` interleave exactly
+// that way — each receives the *last* call's output and every earlier font
+// silently corrupts into an unparseable name table. Funnel every decode
+// through this queue so the copy completes before the next decode can run.
+export function decompressWoff2(buffer: Buffer): Promise<Buffer> {
+  const result = woff2Queue.then(async () => {
+    const { wawoff2 } = loadFontCodec();
+    const decoded = await wawoff2.decompress(buffer);
+    return Buffer.from(decoded);
+  });
+  // Advance the queue on both settle paths so a failed decode cannot wedge
+  // every later font behind a rejected chain link.
+  woff2Queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}

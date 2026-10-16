@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "pagx/nodes/Node.h"
+#include "pagx/types/Data.h"
 #include "pagx/types/Point.h"
 
 namespace pagx {
@@ -68,9 +69,10 @@ class Glyph : public Node {
 };
 
 /**
- * Font defines an embedded font resource containing subsetted glyph data (vector outlines or
- * bitmaps). PAGX files embed glyph data for complete self-containment, ensuring cross-platform
- * rendering consistency.
+ * Font defines a font resource: either embedded subsetted glyph data (vector outlines or bitmaps),
+ * which makes a PAGX file fully self-contained, or a reference to an external font file whose
+ * faces text is shaped and rendered with. A font file supplied by the host at runtime (provided
+ * via PAGXDocument::loadFileData) is cached on the node but never serialized.
  */
 class Font : public Node {
  public:
@@ -81,11 +83,17 @@ class Font : public Node {
   int unitsPerEm = 1000;
 
   /**
-   * Path to an external font file. When set, this Font node serves as a font source declaration:
-   * `pagx embed` loads and registers the referenced font for text shaping. Extracted glyph data
-   * is stored in separate Font nodes (the source node's `glyphs` is preserved as empty across
-   * embed). The path is resolved relative to the PAGX file's directory. An empty string means
-   * no external reference.
+   * Path to an external font file (TrueType, OpenType, TTC or WOFF2). When set, this Font node
+   * serves as a font source: layout registers every face of the file under the family and style
+   * names stored inside it, so Text whose fontFamily / fontStyle match is shaped and rendered with
+   * the file without embedded glyphs. Runtime-shaped Text does not reference the node by id.
+   * A pre-shaped GlyphRun can reference this node directly, using native glyph IDs from the
+   * first face without reshaping Text::text. A relative path is
+   * resolved against the PAGX file's directory. Hosts without file system access (e.g. the web)
+   * supply the file's bytes via PAGXDocument::loadFileData; getExternalFilePaths reports the path
+   * until then. `pagx embed` also shapes with this file and stores extracted glyph data in separate
+   * Font nodes (the source node's `glyphs` stays empty). An empty string means no external
+   * reference.
    *
    * After PAGXImporter::FromFile() resolves relative paths to absolute paths for runtime use,
    * the original verbatim string from the XML attribute is preserved here so that PAGXExporter
@@ -99,6 +107,14 @@ class Font : public Node {
    * authored by the user are preserved after a round-trip through embed and re-export.
    */
   std::string fileOriginal = {};
+
+  /**
+   * Bytes of the font file named by `file`, supplied by the host (typically through
+   * PAGXDocument::loadFileData, after fetching a path reported by getExternalFilePaths). When set,
+   * layout registers these bytes instead of reading `file` from disk. Runtime-only: never
+   * serialized, the exporter keeps writing the `file` reference.
+   */
+  std::shared_ptr<Data> fileData = nullptr;
 
   /**
    * The list of glyphs in this font. GlyphID is the index + 1 (GlyphID 0 is reserved for missing

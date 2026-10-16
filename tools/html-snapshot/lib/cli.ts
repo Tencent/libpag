@@ -321,8 +321,26 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
     opts[dirKey] = path.join(dir, `${base}.${suffix}`);
   };
-  resolveSiblingDir('fontDir',  'downloadFonts',  'fonts',  '--download-fonts',  '--font-dir');
   resolveSiblingDir('imageDir', 'downloadImages', 'images', '--download-images', '--image-dir');
+  // Font files are materialised next to the output even without
+  // --download-fonts: a page may inline its fonts as `data:` URLs (icon fonts
+  // most often) and the importer needs a real file on disk to reference. Only
+  // inline faces are decoded in that mode — network fonts stay opt-in — so the
+  // default carries no download cost. Stdout mode has no output path to derive
+  // from; it can only skip inline fonts, and still requires an explicit
+  // --font-dir when --download-fonts asks for network ones.
+  if (opts.fontDir) {
+    opts.fontDir = path.resolve(opts.fontDir);
+  } else if (opts.outputToStdout || !opts.output) {
+    if (opts.downloadFonts) {
+      fail(`--download-fonts requires --font-dir when output is written to stdout`);
+    }
+  } else {
+    const dir = path.dirname(opts.output);
+    let base = path.basename(opts.output, path.extname(opts.output));
+    if (base.endsWith('.subset')) base = base.slice(0, -'.subset'.length);
+    opts.fontDir = path.join(dir, `${base}.fonts`);
+  }
   // A manifest only makes sense alongside --download-fonts (it lists the
   // captured font files). Resolve it to an absolute path so the paths it
   // records are usable from any working directory.
@@ -374,16 +392,24 @@ Options:
                              Default: disabled. Use for pages that keep
                              below-the-fold sections hidden (opacity:0) until
                              scrolled into view.
-  --download-fonts           Save every web font the page uses (each
-                             unicode-range subset the browser fetched) to disk
-                             as a plain SFNT (TTF/OTF). Default: disabled. Hand
-                             the files to 'pagx render --fallback' or
-                             'pagx embed --fallback' so text in an
-                             uninstalled web font renders with the right face.
-  --font-dir <dir>           Destination for --download-fonts (default:
+  --download-fonts           Save every web font the page fetches from the
+                             network (each unicode-range subset the browser
+                             loaded) to disk as a plain SFNT (TTF/OTF).
+                             Default: disabled. Fonts the page inlines as
+                             data: URLs are always saved regardless of this
+                             flag, and their @font-face rules are written back
+                             into the subset so 'pagx import' can reference
+                             them. Hand the network files to
+                             'pagx render --fallback' or 'pagx embed
+                             --fallback' so text in an uninstalled web font
+                             renders with the right face.
+  --font-dir <dir>           Destination for saved font files (default:
                              <output-without-ext>.fonts/). May be shared across
                              runs; identical faces are stored once (content-
-                             addressed filenames).
+                             addressed filenames). Stdout output has no path to
+                             derive from, so an explicit directory is required
+                             there for data: fonts to be saved too (and always
+                             required with --download-fonts).
   --download-images          Save every external image the page uses to disk and
                              reference it by local file path instead of inlining
                              it as a base64 data: URI. Default: disabled (images
@@ -393,11 +419,16 @@ Options:
                              <output-without-ext>.images/). May be shared across
                              runs; identical images are stored once (content-
                              addressed filenames).
-  --font-manifest <file>     Write the font files this page uses (one absolute
-                             path per line) to <file>. Requires
-                             --download-fonts. Lets callers pass only the fonts
-                             this page needs to 'pagx render' / 'pagx embed'
-                             when --font-dir is shared.
+  --font-manifest <file>     Write the font files this page uses to <file>, one
+                             entry per line: "<absolute-path>" or
+                             "<absolute-path>\t<css-family-name>". The family is
+                             the name the page's @font-face rule declares; pass
+                             the pair to 'pagx render' / 'pagx embed' as
+                             --font-alias "<family>=<path>" so the document's
+                             font name resolves even when the file carries a
+                             different one. Requires --download-fonts. Lets
+                             callers pass only the fonts this page needs when
+                             --font-dir is shared.
   --browser-engine <name>    Headless browser driver: one of
                              ${SUPPORTED_ENGINES.join(' | ')} (default: puppeteer;
                              override via HTML_SNAPSHOT_BROWSER env var).`);

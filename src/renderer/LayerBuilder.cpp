@@ -1105,6 +1105,11 @@ class LayerBuilderContext {
       }
       const Font* fontPtr = run->font;
       FnvMix(&h, &fontPtr, sizeof(fontPtr));
+      if (fontPtr != nullptr && fontPtr->glyphs.empty()) {
+        FnvMix(&h, fontPtr->file.data(), fontPtr->file.size());
+        const auto* fileData = fontPtr->fileData.get();
+        FnvMix(&h, &fileData, sizeof(fileData));
+      }
       FnvMix(&h, &run->fontSize, sizeof(run->fontSize));
       FnvMix(&h, &run->x, sizeof(run->x));
       FnvMix(&h, &run->y, sizeof(run->y));

@@ -1951,7 +1951,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
     out.openTag("div");
     out.addAttr("style", "display:none");
     if (!layer->id.empty()) {
-      out.addAttr("id", layer->id);
+      out.addAttr("id", _ctx->idPrefix + layer->id);
     }
     out.closeTagSelfClosing();
     return;
@@ -2515,7 +2515,7 @@ void HTMLWriter::writeLayer(HTMLBuilder& out, const Layer* layer, float parentAl
 
   out.openTag("div");
   if (!layer->id.empty()) {
-    out.addAttr("id", layer->id);
+    out.addAttr("id", _ctx->idPrefix + layer->id);
   }
   if (!layer->name.empty()) {
     out.addAttr("data-name", layer->name);

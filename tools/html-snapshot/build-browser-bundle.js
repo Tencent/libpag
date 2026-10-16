@@ -26,7 +26,11 @@ const path = require('path');
 const {
   inlineExternalImages,
   inlineCanvases,
+  dropCollapsedDetailsContent,
+  materializeFirstLetter,
+  materializeListMarkers,
   materializeDecorativePseudoElements,
+  inlineMaskImages,
   HELPERS_SRC,
   PAYLOAD_CONSTANTS_SRC,
 } = require('./dist/lib/browser-snapshot');
@@ -49,7 +53,11 @@ const {
 const BROWSER_EXPORTS = [
   { name: 'inlineExternalImages',   fn: inlineExternalImages },
   { name: 'inlineCanvases',         fn: inlineCanvases },
+  { name: 'dropCollapsedDetailsContent', fn: dropCollapsedDetailsContent },
+  { name: 'materializeFirstLetter', fn: materializeFirstLetter },
+  { name: 'materializeListMarkers', fn: materializeListMarkers },
   { name: 'materializeDecorativePseudoElements', fn: materializeDecorativePseudoElements },
+  { name: 'inlineMaskImages',       fn: inlineMaskImages },
   { name: 'collectFontFaceMap',     fn: browserCollectFontFaceMap },
   { name: 'collectIconFontTargets', fn: browserCollectIconFontTargets },
   { name: 'applyIconFontSvgs',      fn: browserApplyIconFontSvgs },
@@ -68,7 +76,9 @@ const banner = `/*!
  *   takeSnapshot()                          -> { html, width, height }
  *   inlineExternalImages(cachedMap?)        -> Promise<void>
  *   inlineCanvases()                        -> Promise<void>
+ *   dropCollapsedDetailsContent()           -> { details, nodes }
  *   materializeDecorativePseudoElements()   -> Promise<void>
+ *   inlineMaskImages()                      -> Promise<void>
  *   collectIconFontTargets()                -> Promise<target[]>
  *   applyIconFontSvgs(target_svg_pairs)     -> void
  *   collectFontFaceMap()                    -> Promise<{family:[{url,format,weight,style}, ...]}>
@@ -105,6 +115,9 @@ return {
   takeSnapshot: snapshotMain,
   inlineExternalImages: inlineExternalImages,
   inlineCanvases: inlineCanvases,
+  dropCollapsedDetailsContent: dropCollapsedDetailsContent,
+  materializeFirstLetter: materializeFirstLetter,
+  materializeListMarkers: materializeListMarkers,
   materializeDecorativePseudoElements: materializeDecorativePseudoElements,
   // Icon-font hooks: callers running outside of node (no opentype.js /
   // wawoff2 available) can still tag icon-font hosts via
@@ -258,10 +271,19 @@ const exampleHtml = `<!DOCTYPE html>
         // libraries (ECharts, Chart.js, …) survive the snapshot. No-op when
         // the page has no canvases.
         await HtmlSnapshot.inlineCanvases();
+        // Optional: drop the collapsed content of closed <details> elements.
+        // Chromium hides it through a UA pseudo-element the walker cannot
+        // observe, so an unclipped <details> would otherwise emit every
+        // collapsed panel as a box painted over the summary rows.
+        HtmlSnapshot.dropCollapsedDetailsContent();
         // Optional: turn decorative ::before/::after pseudo-elements
         // (toggle thumbs, custom radio dots, dividers …) into real <div>
         // children so their boxes survive the snapshot.
         await HtmlSnapshot.materializeDecorativePseudoElements();
+        // Optional: inline remote mask-image: url(https://…) values (icon and
+        // fade masks) as data: URIs. No-op when every mask is a gradient, a
+        // data: URI or a local path.
+        await HtmlSnapshot.inlineMaskImages();
         const { html, width, height } = HtmlSnapshot.takeSnapshot();
         const head = '// ' + width + 'x' + height + ', ' + html.length + ' bytes\\n';
         const preview = html.length > 4000 ? html.slice(0, 4000) + '\\n// …truncated' : html;

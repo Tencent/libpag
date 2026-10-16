@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Tests: mixed GlyphRun fonts emit separate embedded font classes. -->
+<!-- Tests: mixed GlyphRun fonts share one exported font with distinct glyph codes. -->
 <pagx width="120" height="40">
   <Resources>
     <Font id="bullet" unitsPerEm="1000">

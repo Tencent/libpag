@@ -21,14 +21,17 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/types/Color.h"
+#include "pagx/types/Matrix.h"
 
 namespace pagx {
 
 struct DOMNode;
 class Fill;
+class Font;
 class HTMLDiagnosticSink;
 class HTMLIdAllocator;
 class HTMLLayerBuilder;
@@ -38,6 +41,7 @@ class Layer;
 class PAGXDocument;
 class Stroke;
 class Text;
+class TextModifier;
 
 /**
  * Converts HTML text-leaf elements (`<p>`, `<h1..6>`, `<span>`, `<a>`) into PAGX `Layer`
@@ -114,6 +118,9 @@ class HTMLTextFragmentBuilder {
   /** Wires the document handle. Must be called once after the document has been constructed. */
   void bindDocument(PAGXDocument* document);
 
+  /** Registers a local @font-face source used by rendered text hosts. */
+  void registerFontFile(const std::string& family, const std::string& path);
+
   /** Converts a text-leaf element (`<p>`, `<h1..6>`, `<span>`, `<a>`) into a Layer subtree. */
   Layer* convertTextLeaf(const std::shared_ptr<DOMNode>& element, const HTMLBoxAttributes& box,
                          const HTMLInheritedStyle& inherited);
@@ -138,6 +145,12 @@ class HTMLTextFragmentBuilder {
   Stroke* buildTextStroke(const TextFragment& fragment);
 
  private:
+  bool collectReferencedGlyphs(Text* text, const std::shared_ptr<DOMNode>& element,
+                               const HTMLInheritedStyle& inherited, const Matrix& matrix,
+                               TextFragment& firstStyle, int depth = 0);
+  Layer* convertReferencedTextHost(const std::shared_ptr<DOMNode>& element,
+                                   const HTMLInheritedStyle& inherited);
+
   TextFragment makeFragment(const HTMLInheritedStyle& inherited);
 
   /** Overlays the data-pagx-* round-trip metadata (original text / font family / font style /
@@ -212,6 +225,9 @@ class HTMLTextFragmentBuilder {
   HTMLStyleCascade& _styleCascade;
   HTMLIdAllocator& _idAllocator;
   PAGXDocument* _document = nullptr;
+  std::unordered_map<std::string, std::string> _fontFiles = {};
+  std::unordered_map<std::string, Font*> _fontResources = {};
+  std::vector<TextModifier*> _glyphModifiers = {};
 };
 
 }  // namespace pagx

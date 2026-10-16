@@ -10,8 +10,11 @@
 # Per case it is report-only: it never fails on a single low SSIM. Browser
 # fidelity is a corpus-level mean metric, so the only pass/fail gate is on the
 # per-corpus means (SSIM / pixel-diff / RGB-delta) compared against the
-# committed baseline resources/html/baseline.json. A corpus with no baseline
-# entry stays report-only. Inspect report.md / index.html by hand for detail.
+# committed baseline resources/html/baseline.json. Only the deterministic
+# corpora gate: the host-font/browser dependent ones (websites/generated) stay
+# report-only, as does any corpus with no baseline entry. See
+# REPORT_ONLY_CORPORA in tools/html-snapshot/eval/summary.js. Inspect
+# report.md / index.html by hand for detail.
 #
 # Prerequisites:
 #   - a built `pagx` binary (default: <repo>/cmake-build-debug/pagx, or $PAGX_BIN)
@@ -146,11 +149,25 @@ OUT_ROOT="$SNAPSHOT_DIR/eval/out"
 # Do not leave a previous all-corpus summary looking like the result of this run.
 rm -f "$OUT_ROOT/summary.html"
 
+# Per-corpus eval flags. The `cases` corpus is the typography contract: it holds pages whose
+# fonts are inlined as `data:` URIs (no request → the snapshot can only find them by reading
+# the page's `@font-face` rules), so it runs with --download-fonts and the eval registers each
+# captured file under the authored family name (`pagx render --font-alias`). Without it those
+# cases would render every font as a system substitute and their fidelity would say nothing.
+# The other corpora keep the previous no-font behavior.
+corpus_eval_args() {
+  case "$1" in
+    cases) echo "--download-fonts" ;;
+    *)     echo "" ;;
+  esac
+}
+
 for name in "${CORPORA[@]}"; do
   rel="$(corpus_dir "$name")"
   dir="$ROOT/resources/html/$rel"
   label="html-$name"
   out="$OUT_ROOT/$label"
+  FONT_ARGS="$(corpus_eval_args "$name")"
 
   echo ""
   echo "=== HTML eval: $name  ($rel)  [concurrency=$CONCURRENCY engine=$BROWSER_ENGINE] ==="
@@ -162,7 +179,8 @@ for name in "${CORPORA[@]}"; do
   #                       --concurrency 16 --browser-engine playwright
   # shellcheck disable=SC2086
   if "$EVAL" --recursive --corpus "$dir" --label "$label" \
-             --concurrency "$CONCURRENCY" --browser-engine "$BROWSER_ENGINE" $EVAL_EXTRA_ARGS; then
+             --concurrency "$CONCURRENCY" --browser-engine "$BROWSER_ENGINE" \
+             $FONT_ARGS $EVAL_EXTRA_ARGS; then
     if [ -f "$out/report.csv" ] && [ -f "$out/report.md" ] && [ -f "$out/index.html" ]; then
       REPORTS+=("$out")
       LABELS+=("$label")

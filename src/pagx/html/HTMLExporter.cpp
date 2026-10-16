@@ -23,7 +23,9 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include "pagx/html/HTMLBuilder.h"
+#include "pagx/html/HTMLDeckWriter.h"
 #include "pagx/html/HTMLStyleExtractor.h"
 #include "pagx/html/HTMLWriter.h"
 #if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
@@ -199,8 +201,86 @@ static std::string WrapAsHTMLDocument(const std::string& fragment, float width, 
 
 namespace {
 
+bool WriteFontResource(Woff2FontResult& result, const std::string& fontId, HTMLWriterContext& ctx,
+                       std::string& fontFaceRules) {
+  if (result.woff2Data.empty()) {
+    return false;
+  }
+  auto filename = "font_" + fontId + ".woff2";
+  result.relativeUrl = ctx.staticImgUrlPrefix + "fonts/" + filename;
+  std::string error;
+  if (!ctx.writeResource("fonts/" + filename, result.woff2Data.data(), result.woff2Data.size(),
+                         &error)) {
+    return false;
+  }
+  fontFaceRules += "@font-face{font-family:'" + EscapeCssFontFamily(result.familyName) +
+                   "';src:url('" + result.relativeUrl + "') format('woff2')}\n";
+  return true;
+}
+
+bool IsVectorFont(const Font* font) {
+  if (font->glyphs.empty() || font->unitsPerEm <= 0) {
+    return false;
+  }
+  for (auto* glyph : font->glyphs) {
+    if (glyph == nullptr || glyph->image != nullptr) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// WOFF2 uses the BMP private-use range U+E000..U+F8FF. Keep the existing per-font export when
+// the combined glyphs do not fit. Paths and advances are scaled together without changing the
+// source document or its pixel-space GlyphRun positioning.
+bool ExportVectorFontGroup(const std::vector<const Font*>& fonts, HTMLWriterContext& ctx,
+                           std::string& fontFaceRules) {
+  if (fonts.empty()) {
+    return false;
+  }
+  size_t glyphCount = 0;
+  int unitsPerEm = 0;
+  for (auto* font : fonts) {
+    glyphCount += font->glyphs.size();
+    unitsPerEm = std::max(unitsPerEm, font->unitsPerEm);
+  }
+  if (glyphCount > 0xF900u - 0xE000u) {
+    return false;
+  }
+  auto mergedDocument = PAGXDocument::Make(0, 0);
+  auto* mergedFont = mergedDocument->makeNode<Font>();
+  mergedFont->unitsPerEm = std::min(unitsPerEm, 16384);
+  for (auto* font : fonts) {
+    float scale = static_cast<float>(mergedFont->unitsPerEm) / font->unitsPerEm;
+    for (auto* source : font->glyphs) {
+      auto* glyph = mergedDocument->makeNode<Glyph>();
+      glyph->advance = source->advance * scale;
+      if (source->path != nullptr) {
+        glyph->path = mergedDocument->makeNode<PathData>();
+        *glyph->path = *source->path;
+        glyph->path->transform(Matrix::Scale(scale, scale));
+      }
+      mergedFont->glyphs.push_back(glyph);
+    }
+  }
+  auto fontId = ctx.nextId("f");
+  auto result = BuildWoff2FromFont(mergedFont, fontId);
+  if (!WriteFontResource(result, fontId, ctx, fontFaceRules)) {
+    return false;
+  }
+  result.woff2Data.clear();
+  uint32_t offset = 0;
+  for (auto* font : fonts) {
+    result.designScale = static_cast<float>(result.unitsPerEm) / font->unitsPerEm;
+    ctx.woff2Fonts[font] = result;
+    ctx.woff2GlyphOffsets[font] = offset;
+    offset += static_cast<uint32_t>(font->glyphs.size());
+  }
+  return true;
+}
+
 std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter::Options& options,
-                      HTMLWriterContext& ctx) {
+                      HTMLWriterContext& ctx, const std::string& sharedFontFaceRules = {}) {
   if (!doc.isLayoutApplied()) {
     doc.applyLayout();
   }
@@ -210,17 +290,29 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   // SVG filter (feImage + feComposite arithmetic) that matches tgfx PlusDarker pixel-for-pixel.
   HTMLPlusDarkerRenderer::RenderAll(doc, &ctx, ctx.plusDarkerBackdrops);
 
-  // Pre-pass: build WOFF2 fonts for embedded vector fonts. Each Font resource that contains
-  // only vector glyphs (Glyph.path, no Glyph.image) is converted to a minimal OpenType-CFF
-  // font compressed as WOFF2. The resulting files are written through ctx.writeResource to the
-  // fonts/ directory and registered in ctx.woff2Fonts so writeEmbeddedShapeGlyphs can emit
-  // <span> with @font-face instead of SVG <path> elements.
-  std::string fontFaceRules;
+  // Vector font resources share one WOFF2 with disjoint private-use character ranges. Bitmap
+  // fonts retain their own WOFF2 because their image tables use different font metrics.
+  std::string fontFaceRules = sharedFontFaceRules;
+  std::vector<const Font*> vectorFonts;
+  for (auto& node : doc.nodes) {
+    if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<const Font*>(node.get());
+      if (IsVectorFont(font) && ctx.woff2Fonts.find(font) == ctx.woff2Fonts.end()) {
+        vectorFonts.push_back(font);
+      }
+    }
+  }
+  if (vectorFonts.size() > 1) {
+    ExportVectorFontGroup(vectorFonts, ctx, fontFaceRules);
+  }
   for (auto& nodePtr : doc.nodes) {
     if (nodePtr->nodeType() != NodeType::Font) {
       continue;
     }
     auto* font = static_cast<Font*>(nodePtr.get());
+    if (ctx.woff2Fonts.find(font) != ctx.woff2Fonts.end()) {
+      continue;
+    }
     if (font->glyphs.empty() || !font->glyphs[0]) {
       continue;
     }
@@ -230,20 +322,9 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
     }
     std::string fontId = ctx.nextId("f");
     auto result = BuildWoff2FromFont(font, fontId);
-    if (result.woff2Data.empty()) {
+    if (!WriteFontResource(result, fontId, ctx, fontFaceRules)) {
       continue;
     }
-    std::string filename = "font_" + fontId + ".woff2";
-    result.relativeUrl = ctx.staticImgUrlPrefix + "fonts/" + filename;
-    std::string error;
-    if (!ctx.writeResource("fonts/" + filename, result.woff2Data.data(), result.woff2Data.size(),
-                           &error)) {
-      // Skip the font so the generated HTML never references a resource that was not written.
-      // In ToData mode this also avoids dangling URLs to missing ZIP entries.
-      continue;
-    }
-    fontFaceRules += "@font-face{font-family:'" + EscapeCssFontFamily(result.familyName) +
-                     "';src:url('" + result.relativeUrl + "') format('woff2')}\n";
     ctx.woff2Fonts[font] = std::move(result);
   }
 
@@ -293,7 +374,7 @@ std::string BuildHTML(PAGXDocument& doc, HTMLOutputMode mode, const HTMLExporter
   std::string nativeHTML = RoundCoordinatesInHTML(html.release());
 
   if (options.extractStyleSheet) {
-    nativeHTML = HTMLStyleExtractor::Extract(nativeHTML);
+    nativeHTML = HTMLStyleExtractor::Extract(nativeHTML, ctx.idPrefix);
   }
 
   std::string result = nativeHTML;
@@ -438,6 +519,111 @@ std::shared_ptr<Data> HTMLExporter::ToData(PAGXDocument& document, const Options
   return zipWriter.finish(errorMsg);
 #else
   (void)document;
+  (void)options;
+  if (errorMsg) {
+    *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";
+  }
+  return nullptr;
+#endif
+}
+
+std::shared_ptr<Data> HTMLExporter::ToData(const std::vector<PAGXDocument*>& documents,
+                                           const Options& options, std::string* errorMsg) {
+#if defined(PAG_BUILD_HTML) || defined(PAG_BUILD_PPT)
+  if (documents.empty()) {
+    if (errorMsg) {
+      *errorMsg = "documents must not be empty.";
+    }
+    return nullptr;
+  }
+  HTMLZipWriter zipWriter;
+  std::vector<std::string> fragments = {};
+  std::vector<std::pair<float, float>> pageSizes = {};
+  fragments.reserve(documents.size());
+  pageSizes.reserve(documents.size());
+  HTMLWriterContext fontContext;
+  fontContext.zipWriter = &zipWriter;
+  fontContext.staticImgUrlPrefix = "assets/";
+  std::string sharedFontFaceRules;
+  std::vector<const Font*> vectorFonts;
+  std::unordered_set<const Font*> seenFonts;
+  for (auto* document : documents) {
+    if (document == nullptr) {
+      continue;
+    }
+    for (auto& node : document->nodes) {
+      if (node->nodeType() == NodeType::Font) {
+        auto* font = static_cast<const Font*>(node.get());
+        if (IsVectorFont(font) && seenFonts.insert(font).second) {
+          vectorFonts.push_back(font);
+        }
+      }
+    }
+  }
+  ExportVectorFontGroup(vectorFonts, fontContext, sharedFontFaceRules);
+  for (size_t i = 0; i < documents.size(); i++) {
+    auto page = std::to_string(i + 1);
+    auto* document = documents[i];
+    if (document == nullptr) {
+      if (errorMsg) {
+        *errorMsg = "documents[" + std::to_string(i) + "] is null.";
+      }
+      return nullptr;
+    }
+    if (document->hasUnresolvedImports()) {
+      if (errorMsg) {
+        *errorMsg = "page " + page + " has unresolved imports.";
+      }
+      return nullptr;
+    }
+    // applyLayout reports structural failures (for example, a cyclic external composition)
+    // through the document's error list. Fail the whole deck instead of silently turning the
+    // page into a blank one, matching PPTExporter's all-or-nothing deck semantics.
+    auto errorCount = document->errors.size();
+    if (!document->isLayoutApplied()) {
+      document->applyLayout();
+    }
+    if (!document->isLayoutApplied() || document->errors.size() != errorCount) {
+      if (errorMsg) {
+        *errorMsg = "page " + page + " failed to apply layout.";
+      }
+      return nullptr;
+    }
+    HTMLWriterContext ctx;
+    ctx.docWidth = document->width;
+    ctx.docHeight = document->height;
+    ctx.zipWriter = &zipWriter;
+    ctx.staticImgUrlPrefix = "assets/";
+    ctx.rasterScale = std::clamp(options.rasterScale, 0.01f, 4.0f);
+    // Namespace page-specific ids, classes and assets. Shared font resources keep their global
+    // names so every page uses the same character mapping.
+    ctx.idPrefix = "s" + std::to_string(i) + "-";
+    ctx.woff2Fonts = fontContext.woff2Fonts;
+    ctx.woff2GlyphOffsets = fontContext.woff2GlyphOffsets;
+    auto fragment = BuildHTML(*document, HTMLOutputMode::Fragment, options, ctx,
+                              i == 0 ? sharedFontFaceRules : std::string());
+    if (fragment.empty()) {
+      if (errorMsg) {
+        *errorMsg = "page " + page + " produced no HTML output.";
+      }
+      return nullptr;
+    }
+    if (!ctx.zipWriteError.empty()) {
+      if (errorMsg) {
+        *errorMsg = "failed to write resource into archive: " + ctx.zipWriteError;
+      }
+      return nullptr;
+    }
+    fragments.push_back(std::move(fragment));
+    pageSizes.emplace_back(document->width, document->height);
+  }
+  auto deck = BuildDeckHTML(fragments, pageSizes);
+  if (!zipWriter.write("index.html", deck.data(), deck.size(), errorMsg)) {
+    return nullptr;
+  }
+  return zipWriter.finish(errorMsg);
+#else
+  (void)documents;
   (void)options;
   if (errorMsg) {
     *errorMsg = "HTML ZIP export requires PAG_BUILD_HTML or PAG_BUILD_PPT.";

@@ -28,12 +28,14 @@
 #include "pagx/nodes/Animation.h"
 #include "pagx/nodes/AnimationObject.h"
 #include "pagx/nodes/Channel.h"
+#include "pagx/nodes/Font.h"
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/State.h"
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 #include "tgfx/core/Typeface.h"
@@ -165,6 +167,10 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   // it must not be served from — or written to — the spacing/case-insensitive cache below: two
   // variants sharing a normalised key can disagree on the exact match (only one is registered),
   // and caching one variant's verdict under the shared key would wrongly answer the other.
+  // Web font families follow the same exact-match rule, since layout registers them the same way.
+  if (_webFontFamilies.count(family) > 0) {
+    return true;
+  }
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
     return true;
   }
@@ -177,7 +183,12 @@ bool HTMLParserContext::isFontFamilyAvailable(const std::string& family) {
   if (cached != _fontAvailabilityCache.end()) {
     return cached->second;
   }
-  auto typeface = tgfx::Typeface::MakeFromName(family, "Regular");
+  // Probe with the same lookup the renderer uses, so the verdict matches what rendering would
+  // pick. `Typeface::MakeFromName` alone is not enough: backends whose name lookup never reaches
+  // the platform font manager (the FreeType builds) return null for every installed family, which
+  // would report every authored family as unavailable and leave the stack's generic keyword — a
+  // face chosen by the *importing* platform — as the only candidate left.
+  auto typeface = SystemFonts::ResolveTypeface(family, "Regular");
   bool available =
       typeface != nullptr && SystemFonts::FontNamesMatch(family, typeface->fontFamily());
   _fontAvailabilityCache.emplace(std::move(cacheKey), available);
@@ -190,7 +201,10 @@ void HTMLParserContext::resolveFontFaceNames(std::string& family, std::string& s
   }
   // Registered/embedded families are resolved by `LayoutContext` through an exact (family, style)
   // key, so their names must stay verbatim — renaming them would miss the registration and fall
-  // through to a system face instead.
+  // through to a system face instead. Web font families are registered the same way at layout.
+  if (_webFontFamilies.count(family) > 0) {
+    return;
+  }
   if (_document != nullptr && _document->fontConfig().containsFamily(family)) {
     return;
   }
@@ -329,6 +343,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _textFragmentBuilder->bindDocument(_document.get());
   _animationBuilder->bindDocument(_document.get());
   _animationBuilder->setKeyframes(&_styleCascade->keyframes());
+  loadWebFontFiles();
 
   // Title -> data-title on the document (PAGX has no top-level title node; the
   // exporter writes data-* on the root <pagx>).
@@ -374,6 +389,7 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   coalesceAnimations();
   buildAnimationStateMachine();
   suppressBackdropBlurUnderOpacityFade();
+  emitWebFontResources();
   flushFontFallbacksToDocument();
   return _document;
 }
@@ -522,6 +538,66 @@ void HTMLParserContext::flushFontFallbacksToDocument() {
   }
 }
 
+// Only a file on local disk can become a `<Font file>` reference: layout reads the file directly,
+// and nothing downstream fetches remote URLs or inlines data URIs into Font nodes.
+static bool IsLocalFontSource(const std::string& source) {
+  return ToLower(source.substr(0, 5)) != "data:" && source.find("://") == std::string::npos;
+}
+
+void HTMLParserContext::loadWebFontFiles() {
+  for (const auto& rule : _styleCascade->fontFaces()) {
+    std::string loadedPath = {};
+    for (const auto& source : rule.sources) {
+      if (!IsLocalFontSource(source)) {
+        continue;
+      }
+      auto path = _imageResources->resolveSource(source);
+      auto faces = MakeTypefacesFromFile(path);
+      if (faces.empty()) {
+        warn("html: @font-face '" + rule.family + "' source '" + path +
+             "' cannot be loaded as a font; skipped (subset:font-face-unloadable)");
+        continue;
+      }
+      for (auto& face : faces) {
+        _webFontFamilies.insert(face->fontFamily());
+      }
+      loadedPath = path;
+      break;
+    }
+    if (loadedPath.empty()) {
+      warn("html: @font-face '" + rule.family +
+           "' has no loadable local font file; text using it falls back to other fonts "
+           "(subset:font-face-no-local-source)");
+      continue;
+    }
+    _webFontFiles.push_back({ToLower(rule.family), loadedPath});
+    _textFragmentBuilder->registerFontFile(rule.family, loadedPath);
+  }
+}
+
+void HTMLParserContext::emitWebFontResources() {
+  if (_webFontFiles.empty()) {
+    return;
+  }
+  std::unordered_set<std::string> namedFamilies = {};
+  for (const auto& name : _fallbackFamilyNames) {
+    namedFamilies.insert(ToLower(name));
+  }
+  std::unordered_set<std::string> emittedPaths = {};
+  for (auto& node : _document->nodes) {
+    if (node->nodeType() == NodeType::Font) {
+      emittedPaths.insert(static_cast<Font*>(node.get())->file);
+    }
+  }
+  for (const auto& file : _webFontFiles) {
+    if (namedFamilies.count(file.cssFamily) == 0 || !emittedPaths.insert(file.path).second) {
+      continue;
+    }
+    auto* font = _document->makeNode<Font>(_idAllocator->generateUnique("font"));
+    font->file = file.path;
+  }
+}
+
 //==================================================================================================
 // Diagnostics — short forwarders to `_diagnostics`, kept for the very common warn/hardError
 // call sites where the unique_ptr-deref boilerplate would dominate the surrounding code.
@@ -609,7 +685,8 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   Layer* wrapper = _layerBuilder->maybeSplitBoxShadowFromClip(layer);
 
   Layer* contentHost = layer;
-  bool needsInnerHost = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
+  bool needsInnerHost =
+      hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box, hasContentBoxDependentChild(body));
   if (needsInnerHost) {
     contentHost = _layerBuilder->createInnerHost(layer, box);
   } else {
@@ -735,11 +812,31 @@ Layer* HTMLParserContext::convertElement(const std::shared_ptr<DOMNode>& element
   return nullptr;
 }
 
+bool HTMLParserContext::hasContentBoxDependentChild(const std::shared_ptr<DOMNode>& element) {
+  if (element == nullptr) {
+    return false;
+  }
+  for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
+    if (child->type != DOMNodeType::Element) {
+      continue;
+    }
+    HTMLBoxAttributes childBox = _styleCascade->computeBoxAttributes(child);
+    // A flow child is laid out in the content box; a percentage resolves its size against the
+    // containing block, which for an out-of-flow child is the padding box. Both are inset by the
+    // border, unlike an absolutely positioned child with explicit px anchors.
+    if (!childBox.absolute || !std::isnan(childBox.widthPct) || !std::isnan(childBox.heightPct)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& element,
                                            const HTMLBoxAttributes& box,
                                            const HTMLInheritedStyle& inherited, int depth) {
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
-  bool needsInner = hasBgVisuals && HTMLLayerBuilder::requiresInnerHost(box);
+  bool needsInner = hasBgVisuals &&
+                    HTMLLayerBuilder::requiresInnerHost(box, hasContentBoxDependentChild(element));
 
   auto layer = _document->makeNode<Layer>();
   _layerBuilder->applySizeAndPosition(layer, box);
@@ -782,11 +879,10 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     if (child->type == DOMNodeType::Element) {
       auto* childLayer = convertElement(child, inherited, depth + 1);
       if (childLayer) {
-        // CSS border-box: position:absolute descendants are positioned relative to the
-        // parent's padding box, which sits inside the border. Shift their explicit
-        // left/right/top/bottom offsets by the border width so they don't overlap the
-        // border stroke.
-        if (box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
+        // CSS border-box: descendants are laid out against the parent's padding box, which sits
+        // inside the border. The inner host reproduces that inset for every child, so only the
+        // host-less path needs the per-child compensation below (applying both would inset twice).
+        if (!needsInner && box.borderSet && box.borderWidthPx > 0 && !childLayer->includeInLayout) {
           if (!std::isnan(childLayer->left)) childLayer->left += box.borderWidthPx;
           if (!std::isnan(childLayer->right)) childLayer->right += box.borderWidthPx;
           if (!std::isnan(childLayer->top)) childLayer->top += box.borderWidthPx;
@@ -815,7 +911,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
   // Reshape the rectangular `overflow: hidden` clip into the border-radius outline so descendants
   // are rounded-clipped. Runs after `applyMaskOrClip` so its single-mask-slot check is accurate,
   // and is skipped for the folded single-image case (which returned early above).
-  applyRoundedOverflowClip(layer, box);
+  applyRoundedOverflowClip(layer, contentHost, box);
   assignElementId(wrapper, element);
   return wrapper;
 }

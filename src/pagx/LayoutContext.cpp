@@ -152,7 +152,7 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::findTypeface(const std::string& f
 }
 
 std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
-    int32_t codepoint, const tgfx::Typeface* primaryTypeface) {
+    int32_t codepoint, const tgfx::Typeface* primaryTypeface, const std::string& fontStyle) {
   if (fontConfig != nullptr) {
     // Search user-registered fallback fonts first.
     for (auto& holder : fontConfig->data->fallbackTypefaces) {
@@ -170,6 +170,44 @@ std::shared_ptr<tgfx::Typeface> LayoutContext::fallbackTypeface(
   for (auto& holder : systemFallbacks) {
     auto typeface = holder.getTypeface();
     if (typeface == nullptr || typeface.get() == primaryTypeface) {
+      continue;
+    }
+    if (typeface->getGlyphID(codepoint) == 0) {
+      continue;
+    }
+    // These holders each carry one face per family. Re-resolve the family with the requested
+    // style so a glyph borrowed from a fallback family keeps the authored weight — without
+    // this, every fallback glyph would render at the family's default (Regular) face.
+    if (!fontStyle.empty()) {
+      auto styled =
+          ResolveCachedLayoutTypeface(systemTypefaceCache, holder.getFontFamily(), fontStyle);
+      if (styled != nullptr && styled.get() != primaryTypeface &&
+          styled->getGlyphID(codepoint) != 0) {
+        return styled;
+      }
+    }
+    return typeface;
+  }
+  return nullptr;
+}
+
+std::shared_ptr<tgfx::Typeface> LayoutContext::findColorTypeface(
+    int32_t codepoint, const tgfx::Typeface* primaryTypeface) {
+  if (fontConfig != nullptr) {
+    for (auto& holder : fontConfig->data->fallbackTypefaces) {
+      auto typeface = holder.getTypeface();
+      if (typeface == nullptr || typeface.get() == primaryTypeface || !typeface->hasColor()) {
+        continue;
+      }
+      if (typeface->getGlyphID(codepoint) != 0) {
+        return typeface;
+      }
+    }
+  }
+  ensureSystemFallbacks();
+  for (auto& holder : systemFallbacks) {
+    auto typeface = holder.getTypeface();
+    if (typeface == nullptr || typeface.get() == primaryTypeface || !typeface->hasColor()) {
       continue;
     }
     if (typeface->getGlyphID(codepoint) != 0) {

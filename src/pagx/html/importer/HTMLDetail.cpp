@@ -304,6 +304,15 @@ std::string StripSurroundingQuotes(const std::string& s) {
   return s;
 }
 
+// Builds the classification of a generic keyword. A null `resolved` marks a keyword this
+// platform has no face for.
+FontFamilyToken MakeGenericFontToken(const char* resolved) {
+  FontFamilyToken token = {};
+  token.resolved = resolved != nullptr ? resolved : "";
+  token.isGeneric = true;
+  return token;
+}
+
 }  // namespace
 
 std::vector<std::string> ParseFontFamilyTokens(const std::string& raw) {
@@ -322,41 +331,44 @@ std::vector<std::string> ParseFontFamilyTokens(const std::string& raw) {
   return out;
 }
 
-std::string ResolveGenericFontFamily(const std::string& name) {
+FontFamilyToken ClassifyFontFamilyToken(const std::string& name) {
+  FontFamilyToken token = {};
   std::string lower = ToLower(Trim(name));
-  if (lower.empty()) return {};
+  if (lower.empty()) return token;
 
 #if defined(__APPLE__)
-  if (lower == "serif" || lower == "ui-serif") return "Times";
+  if (lower == "serif" || lower == "ui-serif") return MakeGenericFontToken("Times");
   if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
       lower == "-apple-system" || lower == "blinkmacsystemfont") {
-    return "Helvetica";
+    return MakeGenericFontToken("Helvetica");
   }
-  if (lower == "monospace" || lower == "ui-monospace") return "Menlo";
+  if (lower == "monospace" || lower == "ui-monospace") return MakeGenericFontToken("Menlo");
 #elif defined(_WIN32)
-  if (lower == "serif" || lower == "ui-serif") return "Times New Roman";
+  if (lower == "serif" || lower == "ui-serif") return MakeGenericFontToken("Times New Roman");
   if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
       lower == "-apple-system" || lower == "blinkmacsystemfont") {
-    return "Arial";
+    return MakeGenericFontToken("Arial");
   }
-  if (lower == "monospace" || lower == "ui-monospace") return "Consolas";
+  if (lower == "monospace" || lower == "ui-monospace") return MakeGenericFontToken("Consolas");
 #else
-  if (lower == "serif" || lower == "ui-serif") return "DejaVu Serif";
+  if (lower == "serif" || lower == "ui-serif") return MakeGenericFontToken("DejaVu Serif");
   if (lower == "sans-serif" || lower == "ui-sans-serif" || lower == "system-ui" ||
       lower == "-apple-system" || lower == "blinkmacsystemfont") {
-    return "DejaVu Sans";
+    return MakeGenericFontToken("DejaVu Sans");
   }
-  if (lower == "monospace" || lower == "ui-monospace") return "DejaVu Sans Mono";
+  if (lower == "monospace" || lower == "ui-monospace")
+    return MakeGenericFontToken("DejaVu Sans Mono");
 #endif
 
   // Recognised generics with no concrete mapping on the current platform. Distinguished
   // from "not a generic" so callers can warn and drop the token.
   if (lower == "cursive" || lower == "fantasy" || lower == "ui-rounded" || lower == "emoji" ||
       lower == "math" || lower == "fangsong") {
-    return {};
+    return MakeGenericFontToken(nullptr);
   }
 
-  return name;
+  token.resolved = name;
+  return token;
 }
 
 const std::unordered_map<std::string, uint32_t>& NamedColors() {

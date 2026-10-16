@@ -37,6 +37,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextPath.h"
+#include "pagx/utils/FontFileLoader.h"
 #include "renderer/FontEmbedder.h"
 #include "renderer/LayerBuilder.h"
 
@@ -76,6 +77,11 @@ static void AppendExternalFilePaths(const PAGXDocument* document, std::vector<st
         continue;
       }
       paths->push_back(image->filePath);
+    } else if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (font->fileData == nullptr && IsExternalFilePath(font->file)) {
+        paths->push_back(font->file);
+      }
     } else if (node->nodeType() == NodeType::Layer) {
       auto* layer = static_cast<Layer*>(node.get());
       if (layer->composition == nullptr && IsExternalFilePath(layer->compositionFilePath)) {
@@ -165,6 +171,18 @@ static bool LoadFileDataInChain(
         docDirtyNodes[document].push_back(image);
         found = true;
       }
+    } else if (node->nodeType() == NodeType::Font) {
+      auto* font = static_cast<Font*>(node.get());
+      if (font->file == filePath) {
+        font->fileData = data;
+        // A font changes how every Text shapes, so an already laid-out document is refreshed as a
+        // whole. Before the first layout there is nothing to refresh: that layout registers it.
+        if (document->isLayoutApplied()) {
+          docDirtyNodes[document].push_back(document);
+          layoutDirtyDocs.insert(document);
+        }
+        found = true;
+      }
     } else if (node->nodeType() == NodeType::Layer) {
       layers.push_back(static_cast<Layer*>(node.get()));
     }
@@ -207,7 +225,9 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   }
   if (config != nullptr) {
     _fontConfig = *config;
+    registeredFontFiles.clear();
   }
+  registerFontFiles();
   // Re-running layout on an already-laid-out document (e.g. from notifyChange after an edit) must
   // discard the cached layout outputs first; updateSize() skips re-measuring a node whose preferred
   // size is already set, so without this a size/constraint edit would keep the stale geometry.
@@ -284,6 +304,32 @@ void PAGXDocument::applyLayout(const FontConfig* config,
   visited.erase(this);
 }
 
+// The document's own font files go on top of the caller's config: they are what the document was
+// authored against, so a same-named registration from the caller must not shadow them. A Font is
+// registered once per config; it is registered again only when it gains bytes it was not
+// registered from, which is how a host on a platform without file access (the web) delivers it.
+void PAGXDocument::registerFontFiles() {
+  for (auto& node : nodes) {
+    if (node->nodeType() != NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<Font*>(node.get());
+    if (font->file.empty()) {
+      continue;
+    }
+    auto registered = registeredFontFiles.find(font);
+    if (registered != registeredFontFiles.end() && registered->second == font->fileData.get()) {
+      continue;
+    }
+    if (font->fileData != nullptr) {
+      RegisterFontDataFaces(&_fontConfig, font->fileData->bytes(), font->fileData->size(), true);
+    } else if (IsLocalFilePath(font->file)) {
+      RegisterFontFileFaces(&_fontConfig, font->file, true);
+    }
+    registeredFontFiles[font] = font->fileData.get();
+  }
+}
+
 void PAGXDocument::layoutLayers(const std::vector<Layer*>& layers, float containerW,
                                 float containerH, LayoutContext* context) {
   for (auto* layer : layers) {
@@ -331,6 +377,9 @@ void PAGXDocument::removeNodes(const std::unordered_set<Node*>& toRemove) {
       nodes[writeIdx++] = std::move(nodes[readIdx]);
     } else {
       nodeSet.erase(nodes[readIdx].get());
+      if (nodes[readIdx]->nodeType() == NodeType::Font) {
+        registeredFontFiles.erase(static_cast<const Font*>(nodes[readIdx].get()));
+      }
     }
   }
   nodes.resize(writeIdx);

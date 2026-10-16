@@ -35,7 +35,7 @@
 import * as fs from 'fs';
 import { DROP_TAGS_UPPER_JSON } from './dom-tags';
 import { errMessage } from './common';
-import { loadFontCodec } from './font-codec';
+import { decompressWoff2, loadFontCodec } from './font-codec';
 import type { Page } from './browser-engine';
 
 const fsp = fs.promises;
@@ -564,18 +564,27 @@ export async function fetchFontBytes(url: string): Promise<Buffer> {
 // `Font`. WOFF2 is detected by its `wOF2` magic number (0x77 0x4F 0x46 0x32)
 // and decompressed via the `wawoff2` WASM port of Google's reference
 // decoder; everything else is fed straight to `opentype.parse`, which
-// already handles WOFF natively.
+// already handles WOFF natively. The decode goes through `decompressWoff2`,
+// which copies the bytes out of the decoder's shared WASM heap before another
+// (concurrent) decode can overwrite them — icon pages routinely ship several
+// font files (Font Awesome Free has three) that are fetched in parallel.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function parseFontBuffer(buffer: Buffer): Promise<any> {
-  const { opentype, wawoff2 } = loadFontCodec();
+  const { opentype } = loadFontCodec();
   let bytes = buffer;
-  if (bytes.length >= 4 && bytes[0] === 0x77 && bytes[1] === 0x4F && bytes[2] === 0x46 && bytes[3] === 0x32) {
-    const decoded = await wawoff2.decompress(bytes);
-    bytes = Buffer.isBuffer(decoded) ? decoded : Buffer.from(decoded);
+  if (isWoff2Bytes(bytes)) {
+    bytes = await decompressWoff2(bytes);
   }
   return opentype.parse(
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   );
+}
+
+// WOFF2 container signature check shared by `parseFontBuffer` and the callers
+// that sniff before decoding.
+function isWoff2Bytes(bytes: Buffer): boolean {
+  return bytes.length >= 4 && bytes[0] === 0x77 && bytes[1] === 0x4F && bytes[2] === 0x46 &&
+    bytes[3] === 0x32;
 }
 
 // Round a float to `digits` decimal places, matching the precision used
