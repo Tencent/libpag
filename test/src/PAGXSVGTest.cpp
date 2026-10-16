@@ -827,6 +827,132 @@ PAGX_TEST(PAGXSVGTest, SVGImport_TextPathUnresolvedHref) {
 }
 
 /**
+ * Test SVG import: Illustrator-style exports position glyphs with explicit x/y on <tspan>
+ * elements and encode line breaks as a baseline y jump. The importer must split the content
+ * into per-line Text nodes at each explicit baseline instead of concatenating everything into
+ * one overflowing run.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TspanExplicitLineBreaks) {
+  std::string svg =
+      "<svg width=\"300\" height=\"200\" viewBox=\"0 0 300 200\">"
+      "<text font-family=\"Arial\" font-size=\"40\" fill=\"#000000\">"
+      "<tspan x=\"20\" y=\"40\">相</tspan><tspan x=\"60\" y=\"40\">比</tspan>"
+      "<tspan x=\"20\" y=\"108\">数</tspan><tspan x=\"60\" y=\"108\">据</tspan>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  }
+  ASSERT_EQ(texts.size(), 2u);
+
+  auto firstLine = static_cast<pagx::Text*>(texts[0]);
+  EXPECT_EQ(firstLine->text, "相比");
+  EXPECT_FLOAT_EQ(firstLine->position.x, 20.0f);
+  EXPECT_FLOAT_EQ(firstLine->position.y, 40.0f);
+
+  auto secondLine = static_cast<pagx::Text*>(texts[1]);
+  EXPECT_EQ(secondLine->text, "数据");
+  EXPECT_FLOAT_EQ(secondLine->position.x, 20.0f);
+  EXPECT_FLOAT_EQ(secondLine->position.y, 108.0f);
+}
+
+/**
+ * Test SVG import: <tspan> elements sharing the same baseline concatenate into a single Text
+ * run even when their explicit x values reposition glyphs (kerning-style adjustments); only
+ * baseline jumps split lines.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TspanSameBaselineSingleRun) {
+  std::string svg =
+      "<svg width=\"300\" height=\"100\" viewBox=\"0 0 300 100\">"
+      "<text font-family=\"Arial\" font-size=\"40\" fill=\"#000000\">"
+      "<tspan x=\"10\" y=\"50\">A</tspan><tspan x=\"35\" y=\"50\">B</tspan>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  }
+  ASSERT_EQ(texts.size(), 1u);
+
+  auto text = static_cast<pagx::Text*>(texts[0]);
+  EXPECT_EQ(text->text, "AB");
+  EXPECT_FLOAT_EQ(text->position.x, 10.0f);
+  EXPECT_FLOAT_EQ(text->position.y, 50.0f);
+}
+
+/**
+ * Test SVG import: a <tspan> that shifts the pen position via dy without explicit coordinates
+ * still breaks the line once the accumulated baseline offset exceeds half the font size, so
+ * relative dy line breaks (common in hand-written SVG) keep their own baseline too.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TspanRelativeDyLineBreak) {
+  std::string svg =
+      "<svg width=\"300\" height=\"200\" viewBox=\"0 0 300 200\">"
+      "<text font-family=\"Arial\" font-size=\"40\" fill=\"#000000\" x=\"20\" y=\"40\">"
+      "First<tspan x=\"20\" dy=\"68\">Second</tspan>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  }
+  ASSERT_EQ(texts.size(), 2u);
+
+  auto firstLine = static_cast<pagx::Text*>(texts[0]);
+  EXPECT_EQ(firstLine->text, "First");
+  EXPECT_FLOAT_EQ(firstLine->position.x, 20.0f);
+  EXPECT_FLOAT_EQ(firstLine->position.y, 40.0f);
+
+  auto secondLine = static_cast<pagx::Text*>(texts[1]);
+  EXPECT_EQ(secondLine->text, "Second");
+  EXPECT_FLOAT_EQ(secondLine->position.x, 20.0f);
+  EXPECT_FLOAT_EQ(secondLine->position.y, 108.0f);
+}
+
+/**
+ * Test SVG import: Illustrator wraps a whole line of positioned character tspans in an outer
+ * <tspan> without coordinates. The recursive walk must keep collecting the nested runs and
+ * preserve both the wrapped line and the sibling tspans that follow it.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_TspanNestedLineWrap) {
+  std::string svg =
+      "<svg width=\"300\" height=\"200\" viewBox=\"0 0 300 200\">"
+      "<text font-family=\"Arial\" font-size=\"40\" fill=\"#000000\">"
+      "<tspan><tspan x=\"10\" y=\"40\">甲</tspan><tspan x=\"50\" y=\"40\">乙</tspan></tspan>"
+      "<tspan x=\"10\" y=\"108\">丙</tspan>"
+      "</text></svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_FALSE(doc->layers.empty());
+
+  std::vector<pagx::Element*> texts;
+  for (auto layer : doc->layers) {
+    CollectElementsByType(layer, pagx::NodeType::Text, texts);
+  }
+  ASSERT_EQ(texts.size(), 2u);
+
+  auto firstLine = static_cast<pagx::Text*>(texts[0]);
+  EXPECT_EQ(firstLine->text, "甲乙");
+  EXPECT_FLOAT_EQ(firstLine->position.x, 10.0f);
+  EXPECT_FLOAT_EQ(firstLine->position.y, 40.0f);
+
+  auto secondLine = static_cast<pagx::Text*>(texts[1]);
+  EXPECT_EQ(secondLine->text, "丙");
+  EXPECT_FLOAT_EQ(secondLine->position.x, 10.0f);
+  EXPECT_FLOAT_EQ(secondLine->position.y, 108.0f);
+}
+
+/**
  * Test SVG import: `marker-start` / `marker-mid` / `marker-end` on a multi-segment path expand into
  * additional child layers wrapped alongside the shape. The polyline has two interior vertices so
  * the mid marker is instanced twice; every marker triangle contributes its own Path node.

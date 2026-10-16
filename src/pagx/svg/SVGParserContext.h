@@ -129,6 +129,28 @@ class SVGParserContext {
   Element* convertPolygon(const std::shared_ptr<DOMNode>& element);
   Element* convertPath(const std::shared_ptr<DOMNode>& element);
   Group* convertText(const std::shared_ptr<DOMNode>& element, const InheritedStyle& inheritedStyle);
+  // One positioned line of text collected while walking a <text> element's children.
+  struct TextLine {
+    float startX = 0;
+    float baseline = 0;
+    std::string text = {};
+  };
+  // State shared across the recursive <text>/<tspan> walk in collectTextRuns.
+  struct TextWalkState {
+    std::vector<TextLine> lines = {};
+    int currentLineIndex = -1;
+    float currentX = 0;
+    float currentY = 0;
+    float fontSize = 12;
+    // Combined raw content of every descendant text node, used when a <textPath> turns the
+    // run into path-following text (per-line positioning does not apply there).
+    std::string textContent = {};
+    std::shared_ptr<DOMNode> textPathElement = nullptr;
+  };
+  // Recursively walks <text> children and nested <tspan> elements, tracking explicit x/y
+  // (absolute) and dx/dy (relative) pen positioning, and splits content into lines on
+  // baseline jumps larger than half the font size.
+  void collectTextRuns(const std::shared_ptr<DOMNode>& element, TextWalkState* state);
   TextPath* convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                             const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);
