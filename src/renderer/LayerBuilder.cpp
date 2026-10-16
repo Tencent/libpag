@@ -160,19 +160,6 @@ void RuntimeBinding::remove(const Node* node) {
 #define PAG_DISABLE_SHADOW_STYLES 0
 #define PAG_DISABLE_LAYER_FILTERS 0
 
-// Lifts a 2D affine transform into a column-major 4x4 matrix carrying the given Z translation.
-static Matrix3D LiftToMatrix3D(const tgfx::Matrix& matrix, float z) {
-  Matrix3D result = {};
-  result.setRowColumn(0, 0, matrix.getScaleX());
-  result.setRowColumn(0, 1, matrix.getSkewX());
-  result.setRowColumn(0, 3, matrix.getTranslateX());
-  result.setRowColumn(1, 0, matrix.getSkewY());
-  result.setRowColumn(1, 1, matrix.getScaleY());
-  result.setRowColumn(1, 3, matrix.getTranslateY());
-  result.setRowColumn(2, 3, z);
-  return result;
-}
-
 // Returns true if the matrix is a 2D affine transform plus an optional Z translation.
 static bool IsPlanarAffine(const Matrix3D& matrix) {
   return matrix.getRowColumn(0, 2) == 0 && matrix.getRowColumn(1, 2) == 0 &&
@@ -375,12 +362,12 @@ struct LayerRuntimeTarget : RuntimeTarget {
     if (v == nullptr || hasStaticMatrix3D) {
       return false;
     }
-    auto target = ToTGFX(*v);
     auto z = pose.getRowColumn(2, 3);
     if (IsPlanarAffine(pose)) {
-      pose = LiftToMatrix3D(MixTGFXMatrix(PlanarMatrix(pose), target, mix), z);
+      auto mixed = MixTGFXMatrix(PlanarMatrix(pose), ToTGFX(*v), mix);
+      pose = LiftMatrixToMatrix3D(FromTGFX(mixed), z);
     } else {
-      pose = LerpMatrix3D(pose, LiftToMatrix3D(target, z), mix);
+      pose = LerpMatrix3D(pose, LiftMatrixToMatrix3D(*v, z), mix);
     }
     hasComponents = false;
     publish();
