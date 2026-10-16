@@ -35,6 +35,7 @@
 #include "pagx/nodes/ImagePattern.h"
 #include "pagx/nodes/Layer.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/svg/SVGCssRules.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/types/MaskType.h"
 #include "pagx/utils/Base64.h"
@@ -810,8 +811,12 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   }
 
   // Record animated shape descendants before serialisation so any minted `id` is baked into the
-  // import directive and the SVG importer can derive matching Fill / Stroke painter ids.
-  collectInlineSvgShapeAnimations(element);
+  // import directive and the SVG importer can derive matching Fill / Stroke painter ids. The class
+  // rules come from the same SVG document scope the SVG importer will parse, so an animated shape's
+  // baseline transform matches its resolved static matrix.
+  std::unordered_map<std::string, std::string> classRules;
+  CollectSvgClassRules(element, &classRules);
+  collectInlineSvgShapeAnimations(element, classRules);
 
   Layer* importHost = layer;
   if (HTMLLayerBuilder::hasBackgroundVisuals(box)) {
@@ -845,7 +850,9 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
   return wrapper;
 }
 
-void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DOMNode>& node) {
+void HTMLParserContext::collectInlineSvgShapeAnimations(
+    const std::shared_ptr<DOMNode>& node,
+    const std::unordered_map<std::string, std::string>& classRules) {
   if (node == nullptr) {
     return;
   }
@@ -855,16 +862,24 @@ void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DO
     }
     const std::string* styleAttr = child->findAttribute("style");
     if (styleAttr != nullptr) {
-      std::unordered_map<std::string, std::string> style;
-      ParseStyleString(*styleAttr, style);
-      // The SVG transform attribute is the baseline when inline CSS does not override it.
-      if (style.find("transform") == style.end()) {
-        const std::string* transformAttr = child->findAttribute("transform");
-        if (transformAttr != nullptr) {
-          style["transform"] = *transformAttr;
+      std::unordered_map<std::string, std::string> inlineStyle;
+      ParseStyleString(*styleAttr, inlineStyle);
+      // Only inline animation declarations are collected; class rules declaring animations are
+      // intentionally not a trigger.
+      if (inlineStyle.count("animation") > 0 || inlineStyle.count("animation-name") > 0) {
+        // Baselines resolve exactly like the SVG importer: inline style > class rules > the
+        // presentation attribute.
+        std::unordered_map<std::string, std::string> style;
+        ParseStyleString(CollectSvgClassDeclarations(classRules, child), style);
+        for (const auto& property : inlineStyle) {
+          style[property.first] = property.second;
         }
-      }
-      if (style.count("animation") > 0 || style.count("animation-name") > 0) {
+        if (style.find("transform") == style.end()) {
+          const std::string* transformAttr = child->findAttribute("transform");
+          if (transformAttr != nullptr) {
+            style["transform"] = *transformAttr;
+          }
+        }
         // A stable id must survive serialisation so the SVG importer can key the derived painter
         // ids off it. Reuse an authored id; otherwise mint a fresh non-colliding one.
         std::string id;
@@ -932,7 +947,7 @@ void HTMLParserContext::collectInlineSvgShapeAnimations(const std::shared_ptr<DO
         _pendingSvgShapeAnimations.push_back(std::move(pending));
       }
     }
-    collectInlineSvgShapeAnimations(child);
+    collectInlineSvgShapeAnimations(child, classRules);
   }
 }
 

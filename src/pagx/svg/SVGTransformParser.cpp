@@ -54,6 +54,11 @@ static float ReadNumber(const char*& ptr, const char* end) {
   if (start == ptr) {
     return 0.0f;
   }
+  // CSS lengths inside <style> rules or inline styles carry a px suffix; SVG presentation
+  // attributes are unitless. Dropping the suffix keeps both forms parseable and matches browsers.
+  if (ptr + 1 < end && ptr[0] == 'p' && ptr[1] == 'x') {
+    ptr += 2;
+  }
   return strtof(start, nullptr);
 }
 

@@ -26,6 +26,7 @@
 #include "pagx/nodes/Image.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/svg/SVGBlendMode.h"
+#include "pagx/svg/SVGCssRules.h"
 #include "pagx/svg/SVGParserContext.h"
 #include "pagx/svg/SVGPathParser.h"
 #include "pagx/svg/SVGTransformParser.h"
@@ -184,22 +185,7 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
   }
 
   // Parse <style> elements (can be in defs or directly under svg).
-  child = root->getFirstChild();
-  while (child) {
-    if (child->name == "style") {
-      parseStyleElement(child);
-    } else if (child->name == "defs") {
-      // Also check for <style> inside <defs>.
-      auto defsChild = child->getFirstChild();
-      while (defsChild) {
-        if (defsChild->name == "style") {
-          parseStyleElement(defsChild);
-        }
-        defsChild = defsChild->getNextSibling();
-      }
-    }
-    child = child->getNextSibling();
-  }
+  CollectSvgClassRules(root, &_cssClassRules);
 
   // Second pass: count references to gradients/patterns.
   // This determines which ColorSources should be extracted to resources.
@@ -292,109 +278,6 @@ void SVGParserContext::parseDefs(const std::shared_ptr<DOMNode>& defsNode) {
     child = child->getNextSibling();
   }
 }
-void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNode) {
-  // Get the text content of the <style> element.
-  auto textNode = styleNode->getFirstChild();
-  if (!textNode || textNode->type != DOMNodeType::Text) {
-    return;
-  }
-
-  // The text content is stored in the node's name for text nodes.
-  std::string cssContent = textNode->name;
-  if (cssContent.empty()) {
-    return;
-  }
-
-  // Parse CSS rules.
-  // Format: .class-name { property1: value1; property2: value2; }
-  // Also supports comma-separated selectors: .cls-1, .cls-2 { ... }
-  size_t pos = 0;
-  while (pos < cssContent.size()) {
-    // Skip whitespace.
-    while (pos < cssContent.size() && std::isspace(cssContent[pos])) {
-      pos++;
-    }
-    if (pos >= cssContent.size()) {
-      break;
-    }
-
-    // Skip CSS comments.
-    if (pos + 1 < cssContent.size() && cssContent[pos] == '/' && cssContent[pos + 1] == '*') {
-      auto commentEnd = cssContent.find("*/", pos + 2);
-      pos = (commentEnd == std::string::npos) ? cssContent.size() : commentEnd + 2;
-      continue;
-    }
-
-    // Find the opening brace for this rule.
-    size_t bracePos = cssContent.find('{', pos);
-    if (bracePos == std::string::npos) {
-      break;
-    }
-
-    // Extract the selector string before the brace.
-    std::string selectorStr = cssContent.substr(pos, bracePos - pos);
-
-    // Find the closing brace.
-    size_t closeBracePos = cssContent.find('}', bracePos);
-    if (closeBracePos == std::string::npos) {
-      break;
-    }
-
-    // Extract the style content between braces.
-    std::string styleContent = cssContent.substr(bracePos + 1, closeBracePos - bracePos - 1);
-
-    // Trim whitespace and newlines from style content.
-    size_t contentStart = styleContent.find_first_not_of(" \t\n\r");
-    size_t contentEnd = styleContent.find_last_not_of(" \t\n\r");
-    if (contentStart != std::string::npos && contentEnd != std::string::npos) {
-      styleContent = styleContent.substr(contentStart, contentEnd - contentStart + 1);
-    }
-
-    // Parse comma-separated selectors and store rules for each class selector.
-    if (!styleContent.empty()) {
-      size_t selPos = 0;
-      while (selPos < selectorStr.size()) {
-        // Skip whitespace.
-        while (selPos < selectorStr.size() && std::isspace(selectorStr[selPos])) {
-          selPos++;
-        }
-        if (selPos >= selectorStr.size()) {
-          break;
-        }
-
-        // Find end of this selector (comma or end of string).
-        size_t commaPos = selectorStr.find(',', selPos);
-        size_t selEnd = (commaPos == std::string::npos) ? selectorStr.size() : commaPos;
-        std::string selector = selectorStr.substr(selPos, selEnd - selPos);
-
-        // Trim whitespace from selector.
-        size_t selStart = selector.find_first_not_of(" \t\n\r");
-        size_t selLast = selector.find_last_not_of(" \t\n\r");
-        if (selStart != std::string::npos && selLast != std::string::npos) {
-          selector = selector.substr(selStart, selLast - selStart + 1);
-        }
-
-        // Only handle class selectors (starting with dot).
-        if (!selector.empty() && selector[0] == '.') {
-          std::string className = selector.substr(1);
-          if (!className.empty()) {
-            auto it = _cssClassRules.find(className);
-            if (it != _cssClassRules.end()) {
-              it->second += ";" + styleContent;
-            } else {
-              _cssClassRules[className] = styleContent;
-            }
-          }
-        }
-
-        selPos = (commaPos == std::string::npos) ? selectorStr.size() : commaPos + 1;
-      }
-    }
-
-    pos = closeBracePos + 1;
-  }
-}
-
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
                                         const InheritedStyle& parentStyle, int depth) {
   if (depth >= MAX_SVG_RECURSION_DEPTH) {
@@ -2977,28 +2860,10 @@ const std::unordered_map<std::string, std::string>& SVGParserContext::getStylePr
 
   auto& result = _stylePropertiesCache[node.get()];
 
-  // CSS class rules (lowest priority): parse all matching classes.
+  // CSS class rules (lowest priority): parse all matching classes. The concatenated declarations
+  // parse the same as applying each class rule in order.
   if (hasClass) {
-    const std::string& classAttr = *classPtr;
-    size_t pos = 0;
-    while (pos < classAttr.size()) {
-      while (pos < classAttr.size() && std::isspace(classAttr[pos])) {
-        pos++;
-      }
-      if (pos >= classAttr.size()) {
-        break;
-      }
-      size_t endPos = pos;
-      while (endPos < classAttr.size() && !std::isspace(classAttr[endPos])) {
-        endPos++;
-      }
-      std::string className = classAttr.substr(pos, endPos - pos);
-      pos = endPos;
-      auto classIt = _cssClassRules.find(className);
-      if (classIt != _cssClassRules.end()) {
-        ParseStyleString(classIt->second, result);
-      }
-    }
+    ParseStyleString(CollectSvgClassDeclarations(_cssClassRules, node), result);
   }
 
   // Style attribute (highest priority): overwrites class rules.

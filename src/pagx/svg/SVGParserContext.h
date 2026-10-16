@@ -104,7 +104,6 @@ class SVGParserContext {
   std::shared_ptr<PAGXDocument> parseDOM(const std::shared_ptr<XMLDOM>& dom);
 
   void parseDefs(const std::shared_ptr<DOMNode>& defsNode);
-  void parseStyleElement(const std::shared_ptr<DOMNode>& styleNode);
 
   Layer* convertToLayer(const std::shared_ptr<DOMNode>& element, const InheritedStyle& parentStyle,
                         int depth = 0);

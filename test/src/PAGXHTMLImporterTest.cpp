@@ -7172,6 +7172,91 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgTransformAttributeAnimationRestoresStati
   EXPECT_FLOAT_EQ(baseline.ty, 20);
 }
 
+// A static transform from a class rule in the embedded SVG <style> is the baseline just like a
+// transform attribute, so the translate animation becomes matrix samples instead of x/y channels.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgClassTransformAnimationRestoresStaticTransform) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes move {
+        0% { transform: translateX(0px); }
+        100% { transform: translateX(40px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <style>.moved{transform:translate(10px,20px)}</style>
+        <rect id="shape" class="moved" width="20" height="20"
+          style="animation:move 1s linear"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  EXPECT_EQ(FindChannel(animation, "x"), nullptr);
+  EXPECT_EQ(FindChannel(animation, "y"), nullptr);
+  auto* channel = FindChannel(animation, "matrix");
+  ASSERT_NE(channel, nullptr);
+  ASSERT_EQ(channel->valueType(), pagx::ChannelValueType::Matrix);
+  auto* matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+  ASSERT_FALSE(matrixChannel->keyframes.empty());
+  const auto& baseline = matrixChannel->keyframes.back().value;
+  EXPECT_FLOAT_EQ(baseline.tx, 10);
+  EXPECT_FLOAT_EQ(baseline.ty, 20);
+}
+
+// The baseline transform follows the same priority as the SVG importer: inline style over class
+// rules, and class rules over the transform presentation attribute.
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgBaselineTransformFollowsSvgPriority) {
+  pagx::HTMLImporter::Options opts;
+  opts.autoNormalize = false;
+  auto doc = pagx::HTMLImporter::ParseString(R"HTML(
+    <html><head><style>
+      @keyframes move {
+        0% { transform: translateX(0px); }
+        100% { transform: translateX(40px); }
+      }
+    </style></head>
+    <body style="width:200px;height:100px">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <style>.moved{transform:translate(10px,20px)}</style>
+        <rect id="classOverAttr" class="moved" width="20" height="20"
+          transform="translate(30 40)" style="animation:move 1s linear"/>
+        <rect id="inlineOverClass" class="moved" width="20" height="20"
+          style="animation:move 1s linear;transform:translate(50px,60px)"/>
+      </svg>
+    </body></html>
+  )HTML",
+                                             opts);
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->animations.size(), 1u);
+  auto* animation = static_cast<pagx::Animation*>(doc->animations.front());
+  ASSERT_EQ(animation->objects.size(), 2u);
+  for (const auto* target : {"classOverAttr", "inlineOverClass"}) {
+    auto* object = FindObjectByTarget(animation, target);
+    ASSERT_NE(object, nullptr);
+    pagx::TypedChannel<pagx::Matrix>* matrixChannel = nullptr;
+    for (auto* channel : object->channels) {
+      if (channel != nullptr && channel->name == "matrix") {
+        matrixChannel = static_cast<pagx::TypedChannel<pagx::Matrix>*>(channel);
+      }
+    }
+    ASSERT_NE(matrixChannel, nullptr) << target;
+    ASSERT_FALSE(matrixChannel->keyframes.empty());
+    const auto& baseline = matrixChannel->keyframes.back().value;
+    if (std::string(target) == "classOverAttr") {
+      EXPECT_FLOAT_EQ(baseline.tx, 10);
+      EXPECT_FLOAT_EQ(baseline.ty, 20);
+    } else {
+      EXPECT_FLOAT_EQ(baseline.tx, 50);
+      EXPECT_FLOAT_EQ(baseline.ty, 60);
+    }
+  }
+}
+
 PAG_TEST(PAGXHTMLImporterTest, InlineSvgTranslateWithoutStaticTransformUsesXYChannels) {
   pagx::HTMLImporter::Options opts;
   opts.autoNormalize = false;
