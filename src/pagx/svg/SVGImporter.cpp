@@ -1196,25 +1196,14 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
       }
       collectTextRuns(child, state);
     } else if (child->name == "textPath") {
-      // <textPath> places the run along a referenced path. Funnel its (possibly tspan-wrapped)
-      // text into the combined content buffer; the path geometry and offset descriptors are
-      // converted separately into a TextPath modifier sibling below.
+      // <textPath> places the run along a referenced path; SVG ignores x/y on its inner
+      // tspans, so no line splitting applies. Reuse the recursive walk to collect every
+      // descendant text node into the combined content buffer; line entries it may produce
+      // are discarded because the textPath emission path in convertText reads textContent
+      // only. The path geometry and offset descriptors are converted separately into a
+      // TextPath modifier sibling below.
       state->textPathElement = child;
-      auto pathChild = child->getFirstChild();
-      while (pathChild) {
-        if (pathChild->type == DOMNodeType::Text) {
-          state->textContent += pathChild->name;
-        } else if (pathChild->name == "tspan") {
-          auto tspanChild = pathChild->getFirstChild();
-          while (tspanChild) {
-            if (tspanChild->type == DOMNodeType::Text) {
-              state->textContent += tspanChild->name;
-            }
-            tspanChild = tspanChild->getNextSibling();
-          }
-        }
-        pathChild = pathChild->getNextSibling();
-      }
+      collectTextRuns(child, state);
     }
     child = child->getNextSibling();
   }
