@@ -202,6 +202,24 @@ void DataBindRuntime::markAllDirty() {
   }
 }
 
+void DataBindRuntime::reapplyForTarget(const Node* targetNode) {
+  if (targetNode == nullptr || boundBinding == nullptr) {
+    return;
+  }
+  for (auto& entry : entries) {
+    if (entry.targetNode != targetNode || !entry.toTarget()) {
+      continue;
+    }
+    // A fresh bind() pass starts with onceApplied == false, so a Once binding applies its ViewModel
+    // value exactly once per construction. Re-arm it to keep the caller's reset equivalent to a
+    // fresh construction, instead of permanently losing the value to the reset's default restore.
+    if (entry.dataBind->direction == DataBindDirection::Once) {
+      entry.onceApplied = false;
+    }
+    applyEntry(entry, boundBinding, 1.0f);
+  }
+}
+
 // ---- update (ViewModel → render node) ----------------------------------------
 
 static KeyValue ValueToKeyValue(PAGViewModelValue* value) {

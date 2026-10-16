@@ -28,6 +28,7 @@
 #include "pagx/PAGDisplayOptions.h"
 #include "pagx/PAGStateMachine.h"
 #include "pagx/PAGTimeline.h"
+#include "pagx/types/Rect.h"
 
 namespace tgfx {
 class Context;
@@ -40,6 +41,7 @@ namespace pagx {
 
 class Animation;
 class Node;
+class Layer;
 class PAGSurface;
 class PAGViewModel;
 class PAGXDocument;
@@ -173,9 +175,17 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Returns the layers under the given surface point. The first layer in the array is the top-most
-   * under the point, the last is the bottom-most. Returns an empty array if nothing is hit. Hit
-   * testing does not require a prior draw(). Accepts surface coordinates (with zoom and content
-   * offset applied) instead of the composition's local coordinates.
+   * under the point, the last is the bottom-most, and every ancestor of a hit layer follows it. A
+   * layer is hit when the point falls on the actual shape of its own content (glyph outlines for
+   * text, the filled or stroked area for geometry), so the gap between two glyphs, the inside of a
+   * stroke-only shape, and a fully transparent fill are not hits. Hidden layers, and points outside
+   * a layer's scrollRect clip or mask, are skipped together with their subtrees. Returns an empty
+   * array if nothing is hit. Hit testing does not require a prior draw(). Accepts surface
+   * coordinates (with zoom and content offset applied) instead of the composition's local
+   * coordinates. The layers are runtime objects: resolving one to a PAGX source node, or applying
+   * an editor selection policy such as picking a text layer by its box, is the host's job
+   * (PAGLayer::getNode() plus PAGXDocument::ownsNode()), since the core keeps no source-node to
+   * runtime-layer map.
    * @param surfaceX the x coordinate in surface (device) space.
    * @param surfaceY the y coordinate in surface (device) space.
    */
@@ -183,12 +193,22 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
 
   /**
    * Returns the displaying bounds of the given layer in surface coordinates, with the layer's full
-   * on-screen transform (including animation and the display zoom/offset) applied. Returns an empty
-   * rectangle if the layer is null or does not belong to this scene. For the layer's untransformed
-   * local bounds, use PAGLayer::getBounds.
+   * on-screen transform (including animation and the display zoom/offset) applied. Returns an
+   * empty rectangle if the layer is null or does not belong to this scene. For the layer's
+   * untransformed local bounds, use PAGLayer::getBounds.
    * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
    */
   Rect getGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
+
+  /**
+   * Returns the tight bounds of the given layer in surface coordinates: per-glyph extents for text
+   * (instead of the font-wide envelope of getGlobalBounds), clipped to the layer's own scrollRect
+   * window, so selection outlines hug the visible content. The layer's full on-screen transform
+   * (including animation and the display zoom/offset) is applied. Returns an empty rectangle if
+   * the layer is null or does not belong to this scene.
+   * @param pagLayer a layer handle obtained from this scene (e.g. via getLayersUnderPoint).
+   */
+  Rect getTightGlobalBounds(const std::shared_ptr<PAGLayer>& pagLayer) const;
 
  private:
   PAGScene();
@@ -223,6 +243,19 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   void clearAllViewModelsDirty();
   static void ClearCompositionTreeDirty(PAGComposition* comp);
 
+  // Re-applies the ViewModel's current values to every data bind whose target is the given node
+  // across the whole composition tree, immediately (mirrors the VM-change immediate-apply path).
+  // Used by PAGStateMachine::reset() and fresh timeline instantiation: both drop bound SM inputs
+  // back to their declared defaults, and the ViewModel is the truth source for those values.
+  // scopeBinding restricts the re-apply to runtimes bound against that binding: the same source
+  // node can back several instances (a top-level pre-created one plus composition-spawned ones),
+  // and a reset must only re-push the values of the instance it belongs to, not overwrite the
+  // host-set inputs of unrelated instances. A null scopeBinding is a no-op — the re-apply always
+  // belongs to one concrete instance, so an unspecified scope must not touch every runtime.
+  void reapplyDataBindsForTarget(const Node* targetNode, RuntimeBinding* scopeBinding);
+  static void ReapplyCompositionTreeDataBinds(PAGComposition* comp, const Node* targetNode,
+                                              RuntimeBinding* scopeBinding);
+
   RuntimeBinding* mutableBinding();
 
   tgfx::DisplayList* getDisplayListForOptions() const;
@@ -236,6 +269,23 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // list's zoomScale and contentOffset. Returns false if the surface point cannot be mapped (zoom
   // scale is zero). Used by PAGLayer::hitTestPoint so handles can hit-test in surface coordinates.
   bool surfaceToRoot(float surfaceX, float surfaceY, float* rootX, float* rootY) const;
+
+  // Hit-testing helpers for getLayersUnderPoint. The tree walk lives here rather than in
+  // tgfx::Layer::getLayersUnderPoint because tgfx tests every layer against content->getBounds(),
+  // which for a text layer is the whole typeface's envelope instead of the glyphs. Everything they
+  // read is runtime state; the source model is never consulted.
+  static bool CollectLayersUnderPoint(const std::shared_ptr<PAGLayer>& layer, float rootX,
+                                      float rootY, float surfaceX, float surfaceY,
+                                      std::vector<std::shared_ptr<PAGLayer>>* out);
+
+  // True when the point passes the visibility, scrollRect clip and mask of every tgfx layer from
+  // layer up to (but excluding) stop. rootX/rootY are in the runtime tree's root space.
+  static bool RuntimePathAcceptsPoint(tgfx::Layer* layer, const tgfx::Layer* stop, float rootX,
+                                      float rootY);
+
+  // True when the point falls on the shape of the layer's own content. Layers whose runtime layer
+  // carries no contents never report a hit of their own.
+  static bool OwnContentContainsPoint(PAGLayer* layer, float surfaceX, float surfaceY);
 
   // Writes the root-to-surface transform (zoomScale then contentOffset) into out and returns true.
   // Returns false if out is null. Used by PAGLayer::getGlobalMatrix to build the local-to-surface
@@ -262,11 +312,9 @@ class PAGScene : public std::enable_shared_from_this<PAGScene> {
   // common case (no text reshape in the document) avoids walking the composition tree every frame.
   std::vector<std::shared_ptr<TextHolder>> textHolders = {};
 
-  // Maps tgfx layers in the runtime tree to their PAGLayer nodes for hit-test resolution.
-  std::unordered_map<const tgfx::Layer*, PAGLayer*> layerRegistry = {};
-
   friend class PAGXDocument;
   friend class PAGTimeline;
+  friend class PAGStateMachine;
   friend class PAGComposition;
   friend class PAGDisplayOptions;
   friend class PAGLayer;

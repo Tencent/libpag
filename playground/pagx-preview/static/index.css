@@ -4,9 +4,11 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  */
 
-/* Preview-only chrome around the shared PAGXPlayer component. Canvas / toolbar / playback bar
- * styles ship with pagx-player itself (see pagx-player/src/styles.ts) so this file only owns
- * the base layout and the preview-specific overlays. */
+/* Preview-only chrome around the shared PAGXPlayer component. Canvas, toolbar, playback bar,
+ * source editor panel, state-machine blueprint panel and preview chip bar all ship with
+ * pagx-player itself (see pagx-player/src/styles.ts + sm-blueprint.ts) and mount inside the
+ * component's own .pagx-player-root wrapper, so this file only owns the base layout and the
+ * preview-specific overlays (refresh banner / drop hint / drop overlay). */
 
 html, body {
     padding: 0;

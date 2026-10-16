@@ -827,9 +827,9 @@ tgfx::Rect PAGXView::rootLocalBounds(const std::shared_ptr<PAGLayer>& layer) con
   }
   // getGlobalBounds maps root-local bounds to surface space through a uniform-scale-plus-translate
   // transform (surface = root * zoom + offset). That transform has no rotation/skew, so inverting
-  // it recovers the exact axis-aligned root-local rect the removed getImageBounds returned (up to
-  // negligible float round-trip error). getDisplayOptions' zoom/offset are the same values
-  // getGlobalBounds folds in, so the inverse is consistent by construction.
+  // it recovers the exact axis-aligned root-local rect (up to negligible float round-trip error).
+  // getDisplayOptions' zoom/offset are the same values getGlobalBounds folds in, so the inverse
+  // is consistent by construction.
   float x = (surfaceBounds.x - offset.x) / zoom;
   float y = (surfaceBounds.y - offset.y) / zoom;
   float w = surfaceBounds.width / zoom;
