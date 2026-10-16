@@ -604,17 +604,8 @@ inline bool RecomposeMatrix3D(const DecomposedMatrix3D& value, Matrix3D* output)
 // [0, 0, -1/d, 1] with d > 0, or is [0, 0, 0, 1] for none.
 inline bool IsMatrix3DComponentRepresentable(const DecomposedMatrix3D& matrix) {
   constexpr double Tolerance = 1.0e-8;
-  if (std::abs(matrix.perspective[0]) > Tolerance || std::abs(matrix.perspective[1]) > Tolerance ||
-      matrix.perspective[2] > 0) {
-    return false;
-  }
-  if (std::abs(matrix.perspective[2]) > 1.0e-12) {
-    double distance = -1.0 / matrix.perspective[2];
-    if (!std::isfinite(distance) || distance > 3.0e38) {
-      return false;
-    }
-  }
-  return true;
+  return std::abs(matrix.perspective[0]) <= Tolerance &&
+         std::abs(matrix.perspective[1]) <= Tolerance && matrix.perspective[2] <= 0;
 }
 
 // Maps a Layer channel name ("rotation.x", "scale.y", "skew.x", "perspective", ...) to its
