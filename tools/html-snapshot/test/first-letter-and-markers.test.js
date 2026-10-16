@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Tencent. All rights reserved.
+
 'use strict';
 
 // `materializeFirstLetter` / `materializeListMarkers` run inside `page.evaluate`

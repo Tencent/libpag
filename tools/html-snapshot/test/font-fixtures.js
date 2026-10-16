@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Tencent. All rights reserved.
+
 // Generated web-font fixtures for the font capture tests.
 //
 // Fixtures are built at run time instead of being committed as binaries:

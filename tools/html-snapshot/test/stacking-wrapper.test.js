@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Tencent. All rights reserved.
+
 'use strict';
 
 // `resolveEscapingWrapperZIndex` decides whether a static box that paints

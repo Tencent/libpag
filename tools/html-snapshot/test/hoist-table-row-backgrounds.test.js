@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Tencent. All rights reserved.
+
 'use strict';
 
 // `hoistTableRowBackgrounds` runs inside `page.evaluate` against a live DOM,

@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Tencent. All rights reserved.
+
 'use strict';
 
 // Regression tests for the snapshot's local web-font carry-over. The subset

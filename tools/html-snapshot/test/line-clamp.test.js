@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Tencent. All rights reserved.
+
 'use strict';
 
 // `-webkit-line-clamp` support in the line-span emitter. The browser cuts a

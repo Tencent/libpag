@@ -1,3 +1,5 @@
+// Copyright (C) 2026 Tencent. All rights reserved.
+
 'use strict';
 
 // `inlineSvgVectorPatterns` normally runs inside `page.evaluate` against a real DOM: it finds
