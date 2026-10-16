@@ -18,6 +18,7 @@
 
 #include "rendering/pagx/PAGXViewModel.h"
 #include <QAbstractTextDocumentLayout>
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDebug>
 #include <QFile>
@@ -29,13 +30,27 @@
 #include <QTextCursor>
 #include <QTime>
 #include <QTimer>
+#include <QWheelEvent>
 #include <QXmlStreamReader>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include "pag/pag.h"
 #include "pagx/PAGXImporter.h"
+#include "pagx/nodes/Font.h"
+#include "pagx/nodes/Image.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pag {
+
+// Delay before the editor height table is rebuilt after an edit, so a burst of keystrokes
+// triggers a single O(blocks) rebuild instead of one per character.
+constexpr int EDITOR_GEOMETRY_DEBOUNCE_MS = 300;
+
+// Axis lock for editor wheel scrolling: the minor-axis delta is treated as gesture noise and
+// zeroed only when the dominant axis is at least this many times larger, so deliberate diagonal
+// scrolling (comparable axes) still passes through.
+constexpr int WHEEL_AXIS_LOCK_RATIO = 2;
 
 static void EditorLog(const QString& message) {
   qDebug().noquote() << "[PAGXEditor]" << QTime::currentTime().toString("hh:mm:ss.zzz") << message;
@@ -344,10 +359,77 @@ void PAGXViewModel::setProgress(double newProgress) {
 void PAGXViewModel::setShowVideoFrames(bool) {
 }
 
+// True for paths that must not be prefixed with the pagx directory: absolute POSIX paths,
+// absolute Windows paths (drive letter or UNC), and URL schemes.
+static bool IsAbsolutePathOrUrl(const std::string& path) {
+  if (path.empty() || path[0] == '/' || path[0] == '\\') {
+    return true;
+  }
+  if (path.find("://") != std::string::npos) {
+    return true;
+  }
+  return path.size() >= 2 &&
+         ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) &&
+         path[1] == ':';
+}
+
+// Resolves relative Image/Font resource paths against the pagx file's directory, mirroring
+// PAGXImporter::FromFile(). The viewer imports through FromXML() because it also needs the raw
+// XML text for the source editor, and FromXML() leaves resource paths untouched: relative
+// path resolution requires the file origin, which only FromFile() knows. Absolute paths and
+// URLs are passed through unchanged.
+static void ResolveResourcePaths(pagx::PAGXDocument* document, const std::string& pagxFilePath) {
+  auto lastSlash = pagxFilePath.find_last_of("/\\");
+  if (lastSlash == std::string::npos) {
+    return;
+  }
+  auto basePath = pagxFilePath.substr(0, lastSlash + 1);
+  for (auto& node : document->nodes) {
+    std::string* path = nullptr;
+    if (node->nodeType() == pagx::NodeType::Image) {
+      path = &static_cast<pagx::Image*>(node.get())->filePath;
+    } else if (node->nodeType() == pagx::NodeType::Font) {
+      path = &static_cast<pagx::Font*>(node.get())->file;
+    }
+    if (path != nullptr && !IsAbsolutePathOrUrl(*path)) {
+      *path = basePath + *path;
+    }
+  }
+}
+
+// Registers the document's file-backed Font resources into its fontConfig, following the host
+// contract documented on PAGXDocument::fontConfig(). Without this, applyLayout() resolves
+// document font families (e.g. icon fonts) through the system fallback chain, and private-use
+// codepoints render as arbitrary glyphs from unrelated system fonts. The file also joins the
+// fallback chain because a (family, style) key holds one primary registration: unicode-range
+// subset files sharing a key would otherwise overwrite each other.
+static void RegisterDocumentFonts(pagx::PAGXDocument* document) {
+  auto& fontConfig = document->fontConfig();
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != pagx::NodeType::Font) {
+      continue;
+    }
+    auto* font = static_cast<pagx::Font*>(node.get());
+    if (font->file.empty()) {
+      continue;
+    }
+    auto typeface = tgfx::Typeface::MakeFromPath(font->file);
+    if (typeface == nullptr) {
+      EditorLog("failed to load document font: " + QString::fromStdString(font->file));
+      continue;
+    }
+    fontConfig.registerFont(font->file, 0, typeface->fontFamily(), typeface->fontStyle());
+    fontConfig.addFallbackFont(font->file, 0);
+  }
+}
+
 bool PAGXViewModel::loadFile(const QString& filePath) {
-  auto strPath = std::string(filePath.toLocal8Bit());
+  // Keep paths UTF-8 end to end: XML resource paths are UTF-8, so basePath (derived here) and
+  // tgfx's ByteData::FromPath / Typeface::MakeFromPath must use the same encoding, otherwise a
+  // non-ASCII pagx directory or resource name produces a mixed-encoding path that fails to open.
+  auto strPath = std::string(filePath.toUtf8());
   if (filePath.startsWith("file://")) {
-    strPath = std::string(QUrl(filePath).toLocalFile().toLocal8Bit());
+    strPath = std::string(QUrl(filePath).toLocalFile().toUtf8());
   }
   auto byteData = pag::ByteData::FromPath(strPath);
   if (byteData == nullptr) {
@@ -362,6 +444,8 @@ bool PAGXViewModel::loadFile(const QString& filePath) {
     Q_EMIT filePathChanged("");
     return false;
   }
+  ResolveResourcePaths(document.get(), strPath);
+  RegisterDocumentFonts(document.get());
   document->applyLayout();
 
   auto newScene = pagx::PAGScene::Make(document);
@@ -508,6 +592,10 @@ QString PAGXViewModel::applyXmlChanges(const QString& newXml) {
   if (document == nullptr) {
     return tr("Failed to parse XML: invalid syntax or structure");
   }
+  // The editor text carries the original relative resource paths, so an Apply rebuild needs the
+  // same resolution and font registration as the initial load.
+  ResolveResourcePaths(document.get(), currentFilePath);
+  RegisterDocumentFonts(document.get());
   document->applyLayout();
 
   auto newScene = pagx::PAGScene::Make(document);
@@ -601,6 +689,151 @@ void PAGXViewModel::attachHighlighter(QObject* quickTextDocument) {
   if (highlighter->document() != document) {
     highlighter->setDocument(document);
   }
+  if (editorDocument != document) {
+    if (editorDocument != nullptr) {
+      disconnect(editorDocument, &QTextDocument::contentsChange, this,
+                 &PAGXViewModel::onEditorContentsChange);
+    }
+    editorDocument = document;
+    if (document != nullptr) {
+      connect(document, &QTextDocument::contentsChange, this,
+              &PAGXViewModel::onEditorContentsChange);
+    }
+    rebuildEditorGeometry();
+  }
+}
+
+void PAGXViewModel::onEditorContentsChange() {
+  // The chunked loader refreshes the table itself at load completion; contents arriving while
+  // a load is running belong to that load, not to user edits.
+  if (loaderTimer != nullptr && loaderTimer->isActive()) {
+    return;
+  }
+  if (editorGeometryTimer == nullptr) {
+    editorGeometryTimer = new QTimer(this);
+    editorGeometryTimer->setSingleShot(true);
+    editorGeometryTimer->setInterval(EDITOR_GEOMETRY_DEBOUNCE_MS);
+    connect(editorGeometryTimer, &QTimer::timeout, this, &PAGXViewModel::rebuildEditorGeometry);
+  }
+  editorGeometryTimer->start();
+}
+
+void PAGXViewModel::rebuildEditorGeometry() {
+  if (editorGeometryTimer != nullptr) {
+    editorGeometryTimer->stop();
+  }
+  QVector<qreal> tops = {};
+  if (editorDocument != nullptr) {
+    auto* layout = editorDocument->documentLayout();
+    tops.reserve(editorDocument->blockCount() + 1);
+    qreal y = 0;
+    for (auto block = editorDocument->begin(); block.isValid(); block = block.next()) {
+      tops.append(y);
+      y += layout->blockBoundingRect(block).height();
+    }
+    tops.append(y);
+  }
+  if (tops == editorBlockTops) {
+    return;
+  }
+  editorBlockTops = std::move(tops);
+  Q_EMIT editorGeometryChanged();
+}
+
+qreal PAGXViewModel::editorContentHeight() const {
+  return editorBlockTops.isEmpty() ? 0 : editorBlockTops.last();
+}
+
+int PAGXViewModel::editorLineCount() const {
+  return editorBlockTops.isEmpty() ? 0 : static_cast<int>(editorBlockTops.size()) - 1;
+}
+
+qreal PAGXViewModel::editorLineTopY(int line) const {
+  if (line <= 0 || editorBlockTops.isEmpty()) {
+    return 0;
+  }
+  if (line >= editorLineCount()) {
+    return editorBlockTops.last();
+  }
+  return editorBlockTops[line];
+}
+
+int PAGXViewModel::editorLineAtY(qreal y) const {
+  if (editorBlockTops.size() < 2) {
+    return 0;
+  }
+  if (y <= 0) {
+    return 0;
+  }
+  if (y >= editorBlockTops.last()) {
+    return static_cast<int>(editorBlockTops.size()) - 2;
+  }
+  const auto upper = std::upper_bound(editorBlockTops.cbegin(), editorBlockTops.cend(), y);
+  return static_cast<int>(upper - editorBlockTops.cbegin()) - 1;
+}
+
+bool PAGXViewModel::refreshEditorRendering(QObject* textEditItem) {
+  auto* item = qobject_cast<QQuickItem*>(textEditItem);
+  if (item == nullptr) {
+    return false;
+  }
+  // QQuickTextEdit::updateWholeDocument() is a private slot reachable through the meta object by
+  // name but not through public Qt API; it marks all cached text nodes dirty and rebuilds only
+  // the ones intersecting the viewport. Probe the slot once and remember the result: a Qt upgrade
+  // that removes it would otherwise make invokeMethod log "No such method" on every scroll frame.
+  static int methodProbe = -1;  // -1 unprobed, 0 missing, 1 present
+  if (methodProbe < 0) {
+    methodProbe = item->metaObject()->indexOfMethod("updateWholeDocument()") >= 0 ? 1 : 0;
+    if (methodProbe == 0) {
+      EditorLog("updateWholeDocument is unavailable; editor blank-band recovery is disabled");
+    }
+  }
+  if (methodProbe == 0) {
+    return false;
+  }
+  return QMetaObject::invokeMethod(item, "updateWholeDocument");
+}
+
+void PAGXViewModel::lockWheelAxis(QObject* flickable) {
+  if (flickable != nullptr) {
+    flickable->installEventFilter(this);
+  }
+}
+
+bool PAGXViewModel::eventFilter(QObject* watched, QEvent* event) {
+  if (event->type() != QEvent::Wheel || forwardingLockedWheelEvent) {
+    return ContentViewModel::eventFilter(watched, event);
+  }
+  auto* wheel = static_cast<QWheelEvent*>(event);
+  auto pixelDelta = wheel->pixelDelta();
+  auto angleDelta = wheel->angleDelta();
+  // Pick the dominant axis from whichever delta the device fills (trackpads use pixelDelta, mouse
+  // wheels use angleDelta). Only lock when the gesture is near-axis-aligned, so a deliberate
+  // diagonal scroll (comparable axes) keeps both components.
+  const QPoint reference = !pixelDelta.isNull() ? pixelDelta : angleDelta;
+  if (reference.x() == 0 || reference.y() == 0) {
+    return ContentViewModel::eventFilter(watched, event);
+  }
+  const bool verticalDominant = qAbs(reference.y()) >= qAbs(reference.x());
+  const int major = verticalDominant ? qAbs(reference.y()) : qAbs(reference.x());
+  const int minor = verticalDominant ? qAbs(reference.x()) : qAbs(reference.y());
+  if (minor * WHEEL_AXIS_LOCK_RATIO > major) {
+    return ContentViewModel::eventFilter(watched, event);
+  }
+  if (verticalDominant) {
+    pixelDelta.setX(0);
+    angleDelta.setX(0);
+  } else {
+    pixelDelta.setY(0);
+    angleDelta.setY(0);
+  }
+  QWheelEvent locked(wheel->position(), wheel->globalPosition(), pixelDelta, angleDelta,
+                     wheel->buttons(), wheel->modifiers(), wheel->phase(), wheel->isInverted(),
+                     wheel->source());
+  forwardingLockedWheelEvent = true;
+  QCoreApplication::sendEvent(watched, &locked);
+  forwardingLockedWheelEvent = false;
+  return true;
 }
 
 void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& text) {
@@ -639,6 +872,7 @@ void PAGXViewModel::loadEditorText(QObject* quickTextDocument, const QString& te
                   .arg(setMs)
                   .arg(timer.elapsed())
                   .arg(maxLineWidth));
+    rebuildEditorGeometry();
     Q_EMIT editorLoadFinished(maxLineWidth);
     return;
   }
@@ -721,6 +955,9 @@ void PAGXViewModel::appendEditorChunk() {
     // Finish the remaining blocks now, while the loading overlay still covers the editor:
     // the user never sees a partially warmed document.
     warmupLayouts(std::numeric_limits<int>::max());
+    // Refresh the geometry table while the overlay still hides the editor, so the restored
+    // scroll position and the gutter line up with the real block heights from the first frame.
+    rebuildEditorGeometry();
     EditorLog(QString("appendEditorChunk: chunked load finished, chunks=%1 totalMs=%2 "
                       "maxLineWidth=%3 warmupBlocks=%4")
                   .arg(loaderChunkCount)
