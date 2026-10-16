@@ -118,44 +118,6 @@ const AUTO_SCROLL_SWEEP_SCRIPT = `(async (cfg) => {
   return docHeight();
 })`;
 
-// Resolve content the page parked at its entrance state and never revealed.
-// A "reveal" wired through a class flip (`opacity` transition) only fires when
-// its trigger matches, and some pages boot their scroll-driven reveals in a
-// state that never matches during an automated sweep — e.g. Flect's
-// `.word-fade.block-fade` paragraphs sit at `opacity: 0` forever under
-// `prefers-reduced-motion: reduce` because the page's reduced-motion block
-// re-shows its cards but forgets these paragraphs. The walker's visibility
-// check then prunes the still-transparent box and the copy is lost.
-//
-// We only touch boxes that are (a) fully transparent, (b) carry an `opacity`
-// (or `all`) transition — the fingerprint of a reveal that was wired up but
-// never fired, not an authored hide — and (c) hold real content (text or
-// media). display:none / visibility:hidden are respected, and only opacity /
-// entrance blur are forced; transform and geometry are left as measured so
-// centred or entrance-offset boxes keep their layout.
-const AUTO_SCROLL_RESCUE_SCRIPT = `(() => {
-  let rescued = 0;
-  const all = document.body ? document.body.querySelectorAll('*') : [];
-  for (const el of all) {
-    let cs;
-    try { cs = getComputedStyle(el); } catch (_) { continue; }
-    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-    if (!(parseFloat(cs.opacity) < 0.05)) continue;
-    const tp = cs.transitionProperty || '';
-    if (tp.indexOf('opacity') < 0 && tp.indexOf('all') < 0) continue;
-    const rect = el.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) continue;
-    const text = (el.textContent || '').trim();
-    if (!text && !el.querySelector('img,svg,canvas,video')) continue;
-    el.style.setProperty('opacity', '1', 'important');
-    if (cs.filter && cs.filter !== 'none') {
-      el.style.setProperty('filter', 'none', 'important');
-    }
-    rescued += 1;
-  }
-  return rescued;
-})()`;
-
 // Wait (bounded) for any in-flight images to finish decoding so they actually
 // paint, then return to the origin so downstream rect measurement / screenshot
 // framing (which also resets scroll) starts clean, and flush layout.
@@ -345,9 +307,6 @@ async function settleLazyContent(page: Page, engine: EngineName): Promise<void> 
       if (stable >= cfg.stableRounds) break;
       if (typeof height === 'number' && height >= cfg.maxHeightPx) break;
     }
-    // Force-reveal content the sweep never managed to trigger (see
-    // AUTO_SCROLL_RESCUE_SCRIPT) before the finalize pass measures the page.
-    await page.evaluate(AUTO_SCROLL_RESCUE_SCRIPT);
     await page.evaluate(`${AUTO_SCROLL_FINALIZE_SCRIPT}(${cfgJson})`);
   } catch (_) {
     // Best-effort: still try to return the page to the origin so later framing

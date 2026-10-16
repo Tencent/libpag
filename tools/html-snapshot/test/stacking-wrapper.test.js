@@ -81,11 +81,17 @@ function makeWrapper(style) {
 }
 
 describe('resolveEscapingWrapperZIndex — pure stacking wrapper', () => {
-  test('a transparent static wrapper sorts by its highest child z-index', () => {
+  test('different child levels cannot be raised together', () => {
     const wrap = makeWrapper();
-    addChild(wrap, { position: 'relative', 'z-index': '3' });
+    addChild(wrap, { position: 'absolute', 'z-index': '1' });
+    addChild(wrap, { position: 'absolute', 'z-index': '10' });
+    expect(resolveEscapingWrapperZIndex(wrap, wrap.__self)).toBeNull();
+  });
+
+  test('a transparent wrapper can use its shared child level', () => {
+    const wrap = makeWrapper();
     addChild(wrap, { position: 'relative', 'z-index': '10' });
-    addChild(wrap, { position: 'relative', 'z-index': '7' });
+    addChild(wrap, { position: 'relative', 'z-index': '10' });
     expect(resolveEscapingWrapperZIndex(wrap, wrap.__self)).toBe(10);
   });
 

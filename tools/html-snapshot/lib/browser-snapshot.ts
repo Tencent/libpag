@@ -992,9 +992,9 @@ function resolveChildPaintEntry(hostEl, child, childComputed, flexOrGridParent) 
 // A "pure stacking wrapper" paints nothing of its own — no background, border,
 // shadow, outline, transform, filter, mask or clip — so the only mark it leaves
 // is the paint of its children. When every element child is stackable
-// (positioned, or a flex/grid item) and none is pulled below the flow with a
-// negative z-index, those children participate directly in the wrapper's
-// enclosing stacking context: a static wrapper holding `z-index: 3…10` children
+// (positioned, or a flex/grid item) at the same non-negative z-index,
+// those children participate directly in the wrapper's
+// enclosing stacking context: a static wrapper holding `z-index: 10` children
 // paints at their z, i.e. above a later `position: absolute` sibling the browser
 // still draws the wrapper underneath. Because the subset flattens every box to
 // `position: absolute` and replays paint order per parent, such a wrapper would
@@ -1002,7 +1002,7 @@ function resolveChildPaintEntry(hostEl, child, childComputed, flexOrGridParent) 
 // stacking entirely — the negative-margin pull-card pattern where a stack of
 // `z-index` photos must cover the later `z-index: auto` card that slides up
 // under them. The wrapper's own paint collapses to nothing, so stepping it to
-// its greatest child z-index reproduces the browser. Returns that z-index, or
+// a shared child z-index preserves their order. Returns that z-index, or
 // null when the box is not such a wrapper (it paints itself, clips, or holds
 // non-stackable / negative-z content), leaving the caller to use the wrapper's
 // own stacking.
@@ -1043,7 +1043,7 @@ function resolveEscapingWrapperZIndex(el, computed) {
     display === 'grid' || display === 'inline-grid';
   let childCount = 0;
   let maxZ = 0;
-  let minZ = 0;
+  let childZ = null;
   for (const child of el.children) {
     if (child.nodeType !== Node.ELEMENT_NODE) continue;
     childCount++;
@@ -1051,12 +1051,14 @@ function resolveEscapingWrapperZIndex(el, computed) {
     // A non-stackable child would paint in the flow band, which collapsing the
     // whole wrapper onto one z-index cannot represent — bail and stay static.
     if (!stacking.stackable) return null;
+    // Different child levels can straddle a sibling outside this wrapper.
+    if (childZ !== null && stacking.zIndex !== childZ) return null;
+    childZ = stacking.zIndex;
     if (stacking.zIndex > maxZ) maxZ = stacking.zIndex;
-    if (stacking.zIndex < minZ) minZ = stacking.zIndex;
   }
   // No element children, or a child pulled behind the flow (negative z) that a
   // single raised z-index would lift out of place.
-  if (childCount === 0 || minZ < 0) return null;
+  if (childCount === 0 || childZ < 0) return null;
   return maxZ;
 }
 
