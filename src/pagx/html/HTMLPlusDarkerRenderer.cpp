@@ -27,12 +27,12 @@
 #include "pagx/nodes/Layer.h"
 #include "pagx/utils/Base64.h"
 #include "renderer/LayerBuilder.h"
+#include "rendering/gpu/Devices.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/layers/DisplayList.h"
 
 namespace pagx {
@@ -189,14 +189,13 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     return;
   }
 
-  auto device = tgfx::GLDevice::Make();
-  if (!device) {
+  // Reentrancy-safe lock: HTMLExporter::ToData can be invoked while the caller already holds
+  // the default device; the scope then reuses that context instead of deadlocking.
+  pag::DeviceLockScope deviceLock;
+  if (!deviceLock) {
     return;
   }
-  auto gpuCtx = device->lockContext();
-  if (!gpuCtx) {
-    return;
-  }
+  auto gpuCtx = deviceLock.context();
 
   int idx = 0;
   for (Layer* target : candidates) {
@@ -254,8 +253,6 @@ void HTMLPlusDarkerRenderer::RenderAll(const PAGXDocument& doc, HTMLWriterContex
     out[target] = std::move(entry);
     idx++;
   }
-
-  device->unlock();
 }
 
 }  // namespace pagx

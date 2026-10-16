@@ -126,6 +126,22 @@ struct MtlTextureInfo {
 };
 
 /**
+ * Types for interacting with Metal sync objects created externally to PAG. Holds an id<MTLEvent>
+ * and its timeline signal value as opaque handles.
+ */
+struct MtlEventInfo {
+  /**
+   * Pointer to id<MTLEvent>.
+   */
+  void* event = nullptr;
+
+  /**
+   * The timeline signal value paired with the event.
+   */
+  uint64_t value = 0;
+};
+
+/**
  * Types for interacting with Vulkan resources created externally to PAG. Holds the VkImage as a
  * void*.
  */
@@ -312,19 +328,47 @@ class PAG_API BackendSemaphore {
  public:
   BackendSemaphore();
 
-  bool isInitialized() const {
-    return _isInitialized;
+  /**
+   * Returns true if the backend semaphore has been initialized.
+   */
+  bool isInitialized() const;
+
+  /**
+   * Returns the backend API of this semaphore.
+   */
+  Backend backend() const {
+    return _backend;
   }
 
   void initGL(void* sync);
 
   void* glSync() const;
 
+  /**
+   * Initializes the semaphore with a Metal id<MTLEvent> and a signal value. The event pointer is
+   * treated as an opaque handle — libpag never releases it. Metal's cross-queue synchronization
+   * always uses timeline (signaled/waited by counter value) semantics on MTLEvent, so both the
+   * event and its value are required. Passing a null event leaves the semaphore uninitialized.
+   */
+  void initMetal(const MtlEventInfo& info);
+
+  /**
+   * If the backend API is Metal, copies a snapshot of the MtlEventInfo struct into the passed in
+   * pointer and returns true. Otherwise, returns false if the backend API is not Metal.
+   */
+  bool getMtlEventInfo(MtlEventInfo* info) const;
+
  private:
+  // The initialized state is derived from _backend plus the stored handle instead of a dedicated
+  // flag. NOTE: this layout is binary-incompatible with earlier releases. Although sizeof stays
+  // 24, MtlEventInfo::value now occupies the offset where the old _isInitialized bool lived, and
+  // isInitialized() was inline in those headers — binaries compiled against them keep reading
+  // that offset directly and observe an indeterminate byte. Integrators must recompile against
+  // this header; the change must be noted in the release notes.
   Backend _backend = Backend::MOCK;
   union {
     void* _glSync;
+    MtlEventInfo _mtlInfo;
   };
-  bool _isInitialized;
 };
 }  // namespace pag

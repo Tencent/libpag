@@ -9,33 +9,18 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurface.h"
+#import "platform/mac/private/PAGSurface+Internal.h"
 #import "platform/mac/private/PAGSurfaceImpl.h"
 
-@interface PAGSurface ()
-
-@property(nonatomic, strong) PAGSurfaceImpl* surface;
-
-@end
-
 @implementation PAGSurface {
-}
-
-+ (PAGSurface*)FromView:(NSView*)view {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl FromView:view];
-  if (surface == nil) {
-    return nil;
-  }
-  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
-  pagSurface.surface = surface;
-  return pagSurface;
 }
 
 + (PAGSurface*)MakeFromGPU:(CGSize)size {

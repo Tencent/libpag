@@ -21,8 +21,8 @@
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/drawables/Drawable.h"
+#include "rendering/gpu/Devices.h"
 #include "rendering/graphics/Recorder.h"
-#include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
@@ -32,17 +32,17 @@ namespace pag {
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool externalContext)
     : drawable(std::move(drawable)), externalContext(externalContext) {
   rootLocker = std::make_shared<std::mutex>();
-#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
   if (externalContext) {
-    glRestorer = new GLRestorer();
+    // Devices::MakeExternalStateGuard() returns nullptr on backends / platforms that do not need
+    // host GPU state preservation (all non-GL backends, plus Web and Windows on GL for historical
+    // reasons). The raw pointer is stored in a void* field so the public header does not have to
+    // include the internal ExternalStateGuard definition.
+    stateGuard = Devices::MakeExternalStateGuard().release();
   }
-#endif
 }
 
 PAGSurface::~PAGSurface() {
-#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
-  delete static_cast<GLRestorer*>(glRestorer);
-#endif
+  delete static_cast<ExternalStateGuard*>(stateGuard);
 }
 
 int PAGSurface::width() {
@@ -237,9 +237,36 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   } else {
     tgfx::BackendSemaphore semaphore = {};
     recording = context->flush(&semaphore);
-    tgfx::GLSyncInfo signalInfo = {};
-    if (semaphore.getGLSync(&signalInfo)) {
-      signalSemaphore->initGL(signalInfo.sync);
+    // The context hands back a semaphore for whichever backend it was built on. Every tgfx
+    // backend enum is listed explicitly (no default), so adding a new tgfx backend without
+    // handling it here fails -Wswitch at compile time instead of silently dropping the semaphore.
+    switch (semaphore.backend()) {
+      case tgfx::Backend::OpenGL: {
+        tgfx::GLSyncInfo glInfo = {};
+        if (semaphore.getGLSync(&glInfo)) {
+          signalSemaphore->initGL(glInfo.sync);
+        }
+        break;
+      }
+      case tgfx::Backend::Metal: {
+        tgfx::MetalSyncInfo mtlInfo = {};
+        if (semaphore.getMetalSync(&mtlInfo)) {
+          // tgfx::MetalSyncInfo::event is const void*; pag::MtlEventInfo uses void*. The handle
+          // is treated as opaque by libpag — the const_cast is safe because no writer path
+          // exists downstream.
+          MtlEventInfo eventInfo = {};
+          eventInfo.event = const_cast<void*>(mtlInfo.event);
+          eventInfo.value = mtlInfo.value;
+          signalSemaphore->initMetal(eventInfo);
+        }
+        break;
+      }
+      case tgfx::Backend::Unknown:
+      case tgfx::Backend::Vulkan:
+      case tgfx::Backend::WebGPU:
+      case tgfx::Backend::D3D12:
+        LOGE("PAGSurface::flushInternal() cannot forward a semaphore of this backend yet.");
+        break;
     }
   }
   cache->detachFromContext();
@@ -301,20 +328,16 @@ tgfx::Context* PAGSurface::lockContext() {
     return nullptr;
   }
   auto context = device->lockContext();
-#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
-  if (context != nullptr && glRestorer != nullptr) {
-    static_cast<GLRestorer*>(glRestorer)->save();
+  if (context != nullptr && stateGuard != nullptr) {
+    static_cast<ExternalStateGuard*>(stateGuard)->save(context);
   }
-#endif
   return context;
 }
 
 void PAGSurface::unlockContext() {
-#if !defined(PAG_BUILD_FOR_WEB) && !defined(_WIN32)
-  if (glRestorer != nullptr) {
-    static_cast<GLRestorer*>(glRestorer)->restore();
+  if (stateGuard != nullptr) {
+    static_cast<ExternalStateGuard*>(stateGuard)->restore();
   }
-#endif
   auto device = drawable->getDevice();
   if (device != nullptr) {
     device->unlock();

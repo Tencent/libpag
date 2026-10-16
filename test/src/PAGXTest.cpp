@@ -238,6 +238,9 @@ static void AssertSceneConsistent(const std::shared_ptr<pagx::PAGScene>& scene) 
  * This tests the complete round-trip: SVG -> PAGX file -> Load -> Render
  */
 PAGX_TEST(PAGXTest, SVGToPAGXAll) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   constexpr int MinCanvasEdge = 400;
 
   std::string svgDir = ProjectPath::Absolute("resources/svg");
@@ -333,6 +336,9 @@ PAGX_TEST(PAGXTest, SVGToPAGXAll) {
  * Test case: Verify PAGXImporter::FromFile and FromXML produce identical results when rendered.
  */
 PAGX_TEST(PAGXTest, LayerBuilderAPIConsistency) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   auto pagxPath = ProjectPath::Absolute("resources/apitest/api_consistency.pagx");
 
   // Load via FromFile
@@ -895,6 +901,9 @@ PAGX_TEST(PAGXTest, GlyphRunTransforms) {
  * fonts, exports to XML, reimports and renders from embedded glyphs.
  */
 PAGX_TEST(PAGXTest, PrecomposedTextRender) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   auto doc = pagx::PAGXDocument::Make(240, 140);
   auto layer = doc->makeNode<pagx::Layer>();
   layer->width = 240;
@@ -1095,14 +1104,18 @@ static void TestPAGXDirectory(tgfx::Context* context, const std::string& directo
  * Renders each sample and compares with baseline screenshots.
  */
 PAGX_TEST(PAGXTest, SpecSamples) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("spec/samples"), "spec_");
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("spec/samples"), "spec_");
 }
 
 /**
  * Test all text-related PAGX files in resources/text directory.
  */
 PAGX_TEST(PAGXTest, TextFiles) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("resources/text"), "text_");
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("resources/text"), "text_");
 }
 
 /**
@@ -1110,7 +1123,9 @@ PAGX_TEST(PAGXTest, TextFiles) {
  * Tests container layout and constraint positioning behaviors with visual verification.
  */
 PAGX_TEST(PAGXTest, LayoutFiles) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("resources/layout"), "layout_");
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("resources/layout"), "layout_");
 }
 
 /**
@@ -5687,7 +5702,10 @@ PAGX_TEST(PAGXTest, TextBoxPaddingRoundTrip) {
  * Test all HTML-related PAGX files in resources/pagx_to_html directory.
  */
 PAGX_TEST(PAGXTest, HtmlFiles) {
-  TestPAGXDirectory(context, ProjectPath::Absolute("resources/pagx_to_html"), "html_native_");
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  TestPAGXDirectory(deviceLock.context(), ProjectPath::Absolute("resources/pagx_to_html"),
+                    "html_native_");
 }
 
 /**
@@ -8416,6 +8434,9 @@ static void WriteSVGFile(const std::string& svgContent, const std::string& relat
  * Test rendering with Mono, Duo, and Multi noise filters side by side.
  */
 PAGX_TEST(PAGXTest, NoiseFilterModes) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   constexpr int canvasW = 400;
   constexpr int canvasH = 150;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
@@ -8476,6 +8497,9 @@ PAGX_TEST(PAGXTest, NoiseFilterModes) {
  * correctness.
  */
 PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   constexpr int canvasW = 800;
   constexpr int canvasH = 470;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
@@ -8669,6 +8693,9 @@ PAGX_TEST(PAGXTest, NoiseFilterAllElements) {
  * export. The blendMode is set to Multiply so the noise composites differently from Normal.
  */
 PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   constexpr int canvasW = 200;
   constexpr int canvasH = 200;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
@@ -8733,6 +8760,9 @@ PAGX_TEST(PAGXTest, NoiseStyleBlendModeOnImage) {
  * Covers writeNoiseStyle for all three modes.
  */
 PAGX_TEST(PAGXTest, NoiseStyleModes) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   constexpr int canvasW = 400;
   constexpr int canvasH = 180;
   auto doc = pagx::PAGXDocument::Make(canvasW, canvasH);
@@ -9094,6 +9124,9 @@ PAGX_TEST(PAGXTest, ChannelNoiseStyle) {
  * re-accepting baselines after renaming the test.
  */
 PAGX_TEST(PAGXTest, ExportNoiseFilterAnimation) {
+  pag::DeviceLockScope deviceLock;
+  ASSERT_TRUE(static_cast<bool>(deviceLock));
+  auto* context = deviceLock.context();
   constexpr int canvasW = 500;
   constexpr int canvasH = 260;
   constexpr int totalFrames = 12;

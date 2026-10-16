@@ -60,6 +60,107 @@ jobs:
           name: ios_build
           path: ios
 
+  mac_metal:
+    # Compile-only verification of the Metal backend on macOS. Building PAGFullTest covers all
+    # test modules on top of the library itself. Running the Metal tests (PAGFullTest_Metal)
+    # requires the per-backend test infrastructure, which lands in a follow-up PR.
+    runs-on: macos-14
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-mac-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: |
+            third-party-mac-metal-
+            third-party-autotest-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build macOS Metal
+        run: |
+          mkdir -p third_party/tgfx/out/cache
+          cmake -G Ninja -DPAG_USE_METAL=ON -DPAG_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -B build-metal
+          cmake --build build-metal --target PAGFullTest -- -j 12
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-mac-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+  ios_metal:
+    # Compile-only verification of the Metal backend on iOS devices (arm64). The deployment
+    # target is raised to 15.0 automatically by the top-level CMakeLists when Metal is enabled.
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-ios-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: |
+            third-party-ios-metal-
+            third-party-ios-
+
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm
+
+      - name: Install Build Tools
+        run: |
+          chmod +x install_tools.sh
+          ./install_tools.sh
+        shell: bash
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build iOS Metal
+        run: |
+          mkdir -p third_party/tgfx/out/cache
+          cd ios
+          node gen_ios -DPAG_USE_METAL=ON
+          xcodebuild -workspace PAGViewer.xcworkspace -scheme PAGViewer -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-ios-metal-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios_metal_build
+          path: ios
+
   android:
     runs-on: ubuntu-latest
     steps:

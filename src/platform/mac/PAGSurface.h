@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,9 +23,10 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
+// Backend-specific factory categories (PAGSurface+OpenGL.h / PAGSurface+Metal.h) are selected by
+// the libpag build and exported through the framework's umbrella header; only the
+// backend-agnostic surface entry points stay in this class interface.
 PAG_API @interface PAGSurface : NSObject
-
-+ (PAGSurface*)FromView:(NSView*)view;
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead.)
@@ -66,14 +67,20 @@ PAG_API @interface PAGSurface : NSObject
 - (void)freeCache;
 
 /**
- * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if this
- * PAGSurface is created by [PAGSurface FromLayer].
+ * Returns the internal CVPixelBuffer object associated with this PAGSurface. Returns nil if the
+ * PAGSurface is created from a view or a layer — [PAGSurface FromView:] on the OpenGL backend
+ * or [PAGSurface FromLayer:] with a CAMetalLayer on the Metal backend.
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
  * the PAGSurface will not be captured.
+ * Limitation: on a PAGSurface created from a CAMetalLayer this method is unreliable — the
+ * underlying tgfx window presents and releases its CAMetalDrawable as part of every flush, so a
+ * later readback receives whichever drawable comes off the layer's rotation queue (often blank or
+ * stale). Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if you need reliable
+ * readback with Metal. The OpenGL backend is not affected.
  */
 - (CVPixelBufferRef)makeSnapshot;
 @end

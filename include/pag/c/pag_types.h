@@ -105,6 +105,12 @@ typedef struct pag_mtl_texture_info {
   void* texture = nullptr;
 } pag_mtl_texture_info;
 
+// Sync info for an id<MTLEvent>. Always timeline-style (event pointer + signal value).
+typedef struct pag_mtl_event_info {
+  void* event = nullptr;
+  unsigned long long value = 0;
+} pag_mtl_event_info;
+
 typedef struct pag_point {
   float x;
   float y;

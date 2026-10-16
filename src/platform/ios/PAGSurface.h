@@ -9,10 +9,10 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,26 +22,17 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
+// Backend-specific factory categories (PAGSurface+OpenGL.h / PAGSurface+Metal.h) are selected by
+// the libpag build and exported through the framework's umbrella header; only the
+// backend-agnostic surface entry points stay in this class interface.
 PAG_API @interface PAGSurface : NSObject
 
 /**
- * Creates a new PAGSurface from specified CAEAGLLayer. The GPU context will be created internally
- * by PAGSurface.
- */
-+ (PAGSurface*)FromLayer:(CAEAGLLayer*)layer;
-
-/**
  * Creates a new PAGSurface from specified CVPixelBuffer. The GPU context will be created internally
- * by PAGSurface.
+ * by PAGSurface. On the simulator this returns nil when the GL build's EAGL backend has no
+ * hardware buffers; Metal builds are not affected.
  */
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
-
-/**
- * Creates a new PAGSurface from specified CVPixelBuffer and EAGLContext. Multiple PAGSurfaces with
- * the same context share the same GPU caches. The caches are not destroyed when resetting a
- * PAGPlayer's surface to another PAGSurface with the same context.
- */
-+ (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext;
 
 /**
  * [Deprecated](Please use [PAGSurface MakeOffscreen] instead)
@@ -82,20 +73,28 @@ PAG_API @interface PAGSurface : NSObject
 - (void)freeCache;
 
 /**
- * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if the
- * PAGSurface is created by [PAGSurface FromLayer], or the app is running in the simulator.
+ * Returns the internal CVPixelBuffer object associated with this PAGSurface. Returns nil if the
+ * PAGSurface is created from a layer — [PAGSurface FromLayer:] with either a CAEAGLLayer
+ * (OpenGL backend) or a CAMetalLayer (Metal backend) — or if the app is running in the simulator
+ * on the OpenGL backend.
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
  * the PAGSurface will not be captured.
+ * Limitation: on a PAGSurface created from a CAMetalLayer this method is unreliable — the
+ * underlying tgfx window presents and releases its CAMetalDrawable as part of every flush, so a
+ * later readback receives whichever drawable comes off the layer's rotation queue (often blank or
+ * stale). Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if you need reliable
+ * readback with Metal. The OpenGL backend is not affected.
  */
 - (CVPixelBufferRef)makeSnapshot;
 
 /**
  * Copies the pixels of the PAGSurface to the specified memory address. The format of the copied
  * pixels is in the BGRA color type with the premultiplied alpha type. Returns false if failed.
+ * The same CAMetalLayer limitation as makeSnapshot applies.
  */
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 

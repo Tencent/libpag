@@ -20,11 +20,12 @@
 
 namespace pagx {
 
-std::shared_ptr<Drawable> Drawable::MakeFrom(std::shared_ptr<tgfx::Surface> surface) {
-  if (surface == nullptr) {
+std::shared_ptr<Drawable> Drawable::MakeFrom(std::shared_ptr<tgfx::Device> device,
+                                             std::shared_ptr<tgfx::Surface> surface) {
+  if (device == nullptr || surface == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Drawable>(new Drawable(std::move(surface)));
+  return std::shared_ptr<Drawable>(new Drawable(std::move(device), std::move(surface)));
 }
 
 }  // namespace pagx

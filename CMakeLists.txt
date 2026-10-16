@@ -1,4 +1,15 @@
 cmake_minimum_required(VERSION 3.13)
+
+# The iOS toolchain (third_party/vendor_tools/ios.toolchain.cmake) reads DEPLOYMENT_TARGET while
+# configuring the project and derives both the deployment target and the compiler target triple
+# from it. Apple toolchains reject iOS deployment targets below 15.0 (Xcode 26/27 SDKs), and
+# the tgfx Metal backend has its own >= 13.0 floor that 15.0 satisfies, so Metal builds must
+# pre-set the minimum before configuration. This only applies to iOS builds; macOS keeps its own
+# default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
+if (PAG_USE_METAL AND NOT DEFINED DEPLOYMENT_TARGET AND PLATFORM MATCHES "^(OS|SIMULATOR)")
+    set(DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum iOS deployment target" FORCE)
+endif ()
+
 project(PAG)
 
 if (APPLE)
@@ -25,6 +36,10 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building libpag
 option(PAG_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
+option(PAG_USE_METAL "Use Metal as the GPU backend on Apple platforms" OFF)
+option(PAG_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
+option(PAG_USE_D3D12 "Use D3D12 as the GPU backend on Windows" OFF)
+option(PAG_USE_WEBGPU "Use WebGPU as the GPU backend on Web" OFF)
 option(PAG_USE_SWIFTSHADER "Allow build with the SwiftShader library" OFF)
 option(PAG_USE_ANGLE "Allow build with the ANGLE library" OFF)
 option(PAG_USE_QT "Allow build with QT frameworks" OFF)
@@ -87,6 +102,62 @@ if (MACOS AND CLION_IDE AND NOT HasParent)
     option(PAG_BUILD_TESTS "Build libpag tests" ON)
 endif ()
 
+# Non-GL backends (Metal / Vulkan / D3D12 / WebGPU) are mutually exclusive with each other and
+# with OpenGL. If any non-GL backend is enabled, disable OpenGL and all GL-only variants
+# (QT / SwiftShader / ANGLE). This mirrors the mutual-exclusion contract enforced in
+# third_party/tgfx/CMakeLists.txt, and must run BEFORE the existing QT / SwiftShader mutual-
+# exclusion block so the "if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE) set(PAG_USE_OPENGL ON)"
+# fixup further down does not accidentally re-enable GL.
+#
+# The non-GL backends must not be combined: libpag passes each PAG_USE_* to tgfx unchanged, but
+# tgfx resolves them with its own priority chain (Vulkan > D3D12 > Metal > WebGPU) and silently
+# disables the losers. A combination would leave libpag compiling backend glue (Devices_*.cpp)
+# for a backend tgfx never built, failing at link time with undefined symbols.
+set(PAG_NON_GL_BACKENDS_COUNT 0)
+foreach (backend PAG_USE_METAL PAG_USE_VULKAN PAG_USE_D3D12 PAG_USE_WEBGPU)
+    if (${backend})
+        math(EXPR PAG_NON_GL_BACKENDS_COUNT "${PAG_NON_GL_BACKENDS_COUNT} + 1")
+    endif ()
+endforeach ()
+if (PAG_NON_GL_BACKENDS_COUNT GREATER 1)
+    message(FATAL_ERROR
+            "Only one non-OpenGL backend may be enabled at a time "
+            "(PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
+endif ()
+
+if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
+    foreach (gl_variant PAG_USE_OPENGL PAG_USE_QT PAG_USE_SWIFTSHADER PAG_USE_ANGLE)
+        if (${gl_variant})
+            message(WARNING "${gl_variant} is ignored because a non-OpenGL backend is enabled.")
+        endif ()
+    endforeach ()
+    set(PAG_USE_OPENGL OFF)
+    set(PAG_USE_QT OFF)
+    set(PAG_USE_SWIFTSHADER OFF)
+    set(PAG_USE_ANGLE OFF)
+endif ()
+
+# The Metal backend requires iOS 13+ (see the tgfx deployment-target check) and supports the iOS
+# simulator on arm64 only. Raise the deployment target automatically when Metal is selected so
+# `gen_ios -DPAG_USE_METAL=ON` needs no extra flags (as documented in ios/README.md). Without this
+# the toolchain's iOS default (9.0) flows into tgfx and trips its >= 13.0 check. Must run before
+# tgfx is added via add_subdirectory(). Metal also only exists on Apple platforms — reject it
+# elsewhere up front instead of failing later with a pile of undefined symbols.
+if (PAG_USE_METAL AND NOT APPLE)
+    message(FATAL_ERROR "PAG_USE_METAL is only supported on Apple platforms.")
+endif ()
+# The Metal backend supports the iOS simulator on arm64 only.
+if (PAG_USE_METAL AND IOS)
+    set(CMAKE_XCODE_ATTRIBUTE_EXCLUDED_ARCHS[sdk=iphonesimulator*] "x86_64")
+endif ()
+
+if (NOT PAG_USE_OPENGL AND NOT PAG_USE_METAL AND NOT PAG_USE_VULKAN
+        AND NOT PAG_USE_D3D12 AND NOT PAG_USE_WEBGPU)
+    message(FATAL_ERROR
+            "At least one GPU backend must be enabled "
+            "(PAG_USE_OPENGL / PAG_USE_METAL / PAG_USE_VULKAN / PAG_USE_D3D12 / PAG_USE_WEBGPU).")
+endif ()
+
 if (PAG_USE_QT)
     set(PAG_USE_SWIFTSHADER OFF)
     set(PAG_USE_ANGLE OFF)
@@ -118,6 +189,26 @@ endif ()
 
 if (PAG_USE_QT OR PAG_USE_SWIFTSHADER OR PAG_USE_ANGLE)
     set(PAG_USE_OPENGL ON)
+endif ()
+
+# Expose the selected tgfx backend to libpag sources. The Devices_* implementation files dispatch
+# on this macro to pick the right tgfx backend headers; kept in sync with the TGFX_USE_* variables
+# passed to tgfx further down. libpag defines its own copy instead of relying on tgfx's PRIVATE
+# compile definitions, so tgfx can change its visibility policy without breaking libpag.
+if (PAG_USE_OPENGL)
+    list(APPEND PAG_DEFINES TGFX_USE_OPENGL)
+endif ()
+if (PAG_USE_METAL)
+    list(APPEND PAG_DEFINES TGFX_USE_METAL)
+endif ()
+if (PAG_USE_VULKAN)
+    list(APPEND PAG_DEFINES TGFX_USE_VULKAN)
+endif ()
+if (PAG_USE_D3D12)
+    list(APPEND PAG_DEFINES TGFX_USE_D3D12)
+endif ()
+if (PAG_USE_WEBGPU)
+    list(APPEND PAG_DEFINES TGFX_USE_WEBGPU)
 endif ()
 
 if (PAG_USE_FFAVC)
@@ -201,6 +292,13 @@ file(GLOB_RECURSE SRC_FILES
         src/base/*.*
         src/codec/*.*
         src/rendering/*.*)
+# Devices_Metal.mm is an Objective-C++ file; it only has content under TGFX_USE_METAL. On non-Apple
+# platforms the GCC toolchain lacks the Objective-C++ frontend (`cc1objplus`) and would fail even
+# compiling an empty .mm. Drop it from the source list outside of Apple.
+if (NOT APPLE)
+    list(FILTER SRC_FILES EXCLUDE REGEX "src/rendering/gpu/Devices_Metal\\.mm$")
+    list(FILTER SRC_FILES EXCLUDE REGEX "src/base/utils/TGFXCast_Metal\\.mm$")
+endif ()
 list(APPEND PAG_FILES ${SRC_FILES})
 
 if (PAG_BUILD_PAGX)
@@ -430,6 +528,22 @@ function(find_include_dirs out)
     set(${out} ${include_dirs} PARENT_SCOPE)
 endfunction()
 
+# Apple platform files are organized per GPU backend, mirroring tgfx's src/gpu/opengl and
+# src/gpu/metal layout: backend implementations live under private/opengl/ and private/metal/,
+# and the public PAGSurface factories live in the PAGSurface+OpenGL / PAGSurface+Metal
+# categories. Only the built backend's files are compiled and exported. Both categories declare
+# the same ObjC selector (FromLayer:), and framework consumers have no TGFX_USE_* build macros,
+# so the selection has to happen here at configuration time rather than in the public headers.
+if (APPLE)
+    if (PAG_USE_METAL)
+        set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+Metal.h")
+        set(PAG_APPLE_EXCLUDED_BACKEND_REGEX "(/private/opengl(/|$)|PAGSurface\\+OpenGL\\.)")
+    else ()
+        set(PAG_SURFACE_BACKEND_HEADER "PAGSurface+OpenGL.h")
+        set(PAG_APPLE_EXCLUDED_BACKEND_REGEX "(/private/metal(/|$)|PAGSurface\\+Metal\\.)")
+    endif ()
+endif ()
+
 if (WEB)
     list(APPEND PAG_DEFINES PAG_BUILD_FOR_WEB)
     if (USE_NATIVE_PLATFORM)
@@ -465,25 +579,33 @@ elseif (IOS)
             find_library(OpenGLES_LIBS OpenGLES REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${OpenGLES_LIBS})
             list(APPEND PAG_DEFINES GLES_SILENCE_DEPRECATION)
-        else ()
-            # Uses Metal instead.
+        elseif (PAG_USE_METAL)
             find_library(Metal_LIBS Metal REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
         endif ()
 
+        # The umbrella header is generated from libpag.h.in so it imports only the built backend's
+        # surface category. The template itself is not a source; the generated copy must be a
+        # target source as well, otherwise CMake does not copy it into the framework Headers.
+        configure_file(src/platform/ios/libpag.h.in ${CMAKE_CURRENT_BINARY_DIR}/ios/libpag.h @ONLY)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
+        list(FILTER PLATFORM_FILES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}|libpag\\.h\\.in$")
+        list(APPEND PLATFORM_FILES ${CMAKE_CURRENT_BINARY_DIR}/ios/libpag.h)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
         # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
         set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB IOS_PLATFORM_HEADERS src/platform/ios/*.h src/platform/cocoa/*.h)
+        list(FILTER IOS_PLATFORM_HEADERS EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}")
+        list(APPEND IOS_PLATFORM_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/ios/libpag.h)
         list(APPEND PAG_PLATFORM_HEADERS ${IOS_PLATFORM_HEADERS})
         find_include_dirs(IOS_PLATFORM_INCLUDES
                 src/platform/ios/*.h
                 src/platform/ios/private/*.h
                 src/platform/cocoa/*.h
                 src/platform/cocoa/private/*.h)
+        list(FILTER IOS_PLATFORM_INCLUDES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}")
         list(APPEND PAG_INCLUDES ${IOS_PLATFORM_INCLUDES})
     endif ()
 elseif (MACOS)
@@ -508,25 +630,33 @@ elseif (MACOS)
             find_library(OpenGL_LIBS OpenGL REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${OpenGL_LIBS})
             list(APPEND PAG_DEFINES GL_SILENCE_DEPRECATION)
-        else ()
-            # Uses Metal instead.
+        elseif (PAG_USE_METAL)
             find_library(Metal_LIBS Metal REQUIRED)
             list(APPEND PAG_SHARED_LIBS ${Metal_LIBS})
         endif ()
 
+        # The umbrella header is generated from libpag.h.in so it imports only the built backend's
+        # surface category. The template itself is not a source; the generated copy must be a
+        # target source as well, otherwise CMake does not copy it into the framework Headers.
+        configure_file(src/platform/mac/libpag.h.in ${CMAKE_CURRENT_BINARY_DIR}/mac/libpag.h @ONLY)
         file(GLOB_RECURSE PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
+        list(FILTER PLATFORM_FILES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}|libpag\\.h\\.in$")
+        list(APPEND PLATFORM_FILES ${CMAKE_CURRENT_BINARY_DIR}/mac/libpag.h)
         list(APPEND PAG_FILES ${PLATFORM_FILES})
         # The cocoa layer is compiled under manual reference counting, where the __weak zeroing
         # reference used by PAGAnimatorListenerProxy requires -fobjc-weak to be enabled explicitly.
         set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/platform/cocoa/private/PAGAnimatorListenerProxy.mm
                 PROPERTIES COMPILE_OPTIONS "-fobjc-weak")
         file(GLOB MAC_PLATFORM_HEADERS src/platform/mac/*.h src/platform/cocoa/*.h)
+        list(FILTER MAC_PLATFORM_HEADERS EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}")
+        list(APPEND MAC_PLATFORM_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/mac/libpag.h)
         list(APPEND PAG_PLATFORM_HEADERS ${MAC_PLATFORM_HEADERS})
         find_include_dirs(MAC_PLATFORM_INCLUDES
                 src/platform/mac/*.h
                 src/platform/mac/private/*.h
                 src/platform/cocoa/*.h
                 src/platform/cocoa/private/*.h)
+        list(FILTER MAC_PLATFORM_INCLUDES EXCLUDE REGEX "${PAG_APPLE_EXCLUDED_BACKEND_REGEX}")
         list(APPEND PAG_INCLUDES ${MAC_PLATFORM_INCLUDES})
     endif ()
 elseif (ANDROID)
@@ -665,6 +795,10 @@ elseif (HAS_CUSTOM_TGFX_DIR)
     message("TGFX_DIR: ${TGFX_DIR}")
     list(APPEND PAG_INCLUDES ${TGFX_DIR}/include)
     set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+    set(TGFX_USE_METAL ${PAG_USE_METAL})
+    set(TGFX_USE_VULKAN ${PAG_USE_VULKAN})
+    set(TGFX_USE_D3D12 ${PAG_USE_D3D12})
+    set(TGFX_USE_WEBGPU ${PAG_USE_WEBGPU})
     set(TGFX_USE_QT ${PAG_USE_QT})
     set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
     set(TGFX_USE_ANGLE ${PAG_USE_ANGLE})
@@ -689,6 +823,10 @@ else ()
     if (EXISTS ${TGFX_CACHE_DIR})
         message("TGFX_CACHE_DIR: ${TGFX_CACHE_DIR}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_OPENGL=${PAG_USE_OPENGL}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_METAL=${PAG_USE_METAL}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_VULKAN=${PAG_USE_VULKAN}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_D3D12=${PAG_USE_D3D12}")
+        list(APPEND TGFX_OPTIONS "-DTGFX_USE_WEBGPU=${PAG_USE_WEBGPU}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_QT=${PAG_USE_QT}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_SWIFTSHADER=${PAG_USE_SWIFTSHADER}")
         list(APPEND TGFX_OPTIONS "-DTGFX_USE_ANGLE=${PAG_USE_ANGLE}")
@@ -723,6 +861,10 @@ else ()
     else ()
         message("TGFX_DIR: ${TGFX_DIR}")
         set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
+        set(TGFX_USE_METAL ${PAG_USE_METAL})
+        set(TGFX_USE_VULKAN ${PAG_USE_VULKAN})
+        set(TGFX_USE_D3D12 ${PAG_USE_D3D12})
+        set(TGFX_USE_WEBGPU ${PAG_USE_WEBGPU})
         set(TGFX_USE_QT ${PAG_USE_QT})
         set(TGFX_USE_SWIFTSHADER ${PAG_USE_SWIFTSHADER})
         set(TGFX_USE_ANGLE ${PAG_USE_ANGLE})

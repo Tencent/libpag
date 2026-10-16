@@ -147,23 +147,42 @@ bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
   return true;
 }
 
-BackendSemaphore::BackendSemaphore()
-    : _backend(Backend::MOCK), _glSync(nullptr), _isInitialized(false) {
+BackendSemaphore::BackendSemaphore() : _backend(Backend::MOCK), _glSync(nullptr) {
 }
 
 void BackendSemaphore::initGL(void* sync) {
-  if (sync == nullptr) {
-    return;
-  }
   _backend = Backend::OPENGL;
   _glSync = sync;
-  _isInitialized = true;
 }
 
 void* BackendSemaphore::glSync() const {
-  if (!_isInitialized || _backend != Backend::OPENGL) {
+  if (_backend != Backend::OPENGL || _glSync == nullptr) {
     return nullptr;
   }
   return _glSync;
+}
+
+void BackendSemaphore::initMetal(const MtlEventInfo& info) {
+  _backend = Backend::METAL;
+  _mtlInfo = info;
+}
+
+bool BackendSemaphore::getMtlEventInfo(MtlEventInfo* info) const {
+  if (_backend != Backend::METAL || _mtlInfo.event == nullptr) {
+    return false;
+  }
+  *info = _mtlInfo;
+  return true;
+}
+
+bool BackendSemaphore::isInitialized() const {
+  switch (_backend) {
+    case Backend::OPENGL:
+      return _glSync != nullptr;
+    case Backend::METAL:
+      return _mtlInfo.event != nullptr;
+    default:
+      return false;
+  }
 }
 }  // namespace pag

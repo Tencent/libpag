@@ -9,16 +9,16 @@
 //
 //      http://www.apache.org/licenses/LICENSE-2.0
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSurfaceImpl.h"
-#include "GPUDrawable.h"
 #import "PAGLayerImpl+Internal.h"
+#import "PAGSurfaceImpl+Internal.h"
 #include "base/utils/Log.h"
 #include "platform/cocoa/private/PixelBufferUtil.h"
 
@@ -30,15 +30,6 @@
 
 @implementation PAGSurfaceImpl {
   CVPixelBufferRef pixelBuffer;
-}
-
-+ (PAGSurfaceImpl*)FromView:(NSView*)view {
-  auto drawable = pag::GPUDrawable::FromView(view);
-  auto surface = pag::PAGSurface::MakeFrom(drawable);
-  if (surface == nullptr) {
-    return nil;
-  }
-  return [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
 }
 
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
@@ -97,10 +88,10 @@
   uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(hardwareBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
+  CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
   if (!status) {
     LOGE("ReadPixels failed!");
   }
-  CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
   return hardwareBuffer;
 }
 

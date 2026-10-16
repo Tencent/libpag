@@ -43,3 +43,28 @@ void* pag_backend_semaphore_get_gl_sync(pag_backend_semaphore* semaphore) {
   }
   return semaphore->p.glSync();
 }
+
+void pag_backend_semaphore_init_metal(pag_backend_semaphore* semaphore, void* mtlEvent,
+                                      unsigned long long value) {
+  if (semaphore == nullptr) {
+    return;
+  }
+  pag::MtlEventInfo info = {};
+  info.event = mtlEvent;
+  info.value = static_cast<uint64_t>(value);
+  semaphore->p.initMetal(info);
+}
+
+bool pag_backend_semaphore_get_mtl_event(pag_backend_semaphore* semaphore,
+                                         pag_mtl_event_info* eventInfo) {
+  if (semaphore == nullptr || eventInfo == nullptr) {
+    return false;
+  }
+  pag::MtlEventInfo info = {};
+  if (semaphore->p.getMtlEventInfo(&info)) {
+    eventInfo->event = info.event;
+    eventInfo->value = static_cast<unsigned long long>(info.value);
+    return true;
+  }
+  return false;
+}
