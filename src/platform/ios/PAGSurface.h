@@ -81,20 +81,19 @@ PAG_API @interface PAGSurface : NSObject
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
- * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
- * the PAGSurface will not be captured.
- * Limitation: on a PAGSurface created from a CAMetalLayer this method is unreliable — the
- * underlying tgfx window presents and releases its CAMetalDrawable as part of every flush, so a
- * later readback receives whichever drawable comes off the layer's rotation queue (often blank or
- * stale). Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if you need reliable
- * readback with Metal. The OpenGL backend is not affected.
+ * Returns a CVPixelBuffer object capturing the contents of the PAGSurface, or nil if readback
+ * fails. Subsequent rendering of the PAGSurface will not be captured.
+ * On a PAGSurface created from a CAMetalLayer, readback is rejected if the layer is
+ * framebuffer-only or the frame's drawing batch has already been flushed. A presented window frame
+ * is not retained for later snapshots. Use an offscreen PAGSurface ([PAGSurface MakeOffscreen:]) if
+ * you need reliable readback with Metal.
  */
 - (CVPixelBufferRef)makeSnapshot;
 
 /**
  * Copies the pixels of the PAGSurface to the specified memory address. The format of the copied
- * pixels is in the BGRA color type with the premultiplied alpha type. Returns false if failed.
- * The same CAMetalLayer limitation as makeSnapshot applies.
+ * pixels is in the BGRA color type with the premultiplied alpha type. Returns NO if copying fails,
+ * including when CAMetalLayer readback is rejected as described by makeSnapshot.
  */
 - (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 

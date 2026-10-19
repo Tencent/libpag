@@ -1100,6 +1100,11 @@ if (PAG_BUILD_TESTS)
     endif ()
 
     file(GLOB_RECURSE SRC_FILES test/src/*.*)
+    if (NOT PAG_USE_METAL)
+        list(FILTER SRC_FILES EXCLUDE REGEX "PAGMetalSurfaceTest\\.mm$")
+    elseif (APPLE)
+        list(APPEND PAG_TEST_LINK_OPTIONS -ObjC)
+    endif ()
     file(GLOB_RECURSE CLI_TEST_FILES src/cli/*.cpp src/cli/*.h)
     list(FILTER CLI_TEST_FILES EXCLUDE REGEX "main\\.cpp$")
     # Build minizip's reader into test binaries only, so archive-producing tests
