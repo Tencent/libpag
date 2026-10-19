@@ -79,6 +79,7 @@ require('./ensure-built').ensureBuilt();
 
 const { launchBrowser, resolveEngine, SUPPORTED_ENGINES } = require('./dist/lib/browser-engine');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
+const { parseScenario, selectCheckpoint, runScenario } = require('./dist/lib/interaction');
 const { runPagxImport, defaultPagxBin, PagxImportError } = require('./dist/lib/pagx-runner');
 const { errMessage, isHttpUrl, makeFail, parseNumber, SNAPSHOT_DEFAULTS } = require('./dist/lib/common');
 const {
@@ -454,6 +455,17 @@ function parseGetSource(req) {
 function resolveOptions(reqOptions, forUrl) {
   const out = {};
   const r = reqOptions || {};
+  if (r.checkpoint !== undefined && r.scenario === undefined) throw new HttpError(400, 'checkpoint requires scenario');
+  if (r.scenario !== undefined) {
+    try {
+      for (const key of ['viewportWidth', 'viewportHeight', 'waitMs', 'selector', 'captureAnimations', 'scrollReveal']) {
+        if (r[key] !== undefined) throw new Error(`${key} cannot be combined with scenario; configure the scenario instead`);
+      }
+      if (r.checkpoint !== undefined && (typeof r.checkpoint !== 'string' || !r.checkpoint)) throw new Error('checkpoint must be a non-empty string');
+      out.scenario = parseScenario(r.scenario);
+      out.checkpoint = selectCheckpoint(out.scenario, r.checkpoint);
+    } catch (err) { throw new HttpError(400, errMessage(err)); }
+  }
   if (Number.isFinite(r.viewportWidth) && r.viewportWidth > 0) out.viewportWidth = r.viewportWidth;
   if (Number.isFinite(r.viewportHeight) && r.viewportHeight > 0) out.viewportHeight = r.viewportHeight;
   if (Number.isFinite(r.waitMs) && r.waitMs >= 0) out.waitMs = r.waitMs;
@@ -510,7 +522,9 @@ async function handleSnapshot(req, res, ctx, source) {
       targetUrl = `file://${tmp.file}`;
       inputDesc = `in=${source.html.length}B`;
     }
-    const result = await runSnapshot(ctx.engineHandle, targetUrl, runOpts);
+    const result = runOpts.scenario
+      ? (await runScenario(ctx.engineHandle, targetUrl, runOpts.scenario, runOpts))[0]
+      : await runSnapshot(ctx.engineHandle, targetUrl, runOpts);
 
     let pagx = null;
     if (wantsPagx) {
@@ -541,9 +555,12 @@ async function handleSnapshot(req, res, ctx, source) {
     res.setHeader('X-Snapshot-Width', String(result.width));
     res.setHeader('X-Snapshot-Height', String(result.height));
     res.setHeader('X-Snapshot-Format', format);
+    if (result.name) res.setHeader('X-Snapshot-Checkpoint', result.name);
+    if (result.warnings?.length) res.setHeader('X-Snapshot-Warnings', String(result.warnings.length));
 
     if (acceptsJson) {
       const body = { width: result.width, height: result.height };
+      if (result.name) { body.checkpoint = result.name; body.warnings = result.warnings; }
       if (wantsHtml) body.html = result.html;
       if (wantsPagx) body.pagx = pagx;
       jsonResponse(res, 200, body);
@@ -701,7 +718,7 @@ async function startServer(opts) {
   const server = http.createServer((req, res) => dispatch(req, res, ctx));
 
   server.listen(opts.port, opts.host, () => {
-    log(`listening on http://${opts.host}:${opts.port}`);
+    log(`listening on http://${opts.host}:${server.address().port}`);
   });
 
   // Coordinated shutdown: stop accepting new connections, drain in-flight

@@ -28,6 +28,7 @@ const {
   isHttpUrl,
 } = require('./dist/lib/pipeline');
 const { runBatch } = require('./dist/lib/batch');
+const { runScenarioToPagx } = require('./dist/lib/scenario-pipeline');
 const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./dist/lib/browser-engine');
 const { parseNumber } = require('./dist/lib/common');
 
@@ -72,6 +73,9 @@ Options (any unknown flag is forwarded to snapshot.js):
                              animations (CSS @keyframes, WAAPI, GSAP, anime.js)
                              into the subset so the .pagx replays the motion.
                              Default: disabled (a single static frame).
+  --scenario <file.json>     Replay one interaction session; export <base>.<checkpoint>
+                             files and <base>.captures.json for all capture steps
+  --checkpoint <name>        With --scenario, export only the selected checkpoint
   --scroll-reveal            Forwarded to snapshot.js: walk the page top-to-
                              bottom before snapshotting so scroll-triggered
                              reveal animations fire and lazy media loads
@@ -135,6 +139,8 @@ function parseArgs(argv) {
     keepSubsetHtml: true,
     inlineIconFonts: true,
     captureAnimations: false,
+    scenario: '',
+    checkpoint: '',
     scrollReveal: false,
     downloadFonts: false,
     embedFonts: false,
@@ -211,6 +217,12 @@ function parseArgs(argv) {
         break;
       case '--capture-animations':
         opts.captureAnimations = true;
+        break;
+      case '--scenario':
+        opts.scenario = requireValue(a, argv[++i]);
+        break;
+      case '--checkpoint':
+        opts.checkpoint = requireValue(a, argv[++i]);
         break;
       case '--scroll-reveal':
         opts.scrollReveal = true;
@@ -292,6 +304,13 @@ function parseArgs(argv) {
         if (!opts.input) opts.input = a;
         else failArg(`unexpected positional argument '${a}'`);
         break;
+    }
+  }
+  if (opts.checkpoint && !opts.scenario) failArg('--checkpoint requires --scenario');
+  if (opts.scenario) {
+    for (const flag of ['--batch', '--capture-animations', '--scroll-reveal', '--viewport-width',
+      '--viewport-height', '--wait-ms', '--selector']) {
+      if (argv.includes(flag)) failArg(`${flag} cannot be combined with --scenario; configure the scenario instead`);
     }
   }
   if (opts.batchDir) {
@@ -437,8 +456,11 @@ async function main() {
   preflightPagxBin(opts);
 
   try {
-    await runHtmlToPagx({
+    const run = opts.scenario ? runScenarioToPagx : runHtmlToPagx;
+    await run({
       input: opts.input,
+      scenario: opts.scenario,
+      checkpoint: opts.checkpoint,
       outputDir: opts.outputDir,
       outputName: opts.outputName,
       pagxBin: opts.pagxBin,

@@ -13,6 +13,7 @@ export interface CaptureOptions {
   extent?: 'viewport' | 'document';
   unsupported?: 'error' | 'rasterize';
   timeoutMs?: number;
+  inlineIconFonts?: boolean;
 }
 
 export interface CapturedBox {
@@ -189,7 +190,7 @@ export async function renderCapturedPage(
     if (differences.length) throw new Error(`State capture could not preserve geometry: ${differences.slice(0, 5).join('; ')}`);
     await page.evaluate(inlineExternalImages, {});
     await page.evaluate(inlineCanvases);
-    await inlineIconFontsOnPage(page, {});
+    if (options.inlineIconFonts !== false) await inlineIconFontsOnPage(page, {});
     await page.evaluate(materializeDecorativePseudoElements);
     const snapshot = await page.evaluate((extent: string) => {
       const api = (window as unknown as { __pagxSnapshot: { takeSnapshot: (opts: object) =>
@@ -219,7 +220,7 @@ export async function captureCurrentPage(
     const png = Buffer.from(await page.screenshot({ type: 'png', fullPage: false }));
     const { width, height } = captured.viewport;
     return { width, height, url: captured.url, warnings: captured.unsupported,
-      html: `<!DOCTYPE html><html><body style="width:${width}px;height:${height}px"><img style="width:${width}px;height:${height}px" src="data:image/png;base64,${png.toString('base64')}"></body></html>` };
+      html: `<!DOCTYPE html><html><body data-pagx-capture-mode="current-state" style="margin:0;width:${width}px;height:${height}px"><img style="display:block;width:${width}px;height:${height}px" src="data:image/png;base64,${png.toString('base64')}"></body></html>` };
   }
   const mirror = options.mirror || await launchBrowser({ engine: options.engine });
   try { return await renderCapturedPage(mirror, captured, options); }

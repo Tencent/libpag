@@ -27,6 +27,7 @@
 'use strict';
 
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 // Fail fast with a copy-pasteable `npm install` / `npm run build` hint if `dist/` (the
 // compiled TypeScript this script loads below) hasn't been built yet. Must run before the
@@ -37,9 +38,12 @@ const { parseArgs } = require('./dist/lib/cli');
 const { LOG_PREFIX } = require('./dist/lib/common');
 const { launchBrowser, formatLaunchHint } = require('./dist/lib/browser-engine');
 const { runSnapshot } = require('./dist/lib/snapshot-runner');
+const { parseScenario, selectCheckpoint, runScenario } = require('./dist/lib/interaction');
 
 async function main() {
   const opts = parseArgs(process.argv);
+  const scenario = opts.scenario ? parseScenario(JSON.parse(fs.readFileSync(opts.scenario, 'utf8'))) : null;
+  const checkpoint = scenario ? selectCheckpoint(scenario, opts.checkpoint) : '';
 
   if (!opts.isUrl && !fs.existsSync(opts.input)) {
     console.error(`${LOG_PREFIX}input not found: ${opts.input}`);
@@ -48,7 +52,7 @@ async function main() {
 
   // The runner expects a fully-qualified URL. Local paths become file:// URLs
   // here so the runner stays scheme-agnostic.
-  const targetUrl = opts.isUrl ? opts.input : `file://${opts.input}`;
+  const targetUrl = opts.isUrl ? opts.input : pathToFileURL(opts.input).href;
 
   let engineHandle;
   try {
@@ -66,7 +70,7 @@ async function main() {
   }
 
   try {
-    const result = await runSnapshot(engineHandle, targetUrl, {
+    const runOpts = {
       viewportWidth: opts.viewportWidth,
       viewportHeight: opts.viewportHeight,
       waitMs: opts.waitMs,
@@ -82,7 +86,11 @@ async function main() {
       downloadImages: opts.downloadImages,
       imageDir: opts.imageDir,
       log: (msg) => console.error(`${LOG_PREFIX}${msg}`),
-    });
+    };
+    const result = scenario
+      ? (await runScenario(engineHandle, targetUrl, scenario, { ...runOpts, checkpoint }))[0]
+      : await runSnapshot(engineHandle, targetUrl, runOpts);
+    for (const warning of result.warnings || []) console.error(`${LOG_PREFIX}${warning}`);
 
     if (opts.outputToStdout) {
       // Stdout mode (triggered by `-o -`, used by pagx's html-snapshot

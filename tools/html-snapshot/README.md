@@ -160,6 +160,31 @@ Before capture the runner waits for visible images, fonts and stable visible geo
 set `stableMs: 0` when deliberately capturing continuous motion. Input actions are not
 replayed after a failed readiness condition. Errors include the failed step number.
 
+Use the checked-in example `test/fixtures/interaction.scenario.json`:
+
+```bash
+# One selected checkpoint, through the native CLI (from the repository root).
+cmake-build-debug/pagx import --input tools/html-snapshot/test/fixtures/interaction.html \
+  --scenario tools/html-snapshot/test/fixtures/interaction.scenario.json \
+  --checkpoint advanced --output /tmp/advanced.pagx
+
+# All checkpoints in one browser session (from tools/html-snapshot).
+./html2pagx test/fixtures/interaction.html --scenario test/fixtures/interaction.scenario.json -o /tmp/states
+```
+
+`html2pagx` produces `<base>.<checkpoint>.subset.html`, `.pagx`, `.png` and a
+`<base>.captures.json` manifest. `--checkpoint` selects only one state. `snapshot.js`
+and `pagx import` produce a single output, so multiple captures require `--checkpoint`.
+The native importer preserves the measured absolute layout of these subsets.
+Scenario mode owns viewport, readiness and scroll behavior; it rejects `--viewport-*`,
+`--wait-ms`, `--selector`, `--scroll-reveal` and `--capture-animations`. `--batch` with a
+scenario is currently unsupported. The legacy invocation remains unchanged.
+
+For HTTP, POST the usual `{html, format}` or `{url, format}` JSON with
+`options: {scenario: {...}, checkpoint: "advanced"}`. JSON responses include
+`checkpoint` and `warnings`; multiple captures require a checkpoint. Invalid scenario
+syntax, conflicting options and unknown checkpoints return HTTP 400 before execution.
+
 ```bash
 node snapshot.js <input.html | http(s)://url> [-o <out.html>]
 ```

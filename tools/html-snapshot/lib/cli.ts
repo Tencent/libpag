@@ -35,6 +35,8 @@ export interface SnapshotCliOptions {
   reducedMotion: boolean;
   inlineIconFonts: boolean;
   captureAnimations: boolean;
+  scenario: string;
+  checkpoint: string;
   scrollReveal: boolean;
   downloadFonts: boolean;
   fontDir: string;
@@ -47,7 +49,7 @@ export interface SnapshotCliOptions {
 // Parse `name=value` into a puppeteer-compatible cookie descriptor. The URL
 // must be filled in by the caller (we do that once we know the page URL) so
 // the cookie is scoped to the right origin.
-function parseCookie(flagName: string, value: string | undefined): ParsedCookie {
+export function parseCookie(flagName: string, value: string | undefined): ParsedCookie {
   if (value === undefined) {
     fail(`'${flagName}' requires a 'name=value' argument`);
   }
@@ -61,7 +63,7 @@ function parseCookie(flagName: string, value: string | undefined): ParsedCookie 
 // Parse `Key: Value` (or `Key:Value`) into a [key, value] pair. The colon
 // after the key is the separator; any further colons are part of the value
 // (so `Authorization: Bearer xyz:abc` works as expected).
-function parseHeader(flagName: string, value: string | undefined): ParsedHeader {
+export function parseHeader(flagName: string, value: string | undefined): ParsedHeader {
   if (value === undefined) {
     fail(`'${flagName}' requires a 'Key: Value' argument`);
   }
@@ -92,6 +94,8 @@ interface FlagSpec {
 // not to shift the index after the flag is matched. The helper here keeps
 // the table declarative.
 const FLAGS: FlagSpec[] = [
+  { names: ['--scenario'], set: (o, v) => { o.scenario = v as string; } },
+  { names: ['--checkpoint'], set: (o, v) => { o.checkpoint = v as string; } },
   { names: ['-o', '--output'],     set: (o, v) => { o.output = v as string; } },
   { names: ['--viewport-width'],   set: (o, v) => { o.viewportWidth = parseNumber('--viewport-width', v, { min: 1 }); } },
   { names: ['--viewport-height'],  set: (o, v) => { o.viewportHeight = parseNumber('--viewport-height', v, { min: 1 }); } },
@@ -208,6 +212,8 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
     // `@keyframes` + `animation` so the importer can replay it. See the FLAGS
     // entry above and lib/animation-capture.ts.
     captureAnimations: false,
+    scenario: '',
+    checkpoint: '',
     // Scroll-reveal pre-pass: when true, the page is walked top-to-bottom
     // (then scrolled back to the top) before the snapshot so scroll-triggered
     // reveal animations fire and lazy media loads. Off by default; toggle via
@@ -248,7 +254,9 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
       if (flag.takesArg === false) {
         flag.set(opts);
       } else {
-        flag.set(opts, argv[++i]);
+        const value = argv[++i];
+        if (!value || (value.startsWith('--') && value !== '-')) fail(`'${a}' requires a value`);
+        flag.set(opts, value);
       }
       continue;
     }
@@ -260,6 +268,15 @@ export function parseArgs(argv: string[]): SnapshotCliOptions {
   if (positional.length === 0) {
     printUsage();
     process.exit(2);
+  }
+  if (positional.length !== 1) fail('expected exactly one input');
+  if (opts.checkpoint && !opts.scenario) fail('--checkpoint requires --scenario');
+  if (opts.scenario) {
+    for (const flag of ['--capture-animations', '--scroll-reveal', '--viewport-width',
+      '--viewport-height', '--wait-ms', '--selector']) {
+      if (argv.includes(flag)) fail(`${flag} cannot be combined with --scenario; configure the scenario instead`);
+    }
+    opts.scenario = path.resolve(opts.scenario);
   }
   // `-o -` is the sentinel for "write HTML to stdout"; detect it here so the
   // URL/file branches below skip both their own default-output logic and the
@@ -343,6 +360,8 @@ snapshot suitable for 'pagx import --format html'. <input> may be a local
 HTML file or an http(s) URL; -o is required for URL inputs.
 
 Options:
+  --scenario <file.json>     Replay an interaction scenario before capturing
+  --checkpoint <name>        Select one state (required if the scenario has multiple captures)
   -o, --output <file|->      Output path; use '-' to write the HTML to stdout
                              (required for URL inputs;
                              defaults to <input>.subset.html for files)

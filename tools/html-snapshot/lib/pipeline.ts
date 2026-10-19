@@ -115,6 +115,8 @@ export function spawnCapture(
 export interface BuildSnapshotArgsOptions {
   scriptDir: string;
   input: string;
+  scenario?: string;
+  checkpoint?: string;
   output: string;
   browserEngine?: string;
   inlineIconFonts?: boolean;
@@ -140,6 +142,8 @@ export interface BuildSnapshotArgsOptions {
 // has not learned about yet.
 function buildSnapshotArgs(opts: BuildSnapshotArgsOptions): string[] {
   const args = [path.join(opts.scriptDir, 'snapshot.js'), opts.input, '-o', opts.output];
+  if (opts.scenario) args.push('--scenario', opts.scenario);
+  if (opts.checkpoint) args.push('--checkpoint', opts.checkpoint);
   if (opts.browserEngine) args.push('--browser-engine', opts.browserEngine);
   if (opts.inlineIconFonts === false) args.push('--no-inline-icon-fonts');
   if (opts.captureAnimations) args.push('--capture-animations', '--no-reduced-motion');
@@ -339,6 +343,8 @@ export interface RunHtmlToPagxOptions {
   pagxBin?: string;
   scriptDir?: string;
   input?: string;
+  scenario?: string;
+  checkpoint?: string;
   outputDir?: string;
   outputName?: string;
   scale?: number;
@@ -451,6 +457,8 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
     log(`[1/${totalSteps}] snapshot  ${opts.input}`);
     const snapshotResult = await snapshotImpl({
       input: opts.input,
+      scenario: opts.scenario,
+      checkpoint: opts.checkpoint,
       output: subsetHtml,
       scriptDir,
       browserEngine: opts.browserEngine,

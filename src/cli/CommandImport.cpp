@@ -242,7 +242,7 @@ static std::wstring QuoteWindowsArg(const std::wstring& value) {
 }
 
 static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& inputPath,
-                                   bool captureAnimations, std::string& html, int& exitCode,
+                                   const ImportFormatOptions& options, std::string& html, int& exitCode,
                                    std::string& error) {
   std::wstring node = L"node";
   std::wstring wideBin = UTF8ToWide(bin);
@@ -253,7 +253,13 @@ static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& in
   }
   std::wstring command = QuoteWindowsArg(node) + L" " + QuoteWindowsArg(wideBin) + L" " +
                          QuoteWindowsArg(wideInput) + L" \"-o\" \"-\"";
-  if (captureAnimations) command += L" \"--capture-animations\"";
+  if (options.captureAnimations) command += L" \"--capture-animations\"";
+  if (!options.scenario.empty()) {
+    command += L" --scenario " + QuoteWindowsArg(UTF8ToWide(options.scenario));
+  }
+  if (!options.checkpoint.empty()) {
+    command += L" --checkpoint " + QuoteWindowsArg(UTF8ToWide(options.checkpoint));
+  }
 
   SECURITY_ATTRIBUTES security = {};
   security.nLength = sizeof(security);
@@ -308,7 +314,8 @@ static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& in
 // Spawn `node <snapshot.js> <input> -o -` and capture its stdout (the rendered HTML subset).
 // snapshot.js routes progress and browser errors to stderr, which remains connected to the
 // parent's stderr on both the POSIX popen path and the Windows CreateProcessW path.
-static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool captureAnimations) {
+static SnapshotResult RunHTMLSnapshot(const std::string& inputPath,
+                                       const ImportFormatOptions& options) {
   SnapshotResult result;
   auto bin = ResolveSnapshotBin();
   if (bin.empty()) {
@@ -319,7 +326,7 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool capture
   }
 #ifdef _WIN32
   int exitCode = 1;
-  if (!RunHTMLSnapshotProcess(bin, inputPath, captureAnimations, result.html, exitCode,
+  if (!RunHTMLSnapshotProcess(bin, inputPath, options, result.html, exitCode,
                               result.error)) {
     return result;
   }
@@ -336,9 +343,11 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath, bool capture
   command += " -o -";
   // Opt into animation capture; snapshot.js is static-by-default, so the flag is
   // only appended when the caller asked for it.
-  if (captureAnimations) {
+  if (options.captureAnimations) {
     command += " --capture-animations";
   }
+  if (!options.scenario.empty()) command += " --scenario " + ShellQuote(options.scenario);
+  if (!options.checkpoint.empty()) command += " --checkpoint " + ShellQuote(options.checkpoint);
 
   FILE* pipe = popen(command.c_str(), "r");
   if (pipe == nullptr) {
@@ -427,6 +436,16 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
   std::string effectiveFormat =
       isUrl ? NormalizeFormat(format, "html") : NormalizeFormat(format, GetFileExtension(filePath));
   bool snapshotEnabled = HTMLSnapshotEnabled();
+  if (!formatOptions.checkpoint.empty() && formatOptions.scenario.empty()) {
+    result.error = "--checkpoint requires --scenario";
+    return result;
+  }
+  if (!formatOptions.scenario.empty() &&
+      (effectiveFormat != "html" || !snapshotEnabled || formatOptions.captureAnimations)) {
+    result.error = "--scenario requires HTML with the snapshot pre-pass enabled and cannot be "
+                   "combined with --capture-animations";
+    return result;
+  }
   if (isUrl && !snapshotEnabled) {
     result.error =
         "URL inputs require the html-snapshot pre-pass, but it is disabled via "
@@ -442,7 +461,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
       // Run snapshot.js as a subprocess and feed its stdout (a flat, absolute-positioned
       // subset HTML) straight to the importer. No temp file touches the disk; the HTML
       // lives in this string for the duration of the call.
-      auto snap = RunHTMLSnapshot(filePath, formatOptions.captureAnimations);
+      auto snap = RunHTMLSnapshot(filePath, formatOptions);
       if (!snap.error.empty()) {
         result.error = snap.error;
         return result;
@@ -524,6 +543,8 @@ static void PrintUsage() {
       << "  --input <file|url>             Input file or URL to import (required)\n"
       << "  --output <file>                Output PAGX file (default: <input>.pagx)\n"
       << "  --format <format>              Force input format (svg, html)\n"
+      << "  --scenario <file.json>         Replay an HTML interaction scenario\n"
+      << "  --checkpoint <name>            Select its static state (required for multiple captures)\n"
       << "  --no-resolve                   Keep import directives (external <svg> images, inline\n"
       << "                                 <svg>) instead of expanding them into native nodes\n"
       << "  --capture-animations           HTML/URL only: capture the page's animations (CSS\n"
@@ -564,6 +585,14 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       options->resolve = false;
     } else if (arg == "--capture-animations") {
       options->formatOptions.captureAnimations = true;
+    } else if (arg == "--scenario" || arg == "--checkpoint") {
+      if (i + 1 >= argc || argv[i + 1][0] == '\0' || argv[i + 1][0] == '-') {
+        std::cerr << "pagx import: error: " << arg << " requires a value\n";
+        return 1;
+      }
+      auto value = std::string(argv[++i]);
+      if (arg == "--scenario") options->formatOptions.scenario = value;
+      else options->formatOptions.checkpoint = value;
     } else if (arg == "--images" && i + 1 < argc) {
       std::string mode = argv[++i];
       if (!ParseImageStorageMode(mode, &options->imageStorage)) {

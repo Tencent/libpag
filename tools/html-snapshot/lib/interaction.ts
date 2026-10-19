@@ -147,6 +147,17 @@ export function parseScenario(input: unknown): Scenario {
   stableMs: number(raw.stableMs, 150, 'stableMs', 0, 5000) };
 }
 
+/** Single-output entry points must never silently pick one of several states. */
+export function selectCheckpoint(scenario: Scenario, checkpoint?: string): string {
+  const names = scenario.steps.filter(s => s.type === 'capture').map(s => s.name!);
+  if (checkpoint) {
+    if (!names.includes(checkpoint)) throw new Error(`Unknown checkpoint '${checkpoint}'`);
+    return checkpoint;
+  }
+  if (names.length !== 1) throw new Error('Multiple checkpoints: select one with --checkpoint (HTTP: options.checkpoint), or use html2pagx for all states');
+  return names[0];
+}
+
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 function selector(target: Target): string {
@@ -317,6 +328,11 @@ export interface RunScenarioOptions {
   checkpoint?: string;
   cookies?: CookieParam[];
   headers?: Array<[string, string]>;
+  inlineIconFonts?: boolean;
+  downloadFonts?: boolean;
+  fontDir?: string;
+  downloadImages?: boolean;
+  imageDir?: string;
   log?: (message: string) => void;
   onCheckpoint?: (result: Checkpoint) => Promise<void>;
 }
@@ -357,6 +373,7 @@ export async function runScenario(
           if (!mirror) mirror = await launchBrowser({ engine });
           const result: Checkpoint = { ...await captureCurrentPage(page, {
             mirror, engine, extent: step.extent, unsupported: step.unsupported, timeoutMs: remaining(step),
+            inlineIconFonts: options.inlineIconFonts,
           }), name: step.name! };
           if (cancelled) throw new Error('Scenario timed out');
           results.push(result);
