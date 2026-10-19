@@ -71,15 +71,12 @@ void PAGViewEventDispatcher::Finalize(napi_env, void* finalizeData, void*) {
 }
 
 void PAGViewEventDispatcher::Dispatch(napi_env env, napi_value, void* context, void*) {
-  if (context == nullptr) {
+  // A null env means the TSFN is draining its remaining queue during cleanup. N-API runs the
+  // finalizer before that drain, so the context may already be destroyed and must not be touched.
+  if (env == nullptr || context == nullptr) {
     return;
   }
-  auto dispatcher = static_cast<PAGViewEventDispatcher*>(context);
-  if (env == nullptr) {
-    dispatcher->finalize();
-    return;
-  }
-  dispatcher->drain(env);
+  static_cast<PAGViewEventDispatcher*>(context)->drain(env);
 }
 
 void PAGViewEventDispatcher::setProgressCallback(napi_env env, napi_value callback) {
