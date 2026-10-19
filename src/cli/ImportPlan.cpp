@@ -45,7 +45,7 @@ bool IsImportURL(const std::string& input) {
   return input.rfind("http://", 0) == 0 || input.rfind("https://", 0) == 0;
 }
 
-bool ParseImportOptions(const std::vector<std::string>& args, ImportOptions* options, bool* help,
+bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* options, bool* help,
                         std::string* error) {
   *options = {};
   *help = false;
@@ -232,7 +232,7 @@ bool ParseImportOptions(const std::vector<std::string>& args, ImportOptions* opt
   }
 }
 
-bool BuildImportPlan(const ImportOptions& o, const std::vector<std::string>& names,
+bool BuildImportPlan(const ImportRequest& o, const std::vector<std::string>& names,
                      ImportPlan* plan, std::string* error) {
   *plan = {};
   error->clear();

@@ -20,19 +20,46 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#include <sys/wait.h>
 #include <unistd.h>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
 #endif
 #include <cerrno>
+#include <chrono>
+#include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <thread>
 
 namespace pagx::cli {
 namespace fs = std::filesystem;
+
+static volatile std::sig_atomic_t cancellationSignal = 0;
+static volatile std::sig_atomic_t childProcessGroup = 0;
+static void CancelTool(int signal) {
+  cancellationSignal = signal;
+#ifndef _WIN32
+  if (childProcessGroup > 0) kill(-childProcessGroup, signal);
+#endif
+}
+int ToolCancellationCode() {
+  return cancellationSignal == SIGINT ? 130 : cancellationSignal ? 143 : 0;
+}
+ToolProcessScope::ToolProcessScope() {
+  cancellationSignal = 0;
+  oldInterrupt = std::signal(SIGINT, CancelTool);
+  oldTerminate = std::signal(SIGTERM, CancelTool);
+}
+ToolProcessScope::~ToolProcessScope() {
+  std::signal(SIGINT, oldInterrupt);
+  std::signal(SIGTERM, oldTerminate);
+  childProcessGroup = 0;
+  cancellationSignal = 0;
+}
 
 #ifdef _WIN32
 std::wstring UTF8ToWide(const std::string& value) {
@@ -173,7 +200,11 @@ std::string ResolveHTMLTool(const char* environment, const char* bundledEntry,
 #ifdef _WIN32
 static BOOL WINAPI HandleConsoleSignal(DWORD event) {
   // Node shares the console and handles these events; let it finish cleanup.
-  return event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT;
+  if (event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT) {
+    CancelTool(SIGINT);
+    return TRUE;
+  }
+  return FALSE;
 }
 #endif
 
@@ -226,7 +257,17 @@ int RunNodeTool(const std::string& script, const std::vector<std::string>& argum
   SetConsoleCtrlHandler(HandleConsoleSignal, TRUE);
   ResumeThread(process.hThread);
   CloseHandle(process.hThread);
-  WaitForSingleObject(process.hProcess, INFINITE);
+  auto cancelledAt = std::chrono::steady_clock::time_point{};
+  while (WaitForSingleObject(process.hProcess, 100) == WAIT_TIMEOUT) {
+    if (!ToolCancellationCode()) continue;
+    if (cancelledAt == std::chrono::steady_clock::time_point{})
+      cancelledAt = std::chrono::steady_clock::now();
+    if (std::chrono::steady_clock::now() - cancelledAt > std::chrono::seconds(10)) {
+      TerminateJobObject(job, ToolCancellationCode());
+      WaitForSingleObject(process.hProcess, INFINITE);
+      break;
+    }
+  }
   DWORD code = 1;
   GetExitCodeProcess(process.hProcess, &code);
   SetConsoleCtrlHandler(HandleConsoleSignal, FALSE);
@@ -241,6 +282,60 @@ int RunNodeTool(const std::string& script, const std::vector<std::string>& argum
   std::cerr << "pagx: failed to start Node: " << std::strerror(errno)
             << "; install Node.js or set PAGX_NODE_BIN\n";
   return 1;
+#endif
+}
+
+int RunNodeToolWait(const std::string& script, const std::vector<std::string>& arguments) {
+  if (ToolCancellationCode()) return ToolCancellationCode();
+#ifdef _WIN32
+  auto result = RunNodeTool(script, arguments);
+  return ToolCancellationCode() ? ToolCancellationCode() : result;
+#else
+  // Build argv before fork; the child only uses async-signal-safe calls until exec.
+  std::vector<std::string> args = {NodeExecutablePath(), script};
+  args.insert(args.end(), arguments.begin(), arguments.end());
+  std::vector<char*> argv;
+  for (auto& arg : args) argv.push_back(arg.data());
+  argv.push_back(nullptr);
+  auto pid = fork();
+  if (pid < 0) {
+    std::cerr << "pagx import: failed to fork Node: " << std::strerror(errno) << "\n";
+    return 1;
+  }
+  if (pid == 0) {
+    setpgid(0, 0);
+    signal(SIGINT, SIG_DFL);
+    signal(SIGTERM, SIG_DFL);
+    execvp(argv[0], argv.data());
+    static const char message[] =
+        "pagx import: failed to start Node; install Node.js or set PAGX_NODE_BIN\n";
+    auto ignored = write(STDERR_FILENO, message, sizeof(message) - 1);
+    (void)ignored;
+    _exit(127);
+  }
+  setpgid(pid, pid);
+  childProcessGroup = pid;
+  if (cancellationSignal) kill(-pid, cancellationSignal);
+  int status = 0;
+  auto cancelledAt = std::chrono::steady_clock::time_point{};
+  for (;;) {
+    auto result = waitpid(pid, &status, WNOHANG);
+    if (result == pid) break;
+    if (result < 0 && errno != EINTR) {
+      childProcessGroup = 0;
+      return 1;
+    }
+    if (ToolCancellationCode()) {
+      if (cancelledAt == std::chrono::steady_clock::time_point{})
+        cancelledAt = std::chrono::steady_clock::now();
+      if (std::chrono::steady_clock::now() - cancelledAt > std::chrono::seconds(10))
+        kill(-pid, SIGKILL);
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  childProcessGroup = 0;
+  if (ToolCancellationCode()) return ToolCancellationCode();
+  return WIFEXITED(status) ? WEXITSTATUS(status) : WIFSIGNALED(status) ? 128 + WTERMSIG(status) : 1;
 #endif
 }
 

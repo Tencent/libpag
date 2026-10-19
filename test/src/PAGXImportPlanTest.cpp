@@ -10,15 +10,15 @@ namespace pag {
 namespace fs = std::filesystem;
 using namespace pagx::cli;
 
-static bool Parse(const std::vector<std::string>& args, ImportOptions* options,
+static bool Parse(const std::vector<std::string>& args, ImportRequest* options,
                   std::string* error = nullptr) {
   std::string diagnostic;
   bool help = false;
-  return ParseImportOptions(args, options, &help, error ? error : &diagnostic) && !help;
+  return ParseImportRequest(args, options, &help, error ? error : &diagnostic) && !help;
 }
 
 CLI_TEST(PAGXImportPlanTest, ExplicitOutputAndDefaults) {
-  ImportOptions o;
+  ImportRequest o;
   ASSERT_TRUE(Parse({"page.html", "-o", "out.pagx"}, &o));
   EXPECT_EQ(o.output, "out.pagx");
   EXPECT_TRUE(o.outputDir.empty());
@@ -33,7 +33,7 @@ CLI_TEST(PAGXImportPlanTest, ExplicitOutputAndDefaults) {
 }
 
 CLI_TEST(PAGXImportPlanTest, CardinalityDoesNotDependOnScenarioContents) {
-  ImportOptions o;
+  ImportRequest o;
   EXPECT_FALSE(Parse({"page.html", "--scenario", "states.json", "-o", "one.pagx"}, &o));
   EXPECT_TRUE(Parse({"page.html", "--scenario", "states.json", "--output-dir", "out"}, &o));
   EXPECT_TRUE(Parse(
@@ -43,7 +43,7 @@ CLI_TEST(PAGXImportPlanTest, CardinalityDoesNotDependOnScenarioContents) {
 }
 
 CLI_TEST(PAGXImportPlanTest, DependenciesAndFormatsAreValidated) {
-  ImportOptions o;
+  ImportRequest o;
   ASSERT_TRUE(Parse({"page.html", "--preview"}, &o));
   EXPECT_TRUE(o.render);
   for (const auto& args : std::vector<std::vector<std::string>>{
@@ -67,7 +67,7 @@ CLI_TEST(PAGXImportPlanTest, DependenciesAndFormatsAreValidated) {
 }
 
 CLI_TEST(PAGXImportPlanTest, URLNamingAndPortableBasenames) {
-  ImportOptions o;
+  ImportRequest o;
   EXPECT_FALSE(Parse({"https://example.com"}, &o));
   EXPECT_FALSE(Parse({"https://example.com", "--output-dir", "out"}, &o));
   EXPECT_TRUE(Parse({"https://example.com", "-o", "web.pagx"}, &o));
@@ -77,10 +77,10 @@ CLI_TEST(PAGXImportPlanTest, URLNamingAndPortableBasenames) {
 }
 
 CLI_TEST(PAGXImportPlanTest, HelpNeedsNoInputOrRuntime) {
-  ImportOptions o;
+  ImportRequest o;
   bool help = false;
   std::string error;
-  EXPECT_TRUE(ParseImportOptions({"--help"}, &o, &help, &error));
+  EXPECT_TRUE(ParseImportRequest({"--help"}, &o, &help, &error));
   EXPECT_TRUE(help);
   EXPECT_NE(ImportUsage().find("--output-dir"), std::string::npos);
 }
@@ -93,7 +93,7 @@ CLI_TEST(PAGXImportPlanTest, BatchCollisionsAndDryPlanning) {
   std::ofstream(root / "input/a.svg") << "<svg/>";
   std::ofstream(root / "input/sub/b.svg") << "<svg/>";
   auto output = (root / "results").u8string();
-  ImportOptions o;
+  ImportRequest o;
   ASSERT_TRUE(
       Parse({"--batch", (root / "input").u8string(), "--output-dir", output, "--dry-run"}, &o));
   ImportPlan plan;
@@ -122,7 +122,7 @@ CLI_TEST(PAGXImportPlanTest, PlannedCheckpointOrderAndSourceProtection) {
   fs::create_directories(root);
   auto input = (root / "page.html").u8string();
   std::ofstream(input) << "<html/>";
-  ImportOptions o;
+  ImportRequest o;
   ASSERT_TRUE(
       Parse({input, "--scenario", "s.json", "--output-dir", (root / "out").u8string()}, &o));
   ImportPlan plan;

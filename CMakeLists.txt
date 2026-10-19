@@ -897,6 +897,7 @@ if (PAG_BUILD_CLI)
     set_target_properties(pagx-cli PROPERTIES OUTPUT_NAME pagx)
     target_include_directories(pagx-cli PRIVATE
             src/cli
+            ${TGFX_DIR}/third_party/json/include
             ${PAG_INCLUDES}
             ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_options(pagx-cli PRIVATE ${PAG_COMPILE_OPTIONS})

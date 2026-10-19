@@ -9,7 +9,7 @@
 
 namespace pagx::cli {
 
-struct ImportOptions {
+struct ImportRequest {
   std::string input, batch, output, outputDir, outputName, format;
   std::string scenario, checkpoint, imageBaseDir;
   std::string htmlSource = "browser";
@@ -39,10 +39,10 @@ struct ImportPlan {
 bool IsImportURL(const std::string& input);
 // Pure argument parsing. No browser, dependency installation or filesystem mutations.
 // argv excludes the command name. An empty error with help=true means help was requested.
-bool ParseImportOptions(const std::vector<std::string>& args, ImportOptions* options, bool* help,
+bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* options, bool* help,
                         std::string* error);
 // checkpointNames come from the HTML adapter's scenario validator, in execution order.
-bool BuildImportPlan(const ImportOptions& options, const std::vector<std::string>& checkpointNames,
+bool BuildImportPlan(const ImportRequest& options, const std::vector<std::string>& checkpointNames,
                      ImportPlan* plan, std::string* error);
 std::string ImportUsage();
 
