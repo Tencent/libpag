@@ -135,6 +135,9 @@ class SVGParserContext {
     float startX = 0;
     float baseline = 0;
     std::string text = {};
+    // Effective fill of the run; runs with different fills are emitted as separate text nodes
+    // because a PAGX Text node carries a single paint.
+    std::string fill = {};
   };
   // State shared across the recursive <text>/<tspan> walk in collectTextRuns.
   struct TextWalkState {
@@ -151,7 +154,8 @@ class SVGParserContext {
   // Recursively walks <text> children and nested <tspan> elements, tracking explicit x/y
   // (absolute) and dx/dy (relative) pen positioning, and splits content into lines on
   // baseline jumps larger than half the font size.
-  void collectTextRuns(const std::shared_ptr<DOMNode>& element, TextWalkState* state);
+  void collectTextRuns(const std::shared_ptr<DOMNode>& element, TextWalkState* state,
+                       const InheritedStyle& parentStyle);
   TextPath* convertTextPath(const std::shared_ptr<DOMNode>& textPathElement,
                             const std::shared_ptr<DOMNode>& textElement);
   Element* convertUse(const std::shared_ptr<DOMNode>& element);
@@ -177,7 +181,7 @@ class SVGParserContext {
                             ShadowOnlyType* outShadowOnlyType = nullptr);
 
   void addFillStroke(const std::shared_ptr<DOMNode>& element, std::vector<Element*>& contents,
-                     const InheritedStyle& inheritedStyle);
+                     const InheritedStyle& inheritedStyle, bool includeFill = true);
 
   Rect getShapeBounds(const std::shared_ptr<DOMNode>& element);
 

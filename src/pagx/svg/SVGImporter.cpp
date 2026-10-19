@@ -1168,6 +1168,22 @@ static std::string NormalizeTextWhitespace(const std::string& text) {
   return normalized;
 }
 
+// SVG font-family may list fallbacks ("A, B"); PAGX stores a single family, so keep the first.
+static std::string FirstFontFamily(const std::string& value) {
+  std::string first = value.substr(0, value.find(','));
+  size_t start = first.find_first_not_of(" \t\r\n");
+  size_t end = first.find_last_not_of(" \t\r\n");
+  if (start == std::string::npos) {
+    return {};
+  }
+  first = first.substr(start, end - start + 1);
+  if (first.size() >= 2 && (first.front() == '\'' || first.front() == '"') &&
+      first.back() == first.front()) {
+    first = first.substr(1, first.size() - 2);
+  }
+  return first;
+}
+
 Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
                                      const InheritedStyle& inheritedStyle) {
   auto group = _document->makeNode<Group>();
@@ -1203,7 +1219,7 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
   state.currentX = x;
   state.currentY = y;
   state.fontSize = currentFontSize;
-  collectTextRuns(element, &state);
+  collectTextRuns(element, &state, inheritedStyle);
 
   // Collect the emitted runs: one per detected line, or a single combined run when a
   // <textPath> child turns the text into path-following text.
@@ -1217,17 +1233,19 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     for (const auto& line : state.lines) {
       auto normalized = NormalizeTextWhitespace(line.text);
       if (!normalized.empty()) {
-        emittedRuns.push_back(TextLine{line.startX, line.baseline, normalized});
+        emittedRuns.push_back(TextLine{line.startX, line.baseline, normalized, line.fill});
       }
     }
   }
 
+  bool uniformFill = true;
   if (!emittedRuns.empty()) {
     // Font family: element attribute > inherited style.
     std::string fontFamily = getAttribute(element, "font-family");
     if (fontFamily.empty()) {
       fontFamily = inheritedStyle.fontFamily;
     }
+    fontFamily = FirstFontFamily(fontFamily);
 
     // Font weight: element attribute > inherited style.
     // SVG font-weight maps to fontStyle in PAGX (e.g., "Bold", "Light", "Black").
@@ -1262,6 +1280,32 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
       textAnchorValue = TextAnchor::End;
     }
 
+    // Element-level fill; SVG defaults to black when nothing is specified.
+    std::string elementFill = getAttribute(element, "fill");
+    if (elementFill.empty()) {
+      elementFill = inheritedStyle.fill;
+    }
+    if (elementFill.empty()) {
+      elementFill = "#000000";
+    }
+    auto runFill = [&elementFill](const TextLine& run) {
+      return run.fill.empty() ? elementFill : run.fill;
+    };
+    // A Text node carries a single paint, so runs with different fills need their own Fill.
+    std::string firstFill = {};
+    for (const auto& run : emittedRuns) {
+      auto fill = runFill(run);
+      if (fill == "none") {
+        continue;
+      }
+      if (firstFill.empty()) {
+        firstFill = fill;
+      } else if (fill != firstFill) {
+        uniformFill = false;
+        break;
+      }
+    }
+
     for (const auto& run : emittedRuns) {
       auto text = _document->makeNode<Text>();
       text->position = {run.startX, run.baseline};
@@ -1277,7 +1321,19 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
         text->letterSpacing = letterSpacingValue;
       }
       text->textAnchor = textAnchorValue;
-      group->elements.push_back(text);
+      auto fill = runFill(run);
+      if (!uniformFill && fill != "none") {
+        auto runGroup = _document->makeNode<Group>();
+        runGroup->elements.push_back(text);
+        auto fillNode = _document->makeNode<Fill>();
+        auto solidColor = _document->makeNode<SolidColor>();
+        solidColor->color = parseColor(fill);
+        fillNode->color = solidColor;
+        runGroup->elements.push_back(fillNode);
+        group->elements.push_back(runGroup);
+      } else {
+        group->elements.push_back(text);
+      }
     }
 
     // A <textPath> child turns this run into path-following text. Emit the TextPath modifier
@@ -1291,29 +1347,42 @@ Group* SVGParserContext::convertText(const std::shared_ptr<DOMNode>& element,
     }
   }
 
-  addFillStroke(element, group->elements, inheritedStyle);
+  addFillStroke(element, group->elements, inheritedStyle, uniformFill);
   return group;
 }
 
 void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
-                                       TextWalkState* state) {
+                                       TextWalkState* state, const InheritedStyle& parentStyle) {
   auto child = element->getFirstChild();
   while (child) {
     if (child->type == DOMNodeType::Text) {
+      InheritedStyle childStyle = computeInheritedStyle(child, parentStyle);
+      auto fill = childStyle.fill;
       // Bare text flows at the current pen position: it joins the line of the previous run,
       // or opens the first line at the <text> element origin.
-      if (state->currentLineIndex < 0 ||
-          fabs(state->currentY - state->lines[state->currentLineIndex].baseline) >
-              state->fontSize * 0.5f) {
-        state->lines.push_back(TextLine{state->currentX, state->currentY, ""});
+      bool opensLine = state->currentLineIndex < 0 ||
+                       fabs(state->currentY - state->lines[state->currentLineIndex].baseline) >
+                           state->fontSize * 0.5f;
+      // A fill change inside one visual line also opens a run, so each Text keeps one paint.
+      auto* currentLine =
+          opensLine ? nullptr : &state->lines[state->currentLineIndex];
+      bool fillChanged = currentLine != nullptr && !fill.empty() && !currentLine->fill.empty() &&
+                         currentLine->fill != fill;
+      if (opensLine || fillChanged) {
+        state->lines.push_back(TextLine{state->currentX, state->currentY, "", fill});
         state->currentLineIndex = static_cast<int>(state->lines.size()) - 1;
+        currentLine = &state->lines.back();
       }
-      state->lines[state->currentLineIndex].text += child->name;
+      if (currentLine->fill.empty()) {
+        currentLine->fill = fill;
+      }
+      currentLine->text += child->name;
       state->textContent += child->name;
     } else if (child->name == "tspan") {
       // A tspan's explicit x/y replace the pen position (absolute in the <text> element's
       // coordinate space); dx/dy shift it. Nested tspans continue the walk: Illustrator wraps
       // whole lines in an outer tspan while the inner ones carry the actual positions.
+      InheritedStyle childStyle = computeInheritedStyle(child, parentStyle);
       auto xAttribute = getAttribute(child, "x");
       auto yAttribute = getAttribute(child, "y");
       if (!xAttribute.empty()) {
@@ -1327,7 +1396,7 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
         state->currentY +=
             parseLengthEm(getAttribute(child, "dy"), _viewBoxHeight, state->fontSize);
       }
-      collectTextRuns(child, state);
+      collectTextRuns(child, state, childStyle);
     } else if (child->name == "textPath") {
       // <textPath> places the run along a referenced path; SVG ignores x/y on its inner
       // tspans, so no line splitting applies. Reuse the recursive walk to collect every
@@ -1336,7 +1405,7 @@ void SVGParserContext::collectTextRuns(const std::shared_ptr<DOMNode>& element,
       // only. The path geometry and offset descriptors are converted separately into a
       // TextPath modifier sibling below.
       state->textPathElement = child;
-      collectTextRuns(child, state);
+      collectTextRuns(child, state, computeInheritedStyle(child, parentStyle));
     }
     child = child->getNextSibling();
   }
@@ -2145,7 +2214,7 @@ bool SVGParserContext::convertFilterElement(const std::shared_ptr<DOMNode>& filt
 }
 void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
                                      std::vector<Element*>& contents,
-                                     const InheritedStyle& inheritedStyle) {
+                                     const InheritedStyle& inheritedStyle, bool includeFill) {
   // Lazily compute shape bounds only when needed (for gradient/pattern references).
   bool boundsComputed = false;
   Rect shapeBounds = {};
@@ -2179,7 +2248,7 @@ void SVGParserContext::addFillStroke(const std::shared_ptr<DOMNode>& element,
   // Only add fill if we have an effective fill value that is not "none".
   // If fill is empty and no inherited value, SVG default is black fill.
   // But if inherited value is "none", we skip fill entirely.
-  if (fill != "none") {
+  if (includeFill && fill != "none") {
     if (fill.empty()) {
       // No fill specified anywhere - use SVG default black.
       auto fillNode = _document->makeNode<Fill>();
