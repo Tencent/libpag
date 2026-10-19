@@ -9,7 +9,7 @@ describe('DROP_TAG_NAMES', () => {
   });
 
   test('includes the structural / non-visual tags the pipeline drops', () => {
-    for (const tag of ['script', 'style', 'head', 'meta', 'br', 'form', 'iframe']) {
+    for (const tag of ['script', 'style', 'head', 'meta', 'br', 'iframe']) {
       expect(DROP_TAG_NAMES).toContain(tag);
     }
   });

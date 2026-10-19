@@ -81,6 +81,36 @@ nativeTest('downloaded snapshot images resolve and render through the native pip
   expect(fs.readFileSync(path.join(output,'image.ready.subset.html'),'utf8')).not.toContain('data:image/');
 });
 
+nativeTest('scenario exports visible forms and CSS-painted SVG outlines', async () => {
+  const fixture = path.join(output, 'form-svg.html');
+  const plan = path.join(output, 'form-svg.json');
+  fs.writeFileSync(fixture, `<!doctype html><html><head><style>
+    body { margin:0; background:white; font:14px Arial }
+    form { position:absolute; left:10px; top:10px; width:200px; height:130px; background:#eee }
+    input,textarea,button { display:block; width:180px; margin:8px; font:14px Arial }
+    svg { position:absolute; left:230px; top:20px; width:60px; height:60px;
+      fill:none !important; stroke:#ff0000 !important; stroke-width:4px !important;
+      stroke-linecap:round !important; stroke-linejoin:round !important }
+  </style></head><body><form><input value="Captured input"><textarea>Captured draft</textarea>
+    <button type="button">Send comment</button></form>
+    <svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="20"/></svg></body></html>`);
+  fs.writeFileSync(plan, JSON.stringify({ version:1, viewport:{width:320,height:200},
+    steps:[{type:'capture',name:'ready'}] }));
+  const result = await run(process.execPath, ['html2pagx',fixture,'--scenario',plan,'-o',output,'--pagx-bin',pagx]);
+  const subset = fs.readFileSync(path.join(output, 'form-svg.ready.subset.html'), 'utf8');
+  const xml = fs.readFileSync(path.join(output, 'form-svg.ready.pagx'), 'utf8');
+  for (const text of ['Captured input', 'Captured draft', 'Send comment']) {
+    expect(subset).toContain(text);
+    expect(xml).toContain(text);
+  }
+  expect(result.stderr).not.toMatch(/Invalid Line(?:Cap|Join)/);
+  const rendered = PNG.sync.read(fs.readFileSync(path.join(output, 'form-svg.ready.png')));
+  const pixel = (x,y) => Array.from(rendered.data.slice((y*320+x)*4,(y*320+x)*4+4));
+  expect(pixel(260,50)).toEqual([255,255,255,255]); // The circle must stay hollow.
+  expect(pixel(260,30)).toEqual([255,0,0,255]); // Its CSS-driven outline must survive.
+  expect(pixel(14,135)).toEqual([238,238,238,255]); // The form's painted box survives too.
+});
+
 test('HTTP accepts a selected checkpoint and rejects ambiguous/invalid scenarios before execution', async () => {
   const child = spawn(process.execPath,['-e',
     `require('./server').startServer({host:'127.0.0.1',port:0,browserEngine:'puppeteer',maxBodyBytes:1048576,pagxBin:${JSON.stringify(pagx)}})`],{cwd:dir});

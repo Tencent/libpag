@@ -2220,6 +2220,18 @@ function freezeSvg(svgEl, rect) {
       }
       // Inline `style="stroke: currentColor"` is uncommon but legal.
       if (dst.style) {
+        // Current-state collection already resolved the cascade and removed
+        // author stylesheets. Its inline !important markers only protect the
+        // inert mirror's layout; the native SVG parser treats them as part of
+        // paint values (e.g. "none !important" becomes a black fill). Remove
+        // those priorities from the detached export, never the source page.
+        if (SNAPSHOT_CURRENT_STATE) {
+          for (const name of Array.from(dst.style)) {
+            if (dst.style.getPropertyPriority(name)) {
+              dst.style.setProperty(name, dst.style.getPropertyValue(name));
+            }
+          }
+        }
         if (dst.style.stroke === 'currentColor') dst.style.stroke = here;
         if (dst.style.fill === 'currentColor') dst.style.fill = here;
         if (dst.style.color === 'currentColor') dst.style.color = here;
