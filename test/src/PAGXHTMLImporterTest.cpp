@@ -2139,6 +2139,30 @@ PAG_TEST(PAGXHTMLImporterTest, InlineNoWrapFlexGrowTextLeafKeepsWidth) {
 // the middle dot as a 14px gap, but those widths represent source `width:auto` rather than authored
 // constraints. The internal intrinsic-width marker clears them only after inference, leaving both
 // the row and its editable text children content-sized in PAGX.
+PAG_TEST(PAGXHTMLImporterTest, CurrentStateSnapshotKeepsMeasuredAbsoluteLayout) {
+  const std::string content = R"HTML(
+    <div id="row" style="position:absolute;left:20px;top:30px;width:220px;height:40px">
+      <div style="position:absolute;left:0px;top:0px;width:100px;height:40px;background:red"></div>
+      <div style="position:absolute;left:120px;top:0px;width:100px;height:40px;background:blue"></div>
+    </div></body></html>
+  )HTML";
+  auto legacy = ParseFromString("<html><body style=\"width:400px;height:300px\">" + content);
+  ASSERT_NE(legacy, nullptr);
+  EXPECT_EQ(legacy->layers.front()->children.front()->layout, pagx::LayoutMode::Horizontal);
+
+  auto captured = ParseFromString(
+      "<html><body data-pagx-capture-mode=\"current-state\" "
+      "style=\"width:400px;height:300px\">" + content);
+  ASSERT_NE(captured, nullptr);
+  auto* body = captured->layers.front();
+  auto* row = body->children.front();
+  EXPECT_EQ(row->layout, pagx::LayoutMode::None);
+  ASSERT_EQ(row->children.size(), 2u);
+  EXPECT_FLOAT_EQ(row->children[1]->left, 120.0f);
+  EXPECT_FLOAT_EQ(row->children[1]->width, 100.0f);
+  EXPECT_EQ(body->customData.count("pagx-capture-mode"), 0u);
+}
+
 PAG_TEST(PAGXHTMLImporterTest, SnapshotIntrinsicInlineRowKeepsAdaptiveWidthAfterFlexInference) {
   auto doc = ParseFromString(R"HTML(
     <html><body style="width:1120px;height:80px">

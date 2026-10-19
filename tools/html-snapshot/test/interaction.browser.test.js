@@ -50,7 +50,7 @@ test('fails on ambiguous locators and unmet conditions without producing checkpo
   await expect(runScenario(browser, url, {version:1, steps:[
     {type:'waitFor',target:{css:'#dialog'},state:'visible',timeoutMs:100},
     {type:'capture',name:'wrong'},
-  ]}, {onCheckpoint})).rejects.toThrow('Condition timed out');
+  ]}, {onCheckpoint})).rejects.toThrow(/timed out/);
   expect(onCheckpoint).not.toHaveBeenCalled();
 });
 
@@ -75,5 +75,47 @@ test('a scenario deadline closes its session and produces no output', async () =
   const onCheckpoint = jest.fn();
   await expect(runScenario(browser, url, {version:1, timeoutMs:200,
     steps:[{type:'capture',name:'late'}]}, {onCheckpoint})).rejects.toThrow('Scenario timed out');
+  expect(onCheckpoint).not.toHaveBeenCalled();
+});
+
+test('supports form actions, scoped frame targets, scroll and hover through real inputs', async () => {
+  const html = `<!doctype html><body style="height:1200px">
+    <input id="entry"><input type="checkbox" id="check"><select id="pick"><option>a</option><option>b</option></select>
+    <button id="finish">Finish</button><p id="status"></p>
+    <div id="scroller" style="width:150px;height:60px;overflow:auto"><div style="height:300px">Scrollable</div></div>
+    <iframe id="frame" srcdoc="<button onclick='parent.document.getElementById(&quot;frame&quot;).style.display=&quot;none&quot;'>Frame action</button>"></iframe>
+    <div id="hover" style="width:150px;height:30px">Hover</div>
+    <style>#hover:hover::after{content:'hover captured'}</style>
+    <script>
+      entry.onkeydown=e=>{if(e.key==='Enter')entry.dataset.enter='yes'};
+      scroller.onscroll=()=>scroller.dataset.y=String(scroller.scrollTop);
+      finish.onclick=()=>{document.querySelector('#status').textContent=entry.value+'/'+check.checked+'/'+pick.value+'/'+entry.dataset.enter;
+        check.style.display='none';pick.style.display='none'};
+    </script>`;
+  const results=await runScenario(browser,'data:text/html,'+encodeURIComponent(html),{version:1,steps:[
+    {type:'fill',target:{css:'#entry'},value:'A'},
+    {type:'type',target:{css:'#entry'},value:'B'},
+    {type:'focus',target:{css:'#entry'}},
+    {type:'press',target:{css:'#entry'},key:'Enter'},
+    {type:'check',target:{css:'#check'},value:true},
+    {type:'select',target:{css:'#pick'},value:'b'},
+    {type:'click',target:{css:'#finish'}},
+    {type:'waitFor',target:{css:'#status'},text:'AB/true/b/yes'},
+    {type:'scroll',target:{css:'#scroller'},y:50},
+    {type:'waitFor',target:{css:'#scroller'},attribute:{name:'data-y',value:'50'}},
+    {type:'click',target:{frame:'#frame',css:'button'}},
+    {type:'waitFor',target:{css:'#frame'},state:'hidden'},
+    {type:'hover',target:{css:'#hover'}},
+    {type:'capture',name:'form'},
+  ]});
+  expect(results[0].html).toContain('AB/true/b/yes');
+  expect(results[0].html.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ')).toContain('hover captured');
+});
+
+test('a capture step deadline includes readiness and does not emit a checkpoint', async () => {
+  const onCheckpoint=jest.fn();
+  await expect(runScenario(browser,url,{version:1,stableMs:500,steps:[
+    {type:'capture',name:'late',timeoutMs:100},
+  ]},{onCheckpoint})).rejects.toThrow(/step 1.*timed out/);
   expect(onCheckpoint).not.toHaveBeenCalled();
 });

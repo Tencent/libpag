@@ -522,9 +522,17 @@ async function handleSnapshot(req, res, ctx, source) {
       targetUrl = `file://${tmp.file}`;
       inputDesc = `in=${source.html.length}B`;
     }
-    const result = runOpts.scenario
-      ? (await runScenario(ctx.engineHandle, targetUrl, runOpts.scenario, runOpts))[0]
-      : await runSnapshot(ctx.engineHandle, targetUrl, runOpts);
+    let result;
+    if (runOpts.scenario) {
+      // Browser contexts isolate storage but share window focus. Give an
+      // interactive request its own process so another request opening a tab
+      // cannot blur its controls or close focus-dependent menus.
+      const session = await launchBrowser({ engine: ctx.opts.browserEngine });
+      try { result = (await runScenario(session, targetUrl, runOpts.scenario, runOpts))[0]; }
+      finally { await session.browser.close(); }
+    } else {
+      result = await runSnapshot(ctx.engineHandle, targetUrl, runOpts);
+    }
 
     let pagx = null;
     if (wantsPagx) {

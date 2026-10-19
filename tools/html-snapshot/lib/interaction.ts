@@ -4,6 +4,9 @@
 import { openAndSettlePage } from './page-loader';
 import { captureCurrentPage, type CaptureOptions, type CurrentStateResult } from './current-state';
 import { launchBrowser, type EngineWrapper, type Page, type CookieParam } from './browser-engine';
+import { StateResources } from './state-resources';
+import { saveDownloadedFonts } from './font-download';
+import { saveDownloadedImages } from './image-download';
 
 export interface Target {
   css?: string;
@@ -194,9 +197,10 @@ function playwrightLocator(scope: any, target: Target): any {
 /** Poll without retaining element handles across application rerenders. */
 async function waitCondition(page: Page, engine: string, step: Step, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  const expectedUrl = step.url ? new URL(step.url, page.url()).href : '';
   do {
     if (step.url) {
-      if (page.url() === new URL(step.url, page.url()).href) return;
+      if (page.url() === expectedUrl) return;
     } else {
       const target = step.target!;
       const scope = await scopeFor(page, engine, target);
@@ -294,34 +298,44 @@ async function perform(page: Page, engine: string, step: Step, timeoutMs: number
 }
 
 /** Resource and layout readiness is bounded; explicit waitFor steps express business readiness. */
-export async function waitForCaptureReady(page: Page, timeoutMs: number, stableMs: number): Promise<void> {
-  await page.evaluate(async (cfg: { timeoutMs: number; stableMs: number }) => {
+export async function waitForCaptureReady(page: Page, timeoutMs: number, stableMs: number,
+  extent = 'viewport'): Promise<void> {
+  await page.evaluate(async (cfg: { timeoutMs: number; stableMs: number; extent: string }) => {
     const deadline = performance.now() + cfg.timeoutMs;
     let last = '', since = performance.now();
     while (performance.now() < deadline) {
       const images = Array.from(document.images).filter(img => {
         const rect = img.getBoundingClientRect();
-        return rect.bottom > 0 && rect.right > 0 && rect.top < innerHeight && rect.left < innerWidth;
+        const c = getComputedStyle(img);
+        return c.display !== 'none' && c.visibility !== 'hidden' && rect.width > 0 && rect.height > 0 &&
+          (cfg.extent === 'document' || (rect.bottom > 0 && rect.right > 0 && rect.top < innerHeight && rect.left < innerWidth));
       });
       const resourceReady = document.fonts.status === 'loaded' && images.every(img => img.complete);
       const nodes = Array.from(document.body.querySelectorAll('*')).filter(el => {
         const r = el.getBoundingClientRect();
-        return r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+        return cfg.extent === 'document' || (r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth);
       });
       const fingerprint = JSON.stringify(nodes.map(el => {
         const r = el.getBoundingClientRect(), c = getComputedStyle(el);
         return [r.x, r.y, r.width, r.height, c.opacity, c.visibility, c.transform,
-          c.backgroundColor, c.color, el.childElementCount ? '' : el.textContent];
+          c.backgroundColor, c.backgroundImage, c.color, c.filter, c.boxShadow, c.clipPath,
+          el.childElementCount ? '' : el.textContent];
       }));
       if (fingerprint !== last || !resourceReady) { since = performance.now(); last = fingerprint; }
       if (resourceReady && performance.now() - since >= cfg.stableMs) {
-        await Promise.all(images.map(img => img.decode().catch(() => {})));
+        if (images.some(img => !img.naturalWidth)) throw new Error('Visible image failed to load');
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([Promise.all(images.map(img => img.decode())), new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Image decode timed out')), Math.max(1, deadline - performance.now()));
+          })]);
+        } finally { if (timer) clearTimeout(timer); }
         return;
       }
       await new Promise(resolve => setTimeout(resolve, 30));
     }
     throw new Error('Capture readiness timed out; add an explicit waitFor or set stableMs: 0 for a moving state');
-  }, { timeoutMs, stableMs });
+  }, { timeoutMs, stableMs, extent });
 }
 
 export interface RunScenarioOptions {
@@ -342,10 +356,13 @@ export async function runScenario(
   engineHandle: EngineWrapper, url: string, input: unknown, options: RunScenarioOptions = {},
 ): Promise<Checkpoint[]> {
   const scenario = parseScenario(input);
+  if (options.downloadFonts && !options.fontDir) throw new Error('downloadFonts requires fontDir');
+  if (options.downloadImages && !options.imageDir) throw new Error('downloadImages requires imageDir');
   if (options.checkpoint && !scenario.steps.some(s => s.type === 'capture' && s.name === options.checkpoint)) {
     throw new Error(`Unknown checkpoint '${options.checkpoint}'`);
   }
   const { browser, engine } = engineHandle;
+  const resourceCapture = new StateResources(engine, options.log);
   if (engine !== 'playwright' && scenario.steps.some(s => s.target?.role)) {
     throw new Error('Role locators require --browser-engine playwright');
   }
@@ -360,38 +377,75 @@ export async function runScenario(
       viewportWidth: scenario.viewport.width, viewportHeight: scenario.viewport.height,
       waitMs: 0, reducedMotion: false, autoScroll: false,
       cookies: options.cookies, headers: options.headers,
+      onResponse: resourceCapture.onResponse,
     });
     const results: Checkpoint[] = [];
     for (let index = 0; index < scenario.steps.length; index++) {
       if (cancelled || Date.now() >= deadline) throw new Error('Scenario timed out');
       const step = scenario.steps[index];
+      let stepTimer: ReturnType<typeof setTimeout> | undefined;
       options.log?.(`step ${index + 1}/${scenario.steps.length}: ${step.type}${step.name ? ` ${step.name}` : ''}`);
       try {
-        if (step.type === 'capture') {
-          if (options.checkpoint && step.name !== options.checkpoint) continue;
-          await waitForCaptureReady(page, remaining(step), scenario.stableMs);
-          if (!mirror) mirror = await launchBrowser({ engine });
-          const result: Checkpoint = { ...await captureCurrentPage(page, {
-            mirror, engine, extent: step.extent, unsupported: step.unsupported, timeoutMs: remaining(step),
-            inlineIconFonts: options.inlineIconFonts,
-          }), name: step.name! };
-          if (cancelled) throw new Error('Scenario timed out');
-          results.push(result);
-          if (options.onCheckpoint) await options.onCheckpoint(result);
-          if (options.checkpoint) break;
-        } else {
-          // The URL waiter starts before the input; no implicit click retry on
-          // navigation/readiness timeout. Each input is sent at most once here.
-          const waitUrl = step.url && step.type !== 'waitFor'
-            ? waitCondition(page, engine, { type: 'waitFor', url: new URL(step.url, page.url()).href }, remaining(step)) : null;
-          if (waitUrl) {
-            const done = await Promise.allSettled([waitUrl, perform(page, engine, step, remaining(step))]);
-            for (const item of done) if (item.status === 'rejected') throw item.reason;
-          } else await perform(page, engine, step, remaining(step));
-        }
+        const task = (async (): Promise<boolean> => {
+          if (step.type === 'capture') {
+            if (options.checkpoint && step.name !== options.checkpoint) return false;
+            await waitForCaptureReady(page, remaining(step), scenario.stableMs, step.extent);
+            const resources = await resourceCapture.snapshot(remaining(step));
+            if (cancelled) throw new Error('Scenario timed out');
+            if (!mirror) mirror = await launchBrowser({ engine });
+            if (cancelled) {
+              await mirror.browser.close();
+              throw new Error('Scenario timed out');
+            }
+            const result: Checkpoint = { ...await captureCurrentPage(page, {
+              mirror, engine, extent: step.extent, unsupported: step.unsupported, timeoutMs: remaining(step),
+              inlineIconFonts: options.inlineIconFonts,
+              resources,
+            }), name: step.name! };
+            if (options.downloadFonts) {
+              const fonts = new Map(Array.from(resources).filter(([, value]) => value.type === 'font')
+                .map(([url, value]) => [url, value.buffer]));
+              result.fonts = await saveDownloadedFonts(fonts, options.fontDir!, warning => result.warnings.push(warning));
+            }
+            if (options.downloadImages) {
+              const urls = Array.from(new Set(result.html.match(/data:image\/[^;,"'\s]+;base64,[a-zA-Z0-9+/=]+/g) || []));
+              const images = new Map(urls.map((url, index) => [`https://capture.invalid/image${index}`, {
+                buffer: Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'), contentType: url.slice(5, url.indexOf(';')),
+              }]));
+              const saved = await saveDownloadedImages(images, options.imageDir!, warning => result.warnings.push(warning));
+              for (const image of saved) {
+                const index = Number(new URL(image.url).pathname.slice('/image'.length));
+                const escaped = image.path.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                result.html = result.html.split(urls[index]).join(escaped);
+              }
+            }
+            if (cancelled) throw new Error('Scenario timed out');
+            results.push(result);
+            if (options.onCheckpoint) await options.onCheckpoint(result);
+            if (options.checkpoint) return true;
+          } else {
+            // The URL waiter starts before the input; no implicit click retry on
+            // navigation/readiness timeout. Each input is sent at most once here.
+            const waitUrl = step.url && step.type !== 'waitFor'
+              ? waitCondition(page, engine, { type: 'waitFor', url: new URL(step.url, page.url()).href }, remaining(step)) : null;
+            if (waitUrl) {
+              const done = await Promise.allSettled([waitUrl, perform(page, engine, step, remaining(step))]);
+              for (const item of done) if (item.status === 'rejected') throw item.reason;
+            } else await perform(page, engine, step, remaining(step));
+          }
+          return false;
+        })();
+        const stop = await Promise.race([task, new Promise<never>((_, reject) => {
+          const timeout = remaining(step);
+          stepTimer = setTimeout(() => {
+            cancelled = true;
+            reject(new Error(`Step timed out after ${timeout} ms`));
+          }, timeout);
+        })]);
+        if (stop) break;
       } catch (err) {
         throw new Error(`Scenario step ${index + 1} (${step.type}${step.name ? ` ${step.name}` : ''}): ${(err as Error).message}`);
-      }
+      } finally { if (stepTimer) clearTimeout(stepTimer); }
     }
     return results;
   };
@@ -404,9 +458,10 @@ export async function runScenario(
     cancelled = true;
     if (timer) clearTimeout(timer);
     await context.close();
-    // Abort an in-progress mirror render too before draining the worker.
     if (mirror) await mirror.browser.close();
-    await pending.catch(() => {});
-    if (mirror) await mirror.browser.close();
+    // A consumer callback need not be cancellable. Do not let it defeat the
+    // deadline; source/mirror pages have already been closed. A late browser
+    // launch is closed by the cancellation guard immediately after launching.
+    void pending.catch(() => {});
   }
 }

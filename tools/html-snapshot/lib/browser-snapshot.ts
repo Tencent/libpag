@@ -2623,7 +2623,7 @@ function emitTextSpans(textNode, parentRect, computed, opts) {
     // inline sibling: leading on the first line, trailing on the last.
     if (i === 0 && preserve.leading) transformed = BOUNDARY_SPACE + transformed;
     if (i === lines.length - 1 && preserve.trailing) transformed += BOUNDARY_SPACE;
-    const intrinsicMode = opts && opts.intrinsicWidth;
+    const intrinsicMode = !SNAPSHOT_CURRENT_STATE && opts && opts.intrinsicWidth;
     const intrinsicWidth = intrinsicMode
       ? ` ${INTRINSIC_WIDTH_ATTR}="${intrinsicMode === true ? 'true' : escapeHtml(String(intrinsicMode))}"`
       : '';
@@ -4296,7 +4296,7 @@ function renderContainer(el, parentRect, rect, left, top, computed, opts) {
     intrinsicWidth,
   });
   const overlays = borderOverlayHTML(computed, rect.width, rect.height).join('');
-  const intrinsicAttr = intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
+  const intrinsicAttr = !SNAPSHOT_CURRENT_STATE && intrinsicWidth ? ` ${INTRINSIC_WIDTH_ATTR}="true"` : '';
   // Wrapped inline box with element children (e.g. a `<mark>` containing nested
   // styling that spans multiple lines): paint the box visuals per line fragment
   // behind a transparent positioning wrapper, matching how the browser paints a
@@ -4858,14 +4858,35 @@ function snapshotMainImpl(opts) {
     window.__pagxClipDefMap = {};
     const full = opts.extent === 'document';
     const width = full ? Math.max(innerWidth, document.documentElement.scrollWidth) : innerWidth;
-    const height = full ? Math.min(MAX_CAPTURE_HEIGHT_PX,
-      Math.max(innerHeight, document.documentElement.scrollHeight)) : innerHeight;
+    const height = full ? Math.max(innerHeight, document.documentElement.scrollHeight) : innerHeight;
+    if (full && height > MAX_CAPTURE_HEIGHT_PX) {
+      throw new Error(`Current document height ${height}px exceeds the ${MAX_CAPTURE_HEIGHT_PX}px capture limit`);
+    }
     const origin = { left: full ? -scrollX : 0, top: full ? -scrollY : 0, width, height };
     const htmlStyle = getComputedStyle(document.documentElement);
     const bodyStyle = getComputedStyle(document.body);
-    const rootBackground = htmlStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
-      ? htmlStyle.backgroundColor : bodyStyle.backgroundColor;
-    const content = render(document.documentElement, origin);
+    const propagatesBody = ['rgba(0, 0, 0, 0)', 'transparent'].includes(htmlStyle.backgroundColor) &&
+      htmlStyle.backgroundImage === 'none';
+    const backgroundNode = propagatesBody ? document.body : document.documentElement;
+    const backgroundColor = propagatesBody ? bodyStyle.backgroundColor : htmlStyle.backgroundColor;
+    // Chromium's default canvas is white. A propagated body/root color paints
+    // that canvas once, rather than a second time inside the body's box.
+    const pixel = document.createElement('canvas');
+    pixel.width = pixel.height = 1;
+    const ctx = pixel.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1, 1);
+    ctx.fillStyle = backgroundColor; ctx.fillRect(0, 0, 1, 1);
+    const rgba = ctx.getImageData(0, 0, 1, 1).data;
+    const rootBackground = `rgb(${rgba[0]}, ${rgba[1]}, ${rgba[2]})`;
+    const savedColor = backgroundNode.style.getPropertyValue('background-color');
+    const savedPriority = backgroundNode.style.getPropertyPriority('background-color');
+    backgroundNode.style.setProperty('background-color', 'transparent', 'important');
+    let content;
+    try { content = render(document.documentElement, origin); }
+    finally {
+      if (savedColor) backgroundNode.style.setProperty('background-color', savedColor, savedPriority);
+      else backgroundNode.style.removeProperty('background-color');
+    }
     const defs = (window.__pagxClipDefs || []).join('');
     return { width, height, html: `<!DOCTYPE html><html><head><style>` +
       `div,span,img,svg,body{box-sizing:border-box}body{margin:0;padding:0;position:relative}` +
@@ -5821,7 +5842,7 @@ async function inlineCanvases() {
 // actually consults; copying every CSS property would balloon the inline
 // style attribute without adding visible information. Border longhands are
 // emitted per side so asymmetric borders survive.
-async function materializeDecorativePseudoElements() {
+async function materializeDecorativePseudoElements(opts) {
   // Helper functions duplicated locally so this function stays self-contained
   // when shipped through `page.evaluate`. The Node-side helpers are not in
   // scope inside the browser context — Puppeteer/Playwright serialise the
@@ -5981,12 +6002,13 @@ async function materializeDecorativePseudoElements() {
       return { ok: false, reason: 'position-' + (position || 'unknown') };
     }
     const outOfFlow = position === 'absolute' || position === 'fixed';
-    if (pseudoText !== '' && !outOfFlow) {
+    const inlineText = opts && opts.includeInlineText && pseudoText !== '';
+    if (pseudoText !== '' && !outOfFlow && !inlineText) {
       return { ok: false, reason: 'text-content' };
     }
     const widthPx = readNum(cs, 'width');
     const heightPx = readNum(cs, 'height');
-    if (widthPx <= 0 && heightPx <= 0) {
+    if (widthPx <= 0 && heightPx <= 0 && !inlineText) {
       return { ok: false, reason: 'zero-size' };
     }
     return { ok: true, inFlow: !outOfFlow };

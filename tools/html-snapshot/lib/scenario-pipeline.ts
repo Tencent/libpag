@@ -28,7 +28,8 @@ export async function runScenarioToPagx(opts: RunHtmlToPagxOptions): Promise<voi
   let checkpoints;
   try {
     checkpoints = await runScenario(engine, isUrl ? opts.input : pathToFileURL(path.resolve(opts.input)).href,
-      scenario, { ...opts, cookies, headers, fontDir, imageDir });
+      scenario, { ...opts, downloadFonts: opts.downloadFonts || opts.embedFonts,
+        cookies, headers, fontDir, imageDir });
   } finally { await engine.browser.close(); }
 
   const outputs = [];
@@ -36,8 +37,9 @@ export async function runScenarioToPagx(opts: RunHtmlToPagxOptions): Promise<voi
     for (const warning of result.warnings) opts.log?.(`${result.name}: ${warning}`);
     const files = await runHtmlToPagx({
       ...opts, fontDir, imageDir, outputDir, outputName: `${base}.${result.name}`,
+      fontFiles: result.fonts?.map(font => font.path),
       snapshotImpl: async args => {
-        await writeFileAtomic(args.output, result.html);
+        await writeFileAtomic(args.output, result.html, { reuseExisting: false });
         return { code: 0, durationMs: 0, stdout: '', stderr: '' };
       },
     });
@@ -45,6 +47,7 @@ export async function runScenarioToPagx(opts: RunHtmlToPagxOptions): Promise<voi
       warnings: result.warnings, ...files, subsetHtml: opts.keepSubsetHtml === false ? null : files.subsetHtml });
   }
   const manifest = path.join(outputDir, `${base}.captures.json`);
-  await writeFileAtomic(manifest, JSON.stringify({ version: 1, scenario, outputs }, null, 2) + '\n');
+  await writeFileAtomic(manifest, JSON.stringify({ version: 1, scenario, outputs }, null, 2) + '\n',
+    { reuseExisting: false });
   opts.log?.(`[done] ${manifest}`);
 }

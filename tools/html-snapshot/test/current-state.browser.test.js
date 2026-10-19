@@ -3,7 +3,7 @@
 'use strict';
 
 const { launchBrowser, newPage } = require('../dist/lib/browser-engine');
-const { captureCurrentPage } = require('../dist/lib/current-state');
+const { captureCurrentPage, collectCurrentState } = require('../dist/lib/current-state');
 const { PNG } = require('pngjs');
 
 jest.setTimeout(60000);
@@ -88,4 +88,60 @@ test('reports unsupported content and permits an explicit composited viewport fa
     expect(result.html).toContain('data:image/png;base64,');
     expect(result.warnings).toHaveLength(1);
   } finally { await page.close(); }
+});
+
+test('the read-only collector does not invoke custom element constructors', async () => {
+  const page = await newPage(source,{viewport:{width:320,height:200}});
+  try {
+    await page.setContent('<!doctype html><custom-box></custom-box>');
+    await page.evaluate(()=>{
+      window.constructed=0;
+      customElements.define('custom-box',class extends HTMLElement {
+        constructor(){super();window.constructed++}
+      });
+    });
+    const before=await page.evaluate(()=>window.constructed);
+    await page.evaluate(collectCurrentState);
+    expect(await page.evaluate(()=>window.constructed)).toBe(before);
+  } finally {await page.close();}
+});
+
+test('document extent keeps the current materialized document and root scroll intact',async()=>{
+  const page=await newPage(source,{viewport:{width:320,height:200}});
+  try {
+    await page.setContent('<!doctype html><body style="margin:0;height:1200px;background:#abc"><div style="position:absolute;top:1000px">Bottom</div></body>');
+    await page.evaluate(()=>scrollTo(0,600));
+    const result=await captureCurrentPage(page,{mirror,extent:'document'});
+    expect(result).toMatchObject({width:320,height:1200});
+    expect(await page.evaluate(()=>scrollY)).toBe(600);
+    expect(result.html).toContain('Bottom');
+    await page.evaluate(()=>document.body.style.height='20000px');
+    await expect(captureCurrentPage(page,{mirror,extent:'document'})).rejects.toThrow('capture limit');
+  } finally {await page.close();}
+});
+
+test('missing CSS resources report an error or use the explicit viewport fallback',async()=>{
+  const page=await newPage(source,{viewport:{width:320,height:200}});
+  try {
+    await page.setContent('<!doctype html><div style="width:100px;height:100px;background-image:url(http://127.0.0.1:1/image.png)"></div>');
+    await expect(captureCurrentPage(page,{mirror})).rejects.toThrow('uncaptured resources');
+    const result=await captureCurrentPage(page,{mirror,unsupported:'rasterize'});
+    expect(result.warnings[0]).toContain('uncaptured resources');
+    expect(result.html).toContain('data:image/png;base64,');
+  } finally {await page.close();}
+});
+
+test('propagates a translucent body background across the canvas only once',async()=>{
+  const page=await newPage(source,{viewport:{width:320,height:200}});
+  const preview=await newPage(mirror,{viewport:{width:320,height:200}});
+  try {
+    await page.setContent('<!doctype html><body style="margin:20px;background:rgba(255,0,0,.5)"><div style="height:30px">Text</div></body>');
+    const before=PNG.sync.read(Buffer.from(await page.screenshot()));
+    const result=await captureCurrentPage(page,{mirror});
+    await preview.setContent(result.html);
+    const after=PNG.sync.read(Buffer.from(await preview.screenshot()));
+    for(const offset of [(10*320+10)*4,(45*320+150)*4,(150*320+150)*4]) {
+      expect(Array.from(after.data.slice(offset,offset+4))).toEqual(Array.from(before.data.slice(offset,offset+4)));
+    }
+  } finally {await page.close();await preview.close();}
 });

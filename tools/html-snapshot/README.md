@@ -126,8 +126,10 @@ the emitter's normalization from the live application. Callers capturing repeate
 pass a reusable `mirror` engine handle from a **separate** browser process.
 
 Viewport capture preserves the current view. `extent: 'document'` captures the current
-materialized document without scrolling to load more content. Embedded frames, open shadow
-roots, browser top-layer content and native non-text controls currently report an error.
+materialized document without scrolling to load more content (maximum height 16384px;
+larger documents fail instead of truncating). Embedded frames, custom elements/shadow
+roots, native details/dialog/media elements, browser top-layer content and native non-text
+inputs currently report an error.
 `unsupported: 'rasterize'` explicitly allows a whole-viewport PNG fallback, reported in
 `warnings`; document capture does not use this fallback. Ordinary HTML/CSS retains the
 existing importer's rendering support and limitations. This API captures a static state;
@@ -136,6 +138,26 @@ the caller decides when the application is ready.
 The browser bundle also exports `collectCurrentState()` so a user-operated page can send
 its captured state to a Node host using `renderCapturedPage()`. The older `takeSnapshot()`
 continues to use the original page-normalizing behavior.
+
+The collector freezes readable image/canvas pixels and uses captured response bytes for
+cross-origin images and CSS assets. Scenario execution attaches `StateResources` before
+navigation, retaining assets loaded after interactions and replacing earlier responses
+to the same URL. The isolated renderer rejects uncaptured external resources instead of
+refetching them with a different login session. SDK callers can attach
+`StateResources.onResponse` before navigation and pass `resources: await cache.snapshot(timeoutMs)`
+to `captureCurrentPage`; the browser-only collector accepts `{urls, stylesheets}` maps
+containing data URLs and captured CSS text. Missing resources can also trigger the explicit
+viewport raster fallback. Runtime `FontFace` objects without a readable CSS declaration
+require that fallback. Browser-only collection does not include a fallback screenshot.
+
+Use `--download-fonts` for native render fallbacks, or `html2pagx --embed-fonts` for portable
+PAGX fonts; structured snapshots warn when web fonts require this handling. `--download-images`
+writes captured image bytes to disk. These options also apply to scenario execution.
+The source application remains running during collection: `stableMs` detects visual
+settling, not a completed business transaction. For continuously moving pages, a raster
+fallback is sampled immediately after DOM collection and can represent an adjacent frame.
+The existing subset renderer's CSS/text/compositing limitations still apply; a structured
+capture does not guarantee pixel identity for arbitrary CSS or WebGL surfaces.
 
 `lib/interaction.ts` adds `runScenario(engineHandle, url, scenario, options)`. A version-1
 scenario contains a `steps` array and optional `viewport`, `timeoutMs` (default 120000),
@@ -154,6 +176,9 @@ Every step can override `timeoutMs`. `capture` requires a unique filesystem-safe
 and accepts `extent` and `unsupported` as above. Unknown fields are errors.
 
 All steps share one page in a fresh isolated context. Captures never reload that page.
+The CLI and HTTP entry points dedicate a browser process to each active scenario so
+concurrent sessions cannot change one another's window focus. SDK callers should also
+use a dedicated source browser per concurrent scenario.
 Passing `options.checkpoint` runs only through the selected capture; otherwise results
 are returned in capture order. Business readiness belongs in explicit `waitFor` steps.
 Before capture the runner waits for visible images, fonts and stable visible geometry;
@@ -184,6 +209,8 @@ For HTTP, POST the usual `{html, format}` or `{url, format}` JSON with
 `options: {scenario: {...}, checkpoint: "advanced"}`. JSON responses include
 `checkpoint` and `warnings`; multiple captures require a checkpoint. Invalid scenario
 syntax, conflicting options and unknown checkpoints return HTTP 400 before execution.
+The result is an editable static state (or an explicitly requested raster fallback), not
+the application's event handlers, component state or a replayable interaction runtime.
 
 ```bash
 node snapshot.js <input.html | http(s)://url> [-o <out.html>]

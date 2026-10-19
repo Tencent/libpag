@@ -354,6 +354,8 @@ export interface RunHtmlToPagxOptions {
   embedFonts?: boolean;
   downloadFonts?: boolean;
   fontDir?: string;
+  // Captured faces for this particular checkpoint, when sharing a font directory.
+  fontFiles?: string[];
   downloadImages?: boolean;
   imageDir?: string;
   // How image resources are stored in the exported .pagx: 'external' (default; write image files
@@ -481,7 +483,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
 
     let fonts: string[] = [];
     if (downloadFonts) {
-      fonts = collectFontFallbacks({ fontDir });
+      fonts = opts.fontFiles ?? collectFontFallbacks({ fontDir });
       if (fonts.length === 0) {
         log(`html2pagx: --download-fonts: no web fonts were captured in ${fontDir}`);
       }

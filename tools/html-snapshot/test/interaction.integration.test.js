@@ -26,6 +26,7 @@ test('snapshot CLI selects one state and keeps stdout pure', async () => {
   expect(stdout).toMatch(/^<!DOCTYPE html>/i);
   expect(stdout).toContain('Result: PAGX');
   expect(stdout).not.toContain('step 1/');
+  expect(stdout).not.toContain('data-pagx-intrinsic-width');
   await expect(run(process.execPath, ['snapshot.js',input,'--scenario',scenario,'-o','-']))
     .rejects.toMatchObject({stderr:expect.stringContaining('Multiple checkpoints')});
 });
@@ -65,6 +66,19 @@ nativeTest('html2pagx replays once and renders all named checkpoints', async () 
     }
     expect(mismatch / (640*480)).toBeLessThan(0.06);
   } finally { await engine.browser.close(); }
+});
+
+nativeTest('downloaded snapshot images resolve and render through the native pipeline',async()=>{
+  const png=new PNG({width:10,height:10});
+  for(let i=0;i<png.data.length;i+=4)png.data.set([255,0,0,255],i);
+  const fixture=path.join(output,'image.html'),plan=path.join(output,'image.json');
+  fs.writeFileSync(fixture,`<!doctype html><body style="margin:0"><img width="100" height="100" src="data:image/png;base64,${PNG.sync.write(png).toString('base64')}"></body>`);
+  fs.writeFileSync(plan,JSON.stringify({version:1,viewport:{width:320,height:200},steps:[{type:'capture',name:'ready'}]}));
+  await run(process.execPath,['html2pagx',fixture,'--scenario',plan,'-o',output,'--download-images','--pagx-bin',pagx]);
+  const actual=PNG.sync.read(fs.readFileSync(path.join(output,'image.ready.png')));
+  expect(Array.from(actual.data.slice((30*320+30)*4,(30*320+30)*4+4))).toEqual([255,0,0,255]);
+  expect(Array.from(actual.data.slice((150*320+150)*4,(150*320+150)*4+4))).toEqual([255,255,255,255]);
+  expect(fs.readFileSync(path.join(output,'image.ready.subset.html'),'utf8')).not.toContain('data:image/');
 });
 
 test('HTTP accepts a selected checkpoint and rejects ambiguous/invalid scenarios before execution', async () => {
