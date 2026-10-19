@@ -61,6 +61,10 @@ const NAME_ANCHOR_ATTR = 'data-pagx-name-anchor';
 // See `isIntrinsicInlineContentWidth` and HTMLStyleCascade::computeBoxAttributes.
 const INTRINSIC_WIDTH_ATTR = 'data-pagx-intrinsic-width';
 
+// Only enabled while converting an inert, computed-style copy. Its viewport,
+// root layout, scroll offsets and sampled animation values must stay intact.
+let SNAPSHOT_CURRENT_STATE = false;
+
 // Whitespace-collapse pattern that spares NBSP (U+00A0). Source pages run English-typography
 // pre-passes that glue short function words to their neighbours with NBSP (e.g. getflect.app's
 // `applyEnglishTypography` rewrites "to perform" / "But nowhere" into "to\u00a0perform" /
@@ -4486,7 +4490,7 @@ function renderElementBox(el, parentRect, opts, precomputed) {
   // asymmetric borders, stray text, display:contents middlemen) fall
   // through to the absolute path below — the inference pass remains a
   // backstop.
-  const flexChildren = classifyFlexContainer(el, computed);
+  const flexChildren = SNAPSHOT_CURRENT_STATE ? null : classifyFlexContainer(el, computed);
   if (flexChildren) {
     return renderFlexContainer(el, parentRect, computed, flexChildren, opts);
   }
@@ -4849,6 +4853,26 @@ function visibleContentExtent() {
 
 function snapshotMainImpl(opts) {
   opts = opts || {};
+  if (SNAPSHOT_CURRENT_STATE) {
+    window.__pagxClipDefs = [];
+    window.__pagxClipDefMap = {};
+    const full = opts.extent === 'document';
+    const width = full ? Math.max(innerWidth, document.documentElement.scrollWidth) : innerWidth;
+    const height = full ? Math.min(MAX_CAPTURE_HEIGHT_PX,
+      Math.max(innerHeight, document.documentElement.scrollHeight)) : innerHeight;
+    const origin = { left: full ? -scrollX : 0, top: full ? -scrollY : 0, width, height };
+    const htmlStyle = getComputedStyle(document.documentElement);
+    const bodyStyle = getComputedStyle(document.body);
+    const rootBackground = htmlStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
+      ? htmlStyle.backgroundColor : bodyStyle.backgroundColor;
+    const content = render(document.documentElement, origin);
+    const defs = (window.__pagxClipDefs || []).join('');
+    return { width, height, html: `<!DOCTYPE html><html><head><style>` +
+      `div,span,img,svg,body{box-sizing:border-box}body{margin:0;padding:0;position:relative}` +
+      `</style></head><body data-pagx-capture-mode="current-state" style="width:${width}px;height:${height}px;overflow:hidden;background-color:${rootBackground}">` +
+      (defs ? `<svg width="0" height="0" style="display:none"><defs>${defs}</defs></svg>` : '') +
+      content + '</body></html>' };
+  }
   // Neutralise the page and measure the canvas. When the runner has already
   // resized the viewport to the canvas (the normal split-payload path) it
   // passes the dimensions it measured *before* the resize via
@@ -4984,6 +5008,11 @@ ${clipDefsSvg}${parts.join('')}
 // pre-pass. Normalise source-less placeholders here as a final safety net,
 // then always restore the live DOM once the flat snapshot has been built.
 function snapshotMain(opts) {
+  if (opts && opts.mode === 'current-state') {
+    SNAPSHOT_CURRENT_STATE = true;
+    try { return snapshotMainImpl(opts); }
+    finally { SNAPSHOT_CURRENT_STATE = false; }
+  }
   normalizeEmptyImagePlaceholders();
   try {
     return snapshotMainImpl(opts);
@@ -5002,6 +5031,7 @@ function snapshotMain(opts) {
 // helpers are concatenated into the same scope and become visible at the
 // top of execution regardless of their textual position.
 const PAYLOAD_CONSTANTS_SRC = `
+let SNAPSHOT_CURRENT_STATE = false;
 const DROP_TAGS = new Set(${DROP_TAG_NAMES_JSON});
 
 const MAX_CAPTURE_HEIGHT_PX = ${MAX_CAPTURE_HEIGHT_PX_NODE};

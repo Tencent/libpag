@@ -106,6 +106,37 @@ own font metrics.
 
 ## Usage
 
+### Capturing an already-open page
+
+The `lib/current-state.ts` API captures a static interaction state without navigating,
+scrolling, changing focus, cancelling animations, or rewriting the source DOM:
+
+```js
+const { captureCurrentPage } = require('./dist/lib/current-state');
+// page is an already-open Puppeteer or Playwright page, after the desired interaction.
+const result = await captureCurrentPage(page, { extent: 'viewport' });
+// result: { html, width, height, url, warnings }
+```
+
+The synchronous `collectCurrentState()` browser helper records computed styles, pseudo
+elements, current form values, canvas pixels and scroll offsets into an inert copy. A
+separate headless browser converts that copy using the existing HTML subset emitter;
+its element rectangles are checked against the source before conversion. This isolates
+the emitter's normalization from the live application. Callers capturing repeatedly can
+pass a reusable `mirror` engine handle from a **separate** browser process.
+
+Viewport capture preserves the current view. `extent: 'document'` captures the current
+materialized document without scrolling to load more content. Embedded frames, open shadow
+roots, browser top-layer content and native non-text controls currently report an error.
+`unsupported: 'rasterize'` explicitly allows a whole-viewport PNG fallback, reported in
+`warnings`; document capture does not use this fallback. Ordinary HTML/CSS retains the
+existing importer's rendering support and limitations. This API captures a static state;
+the caller decides when the application is ready.
+
+The browser bundle also exports `collectCurrentState()` so a user-operated page can send
+its captured state to a Node host using `renderCapturedPage()`. The older `takeSnapshot()`
+continues to use the original page-normalizing behavior.
+
 ```bash
 node snapshot.js <input.html | http(s)://url> [-o <out.html>]
 ```
