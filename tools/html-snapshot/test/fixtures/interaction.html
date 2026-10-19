@@ -1,0 +1,32 @@
+<!doctype html>
+<!-- Copyright (C) 2026 Tencent. Licensed under the Apache License, Version 2.0. -->
+<html><head><meta charset="utf-8"><style>
+body { margin:16px; background:#e8edf4; font:16px Arial; min-height:1000px }
+button { font:inherit; padding:8px; border:1px solid #234; background:white }
+#dialog { display:none; position:fixed; top:100px; left:60px; width:300px;
+  padding:16px; background:white; box-shadow:0 4px 12px #777; z-index:10 }
+#advanced { display:none; padding:12px; background:#def }
+#query { font:inherit; padding:4px; border:1px solid #456; outline:0 }
+#hover { margin:10px; width:130px; height:30px; background:#acf }
+#hover:hover::after { content:"hover state"; display:block; position:absolute;
+  background:#222; color:white; padding:6px; top:60px; left:170px }
+</style></head><body>
+<button id="open" data-testid="open">Open settings</button><div id="hover">Hover here</div>
+<div id="dialog"><button id="tab">Advanced</button><div id="advanced">
+<input id="query" placeholder="Search"><p id="result" data-ready="false">Waiting</p>
+</div></div>
+<script>
+document.querySelector('#open').onclick = () => { document.querySelector('#dialog').style.display = 'block'; };
+document.querySelector('#tab').onclick = () => { document.querySelector('#advanced').style.display = 'block'; };
+let timer;
+document.querySelector('#query').oninput = event => {
+  const text = event.target.value;
+  document.querySelector('#result').dataset.ready = 'false';
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    const next = document.createElement('p'); next.id = 'result';
+    next.dataset.ready = 'true'; next.textContent = 'Result: ' + text;
+    document.querySelector('#result').replaceWith(next);
+  }, 120);
+};
+</script></body></html>

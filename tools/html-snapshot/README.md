@@ -137,6 +137,29 @@ The browser bundle also exports `collectCurrentState()` so a user-operated page 
 its captured state to a Node host using `renderCapturedPage()`. The older `takeSnapshot()`
 continues to use the original page-normalizing behavior.
 
+`lib/interaction.ts` adds `runScenario(engineHandle, url, scenario, options)`. A version-1
+scenario contains a `steps` array and optional `viewport`, `timeoutMs` (default 120000),
+`stepTimeoutMs` (15000) and `stableMs` (150). Supported step types are `click`, `fill`,
+`type`, `press`, `hover`, `focus`, `check`, `select`, `scroll`, `waitFor` and `capture`.
+Targets specify exactly one of `css`, `testId`, or `role` (with optional exact `name`;
+role locators require Playwright). An optional `frame` CSS selector scopes a target to
+one iframe. Capturing iframe content itself still requires the raster fallback.
+
+`waitFor` takes exactly one of `state` (`visible`, `hidden`, `attached`, `detached`),
+`attribute: {name, value}`, exact `text`, or exact `url` (relative URLs are allowed).
+`click` and `press` can also include an expected `url`. `fill` replaces a control's
+value, while `type` sends individual keystrokes. `check` takes a boolean `value`;
+`select` takes an option value. `scroll` takes `x`/`y` and an optional target container.
+Every step can override `timeoutMs`. `capture` requires a unique filesystem-safe `name`
+and accepts `extent` and `unsupported` as above. Unknown fields are errors.
+
+All steps share one page in a fresh isolated context. Captures never reload that page.
+Passing `options.checkpoint` runs only through the selected capture; otherwise results
+are returned in capture order. Business readiness belongs in explicit `waitFor` steps.
+Before capture the runner waits for visible images, fonts and stable visible geometry;
+set `stableMs: 0` when deliberately capturing continuous motion. Input actions are not
+replayed after a failed readiness condition. Errors include the failed step number.
+
 ```bash
 node snapshot.js <input.html | http(s)://url> [-o <out.html>]
 ```
