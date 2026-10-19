@@ -213,15 +213,19 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
     }
     return false;
   }
+  // Not fatal: a host may legitimately lack a family the page names, and refusing the conversion
+  // would block every page that uses a system font the container does not ship. The outlines are
+  // still from a face the author did not choose, so the caller has to be able to see it.
   if (!substituted.empty()) {
-    std::cerr << command << ": " << substituted.size()
+    std::cerr << command << ": warning: " << substituted.size()
               << " text(s) ask for a font family that resolves to no available face; the baked "
-                 "glyphs would come from a substitute:\n";
+                 "glyphs come from a substitute:\n";
     for (const auto& description : substituted) {
-      std::cerr << command << ":   " << description << "\n";
+      std::cerr << command << ": warning:   " << description << "\n";
     }
-    std::cerr << command << ": install the font or pass it with --font-alias <family>=<file>\n";
-    return false;
+    std::cerr << command
+              << ": warning: install the font or pass it with "
+                 "--font-alias <family>=<file>\n";
   }
   return true;
 }

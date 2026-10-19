@@ -432,9 +432,9 @@ is `Ma Shan Zheng`); `Text@fontFamily` always keeps the authored name.
 
 Remote (`http(s)://`) font sources are never carried over.
 
-An import fails when a `fontFamily` resolves to no available face, because baking it would
-silently store substitute outlines. Install the font, or pass it to `pagx embed` / `pagx render`
-with `--font-alias <family>=<file>`.
+A `fontFamily` that resolves to no available face is reported as a warning: the text is baked
+from whatever substitute the platform picked, and the conversion still succeeds. Install the font,
+or pass it to `pagx embed` / `pagx render` with `--font-alias <family>=<file>`.
 
 ### Zip input
 
