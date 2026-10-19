@@ -20,6 +20,13 @@
 #include <iostream>
 #include <string>
 #include "cli/CommandBounds.h"
+#include "cli/CommandCapture.h"
+#include "cli/NodeTool.h"
+#ifdef _WIN32
+#include <windows.h>
+
+#include <shellapi.h>
+#endif
 #include "cli/CommandEmbed.h"
 #include "cli/CommandExport.h"
 #include "cli/CommandFont.h"
@@ -48,6 +55,7 @@ static void PrintUsage() {
             << "  font           Query font metrics\n"
             << "  embed          Embed fonts and images into a PAGX file\n"
             << "  format         Format a PAGX file (indentation and attribute ordering)\n"
+            << "  capture        Capture web pages and interaction states as PAGX and PNG\n"
             << "  import         Import from another format (e.g. SVG, HTML) to PAGX\n"
             << "  export         Export a PAGX file to another format (e.g. SVG)\n"
             << "\n"
@@ -58,7 +66,7 @@ static void PrintUsage() {
             << "Run 'pagx <command> --help' for detailed options and usage of each command.\n";
 }
 
-int main(int argc, char* argv[]) {
+static int RunCommand(int argc, char* argv[]) {
   if (argc < 2) {
     PrintUsage();
     return 1;
@@ -97,6 +105,9 @@ int main(int argc, char* argv[]) {
   if (command == "format") {
     return pagx::cli::RunFormat(argc - 1, argv + 1);
   }
+  if (command == "capture") {
+    return pagx::cli::RunCapture(argc - 1, argv + 1);
+  }
   if (command == "import") {
     return pagx::cli::RunImport(argc - 1, argv + 1);
   }
@@ -110,4 +121,22 @@ int main(int argc, char* argv[]) {
   std::cerr << "pagx: unknown command '" << command << "'\n";
   std::cerr << "Run 'pagx --help' for usage.\n";
   return 1;
+}
+
+int main(int argc, char* argv[]) {
+#ifdef _WIN32
+  // The narrow CRT argv uses the local codepage. Preserve Unicode paths from npm/PowerShell.
+  int count = 0;
+  auto wideArgs = CommandLineToArgvW(GetCommandLineW(), &count);
+  if (!wideArgs) return 1;
+  std::vector<std::string> utf8;
+  for (int i = 0; i < count; ++i) utf8.push_back(pagx::cli::WideToUTF8(wideArgs[i]));
+  LocalFree(wideArgs);
+  std::vector<char*> args;
+  for (auto& arg : utf8) args.push_back(arg.data());
+  args.push_back(nullptr);
+  return RunCommand(count, args.data());
+#else
+  return RunCommand(argc, argv);
+#endif
 }

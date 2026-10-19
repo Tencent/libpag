@@ -31,6 +31,7 @@
 #include <string>
 #include <system_error>
 #include "cli/CliUtils.h"
+#include "cli/NodeTool.h"
 #include "cli/CommandResolve.h"
 #include "cli/ImageStorage.h"
 #include "pagx/HTMLImporter.h"
@@ -135,53 +136,6 @@ static std::string ShellQuote(const std::string& value) {
 }
 #endif
 
-// Resolve the path to the html-snapshot driver script. The path is fixed in code; resolution
-// order (first hit wins):
-//   1. `PAGX_HTML_SNAPSHOT_BIN` environment variable,
-//   2. the relative path `tools/html-snapshot/snapshot.js` when it resolves from cwd,
-//   3. the repository root's `tools/html-snapshot/snapshot.js`, when a `.git` marker can be found
-//      within eight parent levels.
-// Every candidate must be a regular file. Searching only after locating the repository root also
-// avoids executing a same-named script planted in an arbitrary writable ancestor directory.
-// Returns empty when nothing matched; the caller surfaces a clear error in that case.
-static std::string ResolveSnapshotBin() {
-  namespace fs = std::filesystem;
-  auto isRegularFile = [](const fs::path& path) {
-    std::error_code ec;
-    return fs::is_regular_file(path, ec) && !ec;
-  };
-
-  if (const char* env = std::getenv("PAGX_HTML_SNAPSHOT_BIN")) {
-    if (env[0] != '\0') {
-      return isRegularFile(env) ? std::string(env) : std::string();
-    }
-  }
-
-  const std::string relativeDefault = "tools/html-snapshot/snapshot.js";
-  if (isRegularFile(relativeDefault)) {
-    return relativeDefault;
-  }
-
-  std::error_code ec;
-  auto cur = fs::current_path(ec);
-  if (ec) {
-    return {};
-  }
-  for (int depth = 0; depth < 8; ++depth) {
-    std::error_code markerEc;
-    if (fs::exists(cur / ".git", markerEc) && !markerEc) {
-      auto candidate = cur / "tools" / "html-snapshot" / "snapshot.js";
-      return isRegularFile(candidate) ? candidate.string() : std::string();
-    }
-    auto parent = cur.parent_path();
-    if (parent == cur) {
-      break;
-    }
-    cur = parent;
-  }
-  return {};
-}
-
 // Whether the html-snapshot pre-pass runs before the HTML importer. Enabled by default; set
 // the `PAGX_HTML_SNAPSHOT` environment variable to a falsy value (`0`, `false`, `no`, `off`,
 // case-insensitive) to disable it. The html-snapshot tooling (`html2pagx`, the snapshot
@@ -206,45 +160,10 @@ struct SnapshotResult {
 };
 
 #ifdef _WIN32
-static std::wstring UTF8ToWide(const std::string& value) {
-  if (value.empty()) return {};
-  int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
-                                 static_cast<int>(value.size()), nullptr, 0);
-  if (size <= 0) return {};
-  std::wstring wide(static_cast<size_t>(size), L'\0');
-  MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()),
-                      wide.data(), size);
-  return wide;
-}
-
-// Quotes one argv item using the CommandLineToArgvW / Microsoft C runtime rules. CreateProcessW
-// receives this command line directly, so cmd.exe metacharacters never get a chance to execute.
-static std::wstring QuoteWindowsArg(const std::wstring& value) {
-  std::wstring out = L"\"";
-  size_t backslashes = 0;
-  for (wchar_t ch : value) {
-    if (ch == L'\\') {
-      backslashes++;
-      continue;
-    }
-    if (ch == L'\"') {
-      out.append(backslashes * 2 + 1, L'\\');
-      out.push_back(L'\"');
-    } else {
-      out.append(backslashes, L'\\');
-      out.push_back(ch);
-    }
-    backslashes = 0;
-  }
-  out.append(backslashes * 2, L'\\');
-  out.push_back(L'\"');
-  return out;
-}
-
 static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& inputPath,
                                    const ImportFormatOptions& options, std::string& html, int& exitCode,
                                    std::string& error) {
-  std::wstring node = L"node";
+  std::wstring node = UTF8ToWide(NodeExecutablePath());
   std::wstring wideBin = UTF8ToWide(bin);
   std::wstring wideInput = UTF8ToWide(inputPath);
   if (wideBin.empty() || wideInput.empty()) {
@@ -317,7 +236,7 @@ static bool RunHTMLSnapshotProcess(const std::string& bin, const std::string& in
 static SnapshotResult RunHTMLSnapshot(const std::string& inputPath,
                                        const ImportFormatOptions& options) {
   SnapshotResult result;
-  auto bin = ResolveSnapshotBin();
+  auto bin = ResolveHTMLTool("PAGX_HTML_SNAPSHOT_BIN", "launch.js", "snapshot.js");
   if (bin.empty()) {
     result.error =
         "html-snapshot script not found; set PAGX_HTML_SNAPSHOT_BIN or run from a directory "
@@ -336,7 +255,7 @@ static SnapshotResult RunHTMLSnapshot(const std::string& inputPath,
     return result;
   }
 #else
-  std::string command = "node ";
+  std::string command = ShellQuote(NodeExecutablePath()) + " ";
   command += ShellQuote(bin);
   command += " ";
   command += ShellQuote(inputPath);

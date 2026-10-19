@@ -197,6 +197,31 @@ cmake-build-debug/pagx import --input tools/html-snapshot/test/fixtures/interact
 ./html2pagx test/fixtures/interaction.html --scenario test/fixtures/interaction.scenario.json -o /tmp/states
 ```
 
+The native CLI also exposes the complete pipeline through `capture`:
+
+```bash
+cmake-build-debug/pagx capture page.html --scenario states.json -o out --preview
+# Ordinary page or URL, without an interaction scenario:
+cmake-build-debug/pagx capture page.html -o out
+cmake-build-debug/pagx capture https://example.com --output-name demo -o out
+```
+
+`pagx capture` and `html2pagx` share argument validation and orchestration. `capture`
+accepts a positional input or `--input`, uses `-o` / `--output-dir` for a directory,
+and defaults its conversion steps to the invoking native binary. An explicit
+`--pagx-bin` overrides that default; an unrelated `PAGX_BIN` or `pagx` on PATH does
+not. `pagx import` continues to use `--output` for a single PAGX file.
+Capture progress goes to stderr; the legacy `html2pagx` progress stream is unchanged.
+`--help`, invalid arguments, and batch `--dry-run` do not start a browser; dry-run
+does not create output directories. Scenario exports are independent static states,
+not an interactive PAGX state machine.
+
+The bridge uses `PAGX_NODE_BIN` (default `node`) and an optional
+`PAGX_HTML_CAPTURE_BIN` override for the capture launcher. It searches the bundled
+runtime beside the executable, then the repository containing the working directory
+or native binary. `PAGX_HTML_SNAPSHOT_BIN` retains its single-HTML stdout protocol.
+Both HTML entry points require Node and the HTML runtime in addition to the native binary.
+
 `html2pagx` produces `<base>.<checkpoint>.subset.html`, `.pagx`, `.png` and a
 `<base>.captures.json` manifest. `--checkpoint` selects only one state. `snapshot.js`
 and `pagx import` produce a single output, so multiple captures require `--checkpoint`.
@@ -258,6 +283,15 @@ the per-checkpoint outputs. Files are staged and replaced by atomic per-file ren
 a set of multiple files is not an atomic transaction. After a shorter repeated run,
 old extra sheets may remain on disk: consumers must read the manifest's `pages`,
 not scan the directory. With preview disabled, no `preview` field is written.
+
+The version-1 manifest also has a top-level `status`: `running`, `complete`, or
+`failed`. A run replaces the old manifest before opening the source page, appends
+only successfully converted checkpoints to `outputs`, and records `error` on failure.
+Preview failure preserves completed per-checkpoint outputs and exits nonzero.
+On POSIX, SIGINT/SIGTERM cancel the active CLI, close its browser sessions and native
+children, and return 130/143. Interrupted scenario runs record failure when cleanup
+can finish; abrupt termination such as SIGKILL can leave `running` in the manifest.
+Consumers must require `status: "complete"` for manifests carrying this field.
 
 For HTTP, POST the usual `{html, format}` or `{url, format}` JSON with
 `options: {scenario: {...}, checkpoint: "advanced"}`. JSON responses include
