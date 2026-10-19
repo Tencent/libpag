@@ -23,9 +23,10 @@
 namespace pagx {
 
 /**
- * OffscreenDrawable backs PAGSurface::MakeOffscreen with a fresh OpenGL device and a transient
- * tgfx::Surface sized to the requested pixel dimensions. It is the default Drawable used by
- * unit tests and any caller that just needs to read pixels back via PAGSurface::readPixels.
+ * OffscreenDrawable backs PAGSurface::MakeOffscreen with a device from Devices::MakeDefault() and
+ * a transient tgfx::Surface sized to the requested pixel dimensions. It is the default Drawable
+ * used by unit tests and any caller that just needs to read pixels back via
+ * PAGSurface::readPixels.
  */
 class OffscreenDrawable : public Drawable {
  public:

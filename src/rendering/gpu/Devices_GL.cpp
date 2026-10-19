@@ -62,6 +62,10 @@ std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   return tgfx::GLDevice::Make(sharedContext);
 }
 
+std::shared_ptr<tgfx::Device> Devices::MakeForSharedContext(void* sharedContext) {
+  return tgfx::GLDevice::Make(sharedContext);
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread(const tgfx::BackendTexture&) {
   // GL cannot walk from a texture id back to its owning context, so the worker device is still
   // derived from the calling thread's current context (same as the no-texture overload).

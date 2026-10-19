@@ -68,6 +68,13 @@ std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread() {
   return tgfx::MetalDevice::Make();
 }
 
+std::shared_ptr<tgfx::Device> Devices::MakeForSharedContext(void*) {
+  // Metal has no share-group concept keyed by an opaque context handle: resource sharing is
+  // decided by the MTLDevice itself. The caller's GL-shaped handle carries no usable information
+  // here, so fall back to the default device.
+  return MakeDefault();
+}
+
 std::shared_ptr<tgfx::Device> Devices::MakeForAsyncThread(const tgfx::BackendTexture& texture) {
   // The async worker renders into the caller's external texture, whose own MTLDevice is the only
   // device allowed to touch it. Fall back to the default device when the texture does not carry

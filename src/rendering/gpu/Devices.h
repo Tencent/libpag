@@ -126,6 +126,18 @@ class Devices {
   static bool SupportsBackend(tgfx::Backend backend);
 
   /**
+   * Creates a device that shares GPU resources with a caller-owned native context handle.
+   *   OpenGL: GLDevice::Make(sharedContext) - the handle is a native GL context, so the new
+   *           device joins its share group and both sides can see each other's textures. A null
+   *           handle yields an independent device.
+   *   Other backends: Equivalent to MakeDefault(); they have no share-group notion tied to an
+   *           opaque context handle, so the parameter is unused but kept for signature parity.
+   * Used by pag_surface_make_offscreen_double_buffered(), whose sharedContext parameter predates
+   * the multi-backend split and stays GL-shaped in the public C API.
+   */
+  static std::shared_ptr<tgfx::Device> MakeForSharedContext(void* sharedContext);
+
+  /**
    * Validates a caller-owned GPU texture and resolves the device libpag must render it with.
    * Returns an empty AdoptedDevice when the description is invalid or carries the tag of a
    * backend this build was not compiled with; both cases are logged, so resource factories only
