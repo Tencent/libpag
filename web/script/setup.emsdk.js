@@ -4,8 +4,10 @@ const Utils = require("../../third_party/vendor_tools/lib/Utils");
 
 const versionResult = Utils.execSafe("emcc --version");
 if (versionResult.includes("Emscripten")) {
+    // This file is loaded via require() by the cmake scripts, so exit early with return instead
+    // of process.exit() to avoid terminating the parent build process.
     process.stdout.write("emcc is already available in the environment, skipping emsdk installation.\n");
-    process.exit(0);
+    return;
 }
 
 const emsdkPath = path.resolve(__dirname, '../../third_party/emsdk');
