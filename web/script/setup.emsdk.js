@@ -2,6 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const Utils = require("../../third_party/vendor_tools/lib/Utils");
 
+const versionResult = Utils.execSafe("emcc --version");
+if (versionResult.includes("Emscripten")) {
+    process.stdout.write("emcc is already available in the environment, skipping emsdk installation.\n");
+    process.exit(0);
+}
+
 const emsdkPath = path.resolve(__dirname, '../../third_party/emsdk');
 if (!fs.existsSync(emsdkPath)) {
     Utils.exec(`git clone https://github.com/emscripten-core/emsdk.git ${Utils.escapeSpace(emsdkPath)}`);
