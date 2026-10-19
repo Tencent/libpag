@@ -3,7 +3,7 @@
 Render an arbitrary HTML page in headless Chromium and emit a flat,
 absolute-positioned snapshot that conforms to the HTML subset documented in
 [`spec/html_subset.md`](../../spec/html_subset.md). The output is intended to be
-fed directly to `pagx import --format html`.
+fed directly to `pagx import --html-source snapshot --format html`.
 
 ## Why
 
@@ -53,7 +53,7 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
 - relative `<img src>` paths are preserved so the importer can still resolve
   them.
 
-The output still has to pass through `pagx import --format html` to be turned
+The output still has to pass through `pagx import --html-source snapshot --format html` to be turned
 into PAGX. The importer's normaliser handles any final cleanup (unit
 conversion, dropping properties we missed, etc.).
 
@@ -150,7 +150,7 @@ containing data URLs and captured CSS text. Missing resources can also trigger t
 viewport raster fallback. Runtime `FontFace` objects without a readable CSS declaration
 require that fallback. Browser-only collection does not include a fallback screenshot.
 
-Use `--download-fonts` for native render fallbacks, or `html2pagx --embed-fonts` for portable
+Use `--download-fonts` for native render fallbacks, or `pagx import --embed-fonts` for portable
 PAGX fonts; structured snapshots warn when web fonts require this handling. `--download-images`
 writes captured image bytes to disk. These options also apply to scenario execution.
 The source application remains running during collection: `stableMs` detects visual
@@ -185,113 +185,61 @@ Before capture the runner waits for visible images, fonts and stable visible geo
 set `stableMs: 0` when deliberately capturing continuous motion. Input actions are not
 replayed after a failed readiness condition. Errors include the failed step number.
 
-Use the checked-in example `test/fixtures/interaction.scenario.json`:
+Use `pagx import` for both a selected checkpoint and the complete result set:
 
 ```bash
-# One selected checkpoint, through the native CLI (from the repository root).
-cmake-build-debug/pagx import --input tools/html-snapshot/test/fixtures/interaction.html \
+# From the repository root.
+cmake-build-debug/pagx import tools/html-snapshot/test/fixtures/interaction.html \
   --scenario tools/html-snapshot/test/fixtures/interaction.scenario.json \
-  --checkpoint advanced --output /tmp/advanced.pagx
+  --checkpoint advanced -o /tmp/advanced.pagx
 
-# All checkpoints in one browser session (from tools/html-snapshot).
-./html2pagx test/fixtures/interaction.html --scenario test/fixtures/interaction.scenario.json -o /tmp/states
+cmake-build-debug/pagx import page.html --scenario states.json --output-dir out --preview
+cmake-build-debug/pagx import page.html -o page.pagx --render
+cmake-build-debug/pagx import https://example.com --output-dir out --output-name demo
+cmake-build-debug/pagx import --batch pages --output-dir out --render
 ```
 
-The native CLI also exposes the complete pipeline through `capture`:
+`-o` / `--output` always names one PAGX file; `--output-dir` names a result set.
+They are mutually exclusive. An unselected scenario requires directory output,
+regardless of its number of checkpoints. Selected checkpoints execute prior actions
+before capturing, then stop. Exports are independent static documents.
 
-```bash
-cmake-build-debug/pagx capture page.html --scenario states.json -o out --preview
-# Ordinary page or URL, without an interaction scenario:
-cmake-build-debug/pagx capture page.html -o out
-cmake-build-debug/pagx capture https://example.com --output-name demo -o out
-```
+PAGX is the default output. `--render` adds PNGs, `--preview` adds PNGs and contact
+sheets, and `--keep-snapshot` keeps `.subset.html`. Preview works with ordinary
+inputs, scenarios and batches. Directory mode writes `<base>.<checkpoint>.pagx`
+for scenarios, `<base>.pagx` for ordinary inputs, and `manifest.json` for the job.
+Batch inputs preserve relative directories and use isolated browser contexts.
+`--images external|embed` controls final image storage independently of resolution.
+Existing outputs require `--overwrite`; output name collisions fail before capture.
 
-`pagx capture` and `html2pagx` share argument validation and orchestration. `capture`
-accepts a positional input or `--input`, uses `-o` / `--output-dir` for a directory,
-and defaults its conversion steps to the invoking native binary. An explicit
-`--pagx-bin` overrides that default; an unrelated `PAGX_BIN` or `pagx` on PATH does
-not. `pagx import` continues to use `--output` for a single PAGX file.
-Capture progress goes to stderr; the legacy `html2pagx` progress stream is unchanged.
-`--help`, invalid arguments, and batch `--dry-run` do not start a browser; dry-run
-does not create output directories. Scenario exports are independent static states,
-not an interactive PAGX state machine.
+The manifest lists each output's status, source, optional checkpoint, relative
+artifact paths, dimensions and warnings. Top-level status is `running`, `complete`,
+`failed` or `cancelled`. Require `complete` before treating a job as successful.
+Failures preserve completed outputs and return nonzero. SIGINT/SIGTERM clean up
+browser processes and return 130/143 on POSIX; SIGKILL may leave a running manifest.
 
-The bridge uses `PAGX_NODE_BIN` (default `node`) and an optional
-`PAGX_HTML_CAPTURE_BIN` override for the capture launcher. It searches the bundled
-runtime beside the executable, then the repository containing the working directory
-or native binary. `PAGX_HTML_SNAPSHOT_BIN` retains its single-HTML stdout protocol.
-Both HTML entry points require Node and the HTML runtime in addition to the native binary.
+Preview pages are `preview/sheet-NNN.png` in directory mode or
+`<output-stem>.preview/sheet-NNN.png` for a file target. They consume only this run's
+PAGX-rendered PNGs, in output order, without revisiting the page. Whole images fit
+within 320×480 thumbnails without cropping or upscaling; sheets paginate within
+4096-pixel edges and a 16-megapixel output budget. `--preview-columns` accepts 1–32.
 
-`html2pagx` produces `<base>.<checkpoint>.subset.html`, `.pagx`, `.png` and a
-`<base>.captures.json` manifest. `--checkpoint` selects only one state. `snapshot.js`
-and `pagx import` produce a single output, so multiple captures require `--checkpoint`.
-The native importer preserves the measured absolute layout of these subsets.
-Scenario mode owns viewport, readiness and scroll behavior; it rejects `--viewport-*`,
-`--wait-ms`, `--selector`, `--scroll-reveal` and `--capture-animations`. `--batch` with a
-scenario is currently unsupported. The legacy invocation remains unchanged.
+`--no-resolve` conflicts with rendering and font embedding. A scenario owns its
+viewport, waits and capture selection, so it rejects `--viewport-*`, `--wait-ms`,
+`--selector`, `--scroll-reveal`, `--capture-animations` and `--batch`. HTML-only
+options on SVG inputs are errors. `--dry-run` prints a validated JSON output plan
+without launching/installing browsers or creating output directories.
 
-Add `--preview` to `html2pagx --scenario` to assemble the current run's rendered PNGs
-into a contact sheet, in capture order:
+The native workflow calls `import-adapter.js` through a private versioned JSON
+protocol, converts prepared sources directly, and owns final publication. The Node
+adapter only captures HTML states or composes previews; it never calls `pagx import`.
+`PAGX_NODE_BIN` selects Node and `PAGX_HTML_IMPORT_BIN` can override the adapter
+launcher. Bundled runtime discovery works outside the repository. The older
+single-document library helper still uses `PAGX_HTML_SNAPSHOT_BIN` with HTML stdout.
 
-```bash
-./html2pagx test/fixtures/interaction.html --scenario test/fixtures/interaction.scenario.json \
-  -o /tmp/states --preview
-# Optional: --preview-columns 4, or --checkpoint advanced --preview for a single state.
-```
-
-The sheets are written to `<base>.preview/sheet-001.png`, `sheet-002.png`, etc.
-This directory avoids collisions with a checkpoint named `preview`. No browser session
-is replayed, and existing files in the output directory are not used as inputs.
-Preview is opt-in, currently scenario-only, and incompatible with `--no-render`,
-`--no-resolve`, and `--batch`. `--preview-columns` requires `--preview` and accepts
-integers from 1 to 32 (up to that many columns per page). By default, the layout chooses
-1–6 columns to approximate a 4:3 sheet.
-
-Whole images fit within 320×480 pixels without upscaling or cropping. The actual PNG
-dimensions are authoritative, including when `--scale` changes the rendered size;
-preview rendering always uses scale 1. Labels show sequence, checkpoint name (at most
-two lines), and source pixel dimensions. Transparent pixels are composited over a
-checkerboard. Text uses system font fallbacks, so label pixels can vary by platform.
-
-Sheets paginate at 4096 pixels per edge, 16 million output pixels, or 32 million
-source pixels per sheet. A single input exceeding the source budget is an error;
-PNG files over 128 MiB, missing files, and corrupt PNGs are also rejected before
-preview rendering. These are resource limits, not a guarantee of a particular peak
-memory usage. The generic `lib/contact-sheet.ts` module accepts ordered `{name, png}`
-items independently of scenarios, and uses `pngjs` for validation plus the existing
-`pagx render` pipeline for composition. Python and additional browser processes are
-not required.
-
-The existing capture manifest gains an optional field; paths below are relative to
-the manifest directory and use `/` separators:
-
-```json
-{
-  "preview": {
-    "status": "complete",
-    "pages": [
-      { "file": "interaction.preview/sheet-001.png", "width": 748, "height": 356, "items": ["initial", "advanced"] }
-    ]
-  }
-}
-```
-
-The manifest records `pending` with an empty `pages` array during generation, then
-`complete` only after all sheets are rendered and published. Preview failure exits
-nonzero and records `failed`, an `error` message, and empty `pages`, while preserving
-the per-checkpoint outputs. Files are staged and replaced by atomic per-file renames;
-a set of multiple files is not an atomic transaction. After a shorter repeated run,
-old extra sheets may remain on disk: consumers must read the manifest's `pages`,
-not scan the directory. With preview disabled, no `preview` field is written.
-
-The version-1 manifest also has a top-level `status`: `running`, `complete`, or
-`failed`. A run replaces the old manifest before opening the source page, appends
-only successfully converted checkpoints to `outputs`, and records `error` on failure.
-Preview failure preserves completed per-checkpoint outputs and exits nonzero.
-On POSIX, SIGINT/SIGTERM cancel the active CLI, close its browser sessions and native
-children, and return 130/143. Interrupted scenario runs record failure when cleanup
-can finish; abrupt termination such as SIGKILL can leave `running` in the manifest.
-Consumers must require `status: "complete"` for manifests carrying this field.
+The standalone `capture`/`html2pagx` entrypoints and duplicate orchestration have
+been removed. No compatibility flags or aliases are provided. See the
+[package import documentation](../../cli/npm/README.md) for the full output contract.
 
 For HTTP, POST the usual `{html, format}` or `{url, format}` JSON with
 `options: {scenario: {...}, checkpoint: "advanced"}`. JSON responses include
@@ -330,9 +278,10 @@ Options:
 | `--image-dir <dir>` | `<output>.images/` | Destination for `--download-images` |
 | `--browser-engine <name>` | `puppeteer` (or `$HTML_SNAPSHOT_BROWSER`) | Headless browser driver: `puppeteer` or `playwright` |
 
-`snapshot.js` also supports `-o -` to write the snapshot HTML to stdout (used as the
-`pagx import` bridge). `--embed-fonts` is a `html2pagx`-only flag; `snapshot.js` exposes
-only `--download-fonts` (embedding happens in the `pagx embed` step downstream).
+`snapshot.js` also supports `-o -` to write snapshot HTML to stdout for standalone
+callers and single-document library imports. `pagx import` uses the private JSON
+adapter. `--embed-fonts` belongs to native import; `snapshot.js` exposes only
+`--download-fonts`, whose files can be passed to a subsequent `pagx embed` command.
 
 ### Inline icon fonts
 
@@ -421,7 +370,7 @@ pagx embed page.pagx --fallback page.fonts/*.ttf   # self-contained .pagx
 pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
 ```
 
-`html2pagx --download-fonts` wires all of this up automatically (see below).
+`pagx import --download-fonts` wires all of this up automatically (see below).
 
 **Caveats:**
 
@@ -437,49 +386,25 @@ pagx render page.pagx -o page.png --fallback page.fonts/*.ttf
   fallback) but the *weight* may not match the design. When weight fidelity
   matters for CJK, install the real font on the render host instead.
 
-### One-shot pipeline
+### Unified import
 
-`html2pagx` wraps snapshot + `pagx import` + `pagx resolve` + `pagx render` in
-one call:
+Use the native `pagx import` command above for complete conversion. For example:
 
 ```bash
-tools/html-snapshot/html2pagx /path/to/page.html
-# → page.subset.html  (flat, subset-compliant; suppress with --no-subset-html)
-# → page.pagx         (after import + resolve)
-# → page.png          (rendered at scale=1)
-
-# URL input: --output-name is required (URLs have no filesystem basename)
-tools/html-snapshot/html2pagx https://example.com/demo \
-  --output-name demo --output-dir /tmp/out \
-  --cookie session=abc123 --header 'X-User: alice'
-# → /tmp/out/demo.subset.html / demo.pagx / demo.png
+pagx import page.html -o page.pagx --render --keep-snapshot
+pagx import https://example.com/demo --output-dir /tmp/out --output-name demo \
+  --cookie session=abc123 --header 'X-User: alice' --embed-fonts
 ```
 
-Options:
+`--embed-fonts` acquires web fonts and embeds shaped glyphs. Rendering also acquires
+web fonts for accurate fallback, without embedding them by default.
+`--download-fonts` additionally preserves downloaded faces next to the output.
+`--images external` writes image resources under `<stem>.assets/`; `embed` stores
+image bytes in the PAGX. `--no-resolve` only skips reference expansion, and never
+silently disables requested resource processing. Missing resources fail the import.
 
-| Flag | Description |
-|------|-------------|
-| `-o, --output-dir <dir>` | Write outputs to a different directory |
-| `--output-name <name>` | Base name for outputs (required when input is a URL) |
-| `--pagx-bin <path>` | Path to the `pagx` CLI binary (default `$PAGX_BIN` or `cmake-build-debug/pagx`) |
-| `--scale <N>` | PNG render scale (default 1) |
-| `--no-render` | Stop after `pagx resolve` |
-| `--no-resolve` | Stop after `pagx import` |
-| `--no-subset-html` | Do not write `<input>.subset.html`; default keeps it |
-| `--no-inline-icon-fonts` | Forwarded to `snapshot.js`: disable webfont-glyph → inline SVG conversion |
-| `--capture-animations` | Forwarded to `snapshot.js`: capture the page's animations into the subset so the `.pagx` replays the motion (default: a single static frame) |
-| `--download-fonts` | Download the page's web fonts and register them as render fallbacks (`pagx render --fallback`) **without** embedding them into the `.pagx` |
-| `--embed-fonts` | On top of `--download-fonts`, embed the downloaded faces into the `.pagx` (`pagx embed`) so the document is self-contained and its glyph metrics match the snapshot on any host. Implies `--download-fonts` |
-| `--font-dir <dir>` | Where downloaded fonts are written (default `<output>.fonts/`) |
-| `--download-images` | Save external images to disk and reference them by path instead of inlining base64 |
-| `--image-dir <dir>` | Where downloaded images are written (default `<output>.images/`) |
-| `--batch <dir>` | Convert every `.html` under a directory with one shared browser. Incompatible with a positional input, `--output-name`, and `-o`; use `--output-root` for the output location |
-| `--output-root <dir>` | Mirror the batch's outputs under this directory (batch only) |
-| `--skip-existing` | Skip an input whose target `.pagx` already exists (batch only) |
-| `--dry-run` | List the files that would be converted without running the browser or `pagx` (batch only) |
-| `--cookie <name=value>` / `--header <Key: Value>` | Forwarded to `snapshot.js` (URL inputs only; repeatable) |
-| `--browser-engine <name>` | Headless driver to use (`puppeteer` or `playwright`); forwarded to `snapshot.js`. Honours `$HTML_SNAPSHOT_BROWSER`. |
-| `--viewport-width / --viewport-height / --wait-ms / --selector` | Forwarded to `snapshot.js` (defaults 1400 / 900 / 800) |
+Use `pagx import --help` for HTML/browser and SVG-specific options. The snapshot
+CLI remains available for capture-only debugging and browser-library users.
 
 ### Browser bundle (no Node, no puppeteer)
 
@@ -522,7 +447,7 @@ document and require no other globals:
     }
     const { html, width, height } = HtmlSnapshot.takeSnapshot();
     // `html` is the same flat, subset-compliant string the CLI writes out.
-    // Feed it to `pagx import --format html` (server-side) to convert to PAGX.
+    // Feed it to `pagx import --html-source snapshot --format html` (server-side) to convert to PAGX.
   })();
 </script>
 ```
@@ -549,7 +474,7 @@ The snapshot output is byte-identical to what `node snapshot.js` produces for
 the same page — both code paths share `lib/browser-snapshot.js`.
 
 The browser bundle covers step 1 of the HTML → PAGX pipeline (snapshot).
-Step 2 (`pagx import --format html`) is currently a C++ binary; running it in
+Step 2 (`pagx import --html-source snapshot --format html`) is currently a C++ binary; running it in
 the browser would require a WebAssembly build of libpag's HTML importer.
 
 ### HTTP service
@@ -584,7 +509,7 @@ Endpoints:
   Response shape depends on `format`:
   - `format: "html"` (default) → `text/html` with the processed HTML.
   - `format: "pagx"` → `application/xml` with the PAGX document (the same
-    XML that `pagx import --format html` writes).
+    XML that `pagx import --html-source snapshot --format html` writes).
   - `format: "both"` → JSON only (`{ html, pagx, width, height }`); requires
     `Accept: application/json` (otherwise the server returns `406`).
   All single-format requests also accept `Accept: application/json` to get
@@ -657,9 +582,9 @@ curl -s -H 'Content-Type: application/json' \
      }' \
      http://127.0.0.1:8787/snapshot > dashboard.subset.html
 
-# Save the subset, then import it (PAGX_HTML_SNAPSHOT=0 skips re-snapshotting it):
+# Save the subset, then import it with explicit prepared-input mode:
 curl -s --data-binary @page.html http://127.0.0.1:8787/snapshot > page.subset.html
-PAGX_HTML_SNAPSHOT=0 pagx import --format html --input page.subset.html --output page.pagx
+pagx import --html-source snapshot --format html --input page.subset.html --output page.pagx
 
 # …or skip the local pagx step and ask the server to do it for you:
 curl -s --data-binary @page.html \
@@ -690,7 +615,7 @@ real origin.
 
 ```bash
 node tools/html-snapshot/snapshot.js xiaohongshu_react.html
-pagx import --format html --input xiaohongshu_react.subset.html --output xiaohongshu_react.pagx
+pagx import --html-source snapshot --format html --input xiaohongshu_react.subset.html --output xiaohongshu_react.pagx
 pagx resolve xiaohongshu_react.pagx
 pagx render xiaohongshu_react.pagx -o xiaohongshu_react.png --scale 2
 ```
@@ -723,9 +648,7 @@ Babel-compiled at runtime.
 ## Limitations
 
 - Animation capture is **off by default** — the snapshot emits a single static
-  frame. Pass `--capture-animations` (`snapshot.js` / `html2pagx` /
-  `pagx import`), set `captureAnimations: true` on the `runSnapshot` /
-  `runHtmlToPagx` APIs, or send `captureAnimations: true` in the HTTP service's
+  frame. Pass `--capture-animations` (`snapshot.js` / `pagx import`), set `captureAnimations: true` on the `runSnapshot` API, or send `captureAnimations: true` in the HTTP service's
   options to opt in. When enabled, animations are normalised into the canonical
   `@keyframes` + `animation` subset (`spec/html_subset.md` §13) so the importer
   can replay them. The capture pass (`lib/animation-capture.ts`) reads running

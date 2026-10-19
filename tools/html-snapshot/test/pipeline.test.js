@@ -4,7 +4,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const {
-  PipelineStepError,
   spawnCapture,
   forkSnapshotCli,
   runPagxImportToFile,
@@ -13,10 +12,8 @@ const {
   runPagxRender,
   collectFontFallbacks,
   readFontManifest,
-  runHtmlToPagx,
   isHttpUrl,
 } = require('../dist/lib/pipeline');
-const { ChildProcessError } = require('../dist/lib/errors');
 
 let dir;
 beforeEach(() => {
@@ -73,26 +70,6 @@ function readArgv(argvPath) {
   if (parts.length && parts[parts.length - 1] === '') parts.pop();
   return parts;
 }
-
-describe('PipelineStepError', () => {
-  test('is a ChildProcessError subclass with a step label', () => {
-    const err = new PipelineStepError('snapshot failed', {
-      code: 1,
-      stderr: 'boom',
-      step: 'snapshot',
-    });
-    expect(err).toBeInstanceOf(ChildProcessError);
-    expect(err.name).toBe('PipelineStepError');
-    expect(err.step).toBe('snapshot');
-    expect(err.code).toBe(1);
-    expect(err.stderr).toBe('boom');
-  });
-
-  test('defaults step to empty when omitted', () => {
-    const err = new PipelineStepError('x');
-    expect(err.step).toBe('');
-  });
-});
 
 describe('spawnCapture', () => {
   test('captures stdout, stderr, and a zero exit code', async () => {
@@ -226,7 +203,7 @@ describe('runPagxImportToFile', () => {
       .rejects.toThrow(/pagxFile is required/);
   });
 
-  test('disables the importer snapshot via env and routes filtered stderr to log', async () => {
+  test('selects prepared HTML explicitly and routes filtered stderr to log', async () => {
     const argvPath = path.join(dir, 'argv.bin');
     const envPath = path.join(dir, 'env.bin');
     const wrapper = makeArgvCapturingScript({
@@ -253,10 +230,10 @@ describe('runPagxImportToFile', () => {
       '--input', '/in.html',
       '--output', '/out.pagx',
       '--format', 'html',
-      '--no-resolve',
+      '--html-source', 'snapshot', '--images', 'embed', '--no-resolve', '--overwrite',
     ]);
-    // The subset is already rendered, so the importer's own snapshot is disabled.
-    expect(fs.readFileSync(envPath, 'utf8')).toBe('0');
+    // The helper does not change process-wide acquisition policy.
+    expect(fs.readFileSync(envPath, 'utf8')).toBe(process.env.PAGX_HTML_SNAPSHOT || '');
     const joined = logs.join('\n');
     expect(joined).toMatch(/real warning: keep me/);
     expect(joined).not.toMatch(/position: absolute on text leaf/);
@@ -385,344 +362,3 @@ describe('isHttpUrl re-export', () => {
     expect(isHttpUrl('file:///p')).toBe(false);
   });
 });
-
-describe('runHtmlToPagx — orchestrator', () => {
-  test('rejects when scriptDir is missing', async () => {
-    await expect(runHtmlToPagx({ input: '/foo.html' }))
-      .rejects.toThrow(/scriptDir is required/);
-  });
-
-  test('rejects when input is missing for a file path', async () => {
-    await expect(runHtmlToPagx({ scriptDir: '/s' }))
-      .rejects.toThrow(/input is required/);
-  });
-
-  test('rejects when the input file does not exist', async () => {
-    await expect(runHtmlToPagx({ scriptDir: '/s', input: path.join(dir, 'no.html') }))
-      .rejects.toThrow(/input not found/);
-  });
-
-  test('rejects URL input without an outputName', async () => {
-    await expect(runHtmlToPagx({
-      scriptDir: '/s',
-      input: 'https://example.com/page',
-    })).rejects.toThrow(/outputName is required/);
-  });
-
-  test('runs snapshot → import → resolve → render against fakes', async () => {
-    // Stage a placeholder input so the existence check passes.
-    const inputHtml = path.join(dir, 'page.html');
-    fs.writeFileSync(inputHtml, '<html></html>');
-
-    // Fake pagx wrapper that interprets the first arg as a subcommand and
-    // writes a placeholder file to the path following --output (or to the
-    // first positional argument for `resolve`).
-    const fakePagx = path.join(dir, 'fakepagx.sh');
-    fs.writeFileSync(fakePagx, [
-      '#!/bin/sh',
-      'cmd="$1"; shift',
-      'out=""',
-      'while [ "$#" -gt 0 ]; do',
-      '  case "$1" in',
-      '    --output) out="$2"; shift;;',
-      '  esac',
-      '  shift',
-      'done',
-      'case "$cmd" in',
-      // import writes the .pagx file to --output
-      '  import) echo -n "<pag/>" > "$out" ;;',
-      // resolve takes the pagx path positionally; touch it to record the call
-      '  resolve) : ;;',
-      // render writes a "PNG" to --output (file content shape doesn\'t matter)
-      '  render) echo -n "PNG" > "$out" ;;',
-      'esac',
-    ].join('\n'));
-    fs.chmodSync(fakePagx, 0o755);
-
-    // Inject an in-process snapshot stub instead of forking node snapshot.js;
-    // this writes the subset HTML the import step expects.
-    const snapshotImpl = async (snapshotArgs) => {
-      fs.writeFileSync(snapshotArgs.output, '<html><body>flat</body></html>', 'utf8');
-      return { code: 0, durationMs: 1, stdout: '', stderr: '' };
-    };
-
-    const outDir = path.join(dir, 'out');
-    const result = await runHtmlToPagx({
-      input: inputHtml,
-      outputDir: outDir,
-      pagxBin: fakePagx,
-      scriptDir: dir,
-      snapshotImpl,
-      log: () => {},
-    });
-
-    expect(fs.existsSync(result.subsetHtml)).toBe(true);
-    expect(fs.existsSync(result.pagx)).toBe(true);
-    expect(fs.existsSync(result.png)).toBe(true);
-    expect(path.basename(result.pagx)).toBe('page.pagx');
-    expect(path.basename(result.png)).toBe('page.png');
-  });
-
-  test('throws PipelineStepError when the snapshot step fails', async () => {
-    const inputHtml = path.join(dir, 'page.html');
-    fs.writeFileSync(inputHtml, '<html></html>');
-    const failingSnapshot = async () => ({
-      code: 1, durationMs: 1, stdout: '', stderr: 'snapshot crashed',
-    });
-    // stderr path hijack: avoid spamming jest's console with the error text.
-    const realStderrWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = () => true;
-    try {
-      await expect(runHtmlToPagx({
-        input: inputHtml,
-        outputDir: path.join(dir, 'out'),
-        pagxBin: '/no-pagx',
-        scriptDir: dir,
-        snapshotImpl: failingSnapshot,
-      })).rejects.toMatchObject({
-        name: 'PipelineStepError',
-        step: 'snapshot',
-        code: 1,
-      });
-    } finally {
-      process.stderr.write = realStderrWrite;
-    }
-  });
-
-  test('skips resolve+render when doResolve=false', async () => {
-    const inputHtml = path.join(dir, 'page.html');
-    fs.writeFileSync(inputHtml, '<html></html>');
-    const fakePagx = path.join(dir, 'fakepagx2.sh');
-    fs.writeFileSync(fakePagx, [
-      '#!/bin/sh',
-      'cmd="$1"; shift',
-      'out=""',
-      'while [ "$#" -gt 0 ]; do',
-      '  case "$1" in --output) out="$2"; shift;; esac',
-      '  shift',
-      'done',
-      'if [ "$cmd" = "import" ]; then echo -n "<pag/>" > "$out"; fi',
-      // For `resolve`/`render` we deliberately exit non-zero so a regression
-      // that re-enables those steps would surface immediately.
-      'if [ "$cmd" != "import" ]; then exit 99; fi',
-    ].join('\n'));
-    fs.chmodSync(fakePagx, 0o755);
-
-    const snapshotImpl = async (args) => {
-      fs.writeFileSync(args.output, '<html></html>', 'utf8');
-      return { code: 0, durationMs: 1, stdout: '', stderr: '' };
-    };
-
-    const result = await runHtmlToPagx({
-      input: inputHtml,
-      outputDir: path.join(dir, 'out2'),
-      pagxBin: fakePagx,
-      scriptDir: dir,
-      doResolve: false,
-      snapshotImpl,
-      log: () => {},
-    });
-    expect(result.png).toBeNull();
-    expect(fs.existsSync(result.pagx)).toBe(true);
-  });
-
-  test('skips render when doRender=false but resolve still runs', async () => {
-    const inputHtml = path.join(dir, 'p.html');
-    fs.writeFileSync(inputHtml, '<html></html>');
-    const fakePagx = makeFakePagx({ allowRender: false });
-    let resolveCalls = 0;
-    // Parse argv on every invocation to count the resolve runs.
-    const argvLog = path.join(dir, 'pagx.argv');
-    const wrapper = makeArgvCapturingScript({ argvPath: argvLog });
-    void wrapper;
-    const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
-    const result = await runHtmlToPagx({
-      input: inputHtml,
-      outputDir: path.join(dir, 'r-out'),
-      pagxBin: fakePagx.path,
-      scriptDir: dir,
-      doRender: false,
-      snapshotImpl,
-      log: () => {},
-    });
-    expect(result.png).toBeNull();
-    expect(fs.existsSync(result.pagx)).toBe(true);
-    resolveCalls = fakePagx.callsByCmd.resolve;
-    expect(resolveCalls).toBeGreaterThanOrEqual(1);
-  });
-
-  test('throws when pagx import succeeds but the .pagx file is not on disk', async () => {
-    const inputHtml = path.join(dir, 'q.html');
-    fs.writeFileSync(inputHtml, '<html></html>');
-    // Wrapper that returns 0 from `import` without writing the output file.
-    const wrapper = path.join(dir, 'noimport.sh');
-    fs.writeFileSync(wrapper, '#!/bin/sh\nexit 0\n');
-    fs.chmodSync(wrapper, 0o755);
-    const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
-    const realErr = process.stderr.write.bind(process.stderr);
-    process.stderr.write = () => true;
-    try {
-      await expect(runHtmlToPagx({
-        input: inputHtml,
-        outputDir: path.join(dir, 'q-out'),
-        pagxBin: wrapper,
-        scriptDir: dir,
-        snapshotImpl,
-        log: () => {},
-      })).rejects.toMatchObject({ name: 'PipelineStepError', step: 'pagx import' });
-    } finally {
-      process.stderr.write = realErr;
-    }
-  });
-
-  test('downloadFonts logs when no fonts were captured and runs font embed when faces are present', async () => {
-    const inputHtml = path.join(dir, 'fpage.html');
-    fs.writeFileSync(inputHtml, '<html></html>');
-    const fakePagx = makeFakePagx();
-
-    // Case A: empty font dir → "no web fonts were captured" log.
-    let logsA = [];
-    const snapImplA = async (a) => {
-      // The pipeline pre-creates the font dir via the snapshot child; mimic
-      // that here so collectFontFallbacks finds the directory but no entries.
-      fs.mkdirSync(a.fontDir, { recursive: true });
-      fs.writeFileSync(a.output, '<html/>');
-      return { code: 0, durationMs: 1, stdout: '', stderr: '' };
-    };
-    await runHtmlToPagx({
-      input: inputHtml,
-      outputDir: path.join(dir, 'fa-out'),
-      pagxBin: fakePagx.path,
-      scriptDir: dir,
-      downloadFonts: true,
-      doResolve: false,
-      snapshotImpl: snapImplA,
-      log: (l) => logsA.push(l),
-    });
-    expect(logsA.some((l) => /no web fonts were captured/.test(l))).toBe(true);
-
-    // Case B: embedFonts=true with a real font dir → font-embed step runs.
-    fakePagx.callsByCmd.resolve = 0;
-    fakePagx.callsByCmd.embed = 0;
-    const snapImplB = async (a) => {
-      fs.mkdirSync(a.fontDir, { recursive: true });
-      fs.writeFileSync(path.join(a.fontDir, 'Real.ttf'), 'fake');
-      fs.writeFileSync(a.output, '<html/>');
-      return { code: 0, durationMs: 1, stdout: '', stderr: '' };
-    };
-    const result = await runHtmlToPagx({
-      input: inputHtml,
-      outputDir: path.join(dir, 'fb-out'),
-      pagxBin: fakePagx.path,
-      scriptDir: dir,
-      embedFonts: true,
-      doRender: false,
-      snapshotImpl: snapImplB,
-      log: () => {},
-    });
-    expect(result.fonts).toHaveLength(1);
-    expect(fakePagx.callsByCmd.embed).toBe(1);
-  });
-
-  test('keepSubsetHtml=false writes the subset to a temp dir', async () => {
-    const inputHtml = path.join(dir, 't.html');
-    fs.writeFileSync(inputHtml, '<html></html>');
-    const fakePagx = makeFakePagx();
-    const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
-    const outDir = path.join(dir, 't-out');
-    const result = await runHtmlToPagx({
-      input: inputHtml,
-      outputDir: outDir,
-      pagxBin: fakePagx.path,
-      scriptDir: dir,
-      keepSubsetHtml: false,
-      doResolve: false,
-      snapshotImpl,
-      log: () => {},
-    });
-    // The subset path leaves `outDir` (it lands in os.tmpdir()) and is rm'd at
-    // the end of the run, so it must NOT exist on disk after we return.
-    expect(result.subsetHtml).not.toContain(outDir);
-    expect(fs.existsSync(result.subsetHtml)).toBe(false);
-    // The pagx file itself stays put under the requested outputDir.
-    expect(fs.existsSync(result.pagx)).toBe(true);
-  });
-
-  test('URL inputs default outputDir to cwd and require outputName', async () => {
-    const fakePagx = makeFakePagx();
-    const cwd = process.cwd();
-    const tempCwd = fs.mkdtempSync(path.join(os.tmpdir(), 'pipeline-cwd-'));
-    process.chdir(tempCwd);
-    try {
-      const snapshotImpl = async (a) => { fs.writeFileSync(a.output, '<html/>'); return { code: 0, durationMs: 1, stdout: '', stderr: '' }; };
-      const result = await runHtmlToPagx({
-        input: 'https://example.com/p',
-        outputName: 'remote',
-        pagxBin: fakePagx.path,
-        scriptDir: dir,
-        doResolve: false,
-        snapshotImpl,
-        log: () => {},
-      });
-      expect(path.dirname(result.pagx)).toBe(fs.realpathSync(tempCwd));
-      expect(path.basename(result.pagx)).toBe('remote.pagx');
-    } finally {
-      process.chdir(cwd);
-      fs.rmSync(tempCwd, { recursive: true, force: true });
-    }
-  });
-});
-
-// ----- helpers used by the runHtmlToPagx tests above -----
-
-// Build a single fake-pagx wrapper that handles every subcommand the pipeline
-// invokes (import, resolve, font, render). Tracks per-command call counts so
-// tests can assert which steps actually ran. `allowRender: false` makes the
-// `render` subcommand exit non-zero — useful for asserting that doRender=false
-// really skips the call instead of swallowing a failure.
-function makeFakePagx({ allowRender = true } = {}) {
-  const id = Math.random().toString(36).slice(2);
-  const file = path.join(dir, `fake-pagx-${id}.sh`);
-  const log = path.join(dir, `fake-pagx-${id}.log`);
-  fs.writeFileSync(file, [
-    '#!/bin/sh',
-    'cmd="$1"; shift',
-    `printf '%s\\n' "$cmd" >> ${JSON.stringify(log)}`,
-    'out=""',
-    'while [ "$#" -gt 0 ]; do',
-    '  case "$1" in',
-    '    --output) out="$2"; shift;;',
-    '  esac',
-    '  shift',
-    'done',
-    'case "$cmd" in',
-    '  import) [ -n "$out" ] && echo -n "<pag/>" > "$out" ;;',
-    '  resolve) : ;;',
-    '  embed) : ;;',                         // font-embed: subcommand is `embed`
-    `  render) ${allowRender ? '[ -n "$out" ] && echo -n "PNG" > "$out"' : 'exit 99'} ;;`,
-    'esac',
-  ].join('\n'));
-  fs.chmodSync(file, 0o755);
-  // Read the per-command call counts on demand from the wrapper's log file.
-  // Returning a Proxy lets tests reset a specific count by assigning 0; the
-  // assignment truncates the on-disk log so the next read returns the fresh
-  // state. (We don't allow setting non-zero values — tests don't need that.)
-  const handle = {
-    path: file,
-    get callsByCmd() {
-      const text = fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '';
-      const out = { import: 0, resolve: 0, embed: 0, render: 0 };
-      for (const line of text.split('\n')) {
-        if (line && Object.prototype.hasOwnProperty.call(out, line)) out[line]++;
-      }
-      return new Proxy(out, {
-        set(target, prop, val) {
-          target[prop] = val;
-          if (val === 0) fs.writeFileSync(log, '');
-          return true;
-        },
-      });
-    },
-  };
-  return handle;
-}

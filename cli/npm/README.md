@@ -17,8 +17,7 @@ npm install -g @libpag/pagx
 
 | Command | Description |
 |---------|-------------|
-| `pagx capture` | Capture a web page or interaction checkpoints as PAGX, PNG, and optional preview sheets |
-| `pagx import` | Import a single SVG/HTML document or selected interaction checkpoint into one PAGX file |
+| `pagx import` | Import SVG/HTML files, web pages, interaction states or recursive batches |
 | `pagx validate` | Validate a PAGX file against the specification schema |
 | `pagx render` | Render a PAGX file to an image (PNG, WebP, or JPEG) |
 | `pagx optimize` | Validate, optimize, and format in one step |
@@ -29,82 +28,90 @@ npm install -g @libpag/pagx
 
 ## Usage Examples
 
-### Capture web pages and interaction states
-
-Requires Node.js 18 or newer. The package includes the capture runtime; the selected
-browser driver and Chromium are installed into a user cache on first use.
+### Import files, web pages and interaction states
 
 ```bash
-# One page: page.subset.html, page.pagx, page.png
-pagx capture page.html -o out
-
-# Replay once, export every named capture, and generate preview sheets
-pagx capture page.html --scenario states.json -o out --preview
-
-# Stop at and export just one state
-pagx capture page.html --scenario states.json --checkpoint advanced -o out --preview
-
-# URLs require an output basename
-pagx capture https://example.com --output-name demo -o out
-
-# Use Playwright, including its role locators in scenarios
-pagx capture page.html --scenario states.json --browser-engine playwright -o out
-
-# Single-file import retains its existing output semantics
-pagx import --input page.html --scenario states.json --checkpoint advanced --output advanced.pagx
+pagx import icon.svg -o icon.pagx
+pagx import page.html -o page.pagx --render
+pagx import page.html --scenario states.json --output-dir out --preview
+pagx import page.html --scenario states.json --checkpoint advanced -o advanced.pagx
+pagx import https://example.com --output-dir out --output-name demo
+pagx import --batch pages --output-dir out --render
 ```
 
-For `capture`, `-o` / `--output-dir` always names a directory. Scenario outputs are
-`<base>.<checkpoint>.subset.html`, `.pagx`, `.png`, and `<base>.captures.json`.
-`--preview` additionally writes `<base>.preview/sheet-NNN.png`; it does not open a
-browser viewer. `pagx preview` is the separate interactive viewer command.
+`-o` / `--output` always names one PAGX main file. `--output-dir` names a result set
+and is mutually exclusive with `--output`. Local single inputs default to
+`<input-stem>.pagx`. URLs require an explicit file output, or a directory plus
+`--output-name`. Unselected scenarios require directory output even if the scenario
+has just one checkpoint. Batch imports require directory output, preserve relative
+paths, and infer HTML/SVG formats per file. Name collisions are rejected before capture.
 
-Scenario capture exports independent static states. Without `--checkpoint`, all
-capture steps are exported in order from one source-page session. `--checkpoint`
-stops at the selected capture. The version-1 manifest records top-level `status`
-(`running`, `complete`, or `failed`), completed `outputs`, and an optional `preview`
-status and page list. Use the manifest instead of scanning the directory, which can
-contain older outputs after a shorter repeated run. A failed preview returns a
-nonzero exit status while preserving completed checkpoint exports.
+Import produces PAGX by default. `--render` adds PNGs; `--preview` implies rendering
+and adds ordered contact sheets, including for ordinary files and batches.
+`--keep-snapshot` preserves intermediate HTML. `--images external` (default) writes
+image bytes under `<output-stem>.assets/`; `--images embed` keeps them in the PAGX.
+Web fonts are acquired for rendering or `--embed-fonts`; `--download-fonts` also
+preserves them under `<output-stem>.fonts/`. `--no-resolve` keeps import directives
+and conflicts with rendering and font embedding. Missing resources or failed
+reference expansion are errors, not silently dropped content.
 
-`--preview` requires a scenario and rendering; it conflicts with `--no-render` and
-`--no-resolve`. `--preview-columns` requires `--preview` and accepts 1–32. Scenario
-mode rejects `--batch`, `--capture-animations`, `--scroll-reveal`, `--viewport-*`,
-`--wait-ms`, and `--selector`; configure viewport and readiness in the scenario.
-Use `pagx capture --help` for the complete argument list.
+Existing targets require `--overwrite`. This replaces only planned files; it never
+clears the output directory. `--dry-run` validates and prints a JSON plan without
+capturing, installing a browser, or creating output directories. `--help` needs no
+Node/browser runtime. Prepared local HTML can be imported without a browser using
+`--html-source snapshot`; the default `browser` mode captures the document first.
 
-The capture pipeline uses the package's own native binary for conversion and
-rendering. An explicit `--pagx-bin` can override it. It also supports ordinary
-recursive batches (`--batch <dir> --output-root <dir>`); `--dry-run` lists the work
-without initializing a browser or creating output directories. Help and invalid
-arguments also avoid browser installation.
+Scenario capture exports independent static states in one source-page session.
+`--checkpoint` executes the necessary preceding actions and stops at the selected
+capture. Scenario files own viewport, waits and selection: `--batch`,
+`--capture-animations`, `--scroll-reveal`, `--viewport-*`, `--wait-ms` and `--selector`
+cannot be combined with a scenario. `--browser-engine playwright` enables role
+locators; Puppeteer is the default. Batch HTML inputs have isolated browser contexts.
 
-Runtime configuration:
+Directory results include `manifest.json`, with version 1, task `status`
+(`running`, `complete`, `failed`, `cancelled`), per-output status, paths, dimensions,
+warnings and errors. Paths to artifacts are relative to the manifest. Only
+`status: "complete"` indicates that every requested artifact succeeded. Failed
+jobs preserve completed outputs and return nonzero. POSIX SIGINT/SIGTERM close
+browser children and return 130/143; abrupt termination may leave `running`.
+
+Preview pages are `preview/sheet-NNN.png` in directory mode, or
+`<output-stem>.preview/sheet-NNN.png` with a single file output. They use only this
+run's PAGX-rendered PNGs, in output order, never old directory contents or another
+visit to the source page. `--preview-columns` accepts 1–32 and requires `--preview`.
+`pagx preview` remains the separate interactive viewer.
+
+HTML capture requires Node.js 18 or newer. The package bundles its adapter and
+installs the selected driver/browser into a user cache on first capture. Native SVG
+import and PNG rendering do not need Node or Chromium. Contact sheets use the bundled
+Node helper without initializing a browser. Conversion runs in the invoking native
+binary; an unrelated `PAGX_BIN` or `pagx` on PATH cannot select another version.
 
 | Environment variable | Purpose |
 |---|---|
-| `PAGX_HTML_SNAPSHOT_CACHE` | Browser driver cache; defaults to `~/.cache/libpag-pagx/html-snapshot`, or `%LOCALAPPDATA%/libpag-pagx/html-snapshot` on Windows |
-| `PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL=1` | Fail with an installation hint instead of downloading a missing driver/browser |
-| `PUPPETEER_CACHE_DIR` / `PLAYWRIGHT_BROWSERS_PATH` | Override the corresponding browser download cache |
-| `PUPPETEER_EXECUTABLE_PATH` / `PLAYWRIGHT_EXECUTABLE_PATH` | Use a preinstalled browser executable with the selected driver |
-| `PAGX_NODE_BIN` | Override the Node executable; the npm launcher defaults to its current Node |
-| `PAGX_HTML_CAPTURE_BIN` | Override the complete capture launcher |
-| `PAGX_HTML_SNAPSHOT_BIN` | Override the single-HTML snapshot launcher used by import |
+| `PAGX_HTML_SNAPSHOT_CACHE` | Browser cache; defaults to `~/.cache/libpag-pagx/html-snapshot`, or `%LOCALAPPDATA%/libpag-pagx/html-snapshot` on Windows |
+| `PAGX_HTML_SNAPSHOT_NO_AUTO_INSTALL=1` | Report a missing browser with installation instructions |
+| `PUPPETEER_CACHE_DIR` / `PLAYWRIGHT_BROWSERS_PATH` | Override browser download cache |
+| `PUPPETEER_EXECUTABLE_PATH` / `PLAYWRIGHT_EXECUTABLE_PATH` | Use an installed browser executable |
+| `PAGX_NODE_BIN` | Override Node; the npm launcher defaults to its own Node |
+| `PAGX_HTML_IMPORT_BIN` | Override the private structured import adapter launcher |
+| `PAGX_HTML_SNAPSHOT_BIN` | Override the single-document library snapshot helper |
 
-When preparing a release, run `npm run check:capture` with the staged native binary
-on each supported OS/architecture. `prepack` rebuilds the HTML runtime and runs this
-check on the host, including package/native version agreement and capture/import
-capabilities. Build and stage the native binary before packing (`./pack.sh --build`).
-The final tarball can be tested after installation outside the repository with:
+`capture`, `html2pagx` and their old flags are removed without compatibility aliases.
+Use `pagx import --help` for supported options.
+
+For a release, stage the native binary (`./pack.sh --build`) and run
+`npm run check:import` on each supported OS/architecture. `prepack` rebuilds the
+runtime and checks host capabilities and package/native version agreement.
+Test the actual tarball after installation outside the repository:
 
 ```bash
 PAGX_PACKAGE_TEST_DIR=/absolute/path/to/node_modules/@libpag/pagx \
-  npm test --prefix ../../tools/html-snapshot -- --runInBand test/capture-package.integration.test.js
+  npm test --prefix ../../tools/html-snapshot -- --runInBand test/import-package.integration.test.js
 ```
 
-That test copies test browser drivers into a temporary external cache and runs both
-Puppeteer and Playwright against the installed package. It requires the repository's
-HTML test dependencies and both browsers to be provisioned on the test host.
+This test copies browser drivers to an external cache and exercises both Puppeteer
+and Playwright. Both browser executables must be provisioned on the test host.
 
 ### Other examples
 

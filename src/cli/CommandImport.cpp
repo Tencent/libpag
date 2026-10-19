@@ -136,12 +136,9 @@ static std::string ShellQuote(const std::string& value) {
 }
 #endif
 
-// Whether the html-snapshot pre-pass runs before the HTML importer. Enabled by default; set
-// the `PAGX_HTML_SNAPSHOT` environment variable to a falsy value (`0`, `false`, `no`, `off`,
-// case-insensitive) to disable it. The html-snapshot tooling (`html2pagx`, the snapshot
-// server) sets this when it has already rendered the page to a flat subset and hands that
-// directly to the importer — a second in-importer snapshot would be redundant (and would
-// require a browser the tool already ran).
+// Controls the snapshot pre-pass for single-document library imports, including resolve.
+// Enabled by default; PAGX_HTML_SNAPSHOT=0/false/no/off disables it for prepared input.
+// The public import workflow selects prepared input explicitly through ImportPreparedSource.
 static bool HTMLSnapshotEnabled() {
   const char* env = std::getenv("PAGX_HTML_SNAPSHOT");
   if (env == nullptr || env[0] == '\0') {
@@ -388,7 +385,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
       result.document = HTMLImporter::ParseString(snap.html, htmlOptions);
     } else {
       // Snapshot disabled (PAGX_HTML_SNAPSHOT): the caller already handed us a flat subset
-      // (e.g. html2pagx pre-snapshotted), so import the file directly.
+      // (e.g. an internal prepared-source caller), so import the file directly.
       result.document = HTMLImporter::Parse(filePath, htmlOptions);
     }
   } else {

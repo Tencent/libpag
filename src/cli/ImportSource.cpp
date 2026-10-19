@@ -16,13 +16,15 @@ ImportResult ImportPreparedSource(const ImportItem& item, const std::string& sna
                                   const std::string& baseDir, const ImportRequest& options,
                                   const std::vector<std::string>& fonts) {
   ImportResult result;
+  std::ifstream stream(fs::u8path(snapshot), std::ios::binary);
+  if (!stream) {
+    result.error = "cannot read prepared source: " + snapshot;
+    return result;
+  }
+  std::string content{std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
+  auto imageBase = fs::u8path(options.imageBaseDir.empty() ? baseDir : options.imageBaseDir);
+  if (!imageBase.empty()) imageBase = fs::absolute(imageBase).lexically_normal();
   if (item.format == "html") {
-    std::ifstream stream(fs::u8path(snapshot), std::ios::binary);
-    if (!stream) {
-      result.error = "cannot read prepared HTML: " + snapshot;
-      return result;
-    }
-    std::string html{std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};
     FontConfig fontConfig;
     if (!LoadFontConfig(&fontConfig, fonts, {}, "pagx import")) {
       result.error = "cannot load captured fonts";
@@ -30,9 +32,8 @@ ImportResult ImportPreparedSource(const ImportItem& item, const std::string& sna
     }
     HTMLImporter::Options htmlOptions;
     htmlOptions.fontConfig = &fontConfig;
-    auto imageBase = options.imageBaseDir.empty() ? baseDir : options.imageBaseDir;
-    htmlOptions.basePath = imageBase.empty() ? "" : fs::u8path(imageBase).u8string() + "/";
-    result.document = HTMLImporter::ParseString(html, htmlOptions);
+    htmlOptions.basePath = imageBase.empty() ? "" : imageBase.generic_u8string() + "/";
+    result.document = HTMLImporter::ParseString(content, htmlOptions);
     if (!result.document) {
       result.error = "failed to parse prepared HTML: " + snapshot;
       return result;
@@ -41,7 +42,8 @@ ImportResult ImportPreparedSource(const ImportItem& item, const std::string& sna
       if (node->nodeType() == NodeType::PathData) node->id.clear();
     result.warnings = std::move(result.document->errors);
   } else {
-    result = ImportFile(item.input, "svg", options.formatOptions);
+    // Preserve authored relative paths until the image base override is applied.
+    result = ImportString(content, "svg", options.formatOptions);
   }
   if (!result.error.empty()) return result;
   auto document = result.document.get();
@@ -66,9 +68,7 @@ ImportResult ImportPreparedSource(const ImportItem& item, const std::string& sna
     if (image->filePath.rfind("data:", 0) == 0) image->data = DecodeBase64DataURI(image->filePath);
     else if (!IsImportURL(image->filePath)) {
       auto path = fs::u8path(image->filePath);
-      // HTML strings retain authored relative paths. SVG file imports already anchor theirs.
-      if (path.is_relative())
-        path = fs::u8path(options.imageBaseDir.empty() ? baseDir : options.imageBaseDir) / path;
+      if (path.is_relative()) path = imageBase / path;
       std::ifstream stream(path, std::ios::binary);
       if (stream) {
         std::string bytes{std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};

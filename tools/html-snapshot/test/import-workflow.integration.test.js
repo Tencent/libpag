@@ -31,6 +31,9 @@ nativeTest('help and SVG conversion/rendering do not need Node or Chromium', asy
   expect(read(path.join(dir, 'icon.pagx'))).toContain('<pagx');
   const png = PNG.sync.read(fs.readFileSync(path.join(dir, 'icon.png')));
   expect([png.width, png.height]).toEqual([32, 24]);
+  await expect(exec(pagx, ['capture', '--help'], { cwd: dir })).rejects.toMatchObject({
+    stderr: expect.stringContaining("unknown command 'capture'"),
+  });
 });
 
 nativeTest('scenario dry-run validates and plans all checkpoints without browser or output mutations', async () => {
@@ -166,7 +169,7 @@ nativeTest('existing files require overwrite, and failed imports preserve the ol
   expect(read(out)).toContain('<pagx');
 });
 
-(process.platform !== 'win32' ? nativeTest : test.skip)('SIGTERM returns 143 and records cancellation after browser cleanup', async () => {
+(process.platform !== 'win32' ? nativeTest : test.skip).each([['SIGTERM', 143], ['SIGINT', 130]])('%s returns %i and records cancellation after browser cleanup', async (signal, expectedCode) => {
   const states = path.join(dir, 'states.json'), out = path.join(dir, 'out');
   fs.writeFileSync(states, JSON.stringify({ version: 1, steps: [
     { type: 'waitFor', target: { css: '#never' }, state: 'visible', timeoutMs: 30000 }, { type: 'capture', name: 'done' },
@@ -178,15 +181,48 @@ nativeTest('existing files require overwrite, and failed imports preserve the ol
   const timer = setTimeout(() => child.kill('SIGKILL'), 20000);
   child.stderr.on('data', chunk => {
     stderr += chunk;
-    if (!signalled && stderr.includes('step 1/2: waitFor')) { signalled = true; child.kill('SIGTERM'); }
+    if (!signalled && stderr.includes('step 1/2: waitFor')) { signalled = true; child.kill(signal); }
   });
   try {
     const code = await new Promise((resolve, reject) => { child.on('error', reject); child.on('close', resolve); });
     expect(signalled).toBe(true);
-    expect(code).toBe(143);
+    expect(code).toBe(expectedCode);
     const data = manifest(out);
     expect(data.status).toBe('cancelled');
     expect(data.outputs[0].status).toBe('cancelled');
     expect(fs.readdirSync(out)).toEqual(['manifest.json']);
   } finally { clearTimeout(timer); }
+});
+
+nativeTest('preview failure retains completed PAGX/PNG outputs and a failed manifest', async () => {
+  const input = svg(path.join(dir, 'icon.svg')), out = path.join(dir, 'out');
+  const adapter = path.join(dir, 'failing-preview.js');
+  fs.writeFileSync(adapter, 'process.stderr.write("preview fixture failure\\n"); process.exit(7);');
+  await expect(run([input, '--output-dir', out, '--preview'], { PAGX_HTML_IMPORT_BIN: adapter }))
+    .rejects.toMatchObject({ code: 1, stderr: expect.stringContaining('preview generation failed') });
+  const data = manifest(out);
+  expect(data.status).toBe('failed');
+  expect(data.outputs[0].status).toBe('complete');
+  expect(data.preview.status).toBe('failed');
+  expect(fs.existsSync(path.join(out, data.outputs[0].pagx))).toBe(true);
+  expect(fs.existsSync(path.join(out, data.outputs[0].png))).toBe(true);
+});
+
+nativeTest('native font embedding works for SVG without Node', async () => {
+  const input = path.join(dir, 'text.svg');
+  fs.writeFileSync(input, '<svg width="120" height="40"><text x="2" y="25" font-family="Arial" font-size="20">Hello</text></svg>');
+  await run([input, '-o', 'text.pagx', '--embed-fonts', '--render'], { PAGX_NODE_BIN: '/absent/node' });
+  const xml = read(path.join(dir, 'text.pagx'));
+  expect(xml).toContain('<Glyph');
+  expect(fs.existsSync(path.join(dir, 'text.png'))).toBe(true);
+});
+
+nativeTest('HTTP prepared-source adapter returns image bytes that survive temporary cleanup', async () => {
+  const png = new PNG({ width: 2, height: 2 }); png.data.fill(255);
+  const uri = 'data:image/png;base64,' + PNG.sync.write(png).toString('base64');
+  const { runPagxImport } = require('../dist/lib/pagx-runner');
+  const result = await runPagxImport({ pagxBin: pagx,
+    html: `<html><body style="width:20px;height:20px"><img src="${uri}" style="width:20px;height:20px"/></body></html>` });
+  expect(result).toContain(uri);
+  expect(result).not.toContain('.assets/');
 });

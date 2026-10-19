@@ -8,12 +8,12 @@
 // compiles it and copies the runtime-only pieces into `cli/npm/html-snapshot/`
 // so that an external user who only `npm install`-ed the package (no git
 // checkout) can still run `pagx import` on HTML — the native binary
-// shells out to the bundled `snapshot.js` via `PAGX_HTML_SNAPSHOT_BIN`, which
-// the package's `bin/pagx.js` wrapper points at `html-snapshot/launch.js`.
+// calls the bundled import adapter via PAGX_HTML_IMPORT_BIN. Legacy single-document
+// library imports can also use snapshot.js via PAGX_HTML_SNAPSHOT_BIN.
 //
 // What ships:
 //   - snapshot.js            (CLI driver, copied verbatim)
-//   - capture.js/capture-cli.js (complete pipeline entry and shared argument parsing)
+//   - import-adapter.js      (private structured capture/inspect/preview protocol)
 //   - ensure-built.js        (preflight helper snapshot.js requires at startup)
 //   - dist/                  (compiled TypeScript: dist/lib/*.js)
 //   - node_modules/          (the pure-JS runtime deps: opentype.js, pngjs, wawoff2)
@@ -23,7 +23,7 @@
 //   - puppeteer + its Chromium (~150 MB). Keeping it out of the package keeps
 //     `npm install -g @libpag/pagx` light.
 //
-// `launch.js`, `launch-capture.js`, and `runtime.js` are maintained source files in
+// `launch.js`, `launch-import.js`, and `runtime.js` are maintained source files in
 // `cli/npm/html-snapshot/`, intentionally preserved by this script.
 
 const fs = require('fs');
@@ -84,6 +84,7 @@ function main() {
   if (!fs.existsSync(path.join(TOOL_DIR, 'node_modules'))) {
     runNpm(['ci'], TOOL_DIR);
   }
+  runNpm(['run', 'clean'], TOOL_DIR);
   runNpm(['run', 'build'], TOOL_DIR);
 
   const distDir = path.join(TOOL_DIR, 'dist');
@@ -92,8 +93,8 @@ function main() {
   }
 
   // 2. Reset the generated parts of DEST while preserving the maintained
-  //    launch.js source file.
-  for (const entry of ['dist', 'node_modules', 'snapshot.js', 'ensure-built.js', 'capture.js', 'capture-cli.js', 'package.json']) {
+  //    launcher and runtime source files.
+  for (const entry of ['dist', 'node_modules', 'snapshot.js', 'ensure-built.js', 'import-adapter.js', 'capture.js', 'capture-cli.js', 'package.json']) {
     fs.rmSync(path.join(DEST_DIR, entry), { recursive: true, force: true });
   }
   fs.mkdirSync(DEST_DIR, { recursive: true });
@@ -101,7 +102,7 @@ function main() {
   // 3. Copy the CLI driver, its startup preflight helper, and the compiled output.
   //    snapshot.js does `require('./ensure-built')` on its first line, so the helper
   //    must ship alongside it or the installed package fails with MODULE_NOT_FOUND.
-  for (const file of ['snapshot.js', 'capture.js', 'capture-cli.js', 'ensure-built.js']) {
+  for (const file of ['snapshot.js', 'import-adapter.js', 'ensure-built.js']) {
     fs.copyFileSync(path.join(TOOL_DIR, file), path.join(DEST_DIR, file));
   }
   fs.cpSync(distDir, path.join(DEST_DIR, 'dist'), { recursive: true });

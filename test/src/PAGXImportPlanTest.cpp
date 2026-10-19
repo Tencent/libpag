@@ -72,7 +72,7 @@ CLI_TEST(PAGXImportPlanTest, URLNamingAndPortableBasenames) {
   EXPECT_FALSE(Parse({"https://example.com", "--output-dir", "out"}, &o));
   EXPECT_TRUE(Parse({"https://example.com", "-o", "web.pagx"}, &o));
   EXPECT_TRUE(Parse({"https://example.com", "--output-dir", "out", "--output-name", "web"}, &o));
-  for (const auto& name : {"..", "a/b", "a\\b", "a:", "a.", "CON", "com1", "NUL.txt"})
+  for (const auto& name : {"..", "a/b", "a\\b", "a:", "a.", "CON", "com1", "NUL.txt", "bad\x01"})
     EXPECT_FALSE(Parse({"page.html", "--output-dir", "out", "--output-name", name}, &o));
 }
 

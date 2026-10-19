@@ -68,9 +68,9 @@ if (!process.env.PAGX_HTML_SNAPSHOT_BIN) {
   }
 }
 
-// Keep Node identity and the full capture runtime independent of PATH/cwd.
+// Keep Node identity and the HTML import runtime independent of PATH/cwd.
 process.env.PAGX_NODE_BIN ||= process.execPath;
-process.env.PAGX_HTML_CAPTURE_BIN ||= path.join(__dirname, '..', 'html-snapshot', 'launch-capture.js');
+process.env.PAGX_HTML_IMPORT_BIN ||= path.join(__dirname, '..', 'html-snapshot', 'launch-import.js');
 
 function relay(command, args) {
   runProcess(command, args).then(code => { process.exitCode = code; }).catch(error => {

@@ -25,7 +25,8 @@ bool SafeName(const std::string& name) {
     return false;
   return !name.empty() && name != "." && name != ".." &&
          name.find_first_of("/\\<>:\"|?*\n\r\t") == std::string::npos &&
-         name.find('\0') == std::string::npos && name.back() != '.' && name.back() != ' ';
+         std::none_of(name.begin(), name.end(), [](unsigned char c) { return c < 32; }) &&
+         name.back() != '.' && name.back() != ' ';
 }
 std::string Absolute(const std::string& file) {
   return fs::weakly_canonical(fs::absolute(fs::u8path(file))).u8string();
@@ -373,7 +374,7 @@ std::string ImportUsage() {
 
 Import SVG, HTML or web interaction states as PAGX.
 
-  -o, --output <file>           One PAGX main file (default: <input>.pagx)
+  -o, --output <file>           One PAGX main file (default: <input-stem>.pagx)
   --output-dir <directory>      Result set, including manifest.json; exclusive with -o
   --output-name <name>          Basename in directory mode; required for URL input
   --input <file|url>            Alternative to the positional input
@@ -404,7 +405,7 @@ HTML options:
   --selector <css>             Wait for a selector before capture
   --cookie <name=value>        URL cookie (repeatable)
   --header <Key: Value>        URL request header (repeatable)
-  --download-fonts             Acquire web fonts as render fallbacks
+  --download-fonts             Acquire and preserve web fonts in <output-stem>.fonts/
   --capture-animations         Capture supported animations; exclusive with --scenario
   --scroll-reveal              Trigger scroll-based content before capture
   --no-inline-icon-fonts       Disable webfont icon conversion

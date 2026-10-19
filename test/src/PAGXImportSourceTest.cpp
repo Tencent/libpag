@@ -53,6 +53,47 @@ CLI_TEST(PAGXImportSourceTest, ResolveFailureIsNotSilentlyDropped) {
   EXPECT_TRUE(result.document->hasUnresolvedImports());
 }
 
+CLI_TEST(PAGXImportSourceTest, RelativeImageBaseOverridePreservesAbsoluteReferences) {
+  ImportTempDirectory source, resources, fixed;
+  std::ofstream(source.path / "pixel.png", std::ios::binary) << "original";
+  std::ofstream(resources.path / "pixel.png", std::ios::binary) << "override";
+  std::ofstream(fixed.path / "pixel.png", std::ios::binary) << "absolute";
+  const auto absoluteImage = (fixed.path / "pixel.png").generic_u8string();
+  for (const auto& format : {"html", "svg"}) {
+    SCOPED_TRACE(format);
+    const auto file = source.path / (std::string("page.") + format);
+    if (std::string(format) == "html") {
+      std::ofstream(file) << "<html><body style='width:20px;height:20px'>"
+                             "<img src='pixel.png' width='1' height='1'/><img src='"
+                          << absoluteImage << "' width='1' height='1'/></body></html>";
+    } else {
+      std::ofstream(file) << "<svg width='20' height='20'><image href='pixel.png' width='1' "
+                             "height='1'/><image href='"
+                          << absoluteImage << "' width='1' height='1'/></svg>";
+    }
+    ImportItem item;
+    item.input = file.u8string();
+    item.format = format;
+    ImportRequest options;
+    options.resolve = false;
+    options.imageBaseDir = fs::relative(resources.path, fs::current_path()).u8string();
+    auto result = ImportPreparedSource(item, item.input, source.path.u8string(), options);
+    ASSERT_TRUE(result.error.empty()) << result.error;
+    bool foundOverride = false, foundAbsolute = false;
+    for (const auto& node : result.document->nodes) {
+      if (node->nodeType() != pagx::NodeType::Image) continue;
+      const auto image = static_cast<pagx::Image*>(node.get());
+      ASSERT_NE(image->data, nullptr);
+      const std::string bytes(static_cast<const char*>(image->data->data()), image->data->size());
+      EXPECT_NE(bytes, "original");
+      foundOverride |= bytes == "override";
+      foundAbsolute |= bytes == "absolute";
+    }
+    EXPECT_TRUE(foundOverride);
+    EXPECT_TRUE(foundAbsolute);
+  }
+}
+
 CLI_TEST(PAGXImportSourceTest, MissingImageFailsEvenWithoutResolve) {
   ImportTempDirectory temp;
   auto subset = temp.path / "page.html";
