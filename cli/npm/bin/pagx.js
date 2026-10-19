@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-const { execFileSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const { runProcess } = require("../process");
 
 const SUPPORTED = ["darwin", "linux", "win32"];
 
@@ -68,6 +68,17 @@ if (!process.env.PAGX_HTML_SNAPSHOT_BIN) {
   }
 }
 
+// Keep Node identity and the full capture runtime independent of PATH/cwd.
+process.env.PAGX_NODE_BIN ||= process.execPath;
+process.env.PAGX_HTML_CAPTURE_BIN ||= path.join(__dirname, '..', 'html-snapshot', 'launch-capture.js');
+
+function relay(command, args) {
+  runProcess(command, args).then(code => { process.exitCode = code; }).catch(error => {
+    console.error(`pagx: ${error.message}`);
+    process.exitCode = 1;
+  });
+}
+
 // Intercept the preview sub-command and delegate to pagx-preview (a Node.js-based
 // HTTP server + MCP service). The preview module lives under preview/ at the package
 // root so it can be bundled and published alongside the native binary.
@@ -77,16 +88,7 @@ if (process.argv[2] === 'preview') {
     console.error('pagx: preview command not available. Preview module not found.');
     process.exit(1);
   }
-  const { spawn } = require('child_process');
-  // Use process.execPath (the Node binary currently running this wrapper) rather than the string
-  // 'node': under nvm/Volta/asdf, on Windows without node on PATH, or when launched from a packaged
-  // runtime, a bare 'node' may not resolve. process.execPath is always the correct interpreter.
-  const child = spawn(process.execPath, [previewEntry, ...process.argv.slice(3)], { stdio: 'inherit' });
-  child.on('error', (err) => {
-    console.error('pagx: failed to start preview: ' + err.message);
-    process.exit(1);
-  });
-  child.on('exit', (code) => process.exit(code != null ? code : 1));
+  relay(process.execPath, [previewEntry, ...process.argv.slice(3)]);
   return;
 }
 
@@ -111,8 +113,4 @@ if ((process.argv[2] === '--help' || process.argv[2] === '-h') && process.argv.l
   process.exit(result.status || 0);
 }
 
-try {
-  execFileSync(binPath, process.argv.slice(2), { stdio: "inherit" });
-} catch (e) {
-  process.exit(e.status != null ? e.status : 1);
-}
+relay(binPath, process.argv.slice(2));
