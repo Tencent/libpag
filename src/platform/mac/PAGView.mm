@@ -115,6 +115,9 @@
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
+  // AppKit, unlike UIKit, does not route a frame change through the public setBounds: setter, so
+  // this stays a separate entry point rather than a duplicate of setFrameSize: below. It fires
+  // only when a caller resizes the view's coordinate system directly.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
 #if defined(TGFX_USE_METAL)
@@ -130,9 +133,9 @@
 - (void)setFrameSize:(NSSize)newSize {
   NSSize oldSize = self.bounds.size;
   [super setFrameSize:newSize];
-  // Every size change funnels through setFrameSize:: setFrame: calls it internally, and
-  // autoresizing / Auto Layout drive it directly, so this is the single place to react — handling
-  // the same change in setFrame: as well would run updateSize twice per resize.
+  // Every frame-driven size change funnels through setFrameSize:: setFrame: calls it internally,
+  // and autoresizing / Auto Layout drive it directly, so this is the single place to react —
+  // handling the same change in setFrame: as well would run updateSize twice per resize.
   if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
 #if defined(TGFX_USE_METAL)
     [self updateLayerDrawableSize];

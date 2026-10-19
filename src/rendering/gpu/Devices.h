@@ -126,6 +126,26 @@ class Devices {
   static bool SupportsBackend(tgfx::Backend backend);
 
   /**
+   * Validates a caller-owned GPU texture and resolves the device libpag must render it with.
+   * Returns an empty AdoptedDevice when the description is invalid or carries the tag of a
+   * backend this build was not compiled with; both cases are logged, so resource factories only
+   * have to map a null device onto a null resource instead of returning an object that can never
+   * be drawn. Otherwise the device is resolved as:
+   *   forAsyncThread == true:  MakeForAsyncThread(texture), falling back to MakeDefault().
+   *   forAsyncThread == false: AdoptCurrent() — which sets externalContext on the backends that
+   *                            have a thread-local current context — falling back to
+   *                            MakeForTexture(texture) on the ones that do not.
+   */
+  static AdoptedDevice ResolveForExternalResource(const tgfx::BackendTexture& texture,
+                                                  bool forAsyncThread);
+
+  /**
+   * Same as ResolveForExternalResource(BackendTexture, bool) for a caller-owned render target.
+   * Render targets are never resolved for an async worker, so there is no forAsyncThread variant.
+   */
+  static AdoptedDevice ResolveForExternalResource(const tgfx::BackendRenderTarget& renderTarget);
+
+  /**
    * Adopts the host thread's "current" GPU context as a rendering device. Only meaningful on the
    * OpenGL backend, where {GLDevice::Current(), externalContext=true} is returned so the caller
    * keeps ownership of the GL context and libpag guards its global state. Other backends return
@@ -222,31 +242,36 @@ class Devices {
  * and calls back into libpag code that fetches the default device (e.g. HTMLExporter::ToData
  * rasterizing gradient fills) re-enters the same mutex.
  *
- * DeviceLockScope removes that hazard for libpag-internal usage: scopes created on a thread
- * that already holds the lock (through an outer DeviceLockScope) reuse the live context and
- * only the outermost scope's destruction unlocks the device. Callers that bypass this class
- * and call tgfx::Device::lockContext() directly still own the reentrancy contract themselves.
+ * DeviceLockScope removes that hazard for libpag-internal usage: each scope tracks which device
+ * it locked, and a scope that asks for a device already locked by an outer scope on the same
+ * thread reuses that scope's live context instead of re-entering the mutex. Scopes that ask for
+ * a different device lock it normally, since those are independent mutexes. Callers that bypass
+ * this class and call tgfx::Device::lockContext() directly still own the reentrancy contract
+ * themselves.
  */
 class DeviceLockScope {
  public:
   /**
-   * Locks Devices::MakeDefault(), or reuses the already-locked default device when the calling
-   * thread holds one through an outer DeviceLockScope. Use the bool conversion to check for
-   * failure (device creation or context lock failed); the scope is then empty and inert.
+   * Locks a default device for callers that only need some usable context and have no resources
+   * tied to a specific device. When the calling thread already holds a device through an outer
+   * DeviceLockScope, that scope's context is reused and no new device is created — on the OpenGL
+   * backend every Devices::MakeDefault() builds a brand-new GL context, so fetching one per
+   * nested scope would recompile all shaders. Use the bool conversion to check for failure
+   * (device creation or context lock failed); the scope is then empty and inert.
    */
   DeviceLockScope();
 
   /**
-   * Locks the given device instead of fetching the default one, so callers that cache a device
-   * (e.g. GPUContext reusing one GL context across many rasterization calls) do not create a new
-   * device per scope. Behaves exactly like the default constructor otherwise, including reusing
-   * the context of an outer DeviceLockScope when the calling thread already holds one.
+   * Locks the given device, so callers holding resources on a specific device (e.g. GPUContext
+   * reusing one GL context across many rasterization calls) always render on that device. The
+   * context of an outer DeviceLockScope is reused only when it locked this very device;
+   * otherwise the device is locked on its own. Use the bool conversion to check for failure.
    */
   explicit DeviceLockScope(std::shared_ptr<tgfx::Device> device);
 
   /**
-   * Releases the device lock, unless the calling thread still holds an outer DeviceLockScope
-   * (the lock is released when the outermost scope is destroyed).
+   * Releases the device lock, unless this scope reused the context of an outer DeviceLockScope
+   * (the lock is then released by the scope that acquired it).
    */
   ~DeviceLockScope();
 
@@ -271,6 +296,9 @@ class DeviceLockScope {
   bool _ownsLock = false;
   tgfx::Context* _context = nullptr;
   std::shared_ptr<tgfx::Device> _device = {};
+  DeviceLockScope* _outerScope = nullptr;
+
+  void lockDevice(std::shared_ptr<tgfx::Device> device);
 };
 
 }  // namespace pag

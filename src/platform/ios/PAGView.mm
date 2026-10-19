@@ -128,46 +128,34 @@
 #endif
 }
 
+- (void)refreshSurfaceSize {
+  if (pagSurface == nil) {
+    return;
+  }
+#if defined(TGFX_USE_METAL)
+  // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize
+  // can never overlap with the render thread reading it inside flush (tgfx MetalWindow).
+  // The GL backend serializes updateSize against flush through the device lock already and
+  // has no drawableSize, so the lock is Metal-only.
+  std::lock_guard<std::mutex> autoLock(lock);
+#endif
+  [self updateLayerDrawableSize];
+  [pagSurface updateSize];
+}
+
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
+  // UIView updates its bounds from within setFrame:, so frame, autoresizing and Auto Layout
+  // driven resizes all land here. Overriding setFrame: as well would run the whole update — and
+  // take the lock — twice for a single resize.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
     bool fromZero = (oldBounds.size.width == 0 || oldBounds.size.height == 0);
-    {
-#if defined(TGFX_USE_METAL)
-      // Hold the same lock as onAnimationFlush so the main-thread write to layer.drawableSize
-      // can never overlap with the render thread reading it inside flush (tgfx MetalWindow).
-      // The GL backend serializes updateSize against flush through the device lock already and
-      // has no drawableSize, so the lock is Metal-only.
-      std::lock_guard<std::mutex> autoLock(lock);
-#endif
-      [self updateLayerDrawableSize];
-      [pagSurface updateSize];
-    }
-    // [animator update] must stay outside the lock: in sync mode it re-enters onAnimationFlush:
-    // on the same thread, which lock_guards the same non-recursive mutex and would deadlock.
-    if (fromZero) {
-      [animator update];
-    }
-  }
-}
-
-- (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (pagSurface != nil &&
-      (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height)) {
-    bool fromZero = (oldRect.size.width == 0 || oldRect.size.height == 0);
-    {
-#if defined(TGFX_USE_METAL)
-      // Same locking rationale as setBounds:.
-      std::lock_guard<std::mutex> autoLock(lock);
-#endif
-      [self updateLayerDrawableSize];
-      [pagSurface updateSize];
-    }
-    // Same deadlock rationale as setBounds: keep this call outside the lock.
+    [self refreshSurfaceSize];
+    // [animator update] must stay outside the lock refreshSurfaceSize takes: in sync mode it
+    // re-enters onAnimationFlush: on the same thread, which lock_guards the same non-recursive
+    // mutex and would deadlock.
     if (fromZero) {
       [animator update];
     }
@@ -177,18 +165,20 @@
 - (void)setContentScaleFactor:(CGFloat)scaleFactor {
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
-  if (pagSurface != nil && oldScaleFactor != scaleFactor) {
-#if defined(TGFX_USE_METAL)
-    // Same locking rationale as setBounds:.
-    std::lock_guard<std::mutex> autoLock(lock);
-#endif
-    [self updateLayerDrawableSize];
-    [pagSurface updateSize];
+  if (oldScaleFactor != scaleFactor) {
+    [self refreshSurfaceSize];
   }
 }
 
 - (void)didMoveToWindow {
   [super didMoveToWindow];
+#if defined(TGFX_USE_METAL)
+  // Landing on a window whose screen has a different scale leaves bounds untouched, and UIKit
+  // applies the new contentScaleFactor without necessarily routing through
+  // setContentScaleFactor:, so drawableSize would stay on the old scale (blurry or clipped
+  // content). This mirrors the macOS viewDidChangeBackingProperties path.
+  [self refreshSurfaceSize];
+#endif
   [self checkVisible];
 }
 

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <thread>
-#include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "rendering/drawables/HardwareBufferDrawable.h"
@@ -36,70 +35,24 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
-  if (!Devices::SupportsBackend(ToTGFX(renderTarget).backend())) {
-    // Reject backend-mismatched descriptions up front instead of returning a surface that
-    // silently fails to draw later (the GPU context can never sample the foreign texture).
-    LOGE(
-        "The current libpag build does not support creating a PAGSurface from a render target "
-        "of a different backend.");
-    return nullptr;
-  }
-  auto adopted = Devices::AdoptCurrent();
-  auto device = std::move(adopted.device);
-  bool externalContext = adopted.externalContext;
-  if (device == nullptr) {
-    // AdoptCurrent() only returns a device on backends with a thread-local "current context"
-    // concept (OpenGL). Other backends (Metal / D3D12) reach the render device by walking back
-    // from the caller's external render target itself. Vulkan / WebGPU do not carry a device
-    // reference on their target types and fall back to Devices::MakeDefault() inside
-    // MakeForTexture().
-    device = Devices::MakeForTexture(ToTGFX(renderTarget));
-  }
-  auto drawable = RenderTargetDrawable::MakeFrom(device, ToTGFX(renderTarget), ToTGFX(origin));
+  auto tgfxRenderTarget = ToTGFX(renderTarget);
+  auto adopted = Devices::ResolveForExternalResource(tgfxRenderTarget);
+  auto drawable = RenderTargetDrawable::MakeFrom(adopted.device, tgfxRenderTarget, ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), externalContext));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), adopted.externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                                  bool forAsyncThread) {
-  if (!Devices::SupportsBackend(ToTGFX(texture).backend())) {
-    // Reject backend-mismatched descriptions up front instead of returning a surface that
-    // silently fails to draw later (the GPU context can never sample the foreign texture).
-    LOGE(
-        "The current libpag build does not support creating a PAGSurface from a texture of a "
-        "different backend.");
-    return nullptr;
-  }
-  std::shared_ptr<tgfx::Device> device = nullptr;
-  bool externalContext = false;
-  if (forAsyncThread) {
-    // Prefer a device that can actually access the caller's external texture. Backends that can
-    // reach a device back-reference from the texture handle (Metal / D3D12) derive the worker
-    // device from the texture itself. GL cannot, so its MakeForAsyncThread(texture) still derives
-    // a share-context device from the calling thread's current context (matching the original
-    // behavior of GLDevice::Make(nullptr) fallback, which returned an independent device).
-    device = Devices::MakeForAsyncThread(ToTGFX(texture));
-    if (device == nullptr) {
-      device = Devices::MakeDefault();
-    }
-  }
-  if (device == nullptr) {
-    auto adopted = Devices::AdoptCurrent();
-    device = std::move(adopted.device);
-    externalContext = adopted.externalContext;
-  }
-  if (device == nullptr) {
-    // Backends without a thread-local "current context" (Metal / D3D12) derive the device from
-    // the external texture itself; Vulkan / WebGPU fall back to MakeDefault() internally.
-    device = Devices::MakeForTexture(ToTGFX(texture));
-  }
-  auto drawable = TextureDrawable::MakeFrom(device, ToTGFX(texture), ToTGFX(origin));
+  auto tgfxTexture = ToTGFX(texture);
+  auto adopted = Devices::ResolveForExternalResource(tgfxTexture, forAsyncThread);
+  auto drawable = TextureDrawable::MakeFrom(adopted.device, tgfxTexture, ToTGFX(origin));
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), externalContext));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), adopted.externalContext));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {

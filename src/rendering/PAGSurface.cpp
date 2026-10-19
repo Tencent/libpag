@@ -262,10 +262,14 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         break;
       }
       case tgfx::Backend::Unknown:
+        // The flush produced nothing to synchronize on, so the context left the semaphore
+        // default-constructed. The caller's semaphore simply stays uninitialized — not an error,
+        // and logging it would fire on every frame.
+        break;
       case tgfx::Backend::Vulkan:
       case tgfx::Backend::WebGPU:
       case tgfx::Backend::D3D12:
-        LOGE("PAGSurface::flushInternal() cannot forward a semaphore of this backend yet.");
+        LOGE("PAGSurface::draw() cannot forward a semaphore of this backend yet.");
         break;
     }
   }

@@ -39,7 +39,6 @@ class OffscreenDrawable : public Drawable {
     return _height;
   }
 
-  std::shared_ptr<tgfx::Device> getDevice() override;
   std::shared_ptr<tgfx::Surface> getSurface(tgfx::Context* context) override;
 
  private:
@@ -47,7 +46,6 @@ class OffscreenDrawable : public Drawable {
 
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<tgfx::Device> _device = nullptr;
 };
 
 }  // namespace pagx

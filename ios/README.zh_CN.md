@@ -46,6 +46,7 @@
 ```
 
 Metal 后端要求 iOS 15 及以上版本，且仅支持 arm64 架构。选择 Metal 时部署目标会自动提升到 15.0，
-无需额外参数。因此模拟器构建仅支持 Apple Silicon 设备。
+无需额外参数。因此模拟器构建仅支持 Apple Silicon 设备。注意 PAGViewer demo target 仍保持其默认
+部署目标——如果需要在低于 iOS 15 的设备上用 Metal 运行该 demo，请在 Xcode 里手动将其提升到 15.0。
 
 最后，启动 XCode 并打开 ios/PAGViewer.xcworkspace 即可。

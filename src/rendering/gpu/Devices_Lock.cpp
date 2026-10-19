@@ -22,57 +22,70 @@
 namespace pag {
 
 namespace {
-// Per-thread record of the context locked by the outermost DeviceLockScope. Inner scopes created
-// on the same thread reuse the recorded context instead of re-entering tgfx's non-recursive
-// device mutex (see the class comment in Devices.h). Only DeviceLockScope maintains this record;
-// raw tgfx::Device::lockContext() callers are outside its protection.
-thread_local tgfx::Context* tlsLockedContext = nullptr;
-thread_local int tlsLockDepth = 0;
+// Innermost DeviceLockScope that actually acquired a device lock on the calling thread, linked to
+// its outer scopes through DeviceLockScope::_outerScope. Scopes consult this chain to find out
+// whether the device they want is already locked by an enclosing scope, and reuse its context
+// instead of re-entering tgfx's non-recursive device mutex (see the class comment in Devices.h).
+// Only DeviceLockScope maintains this chain; raw tgfx::Device::lockContext() callers are outside
+// its protection.
+thread_local DeviceLockScope* tlsInnermostScope = nullptr;
 }  // namespace
 
-DeviceLockScope::DeviceLockScope() : DeviceLockScope(Devices::MakeDefault()) {
+DeviceLockScope::DeviceLockScope() {
+  if (tlsInnermostScope != nullptr) {
+    // The caller did not name a device, so any context already locked on this thread satisfies it.
+    // Reusing the innermost one also avoids a second device: on the OpenGL backend every
+    // Devices::MakeDefault() builds a brand-new GL context (see GPUContext::lockContext).
+    _context = tlsInnermostScope->_context;
+    return;
+  }
+  lockDevice(Devices::MakeDefault());
 }
 
 DeviceLockScope::DeviceLockScope(std::shared_ptr<tgfx::Device> device) {
-  if (tlsLockDepth > 0) {
-    // The calling thread already holds the default device through an outer scope: reuse its
-    // context. The outer scope keeps the device alive, so the raw pointers stay valid. The passed
-    // device is ignored here: callers that cache Devices::MakeDefault() results resolve to the
-    // same deduplicated instance anyway, and honoring the outer scope is what prevents the
-    // same-thread re-entry that a raw tgfx::Device::lockContext() call would cause.
-    tlsLockDepth++;
-    _context = tlsLockedContext;
+  lockDevice(std::move(device));
+}
+
+void DeviceLockScope::lockDevice(std::shared_ptr<tgfx::Device> device) {
+  if (!device) {
+    return;
+  }
+  for (auto* scope = tlsInnermostScope; scope != nullptr; scope = scope->_outerScope) {
+    if (scope->_device == device) {
+      _context = scope->_context;
+      return;
+    }
+  }
+  auto* context = device->lockContext();
+  if (!context) {
     return;
   }
   _device = std::move(device);
-  if (!_device) {
-    return;
-  }
-  auto* context = _device->lockContext();
-  if (!context) {
-    _device = nullptr;
-    return;
-  }
   _ownsLock = true;
   _context = context;
-  tlsLockedContext = context;
-  tlsLockDepth = 1;
+  _outerScope = tlsInnermostScope;
+  tlsInnermostScope = this;
 }
 
 DeviceLockScope::~DeviceLockScope() {
-  if (tlsLockDepth == 0) {
-    // A failed scope (no context acquired) or a scope destroyed after an unbalanced unlock.
+  if (!_ownsLock) {
+    // A failed scope, or one that reused the context of an enclosing scope.
     return;
   }
-  tlsLockDepth--;
-  if (tlsLockDepth > 0) {
-    // An inner scope: the outermost owner keeps the device locked.
-    return;
+  if (tlsInnermostScope == this) {
+    // The usual case: scopes are destroyed in reverse construction order.
+    tlsInnermostScope = _outerScope;
+  } else {
+    // Out-of-order destruction of a heap-allocated scope. Splice it out of the thread's chain so
+    // the scopes created after it still consult the right enclosing device.
+    for (auto* scope = tlsInnermostScope; scope != nullptr; scope = scope->_outerScope) {
+      if (scope->_outerScope == this) {
+        scope->_outerScope = _outerScope;
+        break;
+      }
+    }
   }
-  if (_ownsLock && _device) {
-    _device->unlock();
-  }
-  tlsLockedContext = nullptr;
+  _device->unlock();
   _context = nullptr;
 }
 

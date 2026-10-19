@@ -90,7 +90,11 @@
                                         pixelBufferData, bytesPerRow);
   CVPixelBufferUnlockBaseAddress(hardwareBuffer, 0);
   if (!status) {
+    // The buffer was never written, so handing it back would look like a successful snapshot of
+    // a blank frame. Return nil as the iOS implementation does; PixelBufferUtil::Make()
+    // autoreleases the buffer, so dropping the reference is enough.
     LOGE("ReadPixels failed!");
+    return nil;
   }
   return hardwareBuffer;
 }

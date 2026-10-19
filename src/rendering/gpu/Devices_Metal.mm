@@ -32,16 +32,20 @@ namespace {
  * ExternalDeviceRef subclass for the Metal backend. Retains the underlying id<MTLDevice> so
  * comparing identity later is safe even after the caller drops its own strong reference.
  * libpag builds without ARC, so ownership is managed manually: retain in the constructor and
- * release in the destructor, which keeps the object alive for the lifetime of the ref.
+ * release in the destructor, which keeps the object alive for the lifetime of the ref. Copying
+ * is disabled because the manual release would then run once per copy on a single retain.
  */
 class MetalExternalDeviceRef : public ExternalDeviceRef {
  public:
   explicit MetalExternalDeviceRef(id<MTLDevice> mtlDevice) : device([mtlDevice retain]) {
   }
 
-  ~MetalExternalDeviceRef() {
+  ~MetalExternalDeviceRef() override {
     [device release];
   }
+
+  MetalExternalDeviceRef(const MetalExternalDeviceRef&) = delete;
+  MetalExternalDeviceRef& operator=(const MetalExternalDeviceRef&) = delete;
 
   id<MTLDevice> device = nil;
 };

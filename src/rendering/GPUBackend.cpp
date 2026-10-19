@@ -147,7 +147,10 @@ bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
   return true;
 }
 
-BackendSemaphore::BackendSemaphore() : _backend(Backend::MOCK), _glSync(nullptr) {
+// Zero-initializes the whole union, not just the leading pointer: _mtlInfo spans more bytes than
+// _glSync, and leaving the tail indeterminate would surface as garbage the moment a reader looks
+// at the Metal view of an uninitialized semaphore.
+BackendSemaphore::BackendSemaphore() : _backend(Backend::MOCK), _mtlInfo({}) {
 }
 
 void BackendSemaphore::initGL(void* sync) {

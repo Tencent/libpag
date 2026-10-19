@@ -215,10 +215,10 @@ GPUContext::~GPUContext() = default;
 tgfx::Context* GPUContext::lockContext() {
   // The device is created once and cached for the lifetime of this GPUContext: on the GL backend
   // every Devices::MakeDefault() builds a brand-new GL context, so a fresh device per call would
-  // recompile all shaders for each pattern bake in SVG/PPT export. Nested pairs and outer
-  // DeviceLockScope holders still reuse the already-locked context (see DeviceLockScope) instead
-  // of re-entering tgfx's non-recursive device mutex, which deadlocks once devices are
-  // deduplicated per native GPU object (tgfx #1581).
+  // recompile all shaders for each pattern bake in SVG/PPT export. Nested lockContext() pairs all
+  // name this same cached device, so DeviceLockScope hands back the context the enclosing pair
+  // already locked instead of re-entering tgfx's non-recursive device mutex, which deadlocks once
+  // devices are deduplicated per native GPU object (tgfx #1581).
   if (_device == nullptr) {
     _device = pag::Devices::MakeDefault();
     if (_device == nullptr) {

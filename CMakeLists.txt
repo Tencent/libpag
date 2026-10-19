@@ -4,8 +4,10 @@ cmake_minimum_required(VERSION 3.13)
 # configuring the project and derives both the deployment target and the compiler target triple
 # from it. Apple toolchains reject iOS deployment targets below 15.0 (Xcode 26/27 SDKs), and
 # the tgfx Metal backend has its own >= 13.0 floor that 15.0 satisfies, so Metal builds must
-# pre-set the minimum before configuration. This only applies to iOS builds; macOS keeps its own
-# default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
+# pre-set the minimum before configuration — otherwise the toolchain's own iOS default flows into
+# tgfx and trips those checks. Raising it here is what lets `gen_ios -DPAG_USE_METAL=ON` work
+# without extra flags (as documented in ios/README.md). This only applies to iOS builds; macOS
+# keeps its own default. Callers can override with -DDEPLOYMENT_TARGET=... explicitly.
 if (PAG_USE_METAL AND NOT DEFINED DEPLOYMENT_TARGET AND PLATFORM MATCHES "^(OS|SIMULATOR)")
     set(DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum iOS deployment target" FORCE)
 endif ()
@@ -137,12 +139,9 @@ if (PAG_USE_METAL OR PAG_USE_VULKAN OR PAG_USE_D3D12 OR PAG_USE_WEBGPU)
     set(PAG_USE_ANGLE OFF)
 endif ()
 
-# The Metal backend requires iOS 13+ (see the tgfx deployment-target check) and supports the iOS
-# simulator on arm64 only. Raise the deployment target automatically when Metal is selected so
-# `gen_ios -DPAG_USE_METAL=ON` needs no extra flags (as documented in ios/README.md). Without this
-# the toolchain's iOS default (9.0) flows into tgfx and trips its >= 13.0 check. Must run before
-# tgfx is added via add_subdirectory(). Metal also only exists on Apple platforms — reject it
-# elsewhere up front instead of failing later with a pile of undefined symbols.
+# Metal only exists on Apple platforms — reject it elsewhere up front instead of failing later
+# with a pile of undefined symbols. The matching iOS deployment-target bump lives at the top of
+# this file, because the toolchain reads DEPLOYMENT_TARGET before project() runs.
 if (PAG_USE_METAL AND NOT APPLE)
     message(FATAL_ERROR "PAG_USE_METAL is only supported on Apple platforms.")
 endif ()

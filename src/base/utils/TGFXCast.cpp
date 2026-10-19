@@ -264,15 +264,23 @@ tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
   if (!semaphore.isInitialized()) {
     return {};
   }
-  if (auto glSync = semaphore.glSync()) {
-    tgfx::GLSyncInfo syncInfo = {glSync};
-    return tgfx::BackendSemaphore(syncInfo);
+  switch (semaphore.backend()) {
+    case Backend::OPENGL: {
+      tgfx::GLSyncInfo syncInfo = {semaphore.glSync()};
+      return tgfx::BackendSemaphore(syncInfo);
+    }
+    case Backend::METAL: {
+      MtlEventInfo mtlInfo = {};
+      if (!semaphore.getMtlEventInfo(&mtlInfo)) {
+        return {};
+      }
+      tgfx::MetalSyncInfo syncInfo = {mtlInfo.event, mtlInfo.value};
+      return tgfx::BackendSemaphore(syncInfo);
+    }
+    case Backend::VULKAN:
+    case Backend::MOCK:
+    default:
+      return {};
   }
-  MtlEventInfo mtlInfo = {};
-  if (semaphore.getMtlEventInfo(&mtlInfo)) {
-    tgfx::MetalSyncInfo syncInfo = {mtlInfo.event, mtlInfo.value};
-    return tgfx::BackendSemaphore(syncInfo);
-  }
-  return {};
 }
 }  // namespace pag
