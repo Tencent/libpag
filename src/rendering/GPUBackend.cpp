@@ -31,6 +31,10 @@ BackendTexture::BackendTexture(const VkImageInfo& vkInfo, int width, int height)
     : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
 }
 
+BackendTexture::BackendTexture(const WgpuTextureInfo& wgpuInfo, int width, int height)
+    : _backend(Backend::WEBGPU), _width(width), _height(height), wgpuInfo(wgpuInfo) {
+}
+
 BackendTexture::BackendTexture(const BackendTexture& that) {
   *this = that;
 }
@@ -52,6 +56,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       break;
     case Backend::VULKAN:
       vkInfo = that.vkInfo;
+      break;
+    case Backend::WEBGPU:
+      wgpuInfo = that.wgpuInfo;
       break;
     default:
       break;
@@ -83,6 +90,14 @@ bool BackendTexture::getVkImageInfo(VkImageInfo* vkImageInfo) const {
   return true;
 }
 
+bool BackendTexture::getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const {
+  if (!isValid() || _backend != Backend::WEBGPU) {
+    return false;
+  }
+  *wgpuTextureInfo = wgpuInfo;
+  return true;
+}
+
 BackendRenderTarget::BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
     : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
 }
@@ -93,6 +108,10 @@ BackendRenderTarget::BackendRenderTarget(const MtlTextureInfo& mtlInfo, int widt
 
 BackendRenderTarget::BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height)
     : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
+}
+
+BackendRenderTarget::BackendRenderTarget(const WgpuTextureInfo& wgpuInfo, int width, int height)
+    : _backend(Backend::WEBGPU), _width(width), _height(height), wgpuInfo(wgpuInfo) {
 }
 
 BackendRenderTarget::BackendRenderTarget(const BackendRenderTarget& that) {
@@ -116,6 +135,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
       break;
     case Backend::VULKAN:
       vkInfo = that.vkInfo;
+      break;
+    case Backend::WEBGPU:
+      wgpuInfo = that.wgpuInfo;
       break;
     default:
       break;
@@ -144,6 +166,14 @@ bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
     return false;
   }
   *vkImageInfo = vkInfo;
+  return true;
+}
+
+bool BackendRenderTarget::getWgpuTextureInfo(WgpuTextureInfo* wgpuTextureInfo) const {
+  if (!isValid() || _backend != Backend::WEBGPU) {
+    return false;
+  }
+  *wgpuTextureInfo = wgpuInfo;
   return true;
 }
 

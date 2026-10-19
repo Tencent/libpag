@@ -261,9 +261,13 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
         }
         break;
       }
+      case tgfx::Backend::WebGPU:
+        // WebGPU has no cross-queue synchronization primitive (queue submission order is the
+        // guarantee), so tgfx never produces a meaningful semaphore on this backend and there
+        // is nothing to forward.
+        break;
       case tgfx::Backend::Unknown:
       case tgfx::Backend::Vulkan:
-      case tgfx::Backend::WebGPU:
       case tgfx::Backend::D3D12:
         LOGE("PAGSurface::flushInternal() cannot forward a semaphore of this backend yet.");
         break;

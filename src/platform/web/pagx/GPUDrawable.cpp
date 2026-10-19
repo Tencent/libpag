@@ -21,6 +21,12 @@
 #include "GPUDrawable.h"
 #include <emscripten/html5.h>
 
+#if defined(TGFX_USE_WEBGPU)
+#include "tgfx/gpu/webgpu/WebGPUWindow.h"
+#else
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#endif
+
 namespace pagx {
 
 std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {
@@ -49,7 +55,11 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (_window == nullptr) {
+#if defined(TGFX_USE_WEBGPU)
+    _window = tgfx::WebGPUWindow::MakeFrom(_canvasID);
+#else
     _window = tgfx::WebGLWindow::MakeFrom(_canvasID);
+#endif
   }
   return _window != nullptr ? _window->getDevice() : nullptr;
 }

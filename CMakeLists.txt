@@ -910,8 +910,27 @@ if (WEB)
     else ()
         add_executable(pag ${PAG_FILES})
         list(APPEND PAG_LINK_OPTIONS --no-entry -lembind -sEXPORT_NAME='PAGInit' -sWASM=1
-                -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'] -sALLOW_MEMORY_GROWTH=1
-                -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1 -sEXPORTED_FUNCTIONS=['_malloc','_free'])
+                -sALLOW_MEMORY_GROWTH=1 -sMODULARIZE=1 -sENVIRONMENT=web,worker -sEXPORT_ES6=1
+                -sEXPORTED_FUNCTIONS=['_malloc','_free'])
+        if (PAG_USE_WEBGPU)
+            # 'WebGPU' is exported so tgfx's JS glue can resolve GPUDevice/GPUTexture handles
+            # (Module.WebGPU.mgrDevice/mgrTexture) for color-space configuration and video
+            # uploads. 'GL' stays exported because shared web platform code may still touch GL
+            # symbols.
+            list(APPEND PAG_LINK_OPTIONS -sUSE_WEBGPU=1
+                    -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8','WebGPU'])
+            # PAG_STATIC_LIBS references tgfx via $<TARGET_FILE:tgfx>, which bypasses CMake's
+            # transitive dependency propagation. tgfx's WebGPU backend links libtint as a
+            # separate EXCLUDE_FROM_ALL target (tint is added by tgfx's add_subdirectory), so
+            # without this line the target is never built and the final link fails on tint
+            # symbols.
+            if (TARGET libtint)
+                list(APPEND PAG_STATIC_LIBS libtint)
+            endif ()
+        else ()
+            list(APPEND PAG_LINK_OPTIONS -sMAX_WEBGL_VERSION=2
+                    -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8'])
+        endif ()
     endif ()
     set(unsupported_emsdk_versions "4.0.11")
     foreach (unsupported_version IN LISTS unsupported_emsdk_versions)
@@ -919,6 +938,18 @@ if (WEB)
             message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported.")
         endif ()
     endforeach ()
+    if (PAG_USE_WEBGPU)
+        # -sUSE_WEBGPU was removed in emsdk 4.0.18 in favor of --use-port=emdawnwebgpu, and
+        # tgfx's WebGPU backend requires the 4.0.15 runtime (mirrors tgfx's own
+        # web/cmake/check_emscripten.cmake). Pin the supported window here so the failure
+        # surfaces at configure time instead of as obscure link errors.
+        if (${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.15" OR
+                NOT ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.18")
+            message(FATAL_ERROR
+                    "PAG_USE_WEBGPU requires emsdk >= 4.0.15 and < 4.0.18, "
+                    "but the current version is ${EMSCRIPTEN_VERSION}.")
+        endif ()
+    endif ()
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         list(APPEND PAG_COMPILE_OPTIONS -O0 -gsource-map)
         list(APPEND PAG_LINK_OPTIONS -O0 -gsource-map -sSAFE_HEAP=1 -Wno-limited-postlink-optimizations)

@@ -76,7 +76,9 @@ class Devices {
    * the CLI, and internal helpers.
    *   OpenGL: GLDevice::MakeWithFallback()
    *   Metal:  MetalDevice::Make()
-   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails at compile
+   *   WebGPU: WebGPUDevice::Make() — reads the GPUDevice preinitialized on the JS side; only
+   *           callable on the main runtime thread.
+   *   Vulkan / D3D12: Not implemented yet — selecting those backends fails at compile
    *           time (see Devices_Backend.cpp).
    */
   static std::shared_ptr<tgfx::Device> MakeDefault();
@@ -142,10 +144,11 @@ class Devices {
    *                texture's creating context is current. The texture parameter is unused on this
    *                backend but kept for signature parity.
    *   Metal:       Reads MTLTexture.device and wraps it via MetalDevice::MakeFrom().
-   *   Vulkan / D3D12 / WebGPU: Not implemented yet — selecting those backends fails at compile
+   *   WebGPU:      Returns nullptr; WGPUTexture carries no device back-reference, and Web runs
+   *                on a single shared GPUDevice, so callers fall back to MakeDefault().
+   *   Vulkan / D3D12: Not implemented yet — selecting those backends fails at compile
    *                time (see Devices_Backend.cpp). Their texture types do not carry a device
-   *                back-reference; a SetSharedDevice-style API is planned to lift that once the
-   *                first of them lands.
+   *                back-reference either.
    * Used by PAGImage::FromTexture() for implicit device inference.
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(const tgfx::BackendTexture& texture);
@@ -154,7 +157,8 @@ class Devices {
    * Same as MakeForTexture(BackendTexture) but for BackendRenderTarget. Used by
    * PAGSurface::MakeFrom(BackendRenderTarget) on backends that need to reach back through the
    * render target to locate the owning GPU device (Metal). GL adopts the current context as
-   * usual; the remaining backends are not implemented yet (see Devices_Backend.cpp).
+   * usual; WebGPU returns nullptr and lets the caller fall back to MakeDefault(); Vulkan /
+   * D3D12 are not implemented yet (see Devices_Backend.cpp).
    */
   static std::shared_ptr<tgfx::Device> MakeForTexture(
       const tgfx::BackendRenderTarget& renderTarget);

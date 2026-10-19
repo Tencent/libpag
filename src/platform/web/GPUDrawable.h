@@ -19,7 +19,7 @@
 #pragma once
 
 #include "rendering/drawables/Drawable.h"
-#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/Window.h"
 
 namespace pag {
 class GPUDrawable : public Drawable {
@@ -52,6 +52,6 @@ class GPUDrawable : public Drawable {
   std::string canvasID;
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::Window> window = nullptr;
 };
 }  // namespace pag

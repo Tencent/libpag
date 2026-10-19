@@ -20,13 +20,13 @@
 
 #include <string>
 #include "pagx/runtime/Drawable.h"
-#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/Window.h"
 
 namespace pagx {
 
 /**
  * GPUDrawable adapts a browser canvas (selected by its element id) into the pagx Drawable
- * protocol. The underlying WebGL device and surface are created lazily on first access and
+ * protocol. The underlying GPU device and surface are created lazily on first access and
  * tracked for canvas resize via updateSize().
  */
 class GPUDrawable : public Drawable {
@@ -56,7 +56,7 @@ class GPUDrawable : public Drawable {
   std::string _canvasID;
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<tgfx::WebGLWindow> _window = nullptr;
+  std::shared_ptr<tgfx::Window> _window = nullptr;
 };
 
 }  // namespace pagx
