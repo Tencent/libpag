@@ -122,6 +122,16 @@ export interface PAG extends EmscriptenModule {
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   SDKVersion: () => string;
+  /**
+   * Returns true when the loaded wasm module is built with the WebGPU backend.
+   */
+  isWebGPUBackend: () => boolean;
+  _IsWebGPUBackend: () => boolean;
+  /**
+   * WebGPU build only. The GPUDevice preinitialized on the JS side during PAGInit, picked up by
+   * tgfx via emscripten_webgpu_get_device().
+   */
+  preinitializedWebGPUDevice?: object;
   currentPlayer: PAGPlayer | null;
   videoReaderManager: VideoReaderManager | null;
   _videoInfoManager: {

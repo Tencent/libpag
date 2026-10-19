@@ -3,7 +3,7 @@ import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { destroyVerify } from './utils/decorators';
-import { BackendContext } from './core/backend-context';
+import { BackendContext, isWebGPUBackend } from './core/backend-context';
 import { PAGModule } from './pag-module';
 import { RenderCanvas } from './core/render-canvas';
 import { Clock } from './utils/clock';
@@ -28,6 +28,22 @@ export interface PAGViewOptions {
    */
   firstFrame?: boolean;
 }
+
+let autoCanvasID = 0;
+
+// The WebGPU backend locates the canvas through a CSS selector (its C++ WebGPUWindow wraps
+// WGPUSurfaceDescriptorFromCanvasHTMLSelector), so the canvas element must carry an id.
+const ensureCanvasSelector = (canvasElement: HTMLCanvasElement | OffscreenCanvas): string => {
+  if (isOffscreenCanvas(canvasElement)) {
+    throw new Error('PAGView with an OffscreenCanvas is not supported on the WebGPU backend yet.');
+  }
+  const element = canvasElement as HTMLCanvasElement;
+  if (!element.id) {
+    autoCanvasID += 1;
+    element.id = `pag-webgpu-canvas-${autoCanvasID}`;
+  }
+  return `#${element.id}`;
+};
 
 @destroyVerify
 export class PAGView {
@@ -58,16 +74,26 @@ export class PAGView {
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
 
     if (pagView.pagViewOptions.useCanvas2D) {
+      if (isWebGPUBackend()) {
+        throw new Error('PAGView: useCanvas2D is not supported on the WebGPU backend.');
+      }
       PAGModule.globalCanvas.retain();
       pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
     } else {
       pagView.renderCanvas = RenderCanvas.from(canvasElement);
       pagView.renderCanvas.retain();
-      pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
+      if (!isWebGPUBackend()) {
+        pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
+      }
     }
     pagView.resetSize(pagView.pagViewOptions.useScale);
     pagView.frameRate = file.frameRate();
-    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, pagView.rawWidth, pagView.rawHeight);
+    pagView.pagSurface = this.makePAGSurface(
+      pagView.pagGlContext,
+      canvasElement,
+      pagView.rawWidth,
+      pagView.rawHeight,
+    );
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     pagView.setProgress(0);
@@ -78,8 +104,18 @@ export class PAGView {
     return pagView;
   }
 
-  protected static makePAGSurface(pagGlContext: BackendContext, width: number, height: number): PAGSurface {
-    if (!pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
+  protected static makePAGSurface(
+    pagGlContext: BackendContext | null,
+    canvasElement: HTMLCanvasElement | OffscreenCanvas,
+    width: number,
+    height: number,
+  ): PAGSurface {
+    if (isWebGPUBackend()) {
+      // On WebGPU the surface wraps the canvas swapchain managed by tgfx's WebGPUWindow.
+      // Width and height are read from the canvas by the C++ side.
+      return PAGSurface.fromCanvas(ensureCanvasSelector(canvasElement));
+    }
+    if (!pagGlContext || !pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
     const pagSurface = PAGSurface.fromRenderTarget(0, width, height, true);
     pagGlContext.clearCurrent();
     return pagSurface;
@@ -378,8 +414,15 @@ export class PAGView {
     }
     this.rawWidth = this.canvasElement.width;
     this.rawHeight = this.canvasElement.height;
+    if (isWebGPUBackend()) {
+      const webgpuSurface = PAGView.makePAGSurface(null, this.canvasElement, this.rawWidth, this.rawHeight);
+      this.player.setSurface(webgpuSurface);
+      this.pagSurface?.destroy();
+      this.pagSurface = webgpuSurface;
+      return;
+    }
     if (!this.pagGlContext) return;
-    const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.rawWidth, this.rawHeight);
+    const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.canvasElement, this.rawWidth, this.rawHeight);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
     this.pagSurface = pagSurface;
