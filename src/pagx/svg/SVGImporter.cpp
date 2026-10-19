@@ -421,7 +421,17 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
           if (!className.empty()) {
             auto it = _cssClassRules.find(className);
             if (it != _cssClassRules.end()) {
-              it->second += ";" + styleContent;
+              // A class can match several rules and styleContent already ends with ';'.
+              // Keep a single separator, otherwise the next rule's first declaration is
+              // stored as ";prop" and never matches a property lookup.
+              auto& rule = it->second;
+              if (!rule.empty() && rule.back() != ';') {
+                rule += ';';
+              }
+              rule += styleContent;
+              if (!rule.empty() && rule.back() != ';') {
+                rule += ';';
+              }
             } else {
               _cssClassRules[className] = styleContent;
             }
@@ -435,6 +445,9 @@ void SVGParserContext::parseStyleElement(const std::shared_ptr<DOMNode>& styleNo
     pos = closeBracePos + 1;
   }
 }
+
+static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document,
+                                     Layer* layer);
 
 Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
                                         const InheritedStyle& parentStyle, int depth) {
@@ -533,6 +546,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
         // Convert clipPath element to a mask layer.
         auto clipLayer = convertMaskElement(clipElement, inheritedStyle);
         if (clipLayer) {
+          EnsureOpaqueClipMaskFill(_document, clipLayer);
           if (layer->mask != nullptr) {
             // Both mask and clip-path are present. Wrap the current layer in a parent layer
             // so that the mask stays on the inner layer and clip-path goes on the outer layer.
@@ -1768,6 +1782,51 @@ ImagePattern* SVGParserContext::convertPattern(const std::shared_ptr<DOMNode>& e
 
   return pattern;
 }
+static bool IsPaintNode(NodeType type) {
+  return type == NodeType::Fill || type == NodeType::Stroke;
+}
+
+// A clipPath only contributes geometry; SVG ignores the paint declared inside it. PAGX masks are
+// alpha based, so a clip shape with "fill: none" would render nothing and hide the whole masked
+// layer. Give every geometry set an opaque fill before it becomes a mask.
+static void EnsureOpaqueClipFill(const std::shared_ptr<PAGXDocument>& document,
+                                 std::vector<Element*>& elements) {
+  bool hasPaint = false;
+  bool hasGeometry = false;
+  for (auto* element : elements) {
+    if (element == nullptr) {
+      continue;
+    }
+    if (IsPaintNode(element->nodeType())) {
+      hasPaint = true;
+    } else if (element->nodeType() == NodeType::Group) {
+      auto* group = static_cast<Group*>(element);
+      EnsureOpaqueClipFill(document, group->elements);
+    } else {
+      hasGeometry = true;
+    }
+  }
+  if (!hasGeometry || hasPaint) {
+    return;
+  }
+  auto* fill = document->makeNode<Fill>();
+  auto* color = document->makeNode<SolidColor>();
+  color->color = {1, 1, 1, 1, ColorSpace::SRGB};
+  fill->color = color;
+  elements.push_back(fill);
+}
+
+static void EnsureOpaqueClipMaskFill(const std::shared_ptr<PAGXDocument>& document,
+                                     Layer* layer) {
+  if (layer == nullptr) {
+    return;
+  }
+  for (auto* child : layer->children) {
+    EnsureOpaqueClipMaskFill(document, child);
+  }
+  EnsureOpaqueClipFill(document, layer->contents);
+}
+
 Layer* SVGParserContext::convertMaskElement(const std::shared_ptr<DOMNode>& maskElement,
                                             const InheritedStyle& parentStyle) {
   auto maskLayer = _document->makeNode<Layer>();
@@ -3195,7 +3254,9 @@ static void ParseStyleString(const std::string& styleStr,
                              std::unordered_map<std::string, std::string>& out) {
   size_t pos = 0;
   while (pos < styleStr.size()) {
-    while (pos < styleStr.size() && std::isspace(styleStr[pos])) {
+    // Empty declarations (consecutive semicolons) would turn the next property name
+    // into ";prop".
+    while (pos < styleStr.size() && (std::isspace(styleStr[pos]) || styleStr[pos] == ';')) {
       ++pos;
     }
     // Skip CSS comments.
