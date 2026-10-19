@@ -29,6 +29,7 @@ const {
 } = require('./dist/lib/pipeline');
 const { runBatch } = require('./dist/lib/batch');
 const { runScenarioToPagx } = require('./dist/lib/scenario-pipeline');
+const { validateContactSheetColumns } = require('./dist/lib/contact-sheet');
 const { SUPPORTED_ENGINES, DEFAULT_ENGINE } = require('./dist/lib/browser-engine');
 const { parseNumber } = require('./dist/lib/common');
 
@@ -76,6 +77,10 @@ Options (any unknown flag is forwarded to snapshot.js):
   --scenario <file.json>     Replay one interaction session; export <base>.<checkpoint>
                              files and <base>.captures.json for all capture steps
   --checkpoint <name>        With --scenario, export only the selected checkpoint
+  --preview                  With --scenario, assemble rendered PNGs into
+                             <base>.preview/sheet-NNN.png (default: disabled)
+  --preview-columns <N>      With --preview, use up to N columns (1–32;
+                             default: automatic, 1–6). Requires resolve/render.
   --scroll-reveal            Forwarded to snapshot.js: walk the page top-to-
                              bottom before snapshotting so scroll-triggered
                              reveal animations fire and lazy media loads
@@ -141,6 +146,8 @@ function parseArgs(argv) {
     captureAnimations: false,
     scenario: '',
     checkpoint: '',
+    preview: false,
+    previewColumns: undefined,
     scrollReveal: false,
     downloadFonts: false,
     embedFonts: false,
@@ -223,6 +230,14 @@ function parseArgs(argv) {
         break;
       case '--checkpoint':
         opts.checkpoint = requireValue(a, argv[++i]);
+        break;
+      case '--preview':
+        opts.preview = true;
+        break;
+      case '--preview-columns':
+        opts.previewColumns = Number(requireValue(a, argv[++i]));
+        try { validateContactSheetColumns(opts.previewColumns); }
+        catch (err) { failArg(err.message); }
         break;
       case '--scroll-reveal':
         opts.scrollReveal = true;
@@ -307,6 +322,11 @@ function parseArgs(argv) {
     }
   }
   if (opts.checkpoint && !opts.scenario) failArg('--checkpoint requires --scenario');
+  if (opts.previewColumns !== undefined && !opts.preview) failArg('--preview-columns requires --preview');
+  if (opts.preview && (!opts.scenario || opts.batchDir)) failArg('--preview requires --scenario and is not supported with --batch');
+  if (opts.preview && (!opts.doRender || !opts.doResolve)) {
+    failArg('--preview cannot be combined with --no-render or --no-resolve');
+  }
   if (opts.scenario) {
     for (const flag of ['--batch', '--capture-animations', '--scroll-reveal', '--viewport-width',
       '--viewport-height', '--wait-ms', '--selector']) {
@@ -461,6 +481,8 @@ async function main() {
       input: opts.input,
       scenario: opts.scenario,
       checkpoint: opts.checkpoint,
+      preview: opts.preview,
+      previewColumns: opts.previewColumns,
       outputDir: opts.outputDir,
       outputName: opts.outputName,
       pagxBin: opts.pagxBin,

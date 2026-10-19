@@ -205,6 +205,60 @@ Scenario mode owns viewport, readiness and scroll behavior; it rejects `--viewpo
 `--wait-ms`, `--selector`, `--scroll-reveal` and `--capture-animations`. `--batch` with a
 scenario is currently unsupported. The legacy invocation remains unchanged.
 
+Add `--preview` to `html2pagx --scenario` to assemble the current run's rendered PNGs
+into a contact sheet, in capture order:
+
+```bash
+./html2pagx test/fixtures/interaction.html --scenario test/fixtures/interaction.scenario.json \
+  -o /tmp/states --preview
+# Optional: --preview-columns 4, or --checkpoint advanced --preview for a single state.
+```
+
+The sheets are written to `<base>.preview/sheet-001.png`, `sheet-002.png`, etc.
+This directory avoids collisions with a checkpoint named `preview`. No browser session
+is replayed, and existing files in the output directory are not used as inputs.
+Preview is opt-in, currently scenario-only, and incompatible with `--no-render`,
+`--no-resolve`, and `--batch`. `--preview-columns` requires `--preview` and accepts
+integers from 1 to 32 (up to that many columns per page). By default, the layout chooses
+1–6 columns to approximate a 4:3 sheet.
+
+Whole images fit within 320×480 pixels without upscaling or cropping. The actual PNG
+dimensions are authoritative, including when `--scale` changes the rendered size;
+preview rendering always uses scale 1. Labels show sequence, checkpoint name (at most
+two lines), and source pixel dimensions. Transparent pixels are composited over a
+checkerboard. Text uses system font fallbacks, so label pixels can vary by platform.
+
+Sheets paginate at 4096 pixels per edge, 16 million output pixels, or 32 million
+source pixels per sheet. A single input exceeding the source budget is an error;
+PNG files over 128 MiB, missing files, and corrupt PNGs are also rejected before
+preview rendering. These are resource limits, not a guarantee of a particular peak
+memory usage. The generic `lib/contact-sheet.ts` module accepts ordered `{name, png}`
+items independently of scenarios, and uses `pngjs` for validation plus the existing
+`pagx render` pipeline for composition. Python and additional browser processes are
+not required.
+
+The existing capture manifest gains an optional field; paths below are relative to
+the manifest directory and use `/` separators:
+
+```json
+{
+  "preview": {
+    "status": "complete",
+    "pages": [
+      { "file": "interaction.preview/sheet-001.png", "width": 748, "height": 356, "items": ["initial", "advanced"] }
+    ]
+  }
+}
+```
+
+The manifest records `pending` with an empty `pages` array during generation, then
+`complete` only after all sheets are rendered and published. Preview failure exits
+nonzero and records `failed`, an `error` message, and empty `pages`, while preserving
+the per-checkpoint outputs. Files are staged and replaced by atomic per-file renames;
+a set of multiple files is not an atomic transaction. After a shorter repeated run,
+old extra sheets may remain on disk: consumers must read the manifest's `pages`,
+not scan the directory. With preview disabled, no `preview` field is written.
+
 For HTTP, POST the usual `{html, format}` or `{url, format}` JSON with
 `options: {scenario: {...}, checkpoint: "advanced"}`. JSON responses include
 `checkpoint` and `warnings`; multiple captures require a checkpoint. Invalid scenario

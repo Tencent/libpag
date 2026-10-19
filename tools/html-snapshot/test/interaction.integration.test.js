@@ -44,9 +44,13 @@ nativeTest('native import forwards scenario arguments including quoted paths', a
 });
 
 nativeTest('html2pagx replays once and renders all named checkpoints', async () => {
-  await run(process.execPath,['html2pagx',input,'--scenario',scenario,'-o',output,'--pagx-bin',pagx,'--pagx-images','embed']);
+  await run(process.execPath,['html2pagx',input,'--scenario',scenario,'-o',output,'--pagx-bin',pagx,'--pagx-images','embed','--preview']);
   const manifest = JSON.parse(fs.readFileSync(path.join(output,'interaction.captures.json'),'utf8'));
   expect(manifest.outputs.map(s => s.name)).toEqual(['initial','advanced']);
+  expect(manifest.preview.status).toBe('complete');
+  expect(manifest.preview.pages[0].items).toEqual(['initial','advanced']);
+  const sheet = PNG.sync.read(fs.readFileSync(path.join(output, manifest.preview.pages[0].file)));
+  expect([sheet.width, sheet.height]).toEqual([manifest.preview.pages[0].width, manifest.preview.pages[0].height]);
   const initial = fs.readFileSync(path.join(output,'interaction.initial.pagx'),'utf8');
   const advanced = fs.readFileSync(path.join(output,'interaction.advanced.pagx'),'utf8');
   expect(initial).not.toContain('Result: PAGX'); expect(advanced).toContain('Result: PAGX');
@@ -66,6 +70,29 @@ nativeTest('html2pagx replays once and renders all named checkpoints', async () 
     }
     expect(mismatch / (640*480)).toBeLessThan(0.06);
   } finally { await engine.browser.close(); }
+});
+
+nativeTest('selected checkpoint named preview is safe at scale 2 and on repeated runs', async () => {
+  const fixture = path.join(output, 'preview-scale.html'), plan = path.join(output, 'preview-scale.json');
+  fs.writeFileSync(fixture, '<!doctype html><body style="margin:0;background:#f00"><button id="next" onclick="document.body.style.background=\'#00f\'">Next</button></body>');
+  fs.writeFileSync(plan, JSON.stringify({ version:1, viewport:{width:320,height:200}, steps:[
+    {type:'capture',name:'preview'}, {type:'click',target:{css:'#next'}}, {type:'capture',name:'blue'},
+  ] }));
+  const args = ['html2pagx',fixture,'--scenario',plan,'-o',output,'--pagx-bin',pagx,'--preview','--scale','2'];
+  await run(process.execPath, args);
+  const sourcePath = path.join(output, 'preview-scale.preview.png');
+  const original = fs.readFileSync(sourcePath);
+  await run(process.execPath, [...args,'--checkpoint','preview','--preview-columns','4']);
+  const manifest = JSON.parse(fs.readFileSync(path.join(output,'preview-scale.captures.json'),'utf8'));
+  expect(manifest.outputs.map(item => item.name)).toEqual(['preview']);
+  expect(manifest.preview.pages).toHaveLength(1);
+  expect(manifest.preview.pages[0].items).toEqual(['preview']);
+  expect(fs.readFileSync(sourcePath)).toEqual(original);
+  const source = PNG.sync.read(original);
+  expect([source.width,source.height]).toEqual([640,400]);
+  const sheet = PNG.sync.read(fs.readFileSync(path.join(output,manifest.preview.pages[0].file)));
+  // PNG dimensions, rather than CSS viewport dimensions or a second --scale, determine the thumbnail.
+  expect([sheet.width,sheet.height]).toEqual([384,316]);
 });
 
 nativeTest('downloaded snapshot images resolve and render through the native pipeline',async()=>{

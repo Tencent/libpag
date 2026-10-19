@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "opentype.js": "^2.0.0",
+    "pngjs": "^7.0.0",
     "puppeteer": "^23.0.0",
     "wawoff2": "^2.0.1"
   },
@@ -57,7 +58,6 @@
     "babel-jest": "^30.4.1",
     "jest": "^30.4.2",
     "pixelmatch": "^7.2.0",
-    "pngjs": "^7.0.0",
     "typescript": "^5.9.3"
   }
 }
