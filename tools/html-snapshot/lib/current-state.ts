@@ -311,7 +311,7 @@ export async function captureCurrentPage(
   const raster = (warnings: string[]): CurrentStateResult => {
     const { width, height } = captured.viewport;
     return { width, height, url: captured.url, warnings,
-      html: `<!DOCTYPE html><html><body data-pagx-capture-mode="current-state" style="margin:0;width:${width}px;height:${height}px"><img style="display:block;width:${width}px;height:${height}px" src="data:image/png;base64,${png!.toString('base64')}"></body></html>` };
+      html: `<!DOCTYPE html><html><body data-pagx-capture-mode="current-state" style="margin:0;width:${width}px;height:${height}px"><img style="display:block;width:${width}px;height:${height}px" src="data:image/png;base64,${png!.toString('base64')}"/></body></html>` };
   };
   if (captured.unsupported.length) {
     if (!png) throw new StateCaptureError(`Unsupported current-state content: ${captured.unsupported.join('; ')}`);
