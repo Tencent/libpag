@@ -18,6 +18,11 @@ std::string Lower(std::string text) {
   return text;
 }
 bool SafeName(const std::string& name) {
+  auto device = Lower(name.substr(0, name.find('.')));
+  if (device == "con" || device == "prn" || device == "aux" || device == "nul" ||
+      (device.size() == 4 && (device.rfind("com", 0) == 0 || device.rfind("lpt", 0) == 0) &&
+       device[3] >= '1' && device[3] <= '9'))
+    return false;
   return !name.empty() && name != "." && name != ".." &&
          name.find_first_of("/\\<>:\"|?*\n\r\t") == std::string::npos &&
          name.find('\0') == std::string::npos && name.back() != '.' && name.back() != ' ';
@@ -26,9 +31,10 @@ std::string Absolute(const std::string& file) {
   return fs::weakly_canonical(fs::absolute(fs::u8path(file))).u8string();
 }
 std::string Format(const std::string& input, const std::string& forced) {
-  auto format = forced.empty() ? (IsImportURL(input)
-                                      ? "html"
-                                      : Lower(fs::u8path(input).extension().u8string()).substr(1))
+  auto extension = fs::u8path(input).extension().u8string();
+  auto format = forced.empty() ? (IsImportURL(input)  ? "html"
+                                  : extension.empty() ? ""
+                                                      : Lower(extension.substr(1)))
                                : forced;
   if (format == "htm") format = "html";
   Require(format == "html" || format == "svg", "unsupported input format: " + input);
@@ -220,6 +226,7 @@ bool ParseImportRequest(const std::vector<std::string>& args, ImportRequest* opt
     Require((o.cookies.empty() && o.headers.empty()) || IsImportURL(o.input),
             "--cookie and --header require a URL input");
     if (IsImportURL(o.input)) {
+      Require(o.imageBaseDir.empty(), "--image-base-dir requires a local input");
       Require(!o.output.empty() || (!o.outputDir.empty() && !o.outputName.empty()),
               "URL input requires --output, or --output-dir with --output-name");
     }
@@ -299,6 +306,8 @@ bool BuildImportPlan(const ImportRequest& o, const std::vector<std::string>& nam
       Require(format == "svg" || !o.hasSVGOptions,
               "SVG options cannot be applied to batch HTML input: " + input);
       auto base = o.outputName.empty() ? fs::u8path(input).stem().u8string() : o.outputName;
+      Require(!o.output.empty() || SafeName(base),
+              "input needs a portable --output-name or explicit --output: " + input);
       auto dir =
           o.outputDir.empty() ? fs::u8path(input).parent_path() : fs::u8path(Absolute(o.outputDir));
       if (!o.batch.empty())
@@ -314,6 +323,14 @@ bool BuildImportPlan(const ImportRequest& o, const std::vector<std::string>& nam
         target(item.output);
         auto outputStem = fs::u8path(item.output);
         outputStem.replace_extension();
+        if (o.images == ImageStorageMode::External) {
+          item.assets = outputStem.u8string() + ".assets";
+          target(item.assets, true);
+        }
+        if (o.downloadFonts) {
+          item.fonts = outputStem.u8string() + ".fonts";
+          target(item.fonts, true);
+        }
         if (o.render) {
           item.png = outputStem.u8string() + ".png";
           target(item.png);
@@ -336,6 +353,12 @@ bool BuildImportPlan(const ImportRequest& o, const std::vector<std::string>& nam
                              ? stem.u8string() + ".preview"
                              : (fs::u8path(Absolute(o.outputDir)) / "preview").u8string();
       target(plan->previewDir, true);
+    }
+    // A resource/preview directory owns its subtree; other outputs cannot be nested under it.
+    for (const auto& key : targets) {
+      for (auto parent = fs::u8path(key).parent_path();
+           !parent.empty() && parent != parent.parent_path(); parent = parent.parent_path())
+        Require(!targets.count(parent.u8string()), "overlapping output paths: " + key);
     }
     return true;
   } catch (const std::exception& e) {

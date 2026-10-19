@@ -28,7 +28,7 @@ struct ImportRequest {
 };
 
 struct ImportItem {
-  std::string input, format, checkpoint, output, png, snapshot;
+  std::string input, format, checkpoint, output, png, snapshot, assets, fonts;
 };
 
 struct ImportPlan {

@@ -72,7 +72,7 @@ CLI_TEST(PAGXImportPlanTest, URLNamingAndPortableBasenames) {
   EXPECT_FALSE(Parse({"https://example.com", "--output-dir", "out"}, &o));
   EXPECT_TRUE(Parse({"https://example.com", "-o", "web.pagx"}, &o));
   EXPECT_TRUE(Parse({"https://example.com", "--output-dir", "out", "--output-name", "web"}, &o));
-  for (const auto& name : {"..", "a/b", "a\\b", "a:", "a."})
+  for (const auto& name : {"..", "a/b", "a\\b", "a:", "a.", "CON", "com1", "NUL.txt"})
     EXPECT_FALSE(Parse({"page.html", "--output-dir", "out", "--output-name", name}, &o));
 }
 
@@ -113,6 +113,10 @@ CLI_TEST(PAGXImportPlanTest, BatchCollisionsAndDryPlanning) {
   EXPECT_NE(error.find("--overwrite"), std::string::npos);
   o.overwrite = true;
   EXPECT_TRUE(BuildImportPlan(o, {}, &plan, &error));
+  fs::create_directories(root / "input/a.assets");
+  std::ofstream(root / "input/a.assets/c.svg") << "<svg/>";
+  EXPECT_FALSE(BuildImportPlan(o, {}, &plan, &error));
+  EXPECT_NE(error.find("overlapping"), std::string::npos);
   fs::remove_all(root);
 }
 
