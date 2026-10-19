@@ -46,6 +46,23 @@ test('default export retains its manifest format and does not generate a preview
   expect(readManifest()).not.toHaveProperty('preview');
   expect(generateContactSheet).not.toHaveBeenCalled();
   expect(close).toHaveBeenCalledTimes(1);
+  expect(readManifest().status).toBe('complete');
+});
+
+test('a capture failure invalidates an earlier successful manifest', async () => {
+  await runScenarioToPagx({ ...options, preview: true });
+  runScenario.mockRejectedValueOnce(new Error('navigation failed'));
+  await expect(runScenarioToPagx({ ...options, preview: true })).rejects.toThrow('navigation failed');
+  expect(readManifest()).toMatchObject({ status: 'failed', outputs: [], error: 'navigation failed',
+    preview: { status: 'failed', pages: [] } });
+});
+
+test('conversion failure records only completed checkpoints from this run', async () => {
+  runHtmlToPagx.mockImplementationOnce(async () => ({ pagx: 'first.pagx', png: 'first.png', subsetHtml: 'first.html', fonts: [] }))
+    .mockRejectedValueOnce(new Error('import failed'));
+  await expect(runScenarioToPagx(options)).rejects.toThrow('import failed');
+  expect(readManifest()).toMatchObject({ status: 'failed', error: 'import failed', outputs: [{ name: 'preview' }] });
+  expect(readManifest().outputs).toHaveLength(1);
 });
 
 test('preview uses only this run, in capture order, with relative paths and no replay', async () => {

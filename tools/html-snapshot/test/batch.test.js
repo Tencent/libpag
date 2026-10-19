@@ -160,9 +160,8 @@ describe('runBatch — dryRun', () => {
       dryRun: true,
     }));
     expect(result.processed).toBe(2);
-    // The directory was created by runBatch even though dry-run never wrote
-    // anything underneath it.
-    expect(fs.existsSync(outRoot)).toBe(true);
+    // Planning a batch must not create its output directory.
+    expect(fs.existsSync(outRoot)).toBe(false);
   });
 });
 

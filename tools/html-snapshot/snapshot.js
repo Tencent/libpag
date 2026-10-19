@@ -117,7 +117,8 @@ async function main() {
   }
 }
 
-main().catch((err) => {
+const { withCliLifecycle } = require('./dist/lib/cli-lifecycle');
+withCliLifecycle(main).catch((err) => {
   console.error(err && err.stack ? err.stack : err);
-  process.exit(1);
+  process.exitCode = err.exitCode || 1;
 });

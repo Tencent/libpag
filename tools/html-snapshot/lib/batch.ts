@@ -11,6 +11,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { throwIfCancelled } from './cli-lifecycle';
 
 import { launchBrowser, type EngineWrapper } from './browser-engine';
 import { runSnapshot } from './snapshot-runner';
@@ -130,6 +131,7 @@ function makeInProcessSnapshot(engineHandle: EngineWrapper): SnapshotImpl {
 }
 
 export interface RunBatchOptions {
+  log?: (line: string) => void;
   inputDir: string;
   scriptDir: string;
   pagxBin?: string;
@@ -167,6 +169,7 @@ export interface RunBatchResult {
 
 // Run the batch.
 export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
+  const log = opts.log || ((line: string) => process.stdout.write(line + '\n'));
   const inputDir = opts.inputDir ? path.resolve(opts.inputDir) : '';
   if (!inputDir) throw new Error('runBatch: inputDir is required');
   if (!fs.existsSync(inputDir) || !fs.statSync(inputDir).isDirectory()) {
@@ -174,17 +177,17 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
   }
   let outputRoot = opts.outputRoot || '';
   if (outputRoot) {
-    fs.mkdirSync(outputRoot, { recursive: true });
+    if (!opts.dryRun) fs.mkdirSync(outputRoot, { recursive: true });
     outputRoot = path.resolve(outputRoot);
   }
 
   const files = collectHtmlInputs(inputDir);
   const total = files.length;
   if (total === 0) {
-    process.stdout.write(`No non-subset HTML files found under: ${inputDir}\n`);
+    log(`No non-subset HTML files found under: ${inputDir}`);
     return { processed: 0, skipped: 0, failed: 0, total: 0 };
   }
-  process.stdout.write(`Found ${total} non-subset HTML files under: ${inputDir}\n`);
+  log(`Found ${total} non-subset HTML files under: ${inputDir}`);
 
   // Dry run never opens the browser.
   if (opts.dryRun) {
@@ -197,14 +200,14 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       const target = path.join(outDir, `${stem}.pagx`);
       const index = idx + 1;
       if (opts.skipExisting && fs.existsSync(target)) {
-        process.stdout.write(`[${index}/${total}] skip      ${rel}\n`);
+        log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
         return;
       }
-      process.stdout.write(`[${index}/${total}] would process ${rel}\n`);
+      log(`[${index}/${total}] would process ${rel}`);
       processed++;
     });
-    process.stdout.write(`Summary: processed=${processed} skipped=${skipped} failed=0 total=${total}\n`);
+    log(`Summary: processed=${processed} skipped=${skipped} failed=0 total=${total}`);
     return { processed, skipped, failed: 0, total };
   }
 
@@ -218,6 +221,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
 
   try {
     for (let i = 0; i < total; i++) {
+      throwIfCancelled();
       const file = files[i];
       const rel = path.relative(inputDir, file);
       const index = i + 1;
@@ -226,13 +230,13 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
       const pagxTarget = path.join(outDir, `${stem}.pagx`);
 
       if (opts.skipExisting && fs.existsSync(pagxTarget)) {
-        process.stdout.write(`[${index}/${total}] skip      ${rel}\n`);
+        log(`[${index}/${total}] skip      ${rel}`);
         skipped++;
         continue;
       }
 
       fs.mkdirSync(outDir, { recursive: true });
-      process.stdout.write(`[${index}/${total}] process   ${rel}\n`);
+      log(`[${index}/${total}] process   ${rel}`);
 
       try {
         await runHtmlToPagx({
@@ -261,7 +265,7 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
           viewportHeight: opts.viewportHeight,
           waitMs: opts.waitMs,
           selector: opts.selector,
-          log: (line: string) => process.stdout.write(line + '\n'),
+          log,
           snapshotImpl,
         });
         processed++;
@@ -281,6 +285,6 @@ export async function runBatch(opts: RunBatchOptions): Promise<RunBatchResult> {
     }
   }
 
-  process.stdout.write(`Summary: processed=${processed} skipped=${skipped} failed=${failed} total=${total}\n`);
+  log(`Summary: processed=${processed} skipped=${skipped} failed=${failed} total=${total}`);
   return { processed, skipped, failed, total };
 }

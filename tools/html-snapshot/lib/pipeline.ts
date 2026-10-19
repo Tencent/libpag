@@ -24,6 +24,7 @@ import { spawn } from 'child_process';
 import { defaultPagxBin, filterKnownWarnings } from './pagx-runner';
 import { isHttpUrl } from './common';
 import { ChildProcessError, type ChildProcessErrorInit } from './errors';
+import { throwIfCancelled, trackCliResource } from './cli-lifecycle';
 
 // Tagged error class thrown by `runHtmlToPagx` when one of the pipeline steps
 // exits non-zero. Carries the step label, exit code, and stderr so the
@@ -73,6 +74,7 @@ export function spawnCapture(
   args: string[],
   opts: SpawnCaptureOptions = {},
 ): Promise<SpawnCaptureResult> {
+  throwIfCancelled();
   const stderrPath = opts.stderrPath || '';
   const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : DEFAULT_STEP_TIMEOUT_MS;
   return new Promise<SpawnCaptureResult>((resolve) => {
@@ -96,12 +98,22 @@ export function spawnCapture(
     child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
     child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
     let killedByTimeout = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      if (killTimer) return;
+      child.kill('SIGTERM');
+      killTimer = setTimeout(() => child.kill('SIGKILL'), 5000);
+      killTimer.unref();
+    };
+    const release = trackCliResource(stop);
     const timer = setTimeout(() => {
       killedByTimeout = true;
-      try { child.kill('SIGKILL'); } catch (_e) { /* ignore */ }
+      stop();
     }, timeoutMs);
     child.on('error', (err: Error) => { stderr += `\n${err.message || String(err)}`; });
     child.on('close', (code: number | null) => {
+      release();
+      if (killTimer) clearTimeout(killTimer);
       clearTimeout(timer);
       if (killedByTimeout) stderr += `\n[pipeline] killed by timeout (${timeoutMs}ms)`;
       if (stderrPath) {
@@ -389,6 +401,7 @@ export interface RunHtmlToPagxResult {
 // first non-zero step so the html2pagx CLI can print a uniform
 // `html2pagx: <step> failed` message and exit 1.
 export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<RunHtmlToPagxResult> {
+  throwIfCancelled();
   const log = typeof opts.log === 'function' ? opts.log : noopLog;
   const pagxBin = opts.pagxBin || defaultPagxBin();
   const scriptDir = opts.scriptDir;

@@ -12,7 +12,9 @@
 
 import * as path from 'path';
 import { SUPPORTED_ENGINES, resolveEngine, type EngineName } from './browser-engine';
-import { SNAPSHOT_DEFAULTS, fail, parseNumber, isHttpUrl } from './common';
+import { SNAPSHOT_DEFAULTS, fail, parseNumber, isHttpUrl, type FailFn } from './common';
+
+const defaultFail = fail;
 
 export interface ParsedCookie {
   name: string;
@@ -49,7 +51,7 @@ export interface SnapshotCliOptions {
 // Parse `name=value` into a puppeteer-compatible cookie descriptor. The URL
 // must be filled in by the caller (we do that once we know the page URL) so
 // the cookie is scoped to the right origin.
-export function parseCookie(flagName: string, value: string | undefined): ParsedCookie {
+export function parseCookie(flagName: string, value: string | undefined, fail: FailFn = defaultFail): ParsedCookie {
   if (value === undefined) {
     fail(`'${flagName}' requires a 'name=value' argument`);
   }
@@ -63,7 +65,7 @@ export function parseCookie(flagName: string, value: string | undefined): Parsed
 // Parse `Key: Value` (or `Key:Value`) into a [key, value] pair. The colon
 // after the key is the separator; any further colons are part of the value
 // (so `Authorization: Bearer xyz:abc` works as expected).
-export function parseHeader(flagName: string, value: string | undefined): ParsedHeader {
+export function parseHeader(flagName: string, value: string | undefined, fail: FailFn = defaultFail): ParsedHeader {
   if (value === undefined) {
     fail(`'${flagName}' requires a 'Key: Value' argument`);
   }
