@@ -112,18 +112,26 @@
   [super dealloc];
 }
 
+- (void)refreshSurfaceSize {
+  if (pagSurface == nil) {
+    return;
+  }
+#if defined(TGFX_USE_METAL)
+  [self updateLayerDrawableSize];
+#endif
+  [pagSurface updateSize];
+}
+
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
-  // AppKit, unlike UIKit, does not route a frame change through the public setBounds: setter, so
-  // this stays a separate entry point rather than a duplicate of setFrameSize: below. It fires
-  // only when a caller resizes the view's coordinate system directly.
+  // Resizing the view's coordinate system directly does not necessarily go through
+  // setFrameSize:, and AppKit does not document which internal paths call which setter. Both
+  // overrides therefore call the same helper, and the size comparison here keeps an
+  // already-applied change from being applied twice.
   if (pagSurface != nil &&
       (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height)) {
-#if defined(TGFX_USE_METAL)
-    [self updateLayerDrawableSize];
-#endif
-    [pagSurface updateSize];
+    [self refreshSurfaceSize];
     if (oldBounds.size.width == 0 || oldBounds.size.height == 0) {
       [animator update];
     }
@@ -133,14 +141,11 @@
 - (void)setFrameSize:(NSSize)newSize {
   NSSize oldSize = self.bounds.size;
   [super setFrameSize:newSize];
-  // Every frame-driven size change funnels through setFrameSize:: setFrame: calls it internally,
-  // and autoresizing / Auto Layout drive it directly, so this is the single place to react —
-  // handling the same change in setFrame: as well would run updateSize twice per resize.
+  // setFrame: calls this internally, and autoresizing / Auto Layout drive it directly, so this is
+  // the main entry for frame-driven resizes. Handling the same change in setFrame: as well would
+  // run updateSize twice per resize.
   if (pagSurface != nil && (oldSize.width != newSize.width || oldSize.height != newSize.height)) {
-#if defined(TGFX_USE_METAL)
-    [self updateLayerDrawableSize];
-#endif
-    [pagSurface updateSize];
+    [self refreshSurfaceSize];
     if (oldSize.width == 0 || oldSize.height == 0) {
       [animator update];
     }
@@ -156,12 +161,9 @@
 - (void)viewDidChangeBackingProperties {
   [super viewDidChangeBackingProperties];
   // Moving the window between displays with different backing scales does not change bounds, so
-  // setBounds:/setFrame: never fire and contentsScale would stay stuck on the old display's
-  // scale (blurry or clipped content).
-  if (pagSurface != nil) {
-    [self updateLayerDrawableSize];
-    [pagSurface updateSize];
-  }
+  // neither setBounds: nor setFrameSize: fires and contentsScale would stay stuck on the old
+  // display's scale (blurry or clipped content).
+  [self refreshSurfaceSize];
 }
 #endif
 

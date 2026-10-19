@@ -213,7 +213,9 @@
   CAMetalLayer* layer = (CAMetalLayer*)[self layer];
   pag::cocoa::SetUpPAGMetalLayer(layer);
   // CAMetalLayer does not auto-derive drawableSize from bounds * contentsScale, so set it
-  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible.
+  // explicitly here; otherwise the drawable is 0x0 and Metal rendering stays invisible. This has
+  // to happen before FromLayer: below, so refreshSurfaceSize() cannot be reused — it bails out
+  // while pagSurface is still nil.
   [self updateLayerDrawableSize];
   pagSurface = [[PAGSurface FromLayer:layer] retain];
 #else

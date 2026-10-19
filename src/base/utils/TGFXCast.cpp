@@ -279,8 +279,8 @@ tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
     }
     case Backend::VULKAN:
     case Backend::MOCK:
-    default:
       return {};
   }
+  return {};
 }
 }  // namespace pag
