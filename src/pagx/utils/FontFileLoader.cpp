@@ -110,7 +110,7 @@ std::vector<std::shared_ptr<tgfx::Typeface>> MakeTypefacesFromFile(const std::st
 }
 
 int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t length,
-                          bool addToFallbackChain) {
+                          bool addToFallbackChain, const std::string& familyOverride) {
   std::shared_ptr<tgfx::Data> sfnt = nullptr;
   if (HasWOFF2Signature(bytes, length)) {
     sfnt = DecodeWOFF2(bytes, length);
@@ -126,7 +126,7 @@ int RegisterFontDataFaces(FontConfig* fontConfig, const void* bytes, size_t leng
     if (typeface == nullptr) {
       break;
     }
-    auto family = typeface->fontFamily();
+    auto family = familyOverride.empty() ? typeface->fontFamily() : familyOverride;
     auto style = typeface->fontStyle();
     fontConfig->registerFont(sfnt->data(), sfnt->size(), index, family, style);
     if (addToFallbackChain) {

@@ -98,21 +98,23 @@
 
 ### 3.5 Web 字体（`@font-face`）
 
-`<style>` 块中引用本地字体文件的 `@font-face` 规则会被采纳：
+`<style>` 块中的 `@font-face` 规则会被采纳，无论 `src` 指向本地字体文件还是内联的 `data:` URI：
 
 ```css
 @font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
 ```
 
-- 只读取 `font-family` 与 `src` 两个描述符。按顺序扫描 `src` 中的 `url()` 源，取第一个本地路径
-  （相对路径基于 HTML 文件所在目录解析）且能作为 TTF、OTF、TTC 或 WOFF2 字体打开的文件；
-  `local()` 名称、`format()` 提示及其他描述符均被忽略。
-- 文档中被某个 font-family 栈用到的字体文件会生成 `<Font file="…">` 资源，排版时按文件内记录的
-  字体族名与样式名注册（见 PAGX 规范 §3.3.5）。因此 CSS 中的字体族名应与文件自身的字体族名
-  一致，文本才能匹配到该字体。
-- 远程（`http(s)://`）与 `data:` 源不会被使用（`subset:font-face-no-local-source`）；无法作为
-  字体加载的本地文件会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持
-  的 at-rule 一样被丢弃。
+- 只读取 `font-family` 与 `src` 两个描述符。按顺序扫描 `src` 中的 `url()` 源，取第一个可用源：
+  本地路径（相对路径基于 HTML 文件所在目录解析）或 `data:` URI；`local()` 名称、`format()` 提示
+  及其他描述符均被忽略。
+- 两种源都按规则声明的 CSS 族名注册，因此 `font-family` 与文件内部的族名不必一致（页面常把
+  `Ma Shan Zheng` 写成 `MaShanZheng`）。差别只在产物形态：本地文件会生成 `<Font file="…">`
+  资源（见 PAGX 规范 §3.3.5），`data:` 源的字节则直接进入文档的字体配置，不产生资源节点。
+- 产物是否保留 `<Font file>` 由导入选项决定：`pagx import --fonts embed`（HTML 默认）会烘焙字形并
+  丢弃文件引用，`--fonts external` 保留引用与随产物复制的字体文件。
+- 远程（`http(s)://`）源不会被使用（`subset:font-face-no-local-source`）；无法作为字体加载的源
+  会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持的 at-rule 一样被
+  丢弃。
 
 ## 4. 允许的 CSS 属性
 

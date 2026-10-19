@@ -356,8 +356,9 @@ class HTMLParserContext {
     std::string path = {};
   };
   std::vector<WebFontFile> _webFontFiles = {};
-  // Family names carried inside the loaded web font files. Layout registers a Font file under
-  // these names, so a font-family stack that names one of them resolves at render time.
+  // CSS family names declared by the loaded @font-face rules. Layout registers every source under
+  // its own rule's family, so a font-family stack that names one of them resolves at render time
+  // regardless of the family name stored inside the file.
   std::unordered_set<std::string> _webFontFamilies = {};
 
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
@@ -411,9 +412,11 @@ class HTMLParserContext {
   // discovered during the walk is available for per-glyph fallback at layout time.
   void flushFontFallbacksToDocument();
 
-  // Loads the local font file of every `@font-face` rule (the first `url()` source that is a local
-  // file and opens as a font) into `_webFontFiles` / `_webFontFamilies`. Runs before the body walk
-  // so font-family stacks see those families as available.
+  // Registers the first loadable source of every `@font-face` rule — a font file on local disk
+  // (also recorded in `_webFontFiles` so `emitWebFontResources` can reference it) or the bytes of
+  // an inlined `data:` URI — under the CSS family the rule declares, and records that family in
+  // `_webFontFamilies`. Runs before the body walk so font-family stacks see those families as
+  // available.
   void loadWebFontFiles();
 
   // Emits one `<Font file>` resource per loaded web font file whose CSS family is named by some

@@ -24,6 +24,8 @@
 
 namespace pagx {
 
+class Text;
+
 /**
  * FontEmbedder extracts glyph data from laid-out Text nodes and embeds it into the PAGXDocument.
  * It creates Font nodes with glyph paths/images and updates Text nodes with GlyphRun data.
@@ -70,6 +72,12 @@ class FontEmbedder {
   const std::vector<std::string>& unembeddedTexts() const {
     return unembedded;
   }
+
+  /**
+   * Formats one text for a diagnostic list as "<family>/<style> id=<id>: <preview>". Shared by the
+   * embedder's own reporting and by callers that check the resolved font separately.
+   */
+  static std::string DescribeText(const Text* text);
 
  private:
   std::vector<std::string> unembedded = {};

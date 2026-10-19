@@ -106,24 +106,28 @@ External `<link rel="stylesheet">` is forbidden. The importer never performs HTT
 
 ### 3.5 Web fonts (`@font-face`)
 
-`@font-face` rules inside a `<style>` block are honoured when they reference a font file on local
-disk:
+`@font-face` rules inside a `<style>` block are honoured whether `src` names a font file on
+local disk or inlines the font as a `data:` URI:
 
 ```css
 @font-face { font-family: "Brand"; src: url("fonts/brand.woff2") format("woff2"); }
 ```
 
 - Only the `font-family` and `src` descriptors are read. `src` is scanned for `url()` sources in
-  order, and the first one that is a local path (relative paths resolve against the HTML file's
-  directory) and opens as a TTF, OTF, TTC or WOFF2 font is used. `local()` names, `format()`
-  hints and every other descriptor are ignored.
-- Each font file used by a font-family stack in the document becomes a `<Font file="…">`
-  resource, which layout registers under the family and style names stored inside the file
-  (PAGX spec §3.3.5). The CSS family should therefore match the file's own family name for text
-  to resolve to it.
-- Remote (`http(s)://`) and `data:` sources are not used (`subset:font-face-no-local-source`); a
-  local file that cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule
-  without a `url()` source is dropped like any other unsupported at-rule.
+  order, and the first usable one is taken: a local path (relative paths resolve against the HTML
+  file's directory) or a `data:` URI. `local()` names, `format()` hints and every other
+  descriptor are ignored.
+- Both kinds of source are registered under the CSS family the rule declares, so
+  `font-family` need not match the family name stored inside the font file (pages routinely write
+  `MaShanZheng` for a file whose family is `Ma Shan Zheng`). Only the artifact differs: a local
+  file becomes a `<Font file="…">` resource (PAGX spec §3.3.5), while a `data:` URI's bytes go
+  straight into the document's font config and produce no resource node.
+- Whether the output keeps `<Font file>` is an import option: `pagx import --fonts embed` (the HTML
+  default) bakes the glyphs and drops the references, `--fonts external` keeps them along with the
+  font files copied next to the output.
+- Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
+  cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`
+  source is dropped like any other unsupported at-rule.
 
 HTML exported by PAGX may render pre-shaped glyphs as private-use characters while keeping
 readable text in `data-pagx-text`. The snapshot bridge preserves this attribute and filters the

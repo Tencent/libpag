@@ -1642,9 +1642,9 @@ static std::string WebFontIndexHTML() {
          "font-size:20px;white-space:nowrap\">&#xE000;&#xE001;</span></body></html>";
 }
 
-// A zipped HTML export is extracted, imported from its index.html, and the font file its
-// @font-face names is copied next to the output, where the PAGX references it by relative path
-// instead of embedding glyphs. The reloaded document registers that file for layout.
+// A zipped HTML export is extracted, imported from its index.html, and with `--fonts external` the
+// font file its @font-face names is copied next to the output, where the PAGX references it by
+// relative path instead of embedding glyphs. The reloaded document registers that file for layout.
 CLI_TEST(PAGXCliTest, Import_ZipExportReferencesFontFile) {
   ScopedSnapshotDisabled snapshotOff;
   auto dir = TempDir() + "/ImportZipFont";
@@ -1657,7 +1657,8 @@ CLI_TEST(PAGXCliTest, Import_ZipExportReferencesFontFile) {
       zipPath, {{"index.html", WebFontIndexHTML()}, {"assets/fonts/font_f0.woff2", fontBytes}}));
 
   auto outputPath = dir + "/out/export.pagx";
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--output", outputPath});
+  auto ret = CallRun(pagx::cli::RunImport,
+                     {"import", "--input", zipPath, "--output", outputPath, "--fonts", "external"});
   ASSERT_EQ(ret, 0);
   auto xml = ReadFile(outputPath);
   EXPECT_NE(xml.find(R"(file="assets/fonts/font_f0.woff2")"), std::string::npos);
@@ -1671,6 +1672,63 @@ CLI_TEST(PAGXCliTest, Import_ZipExportReferencesFontFile) {
   EXPECT_TRUE(document->fontConfig().containsFamily("pagx-font-f0"));
 }
 
+// By default a zipped HTML export is baked: the glyphs the page was laid out with end up in the
+// output, and the font file they came from is neither referenced nor copied, so the .pagx renders
+// the same anywhere on its own.
+CLI_TEST(PAGXCliTest, Import_ZipExportBakesFontGlyphsByDefault) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportZipBake";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir + "/out");
+  auto zipPath = dir + "/export.zip";
+  auto fontBytes = ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT));
+  ASSERT_FALSE(fontBytes.empty());
+  ASSERT_TRUE(WriteZipArchive(
+      zipPath, {{"index.html", WebFontIndexHTML()}, {"assets/fonts/font_f0.woff2", fontBytes}}));
+
+  auto outputPath = dir + "/out/export.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_EQ(xml.find("file=\""), std::string::npos);
+  EXPECT_NE(xml.find("fontFamily=\"pagx-font-f0\""), std::string::npos);
+  // The page draws two PUA codepoints, so two distinct outlines are baked into one glyph run.
+  EXPECT_NE(xml.find(R"(glyphs="1,2")"), std::string::npos);
+  EXPECT_FALSE(std::filesystem::exists(dir + "/out/assets/fonts/font_f0.woff2"));
+
+  auto document = pagx::PAGXImporter::FromFile(outputPath);
+  ASSERT_NE(document, nullptr);
+  EXPECT_TRUE(pagx::cli::FindUnloadableFontFiles(document.get()).empty());
+}
+
+// A page may alias a face: the CSS family it declares need not match the name stored inside the
+// font file. The importer registers the source under the CSS name, so baking keeps the text on the
+// outlines of that file instead of whatever face the host substitutes for an unknown name.
+CLI_TEST(PAGXCliTest, Import_BakesAliasedWebFontUnderCssFamily) {
+  ScopedSnapshotDisabled snapshotOff;
+  auto dir = TempDir() + "/ImportAliasedFont";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  auto fontPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(std::filesystem::exists(fontPath));
+  auto htmlPath = dir + "/aliased.html";
+  {
+    std::ofstream out(htmlPath);
+    out << "<html><head><style>@font-face{font-family:\"AliasedFace\";src:url(\"" << fontPath
+        << "\")}</style></head>"
+        << "<body style=\"width:80px;height:30px\">"
+        << "<span style=\"position:absolute;left:0px;top:0px;font-family:AliasedFace;"
+           "font-size:20px;white-space:nowrap\">A</span></body></html>";
+  }
+  auto outputPath = dir + "/aliased.pagx";
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", htmlPath, "--output", outputPath});
+  ASSERT_EQ(ret, 0);
+  auto xml = ReadFile(outputPath);
+  EXPECT_NE(xml.find("fontFamily=\"AliasedFace\""), std::string::npos);
+  EXPECT_NE(xml.find("<Glyph "), std::string::npos);
+  EXPECT_EQ(xml.find("file=\""), std::string::npos);
+}
+
 // Without --output, a zip input writes `<archive>.pagx` next to the archive, with its assets.
 CLI_TEST(PAGXCliTest, Import_ZipDefaultOutputNextToArchive) {
   ScopedSnapshotDisabled snapshotOff;
@@ -1681,7 +1739,7 @@ CLI_TEST(PAGXCliTest, Import_ZipDefaultOutputNextToArchive) {
   ASSERT_TRUE(WriteZipArchive(zipPath, {{"site/index.html", WebFontIndexHTML()},
                                         {"site/assets/fonts/font_f0.woff2",
                                          ReadBinaryFile(ProjectPath::Absolute(PUA_WOFF2_FONT))}}));
-  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath});
+  auto ret = CallRun(pagx::cli::RunImport, {"import", "--input", zipPath, "--fonts", "external"});
   ASSERT_EQ(ret, 0);
   EXPECT_TRUE(std::filesystem::exists(dir + "/page.pagx"));
   EXPECT_TRUE(std::filesystem::exists(dir + "/assets/fonts/font_f0.woff2"));

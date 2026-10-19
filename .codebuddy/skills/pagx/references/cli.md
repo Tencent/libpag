@@ -384,6 +384,7 @@ pagx import --input export.zip                    # zipped HTML export (page + a
 | `--no-resolve` | Keep `import` directives (external `<svg>` images, inline `<svg>`) instead of expanding them into native nodes (default: resolve) |
 | `--images <mode>` | How image resources are stored: `external` (default) or `embed`. See [Image storage](#image-storage) |
 | `--image-base-dir <dir>` | Directory to resolve relative image paths against (default: the input file's directory) |
+| `--fonts <mode>` | HTML only: how web fonts are carried into the output — `embed` (default) or `external`. See [Font files](#font-files) |
 | `--verbose, -v` | Print conversion warnings (suppressed by default) |
 
 ### Image storage
@@ -412,12 +413,28 @@ pagx import --input page.html --output card.pagx --images embed  # self-containe
 
 ### Font files
 
-Web fonts the page loads from local files through `@font-face` become `<Font file="…">`
-resources (only fonts some `font-family` stack in the page uses). Font files are always stored
-externally, like `--images external`: each file is copied next to the output `.pagx` at its
-original relative path (e.g. `assets/fonts/font_f1.woff2`). Text keeps runtime shaping and renders
-with those files — no glyph outlines are embedded. Run `pagx embed` afterwards only if the `.pagx`
-must render without the font files. Remote and `data:` font sources are not carried over.
+Web fonts the page declares through `@font-face` are registered under the CSS family the rule
+names, whether `src` points at a local file or inlines the font as a `data:` URI. Registering by
+the CSS name is what lets a page alias a face (`font-family: MaShanZheng` for a file whose family
+is `Ma Shan Zheng`); `Text@fontFamily` always keeps the authored name.
+
+`--fonts` decides what the output carries:
+
+- **`embed` (default, HTML)** — the page's glyphs are baked as pre-shaped `GlyphRun` data and the
+  font sources are dropped, so the `.pagx` renders identically on a host that has none of the
+  page's fonts. Placement and advances come from the import machine, and the file grows by roughly
+  one outline per distinct character.
+- **`external`** — text keeps runtime shaping and each font file is copied next to the output at
+  its original relative path (e.g. `assets/fonts/font_f1.woff2`), referenced by `<Font file="…">`.
+  Smaller and editable, but the output only renders correctly on a host that can load those files
+  — and a `<Font file>` registers under the family name stored inside the file, so a page that
+  aliases a face will not resolve after reload.
+
+Remote (`http(s)://`) font sources are never carried over.
+
+An import fails when a `fontFamily` resolves to no available face, because baking it would
+silently store substitute outlines. Install the font, or pass it to `pagx embed` / `pagx render`
+with `--font-alias <family>=<file>`.
 
 ### Zip input
 

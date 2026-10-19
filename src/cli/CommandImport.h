@@ -31,6 +31,9 @@ namespace pagx::cli {
 
 struct ImportResult {
   std::shared_ptr<PAGXDocument> document = nullptr;
+  // The format the input was actually parsed as, after inference and normalization ("svg" or
+  // "html"). Callers use it to decide which post-import passes apply.
+  std::string format = {};
   std::string error = {};
   std::vector<std::string> warnings = {};
 };
@@ -47,6 +50,9 @@ struct ImportFormatOptions {
   bool captureAnimations = false;
   // Preserve HTML source requests for post-embedding replacement without generated ids.
   bool fontRequestMetadata = false;
+  // Emit one `<Font file>` resource per `@font-face` source on disk. Turned off when the import
+  // bakes the glyphs, so the output carries no font file reference it no longer needs.
+  bool emitFontFileResources = true;
 };
 
 /**

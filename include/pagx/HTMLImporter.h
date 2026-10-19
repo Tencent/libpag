@@ -127,6 +127,15 @@ class HTMLImporter {
      */
     bool emitFontRequestMetadata = false;
 
+    /**
+     * Emits one `<Font file>` resource per `@font-face` source that resolves to a file on disk.
+     * The sources are loaded and registered into the document's font config either way, so
+     * turning this off keeps layout intact while leaving the output free of font file references
+     * — the shape a self-contained document needs once its glyphs have been baked.
+     * Default true.
+     */
+    bool emitFontFileResources = true;
+
     Options() {
     }
   };

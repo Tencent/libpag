@@ -43,6 +43,7 @@
 #include "pagx/nodes/Text.h"
 #include "pagx/nodes/TextBox.h"
 #include "pagx/nodes/TextModifier.h"
+#include "pagx/types/Data.h"
 #include "pagx/utils/FontFileLoader.h"
 #include "pagx/utils/TextUtils.h"
 #include "pagx/xml/XMLDOM.h"
@@ -81,9 +82,17 @@ void HTMLTextFragmentBuilder::bindDocument(PAGXDocument* document) {
   _document = document;
 }
 
-void HTMLTextFragmentBuilder::registerFontFile(const std::string& family, const std::string& path) {
+bool HTMLTextFragmentBuilder::registerFontFile(const std::string& family, const std::string& path) {
+  if (RegisterFontFileFaces(&_document->fontConfig(), path, false, family) == 0) {
+    return false;
+  }
   _fontFiles[ToLower(family)] = path;
-  RegisterFontFileFaces(&_document->fontConfig(), path, false, family);
+  return true;
+}
+
+bool HTMLTextFragmentBuilder::registerFontData(const std::string& family, const Data& fontData) {
+  return RegisterFontDataFaces(&_document->fontConfig(), fontData.bytes(), fontData.size(), false,
+                               family) > 0;
 }
 
 bool HTMLTextFragmentBuilder::collectReferencedGlyphs(Text* text,

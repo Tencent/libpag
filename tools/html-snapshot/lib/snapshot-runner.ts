@@ -32,7 +32,6 @@ import {
   PAGX_VIRTUAL_CLOCK_INIT_SCRIPT,
 } from './animation-capture';
 import {
-  injectInlineFontFaces,
   makeFontCaptureListener,
   resolveFontFamilies,
   saveDownloadedFonts,
@@ -843,10 +842,12 @@ export async function runSnapshot(
     // the page loaded.
     //
     // The inline half runs whenever a directory is set: those faces live only
-    // inside the document, so they have no other way onto disk and the subset
-    // carries no rule that references them (see `injectInlineFontFaces`).
-    // With `fontBytesByUrl` empty the call below naturally only decodes the
-    // data: sources, so nothing here reaches the network on its own.
+    // inside the document, so saving them here is the only way a caller that
+    // needs the bytes on disk can get them. The subset does not depend on this
+    // pass — it carries each `data:` URI verbatim (see
+    // `collectCarryOverFontFaces`), so an unsaved face still reaches the
+    // importer. With `fontBytesByUrl` empty the call below naturally only
+    // decodes the data: sources, so nothing here reaches the network on its own.
     //
     // `resolveFontFamilies` also returns each file's authored CSS family names:
     // PAGX resolves text by the name the document carries, which need not match
@@ -887,10 +888,9 @@ export async function runSnapshot(
         'font',
       );
     }
-    // Re-declare the saved inline faces in the subset so the importer turns
-    // them into PAGX `<Font file>` resources; network fonts keep travelling
-    // through the font manifest instead.
-    return { ...snapshot, html: injectInlineFontFaces(snapshot.html, fonts), fonts, images };
+    // Network fonts keep travelling through the font manifest: their files are named there so
+    // `pagx embed` / `pagx render` can register them under the authored CSS family.
+    return { ...snapshot, fonts, images };
   } finally {
     // Always close the page so a long-lived browser (HTTP server) does
     // not leak a tab per request. Swallow close-time errors — the

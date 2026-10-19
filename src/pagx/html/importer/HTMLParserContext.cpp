@@ -35,7 +35,7 @@
 #include "pagx/nodes/StateMachine.h"
 #include "pagx/nodes/StateRegion.h"
 #include "pagx/nodes/Text.h"
-#include "pagx/utils/FontFileLoader.h"
+#include "pagx/utils/Base64.h"
 #include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 #include "tgfx/core/Typeface.h"
@@ -542,45 +542,68 @@ void HTMLParserContext::flushFontFallbacksToDocument() {
   }
 }
 
+// A `data:` source carries the font bytes inside the document, so it never becomes a
+// `<Font file>` reference — layout registers the decoded bytes instead.
+static bool IsInlineFontSource(const std::string& source) {
+  return ToLower(source.substr(0, 5)) == "data:";
+}
+
 // Only a file on local disk can become a `<Font file>` reference: layout reads the file directly,
-// and nothing downstream fetches remote URLs or inlines data URIs into Font nodes.
+// and nothing downstream fetches remote URLs.
 static bool IsLocalFontSource(const std::string& source) {
-  return ToLower(source.substr(0, 5)) != "data:" && source.find("://") == std::string::npos;
+  return !IsInlineFontSource(source) && source.find("://") == std::string::npos;
 }
 
 void HTMLParserContext::loadWebFontFiles() {
   for (const auto& rule : _styleCascade->fontFaces()) {
-    std::string loadedPath = {};
+    bool registered = false;
     for (const auto& source : rule.sources) {
+      if (IsInlineFontSource(source)) {
+        auto bytes = DecodeBase64DataURI(source);
+        if (bytes == nullptr) {
+          warn("html: @font-face '" + rule.family +
+               "' inlined source is not a base64 data URI; skipped "
+               "(subset:font-face-unloadable)");
+          continue;
+        }
+        if (!_textFragmentBuilder->registerFontData(rule.family, *bytes)) {
+          warn("html: @font-face '" + rule.family +
+               "' inlined font bytes hold no usable face; skipped "
+               "(subset:font-face-unloadable)");
+          continue;
+        }
+        registered = true;
+        break;
+      }
       if (!IsLocalFontSource(source)) {
         continue;
       }
       auto path = _imageResources->resolveSource(source);
-      auto faces = MakeTypefacesFromFile(path);
-      if (faces.empty()) {
+      if (!_textFragmentBuilder->registerFontFile(rule.family, path)) {
         warn("html: @font-face '" + rule.family + "' source '" + path +
              "' cannot be loaded as a font; skipped (subset:font-face-unloadable)");
         continue;
       }
-      for (auto& face : faces) {
-        _webFontFamilies.insert(face->fontFamily());
-      }
-      loadedPath = path;
+      _webFontFiles.push_back({ToLower(rule.family), path});
+      registered = true;
       break;
     }
-    if (loadedPath.empty()) {
+    if (!registered) {
       warn("html: @font-face '" + rule.family +
-           "' has no loadable local font file; text using it falls back to other fonts "
+           "' has no loadable font source; text using it falls back to other fonts "
            "(subset:font-face-no-local-source)");
       continue;
     }
-    _webFontFiles.push_back({ToLower(rule.family), loadedPath});
-    _textFragmentBuilder->registerFontFile(rule.family, loadedPath);
+    // Layout resolves registered fonts by the exact (family, style) key, so the set has to carry
+    // the CSS name the rule declares rather than the family stored inside the file: a page may
+    // alias a face (`MaShanZheng` for a file whose family is "Ma Shan Zheng"), and only the
+    // authored name ever appears in a Text's fontFamily.
+    _webFontFamilies.insert(rule.family);
   }
 }
 
 void HTMLParserContext::emitWebFontResources() {
-  if (_webFontFiles.empty()) {
+  if (_webFontFiles.empty() || !_options.emitFontFileResources) {
     return;
   }
   std::unordered_set<std::string> namedFamilies = {};

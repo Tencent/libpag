@@ -201,6 +201,9 @@ export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
   subsetHtml?: string;
   pagxFile?: string;
   fontRequestMetadata?: boolean;
+  // Font files the snapshot downloaded rather than carried inside the subset. Import bakes glyphs
+  // by default, so it needs them registered under the authored CSS families to shape with.
+  fonts?: CapturedFontRef[];
   log?: (line: string) => void;
 }
 
@@ -208,7 +211,8 @@ export interface RunPagxImportToFileOptions extends SpawnCaptureOptions {
 export async function runPagxImportToFile(
   opts: RunPagxImportToFileOptions = {},
 ): Promise<SpawnCaptureResult> {
-  const { pagxBin, subsetHtml, pagxFile, fontRequestMetadata, stderrPath, log, timeoutMs } = opts;
+  const { pagxBin, subsetHtml, pagxFile, fontRequestMetadata, fonts = [], stderrPath, log,
+    timeoutMs } = opts;
   if (!pagxBin) throw new Error('runPagxImportToFile: pagxBin is required');
   if (!subsetHtml) throw new Error('runPagxImportToFile: subsetHtml is required');
   if (!pagxFile) throw new Error('runPagxImportToFile: pagxFile is required');
@@ -218,6 +222,9 @@ export async function runPagxImportToFile(
   const args = ['import', '--input', subsetHtml, '--output', pagxFile, '--format', 'html',
     '--no-resolve'];
   if (fontRequestMetadata) args.push('--font-request-metadata');
+  // Import bakes the page's glyphs by default, so the fonts it cannot find on its own — the ones
+  // the snapshot downloaded rather than carried inside the subset — have to be named here.
+  appendFontArgs(args, fonts);
   // Flex inference is always on inside the importer now. The subset is already rendered, so
   // disable the importer's own snapshot pre-pass to avoid a redundant second browser render.
   const result = await spawnCapture(pagxBin, args, {
@@ -530,6 +537,7 @@ export async function runHtmlToPagx(opts: RunHtmlToPagxOptions = {}): Promise<Ru
       subsetHtml,
       pagxFile,
       fontRequestMetadata: true,
+      fonts,
       log: (line: string) => process.stderr.write(line + '\n'),
     });
     if (importResult.code !== 0 || !fs.existsSync(pagxFile)) {

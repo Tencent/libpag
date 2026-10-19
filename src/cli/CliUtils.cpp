@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
+#include "pagx/LayoutContext.h"
 #include "pagx/PAGXImporter.h"
 #include "pagx/nodes/Font.h"
 #include "pagx/nodes/GlyphRun.h"
@@ -119,6 +120,42 @@ std::vector<std::string> FindUnloadableFontFiles(const PAGXDocument* document) {
   return files;
 }
 
+// A text whose requested family resolves to nothing was shaped entirely with the substitute face
+// the platform picked, and those outlines are now baked into the document. Such a text still has
+// glyph runs, so FontEmbedder::unembeddedTexts() cannot see it; without this check the failure
+// ships silently and only shows up when the render is compared with the source page.
+//
+// "Resolves to nothing" means layout could not find a face for the family at all. A family that
+// the platform knows under another spelling is not reported: fontconfig-style aliasing
+// (Arial -> Liberation Sans) still gives layout a face, and rejecting that would make a document
+// authored on one platform unembeddable on another. A name the platform has never heard of is the
+// case that silently produces substitute outlines.
+static std::vector<std::string> CollectSubstitutedTexts(PAGXDocument* document) {
+  std::vector<std::string> substituted = {};
+  // applyLayout registers the document's own font files into the document's config, not into the
+  // copy the caller passed in, so the resolved set is the document's.
+  LayoutContext context(&document->fontConfig());
+  for (auto& node : document->nodes) {
+    if (node->nodeType() != NodeType::Text) {
+      continue;
+    }
+    auto* text = static_cast<const Text*>(node.get());
+    // Only texts this pass will shape can be substituted: a text that already carries glyph runs
+    // was shaped by an earlier pass, from a font file or from outlines baked back then.
+    if (text->fontFamily.empty() || !text->glyphRuns.empty()) {
+      continue;
+    }
+    if (context.findTypeface(text->fontFamily, text->fontStyle) != nullptr) {
+      continue;
+    }
+    if (!SystemFonts::FindFont(text->fontFamily, text->fontStyle).path.empty()) {
+      continue;
+    }
+    substituted.push_back(FontEmbedder::DescribeText(text));
+  }
+  return substituted;
+}
+
 bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallbacks,
                 const std::vector<FontAlias>& aliases, const std::string& command) {
   // Start from the document's own fallback chain: the HTML importer records the CSS font-family
@@ -157,6 +194,9 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
   }
   // applyLayout registers the document's own font files on top of this config.
   document->applyLayout(&fontConfig);
+  // Collected before embedding, while the difference between a runtime-shaped text and a
+  // pre-shaped one is still visible.
+  auto substituted = CollectSubstitutedTexts(document);
   FontEmbedder embedder = {};
   if (!embedder.embed(document)) {
     std::cerr << command << ": font embedding failed\n";
@@ -171,6 +211,16 @@ bool EmbedFonts(PAGXDocument* document, const std::vector<std::string>& fallback
     for (const auto& description : embedder.unembeddedTexts()) {
       std::cerr << command << ":   " << description << "\n";
     }
+    return false;
+  }
+  if (!substituted.empty()) {
+    std::cerr << command << ": " << substituted.size()
+              << " text(s) ask for a font family that resolves to no available face; the baked "
+                 "glyphs would come from a substitute:\n";
+    for (const auto& description : substituted) {
+      std::cerr << command << ":   " << description << "\n";
+    }
+    std::cerr << command << ": install the font or pass it with --font-alias <family>=<file>\n";
     return false;
   }
   return true;

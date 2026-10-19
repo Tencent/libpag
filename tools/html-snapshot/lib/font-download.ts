@@ -67,9 +67,8 @@ export interface SavedFont {
   cssFamilies: string[];
   // The full `@font-face` declarations that resolved to this file (family + style + weight).
   // `cssFamilies` is the de-duplicated family projection of this list; the face list also keeps
-  // the per-face style/weight, which `injectInlineFontFaces` needs to re-declare a face without
-  // letting a sibling face of the same family shadow it. Empty under the same conditions as
-  // `cssFamilies`.
+  // the per-face style/weight the manifest needs to name each authored cut. Empty under the
+  // same conditions as `cssFamilies`.
   cssFaces: FontFaceSource[];
 }
 
@@ -289,27 +288,6 @@ export async function resolveFontFamilies(
   return facesByKey;
 }
 
-// True for a cache key `resolveFontFamilies` minted for an inline (`data:`)
-// source. Such a font has no URL to re-fetch and no `@font-face` rule left in
-// the subset, so it is the only kind this pass writes back below.
-export function isInlineFontUrl(url: string): boolean {
-  return url.startsWith('inline-font:');
-}
-
-// Quote a string for a CSS `font-family` / `url()` value. Mirrors
-// browser-snapshot's `cssQuotedString` so the faces this module writes back
-// and the ones `collectLocalFontFaces` carry over encode names identically.
-function cssQuotedString(value: string): string {
-  let out = '"';
-  for (const ch of String(value)) {
-    if (ch === '"' || ch === '\\' || ch === '<' || ch === '>' || ch === '&' || ch < ' ') {
-      out += '\\' + ch.codePointAt(0)!.toString(16) + ' ';
-    } else {
-      out += ch;
-    }
-  }
-  return out + '"';
-}
 
 // Normalise a family name for comparison the way the font stack does:
 // case-insensitive, trimmed, internal whitespace collapsed to one space.
@@ -317,74 +295,6 @@ function normalizeFontName(name: string): string {
   return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-// Write the inline (`data:`) fonts saved during this snapshot back into the
-// subset HTML as `@font-face` rules pointing at their on-disk files.
-//
-// A `data:` font exists only inside the original document — the browser never
-// requests it, so nothing carries it into the subset: the computed
-// `font-family` name survives on each text node, but the importer has no file
-// to turn into a PAGX `<Font file>` resource. Text then falls back to a host
-// font, which for icon fonts (Material Icons, …) means the ligature name
-// itself is drawn ("location_on" instead of a pin). Re-declaring the saved
-// file here closes that gap: the importer's `loadWebFontFiles` picks up local
-// `@font-face` rules and emits the font resource, so the .pagx carries its
-// icon fonts instead of depending on out-of-band `--font-alias`
-// registrations at render time.
-//
-// Two restrictions keep this pass strictly additive:
-//   - Network fonts stay out of it entirely: their multi-subset CJK families
-//     would need `unicode-range` pairing to stay faithful, and they already
-//     reach `pagx render/embed` through the font manifest.
-//   - A face is only re-declared when its authored CSS name matches the
-//     file's own family name. `<Font file>` resources register under the
-//     font's internal family, so an aliased face (CSS "Playfair" → file
-//     family "Playfair Display") could never resolve through this route —
-//     writing the rule anyway would only shadow the working alias path with
-//     a dead reference.
-//
-// Every qualifying face is emitted, carrying its own style/weight, so a
-// family served as several inline files (roman + italic cuts) keeps both
-// cuts distinct instead of letting the later rule shadow the earlier one.
-export function injectInlineFontFaces(html: string, fonts: SavedFont[]): string {
-  const rules: string[] = [];
-  const seenFaces = new Set<string>();
-  for (const font of fonts) {
-    if (!font.path || !isInlineFontUrl(font.url)) {
-      continue;
-    }
-    const internalFamily = normalizeFontName(font.family);
-    for (const face of font.cssFaces || []) {
-      if (!face.family || normalizeFontName(face.family) !== internalFamily) {
-        continue;
-      }
-      const style = String(face.style || '').trim();
-      const weight = String(face.weight || '').trim();
-      const faceKey = face.family + '\n' + style + '\n' + weight;
-      if (seenFaces.has(faceKey)) {
-        continue;
-      }
-      seenFaces.add(faceKey);
-      let rule = '@font-face{font-family:' + cssQuotedString(face.family);
-      if (style && style !== 'normal') {
-        rule += ';font-style:' + cssQuotedString(style);
-      }
-      if (weight && weight !== 'normal' && weight !== '400') {
-        rule += ';font-weight:' + weight;
-      }
-      rule += ';src:url(' + cssQuotedString(font.path) + ')}';
-      rules.push(rule);
-    }
-  }
-  if (rules.length === 0) {
-    return html;
-  }
-  const style = '<style id="__pagx_web_fonts">' + rules.join('') + '</style>';
-  const headEnd = html.indexOf('</head>');
-  if (headEnd < 0) {
-    return html;
-  }
-  return html.slice(0, headEnd) + style + '\n' + html.slice(headEnd);
-}
 
 // Build a content-addressed `<Family>-<Style>-<hash>.<ext>` filename. The
 // hash suffix (first 16 hex chars of the SFNT's SHA-1) makes the name a pure

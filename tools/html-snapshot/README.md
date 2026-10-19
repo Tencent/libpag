@@ -187,11 +187,14 @@ A page whose `@font-face` rules point at font files on **local disk** (a saved
 page, or a design-tool HTML export with an `assets/fonts/` folder) needs no
 extra flag: the snapshot carries every such rule over into its `<style>` block
 as `@font-face{font-family:"…";src:url("<absolute path>")}` — the same absolute
-path form local images take — and the importer turns each font file a
-`font-family` stack uses into a PAGX `<Font file>` resource. PAGX layout loads
-those files (TTF/OTF/TTC/WOFF2) directly, so the text renders with its web font
-without embedded glyphs. Remote and `data:` sources are not carried over this
-way; use `--download-fonts` below for them.
+path form local images take. Rules whose `src` is a `data:` URI are carried
+over verbatim, so a page that inlines its fonts needs neither a file on disk nor
+any flag. The importer registers each source under the **CSS family the rule
+declares** — not the family stored inside the font file, which a page routinely
+aliases (`font-family: MaShanZheng` for a file named `Ma Shan Zheng`) — and
+`pagx import` then bakes the glyphs by default (`--fonts embed`). Remote
+sources are still not carried over this way; use `--download-fonts` below for
+them.
 
 ### Download web fonts
 

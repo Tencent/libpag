@@ -282,7 +282,7 @@ static bool HasVisibleCharacters(const std::string& text) {
   return false;
 }
 
-static std::string DescribeUnembeddedText(const Text* text) {
+std::string FontEmbedder::DescribeText(const Text* text) {
   std::string preview = text->text;
   if (preview.size() > 32) {
     preview.resize(32);
@@ -754,7 +754,7 @@ bool FontEmbedder::embed(PAGXDocument* document) {
   // face) on every host that also lacks the authored font.
   for (auto* text : textOrder) {
     if (text->glyphRuns.empty() && HasVisibleCharacters(text->text)) {
-      unembedded.push_back(DescribeUnembeddedText(text));
+      unembedded.push_back(DescribeText(text));
     }
   }
 

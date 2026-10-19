@@ -5687,21 +5687,29 @@ function cssQuotedString(value) {
   return out + '"';
 }
 
-// Collect the page's `@font-face` rules whose font file is on local disk, as
-// `{ family, path }` pairs in stylesheet order. The importer turns each into a
-// PAGX `<Font file>` resource, so text keeps its web font without embedding
-// glyph outlines. Only local files qualify because PAGX layout opens the file
-// directly; remote and `data:` sources are left out. Each rule contributes its
-// first local `url()` source, ignoring `local()` names and `format()` hints.
-// Rules nested in grouping rules (`@media`, `@supports`) and imported sheets
-// are visited too. A sheet whose rules are inaccessible (cross-origin) is
-// skipped, which loses nothing: its fonts cannot be local files anyway.
-function collectLocalFontFaces(sheets, baseURI) {
+// Collect the page's `@font-face` rules the subset can carry over, as
+// `{ family, src }` pairs in stylesheet order. `src` is either the absolute path
+// of a font file on local disk or the rule's original `data:` URI. The importer
+// registers either form under `family` — a file becomes a PAGX `<Font file>`
+// resource, a `data:` URI is decoded into the document's font config — so the
+// CSS name the subset carries always resolves, however it relates to the family
+// name stored inside the file. Remote sources are left out: the page fetch that
+// produced them no longer exists once the subset is handed to the importer.
+// Each rule contributes its first `url()` source, ignoring `local()` names and
+// `format()` hints. Rules nested in grouping rules (`@media`, `@supports`) and
+// imported sheets are visited too. A sheet whose rules are inaccessible
+// (cross-origin) is skipped, which loses nothing: its fonts cannot be local.
+function collectCarryOverFontFaces(sheets, baseURI) {
   const faces = [];
   const seen = new Set();
   const URL_RE = /url\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^)\s]*))\s*\)/gi;
   const unescape = (text) => text.replace(/\\(.)/g, '$1');
-  const toLocalPath = (raw, base) => {
+  // A `data:` URI is already self-contained, so it travels verbatim; anything else has to
+  // resolve to a file on local disk.
+  const toCarryOverSource = (raw, base) => {
+    if (/^data:/i.test(raw)) {
+      return raw;
+    }
     try {
       const u = new URL(raw, base);
       if (u.protocol !== 'file:') return '';
@@ -5733,12 +5741,12 @@ function collectLocalFontFaces(sheets, baseURI) {
       let m;
       while ((m = URL_RE.exec(src)) !== null) {
         const raw = unescape(m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]));
-        const path = raw ? toLocalPath(raw, base) : '';
-        if (!path) continue;
-        const key = family + '\n' + path;
+        const carried = raw ? toCarryOverSource(raw, base) : '';
+        if (!carried) continue;
+        const key = family + '\n' + carried;
         if (!seen.has(key)) {
           seen.add(key);
-          faces.push({ family, path });
+          faces.push({ family, src: carried });
         }
         break;
       }
@@ -5892,12 +5900,13 @@ function snapshotMainImpl(opts) {
     styleBlock += animKeyframes.textContent.trim();
   }
 
-  // Carry the page's local web fonts over as `@font-face` rules pointing at the
-  // absolute file path (the same form local images take), so the importer can
-  // reference each font file from PAGX instead of losing it with the cascade.
-  for (const face of collectLocalFontFaces(document.styleSheets, document.baseURI)) {
+  // Carry the page's web fonts over as `@font-face` rules, either pointing at the absolute
+  // file path (the same form local images take) or re-using the rule's own `data:` URI. The
+  // importer registers both under the CSS family, so the subset keeps the authored name for
+  // every face instead of losing it with the cascade.
+  for (const face of collectCarryOverFontFaces(document.styleSheets, document.baseURI)) {
     styleBlock += '@font-face{font-family:' + cssQuotedString(face.family) +
-      ';src:url(' + cssQuotedString(face.path) + ')}';
+      ';src:url(' + cssQuotedString(face.src) + ')}';
   }
 
   // Flush the synthesized geometric-clip-path `<clipPath>` defs into a single
@@ -6261,7 +6270,7 @@ const HELPER_FNS = [
   visibleContentExtent,
   measureCanvas,
   cssQuotedString,
-  collectLocalFontFaces,
+  collectCarryOverFontFaces,
   snapshotMainImpl,
   snapshotMain,
 ];
@@ -8365,7 +8374,7 @@ export {
   resetRootScroll,
   canvasRootRect,
   cssQuotedString,
-  collectLocalFontFaces,
+  collectCarryOverFontFaces,
   readLineClamp,
   ellipsizeClampedLine,
   nativeControlKind,

@@ -10,8 +10,6 @@ const {
   makeFontCaptureListener,
   resolveFontFamilies,
   saveDownloadedFonts,
-  injectInlineFontFaces,
-  isInlineFontUrl,
 } = require('../dist/lib/font-download');
 
 // A throwaway buffer that is neither WOFF nor WOFF2 (so toSfnt returns it
@@ -461,113 +459,5 @@ describe('resolveFontFamilies', () => {
 
     expect(familyNames(families)).toEqual([['Good']]);
     expect(logs.join('\n')).toMatch(/font decode skipped for 'Broken'/);
-  });
-});
-
-describe('injectInlineFontFaces', () => {
-  const PAGE = '<!DOCTYPE html><html><head><title>x</title></head><body>hi</body></html>';
-
-  function face(family, overrides) {
-    return Object.assign({ family, style: '', weight: '', url: 'inline-font:0:' + family }, overrides);
-  }
-
-  function inlineFont(overrides) {
-    return Object.assign({
-      url: 'inline-font:0:Material Icons',
-      path: '/out/case.fonts/Material-Icons-Regular-abc.ttf',
-      family: 'Material Icons',
-      style: 'Regular',
-      cssFamilies: ['Material Icons'],
-      cssFaces: [face('Material Icons')],
-    }, overrides);
-  }
-
-  test('re-declares a saved inline face before </head>', () => {
-    const out = injectInlineFontFaces(PAGE, [inlineFont()]);
-    expect(out).toContain(
-      '<style id="__pagx_web_fonts">' +
-        '@font-face{font-family:"Material Icons";src:url("/out/case.fonts/Material-Icons-Regular-abc.ttf")}' +
-        '</style>',
-    );
-    expect(out.indexOf('__pagx_web_fonts')).toBeLessThan(out.indexOf('</head>'));
-    expect(out).toContain('<body>hi</body>');
-  });
-
-  test('leaves network fonts to the font manifest', () => {
-    const out = injectInlineFontFaces(PAGE, [
-      inlineFont({ url: 'https://cdn.example/font.woff2', cssFamilies: ['WebFont'], cssFaces: [face('WebFont')] }),
-    ]);
-    expect(out).toBe(PAGE);
-  });
-
-  test('skips a face whose CSS name only matches through an alias', () => {
-    // A `<Font file>` resource registers under the file's own family, so an
-    // aliased face (CSS "Playfair" → file family "Playfair Display") could
-    // never resolve through this route — it must reach the renderer through
-    // the manifest's --font-alias instead.
-    const out = injectInlineFontFaces(PAGE, [
-      inlineFont({ family: 'Playfair Display', cssFamilies: ['Playfair'], cssFaces: [face('Playfair')] }),
-    ]);
-    expect(out).toBe(PAGE);
-  });
-
-  test('accepts a CSS name that differs only in case or spacing', () => {
-    const out = injectInlineFontFaces(PAGE, [
-      inlineFont({ family: 'Material  ICONS', cssFamilies: ['material icons'], cssFaces: [face('material icons')] }),
-    ]);
-    expect(out).toContain('font-family:"material icons"');
-  });
-
-  test('emits every cut of a family, carrying its style and weight', () => {
-    const out = injectInlineFontFaces(PAGE, [
-      inlineFont({
-        cssFamilies: ['Material Icons'],
-        cssFaces: [
-          face('Material Icons'),
-          face('Material Icons', { style: 'italic' }),
-          face('Material Icons', { style: 'italic', weight: '700' }),
-          face('Material Icons', { style: 'normal', weight: '400 900', url: 'inline-font:1:Material Icons' }),
-        ],
-      }),
-    ]);
-    expect(out).toContain('@font-face{font-family:"Material Icons";src:url("/out/case.fonts/Material-Icons-Regular-abc.ttf")}');
-    expect(out).toContain('@font-face{font-family:"Material Icons";font-style:"italic";src:url(');
-    expect(out).toContain('@font-face{font-family:"Material Icons";font-style:"italic";font-weight:700;src:url(');
-    expect(out).toContain('@font-face{font-family:"Material Icons";font-weight:400 900;src:url(');
-  });
-
-  test('de-duplicates identical faces across entries', () => {
-    const out = injectInlineFontFaces(PAGE, [
-      inlineFont(),
-      inlineFont({ url: 'inline-font:1:Material Icons' }),
-    ]);
-    expect(out.match(/@font-face\{/g)).toHaveLength(1);
-  });
-
-  test('quotes families and paths that need escaping', () => {
-    const out = injectInlineFontFaces(PAGE, [
-      inlineFont({ family: 'Weird "Family"', cssFamilies: ['Weird "Family"'], cssFaces: [face('Weird "Family"')], path: '/out/a b/f.otf' }),
-    ]);
-    expect(out).toContain('font-family:"Weird \\22 Family\\22 "');
-    expect(out).toContain('src:url("/out/a b/f.otf")');
-  });
-
-  test('returns the html unchanged when nothing qualifies', () => {
-    expect(injectInlineFontFaces(PAGE, [])).toBe(PAGE);
-    expect(injectInlineFontFaces(PAGE, [inlineFont({ cssFaces: [] })])).toBe(PAGE);
-    expect(injectInlineFontFaces(PAGE, [inlineFont({ path: '' })])).toBe(PAGE);
-  });
-
-  test('returns the html unchanged when there is no head to inject into', () => {
-    const bare = '<body>hi</body>';
-    expect(injectInlineFontFaces(bare, [inlineFont()])).toBe(bare);
-  });
-});
-
-describe('isInlineFontUrl', () => {
-  test('matches the keys resolveFontFamilies mints for data: sources', () => {
-    expect(isInlineFontUrl('inline-font:0:Material Icons')).toBe(true);
-    expect(isInlineFontUrl('https://cdn.example/f.woff2')).toBe(false);
-    expect(isInlineFontUrl('')).toBe(false);
   });
 });

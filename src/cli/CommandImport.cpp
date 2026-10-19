@@ -407,6 +407,7 @@ static HTMLImporter::Options ToHTMLOptions(const ImportFormatOptions& formatOpti
   options.targetWidth = targetWidth;
   options.targetHeight = targetHeight;
   options.emitFontRequestMetadata = formatOptions.fontRequestMetadata;
+  options.emitFontFileResources = formatOptions.emitFontFileResources;
   return options;
 }
 
@@ -464,6 +465,7 @@ ImportResult ImportFile(const std::string& filePath, const std::string& format,
     result.error = "failed to parse '" + filePath + "'";
     return result;
   }
+  result.format = effectiveFormat;
   InlinePathData(result.document.get());
   result.warnings = std::move(result.document->errors);
   return result;
@@ -488,6 +490,7 @@ ImportResult ImportString(const std::string& content, const std::string& format,
     result.error = "failed to parse inline content";
     return result;
   }
+  result.format = effectiveFormat;
   InlinePathData(result.document.get());
   result.warnings = std::move(result.document->errors);
   return result;
@@ -496,6 +499,28 @@ ImportResult ImportString(const std::string& content, const std::string& format,
 //--------------------------------------------------------------------------------------------------
 // CLI entry point
 //--------------------------------------------------------------------------------------------------
+
+// How web fonts are carried into the exported PAGX. Imported HTML text is normally left as plain
+// text plus font attributes, which only renders correctly on a host that can resolve the same
+// fonts. Embed bakes the glyphs the page was laid out with as pre-shaped runs, so the output is
+// one self-contained file; External keeps the `<Font file>` references to the fonts written next
+// to the output instead.
+enum class FontStorageMode {
+  External,
+  Embed,
+};
+
+static bool ParseFontStorageMode(const std::string& value, FontStorageMode* mode) {
+  if (value == "external") {
+    *mode = FontStorageMode::External;
+    return true;
+  }
+  if (value == "embed") {
+    *mode = FontStorageMode::Embed;
+    return true;
+  }
+  return false;
+}
 
 struct ImportOptions {
   std::string inputFile = {};
@@ -516,6 +541,14 @@ struct ImportOptions {
   // Directory used to resolve relative image `source` paths to real files. Defaults to the input
   // file's directory. Only meaningful for local (non-URL) inputs.
   std::string imageBaseDir = {};
+  // How the page's web fonts are carried into the output. HTML defaults to Embed: a page's fonts
+  // are usually a snapshot artifact, and an unembedded document silently renders with whatever
+  // substitute face the host resolves the authored family name to.
+  FontStorageMode fontStorage = FontStorageMode::Embed;
+  // Font files to shape with before baking, registered under an explicit CSS family. The snapshot
+  // saves network fonts to disk rather than carrying them into the subset, so a caller that
+  // downloaded them names them here; otherwise their family resolves to nothing.
+  std::vector<FontAlias> fontAliases = {};
 };
 
 static void PrintUsage() {
@@ -542,6 +575,12 @@ static void PrintUsage() {
       << "                                 relative path) or 'embed' (inline as base64 data URIs)\n"
       << "  --image-base-dir <dir>         Directory to resolve relative image paths against\n"
       << "                                 (default: the input file's directory)\n"
+      << "  --fonts <mode>                 HTML only: how web fonts are carried into the output.\n"
+      << "                                 'embed' (default) bakes the page's glyphs so the\n"
+      << "                                 document needs no font on the host; 'external' keeps\n"
+      << "                                 <Font file> references and leaves text runtime-shaped\n"
+      << "  --font-alias <family>=<file>   Register a font file under an explicit family name\n"
+      << "                                 while baking (repeatable; HTML only)\n"
       << "  --verbose, -v                  Print conversion warnings (suppressed by default)\n"
       << "\n"
       << "SVG options:\n"
@@ -584,6 +623,19 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
       }
     } else if (arg == "--image-base-dir" && i + 1 < argc) {
       options->imageBaseDir = argv[++i];
+    } else if (arg == "--font-alias" && i + 1 < argc) {
+      FontAlias alias = {};
+      if (!ParseFontAlias(argv[++i], &alias, "pagx import")) {
+        return 1;
+      }
+      options->fontAliases.push_back(alias);
+    } else if (arg == "--fonts" && i + 1 < argc) {
+      std::string mode = argv[++i];
+      if (!ParseFontStorageMode(mode, &options->fontStorage)) {
+        std::cerr << "pagx import: error: invalid --fonts value '" << mode
+                  << "' (expected 'external' or 'embed')\n";
+        return 1;
+      }
     } else if (arg == "--verbose" || arg == "-v") {
       options->verbose = true;
     } else if (arg == "--svg-no-expand-use" || arg == "--svg-flatten-transforms" ||
@@ -616,6 +668,13 @@ static int ParseOptions(int argc, char* argv[], ImportOptions* options) {
   }
 
   ParseFormatOptions(argc, argv, &options->formatOptions);
+  if (options->fontStorage == FontStorageMode::External && !options->fontAliases.empty()) {
+    std::cerr << "pagx import: error: --font-alias requires --fonts embed\n";
+    return 1;
+  }
+  // Baking replaces the font sources with the glyphs they produced, so the references are dropped
+  // in the same pass that arranges for the fonts to be resolvable.
+  options->formatOptions.emitFontFileResources = options->fontStorage != FontStorageMode::Embed;
   return 0;
 }
 
@@ -686,6 +745,17 @@ int RunImport(int argc, char* argv[]) {
   if (options.verbose && !optimizeResult.converged) {
     std::cerr << "pagx import: warning: PAGXOptimizer did not converge within "
               << optimizeResult.iterationsUsed << " iteration(s); output may be sub-optimal\n";
+  }
+
+  // The importer registers every @font-face source under the CSS family its rule declares, and that
+  // registration lives only in the document's own FontConfig. Baking here — while the authored
+  // alias still resolves — is what makes the output independent of the fonts a host happens to
+  // have installed: a Font node reloaded from disk re-registers under the family stored inside the
+  // font file, which a page that aliases a face never matches.
+  if (result.format == "html" && options.fontStorage == FontStorageMode::Embed) {
+    if (!EmbedFonts(result.document.get(), {}, options.fontAliases, "pagx import")) {
+      return 1;
+    }
   }
 
   // Normalise image resources to the requested storage mode and copy the font files next to the
