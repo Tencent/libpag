@@ -1625,6 +1625,16 @@ void HTMLWriter::renderCSSDiv(HTMLBuilder& out, const GeoInfo& geo, const Fill* 
   }
 
   out.openTag("div");
+  auto animIdIt = _ctx->animatedElementIds.end();
+  if (fill) {
+    animIdIt = _ctx->animatedElementIds.find(fill);
+  }
+  if (animIdIt == _ctx->animatedElementIds.end() && geo.element) {
+    animIdIt = _ctx->animatedElementIds.find(geo.element);
+  }
+  if (animIdIt != _ctx->animatedElementIds.end()) {
+    out.addAttr("id", animIdIt->second);
+  }
   out.addAttr("style", style);
   out.closeTagSelfClosing();
 }
@@ -1976,13 +1986,39 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
     }
   }
 
+  std::string svgAnimId;
+  if (!_ctx->animatedElementIds.empty()) {
+    if (stroke) {
+      auto it = _ctx->animatedElementIds.find(stroke);
+      if (it != _ctx->animatedElementIds.end()) {
+        svgAnimId = it->second;
+      }
+    }
+    if (svgAnimId.empty() && fill) {
+      auto it = _ctx->animatedElementIds.find(fill);
+      if (it != _ctx->animatedElementIds.end()) {
+        svgAnimId = it->second;
+      }
+    }
+  }
+
   for (size_t geoIdx = 0; geoIdx < geos.size(); geoIdx++) {
     auto& g = geos[geoIdx];
     if (isContinuousTrim && !isContinuousTrimVisible(trim, pathLengths, totalPathLength, geoIdx)) {
       continue;
     }
+    std::string geoAnimId = svgAnimId;
+    if (geoAnimId.empty() && g.element && !_ctx->animatedElementIds.empty()) {
+      auto it = _ctx->animatedElementIds.find(g.element);
+      if (it != _ctx->animatedElementIds.end()) {
+        geoAnimId = it->second;
+      }
+    }
     if (!g.modifiedPathData.empty()) {
       out.openTag("path");
+      if (!geoAnimId.empty()) {
+        out.addAttr("id", geoAnimId);
+      }
       out.addAttr("d", g.modifiedPathData);
       applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
       if (isContinuousTrim) {
@@ -2013,6 +2049,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
             d = PathDataToSVGString(pathData);
           }
           out.openTag("path");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           out.addAttr("d", d);
         } else {
           auto pos = r->renderPosition();
@@ -2020,6 +2059,9 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           float x = pos.x - size.width / 2;
           float y = pos.y - size.height / 2;
           out.openTag("rect");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           if (!FloatNearlyZero(x)) {
             out.addAttr("x", CssFloatToString(x));
           }
@@ -2051,12 +2093,18 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
           GeoToPathData(g.element, g.type, pathData);
           std::string d = PathDataToSVGString(pathData);
           out.openTag("path");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           out.addAttr("d", d);
         } else {
           auto e = static_cast<const Ellipse*>(g.element);
           auto pos = e->renderPosition();
           auto size = e->renderSize();
           out.openTag("ellipse");
+          if (!geoAnimId.empty()) {
+            out.addAttr("id", geoAnimId);
+          }
           out.addAttr("cx", CssFloatToString(pos.x));
           out.addAttr("cy", CssFloatToString(pos.y));
           out.addAttr("rx", CssFloatToString(size.width / 2));
@@ -2077,12 +2125,15 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         auto p = static_cast<const Path*>(g.element);
         std::string d = GetPathSVGString(p);
         if (!d.empty()) {
-          if (!trim && g.modifiedPathData.empty()) {
+          if (!trim && g.modifiedPathData.empty() && geoAnimId.empty()) {
             auto defId = getOrCreatePathDef(d);
             out.openTag("use");
             out.addAttr("href", "#" + defId);
           } else {
             out.openTag("path");
+            if (!geoAnimId.empty()) {
+              out.addAttr("id", geoAnimId);
+            }
             out.addAttr("d", d);
           }
           applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);
@@ -2101,12 +2152,15 @@ void HTMLWriter::renderSVG(HTMLBuilder& out, const std::vector<GeoInfo>& geos, c
         auto ps = static_cast<const Polystar*>(g.element);
         std::string d = BuildPolystarPath(ps);
         if (!d.empty()) {
-          if (!trim && g.modifiedPathData.empty()) {
+          if (!trim && g.modifiedPathData.empty() && geoAnimId.empty()) {
             auto defId = getOrCreatePathDef(d);
             out.openTag("use");
             out.addAttr("href", "#" + defId);
           } else {
             out.openTag("path");
+            if (!geoAnimId.empty()) {
+              out.addAttr("id", geoAnimId);
+            }
             out.addAttr("d", d);
           }
           applySVGFill(out, trim ? nullptr : fill, x0, y0, sw, sh);

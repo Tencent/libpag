@@ -53,6 +53,10 @@ void HTMLWriter::writeGroup(HTMLBuilder& out, const Group* group, float alpha, b
     style += ";opacity:" + CssFloatToString(ea);
   }
   out.openTag("div");
+  auto animIdIt = _ctx->animatedElementIds.find(group);
+  if (animIdIt != _ctx->animatedElementIds.end()) {
+    out.addAttr("id", animIdIt->second);
+  }
   out.addAttr("class", "pagx-group");
   out.addAttr("style", style);
   out.closeTagStart();

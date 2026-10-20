@@ -38,6 +38,7 @@ struct ExportOptions {
   int svgIndent = 2;
   bool svgNoXmlDeclaration = false;
   bool textToPath = false;
+  bool htmlExportAnimations = true;
   bool pptBakeUnsupported = true;
   bool pptIgnoreGlyphRuns = false;
 };
@@ -59,6 +60,9 @@ static void PrintUsage() {
       << "SVG options:\n"
       << "  --svg-indent <n>            Indentation spaces (default: 2, valid range: 0-16)\n"
       << "  --svg-no-xml-declaration    Omit the <?xml ...?> declaration\n"
+      << "\n"
+      << "HTML options:\n"
+      << "  --no-animations             Omit CSS @keyframes and animation declarations\n"
       << "\n"
       << "PPT options:\n"
       << "  --ppt-no-bake-unsupported\n"
@@ -127,6 +131,8 @@ static int ParseOptions(int argc, char* argv[], ExportOptions* options) {
       options->svgNoXmlDeclaration = true;
     } else if (arg == "--text-to-path") {
       options->textToPath = true;
+    } else if (arg == "--no-animations") {
+      options->htmlExportAnimations = false;
     } else if (arg == "--ppt-no-bake-unsupported") {
       options->pptBakeUnsupported = false;
     } else if (arg == "--ppt-ignore-glyphruns") {
@@ -210,8 +216,11 @@ static int ExportToHTML(const ExportOptions& options) {
     return 1;
   }
 
+  pagx::HTMLExportOptions htmlOptions = {};
+  htmlOptions.exportAnimations = options.htmlExportAnimations;
+
   std::string errorMsg;
-  if (!HTMLExporter::ToFile(*document, options.outputFile, {}, &errorMsg)) {
+  if (!HTMLExporter::ToFile(*document, options.outputFile, htmlOptions, &errorMsg)) {
     std::cerr << "pagx export: error: " << (errorMsg.empty() ? "export failed" : errorMsg) << "\n";
     return 1;
   }
