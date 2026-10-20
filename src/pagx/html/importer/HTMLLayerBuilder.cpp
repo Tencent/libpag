@@ -47,6 +47,7 @@
 #include "pagx/nodes/PathData.h"
 #include "pagx/nodes/RadialGradient.h"
 #include "pagx/nodes/Rectangle.h"
+#include "pagx/nodes/Repeater.h"
 #include "pagx/nodes/SolidColor.h"
 #include "pagx/nodes/Stroke.h"
 #include "pagx/svg/SVGBlendMode.h"
@@ -256,7 +257,7 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, fl
     return _valueParser.parseRadialGradient(trimmed, boxWidth, boxHeight, /*repeating=*/true);
   }
   if (lower.compare(0, 25, "repeating-conic-gradient(") == 0) {
-    return _valueParser.parseConicGradient(trimmed, /*repeating=*/true);
+    return _valueParser.parseConicGradient(trimmed, /*repeating=*/true, boxWidth, boxHeight);
   }
   if (lower.compare(0, 16, "linear-gradient(") == 0) {
     return _valueParser.parseLinearGradient(trimmed, boxWidth, boxHeight);
@@ -265,7 +266,7 @@ ColorSource* HTMLLayerBuilder::parseGradientByValue(const std::string& value, fl
     return _valueParser.parseRadialGradient(trimmed, boxWidth, boxHeight);
   }
   if (lower.compare(0, 15, "conic-gradient(") == 0) {
-    return _valueParser.parseConicGradient(trimmed);
+    return _valueParser.parseConicGradient(trimmed, false, boxWidth, boxHeight);
   }
   return nullptr;
 }
@@ -390,6 +391,26 @@ Element* HTMLLayerBuilder::buildBackgroundGeometry(const HTMLBoxAttributes& box)
 
 bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttributes& box,
                                               Fill* foregroundFill) {
+  if (!ClipsBackgroundToText(box) && usesBackgroundLayout(box)) {
+    bool emitted = applyBackgroundLayers(layer, box);
+    applyBoxShadows(layer, box, emitted);
+    // A Layer's contents paint below all of its children. Put replaced content and border
+    // together after the background stack so tiled backgrounds cannot cover the <img>.
+    if (foregroundFill || box.borderSet) {
+      auto* foreground = _document->makeNode<Layer>();
+      foreground->includeInLayout = false;
+      foreground->width = box.widthPx;
+      foreground->height = box.heightPx;
+      auto* geometry = buildBackgroundGeometry(box);
+      foreground->contents.push_back(geometry);
+      if (foregroundFill) foreground->contents.push_back(foregroundFill);
+      applyBorderStroke(foreground, box, geometry, emitted);
+      layer->children.push_back(foreground);
+      emitted = true;
+    }
+    applyBackdropFilter(layer, box, emitted);
+    return emitted;
+  }
   // `background-clip: text` redirects the background to descendant text fills (see
   // `convertTextLeaf` -> `buildTextFill`, and `HTMLStyleCascade::resolveInheritedStyle` for the
   // gradient / solid channels). Suppress only that box background. Replaced-element foregrounds
@@ -417,6 +438,206 @@ bool HTMLLayerBuilder::applyBackgroundVisuals(Layer* layer, const HTMLBoxAttribu
   applyBoxShadows(layer, box, emitted);
   applyBackdropFilter(layer, box, emitted);
   return emitted;
+}
+
+void HTMLLayerBuilder::setBackgroundImageResolver(
+    std::function<HTMLBackgroundImage(const std::string&)> resolver) {
+  _backgroundImageResolver = std::move(resolver);
+}
+
+bool HTMLLayerBuilder::usesBackgroundLayout(const HTMLBoxAttributes& box) {
+  if (!std::isfinite(box.widthPx) || !std::isfinite(box.heightPx)) return false;
+  if (!box.backgroundClip.empty()) return true;
+  if (box.backgroundImage.empty()) return false;
+  return ToLower(box.backgroundImage).find("url(") != std::string::npos ||
+         (!box.backgroundSize.empty() && box.backgroundSize != "auto") ||
+         (!box.backgroundPosition.empty() && box.backgroundPosition != "0% 0%") ||
+         (!box.backgroundOrigin.empty() && box.backgroundOrigin != "padding-box") ||
+         box.borderWidthPx > 0 ||
+         (!box.backgroundBlendMode.empty() && box.backgroundBlendMode != "normal");
+}
+
+Layer* HTMLLayerBuilder::makeBackgroundClip(const HTMLBoxAttributes& box,
+                                            const HTMLBackgroundRect& rect) {
+  auto* host = _document->makeNode<Layer>();
+  host->width = box.widthPx;
+  host->height = box.heightPx;
+  host->includeInLayout = false;
+  auto* mask = _document->makeNode<Layer>();
+  mask->id = _idAllocator.generateUnique("backgroundClip");
+  mask->includeInLayout = false;
+  mask->width = rect.width;
+  mask->height = rect.height;
+  mask->left = rect.x;
+  mask->top = rect.y;
+  // CSS derives each inner corner by subtracting the corresponding two edge insets.
+  float rx[4] = {box.borderRadiusTLPx, box.borderRadiusTRPx, box.borderRadiusBRPx,
+                 box.borderRadiusBLPx};
+  float ry[4] = {rx[0], rx[1], rx[2], rx[3]};
+  if (box.borderRadiusEllipse) {
+    for (int i = 0; i < 4; ++i) {
+      rx[i] = box.widthPx * .5f;
+      ry[i] = box.heightPx * .5f;
+    }
+  }
+  float right = box.widthPx - rect.x - rect.width;
+  float bottom = box.heightPx - rect.y - rect.height;
+  float dx[4] = {rect.x, right, right, rect.x};
+  float dy[4] = {rect.y, rect.y, bottom, bottom};
+  for (int i = 0; i < 4; ++i) {
+    rx[i] = std::max(0.0f, rx[i] - dx[i]);
+    ry[i] = std::max(0.0f, ry[i] - dy[i]);
+  }
+  float scale = 1;
+  for (auto pair :
+       {std::make_pair(rect.width, rx[0] + rx[1]), std::make_pair(rect.width, rx[2] + rx[3]),
+        std::make_pair(rect.height, ry[0] + ry[3]), std::make_pair(rect.height, ry[1] + ry[2])}) {
+    if (pair.second > 0) scale = std::min(scale, pair.first / pair.second);
+  }
+  for (int i = 0; i < 4; ++i) {
+    rx[i] *= scale;
+    ry[i] *= scale;
+  }
+  auto* data = _document->makeNode<PathData>();
+  float w = rect.width, h = rect.height, k = 1 - BEZIER_KAPPA;
+  data->moveTo(rx[0], 0);
+  data->lineTo(w - rx[1], 0);
+  data->cubicTo(w - rx[1] * k, 0, w, ry[1] * k, w, ry[1]);
+  data->lineTo(w, h - ry[2]);
+  data->cubicTo(w, h - ry[2] * k, w - rx[2] * k, h, w - rx[2], h);
+  data->lineTo(rx[3], h);
+  data->cubicTo(rx[3] * k, h, 0, h - ry[3] * k, 0, h - ry[3]);
+  data->lineTo(0, ry[0]);
+  data->cubicTo(0, ry[0] * k, rx[0] * k, 0, rx[0], 0);
+  data->close();
+  auto* path = _document->makeNode<Path>();
+  path->data = data;
+  path->position = {0, 0};
+  mask->contents.push_back(path);
+  mask->contents.push_back(buildSolidFill(Color{1, 1, 1, 1}));
+  host->mask = mask;
+  host->maskType = MaskType::Contour;
+  host->children.push_back(mask);
+  return host;
+}
+
+bool HTMLLayerBuilder::applyBackgroundLayers(Layer* layer, const HTMLBoxAttributes& box) {
+  if (box.widthPx <= 0 || box.heightPx <= 0) return false;
+  auto images = SplitTopLevelCommas(box.backgroundImage);
+  auto* stack = _document->makeNode<Layer>();
+  stack->width = box.widthPx;
+  stack->height = box.heightPx;
+  stack->includeInLayout = false;
+  // Background blend modes see only this element's background, not its ancestors or content.
+  stack->passThroughBackground = false;
+  layer->children.push_back(stack);
+  if (box.backgroundColorSet) {
+    auto rect = BackgroundBoxRect(
+        box, BackgroundListEntry(box.backgroundClip, images.empty() ? 0 : images.size() - 1,
+                                 "border-box"));
+    auto* color = makeBackgroundClip(box, rect);
+    auto* geometry = _document->makeNode<Rectangle>();
+    geometry->width = box.widthPx;
+    geometry->height = box.heightPx;
+    geometry->left = geometry->top = 0;
+    color->contents.push_back(geometry);
+    color->contents.push_back(buildSolidFill(box.backgroundColor));
+    stack->children.push_back(color);
+  }
+  for (size_t i = images.size(); i-- > 0;) {
+    auto value = Trim(images[i]);
+    if (ToLower(value) == "none") continue;
+    HTMLBackgroundImage image;
+    if (ToLower(value).rfind("url(", 0) == 0 && _backgroundImageResolver) {
+      image = _backgroundImageResolver(value);
+    }
+    HTMLBackgroundLayout layout;
+    if (!ResolveBackgroundLayout(box, i, image.intrinsicWidth, image.intrinsicHeight, _valueParser,
+                                 layout)) {
+      _diagnostics.warn("html: unsupported background layout or repeat budget exceeded at layer " +
+                        std::to_string(i) + "; omitted");
+      continue;
+    }
+    if (layout.x.count == 0 || layout.y.count == 0 || layout.clip.width <= 0 ||
+        layout.clip.height <= 0)
+      continue;
+    if (!image.color && !image.vectorTile) {
+      image.color = parseGradientByValue(value, layout.x.size, layout.y.size);
+    }
+    if (!image.color && !image.vectorTile) {
+      _diagnostics.warn("html: unsupported background image at layer " + std::to_string(i));
+      continue;
+    }
+    // Repeater is compact on disk but still costs geometry/render work per visible copy.
+    if (static_cast<int64_t>(layout.x.count) * layout.y.count > 65536 ||
+        (image.vectorTile && static_cast<int64_t>(layout.x.count) * layout.y.count > 4096)) {
+      _diagnostics.warn("html: background tile budget exceeded at layer " + std::to_string(i) +
+                        "; omitted");
+      continue;
+    }
+    auto* clip = makeBackgroundClip(box, layout.clip);
+    clip->blendMode =
+        resolveBackgroundBlendMode(BackgroundListEntry(box.backgroundBlendMode, i, "normal"));
+    stack->children.push_back(clip);
+    if (image.vectorTile) {
+      for (int y = 0; y < layout.y.count; ++y) {
+        for (int x = 0; x < layout.x.count; ++x) {
+          auto* tile = image.vectorTile(layout.x.size, layout.y.size);
+          tile->left = layout.x.first + x * layout.x.step;
+          tile->top = layout.y.first + y * layout.y.step;
+          clip->children.push_back(tile);
+        }
+      }
+      continue;
+    }
+    // Internal shared tile boundaries must not be individually antialiased: two half-covered
+    // rectangles composited source-over leak the backdrop. Clip each contiguous run once,
+    // retaining AA on real outer edges and on gaps introduced by `space`/`no-repeat`.
+    int columns = layout.x.contiguous ? 1 : layout.x.count;
+    int rows = layout.y.contiguous ? 1 : layout.y.count;
+    for (int y = 0; y < rows; ++y) {
+      for (int x = 0; x < columns; ++x) {
+        float left = layout.x.first + x * layout.x.step;
+        float top = layout.y.first + y * layout.y.step;
+        auto* run = _document->makeNode<Layer>();
+        run->width = layout.x.size * (layout.x.contiguous ? layout.x.count : 1);
+        run->height = layout.y.size * (layout.y.contiguous ? layout.y.count : 1);
+        run->left = left;
+        run->top = top;
+        run->includeInLayout = false;
+        run->clipToBounds = true;
+        clip->children.push_back(run);
+        auto* paint = _document->makeNode<Layer>();
+        paint->width = run->width;
+        paint->height = run->height;
+        paint->includeInLayout = false;
+        paint->antiAlias = false;
+        run->children.push_back(paint);
+        auto* group = _document->makeNode<Group>();
+        group->width = paint->width;
+        group->height = paint->height;
+        auto* tile = _document->makeNode<Rectangle>();
+        tile->width = layout.x.size;
+        tile->height = layout.y.size;
+        tile->left = tile->top = 0;
+        group->elements.push_back(tile);
+        auto* fill = _document->makeNode<Fill>();
+        fill->color = image.color;
+        group->elements.push_back(fill);
+        auto repeat = [&](int count, float dx, float dy) {
+          if (count <= 1) return;
+          auto* repeater = _document->makeNode<Repeater>();
+          repeater->copies = static_cast<float>(count);
+          repeater->position = {dx, dy};
+          group->elements.push_back(repeater);
+        };
+        repeat(layout.x.contiguous ? layout.x.count : 1, layout.x.step, 0);
+        repeat(layout.y.contiguous ? layout.y.count : 1, 0, layout.y.step);
+        paint->contents.push_back(group);
+      }
+    }
+  }
+  return true;
 }
 
 namespace {
@@ -483,6 +704,7 @@ void HTMLLayerBuilder::applyBackgroundFill(Layer* layer, const HTMLBoxAttributes
   bool anyUnsupported = false;
   for (size_t i = 0; i < layers.size(); i++) {
     const std::string& part = layers[i];
+    if (ToLower(Trim(part)) == "none") continue;
     if (auto* color = parseGradientByValue(part, box.widthPx, box.heightPx)) {
       colors.push_back(color);
       colorLayerIndices.push_back(i);

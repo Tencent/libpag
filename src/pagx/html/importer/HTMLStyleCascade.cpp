@@ -913,33 +913,16 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   if (!bgImage.empty()) {
     box.backgroundImage = bgImage;
   }
-  // A `url(...)` background round-trips through `ImagePattern`, which needs the CSS fitting
-  // hints the exporter emitted alongside it. Capture them only for url backgrounds; gradients
-  // ignore size/repeat/position entirely.
-  if (!bgImage.empty() && ToLower(bgImage).find("url(") != std::string::npos) {
+  if (!bgImage.empty()) {
     box.backgroundSize = LookupLowerTrimmed(props, "background-size");
     box.backgroundRepeat = LookupLowerTrimmed(props, "background-repeat");
     box.backgroundPosition = LookupLowerTrimmed(props, "background-position");
+    box.backgroundOrigin = LookupLowerTrimmed(props, "background-origin");
   }
   // `background-blend-mode` blends the element's background layers among themselves. Kept
   // lower-cased so the keyword comparison in applyBackgroundFill is case-insensitive; `normal`
   // is treated as "no blending" there.
   box.backgroundBlendMode = LookupLowerTrimmed(props, "background-blend-mode");
-  auto backgroundBlendModes = SplitTopLevelCommas(box.backgroundBlendMode);
-  if (backgroundBlendModes.size() > 1) {
-    std::string firstMode = ToLower(Trim(backgroundBlendModes.front()));
-    bool hasDifferentMode = false;
-    for (size_t i = 1; i < backgroundBlendModes.size(); ++i) {
-      if (ToLower(Trim(backgroundBlendModes[i])) != firstMode) {
-        hasDifferentMode = true;
-        break;
-      }
-    }
-    if (hasDifferentMode) {
-      _diagnostics.warn("html: per-layer background-blend-mode values are not supported; using '" +
-                        firstMode + "' for every background layer");
-    }
-  }
   // `background-clip: text` routes the gradient onto descendant text fills. Any other
   // non-empty list carries per-layer box clips (`padding-box`, comma-separated in CSS layer
   // order) — kept raw so `applyBackgroundFill` can rebuild each layer with its own inset
@@ -973,6 +956,7 @@ void HTMLStyleCascade::parseBoxVisuals(HTMLBoxAttributes& box, const PropertyMap
   box.maskMode = LookupLowerTrimmed(props, "mask-mode");
   box.maskSize = LookupLowerTrimmed(props, "mask-size");
   box.maskPosition = LookupLowerTrimmed(props, "mask-position");
+  box.maskRepeat = LookupLowerTrimmed(props, "mask-repeat");
   // `clip-path: url(#id)` reference, kept raw so the apply-side can extract the id.
   box.clipPathRef = LookupProperty(props, "clip-path");
 

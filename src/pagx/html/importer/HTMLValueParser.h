@@ -125,7 +125,8 @@ class HTMLValueParser {
                                       float boxHeight = NAN, bool repeating = false);
   /** Parses a CSS `conic-gradient(...)`. `repeating` (CSS `repeating-conic-gradient`) tiles the
    *  authored angular period across the full turn. */
-  ConicGradient* parseConicGradient(const std::string& value, bool repeating = false);
+  ConicGradient* parseConicGradient(const std::string& value, bool repeating = false,
+                                    float boxWidth = NAN, float boxHeight = NAN);
 
   /** Parses the comma-separated tail of a gradient call into (offset, color) pairs. Offsets that
    *  fail to parse are left as NaN for `finaliseGradientStops` to fill in. `pxOffsetScale` is the

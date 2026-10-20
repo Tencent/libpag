@@ -406,11 +406,11 @@ const PropertyEntry SubsetPropertyEntries[] = {
     // keyword) and consumed in HTMLStyleCascade::parseBoxVisuals.
     {"background-blend-mode", PropAction::Keep, nullptr, nullptr},
     // `background-size` / `background-repeat` / `background-position` are kept verbatim and
-    // consumed only when paired with a `url(...)` background, where they drive the recovered
-    // ImagePattern's scaleMode / tile modes / matrix.
+    // consumed by the shared background layout for images and gradients.
     {"background-size", PropAction::Keep, nullptr, nullptr},
     {"background-repeat", PropAction::Keep, nullptr, nullptr},
     {"background-position", PropAction::Keep, nullptr, nullptr},
+    {"background-origin", PropAction::Keep, nullptr, nullptr},
     // Alpha / luminance masks. `mask-image` carries a `url(data:image/svg+xml,...)` whose SVG the
     // importer turns back into a PAGX mask layer; `mask-mode` selects Alpha vs Luminance and
     // `mask-size` / `mask-position` drive the mask layer's scale / offset. Kept verbatim and

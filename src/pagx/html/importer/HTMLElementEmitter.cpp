@@ -638,6 +638,7 @@ bool HTMLParserContext::foldRoundedImageWrapper(const std::shared_ptr<DOMNode>& 
                                                 const HTMLBoxAttributes& box, Layer* layer) {
   if (!box.borderRadiusSet || !box.clipOverflow) return false;
   if (HTMLLayerBuilder::hasLayoutHostAttributes(box)) return false;
+  if (HTMLLayerBuilder::usesBackgroundLayout(box)) return false;
 
   // Walk down through up to `HTML_ROUND_IMAGE_MAX_WRAPPER_DEPTH` intermediate
   // layout-only `<div>` wrappers that share `element`'s content box. The
@@ -824,9 +825,11 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
     // Resolve the SVG in the same viewport as its HTML host. Percent-only children are not
     // measured until after imports resolve, which otherwise uses the unscaled viewBox size.
     if (!std::isnan(layer->width)) importHost->width = layer->width;
-    else importHost->percentWidth = 100.0f;
+    else
+      importHost->percentWidth = 100.0f;
     if (!std::isnan(layer->height)) importHost->height = layer->height;
-    else importHost->percentHeight = 100.0f;
+    else
+      importHost->percentHeight = 100.0f;
     layer->children.push_back(importHost);
 
     if (box.borderSet) {
@@ -1118,47 +1121,31 @@ bool HTMLParserContext::applyRasterImageMask(Layer* layer, const HTMLBoxAttribut
 }
 
 bool HTMLParserContext::applyGradientImageMask(Layer* layer, const HTMLBoxAttributes& box) {
+  auto value = ToLower(Trim(box.maskImage));
+  if (value.rfind("linear-gradient(", 0) != 0 && value.rfind("radial-gradient(", 0) != 0 &&
+      value.rfind("conic-gradient(", 0) != 0 && value.rfind("repeating-linear-gradient(", 0) != 0 &&
+      value.rfind("repeating-radial-gradient(", 0) != 0 &&
+      value.rfind("repeating-conic-gradient(", 0) != 0)
+    return false;
   float boxW = std::isnan(box.widthPx) ? _canvasWidth : box.widthPx;
   float boxH = std::isnan(box.heightPx) ? _canvasHeight : box.heightPx;
   if (!(boxW > 0) || !(boxH > 0)) return false;
-  // A gradient carries no intrinsic size: CSS paints it into the mask positioning area, which is
-  // the masked element's own box unless `mask-size` states another tile. Resolving the tile first
-  // keeps `mask-size` faithful — the gradient's own geometry is then computed for that box rather
-  // than the rendered gradient being stretched.
-  auto tile = ResolveCssTileSize(box.maskSize, boxW, boxH, boxW, boxH, *_valueParser);
-  if (std::isnan(tile.first) || std::isnan(tile.second) || !(tile.first > 0) ||
-      !(tile.second > 0)) {
-    return false;
-  }
-  auto* gradient = _layerBuilder->parseGradientByValue(box.maskImage, tile.first, tile.second);
-  if (gradient == nullptr) return false;
-
-  // The gradient is the mask's own paint, so the mask layer holds a Rectangle covering that tile
-  // and a Fill carrying the gradient. An alpha mask reads the alpha channel, which is exactly the
-  // per-stop alpha the CSS gradient authored.
+  // A generated mask has no intrinsic aspect ratio. Reuse the background layout so auto axes,
+  // percentage positions and repetition use the same concrete tile geometry as CSS gradients.
+  HTMLBoxAttributes paint;
+  paint.widthPx = boxW;
+  paint.heightPx = boxH;
+  paint.backgroundImage = box.maskImage;
+  paint.backgroundSize = box.maskSize;
+  paint.backgroundPosition = box.maskPosition;
+  paint.backgroundRepeat = box.maskRepeat;
+  paint.backgroundOrigin = "border-box";
   auto* maskLayer = _document->makeNode<Layer>();
-  maskLayer->width = tile.first;
-  maskLayer->height = tile.second;
+  maskLayer->width = boxW;
+  maskLayer->height = boxH;
   maskLayer->includeInLayout = false;
-  auto* rect = _document->makeNode<Rectangle>();
-  rect->size = {tile.first, tile.second};
-  maskLayer->contents.push_back(rect);
-  auto* fill = _document->makeNode<Fill>();
-  fill->color = gradient;
-  maskLayer->contents.push_back(fill);
-
-  // `mask-position` places the tile inside the element, resolved against the same box/tile slack the
-  // image paths use. The mask layer shares the masked layer's local origin, so the offset rides on
-  // its own matrix.
-  std::string posX;
-  std::string posY;
-  SplitPositionTokens(box.maskPosition, posX, posY);
-  float tx = resolveMaskPositionAxis(posX, boxW, tile.first);
-  float ty = resolveMaskPositionAxis(posY, boxH, tile.second);
-  if (!std::isnan(tx) && !std::isnan(ty) && (tx != 0.0f || ty != 0.0f)) {
-    maskLayer->matrix = Matrix::Translate(tx, ty);
-  }
   maskLayer->id = _idAllocator->generateUnique("mask");
+  if (!_layerBuilder->applyBackgroundVisuals(maskLayer, paint)) return false;
 
   layer->mask = maskLayer;
   // `mask-mode: match-source` resolves to the alpha channel for a gradient, which is also the
@@ -1266,6 +1253,55 @@ void HTMLParserContext::applyMaskSizeAndPosition(Layer* maskLayer, const HTMLBox
   // the mask lands where CSS positions it. Compose ahead of any transform the SVG import produced.
   Matrix transform = Matrix::Translate(tx, ty) * Matrix::Scale(scaleX, scaleY);
   maskLayer->matrix = transform * maskLayer->matrix;
+}
+
+HTMLBackgroundImage HTMLParserContext::resolveBackgroundImage(const std::string& value) {
+  HTMLBackgroundImage result;
+  auto src = ExtractCssUrl(value);
+  if (src.empty()) return result;
+  std::string svgContent;
+  if (IsSvgImportSource(src, &svgContent) && IsResolvableSvgSource(src, svgContent)) {
+    auto source = resolveImageSource(src);
+    auto intrinsic =
+        resolveSvgIntrinsicSize(svgContent.empty() ? source : svgContent, svgContent.empty());
+    result.intrinsicWidth = intrinsic.first;
+    result.intrinsicHeight = intrinsic.second;
+    result.vectorTile = [this, source, svgContent, intrinsic](float width, float height) {
+      auto* host = _document->makeNode<Layer>();
+      host->includeInLayout = false;
+      host->width = width;
+      host->height = height;
+      host->clipToBounds = true;
+      // Keep the SVG's own viewport/aspect handling, then scale that rendered image to the
+      // CSS concrete object size. Explicit two-axis background-size can distort the aspect.
+      auto* svg = _document->makeNode<Layer>();
+      svg->includeInLayout = false;
+      svg->width = intrinsic.first > 0 ? intrinsic.first : width;
+      svg->height = intrinsic.second > 0 ? intrinsic.second : height;
+      svg->matrix = Matrix::Scale(width / svg->width, height / svg->height);
+      if (svgContent.empty()) svg->importDirective.source = source;
+      else
+        svg->importDirective.content = svgContent;
+      svg->importDirective.format = "svg";
+      host->children.push_back(svg);
+      return host;
+    };
+    return result;
+  }
+  auto* image = registerImageResource(resolveImageSource(src));
+  if (!image) return result;
+  auto size = decodeImageNativeSize(image);
+  result.intrinsicWidth = static_cast<float>(size.first);
+  result.intrinsicHeight = static_cast<float>(size.second);
+  auto* pattern = _document->makeNode<ImagePattern>();
+  pattern->image = image;
+  pattern->scaleMode = ScaleMode::Stretch;
+  // The tile geometry supplies the image's boundary. Clamp sampling inside it so bilinear
+  // filtering does not mix transparent decal texels into the first/last source pixels.
+  pattern->tileModeX = TileMode::Clamp;
+  pattern->tileModeY = TileMode::Clamp;
+  result.color = pattern;
+  return result;
 }
 
 bool HTMLParserContext::applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer) {

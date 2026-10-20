@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pagx/html/importer/HTMLDetail.h"
-#include "pagx/utils/CSSFontStyle.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -26,6 +25,7 @@
 #include <sstream>
 #include <utility>
 #include "pagx/html/importer/HTMLBoxAttributes.h"
+#include "pagx/utils/CSSFontStyle.h"
 
 namespace pagx::html {
 
@@ -197,8 +197,8 @@ std::string JoinStyleTokens(const std::vector<std::string>& tokens) {
 void ApplyBackgroundShorthand(const std::string& value,
                               std::unordered_map<std::string, std::string>& out) {
   static const char* kResetProperties[] = {
-      "background-color", "background-image",  "background-position",
-      "background-size",  "background-repeat", "background-clip",
+      "background-color",  "background-image", "background-position", "background-size",
+      "background-repeat", "background-clip",  "background-origin",
   };
   for (const char* property : kResetProperties) {
     out[property].clear();
@@ -206,11 +206,8 @@ void ApplyBackgroundShorthand(const std::string& value,
 
   auto layers = SplitTopLevelCommas(Trim(value));
   std::vector<std::string> imageLayers;
-  bool hasURLImage = false;
   std::string colorToken;
-  std::string positionValue;
-  std::string sizeValue;
-  std::string repeatValue;
+  std::vector<std::string> positions, sizes, repeats, origins, clips;
 
   for (size_t layerIndex = 0; layerIndex < layers.size(); ++layerIndex) {
     bool isLastLayer = layerIndex + 1 == layers.size();
@@ -218,6 +215,7 @@ void ApplyBackgroundShorthand(const std::string& value,
     std::vector<std::string> positionTokens;
     std::vector<std::string> sizeTokens;
     std::vector<std::string> repeatTokens;
+    std::vector<std::string> boxes;
     bool afterSlash = false;
     for (const auto& token : SplitBackgroundLayerTokens(layers[layerIndex])) {
       if (token == "/") {
@@ -228,51 +226,47 @@ void ApplyBackgroundShorthand(const std::string& value,
       if (IsBackgroundImageToken(lower)) {
         imageToken = token;
       } else if (lower == "none") {
-        // The reset above already represents `background-image:none`.
+        imageToken = "none";
       } else if (isLastLayer && colorToken.empty() && IsBackgroundColorToken(token)) {
         colorToken = token;
       } else if (IsBackgroundRepeatToken(lower)) {
         repeatTokens.push_back(lower);
       } else if (IsBackgroundBoxOrAttachmentToken(lower)) {
-        // These reset correctly above but have no PAGX visual analogue.
+        if (lower == "border-box" || lower == "padding-box" || lower == "content-box") {
+          boxes.push_back(lower);
+        }
       } else if (afterSlash) {
         sizeTokens.push_back(token);
       } else {
         positionTokens.push_back(token);
       }
     }
-    if (!imageToken.empty()) {
-      bool isURLImage = ToLower(imageToken).rfind("url(", 0) == 0;
-      imageLayers.push_back(std::move(imageToken));
-      hasURLImage |= isURLImage;
-      // PAGX can stack gradients, but its ImagePattern path consumes only one image layer. Keep
-      // the fitting values from the CSS-topmost image so they stay paired with the same layer if
-      // the shorthand has to be reduced to one image below.
-      if (imageLayers.size() == 1) {
-        positionValue = JoinStyleTokens(positionTokens);
-        sizeValue = JoinStyleTokens(sizeTokens);
-        repeatValue = JoinStyleTokens(repeatTokens);
-      }
-    }
+    imageLayers.push_back(imageToken.empty() ? "none" : imageToken);
+    positions.push_back(positionTokens.empty() ? "0% 0%" : JoinStyleTokens(positionTokens));
+    sizes.push_back(sizeTokens.empty() ? "auto" : JoinStyleTokens(sizeTokens));
+    repeats.push_back(repeatTokens.empty() ? "repeat" : JoinStyleTokens(repeatTokens));
+    origins.push_back(boxes.empty() ? "padding-box" : boxes[0]);
+    clips.push_back(boxes.empty() ? "border-box" : boxes.back());
   }
 
   if (!imageLayers.empty()) {
-    std::string joinedImages;
-    if (hasURLImage) {
-      // Mixed/url stacks cannot be represented by one PAGX ImagePattern. CSS paints the first
-      // listed image on top, so retain that layer and its position/size/repeat values rather than
-      // pairing a multi-layer image list with unrelated fitting data.
-      joinedImages = imageLayers.front();
-    } else {
-      for (const auto& image : imageLayers) {
-        if (!joinedImages.empty()) joinedImages += ", ";
-        joinedImages += image;
+    auto join = [](const std::vector<std::string>& values, const std::string& initial) {
+      if (std::all_of(values.begin(), values.end(),
+                      [&](const std::string& v) { return v == initial; }))
+        return std::string();
+      std::string result;
+      for (const auto& v : values) {
+        if (!result.empty()) result += ", ";
+        result += v;
       }
-    }
-    out["background-image"] = std::move(joinedImages);
-    out["background-position"] = std::move(positionValue);
-    out["background-size"] = std::move(sizeValue);
-    out["background-repeat"] = std::move(repeatValue);
+      return result;
+    };
+    out["background-image"] = join(imageLayers, "none");
+    out["background-position"] = join(positions, "0% 0%");
+    out["background-size"] = join(sizes, "auto");
+    out["background-repeat"] = join(repeats, "repeat");
+    out["background-origin"] = join(origins, "padding-box");
+    out["background-clip"] = join(clips, "border-box");
   }
   if (!colorToken.empty()) {
     out["background-color"] = std::move(colorToken);
@@ -522,6 +516,7 @@ float ParseAngle(const std::string& raw) {
   std::string suffix = Trim(end);
   if (suffix.empty() || suffix == "deg") return v;
   if (suffix == "rad") return v * 180.0f / 3.14159265358979323846f;
+  if (suffix == "grad") return v * 0.9f;
   if (suffix == "turn") return v * 360.0f;
   return v;
 }

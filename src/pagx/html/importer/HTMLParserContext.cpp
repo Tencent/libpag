@@ -327,6 +327,8 @@ std::shared_ptr<PAGXDocument> HTMLParserContext::parseDOM(const std::shared_ptr<
   _valueParser->bindDocument(_document.get());
   _imageResources->bindDocument(_document.get());
   _layerBuilder->bindDocument(_document.get());
+  _layerBuilder->setBackgroundImageResolver(
+      [this](const std::string& value) { return resolveBackgroundImage(value); });
   _textFragmentBuilder->bindDocument(_document.get());
   _animationBuilder->bindDocument(_document.get());
   _animationBuilder->setKeyframes(&_styleCascade->keyframes());
@@ -598,7 +600,7 @@ Layer* HTMLParserContext::convertBody(const std::shared_ptr<DOMNode>& body, floa
   bool hasBgVisuals = HTMLLayerBuilder::hasBackgroundVisuals(box);
   if (hasBgVisuals) {
     _layerBuilder->applyBackgroundVisuals(layer, box);
-    if (!box.backgroundImage.empty() &&
+    if (!HTMLLayerBuilder::usesBackgroundLayout(box) && !box.backgroundImage.empty() &&
         ToLower(box.backgroundImage).find("url(") != std::string::npos) {
       applyBackgroundImageFill(box, layer);
     }
@@ -751,7 +753,7 @@ Layer* HTMLParserContext::convertContainer(const std::shared_ptr<DOMNode>& eleme
     // A `url(...)` background is recovered as an ImagePattern fill here (it needs the image
     // registry + native-size decoding the layer builder has no access to). Runs right after the
     // background geometry is emitted so the fill stacks on top of it.
-    if (!box.backgroundImage.empty() &&
+    if (!HTMLLayerBuilder::usesBackgroundLayout(box) && !box.backgroundImage.empty() &&
         ToLower(box.backgroundImage).find("url(") != std::string::npos) {
       applyBackgroundImageFill(box, layer);
     }

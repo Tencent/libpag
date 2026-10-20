@@ -52,7 +52,8 @@ to settle, then walks the rendered DOM and produces a snapshot in which:
 - every box is `position: absolute` with `left/top/width/height` taken from
   `getBoundingClientRect()`, relative to its parent;
 - only the visual CSS properties allowed by the subset are forwarded
-  (`background-color`, `background-image` for gradients, `border`,
+  (`background-color`, layered `background-image` with per-layer size, position,
+  repeat, origin and clip, `border`,
   `border-radius`, `box-shadow`, `color`, `font-*`, `letter-spacing`,
   `line-height`, `text-align`, `text-decoration`, `text-decoration-color`,
   `opacity`, `overflow`, `backdrop-filter`, …);

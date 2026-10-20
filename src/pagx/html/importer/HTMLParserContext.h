@@ -104,6 +104,7 @@ class HTMLParserContext {
   // per-axis scale and the position offset. Returns true when a fill was emitted. The layer's
   // background geometry must already be present (added by `applyBackgroundVisuals`).
   bool applyBackgroundImageFill(const HTMLBoxAttributes& box, Layer* layer);
+  HTMLBackgroundImage resolveBackgroundImage(const std::string& value);
 
   // Recovers a CSS `url(...)` background whose source is an SVG — an inline `data:image/svg+xml`
   // URI (`svgContent` carries the decoded payload) or an external `.svg` reference

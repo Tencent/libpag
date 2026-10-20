@@ -250,15 +250,10 @@ struct HTMLBoxAttributes {
   // A `padding-box` layer is how CSS paints gradient borders: the layer inset by the border
   // width lets the border-box layer beneath show through as a frame.
   std::string backgroundClip = {};
+  std::string backgroundOrigin = {};
 
   // CSS `background-size` / `background-repeat` / `background-position`, kept lower-cased and
-  // trimmed. Only meaningful when `backgroundImage` is a `url(...)` reference; the importer maps
-  // them back onto an `ImagePattern` fill — the inverse of `HTMLWriter`'s exporter emission:
-  //   - size `contain` / `cover` / `100% 100%` → ScaleMode LetterBox / Zoom / Stretch (a fitted
-  //     mode that centres the image and ignores repeat/position).
-  //   - any other case (explicit `<w>px <h>px` size, or `repeat`) → ScaleMode None with the
-  //     pattern matrix carrying the per-axis scale (tile px / native px) and the position offset,
-  //     and tile modes taken from `background-repeat`.
+  // trimmed. These per-layer lists apply to both generated gradients and URL images.
   // Empty means "not authored" and the property falls back to its CSS default.
   std::string backgroundSize = {};
   std::string backgroundRepeat = {};
@@ -308,6 +303,7 @@ struct HTMLBoxAttributes {
   std::string maskMode = {};
   std::string maskSize = {};
   std::string maskPosition = {};
+  std::string maskRepeat = {};
 
   // CSS `clip-path` value, kept raw. Either a `url(#id)` reference to a hidden `<clipPath>` def
   // (including the `url(...)` wrapper and any quotes) or a CSS basic shape (`polygon()` / `path()`

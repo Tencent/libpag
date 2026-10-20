@@ -119,58 +119,29 @@ function normalizeBorderRadius(value) {
   return value;
 }
 
-// PAGX supports `background-image` when the value is one of the gradient
-// functions (linear/radial/conic) or a single `url(...)` reference. A url
-// background round-trips into an `ImagePattern` fill on import (the inverse of
-// the HTML exporter's emission). Chromium reports the url already resolved to
-// an absolute form; rewrite a local `file://` url to a plain absolute path
-// (the form the PAGX importer + tgfx load directly, matching the `<img>`
-// `data-snapshot-src` path), and keep `data:` / `http(s)` urls verbatim (the
-// `inlineExternalImages` pre-pass converts remote bytes to a data URI).
-// Compound url + gradient stacks and the `none` keyword are dropped.
+// Normalize every URL independently, preserving gradient/none layers and their list indices.
+// Single-quoted CSS strings embed safely in the snapshot's double-quoted HTML style attributes.
 function normalizeBackgroundImage(value) {
-  if (!value) return '';
-  if (value === 'none') return '';
-  if (/(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value)) {
-    return value;
-  }
-  const trimmed = value.trim();
-  if (/^url\(/i.test(trimmed)) {
-    const m = /^url\(\s*([\s\S]*?)\s*\)$/i.exec(trimmed);
-    if (!m) return '';
-    let url = m[1].trim();
-    if (url[0] === '"' || url[0] === "'") {
-      if (url.length < 2 || url[url.length - 1] !== url[0]) return '';
-      url = url.slice(1, -1);
-    } else if (/[\s'"]/.test(url)) {
-      return '';
-    }
+  if (!value || value.trim() === 'none') return '';
+  const hasGradient = /(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value);
+  let found = false;
+  const normalized = value.replace(/url\(\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^)]*)\s*\)/gi, token => {
+    found = true;
+    let url = token.slice(token.indexOf('(') + 1, -1).trim();
+    if (url[0] === '"' || url[0] === "'") url = url.slice(1, -1);
+    else if (/[\s'"]/.test(url)) return 'none';
+    url = url.replace(/\\(['"\\])/g, '$1');
     if (/^file:/i.test(url)) {
       try {
         const u = new URL(url);
-        let p = decodeURIComponent(u.pathname);
-        if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
-        url = p;
-      } catch (_) {
-        return '';
-      }
+        url = decodeURIComponent(u.pathname);
+        if (/^\/[A-Za-z]:/.test(url)) url = url.slice(1);
+      } catch (_) { return 'none'; }
     }
-    // Emit a SINGLE-quoted url() so the value embeds safely inside the
-    // double-quoted `style="…"` attribute the snapshot writes. The <body>
-    // background path pushes this value verbatim (it does not route through
-    // `appendStyleProp`, which is the only place that rewrites embedded double
-    // quotes), so a double-quoted url() here would prematurely close the style
-    // attribute and break the importer's XML parse. CSS treats url("…") and
-    // url('…') as equivalent, and the importer's ExtractCssUrl strips either
-    // quote style, so single quotes round-trip cleanly. Escape backslashes and
-    // embedded single quotes for the CSS string; rewrite double quotes so none
-    // can close the surrounding HTML attribute. ExtractCssUrl reverses these
-    // simple CSS escapes when the snapshot is imported.
     const escaped = url.replace(/\\/g, '\\\\').replace(/"/g, "'").replace(/'/g, "\\'");
     return `url('${escaped}')`;
-  }
-  if (/url\(/i.test(value)) return '';
-  return '';
+  });
+  return found || hasGradient ? normalized : '';
 }
 
 // `background-clip: text` routes a gradient `background-image` to descendant
@@ -1464,23 +1435,20 @@ function appendTextShadow(parts, computed) {
   else parts.push(`filter: ${glow}`);
 }
 
-// Forward `background-size` / `background-repeat` / `background-position` when the element
-// carries a `url(...)` background image. The importer recovers them into the ImagePattern's
-// scaleMode / tile modes / matrix (the inverse of the exporter). Gradients ignore these
-// properties, so emitting them there would be noise; only forward for url backgrounds. Each
-// value is suppressed when it equals the CSS default so the common fitted card stays compact.
+// Preserve the complete per-layer layout for generated and URL images alike. Keeping the
+// comma-separated lists intact also preserves entries paired with `none` background layers.
 function appendBackgroundImageFitting(parts, computed) {
   const bgImage = computed.getPropertyValue('background-image').trim();
-  if (!/^url\(/i.test(bgImage)) return;
+  if (!bgImage || bgImage === 'none') return;
   const size = computed.getPropertyValue('background-size').trim();
   if (size && size !== 'auto') parts.push(`background-size: ${size}`);
-  // `background-repeat` is always forwarded for url backgrounds (never suppressed against the
-  // CSS default `repeat`): the importer maps `repeat` to the tiling ScaleMode::None pattern, so
-  // dropping it would silently turn a tiled card into a single off-screen image.
+  // Preserve repeat lists verbatim; list indices stay paired with background-image.
   const repeat = computed.getPropertyValue('background-repeat').trim();
   if (repeat) parts.push(`background-repeat: ${repeat}`);
   const position = computed.getPropertyValue('background-position').trim();
   if (position && position !== '0% 0%') parts.push(`background-position: ${position}`);
+  const origin = computed.getPropertyValue('background-origin').trim();
+  if (origin && origin !== 'padding-box') parts.push(`background-origin: ${origin}`);
 }
 
 // Forward the `mask-mode` / `mask-size` / `mask-position` / `mask-repeat`
@@ -3974,105 +3942,6 @@ function emitInlineRunMarkup(el, parentComputed) {
   return out;
 }
 
-// The `<mark>` highlighter idiom paints a gradient over only a short band near
-// the text baseline via `background-size: 100% 0.6em; background-position: 0 88%;
-// background-repeat: no-repeat` — the tint hugs the lower part of the glyphs
-// rather than filling the whole line box. The snapshot bakes browser layout into
-// flat boxes, so instead of forwarding these properties (the importer paints a
-// gradient across the entire geometry) we compute the tile the browser actually
-// paints and emit the fill only over that sub-rect.
-//
-// `backgroundBandDescriptor` recognises the shape and returns the parsed
-// size/position/repeat, or null. It is deliberately restricted to a lone
-// gradient `background-image` with no border / shadow / background-color: those
-// visuals need the full box, so mixing them would require painting two rects.
-function backgroundBandDescriptor(computed) {
-  const img = (computed.getPropertyValue('background-image') || '').trim();
-  if (!img || img === 'none' || !/gradient/i.test(img)) return null;
-  const bg = (computed.getPropertyValue('background-color') || '').trim();
-  if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return null;
-  if (borderWidthOf(computed, 'top') > 0 || borderWidthOf(computed, 'right') > 0 ||
-      borderWidthOf(computed, 'bottom') > 0 || borderWidthOf(computed, 'left') > 0) return null;
-  const shadow = (computed.getPropertyValue('box-shadow') || '').trim();
-  if (shadow && shadow !== 'none') return null;
-  const size = (computed.getPropertyValue('background-size') || '').trim().toLowerCase();
-  if (!size || size === 'auto' || size === 'auto auto') return null;
-  // `contain` / `cover` scale to the box, so there is nothing to inset.
-  if (size.includes('contain') || size.includes('cover')) return null;
-  const sizeTokens = size.split(/\s+/);
-  if (sizeTokens.length > 2) return null;
-  const posTokens = (computed.getPropertyValue('background-position') || '0% 0%')
-    .trim().toLowerCase().split(/\s+/);
-  if (posTokens.length > 2) return null; // 3/4-value edge syntax: leave full box
-  const repeat = (computed.getPropertyValue('background-repeat') || 'repeat').trim().toLowerCase();
-  const rTokens = repeat.split(/\s+/);
-  let repeatX;
-  let repeatY;
-  if (repeat === 'repeat-x') {
-    repeatX = true;
-    repeatY = false;
-  } else if (repeat === 'repeat-y') {
-    repeatX = false;
-    repeatY = true;
-  } else if (rTokens.length === 2) {
-    repeatX = rTokens[0] !== 'no-repeat';
-    repeatY = rTokens[1] !== 'no-repeat';
-  } else {
-    repeatX = repeatY = rTokens[0] !== 'no-repeat';
-  }
-  return { sizeTokens, posTokens, repeatX, repeatY };
-}
-
-// Resolve one axis of `background-size` (a computed length or percentage; `em`
-// is already px in computed style) against the box extent `base`. Returns null
-// for an unparseable token so the caller keeps the full box.
-function resolveBandSizeAxis(tok, base) {
-  if (tok == null || tok === 'auto') return base;
-  if (tok.endsWith('%')) return (parseFloat(tok) / 100) * base;
-  const v = parseFloat(tok);
-  return Number.isFinite(v) ? v : null;
-}
-
-// Resolve one axis of `background-position` into a pixel offset of the tile
-// inside the box, following CSS: a percentage aligns the same percentage point
-// of the tile with that of the box, a length is a direct offset, keywords map to
-// 0% / 50% / 100%.
-function resolveBandPosAxis(tok, base, tile, axis) {
-  if (tok == null) return 0;
-  if (tok === 'center') return (base - tile) / 2;
-  if (axis === 'x') {
-    if (tok === 'left') return 0;
-    if (tok === 'right') return base - tile;
-  } else {
-    if (tok === 'top') return 0;
-    if (tok === 'bottom') return base - tile;
-  }
-  if (tok.endsWith('%')) return (base - tile) * (parseFloat(tok) / 100);
-  const v = parseFloat(tok);
-  return Number.isFinite(v) ? v : 0;
-}
-
-// Given a box rect, return the sub-rect the highlighter gradient actually paints
-// (per `backgroundBandDescriptor`), or null when no band applies or it fills the
-// whole box. An axis that repeats fills that axis (offset 0, extent = box).
-function bandInsetRect(r, computed) {
-  const d = backgroundBandDescriptor(computed);
-  if (!d) return null;
-  let tileW = resolveBandSizeAxis(d.sizeTokens[0], r.width);
-  let tileH = resolveBandSizeAxis(d.sizeTokens.length > 1 ? d.sizeTokens[1] : 'auto', r.height);
-  if (tileW == null || tileH == null) return null;
-  if (d.repeatX) tileW = r.width;
-  if (d.repeatY) tileH = r.height;
-  const offX = d.repeatX ? 0 : resolveBandPosAxis(d.posTokens[0], r.width, tileW, 'x');
-  const offY = d.repeatY
-    ? 0
-    : resolveBandPosAxis(d.posTokens.length > 1 ? d.posTokens[1] : 'center', r.height, tileH, 'y');
-  const rect = { left: r.left + offX, top: r.top + offY, width: tileW, height: tileH };
-  const unchanged = Math.abs(rect.left - r.left) < 0.01 && Math.abs(rect.top - r.top) < 0.01 &&
-    Math.abs(rect.width - r.width) < 0.01 && Math.abs(rect.height - r.height) < 0.01;
-  return unchanged ? null : rect;
-}
-
 // An inline-level box (`display: inline`) that wraps across several lines
 // paints its background / border / radius / shadow ONCE PER LINE FRAGMENT —
 // never as one rectangle spanning the union bounding box. `getBoundingClientRect`
@@ -4083,15 +3952,14 @@ function bandInsetRect(r, computed) {
 //
 // `inlineBoxLineRects` decides whether the element is a wrapped inline box and,
 // if so, returns one per-line border-box rect (each relative to `parentRect`),
-// with any highlighter band (see bandInsetRect) already applied. `getClientRects`
+// without applying background-size a second time. `getClientRects`
 // reports one border box per line fragment for an inline element (block /
 // inline-block / flex boxes report a single box, so those fall through to the
 // single-box path); `mergeRectsOnSameLine` coalesces same-line glyph-run splits
 // (bidi / soft-hyphen) back to one rect per visual line. Returns null when the
 // element is not an inline box, carries no box visuals, or occupies a single
-// unbanded fragment — in every such case the caller keeps its existing
-// single-box emission. A single-line box whose band shrinks the paint rect still
-// takes this path so the band is honoured. Kept free of `buildStyle` so it stays
+// fragment — in every such case the caller keeps its existing
+// single-box emission. Kept free of `buildStyle` so it stays
 // unit-testable in Node (the style schema lives only in the browser payload).
 function inlineBoxLineRects(el, parentRect, computed) {
   if (computed.display !== 'inline') return null;
@@ -4102,10 +3970,10 @@ function inlineBoxLineRects(el, parentRect, computed) {
   const wm = String(computed.getPropertyValue('writing-mode') || '').trim().toLowerCase();
   const blockAxis = wm === 'vertical-lr' ? 'x-lr' : wm === 'vertical-rl' ? 'x-rl' : 'y';
   const lineRects = mergeRectsOnSameLine(raw, blockAxis);
-  const painted = lineRects.map((r) => bandInsetRect(r, computed) || r);
-  const banded = painted.some((p, i) => p !== lineRects[i]);
-  if (lineRects.length <= 1 && !banded) return null;
-  return painted.map((r) => ({
+  // Keep each measured fragment's border box. Background layout is now preserved in style;
+  // shrinking the fragment to a highlighter band here would apply size/position a second time.
+  if (lineRects.length <= 1) return null;
+  return lineRects.map((r) => ({
     left: r.left - parentRect.left,
     top: r.top - parentRect.top,
     width: r.width,
@@ -5532,10 +5400,6 @@ const HELPER_FNS = [
   emitInlineRunMarkup,
   hasAuthorDefinedFlexSize,
   isPureInlineTextLeaf,
-  backgroundBandDescriptor,
-  resolveBandSizeAxis,
-  resolveBandPosAxis,
-  bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
   renderInlineTextLeaf,
@@ -5873,61 +5737,43 @@ async function inlineExternalImages(cachedMap) {
   // `normalizeBackgroundImage` (stripped to a plain path the importer loads directly), so only
   // remote `http(s)` bytes need inlining here — fetch them and overwrite the element's inline
   // `background-image` with a `data:` URI so the walker emits a self-contained reference.
-  function firstCssUrl(value) {
-    const m = /url\(\s*(['"]?)([^'")]+)\1\s*\)/i.exec(value || '');
-    return m ? m[2] : '';
+  function cssUrls(value) {
+    return Array.from(value.matchAll(/url\(\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^)]*)\s*\)/gi));
   }
-
-  // A stack that mixes a colour wash with a photo — `linear-gradient(...), url(photo.jpg)`, the
-  // usual "tinted card" pattern — is inlined layer by layer. Replacing the whole declaration
-  // would throw the gradient away, and leaving the photo remote makes the importer emit an
-  // `<Image source="https://…">` the renderer cannot fetch, so the card renders as bare text.
-  // Only a single-url stack is handled: `url(...), url(...)` has no gradient to preserve and
-  // keeps the previous whole-declaration replacement.
-  function hasGradientLayer(value) {
-    return /(?:^|\s|,)(?:repeating-)?(?:linear|radial|conic)-gradient\(/i.test(value || '');
-  }
-
-  // Replaces just the `url(...)` token, leaving every other background layer in place. The data
-  // URI is emitted single-quoted because `normalizeBackgroundImage` passes a gradient-bearing
-  // value through verbatim: the value lands inside the double-quoted `style="…"` attribute the
-  // walker writes, where a double-quoted url() would close the attribute early.
-  function replaceFirstCssUrl(value, replacement) {
-    const token = `url('${replacement.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
-    return value.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/i, () => token);
-  }
-
   const bgPending = [];
   const bgInlinePending = [];
   const allEls = Array.from(document.querySelectorAll('*'));
   for (const el of allEls) {
     const bg = getComputedStyle(el).getPropertyValue('background-image').trim();
-    const layered = hasGradientLayer(bg) && (bg.match(/url\(/gi) || []).length === 1;
-    if (!bg || (!/^url\(/i.test(bg) && !layered)) continue;
-    const url = firstCssUrl(bg);
-    if (!url || /^file:/i.test(url)) continue;
-    if (url.startsWith('data:')) {
-      bgInlinePending.push({ el, src: url, current: url, bg, layered });
-      continue;
+    const matches = cssUrls(bg);
+    // Each element owns one mutable token list. Concurrent downloads replace their own token;
+    // writing from the original string on each completion would erase previously inlined layers.
+    const state = { el, bg, matches, replacements: matches.map(m => m[0]) };
+    for (let index = 0; index < matches.length; index++) {
+      const token = matches[index][0];
+      let url = token.slice(token.indexOf('(') + 1, -1).trim();
+      if (url[0] === '"' || url[0] === "'") url = url.slice(1, -1);
+      url = url.replace(/\\(['"\\])/g, '$1');
+      if (!url || /^file:/i.test(url)) continue;
+      if (url.startsWith('data:')) {
+        bgInlinePending.push({ state, index, src: url, current: url });
+      } else if (/^https?:/i.test(url)) {
+        if (cache[url]) bgInlinePending.push({ state, index, src: cache[url], current: url });
+        else bgPending.push({ state, index, url });
+      }
     }
-    if (!/^https?:/i.test(url)) continue;
-    const cached = cache[url];
-    if (cached) {
-      // `current` records what the element still declares: a cache hit has to be written back even
-      // when the cached bytes already are in a portable format, because the element is carrying
-      // the remote URL that entry replaces.
-      bgInlinePending.push({ el, src: cached, current: url, bg, layered });
-      continue;
-    }
-    bgPending.push({ el, url, bg, layered });
   }
 
-  // The inline declaration a fetched/cached url layer is written back into: a layered stack gets
-  // only its url token swapped, anything else keeps the whole-declaration replacement.
   function writeInlinedBackground(entry, value) {
-    entry.el.style.backgroundImage = entry.layered
-      ? replaceFirstCssUrl(entry.bg, value)
-      : `url("${value.replace(/"/g, '\\"')}")`;
+    const state = entry.state;
+    state.replacements[entry.index] = `url('${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+    let at = 0, result = '';
+    for (let i = 0; i < state.matches.length; i++) {
+      const match = state.matches[i];
+      result += state.bg.slice(at, match.index) + state.replacements[i];
+      at = match.index + match[0].length;
+    }
+    state.el.style.backgroundImage = result + state.bg.slice(at);
   }
 
   async function processOneBg(entry) {
@@ -5962,75 +5808,6 @@ async function inlineExternalImages(cachedMap) {
     await Promise.all(slice.map(processOneBg));
   }
 
-  // Top-level comma split of a CSS value list. Commas nested inside `rgb(...)`,
-  // `linear-gradient(...)` or a quoted `url('…')` argument — a `data:` URI in particular — must
-  // not split the list. Mirrors the importer's `SplitTopLevelCommas`.
-  function splitTopLevelCommas(value) {
-    const out = [];
-    let depth = 0;
-    let cur = '';
-    for (const ch of String(value || '')) {
-      if (ch === '(') depth++;
-      else if (ch === ')') depth = Math.max(0, depth - 1);
-      if (ch === ',' && depth === 0) {
-        if (cur.trim() !== '') out.push(cur.trim());
-        cur = '';
-        continue;
-      }
-      cur += ch;
-    }
-    if (cur.trim() !== '') out.push(cur.trim());
-    return out;
-  }
-
-  // A stack that layers a colour wash over a photo cannot be expressed as one PAGX background:
-  // the importer paints either the gradient layers or the image, never both. Split it into two
-  // boxes that the existing paths already handle — the element keeps the photo as a lone url()
-  // background (so its `background-size` / `-position` / `-repeat` apply as usual), and a
-  // synthesized full-bleed child carries the wash on top of it. Only backdrop boxes are split:
-  // an element with content of its own would need the wash slotted between its background and
-  // that content, which the flattened subset has no way to express.
-  function splitTintedBackgrounds() {
-    for (const el of Array.from(document.querySelectorAll('*'))) {
-      if (el.children.length > 0 || (el.textContent || '').trim() !== '') continue;
-      const computed = getComputedStyle(el);
-      // The wash child is positioned against the element, so the element has to be its own
-      // containing block; on a static box the inset would resolve against some distant ancestor.
-      if (computed.position === 'static') continue;
-      const bg = (computed.getPropertyValue('background-image') || '').trim();
-      if (!hasGradientLayer(bg)) continue;
-      const layers = splitTopLevelCommas(bg);
-      const urlIndex = layers.findIndex((layer) => /^url\(/i.test(layer));
-      if (urlIndex < 0 || (bg.match(/url\(/gi) || []).length !== 1) continue;
-      const wash = layers.filter((layer, index) => index !== urlIndex);
-      if (wash.length === 0) continue;
-      // Each fitting property is a per-layer list; the element now carries a single layer, so it
-      // needs that layer's own entry rather than the list. A one-entry value is already shared by
-      // every layer and passes through unchanged.
-      const entryFor = (value, fallback) => {
-        const entries = splitTopLevelCommas(value);
-        const picked = entries.length > 1 ? entries[urlIndex] : entries[0];
-        return picked || fallback;
-      };
-      const size = entryFor(computed.getPropertyValue('background-size'), 'auto');
-      const position = entryFor(computed.getPropertyValue('background-position'), '0% 0%');
-      const repeat = entryFor(computed.getPropertyValue('background-repeat'), 'repeat');
-      el.style.backgroundImage = layers[urlIndex];
-      el.style.backgroundSize = size;
-      el.style.backgroundPosition = position;
-      el.style.backgroundRepeat = repeat;
-      const tint = document.createElement('div');
-      tint.setAttribute('data-pagx-tint', '');
-      tint.setAttribute(
-        'style',
-        'position:absolute;left:0;top:0;width:100%;height:100%;background-image:' +
-          wash.join(', ') +
-          ';'
-      );
-      el.appendChild(tint);
-    }
-  }
-  splitTintedBackgrounds();
 }
 
 // ===== Pre-snapshot pass: snapshot live <canvas> bitmaps =====
@@ -6686,7 +6463,6 @@ export {
   materializeDecorativePseudoElements,
   expandStickyScrollytelling,
   mergeRectsOnSameLine,
-  bandInsetRect,
   inlineBoxLineRects,
   emitInlineBoxFragments,
   flexCharCarriesReveal,

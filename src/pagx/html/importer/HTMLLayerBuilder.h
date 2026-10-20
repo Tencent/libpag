@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include "pagx/html/importer/HTMLBackgroundLayout.h"
 #include "pagx/html/importer/HTMLBoxAttributes.h"
 #include "pagx/html/importer/HTMLSvgFilterDecoder.h"
 #include "pagx/types/BlendMode.h"
@@ -39,6 +41,14 @@ class HTMLValueParser;
 class Layer;
 class PAGXDocument;
 
+struct HTMLBackgroundImage {
+  ColorSource* color = nullptr;
+  float intrinsicWidth = NAN;
+  float intrinsicHeight = NAN;
+  // SVG stays vector. The factory creates a fresh import host for each visible tile.
+  std::function<Layer*(float, float)> vectorTile;
+};
+
 /**
  * Applies typed `HTMLBoxAttributes` onto PAGX `Layer` instances and synthesises the geometry /
  * fill / stroke / shadow chain needed for HTML containers and replaced elements.
@@ -55,6 +65,8 @@ class HTMLLayerBuilder {
                    HTMLInlineSvgEmitter& svgEmitter, HTMLIdAllocator& idAllocator);
 
   void bindDocument(PAGXDocument* document);
+  void setBackgroundImageResolver(std::function<HTMLBackgroundImage(const std::string&)> resolver);
+  static bool usesBackgroundLayout(const HTMLBoxAttributes& box);
 
   // Geometry / fills ------------------------------------------------------------------
   /** Writes width/height (px or %) and absolute-positioning anchors onto `layer`. Also
@@ -142,6 +154,8 @@ class HTMLLayerBuilder {
                               bool decorationColorDiffers, float bottom, float centerY);
 
  private:
+  bool applyBackgroundLayers(Layer* layer, const HTMLBoxAttributes& box);
+  Layer* makeBackgroundClip(const HTMLBoxAttributes& box, const HTMLBackgroundRect& rect);
   void applyBackgroundFill(Layer* layer, const HTMLBoxAttributes& box, Element* geometry,
                            bool& emitted);
   void emitInsetBackgroundLayer(Layer* layer, const HTMLBoxAttributes& box, ColorSource* color,
@@ -157,6 +171,7 @@ class HTMLLayerBuilder {
   HTMLSvgFilterDecoder _filterDecoder;
   PAGXDocument* _document = nullptr;
   std::unordered_map<Layer*, std::vector<Layer*>> _outerBoxShadows;
+  std::function<HTMLBackgroundImage(const std::string&)> _backgroundImageResolver;
 };
 
 }  // namespace pagx
