@@ -2210,6 +2210,10 @@ function freezeSvg(svgEl, rect) {
   if (rect && Number.isFinite(rect.width) && Number.isFinite(rect.height)) {
     clone.setAttribute('width', String(Math.round(rect.width * 1000) / 1000));
     clone.setAttribute('height', String(Math.round(rect.height * 1000) / 1000));
+    // Authored CSS sizing outranks the geometry attributes. Freeze both to the same used
+    // viewport so percentage/auto/class sizing cannot change when the SVG is detached.
+    clone.style.setProperty('width', `${Math.round(rect.width * 1000) / 1000}px`);
+    clone.style.setProperty('height', `${Math.round(rect.height * 1000) / 1000}px`);
   }
   const fallback = (getComputedStyle(svgEl).color || 'rgb(0, 0, 0)').trim();
   const walk = (orig, dst, inheritedColor, inheritedAttrs, isRoot) => {

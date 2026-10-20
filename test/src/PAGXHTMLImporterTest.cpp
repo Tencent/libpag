@@ -2487,6 +2487,28 @@ PAG_TEST(PAGXHTMLImporterTest, InlineSvgPassedAsImportDirective) {
   EXPECT_FALSE(leaf->importDirective.content.empty());
   EXPECT_EQ(leaf->importDirective.format, "svg");
   EXPECT_NE(leaf->importDirective.content.find("circle"), std::string::npos);
+  EXPECT_FLOAT_EQ(leaf->width, 80);
+  EXPECT_FLOAT_EQ(leaf->height, 80);
+}
+
+PAG_TEST(PAGXHTMLImporterTest, InlineSvgViewportSizesDecoratedHost) {
+  auto doc = ParseFromString(R"HTML(
+    <html><body style="width:300px;height:200px">
+      <svg width="240" height="120" viewBox="0 0 480 240"
+           style="width:180px;height:auto;border-radius:20px;overflow:hidden">
+        <rect width="480" height="240" fill="red"/>
+      </svg>
+    </body></html>
+  )HTML");
+  ASSERT_NE(doc, nullptr);
+  auto* host = doc->layers.front()->children.front();
+  EXPECT_FLOAT_EQ(host->width, 180);
+  EXPECT_FLOAT_EQ(host->height, 90);
+  ASSERT_EQ(host->children.size(), 1u);
+  auto* content = host->children.front();
+  EXPECT_EQ(content->importDirective.format, "svg");
+  EXPECT_FLOAT_EQ(content->width, 180);
+  EXPECT_FLOAT_EQ(content->height, 90);
 }
 
 // Regression: an inline <svg> carrying its own `opacity` (presentation attribute and/or inline

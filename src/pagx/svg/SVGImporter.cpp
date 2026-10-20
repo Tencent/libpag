@@ -42,6 +42,9 @@ using pag::DegreesToRadians;
 
 static constexpr float DEFAULT_FONT_SIZE = 16.0f;
 
+static Matrix ComputeViewBoxMatrix(const std::vector<float>& viewBox, float vpW, float vpH,
+                                  const std::string& preserveAspectRatio);
+
 static bool ParseInternalFloat(const std::string& value, float* result) {
   if (value.empty() || result == nullptr) return false;
   char* end = nullptr;
@@ -157,13 +160,14 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
     targetW = _options.targetWidth;
     targetH = _options.targetHeight;
   } else if (viewBox.size() >= 4) {
-    // When viewBox is present, check if SVG has explicit width/height that differ.
-    float svgW = parseLength(getAttribute(root, "width"), 0);
-    float svgH = parseLength(getAttribute(root, "height"), 0);
-    if (svgW > 0 && svgH > 0) {
-      targetW = svgW;
-      targetH = svgH;
-    }
+    auto width = getAttribute(root, "width");
+    auto height = getAttribute(root, "height");
+    bool hasWidth = !width.empty() && width != "auto";
+    bool hasHeight = !height.empty() && height != "auto";
+    if (hasWidth) targetW = parseLength(width, sourceW);
+    if (hasHeight) targetH = parseLength(height, sourceH);
+    if (hasWidth && !hasHeight) targetH = targetW * sourceH / sourceW;
+    if (hasHeight && !hasWidth) targetW = targetH * sourceW / sourceH;
   }
 
   if (targetW <= 0 || targetH <= 0) {
@@ -209,20 +213,12 @@ std::shared_ptr<PAGXDocument> SVGParserContext::parseDOM(const std::shared_ptr<X
 
   // Compute content transform matrix for viewBox mapping.
   // This handles viewBox origin offset, uniform scaling, and centering in one matrix.
-  float viewBoxX = (viewBox.size() >= 4) ? viewBox[0] : 0;
-  float viewBoxY = (viewBox.size() >= 4) ? viewBox[1] : 0;
-  bool needsContentTransform = false;
   Matrix contentMatrix = Matrix::Identity();
-
-  if (targetW != sourceW || targetH != sourceH || viewBoxX != 0 || viewBoxY != 0) {
-    float scaleX = targetW / sourceW;
-    float scaleY = targetH / sourceH;
-    float scale = std::min(scaleX, scaleY);
-    float offsetX = (targetW - sourceW * scale) / 2.0f - viewBoxX * scale;
-    float offsetY = (targetH - sourceH * scale) / 2.0f - viewBoxY * scale;
-    contentMatrix = {scale, 0, 0, scale, offsetX, offsetY};
-    needsContentTransform = !contentMatrix.isIdentity();
+  if (viewBox.size() >= 4) {
+    contentMatrix = ComputeViewBoxMatrix(viewBox, targetW, targetH,
+                                         getAttribute(root, "preserveAspectRatio"));
   }
+  bool needsContentTransform = !contentMatrix.isIdentity();
 
   // Compute initial inherited style from the root <svg> element.
   InheritedStyle rootStyle = {};
@@ -406,7 +402,7 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
 
   if (tag == "defs" || tag == "linearGradient" || tag == "radialGradient" || tag == "pattern" ||
       tag == "mask" || tag == "clipPath" || tag == "filter" || tag == "marker" || tag == "style" ||
-      tag == "title" || tag == "desc" || tag == "metadata") {
+      tag == "title" || tag == "desc" || tag == "metadata" || tag == "symbol") {
     return nullptr;
   }
 
@@ -546,7 +542,15 @@ Layer* SVGParserContext::convertToLayer(const std::shared_ptr<DOMNode>& element,
   }
 
   // Convert contents.
-  if (tag == "g" || tag == "svg") {
+  if (tag == "svg") {
+    float width = parseLength(getAttribute(element, "width", "100%"), _viewBoxWidth);
+    float height = parseLength(getAttribute(element, "height", "100%"), _viewBoxHeight);
+    auto viewport = convertViewport(element, inheritedStyle, width, height, depth);
+    if (viewport == nullptr) return nullptr;
+    viewport->matrix = Matrix::Translate(parseLength(getAttribute(element, "x"), _viewBoxWidth),
+                                         parseLength(getAttribute(element, "y"), _viewBoxHeight));
+    layer->children.push_back(viewport);
+  } else if (tag == "g") {
     // Group: convert children as child layers.
     auto child = element->getFirstChild();
     while (child) {
@@ -1379,6 +1383,38 @@ static Matrix ComputeViewBoxMatrix(const std::vector<float>& viewBox, float vpW,
   }
   return Matrix::Translate(tx, ty) * Matrix::Scale(scaleX, scaleY);
 }
+
+Layer* SVGParserContext::convertViewport(const std::shared_ptr<DOMNode>& element,
+                                        const InheritedStyle& inheritedStyle, float width,
+                                        float height, int depth) {
+  auto viewBox = parseViewBox(getAttribute(element, "viewBox"));
+  if (width <= 0 || height <= 0 ||
+      (viewBox.size() == 4 && (viewBox[2] <= 0 || viewBox[3] <= 0))) {
+    return nullptr;
+  }
+  auto viewport = _document->makeNode<Layer>();
+  viewport->width = width;
+  viewport->height = height;
+  viewport->clipToBounds = getAttribute(element, "overflow") != "visible";
+  auto content = _document->makeNode<Layer>();
+  if (viewBox.size() == 4) {
+    content->matrix = ComputeViewBoxMatrix(viewBox, width, height,
+                                          getAttribute(element, "preserveAspectRatio"));
+  }
+  float savedWidth = _viewBoxWidth;
+  float savedHeight = _viewBoxHeight;
+  _viewBoxWidth = viewBox.size() == 4 ? viewBox[2] : width;
+  _viewBoxHeight = viewBox.size() == 4 ? viewBox[3] : height;
+  for (auto child = element->getFirstChild(); child; child = child->getNextSibling()) {
+    auto converted = convertToLayer(child, inheritedStyle, depth + 1);
+    if (converted != nullptr) content->children.push_back(converted);
+  }
+  _viewBoxWidth = savedWidth;
+  _viewBoxHeight = savedHeight;
+  viewport->children.push_back(content);
+  return viewport;
+}
+
 Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& useElement,
                                              const std::shared_ptr<DOMNode>& refElement,
                                              const InheritedStyle& inheritedStyle, int depth) {
@@ -1389,23 +1425,24 @@ Layer* SVGParserContext::convertUseContainer(const std::shared_ptr<DOMNode>& use
   // The use's x/y establishes the referenced content's origin. For <symbol>/<svg> the use's
   // width/height define a viewport that the referenced viewBox is fitted into (per
   // preserveAspectRatio); a plain <g> has no viewport of its own.
-  Matrix contentMatrix = Matrix::Translate(x, y);
+  InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
+  _useStack.insert(refId);
   if (refElement->name == "symbol" || refElement->name == "svg") {
-    auto viewBox = parseViewBox(getAttribute(refElement, "viewBox"));
-    float useWidth = parseLength(getAttribute(useElement, "width"), _viewBoxWidth);
-    float useHeight = parseLength(getAttribute(useElement, "height"), _viewBoxHeight);
-    if (viewBox.size() >= 4 && viewBox[2] > 0 && viewBox[3] > 0 && useWidth > 0 && useHeight > 0) {
-      contentMatrix =
-          contentMatrix * ComputeViewBoxMatrix(viewBox, useWidth, useHeight,
-                                               getAttribute(refElement, "preserveAspectRatio"));
+    float width = parseLength(getAttribute(useElement, "width",
+                                getAttribute(refElement, "width", "100%")), _viewBoxWidth);
+    float height = parseLength(getAttribute(useElement, "height",
+                                 getAttribute(refElement, "height", "100%")), _viewBoxHeight);
+    auto viewport = convertViewport(refElement, refStyle, width, height, depth);
+    if (viewport != nullptr) {
+      viewport->matrix = Matrix::Translate(x, y) *
+                         parseTransform(getAttribute(refElement, "transform"));
     }
+    _useStack.erase(refId);
+    return viewport;
   }
 
   auto group = _document->makeNode<Layer>();
-  group->matrix = contentMatrix;
-
-  InheritedStyle refStyle = computeInheritedStyle(refElement, inheritedStyle);
-  _useStack.insert(refId);
+  group->matrix = Matrix::Translate(x, y) * parseTransform(getAttribute(refElement, "transform"));
   auto child = refElement->getFirstChild();
   while (child) {
     auto childLayer = convertToLayer(child, refStyle, depth + 1);

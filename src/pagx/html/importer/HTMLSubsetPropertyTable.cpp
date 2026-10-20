@@ -564,6 +564,12 @@ std::string ResolveLength(const std::string& value, const PropertyContext& ctx,
   // `auto`, `none`, `inherit`, `initial`, `unset`, `revert`: drop silently (they're benign no-ops
   // when the subset uses explicit values everywhere).
   std::string lc = ToLower(trimmed);
+  // On SVG, auto overrides a width/height presentation attribute and participates in intrinsic
+  // aspect-ratio sizing. Dropping it would incorrectly restore the attribute's value.
+  if (ctx.ownerTag == "svg" && (ctx.propertyName == "width" || ctx.propertyName == "height") &&
+      lc == "auto") {
+    return lc;
+  }
   if (lc == "auto" || lc == "none" || lc == "inherit" || lc == "initial" || lc == "unset" ||
       lc == "revert") {
     return std::string();

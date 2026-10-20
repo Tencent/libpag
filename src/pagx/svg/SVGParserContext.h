@@ -115,6 +115,8 @@ class SVGParserContext {
   Layer* convertUseContainer(const std::shared_ptr<DOMNode>& useElement,
                              const std::shared_ptr<DOMNode>& refElement,
                              const InheritedStyle& inheritedStyle, int depth);
+  Layer* convertViewport(const std::shared_ptr<DOMNode>& element,
+                         const InheritedStyle& inheritedStyle, float width, float height, int depth);
   void convertChildren(const std::shared_ptr<DOMNode>& element, std::vector<Element*>& contents,
                        const InheritedStyle& inheritedStyle,
                        ShadowOnlyType shadowOnlyType = ShadowOnlyType::None);

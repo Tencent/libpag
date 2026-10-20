@@ -291,6 +291,18 @@ describe('CSS painting survives the snapshot', () => {
       `<img src="${src}"/>`, snapshot => assert.match(snapshot.html, /<img\b[^>]*\/>/));
   });
 
+  it('keeps a decorated SVG in its measured viewport', async () => {
+    await compare('svg-viewport', `
+      .host { width:200px;height:150px;display:flex;align-items:center;justify-content:center }
+      svg { width:120px;height:80px;border-radius:12px;overflow:hidden }
+    `, `<div class="host"><svg width="100%" viewBox="0 0 300 200">
+      <rect width="300" height="200" fill="#e02020"/>
+      <rect x="150" width="150" height="100" fill="#2040d0"/>
+    </svg></div>`, snapshot => {
+      assert.match(snapshot.html, /<svg[^>]*width="120"[^>]*height="80"/);
+    });
+  });
+
   it('retains rounded clipping on generated image content', async () => {
     const src = 'data:image/svg+xml,' + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><path fill="#e02020" d="M0 0h100v100H0z"/></svg>');

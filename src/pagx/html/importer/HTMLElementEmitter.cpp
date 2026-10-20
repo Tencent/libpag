@@ -820,8 +820,12 @@ Layer* HTMLParserContext::convertInlineSvg(const std::shared_ptr<DOMNode>& eleme
     _layerBuilder->applyBackgroundVisuals(layer, underlayBox);
 
     importHost = _document->makeNode<Layer>();
-    importHost->percentWidth = 100.0f;
-    importHost->percentHeight = 100.0f;
+    // Resolve the SVG in the same viewport as its HTML host. Percent-only children are not
+    // measured until after imports resolve, which otherwise uses the unscaled viewBox size.
+    if (!std::isnan(layer->width)) importHost->width = layer->width;
+    else importHost->percentWidth = 100.0f;
+    if (!std::isnan(layer->height)) importHost->height = layer->height;
+    else importHost->percentHeight = 100.0f;
     layer->children.push_back(importHost);
 
     if (box.borderSet) {

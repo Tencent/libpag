@@ -853,6 +853,57 @@ PAGX_TEST(PAGXSVGTest, SVGImport_ViewBoxScaleFoldsIntoLayerMatrix) {
   EXPECT_FLOAT_EQ(layer->matrix.d, 2.0f);
 }
 
+PAGX_TEST(PAGXSVGTest, SVGImport_RootViewportAspectRatioAndZeroSize) {
+  auto doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="200" height="100" viewBox="10 20 100 100" preserveAspectRatio="none">
+           <rect width="100" height="100"/></svg>)");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.a, 2);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.d, 1);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.tx, -20);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.ty, -20);
+  doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="200" height="100" viewBox="0 0 100 100" preserveAspectRatio="xMaxYMax slice">
+           <rect width="100" height="100"/></svg>)");
+  ASSERT_EQ(doc->layers.size(), 1u);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.d, 2);
+  EXPECT_FLOAT_EQ(doc->layers[0]->matrix.ty, -100);
+  doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="0" viewBox="0 0 100 100"><rect width="100" height="100"/></svg>)");
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(doc->layers.empty());
+  doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="200" viewBox="0 0 100 50"><rect width="100" height="50"/></svg>)");
+  EXPECT_FLOAT_EQ(doc->width, 200);
+  EXPECT_FLOAT_EQ(doc->height, 100);
+}
+
+PAGX_TEST(PAGXSVGTest, SVGImport_NestedViewportResolvesPercentagesLocally) {
+  auto doc = pagx::SVGImporter::ParseString(
+      R"(<svg width="300" height="200">
+           <svg x="30" y="20" width="120" height="60" viewBox="0 0 40 40"
+                preserveAspectRatio="none"><rect width="50%" height="100%"/></svg>
+         </svg>)");
+  ASSERT_NE(doc, nullptr);
+  ASSERT_EQ(doc->layers.size(), 1u);
+  auto* viewport = doc->layers.front()->children.front();
+  EXPECT_TRUE(viewport->clipToBounds);
+  EXPECT_FLOAT_EQ(viewport->width, 120);
+  EXPECT_FLOAT_EQ(viewport->height, 60);
+  EXPECT_FLOAT_EQ(viewport->matrix.tx, 30);
+  EXPECT_FLOAT_EQ(viewport->matrix.ty, 20);
+  auto* content = viewport->children.front();
+  EXPECT_FLOAT_EQ(content->matrix.a, 3);
+  EXPECT_FLOAT_EQ(content->matrix.d, 1.5);
+  std::vector<pagx::Element*> rectangles;
+  CollectElementsByType(content, pagx::NodeType::Rectangle, rectangles);
+  ASSERT_EQ(rectangles.size(), 1u);
+  auto* rectangle = static_cast<pagx::Rectangle*>(rectangles.front());
+  EXPECT_FLOAT_EQ(rectangle->size.width, 20);
+  EXPECT_FLOAT_EQ(rectangle->size.height, 40);
+}
+
 /**
  * Test SVG import: an element carrying both `mask` and `clip-path` keeps the mask on the inner
  * layer and moves the clip-path onto a wrapping parent layer, so neither is dropped.

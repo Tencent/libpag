@@ -30,6 +30,7 @@
 #include "pagx/html/importer/HTMLDiagnosticSink.h"
 #include "pagx/html/importer/HTMLValueParser.h"
 #include "pagx/utils/CSSFontStyle.h"
+#include "pagx/utils/StringParser.h"
 #include "pagx/xml/XMLDOM.h"
 
 namespace pagx {
@@ -685,6 +686,29 @@ HTMLBoxAttributes HTMLStyleCascade::computeBoxAttributes(const std::shared_ptr<D
   HTMLBoxAttributes box = {};
   const auto& props = getResolvedStyle(element);
   parseBoxSizing(box, props);
+  if (element->name == "svg") {
+    // SVG geometry attributes are presentation attributes. CSS wins, including an explicit
+    // auto/zero value; otherwise the viewport must size the HTML host before layout runs.
+    if (LookupProperty(props, "width").empty()) {
+      auto* width = element->findAttribute("width");
+      if (width != nullptr) ParseSizingDimension(*width, box.widthPx, box.widthPct);
+    }
+    if (LookupProperty(props, "height").empty()) {
+      auto* height = element->findAttribute("height");
+      if (height != nullptr) ParseSizingDimension(*height, box.heightPx, box.heightPct);
+    }
+    auto* viewBoxAttr = element->findAttribute("viewBox");
+    auto viewBox = viewBoxAttr == nullptr ? std::vector<float>{} : ParseFloatList(*viewBoxAttr);
+    if (viewBox.size() == 4 && viewBox[2] > 0 && viewBox[3] > 0) {
+      bool autoWidth = std::isnan(box.widthPx) && std::isnan(box.widthPct);
+      bool autoHeight = std::isnan(box.heightPx) && std::isnan(box.heightPct);
+      if (autoWidth && !std::isnan(box.heightPx)) {
+        box.widthPx = box.heightPx * viewBox[2] / viewBox[3];
+      } else if (autoHeight && !std::isnan(box.widthPx)) {
+        box.heightPx = box.widthPx * viewBox[3] / viewBox[2];
+      }
+    }
+  }
   // html-snapshot keeps Chromium's measured width in CSS while flex inference runs, then marks
   // boxes whose source `width:auto` was genuinely content-sized. Consume that internal marker
   // only at Layer construction time so inference can still use the measured child geometry.
