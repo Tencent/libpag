@@ -7210,6 +7210,52 @@ PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileBecomesFontResource) {
   ExpectWebFontImported(ParseFromString(WebFontPage(fontPath)), fontPath);
 }
 
+// A family split across several @font-face rules (unicode-range subsets, as CJK web fonts ship)
+// registers every file under one (family, style) key, so only the last one is the primary face.
+// The earlier ones stay reachable through the fallback chain, so each character still shapes with
+// the file that covers it instead of a system substitute, whether the source is a file or inlined.
+// Baking (the CLI default) emits no `<Font file>` for layout to register on its own, so the
+// importer's registrations are all the document has.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceRulesSharingFamilyStayReachable) {
+  auto puaPath = PuaWoff2FontPath();
+  std::ifstream file(puaPath, std::ios::binary);
+  std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  ASSERT_FALSE(bytes.empty());
+  auto puaDataURI =
+      "data:font/woff2;base64," +
+      pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
+  auto cjkPath = ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf");
+  pagx::HTMLImporter::Options options;
+  options.emitFontFileResources = false;
+  for (const auto& puaSource : {puaPath, puaDataURI}) {
+    auto doc = pagx::HTMLImporter::ParseString(
+        "<html><head><style>@font-face{font-family:Split;src:url('" + puaSource +
+            "')}@font-face{font-family:Split;src:url('" + cjkPath +
+            "')}</style></head><body style='width:120px;height:40px'>"
+            "<span style='position:absolute;left:0px;top:0px;font-family:Split;font-size:20px;"
+            "white-space:nowrap'>&#xE000;中</span></body></html>",
+        options);
+    ASSERT_NE(doc, nullptr);
+    auto* text = FindFirstText(doc.get());
+    ASSERT_NE(text, nullptr);
+    doc->applyLayout();
+    ASSERT_NE(text->glyphData, nullptr);
+    bool shapedWithPua = false;
+    bool shapedWithCjk = false;
+    for (auto& run : text->glyphData->layoutRuns) {
+      ASSERT_NE(run.font.getTypeface(), nullptr);
+      auto family = run.font.getTypeface()->fontFamily();
+      shapedWithPua |= family == "pagx-font-f0";
+      shapedWithCjk |= family == "Noto Sans SC";
+      for (auto glyph : run.glyphs) {
+        EXPECT_NE(glyph, 0);
+      }
+    }
+    EXPECT_TRUE(shapedWithPua);
+    EXPECT_TRUE(shapedWithCjk);
+  }
+}
+
 // An inlined source has no file a `<Font file>` could reference, so a document that keeps font
 // references instead of baked glyphs cannot carry its family: each such family that text uses is
 // reported. Baking carries the glyphs themselves and reports nothing.

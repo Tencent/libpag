@@ -122,6 +122,9 @@ local disk or inlines the font as a `data:` URI:
   `MaShanZheng` for a file whose family is `Ma Shan Zheng`). Only the artifact differs: a local
   file becomes a `<Font file="…">` resource (PAGX spec §3.3.5), while a `data:` URI's bytes go
   straight into the document's font config and produce no resource node.
+- Several rules may declare the same family, as unicode-range subsets of a CJK font do. Every
+  source is registered: the last rule's file is the family's primary face, and the others join the
+  fallback chain, so a character the primary face lacks still shapes with the subset that has it.
 - Whether the output keeps `<Font file>` is an import option: `pagx import --fonts embed` (the HTML
   default) bakes the glyphs and drops the references, `--fonts external` keeps them along with the
   font files copied next to the output. A `data:` source has no file to keep, so with
