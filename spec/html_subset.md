@@ -124,7 +124,9 @@ local disk or inlines the font as a `data:` URI:
   straight into the document's font config and produce no resource node.
 - Whether the output keeps `<Font file>` is an import option: `pagx import --fonts embed` (the HTML
   default) bakes the glyphs and drops the references, `--fonts external` keeps them along with the
-  font files copied next to the output.
+  font files copied next to the output. A `data:` source has no file to keep, so with
+  `--fonts external` text using it falls back to other fonts once the output is reloaded
+  (`subset:font-face-inline-not-emitted`).
 - Remote (`http(s)://`) sources are not used (`subset:font-face-no-local-source`); a source that
   cannot be loaded as a font is skipped (`subset:font-face-unloadable`). A rule without a `url()`
   source is dropped like any other unsupported at-rule.

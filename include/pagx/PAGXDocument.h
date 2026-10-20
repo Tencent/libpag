@@ -191,8 +191,10 @@ class PAGXDocument : public Node {
   /**
    * Returns the document's font configuration. Importers populate fallback fonts here
    * (e.g. the HTML importer registers every concrete name from CSS `font-family` stacks
-   * so glyph-level fallback can pick them up at layout time). Callers may also register
-   * additional typefaces or fallbacks directly before invoking `applyLayout`.
+   * so glyph-level fallback can pick them up at layout time, and every `@font-face` source under
+   * the CSS family its rule declares). Those registrations exist only in this config, and passing
+   * a config to `applyLayout` replaces it, so a caller adding fonts either registers them here
+   * directly or passes a copy of this config with them added.
    */
   FontConfig& fontConfig() {
     return _fontConfig;

@@ -644,6 +644,7 @@ void HTMLParserContext::loadWebFontFiles() {
           continue;
         }
         registerMappedFontAliases(bytes->data(), bytes->size());
+        _inlineFontFamilies.push_back(rule.family);
         registered = true;
         break;
       }
@@ -679,12 +680,24 @@ void HTMLParserContext::loadWebFontFiles() {
 }
 
 void HTMLParserContext::emitWebFontResources() {
-  if (_webFontFiles.empty() || !_options.emitFontFileResources) {
+  if (!_options.emitFontFileResources || (_webFontFiles.empty() && _inlineFontFamilies.empty())) {
     return;
   }
   std::unordered_set<std::string> namedFamilies = {};
   for (const auto& name : _fallbackFamilyNames) {
     namedFamilies.insert(ToLower(name));
+  }
+  // An inlined source's bytes exist only in this document's font config, so a reloaded output
+  // has no way to resolve the family. Baking the glyphs is the only form that carries it.
+  std::unordered_set<std::string> reportedFamilies = {};
+  for (const auto& family : _inlineFontFamilies) {
+    auto key = ToLower(family);
+    if (namedFamilies.count(key) != 0 && reportedFamilies.insert(key).second) {
+      warn("html: @font-face '" + family +
+           "' is inlined as a data: URI and cannot become a <Font file> resource; text using it "
+           "falls back to other fonts once the output is reloaded unless its glyphs are baked "
+           "(subset:font-face-inline-not-emitted)");
+    }
   }
   std::unordered_set<std::string> emittedPaths = {};
   for (auto& node : _document->nodes) {

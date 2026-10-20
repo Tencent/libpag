@@ -7210,6 +7210,29 @@ PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileBecomesFontResource) {
   ExpectWebFontImported(ParseFromString(WebFontPage(fontPath)), fontPath);
 }
 
+// An inlined source has no file a `<Font file>` could reference, so a document that keeps font
+// references instead of baked glyphs cannot carry its family: each such family that text uses is
+// reported. Baking carries the glyphs themselves and reports nothing.
+PAG_TEST(PAGXHTMLImporterTest, FontFaceInlineSourceReportedWhenKeepingFontFiles) {
+  std::ifstream file(PuaWoff2FontPath(), std::ios::binary);
+  std::string bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  ASSERT_FALSE(bytes.empty());
+  auto html =
+      WebFontPage("data:font/woff2;base64," +
+                  pagx::Base64Encode(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()));
+  pagx::HTMLImporter::Options options;
+  auto doc = pagx::HTMLImporter::ParseString(html, options);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_TRUE(CollectFonts(doc.get()).empty());
+  EXPECT_TRUE(HasDiagnosticContaining(doc, "'pagx-font-f0' is inlined as a data: URI"));
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "'Unused Face' is inlined"));
+
+  options.emitFontFileResources = false;
+  doc = pagx::HTMLImporter::ParseString(html, options);
+  ASSERT_NE(doc, nullptr);
+  EXPECT_FALSE(HasDiagnosticContaining(doc, "subset:font-face-inline-not-emitted"));
+}
+
 // With the subset transformer off, the importer reads `@font-face` from the original <style>
 // instead of the block the transformer re-emits; both routes must yield the same resource.
 PAG_TEST(PAGXHTMLImporterTest, FontFaceLocalFileWithoutNormalization) {

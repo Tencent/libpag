@@ -430,7 +430,8 @@ is `Ma Shan Zheng`); `Text@fontFamily` always keeps the authored name.
   its original relative path (e.g. `assets/fonts/font_f1.woff2`), referenced by `<Font file="…">`.
   Smaller and editable, but the output only renders correctly on a host that can load those files
   — and a `<Font file>` registers under the family name stored inside the file, so a page that
-  aliases a face will not resolve after reload.
+  aliases a face will not resolve after reload. A `data:` source has no file to copy, so text
+  using it falls back to other fonts after reload (reported with `-v`); use `embed` for such pages.
 
 Remote (`http(s)://`) font sources are never carried over.
 

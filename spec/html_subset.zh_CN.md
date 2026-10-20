@@ -111,7 +111,9 @@
   `Ma Shan Zheng` 写成 `MaShanZheng`）。差别只在产物形态：本地文件会生成 `<Font file="…">`
   资源（见 PAGX 规范 §3.3.5），`data:` 源的字节则直接进入文档的字体配置，不产生资源节点。
 - 产物是否保留 `<Font file>` 由导入选项决定：`pagx import --fonts embed`（HTML 默认）会烘焙字形并
-  丢弃文件引用，`--fonts external` 保留引用与随产物复制的字体文件。
+  丢弃文件引用，`--fonts external` 保留引用与随产物复制的字体文件。`data:` 源没有可保留的文件，
+  因此在 `--fonts external` 下，使用它的文本在产物重新加载后会回退到其他字体
+  （`subset:font-face-inline-not-emitted`）。
 - 远程（`http(s)://`）源不会被使用（`subset:font-face-no-local-source`）；无法作为字体加载的源
   会被跳过（`subset:font-face-unloadable`）。没有 `url()` 源的规则与其他不支持的 at-rule 一样被
   丢弃。

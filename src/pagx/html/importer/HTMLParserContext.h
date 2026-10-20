@@ -360,6 +360,9 @@ class HTMLParserContext {
   // its own rule's family, so a font-family stack that names one of them resolves at render time
   // regardless of the family name stored inside the file.
   std::unordered_set<std::string> _webFontFamilies = {};
+  // CSS families whose @font-face source is an inlined `data:` URI. Their bytes live only in the
+  // document's font config, which no `<Font file>` can reference.
+  std::vector<std::string> _inlineFontFamilies = {};
 
   // Memoises `isFontFamilyAvailable` (family name -> resolvable) so each distinct CSS family is
   // probed against the font system at most once during traversal.
@@ -422,7 +425,8 @@ class HTMLParserContext {
 
   // Emits one `<Font file>` resource per loaded web font file whose CSS family is named by some
   // font-family stack in the document. Unused faces are left out so they are neither written nor
-  // copied next to the output.
+  // copied next to the output. A used family whose source is an inlined `data:` URI has nothing
+  // to reference, so it is reported instead.
   void emitWebFontResources();
 };
 

@@ -140,6 +140,9 @@ class HTMLImporter {
      * The sources are loaded and registered into the document's font config either way, so
      * turning this off keeps layout intact while leaving the output free of font file references
      * — the shape a self-contained document needs once its glyphs have been baked.
+     * An inlined `data:` source has no file to reference: its family resolves only through this
+     * document's font config, so text using it falls back to other fonts once the output is
+     * reloaded, and the importer reports such a family as a warning.
      * Default true.
      */
     bool emitFontFileResources = true;
