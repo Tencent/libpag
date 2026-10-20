@@ -3272,11 +3272,9 @@ void SVGWriter::writeLayer(SVGBuilder& out, const Layer* layer) {
     }
   }
 
-  auto renderPos = layer->renderPosition();
-  bool needsGroup = !layer->matrix.isIdentity() || !layer->matrix3D.isIdentity() ||
-                    layer->alpha < 1.0f || !layer->id.empty() || !layer->filters.empty() ||
-                    !layer->styles.empty() || layer->mask != nullptr || renderPos.x != 0.0f ||
-                    renderPos.y != 0.0f || !layer->customData.empty() ||
+  bool needsGroup = !BuildLayerMatrix(layer).isIdentity() || layer->alpha < 1.0f ||
+                    !layer->id.empty() || !layer->filters.empty() || !layer->styles.empty() ||
+                    layer->mask != nullptr || !layer->customData.empty() ||
                     layer->blendMode != BlendMode::Normal || layer->hasScrollRect;
 
   // When groupOpacity is false, the layer's alpha is distributed to each child
@@ -3490,8 +3488,9 @@ std::string SVGWriter::writeScrollRectClipDef(const Layer* layer) {
 
 std::string SVGExporter::ToSVG(PAGXDocument& doc, const Options& options,
                                std::vector<std::string>* warnings) {
-  // Mirror PPTExporter: resolve renderPosition() for every layer/group so authored x/y/position
-  // attributes flow into the matrix helpers (BuildLayerMatrix / BuildGroupMatrix).
+  // Mirror PPTExporter: resolve layout before reading the matrix helpers. BuildLayerMatrix composes
+  // each Layer's generated layout position outside its authored x / y and transform, and
+  // BuildGroupMatrix reads each Group's renderPosition().
   if (!doc.isLayoutApplied()) {
     doc.applyLayout(options.fontConfig);
   }

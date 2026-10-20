@@ -90,6 +90,17 @@ tgfx::Matrix ToTGFX(const Matrix& m) {
   return tgfx::Matrix::MakeAll(m.a, m.c, m.tx, m.b, m.d, m.ty);
 }
 
+Matrix FromTGFX(const tgfx::Matrix& m) {
+  Matrix result = {};
+  result.a = m.getScaleX();
+  result.b = m.getSkewY();
+  result.c = m.getSkewX();
+  result.d = m.getScaleY();
+  result.tx = m.getTranslateX();
+  result.ty = m.getTranslateY();
+  return result;
+}
+
 tgfx::Rect ToTGFX(const Rect& r) {
   return tgfx::Rect::MakeXYWH(r.x, r.y, r.width, r.height);
 }

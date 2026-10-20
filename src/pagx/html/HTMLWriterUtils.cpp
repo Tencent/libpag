@@ -38,6 +38,7 @@
 #include "pagx/types/Arrangement.h"
 #include "pagx/types/Padding.h"
 #include "pagx/utils/Base64.h"
+#include "pagx/utils/ExporterUtils.h"
 #include "pagx/utils/ImageMime.h"
 #include "pagx/utils/StringParser.h"
 #include "renderer/LineBreaker.h"
@@ -560,9 +561,25 @@ std::string LayerTransformCSS(const Layer* layer) {
   if (!layer->matrix3D.isIdentity()) {
     return Matrix3DToCSS(layer->matrix3D);
   }
-  // Layer position (x/y) is emitted as left/top by the caller. The matrix is applied on top of
-  // that position, following the tgfx rendering formula: Translate(renderPosition) * matrix.
+  // Transform components compose with the complete authored x / y / z (the perspective applies
+  // outside the translation), so the caller emits only the generated layout slot as left / top.
+  if (layer->matrix.isIdentity() && HasLayerTransformComponents(layer)) {
+    return Matrix3DToCSS(BuildLayerLocalMatrix3D(layer));
+  }
+  // Generated layout is emitted as the outer left/top slot. Keep authored x/y in the local
+  // transform only on axes where layout supplied a separate position.
   Matrix m = layer->matrix;
+  if (layer->matrix.isIdentity()) {
+    auto layoutPosition = layer->layoutPosition();
+    float x = std::isnan(layoutPosition.x) ? 0 : layer->x;
+    float y = std::isnan(layoutPosition.y) ? 0 : layer->y;
+    if (x != 0 || y != 0) {
+      m = Matrix::Translate(x, y) * m;
+    }
+  }
+  if (layer->z != 0) {
+    return Matrix3DToCSS(LiftMatrixToMatrix3D(m, layer->z));
+  }
   if (m.isIdentity()) {
     return {};
   }

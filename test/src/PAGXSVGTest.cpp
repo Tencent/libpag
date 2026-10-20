@@ -630,6 +630,48 @@ PAGX_TEST(PAGXSVGTest, SVGExport_EmptyDocument) {
 }
 
 /**
+ * Test SVG import: transform from a <style> class rule is applied to the imported layer matrix,
+ * whether the <style> sits under the root or inside a root-level <defs>, and the inline style
+ * overrides the class rule.
+ */
+PAGX_TEST(PAGXSVGTest, SVGImport_ClassRuleTransform) {
+  std::string svg =
+      "<svg width=\"100\" height=\"100\">"
+      "<style>.moved{transform:translate(10px,20px)}.shifted{transform:translate(1px,1px)}</style>"
+      "<rect id=\"classOnly\" class=\"moved\" width=\"10\" height=\"10\"/>"
+      "<rect id=\"inlineWins\" class=\"moved\" width=\"10\" height=\"10\" "
+      "style=\"transform:translate(30px,40px)\"/>"
+      "<defs><style>.deep{transform:translate(5px,6px)}</style></defs>"
+      "<rect id=\"defsClass\" class=\"deep\" width=\"10\" height=\"10\"/>"
+      "</svg>";
+  auto doc = pagx::SVGImporter::ParseString(svg);
+  ASSERT_NE(doc, nullptr);
+  // SVG import assigns layer ids without registering them in the document node map, so find the
+  // layers directly.
+  pagx::Layer* classOnly = nullptr;
+  pagx::Layer* inlineWins = nullptr;
+  pagx::Layer* defsClass = nullptr;
+  for (auto* layer : doc->layers) {
+    if (layer->id == "classOnly") {
+      classOnly = layer;
+    } else if (layer->id == "inlineWins") {
+      inlineWins = layer;
+    } else if (layer->id == "defsClass") {
+      defsClass = layer;
+    }
+  }
+  ASSERT_NE(classOnly, nullptr);
+  ASSERT_NE(inlineWins, nullptr);
+  ASSERT_NE(defsClass, nullptr);
+  EXPECT_FLOAT_EQ(classOnly->matrix.tx, 10);
+  EXPECT_FLOAT_EQ(classOnly->matrix.ty, 20);
+  EXPECT_FLOAT_EQ(inlineWins->matrix.tx, 30);
+  EXPECT_FLOAT_EQ(inlineWins->matrix.ty, 40);
+  EXPECT_FLOAT_EQ(defsClass->matrix.tx, 5);
+  EXPECT_FLOAT_EQ(defsClass->matrix.ty, 6);
+}
+
+/**
  * Test SVG import: a zero-size SVG that only hosts <defs> (a common hidden
  * container in snapshotted HTML) is legal and must import to a valid empty
  * document rather than failing the parse.
