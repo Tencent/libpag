@@ -30,7 +30,6 @@ static void Merge(SVGFeatureFlags* dst, const SVGFeatureFlags& src) {
   dst->hasTextPath |= src.hasTextPath;
   dst->hasTextModifier |= src.hasTextModifier;
   dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
-  dst->hasPreserve3D |= src.hasPreserve3D;
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasDiamondGradient |= src.hasDiamondGradient;
 }

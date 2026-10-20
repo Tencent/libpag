@@ -95,7 +95,6 @@ static void Merge(PPTFeatureFlags* dst, const PPTFeatureFlags& src) {
   dst->hasConicGradient |= src.hasConicGradient;
   dst->hasShearTransform |= src.hasShearTransform;
   dst->hasPerspectiveTransform |= src.hasPerspectiveTransform;
-  dst->hasPreserve3D |= src.hasPreserve3D;
   dst->hasBackdropStyle |= src.hasBackdropStyle;
 }
 
